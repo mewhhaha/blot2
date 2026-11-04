@@ -6,7 +6,7 @@
 //! independent Capture whose module pins name the archive's own Core; the
 //! ordinary Gate, Importer and graph Plan still compare it with current source
 //! and re-admit every receipt. Executable fragments, layouts, captures,
-//! templates, provider/request state and demand memos are not represented.
+//! templates and provider/request state are not represented.
 const std = @import("std");
 const core = @import("../check/core.zig");
 const eval = @import("../eval/core_eval.zig");
@@ -241,7 +241,6 @@ fn validEvaluator(snapshot: *const eval.Snapshot, units: usize) format.Error!voi
     for (snapshot.row_mappings) |mapping| try require(mapping.evidence < snapshot.evidence.effects.rows.len);
     for (snapshot.value_records) |record| try require(record < snapshot.record_layouts.len);
     for (snapshot.record_layouts) |layout| try require(validSpan(snapshot.field_names.len, layout.start, layout.len));
-    for (snapshot.demands) |demand| try require(demand.value < values);
     const proofs = snapshot.implementation_proofs;
     for (proofs.arguments) |root| try require(root != 0 and root < nodes);
     for (proofs.members) |member| try require(member.root != 0 and member.root < nodes and member.target.unit <= units);
@@ -266,7 +265,6 @@ fn validRecord(record: Record, snapshot: *const Snapshot) format.Error!void {
     try require(key.input != 0 and key.input < values);
     const expected_kind: @import("../eval/type_evidence.zig").Tag = switch (evaluator.values[key.input].kind) {
         .closure => .function,
-        .suspension => .demand,
         else => return error.InvalidArtifact,
     };
     try require(record.result.selected < values and key.expected != 0 and key.expected < nodes and evaluator.evidence.nodes[key.expected].tag == expected_kind);
@@ -386,5 +384,5 @@ fn adopt(a: A, snapshot: *Snapshot) format.Error!Archive {
 }
 
 fn emptyEvaluator() eval.Snapshot {
-    return .{ .values = &.{}, .children = &.{}, .closures = &.{}, .value_evidence = &.{}, .type_mappings = &.{}, .row_mappings = &.{}, .evidence = .{ .nodes = &.{}, .extra = &.{}, .effects = .{ .operations = &.{}, .arguments = &.{}, .rows = &.{}, .labels = &.{} } }, .value_records = &.{}, .record_layouts = &.{}, .field_names = &.{}, .demands = &.{} };
+    return .{ .values = &.{}, .children = &.{}, .closures = &.{}, .value_evidence = &.{}, .type_mappings = &.{}, .row_mappings = &.{}, .evidence = .{ .nodes = &.{}, .extra = &.{}, .effects = .{ .operations = &.{}, .arguments = &.{}, .rows = &.{}, .labels = &.{} } }, .value_records = &.{}, .record_layouts = &.{}, .field_names = &.{} };
 }

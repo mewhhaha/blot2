@@ -4,7 +4,7 @@ const std = @import("std");
 const wasm = @import("../backend/wasm.zig");
 const Allocator = std.mem.Allocator;
 pub const Span = struct { start: u32, len: u32 };
-pub const Role = enum { literal, function, import_, signature, global, table_function, callable_function, demand_function, callable_layout, static_address, operation, host_table };
+pub const Role = enum { literal, function, import_, signature, global, table_function, callable_function, callable_layout, static_address, operation, host_table };
 pub const Operand = struct { role: Role = .literal, value: u32 = 0 };
 pub const ResourceKind = enum { function, import_, signature, global, arena, host_references, static_data, operation, lists };
 pub const Event = union(enum) {
@@ -39,7 +39,7 @@ pub const Event = union(enum) {
 };
 pub const Record = struct { sequence: u64, owner: u32, event: Event };
 pub const SymbolicInstruction = struct { op: wasm.Op, operand: Operand };
-pub const FunctionRole = enum { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_allocate_typed, arena_retain, arena_release, arena_release_lease, arena_retire, arena_free, arena_store_word, arena_copy_words, arena_decrement, arena_root_allocate, arena_root_reserve, arena_root_pop, arena_root_open, arena_root_close, arena_root_enter, arena_root_leave, arena_root_store, arena_root_public_allocate, arena_root_public_reset, arena_root_force, arena_root_authority, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure, list_directory, list_leaf_count, list_write_leaves, arena_cycle_enqueue, arena_cycle_unlink, arena_cycle_visit, arena_cycle_collect, arena_cycle_safe, arena_mark_acyclic, arena_allocate_shaped, arena_root_allocate_shaped, list_address_unchecked, list_set_unchecked, public_owner_publish, public_owner_take, task_mover, list_snapshot };
+pub const FunctionRole = enum { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_allocate_typed, arena_retain, arena_release, arena_release_lease, arena_retire, arena_free, arena_store_word, arena_copy_words, arena_decrement, arena_root_allocate, arena_root_reserve, arena_root_pop, arena_root_open, arena_root_close, arena_root_enter, arena_root_leave, arena_root_store, arena_root_public_allocate, arena_root_public_reset, arena_root_authority, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure, list_directory, list_leaf_count, list_write_leaves, arena_cycle_enqueue, arena_cycle_unlink, arena_cycle_visit, arena_cycle_collect, arena_cycle_safe, arena_mark_acyclic, arena_allocate_shaped, arena_root_allocate_shaped, list_address_unchecked, list_set_unchecked, public_owner_publish, public_owner_take, task_mover, list_snapshot };
 pub const FunctionArtifact = struct { owner: u32, resource_owner: u32, role: FunctionRole, signature: u32, creation_sequence: u64, locals: Span, instructions: Span };
 const Operation = struct { key: Span, foreign: bool };
 pub const Recorder = struct {
@@ -464,7 +464,7 @@ const Replay = struct {
     fn resolve(self: *const Replay, operand: Operand) !u32 {
         return switch (operand.role) {
             .literal, .host_table, .callable_layout => operand.value,
-            .function, .table_function, .callable_function, .demand_function => self.get(self.functions.items, operand.value),
+            .function, .table_function, .callable_function => self.get(self.functions.items, operand.value),
             .import_ => self.get(self.imports.items, operand.value),
             .signature => self.get(self.signatures.items, operand.value),
             .global => self.get(self.globals.items, operand.value),

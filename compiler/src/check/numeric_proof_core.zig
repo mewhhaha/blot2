@@ -157,7 +157,7 @@ fn resolved(source: anytype, id: T.Id) T.Id {
 /// and cannot fill an ordinary container or datatype parameter.
 pub fn dataTypes(source: anytype, nodes: []const T.Node) Error!void {
     for (nodes) |node| switch (node.tag) {
-        .array, .list, .cursor, .demand, .resolver, .provider => try require(source.node(node.a).tag != .erased_proof),
+        .array, .list, .cursor, .resolver, .provider => try require(source.node(node.a).tag != .erased_proof),
         .state_provider => for ([_]T.Id{ node.a, node.b, node.c }) |child| try require(source.node(child).tag != .erased_proof),
         .product => for (source.list(.{ .start = node.a, .len = node.b })) |child| try require(source.node(child).tag != .erased_proof),
         .record => for (0..node.b) |field| try require(source.node(source.recordField(node, field).ty).tag != .erased_proof),
@@ -445,8 +445,7 @@ const Checker = struct {
     }
     /// Read the selected immutable body, without trusting the helper's name or
     /// a stored summary. Exact operand identities, collection lengths, primitive
-    /// comparisons and their Boolean composition qualify. Demand conditions
-    /// come from exact captured values; reading them does not execute guards.
+    /// comparisons and their Boolean composition qualify.
     fn summaryCall(self: *Checker, target_: core.BindingRef, actual: []const Value, depth: usize) WorkError!Value {
         if (depth >= 32) return .{};
         const selected = try self.target(target_);
@@ -549,7 +548,6 @@ const Checker = struct {
             if (reference.unit != 0 and reference.unit != module.unit) return 0;
             if (inputs.lookup(reference.binding)) |value| return value.condition;
         }
-        if (node.tag == .force) return self.summaryCondition(module, inputs, node.a, depth + 1);
         if (node.tag == .call) return (try self.summaryInvocation(module, inputs, id, depth)).condition;
         if (node.tag == .scalar and node.c == 0 and module.types.node(node.ty).tag == .boolean) {
             const left = try self.summaryOperand(module, inputs, node.a, depth + 1);
@@ -846,12 +844,6 @@ const Checker = struct {
                 return self.branches(id, condition_value.condition, n.b, n.c, depth);
             },
             .closure => return self.closure(id, depth),
-            .suspend_ => {
-                _ = try self.closure(id, depth);
-                const shape = module.types.node(n.ty);
-                if (self.plan != null and shape.tag == .demand and module.types.node(shape.a).tag == .boolean) return .{ .condition = try self.summaryCondition(module, .{ .captures = self.environment.items }, module.suspension(id).body, 0) };
-                return .{};
-            },
             .loop => {
                 const metadata = module.loopInfo(id);
                 const first = try self.walk(metadata.first, depth + 1);
@@ -1031,7 +1023,7 @@ const Checker = struct {
                 try self.bind(n.b, .{});
                 return self.walk(module.packageOpening(id).body, depth + 1);
             },
-            .project, .result_associated, .force, .computation, .effect_scope => try ordinary(try self.walk(n.a, depth + 1)),
+            .project, .result_associated, .computation, .effect_scope => try ordinary(try self.walk(n.a, depth + 1)),
             .state_provider => {
                 try ordinary(try self.walk(n.a, depth + 1));
                 try ordinary(try self.walk(n.b, depth + 1));

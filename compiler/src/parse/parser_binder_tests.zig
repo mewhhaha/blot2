@@ -126,11 +126,6 @@ const cases = [_]Case{
     \\entry const x = func (X: U32) => 0
     \\
     , .valid = false, .start = 0, .end = 5 },
-    // lambda_demand_upper
-    .{ .source =
-    \\entry const x = func ~X => 0
-    \\
-    , .valid = false, .start = 0, .end = 5 },
     // record_payload_upper
     .{ .source =
     \\entry const x = do:

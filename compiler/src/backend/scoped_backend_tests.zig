@@ -119,16 +119,16 @@ test "generic data stack builders reconstruct builtin member authority through a
     try publish(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
 }
-test "local scalar demand caches retain checked captures through allocation failure" {
+test "local scalar callbacks retain checked captures through allocation failure" {
     const source =
         \\const calls: GrowArray U32 = #[0]
         \\const bump = func () => return do:
         \\  let changed = @storage.write (&calls[0]) (@u32.add calls[0] 1)
         \\  return 42
-        \\const twice = func ~(value: U32) -> (flag: Bool) => return do:
-        \\  let first = if flag then @demand value else 0
-        \\  return @u32.add first (@demand value)
-        \\entry const answer = func (flag: Bool) => return twice (bump ()) flag
+        \\const twice = func (value: Unit -> U32) -> (flag: Bool) => return do:
+        \\  let first = if flag then value () else 0
+        \\  return @u32.add first (value ())
+        \\entry const answer = func (flag: Bool) => return twice bump flag
     ;
     var module = try lower(a, source);
     defer module.deinit(a);

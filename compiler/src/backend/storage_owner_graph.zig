@@ -78,7 +78,7 @@ pub fn Graph(comptime Value: type) type {
             self.owners.appendAssumeCapacity(owner);
         }
         fn visit(self: *Self, value: Value, owner_count: usize, stored: bool, depth: usize) Error!void {
-            if (self.remaining == 0 or depth > 128 or value.host != null or value.demand != null) return error.Declined;
+            if (self.remaining == 0 or depth > 128 or value.host != null) return error.Declined;
             self.remaining -= 1;
             if (stored and (value.tag == .array or value.tag == .callable)) return error.Declined;
             if (!stored and value.tag != .scalar and value.tag != .aggregate and value.tag != .callable and value.root == null) return error.Declined;
@@ -110,7 +110,6 @@ const TestValue = struct {
     other_roots: []const usize = &.{},
     fields: []const TestValue = &.{},
     host: ?u32 = null,
-    demand: ?u32 = null,
     callable: ?u32 = null,
 };
 const TestRoot = struct { element: TestValue = .{} };

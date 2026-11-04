@@ -12,27 +12,6 @@ const unknown = `entry const run = func (count: U32) => return do:
   let values = @array.generate count (func i => return func n => return @u32.add i n)
   break values[0] count
 `;
-const cyclic = `type State a is effect = {get: Unit -> a, set: a -> Unit}
-type Node is data = $End | $Next (Unit -> Node ! {State.get Node})
-const keep = func ~value => return func () => return @demand value
-const get = func (witness: Unit -> a) : a => return State.get ()
-entry const run = func (seed: U32) => return do:
-  let (_, result) = @effect.run State.get State.set $End (func () => return do:
-    let delayed = keep (get (func () => return $End))
-    use State.set ($Next delayed)
-    use first <- delayed ()
-    use State.set $End
-    use cached <- delayed ()
-    break case cached of
-      $End => @panic "memo lost its cycle"
-      $Next same => do:
-        use again <- same ()
-        break case again of
-          $End => @panic "closure lost its memo"
-          $Next _ => seed
-  )
-  break result
-`;
 const certificate = (bytes: Uint8Array<ArrayBuffer>) =>
   JSON.parse(
     new TextDecoder().decode(
@@ -107,16 +86,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
               ),
               JSON.stringify(rejected),
             );
-            const cycles = await compiler.build({
-              sources: { [entry]: cyclic },
-            });
-            assert(!cycles.success);
-            assert(
-              JSON.stringify(cycles.diagnostics).includes(
-                "collector_free_unproved",
-              ),
-              JSON.stringify(cycles),
-            );
+
           }
         } finally {
           await compiler.dispose();
@@ -132,17 +102,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
             .run as CallableFunction)(8),
           8,
         );
-        const cycles = await ordinary.build({ sources: { [entry]: cyclic } });
-        assert(cycles.success, JSON.stringify(cycles));
-        assert.equal(certificate(cycles.bytes).certificate.certified, false);
-        const raw =
-          new WebAssembly.Instance(new WebAssembly.Module(cycles.bytes))
-            .exports;
-        for (let pass = 0; pass < 32; pass++) {
-          assert.equal((raw.run as CallableFunction)(pass), pass);
-        }
-        assert.equal((raw["blot:rc_roots"] as WebAssembly.Global).value, 0);
-        assert.equal((raw["blot:rc_leases"] as WebAssembly.Global).value, 0);
+
       } finally {
         await ordinary.dispose();
       }

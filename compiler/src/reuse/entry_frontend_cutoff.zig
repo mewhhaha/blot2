@@ -112,7 +112,7 @@ fn storageTypeStable(source: *const project.Project, checked: anytype, module: *
             break :stable true;
         },
         .array, .list, .cursor, .resolver => storageTypeStable(source, checked, module, node.a, depth + 1, remaining),
-        .demand, .provider => node.c == 0 and storageTypeStable(source, checked, module, node.a, depth + 1, remaining),
+        .provider => node.c == 0 and storageTypeStable(source, checked, module, node.a, depth + 1, remaining),
         .function => node.c == 0 and storageTypeStable(source, checked, module, node.a, depth + 1, remaining) and storageTypeStable(source, checked, module, node.b, depth + 1, remaining),
         .state_provider => storageTypeStable(source, checked, module, node.a, depth + 1, remaining) and storageTypeStable(source, checked, module, node.b, depth + 1, remaining) and storageTypeStable(source, checked, module, node.c, depth + 1, remaining),
         .usage => storageTypeStable(source, checked, module, node.a, depth + 1, remaining) and (node.c == 0 or storageTypeStable(source, checked, module, node.c, depth + 1, remaining)),

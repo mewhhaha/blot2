@@ -18,7 +18,7 @@ fn versionType(types: *const core.Types, id: u32, budget: *usize, depth: usize) 
     if (id >= types.nodes.len or depth == 128 or budget.* == 0) return true;
     budget.* -= 1;
     const n = types.node(id);
-    if (n.tag == .function or n.tag == .demand or n.tag == .provider) {
+    if (n.tag == .function or n.tag == .provider) {
         for (types.rowLabels(n.c)) |label| {
             const operation = types.operation(label);
             if (operation.instance.unit == 0 and versionType(types, operation.instance.decl, budget, depth + 1)) return true;
@@ -32,7 +32,7 @@ fn versionType(types: *const core.Types, id: u32, budget: *usize, depth: usize) 
             if (versionType(types, n.a, budget, depth + 1)) return true;
             if ((n.tag == .usage and n.c != 0) or (n.tag == .scoped and n.b == 0)) return versionType(types, n.c, budget, depth + 1);
         },
-        .array, .list, .cursor, .demand, .resolver, .provider, .forall, .existential => return versionType(types, n.a, budget, depth + 1),
+        .array, .list, .cursor, .resolver, .provider, .forall, .existential => return versionType(types, n.a, budget, depth + 1),
         .state_provider => return versionType(types, n.a, budget, depth + 1) or versionType(types, n.b, budget, depth + 1) or versionType(types, n.c, budget, depth + 1),
         .product => for (types.list(.{ .start = n.a, .len = n.b })) |child| {
             if (versionType(types, child, budget, depth + 1)) return true;
@@ -79,9 +79,8 @@ fn generativeBody(a: Allocator, module: *const core.Module, root: core.Id, ty: u
         budget = 4096;
         if (versionType(&module.types, n.ty, &budget, 0)) return true;
         if (n.tag == .call and versionType(&module.types, module.call(id).callee_type, &budget, 0)) return true;
-        if (n.tag == .closure or n.tag == .suspend_) {
+        if (n.tag == .closure) {
             const closure = closure: {
-                if (n.tag == .suspend_) break :closure module.suspension(id);
                 break :closure module.closure(id);
             };
             if (versionType(&module.types, closure.function_type, &budget, 0) or versionType(&module.types, closure.parameter.ty, &budget, 0)) return true;
@@ -317,7 +316,7 @@ const Checker = struct {
                 for (view.extra[n.c + 1 ..][0..count]) |child| if (!(try self.tyOwned(child, depth + 1, quantified))) break :list false;
                 break :list true;
             },
-            .usage, .absent, .demand, .type_constructor, .resolver, .provider, .state_provider, .erased_proof => false,
+            .usage, .absent, .type_constructor, .resolver, .provider, .state_provider, .erased_proof => false,
         };
         var final_state: u8 = 3;
         if (valid) final_state = 2;
@@ -1055,7 +1054,6 @@ pub const Plan = struct {
         try session.storage.value_records.ensureUnusedCapacity(a, self.order.len);
         try session.storage.children.ensureUnusedCapacity(a, if (storage != null) added_children else self.stats.children);
         try session.storage.closures.ensureUnusedCapacity(a, self.stats.closures);
-        try session.storage.demands.ensureUnusedCapacity(a, self.stats.closures);
         try session.storage.type_mappings.ensureUnusedCapacity(a, maps.len);
         try session.storage.row_mappings.ensureUnusedCapacity(a, rows.len);
         try session.storage.record_layouts.ensureUnusedCapacity(a, self.order.len);
@@ -1116,7 +1114,6 @@ pub const Plan = struct {
                 row_index += row_len;
                 info.bits = @intCast(session.storage.closures.items.len);
                 session.storage.closures.appendAssumeCapacity(meta);
-                session.storage.demands.appendAssumeCapacity(.{});
             }
             var record: u32 = 0;
             if (old.value_records[id] != 0) {

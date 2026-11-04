@@ -86,43 +86,6 @@ test "closed local values carry live generic captures with complete ownership th
     try compile(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compile, .{});
 }
-test "closed local value proof keeps exact wrapper dependencies and rejects effects traps runtime captures and demands" {
-    var good = try lower(a, captured);
-    defer good.deinit(a);
-    const proof = closed.analyze(&.{good}, 1, try initializer(&good)) orelse return error.MissingProof;
-    try std.testing.expectEqual(@as(usize, 1), proof.len);
-    const body = good.body(proof.dependencies[0].binding).?;
-    try std.testing.expectEqual(core.Tag.construct, good.node(body.root).tag);
-    // Even a source-shaped promise of purity cannot hide a changed executable
-    // wrapper body. The structural proof inspects that exact selected body.
-    const saved = good.nodes[body.root];
-    good.nodes[body.root].tag = .panic;
-    try std.testing.expect(closed.analyze(&.{good}, 1, try initializer(&good)) == null);
-    good.nodes[body.root] = saved;
-    {
-        const old_nodes = good.nodes;
-        const nodes = try a.alloc(core.Node, old_nodes.len + 1);
-        defer a.free(nodes);
-        @memcpy(nodes[0..old_nodes.len], old_nodes);
-        nodes[old_nodes.len] = saved;
-        nodes[body.root] = .{ .tag = .return_, .ty = @import("../check/types.zig").never, .a = @intCast(old_nodes.len) };
-        good.nodes = nodes;
-        defer good.nodes = old_nodes;
-        try std.testing.expect(closed.analyze(&.{good}, 1, try initializer(&good)) != null);
-    }
-    const cases = [_][]const u8{
-        definitions ++ "entry const run = func (seed: U32) => return do:\n  let stored = box (func value => return {item: @u32.add value seed})\n  let $Box mapper = stored\n  break (mapper 3).item\n",
-        definitions ++ "entry const run = func (seed: U32) => return do:\n  let stored = box (func value => return {item: @u32.div value 0})\n  let $Box mapper = stored\n  break (mapper seed).item\n",
-        definitions ++ "entry const run = func (host: Unit -> U32 ! {Foreign}) => return do:\n  use stored <- box ((func value => return {item: value}), host ())\n  let $Box (mapper, stamp) = stored\n  break @u32.add stamp (mapper 3).item\n",
-        definitions ++ "const keep = func ~value => return func () => return @demand value\nentry const run = func () => return do:\n  let stored = box (keep 42)\n  let $Box waiting = stored\n  break waiting ()\n",
-        definitions ++ "entry const run = func (seed: unique U32) => return do:\n  let stored = box (func (value: unique U32) : once (Unit -> unique U32) => return func () => return value)\n  let $Box mapper = stored\n  break (mapper seed) ()\n",
-    };
-    for (cases) |source| {
-        var m = try lower(a, source);
-        defer m.deinit(a);
-        try std.testing.expect(closed.analyze(&.{m}, 1, try initializer(&m)) == null);
-    }
-}
 
 test "closed local value proof rejects phantom authority recursively through every data shape" {
     const T = @import("../check/types.zig");
@@ -211,5 +174,42 @@ test "closed local value proof rejects phantom authority recursively through eve
             nodes[authority] = forged;
             try std.testing.expect(closed.analyze(&.{m}, 1, root) == null);
         }
+    }
+}
+
+test "closed local value proof keeps exact wrapper dependencies and rejects effects traps runtime captures" {
+    var good = try lower(a, captured);
+    defer good.deinit(a);
+    const proof = closed.analyze(&.{good}, 1, try initializer(&good)) orelse return error.MissingProof;
+    try std.testing.expectEqual(@as(usize, 1), proof.len);
+    const body = good.body(proof.dependencies[0].binding).?;
+    try std.testing.expectEqual(core.Tag.construct, good.node(body.root).tag);
+    // Even a source-shaped promise of purity cannot hide a changed executable
+    // wrapper body. The structural proof inspects that exact selected body.
+    const saved = good.nodes[body.root];
+    good.nodes[body.root].tag = .panic;
+    try std.testing.expect(closed.analyze(&.{good}, 1, try initializer(&good)) == null);
+    good.nodes[body.root] = saved;
+    {
+        const old_nodes = good.nodes;
+        const nodes = try a.alloc(core.Node, old_nodes.len + 1);
+        defer a.free(nodes);
+        @memcpy(nodes[0..old_nodes.len], old_nodes);
+        nodes[old_nodes.len] = saved;
+        nodes[body.root] = .{ .tag = .return_, .ty = @import("../check/types.zig").never, .a = @intCast(old_nodes.len) };
+        good.nodes = nodes;
+        defer good.nodes = old_nodes;
+        try std.testing.expect(closed.analyze(&.{good}, 1, try initializer(&good)) != null);
+    }
+    const cases = [_][]const u8{
+        definitions ++ "entry const run = func (seed: U32) => return do:\n  let stored = box (func value => return {item: @u32.add value seed})\n  let $Box mapper = stored\n  break (mapper 3).item\n",
+        definitions ++ "entry const run = func (seed: U32) => return do:\n  let stored = box (func value => return {item: @u32.div value 0})\n  let $Box mapper = stored\n  break (mapper seed).item\n",
+        definitions ++ "entry const run = func (host: Unit -> U32 ! {Foreign}) => return do:\n  use stored <- box ((func value => return {item: value}), host ())\n  let $Box (mapper, stamp) = stored\n  break @u32.add stamp (mapper 3).item\n",
+        definitions ++ "entry const run = func (seed: unique U32) => return do:\n  let stored = box (func (value: unique U32) : once (Unit -> unique U32) => return func () => return value)\n  let $Box mapper = stored\n  break (mapper seed) ()\n",
+    };
+    for (cases) |source| {
+        var m = try lower(a, source);
+        defer m.deinit(a);
+        try std.testing.expect(closed.analyze(&.{m}, 1, try initializer(&m)) == null);
     }
 }

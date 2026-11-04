@@ -48,7 +48,6 @@ comptime {
     _ = @import("check/tag_tests.zig");
     _ = @import("check/check_loop_tests.zig");
     _ = @import("check/check_result_tests.zig");
-    _ = @import("check/check_demand_tests.zig");
     _ = @import("check/check_monad_tests.zig");
     _ = @import("check/effects_tests.zig");
     _ = @import("backend/provider_chain.zig");
@@ -111,9 +110,6 @@ comptime {
     _ = @import("backend/acyclic_layout_tests.zig");
     _ = @import("backend/suspended_ownership_tests.zig");
     _ = @import("reuse/code_expectation.zig");
-    _ = @import("backend/demand_inline_tests.zig");
-    _ = @import("backend/demand_lowering.zig");
-    _ = @import("backend/demand_summary_tests.zig");
     _ = @import("reuse/substitution_keys.zig");
     _ = @import("reuse/validation_image.zig");
     _ = @import("reuse/editor_completion.zig");

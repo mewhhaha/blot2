@@ -21,10 +21,10 @@ fn world(allocator: std.mem.Allocator, noise: bool) ![]u8 {
     const record = try source.intern(.record, 0, 0, if (noise) &.{ 19, types.f32_type, 7, types.u32_type } else &.{ 7, types.u32_type, 19, types.f32_type });
     const arrow = try source.internWithEffects(.function, record, types.f32_type, row, &.{});
     const family = try source.intern(.nominal, 8, 2, &.{arrow});
-    const demand = try source.internWithEffects(.demand, family, 0, row, &.{});
-    const operation = try source.effects.internOperation(.{ .unit = 3, .decl = 11 }, &.{ demand, record });
+    const callback = try source.internWithEffects(.function, types.unit, family, row, &.{});
+    const operation = try source.effects.internOperation(.{ .unit = 3, .decl = 11 }, &.{ callback, record });
     const other_argument = try source.effects.internOperation(.{ .unit = 3, .decl = 11 }, &.{types.f32_type});
-    const other_owner = try source.effects.internOperation(.{ .unit = 9, .decl = 11 }, &.{ demand, record });
+    const other_owner = try source.effects.internOperation(.{ .unit = 9, .decl = 11 }, &.{ callback, record });
     const foreign = try source.effects.internOperation(.{ .unit = 0, .decl = 1 }, &.{});
     var tags = runtime.Store.init(allocator);
     defer tags.deinit();

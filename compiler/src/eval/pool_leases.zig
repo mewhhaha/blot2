@@ -56,7 +56,6 @@ pub const Field = enum {
     value_records,
     record_layouts,
     field_names,
-    demands,
     implementation_proofs,
     implementation_arguments,
     implementation_members,

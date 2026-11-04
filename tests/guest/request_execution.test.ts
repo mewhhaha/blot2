@@ -106,10 +106,10 @@ entry const answer = func () => return do:
     expected: 42,
   },
   {
-    name: "cancelled demand forcing remains suspended for a later handler",
+    name: "cancelled callback invocation remains suspended for a later handler",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const keep = func ~value => return func () => return @demand value
+const keep = func value => return value
 const checked = func stop => return func computation => return do:
   for request in @requests computation:
     case request of
@@ -120,7 +120,7 @@ const checked = func stop => return func computation => return do:
       complete value =>
         break value
 entry const answer = func () => return do:
-  let delayed = keep (Validate.check 0)
+  let delayed = keep (func () => return Validate.check 0)
   let calculation = @computation (func () => return delayed ())
   let cancelled = checked 1 calculation
   let completed = checked 0 calculation
@@ -1032,17 +1032,6 @@ Deno.test("request runtime: nested captured local factories retain source certif
   );
 });
 
-Deno.test("request runtime: factory-created demanded action retains source row and memo state", async () => {
-  await compileAndRun(
-    "type Tick is effect = { read: Unit -> F32 }\nconst keep = func ~value => return func () => return @demand value\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        yield 42.5\n      complete value =>\n        break value\nconst create = func action => return do:\n  let delayed = keep (action ())\n  break @computation (func () => return delayed ())\nentry const answer = func () => return do:\n  let computation = create (func () => return Tick.read ())\n  break handled computation\nentry const folded = answer ()\n",
-    (guest) => {
-      for (let iteration = 0; iteration < 100; iteration++) {
-        equal(guest.call("answer", null), 42.5);
-      }
-      equal(guest.read("folded"), 42.5);
-    },
-  );
-});
 
 Deno.test("request runtime: local factory bindings in distinct State scopes preserve nominal instances", async () => {
   await compileAndRun(

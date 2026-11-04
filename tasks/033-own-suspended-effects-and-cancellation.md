@@ -7,7 +7,7 @@
 - **Dependencies:** [032](032-own-escaping-values-and-persistent-roots.md)
 - **Originating requirements:** PLAN: Earlier programs / suspended ownership;
   DEMANDS: Completion and cancellation. Sources: [PLAN.md](../PLAN.md),
-  [Demand evaluation](../docs/compiler/DEMANDS.md).
+  [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -21,7 +21,7 @@ resumption, cancellation, traps and host exceptions.
 [request_runtime.zig](../compiler/src/runtime/request_runtime.zig),
 [runtime_cleanup.zig](../compiler/src/runtime/runtime_cleanup.zig),
 [host/guest.ts](../host/guest.ts) and
-[tests/demand_completion_execution.test.ts](../tests/guest/demand_completion_execution.test.ts)
+[tests/demand_completion_execution.test.ts](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/tests/guest/demand_completion_execution.test.ts)
 preserve request and demand completion behavior. Persistent payload ownership
 remains part of the runtime program.
 
@@ -74,6 +74,7 @@ commands for focused development and the scenarios below.
 - Remaining limitations: Task 034 owns complete cycle collection; task 035 owns
   tracing removal and final CPU/memory qualification. JSPI settlement/rejection
   is supported; the guest has no abort API.
-- Durable record: [SUSPENDED_OWNERSHIP](../docs/compiler/SUSPENDED_OWNERSHIP.md);
-  exact combined pins, commands, rejected attempts and raw evidence are in
+- Durable record:
+  [SUSPENDED_OWNERSHIP](../docs/compiler/SUSPENDED_OWNERSHIP.md); exact combined
+  pins, commands, rejected attempts and raw evidence are in
   [integrated qualification](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).

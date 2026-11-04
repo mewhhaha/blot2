@@ -145,10 +145,9 @@ test "acyclic proofs admit foreign, prelude, recursive and collection layouts an
     try std.testing.expect(!try proof.proven(&store, ready.units, shape.callback));
     try std.testing.expect(!try proof.proven(&store, ready.units, try store.intern(.array, shape.callback, 0, &.{})));
     const function = try store.intern(.function, types.u32_type, types.u32_type, &.{});
-    const demand = try store.intern(.demand, types.u32_type, 0, &.{});
     const state = try store.intern(.nominal, types.builtin_state_read.unit, types.builtin_state_read.decl, &.{types.u32_type});
     const cursor = try store.intern(.cursor, try store.intern(.list, shape.vec, 0, &.{}), 0, &.{});
-    for ([_]layout.Id{ function, demand, state, cursor }) |declined| {
+    for ([_]layout.Id{ function, state, cursor }) |declined| {
         try std.testing.expect(!try proof.proven(&store, ready.units, declined));
         try std.testing.expect(!try proof.proven(&store, ready.units, try store.intern(.list, declined, 0, &.{})));
         try std.testing.expect(!try proof.proven(&store, ready.units, try store.intern(.product, 0, 0, &.{ shape.vec, declined })));

@@ -160,7 +160,7 @@ const Capture = struct {
                             try self.scheme(self.module.binding(n.a).scheme);
                             try self.node(n.b);
                         },
-                        .return_, .force, .project, .computation, .effect_scope => {
+                        .return_, .project, .computation, .effect_scope => {
                             if (self.selection and n.tag == .project) {
                                 if (n.b >= self.module.projections.len) return error.CoreLimit;
                                 try self.member(self.module.projection(n.b).field, .none);
@@ -172,7 +172,7 @@ const Capture = struct {
                             try self.node(n.a);
                         },
                         .construct => try self.node(n.b),
-                        .closure, .suspend_ => {
+                        .closure => {
                             const metadata = self.module.closures[n.a];
                             if (metadata.qualifier != 0) try self.scheme(self.module.binding(metadata.qualifier).scheme);
                             try self.node(metadata.body);

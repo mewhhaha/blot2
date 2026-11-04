@@ -20,7 +20,7 @@ pub const OwnershipFallback = enum(u8) { none, no_arena, public_arena, host_refe
 pub const OwnerBoundary = struct { schema: u32, kind: enum(u8) { unique = 1, shared = 2 }, fresh: ?Scalar = null };
 const Export = struct { name: []u8, index: u32, parameter: Scalar, result: Scalar, global: bool, callback: ?Callback = null, once: bool = false, parameter_owner: ?OwnerBoundary = null, result_owner: ?OwnerBoundary = null, owner_adapter: bool = false, task_adapter: bool = false, task_runtime: bool = false };
 pub const Arena = struct {
-    pub const function_fields = .{ "allocate", "allocate_scalar", "recycle", "reset", "allocate_typed", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement", "root_allocate", "root_reserve", "root_pop", "root_open", "root_close", "root_enter", "root_leave", "root_store", "root_public_allocate", "root_public_reset", "root_force", "root_authority", "cycle_enqueue", "cycle_unlink", "cycle_visit", "cycle_collect", "cycle_safe", "mark_acyclic", "allocate_shaped", "root_allocate_shaped" };
+    pub const function_fields = .{ "allocate", "allocate_scalar", "recycle", "reset", "allocate_typed", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement", "root_allocate", "root_reserve", "root_pop", "root_open", "root_close", "root_enter", "root_leave", "root_store", "root_public_allocate", "root_public_reset", "root_authority", "cycle_enqueue", "cycle_unlink", "cycle_visit", "cycle_collect", "cycle_safe", "mark_acyclic", "allocate_shaped", "root_allocate_shaped" };
     pub const global_fields = .{ "heap", "base", "static_end", "allocated", "rc_enabled", "rc_leases", "rc_retains", "rc_releases", "rc_destroyed", "root_enabled", "root_page", "root_top", "root_frame", "root_active", "root_external", "root_count", "root_globals", "root_started", "root_host_cursor", "root_host_active", "root_static_map", "root_static_count", "root_global_count", "cycle_head", "cycle_members", "cycle_work", "cycle_phase", "cycle_removed", "cycle_cadence", "cycle_passes", "cycle_vertices", "cycle_edges", "cycle_bytes", "cycle_threshold" };
     mark_acyclic: u32,
     allocate_shaped: u32,
@@ -57,7 +57,6 @@ pub const Arena = struct {
     root_store: u32,
     root_public_allocate: u32,
     root_public_reset: u32,
-    root_force: u32,
     root_authority: u32,
     root_enabled: u32,
     root_page: u32,
@@ -379,7 +378,6 @@ pub const Module = struct {
         if (instruction.table_reference) return self.emitReference(id, instruction, switch (instruction.table_kind) {
             .unknown => .table_function,
             .callable => .callable_function,
-            .demand => .demand_function,
         });
         const role: artifact.Role = switch (instruction.op) {
             .call => .function,
@@ -395,7 +393,6 @@ pub const Module = struct {
         const table_kind: ?ir.TableKind = switch (role) {
             .table_function => .unknown,
             .callable_function => .callable,
-            .demand_function => .demand,
             else => null,
         };
         std.debug.assert(table_kind == null or instruction.op == .i32_const);
@@ -422,7 +419,6 @@ pub const Module = struct {
         const kind: ir.TableKind = switch (role) {
             .table_function => .unknown,
             .callable_function => .callable,
-            .demand_function => .demand,
             else => return,
         };
         try self.table_functions.ensureUnusedCapacity(self.allocator, 1);
@@ -662,7 +658,6 @@ pub const Module = struct {
         const root_leave = try self.addFunction(&.{.i32}, .none);
         const root_store = try self.addFunction(&.{ .i32, .i32 }, .none);
         const root_public_allocate = try self.addFunction(&.{.i32}, .i32);
-        const root_force = try self.addFunction(&.{.i32}, .none);
         const root_authority = try self.addFunction(&.{.i32}, .none);
         const root_public_reset = try self.addFunction(&.{.i32}, .i32);
         const cycle_enqueue = try self.addFunction(&.{.i32}, .none);
@@ -693,7 +688,6 @@ pub const Module = struct {
             .cycle_edges = cycle_edges,
             .cycle_bytes = cycle_bytes,
             .cycle_threshold = cycle_threshold,
-            .root_force = root_force,
             .root_authority = root_authority,
             .root_public_allocate = root_public_allocate,
             .root_public_reset = root_public_reset,

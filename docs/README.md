@@ -27,6 +27,9 @@ rewrite scope.
 - [Compiler](compiler/ARCHITECTURE.md): architecture, ownership and
   implementation contracts. [Compiler status](compiler/STATUS.md) tracks current
   design state.
+- [Deferred work](compiler/DEFERRED_WORK.md): ordinary callbacks after memoized
+  demands were removed. [Packed sequences](compiler/PACKED_SEQUENCES.md): the
+  immutable List representation pilot, separate from production support.
 - [Host](host/packages.md): public Deno APIs, packages, assets and guest ABI.
 - [Qualification](qualification/): candidate-specific qualification reports.
 

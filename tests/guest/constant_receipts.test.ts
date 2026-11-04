@@ -582,12 +582,12 @@ Deno.test("receipt closure templates preserve deferred global and capture edits 
   ) => `
 const global = ${global}
 const capture = ${capture}
-const delayed = func ~(value: U32) => return @demand value
-const named = func (value: U32) => return @u32.add (delayed value) (@u32.add global ${body})
+const delayed = func value => return value ()
+const named = func (value: U32) => return @u32.add (delayed (func () => return value)) (@u32.add global ${body})
 const saved = do:
   let cost = ${cost}
   let captured = capture
-  break { named: named, anonymous: func (value: U32) => return @u32.add (delayed value) (@u32.add global ${delta}), captured: func (value: U32) => return @u32.add (delayed value) (@u32.add cost captured) }
+  break { named: named, anonymous: func (value: U32) => return @u32.add (delayed (func () => return value)) (@u32.add global ${delta}), captured: func (value: U32) => return @u32.add (delayed (func () => return value)) (@u32.add cost captured) }
 entry const run_named = func (value: U32) => return saved.named value
 entry const run_anonymous = func (value: U32) => return saved.anonymous value
 entry const run_captured = func (value: U32) => return saved.captured value

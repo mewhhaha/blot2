@@ -391,12 +391,12 @@ test "numeric proof selected comparisons decline changed operands reversed condi
     , false, .{});
     try checkPlan(allocator, guarded_helper, false, .{ .visits = 2 });
 }
-fn demandComparisonPlans(allocator: std.mem.Allocator) !void {
+fn booleanComparisonPlans(allocator: std.mem.Allocator) !void {
     const helpers =
-        \\const both = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
-        \\const either = func (left: Bool) => return func ~(right: Bool) => return if left then true else @demand right
-        \\const inverted = func (left: Bool) => return func ~(right: Bool) => return if left then false else @demand right
-        \\const ignore = func (left: Bool) => return func ~(right: Bool) => return true
+        \\const both = func (left: Bool) => return func (right: Bool) => return left and right
+        \\const either = func (left: Bool) => return func (right: Bool) => return left or right
+        \\const inverted = func (left: Bool) => return func (right: Bool) => return if left then false else right
+        \\const ignore = func (left: Bool) => return func (right: Bool) => return true
         \\
     ;
     try checkPlan(allocator, helpers ++ "entry const run = func (values: Array U32) => return func (index: U32) => return if both (@u32.lt index (@array.length values)) (@u32.eq index 0) then @array.get values index else 0", true, .{});
@@ -406,16 +406,16 @@ fn demandComparisonPlans(allocator: std.mem.Allocator) !void {
     try checkPlan(allocator, helpers ++ "entry const run = func (values: Array U32) => return func (index: U32) => return if ignore (@u32.lt index (@array.length values)) (@u32.eq index 0) then @array.get values index else 0", false, .{});
     try checkPlan(allocator, helpers ++ "entry const run = func (values: Array U32) => return func (index: U32) => return if either (@u32.lt index (@array.length values)) (@u32.eq index 9) then @array.get values index else 0", false, .{});
 }
-test "numeric proof selected demand bodies establish only their actual Boolean edges through OOM" {
-    try demandComparisonPlans(std.testing.allocator);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, demandComparisonPlans, .{});
+test "numeric proof selected Boolean bodies establish only their actual Boolean edges through OOM" {
+    try booleanComparisonPlans(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, booleanComparisonPlans, .{});
 }
 fn forwardedComparisonPlans(allocator: std.mem.Allocator) !void {
     const common =
         \\infixl 50 (<) = lt
         \\const lt = func left => return func right => return compare left right
         \\const within = func index => return func length => return lt index length
-        \\const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
+        \\const choose = func (left: Bool) => return func (right: Bool) => return left and right
         \\entry const run = func (values: Array U32) => return func (index: U32) => return if choose (within index (@array.length values)) (index < 2) then @array.get values index else 0
         \\
     ;
@@ -479,10 +479,10 @@ test "numeric proof check plans own exact dominated facts and repeated guards th
     try ownedCheckPlan(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ownedCheckPlan, .{});
 }
-test "numeric proof check plans traverse suspended demands without closure-only metadata assumptions" {
+test "numeric proof check plans traverse ordinary callback bodies" {
     try checkPlan(std.testing.allocator,
-        \\const force = func ~(value: U32) => return @demand value
-        \\entry const run = func (values: Array U32) => return func (index: U32) => return force (if @u32.lt index (@array.length values) then @array.get values index else 0)
+        \\const force = func (value: Unit -> U32) => return value ()
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return force (func () => return if @u32.lt index (@array.length values) then @array.get values index else 0)
     , true, .{});
 }
 test "numeric proof check plans retain invalidated joins unrelated collections wrap and false edges" {
@@ -603,12 +603,12 @@ test "numeric proof lowering removes only the admitted bounds comparison in deve
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] index else 0"));
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@u32.add index 1) else 0"));
 }
-test "numeric proof selected demand bodies remove the outer check and retain required checks" {
+test "numeric proof selected Boolean bodies remove the outer check and retain required checks" {
     const allocator = std.testing.allocator;
     const body = "\nentry const run = func (index: U32) => return if choose (@u32.lt index 2) (@u32.eq index 0) then @array.get #[8, 13] index else 0";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false" ++ body));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = func (left: Bool) => return func ~(right: Bool) => return true" ++ body));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = func (left: Bool) => return func ~(right: Bool) => return if left then true else @demand right" ++ body));
+    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const choose = func (left: Bool) => return func (right: Bool) => return left and right" ++ body));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = func (left: Bool) => return func (right: Bool) => return true" ++ body));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = func (left: Bool) => return func (right: Bool) => return left or right" ++ body));
     try checkPlan(allocator,
         \\const opposite = func (value: Bool) => return if value then false else true
         \\entry const run = func (values: Array U32) => return func (index: U32) => return if opposite (@u32.lt index (@array.length values)) then 0 else @array.get values index

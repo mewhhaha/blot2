@@ -11,7 +11,7 @@ fn fingerprint(store: *const T.Store, root: T.Id, hash: *std.hash.Wyhash, depth:
             hash.update(std.mem.asBytes(&n.a));
             hash.update(std.mem.asBytes(&n.b));
         },
-        .function, .demand, .provider => {
+        .function, .provider => {
             try fingerprint(store, n.a, hash, depth + 1);
             if (n.tag == .function) try fingerprint(store, n.b, hash, depth + 1);
             const row = store.row(n.c);
@@ -76,7 +76,7 @@ fn chronology(allocator: std.mem.Allocator) !void {
         const operation = try store.internOperation(.{ .unit = 29, .decl = 33 }, &.{nominal});
         argument_lists[side] = store.operations.items[operation].arguments;
         const closed_row = try store.effects.row(&.{ operation, operation }, .closed);
-        const closed = try store.functionWithEffects(try store.array(nominal), try store.demandWithEffects(T.f32_type, closed_row), closed_row);
+        const closed = try store.functionWithEffects(try store.array(nominal), try store.functionWithEffects(T.unit, T.f32_type, closed_row), closed_row);
         const changing = try store.functionWithEffects(variables[side], closed, row_variables[side]);
         roots[side] = try store.record(&.{ .{ .name = 91, .ty = closed }, .{ .name = 29, .ty = changing } });
     }
@@ -193,7 +193,7 @@ fn hiddenVariables(allocator: std.mem.Allocator) !void {
         const nominal = try store.nominal(.{ .unit = 31, .decl = 7 }, &.{variables[side]});
         const provider = try store.provider(nominal, tails[side]);
         const state = try store.stateProvider(try store.function(T.unit, variables[side]), try store.function(variables[side], T.unit), nominal);
-        const record = try store.record(&.{ .{ .name = 8, .ty = T.u32_type }, .{ .name = 4, .ty = try store.demandWithEffects(variables[side], tails[side]) } });
+        const record = try store.record(&.{ .{ .name = 8, .ty = T.u32_type }, .{ .name = 4, .ty = try store.functionWithEffects(T.unit, variables[side], tails[side]) } });
         records[side] = .{ .start = store.node(record).a, .len = store.node(record).b * 2 };
         roots[side] = try store.product(&.{ provider, state, record, try store.resolver(try store.array(nominal)) });
     }

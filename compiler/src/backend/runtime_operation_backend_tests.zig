@@ -402,56 +402,6 @@ test "checked constant callable adapters preserve exact source callee roles and 
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, constantGetter, .{&module});
 }
 
-const retained_demand_source =
-    \\const keep = func ~value => return func () => return @demand value
-    \\entry const run = func (host: U32 -> Array U32 ! {Foreign}) => return do:
-    \\  let delayed = keep (host 41)
-    \\  use first <- delayed ()
-    \\  use second <- delayed ()
-    \\  break @u32.add (@array.get first 0) (@array.get second 0)
-;
-fn retainedDemand(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var result = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .inline_named = false, .retain_artifacts = true });
-    defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(?backend.Diagnostic, null), result.diagnostic);
-    const capture = &result.capture.?;
-    const pools = capture.metadata.pools.?;
-    var producers: usize = 0;
-    for (pools.captures) |template| if (template.demand_cell) {
-        try std.testing.expect(template.has_environment and !template.computation);
-        try std.testing.expectEqual(core.Tag.suspend_, module.node(template.node).tag);
-        producers += 1;
-    };
-    try std.testing.expect(producers > 0);
-    var consumers: usize = 0;
-    for (capture.metadata.jobs.items) |job| {
-        if (job.request != .named or job.request.named.templates == 0 or job.function == null) continue;
-        const function = capture.emission.functions[job.function.?];
-        const instructions = capture.emission.instructions[function.instructions.start..][0..function.instructions.len];
-        var direct: usize = 0;
-        for (instructions) |inst| {
-            try std.testing.expect(inst.op != .call_indirect);
-            if (inst.op == .call and inst.operand.role == .function) direct += 1;
-        }
-        try std.testing.expect(direct > 0);
-        consumers += 1;
-    }
-    try std.testing.expect(consumers > 0);
-    var replay = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .inline_named = false, .retain_artifacts = true, .previous = capture });
-    defer replay.deinit(allocator);
-    try std.testing.expectEqual(@as(?backend.Diagnostic, null), replay.diagnostic);
-    try std.testing.expectEqualSlices(u8, result.bytes, replay.bytes);
-}
-test "checked retained demand producer descriptors preserve the same memo cell and exact owned replay through OOM" {
-    var module = try lower(a, retained_demand_source);
-    defer module.deinit(a);
-    const nodes = try a.dupe(core.Node, module.nodes);
-    defer a.free(nodes);
-    try retainedDemand(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, retainedDemand, .{&module});
-    try std.testing.expectEqualDeep(nodes, module.nodes);
-}
-
 fn checkProviderFlow(allocator: std.mem.Allocator, module: *const @import("wasm.zig").Module) !void {
     try std.testing.expect(try @import("provider_flow.zig").complete(allocator, module));
 }
@@ -592,7 +542,7 @@ test "private State provider heads stay outside source Array graphs across direc
     defer module.deinit(a);
     try providerConstruction(a, &module, true);
 }
-test "private provider flow covers captured request cancellation and memoized source cycle bodies" {
+test "private provider flow covers captured request cancellation and callback source cycle bodies" {
     var module = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
     defer module.deinit(a);
     try providerConstruction(a, &module, true);
@@ -761,7 +711,7 @@ fn callableReplay(allocator: std.mem.Allocator, journal: *const @import("../reus
         const fact = @import("callable_origins.zig").construction(&module, origin).?;
         try std.testing.expectEqual(origin.target, fact.target);
         try std.testing.expectEqual(@import("callable_origins.zig").constructionLayout(&module, origin).?, fact.layout);
-        try std.testing.expectEqual(@as(u32, if (origin.kind == .callable) 8 else 16), fact.bytes);
+        try std.testing.expectEqual(@as(u32, 8), fact.bytes);
         if (origin.function) |id| {
             try std.testing.expect(fact.local != null and fact.allocation != null);
             try std.testing.expect(fact.end <= module.functions.items[id].instructions.items.len);
@@ -774,7 +724,7 @@ fn callableReplay(allocator: std.mem.Allocator, journal: *const @import("../reus
     }
     try std.testing.expect(constructions > 0);
 }
-test "callable construction edges rederive exact Memo closure environments without granting later immutability" {
+test "callable construction edges rederive exact closure environments without granting later immutability" {
     const ir = @import("runtime_ir.zig");
     const origins = @import("callable_origins.zig");
     var source = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
@@ -784,7 +734,6 @@ test "callable construction edges rederive exact Memo closure environments witho
     var module = try built.capture.?.emission.materialize(a);
     defer module.deinit();
     var closure_edge = false;
-    var memo_edge = false;
     for (module.table_origins.items) |origin| {
         if (origin.kind == .unknown or origin.function == null) continue;
         const fact = origins.construction(&module, origin).?;
@@ -811,20 +760,7 @@ test "callable construction edges rederive exact Memo closure environments witho
                 body.instructions.items[environment_at] = before[environment_at];
                 closure_edge = true;
             },
-            .zero => {
-                if (origin.kind != .demand) continue;
-                try std.testing.expectEqual(@as(u32, 16), fact.bytes);
-                body.instructions.items[environment_at].operand = 1;
-                try std.testing.expect(origins.construction(&module, origin) == null);
-                body.instructions.items[environment_at] = before[environment_at];
-                // Status and cached-result words are creation-time zeros.
-                for ([_]usize{ environment_at + 3, environment_at + 6 }) |at| {
-                    body.instructions.items[at].operand = 1;
-                    try std.testing.expect(origins.construction(&module, origin) == null);
-                    body.instructions.items[at] = before[at];
-                }
-                memo_edge = true;
-            },
+            .zero => continue,
             .data_word => return error.UnexpectedDynamicDataWord,
         }
         body.instructions.items[origin.place].operand ^= 1;
@@ -847,7 +783,7 @@ test "callable construction edges rederive exact Memo closure environments witho
             try std.testing.expectEqualDeep(fact, origins.construction(&module, origin).?);
         }
     }
-    try std.testing.expect(closure_edge and memo_edge);
+    try std.testing.expect(closure_edge);
     try callableReplay(a, &built.capture.?.emission);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, callableReplay, .{&built.capture.?.emission});
 }
@@ -910,368 +846,35 @@ test "callable result ownership edges reject changed returns later stores and op
     try callableResultMutants(a, &built.capture.?.emission);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, callableResultMutants, .{&built.capture.?.emission});
 }
-fn demandOutcomeMutants(allocator: std.mem.Allocator, journal: *const @import("../reuse/artifact_emitter.zig").Recorder, guarded: bool) !void {
-    const origins = @import("../eval/demand_origins.zig");
-    var module = try journal.materialize(allocator);
-    defer module.deinit();
-    var matched = false;
-    for (module.functions.items, 0..) |*body, id| {
-        const fact = origins.force(&module, @intCast(id)) orelse continue;
-        try std.testing.expectEqual(guarded, fact.guard_global != null);
-        try std.testing.expectEqual(@as(u32, 0), fact.cell_parameter);
-        try std.testing.expectEqual(@as(u32, 2), fact.provider_parameter);
-        try std.testing.expect(fact.producer_call < fact.cache_publication and fact.cache_publication < fact.ready_publication);
-        var constructed = false;
-        for (module.table_origins.items) |origin| {
-            if (origin.kind != .demand or origin.target != fact.producer) continue;
-            try std.testing.expect(@import("callable_origins.zig").construction(&module, origin) != null);
-            constructed = true;
-        }
-        try std.testing.expect(constructed);
-        const original = body.instructions;
-        defer body.instructions = original;
-        var changed = try original.clone(allocator);
-        defer changed.deinit(allocator);
-        body.instructions = changed;
-        const mutations = [_]struct { at: usize, operand: u32 }{
-            .{ .at = 4, .operand = 3 }, // terminal must never become ready
-            .{ .at = 16, .operand = 0 }, // force owner before evaluation
-            .{ .at = 26, .operand = 0 }, // actual provider argument
-            .{ .at = fact.cache_publication - 3, .operand = 4 }, // cache field
-            .{ .at = fact.cache_publication - 1, .operand = 3 }, // result owner
-            .{ .at = fact.ready_publication - 1, .operand = 1 }, // publication state
-            .{ .at = original.items.len - 1, .operand = 3 }, // final cached return
-        };
-        for (mutations) |mutation| {
-            changed.items[mutation.at].operand = mutation.operand;
-            try std.testing.expect(origins.force(&module, @intCast(id)) == null);
-            changed.items[mutation.at] = original.items[mutation.at];
-        }
-        if (fact.guard_global) |global| {
-            changed.items[35].operand = 2;
-            try std.testing.expect(origins.force(&module, @intCast(id)) == null);
-            changed.items[35] = original.items[35];
-            const mutable = module.globals.items[global].mutable;
-            module.globals.items[global].mutable = false;
-            const rejected = origins.force(&module, @intCast(id)) == null;
-            module.globals.items[global].mutable = mutable;
-            try std.testing.expect(rejected);
-        }
-        {
-            const producer = &module.functions.items[fact.producer];
-            const role = producer.result_role;
-            producer.result_role = .scalar;
-            const rejected = origins.force(&module, @intCast(id)) == null;
-            producer.result_role = role;
-            try std.testing.expect(rejected);
-        }
-        // A valid producer edit updates the executable edge; no stale table
-        // descriptor or equal machine ABI can preserve the previous target.
-        var edited = false;
-        for (module.functions.items, 0..) |candidate, target| {
-            if (target == fact.producer or target == id or module.runtimeHelper(target) or candidate.entry or candidate.result != body.result or candidate.result_role != body.result_role or candidate.provider_parameter != 2 or candidate.parameter_roles != body.parameter_roles or !std.mem.eql(@import("runtime_ir.zig").ValueType, candidate.parameters, body.parameters)) continue;
-            changed.items[fact.producer_call].operand = @intCast(target);
-            try std.testing.expectEqual(@as(u32, @intCast(target)), origins.force(&module, @intCast(id)).?.producer);
-            changed.items[fact.producer_call] = original.items[fact.producer_call];
-            edited = true;
-            break;
-        }
-        try std.testing.expect(edited);
-        try std.testing.expectEqualDeep(fact, origins.force(&module, @intCast(id)).?);
-        matched = true;
-    }
-    try std.testing.expect(matched);
-}
-test "stored Memo outcome edges rederive cache readiness producer and cancellation ordering through OOM" {
-    const full = @import("fixtures").source("provider-fixtures/lifetime-cost.blot");
-    const state_start = std.mem.find(u8, full, "type State").?;
-    for ([_][]const u8{ full, full[state_start..] }, [_]bool{ true, false }) |text, guarded| {
-        var source = try lowerCatalog(a, text, true);
-        defer source.deinit(a);
-        var built = try backend.compileWithOptions(a, &.{source}, 1, .{ .inline_named = false, .retain_artifacts = true });
-        defer built.deinit(a);
-        try demandOutcomeMutants(a, &built.capture.?.emission, guarded);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, demandOutcomeMutants, .{ &built.capture.?.emission, guarded });
-    }
-}
-fn activationReach(sites: []const @import("activation_graph.zig").Site, initial: u64) u64 {
-    var seen = initial;
-    for (0..64) |_| {
-        var next = seen;
-        var pending = seen;
-        while (pending != 0) {
-            const id: usize = @intCast(@ctz(pending));
-            pending &= pending - 1;
-            next |= sites[id].children;
-        }
-        if (next == seen) return seen;
-        seen = next;
-    }
-    return seen;
-}
-fn closedCycleGraph(allocator: std.mem.Allocator, journal: *const @import("../reuse/artifact_emitter.zig").Recorder) !void {
+
+fn callbackActivationGraph(allocator: std.mem.Allocator, journal: *const @import("../reuse/artifact_emitter.zig").Recorder) !void {
     const flow = @import("activation_graph.zig");
     var module = try journal.materialize(allocator);
     defer module.deinit();
-    var matched = false;
-    var outer_epoch = false;
-    for (module.functions.items, 0..) |body, id| {
-        if (body.entry or body.provider_parameter != 1 or body.result_role != .scalar or body.parameter_roles != @import("runtime_ir.zig").packParameterRoles(&.{ .scalar, .reference })) continue;
-        var graph = try flow.analyze(allocator, &module, @intCast(id));
-        defer graph.deinit(allocator);
-        if (!graph.complete) {
-            outer_epoch = outer_epoch or graph.blocker == .epoch;
-            continue;
-        }
-        var memo: usize = 0;
-        var closures: usize = 0;
-        for (graph.sites, 0..) |site, at| {
-            memo += @intFromBool(site.kind == .memo);
-            closures += @intFromBool(site.kind == .closure);
-            if (site.kind != .memo) continue;
-            const bit = @as(u64, 1) << @intCast(at);
-            var reachable = activationReach(graph.sites, bit);
-            var members: u64 = 0;
-            var bytes: u32 = 0;
-            while (reachable != 0) {
-                const child: u6 = @intCast(@ctz(reachable));
-                reachable &= reachable - 1;
-                if (activationReach(graph.sites, @as(u64, 1) << child) & bit == 0) continue;
-                members |= @as(u64, 1) << child;
-                bytes += graph.sites[child].bytes;
-            }
-            try std.testing.expectEqual(@as(u32, 3), @popCount(members));
-            try std.testing.expectEqual(@as(u32, 32), bytes);
-            var member_bits = members;
-            var owner: ?u64 = null;
-            while (member_bits != 0) {
-                const member: u6 = @intCast(@ctz(member_bits));
-                member_bits &= member_bits - 1;
-                const provider = graph.sites[member].provider;
-                try std.testing.expectEqual(@as(u32, 1), @popCount(provider));
-                try std.testing.expectEqual(flow.Kind.frame, graph.sites[@intCast(@ctz(provider))].kind);
-                if (owner) |expected| try std.testing.expectEqual(expected, provider) else owner = provider;
-            }
-            var cache_store = false;
-            var installed_store = false;
-            for (graph.stores) |store| {
-                try std.testing.expect(store.context < graph.contexts.len);
-                try std.testing.expectEqual(store.function, graph.contexts[store.context].function);
-                cache_store = cache_store or (store.owners & bit != 0 and store.offset == 12 and store.values & members != 0);
-                installed_store = installed_store or (store.owners & owner.? != 0 and store.offset == 4 and store.values & members != 0);
-            }
-            try std.testing.expect(cache_store and installed_store);
-            // Current State contents differ from retained write history. The
-            // post-run tuple may carry End, never the old cyclic Node.
-            for (graph.stores) |store| {
-                if (store.owners & (members | owner.?) != 0) continue;
-                try std.testing.expectEqual(@as(u64, 0), store.values & members);
-            }
-        }
-        try std.testing.expect(memo > 0 and closures > 0);
-        var cohort = (try flow.cohort(allocator, &module, @intCast(id))).?;
-        defer cohort.deinit(allocator);
-        try std.testing.expectEqual(@as(u32, 3), @popCount(cohort.members));
-        matched = true;
-    }
-    try std.testing.expect(matched and outer_epoch);
-}
-test "closed cycle activation graph composes executable constructors State cache and finite callees" {
-    var source = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
-    defer source.deinit(a);
-    var built = try backend.compileWithOptions(a, &.{source}, 1, .{ .inline_named = false, .retain_artifacts = true });
-    defer built.deinit(a);
-    try closedCycleGraph(a, &built.capture.?.emission);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, closedCycleGraph, .{&built.capture.?.emission});
-}
-fn activationRejects(allocator: std.mem.Allocator, module: *const @import("wasm.zig").Module, boundary: u32, reason: @import("activation_graph.zig").Blocker) !void {
-    var graph = try @import("activation_graph.zig").analyze(allocator, module, boundary);
-    defer graph.deinit(allocator);
-    try std.testing.expect(!graph.complete);
-    try std.testing.expectEqual(reason, graph.blocker);
-}
-fn activationMutants(allocator: std.mem.Allocator, journal: *const @import("../reuse/artifact_emitter.zig").Recorder) !void {
-    const ir = @import("runtime_ir.zig");
-    const flow = @import("activation_graph.zig");
-    var module = try journal.materialize(allocator);
-    defer module.deinit();
-    var boundary: ?u32 = null;
-    var memo_site: ?flow.Site = null;
-    var factory: ?u32 = null;
-    var witness: ?u32 = null;
-    for (module.functions.items, 0..) |body, id| {
-        if (body.entry or body.provider_parameter != 1 or body.result_role != .scalar or body.parameter_roles != ir.packParameterRoles(&.{ .scalar, .reference })) continue;
-        var graph = try flow.analyze(allocator, &module, @intCast(id));
-        defer graph.deinit(allocator);
-        if (!graph.complete) continue;
-        boundary = @intCast(id);
-        for (graph.sites) |site| if (site.kind == .memo) {
-            memo_site = site;
-        };
-        for (graph.sites) |site| if (site.kind == .closure and @import("callable_origins.zig").resultConstruction(&module, site.function) != null) {
-            factory = site.function;
-        };
-        for (module.table_origins.items) |origin| {
-            if (origin.function != null or module.functions.items[origin.target].parameters.len != 3) continue;
-            var used = false;
-            for (graph.calls) |call| used = used or call.target == origin.target;
-            if (!used) witness = origin.target;
-        }
-    }
-    try std.testing.expect(boundary != null and memo_site != null and factory != null and witness != null);
-    const body = &module.functions.items[boundary.?];
-    // The machine result and declared scalar role cannot hide a heap pointer.
-    var changed_return = false;
-    var at = body.instructions.items.len;
-    while (at != 0) {
-        at -= 1;
-        if (body.instructions.items[at].op != .i32_load) continue;
-        const original = body.instructions.items[at];
-        body.instructions.items[at].operand = 0;
-        try activationRejects(allocator, &module, boundary.?, .escape);
-        body.instructions.items[at] = original;
-        changed_return = true;
-        break;
-    }
-    try std.testing.expect(changed_return);
-    // Scalar allocation cannot conceal reference layout slots.
-    const allocation = &module.functions.items[memo_site.?.function].instructions.items[memo_site.?.at];
-    const original_allocation = allocation.*;
-    allocation.operand = module.arena.?.allocate_scalar;
-    try activationRejects(allocator, &module, boundary.?, .instruction);
-    allocation.* = original_allocation;
-    // An executable Foreign sink remains a blocker even for a scalar boundary.
-    var foreign = false;
+    var checked: usize = 0;
     for (module.functions.items, 0..) |_, id| {
-        const force = @import("../eval/demand_origins.zig").force(&module, @intCast(id)) orelse continue;
-        const producer = &module.functions.items[force.producer];
-        for (producer.instructions.items) |*inst| {
-            if (inst.op != .call) continue;
-            const original = inst.*;
-            inst.op = .call_import;
-            inst.operand = 0;
-            try activationRejects(allocator, &module, boundary.?, .boundary);
-            inst.* = original;
-            foreign = true;
-            break;
+        if (module.runtimeHelper(id)) continue;
+        var graph = try flow.analyze(allocator, &module, @intCast(id));
+        defer graph.deinit(allocator);
+        try std.testing.expect(graph.complete or graph.blocker != .none);
+        for (graph.stores) |store| {
+            try std.testing.expect(store.context < graph.contexts.len);
+            try std.testing.expectEqual(store.function, graph.contexts[store.context].function);
         }
-        if (foreign) break;
+        var cohort = try flow.cohort(allocator, &module, @intCast(id));
+        defer if (cohort) |*owned| owned.deinit(allocator);
+        try std.testing.expect(cohort == null);
+        checked += 1;
     }
-    try std.testing.expect(foreign);
-    // A factory used outside the activation cannot share raw grouped stores.
-    const outside = &module.functions.items[witness.?];
-    const original = outside.instructions;
-    defer outside.instructions = original;
-    var replacement: std.ArrayList(ir.Instruction) = .empty;
-    defer replacement.deinit(allocator);
-    try replacement.appendSlice(allocator, &.{ .{ .op = .local_get }, .{ .op = .i32_const }, .{ .op = .local_get, .operand = 2 }, .{ .op = .call, .operand = factory.? }, .{ .op = .drop }, .{ .op = .i32_const } });
-    outside.instructions = replacement;
-    try activationRejects(allocator, &module, boundary.?, .caller);
+    try std.testing.expect(checked > 0);
 }
-test "closed activation graph rejects disguised result owners scalar allocation Foreign sinks and outside factory callers" {
+test "callback activation graphs retain bounded observations and decline invented cycles" {
     var source = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
     defer source.deinit(a);
     var built = try backend.compileWithOptions(a, &.{source}, 1, .{ .inline_named = false, .retain_artifacts = true });
     defer built.deinit(a);
-    try activationMutants(a, &built.capture.?.emission);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, activationMutants, .{&built.capture.?.emission});
-}
-fn cohortLifetimeMutants(allocator: std.mem.Allocator, journal: *const @import("../reuse/artifact_emitter.zig").Recorder) !void {
-    const flow = @import("activation_graph.zig");
-    const ir = @import("runtime_ir.zig");
-    var module = try journal.materialize(allocator);
-    defer module.deinit();
-    var checked = false;
-    for (module.functions.items, 0..) |body, boundary| {
-        if (body.entry or body.provider_parameter != 1 or body.result_role != .scalar or body.parameter_roles != ir.packParameterRoles(&.{ .scalar, .reference })) continue;
-        var cohort = (try flow.cohort(allocator, &module, @intCast(boundary))) orelse continue;
-        defer cohort.deinit(allocator);
-        var node: ?flow.Site = null;
-        for (cohort.graph.sites, 0..) |site, id| if (cohort.members & (@as(u64, 1) << @intCast(id)) != 0 and site.kind == .ordinary) {
-            node = site;
-        };
-        const site = node.?;
-        const callback = &module.functions.items[site.function];
-        const assigned = callback.instructions.items[site.at + 1];
-        try std.testing.expectEqual(ir.Op.local_set, assigned.op);
-        var changed = false;
-        for (callback.instructions.items, 0..) |*inst, at| {
-            if (inst.op != .i32_const or (!ir.hasImmortalReference(callback.instructions.items, at) and ir.staticConstructor(callback.instructions.items, at) == null)) continue;
-            const original = inst.*;
-            // Retaining Node in State carries a member into the boundary's
-            // older post-run tuple, even though the eventual result is scalar.
-            inst.* = .{ .op = .local_get, .operand = assigned.operand };
-            var report = try flow.analyze(allocator, &module, @intCast(boundary));
-            defer report.deinit(allocator);
-            try std.testing.expect(report.complete);
-            var rejected = try flow.cohort(allocator, &module, @intCast(boundary));
-            defer if (rejected) |*owned| owned.deinit(allocator);
-            try std.testing.expect(rejected == null);
-            inst.* = original;
-            changed = true;
-            break;
-        }
-        try std.testing.expect(changed);
-        checked = true;
-    }
-    try std.testing.expect(checked);
-}
-test "cohort owner ordering rejects retained member result roots after State clear edits" {
-    var source = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
-    defer source.deinit(a);
-    var built = try backend.compileWithOptions(a, &.{source}, 1, .{ .inline_named = false, .retain_artifacts = true });
-    defer built.deinit(a);
-    try cohortLifetimeMutants(a, &built.capture.?.emission);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, cohortLifetimeMutants, .{&built.capture.?.emission});
-}
-fn cohortAssembly(allocator: std.mem.Allocator, journal: *const @import("../reuse/artifact_emitter.zig").Recorder, model: @import("activation_intersection.zig").Model) !void {
-    const ir = @import("runtime_ir.zig");
-    var source = try journal.materialize(allocator);
-    defer source.deinit();
-    var matched = false;
-    for (source.functions.items, 0..) |body, boundary| {
-        if (body.entry or body.provider_parameter != 1 or body.result_role != .scalar or body.parameter_roles != ir.packParameterRoles(&.{ .scalar, .reference })) continue;
-        var candidate = (try @import("cohort_candidate.zig").checked(allocator, &source, model, @intCast(boundary))) orelse continue;
-        defer candidate.deinit();
-        try std.testing.expect(try @import("provider_flow.zig").complete(allocator, &candidate.module));
-        try std.testing.expect(try @import("provider_flow.zig").protectedActivations(allocator, &candidate.module));
-        var rejection: @import("wasm.zig").OwnershipFailure = .{};
-        const bytes = try candidate.module.assembleCheckedWithOptions(.{ .rejection = &rejection });
-        defer allocator.free(bytes);
-        try std.testing.expect(bytes.len != 0);
-        const ordinary = try source.assembleCheckedWithOptions(.{});
-        defer allocator.free(ordinary);
-        try std.testing.expectEqual(@import("wasm.zig").OwnershipFallback.none, rejection.fallback);
-        try std.testing.expect(source.cohorts == null and source.functions.items.len + 3 == candidate.module.functions.items.len);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, cohortConstruction, .{ &source, @as(u32, @intCast(boundary)) });
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, cohortPreparation, .{ &candidate.module, @as(u32, @intCast(boundary)) });
-        for (candidate.owned, 0..) |owned, id| {
-            if (!owned or id == boundary or candidate.module.runtimeHelper(id)) continue;
-            try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, cohortPreparation, .{ &candidate.module, @as(u32, @intCast(id)) });
-        }
-        matched = true;
-    }
-    try std.testing.expect(matched);
-}
-fn cohortPreparation(allocator: std.mem.Allocator, module: *const @import("wasm.zig").Module, function: u32) !void {
-    var pipeline = try @import("runtime_pipeline.zig").Session.init(allocator, module);
-    defer pipeline.deinit();
-    var result = try pipeline.optimize(&module.functions.items[function]);
-    defer if (result) |*owned| owned.deinit(allocator);
-}
-fn cohortConstruction(allocator: std.mem.Allocator, source: *const @import("wasm.zig").Module, boundary: u32) !void {
-    var candidate = (try @import("cohort_candidate.zig").extensionForTest(allocator, source, boundary)).?;
-    defer candidate.deinit();
-    try std.testing.expect(candidate.module.artifacts == null);
-    try std.testing.expect(source.cohorts == null and source.functions.items.len + 3 == candidate.module.functions.items.len);
-}
-test "private cohort Source view preserves complete root RC admission without changing original bodies" {
-    var source = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
-    defer source.deinit(a);
-    var built = try backend.compileWithOptions(a, &.{source}, 1, .{ .inline_named = false, .retain_artifacts = true });
-    defer built.deinit(a);
-    const pools = &built.capture.?.metadata.pools.?;
-    try cohortAssembly(a, &built.capture.?.emission, .{ .units = &.{source}, .functions = pools.functions, .evidence = pools.evaluator.evidence.view(), .rows = pools.rows, .templates = pools.templates, .captures = pools.captures, .operations = pools.operations });
+    try callbackActivationGraph(a, &built.capture.?.emission);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, callbackActivationGraph, .{&built.capture.?.emission});
 }
 fn cohortDetachedTables(allocator: std.mem.Allocator) !void {
     var source = @import("wasm.zig").Module.init(allocator);
@@ -1419,7 +1022,7 @@ test "checked callable layout endpoints distinguish source types through physica
         try std.testing.expect(origins.constructionLayout(&module, origin) == null);
         endpoint.* = ty;
         const value = &module.functions.items[origin.function.?].instructions.items[origin.place];
-        value.table_kind = .demand;
+        value.table_kind = .unknown;
         try std.testing.expect(origins.constructionLayout(&module, origin) == null);
         value.table_kind = .callable;
         changed_field = true;
@@ -2063,217 +1666,11 @@ test "nested callable fragment records retain their own checked job layout throu
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nestedCallableReuse, .{});
 }
 
-fn activationCorrespondenceOom(allocator: std.mem.Allocator, source: *const @import("wasm.zig").Module, model: @import("activation_intersection.zig").Model, runtime: *const @import("activation_graph.zig").Cohort, semantic: *const @import("../check/capability_lifetimes.zig").Report, boundary: core.BindingRef) !void {
-    const mapped = try @import("activation_intersection.zig").correspondence(allocator, source, model, runtime, semantic, boundary);
-    defer mapped.deinit(allocator);
-    try std.testing.expectEqual(@as(u32, 14), mapped.contexts.len);
-}
-fn activationIntersectionRejects(module: *const @import("wasm.zig").Module, model: @import("activation_intersection.zig").Model, boundary: u32) !void {
-    var result = try @import("activation_intersection.zig").analyze(a, module, model, boundary);
-    defer if (result) |*owned| owned.deinit(a);
-    try std.testing.expect(result == null);
-}
-fn activationIntersectionMutants(module: *@import("wasm.zig").Module, model: @import("activation_intersection.zig").Model, boundary: u32, proof: *const @import("activation_intersection.zig").Intersection) !void {
-    var checked: usize = 0;
-    for (module.semantic_sites.items) |*site| {
-        var used = false;
-        for (proof.runtime.graph.contexts[1..]) |context| used = used or (proof.runtime.graph.contexts[context.parent].function == site.function and context.at == site.place);
-        for (proof.runtime.graph.sites, 0..) |allocation, id| if (id == proof.runtime.owner or proof.runtime.members & (@as(u64, 1) << @intCast(id)) != 0) {
-            used = used or (allocation.function == site.function and allocation.at == site.place);
-        };
-        if (!used) continue;
-        const original = site.*;
-        site.node = 0;
-        try activationIntersectionRejects(module, model, boundary);
-        site.* = original;
-        site.root = 0;
-        try activationIntersectionRejects(module, model, boundary);
-        site.* = original;
-        site.unit = @intCast(model.units.len + 1);
-        try activationIntersectionRejects(module, model, boundary);
-        site.* = original;
-        site.place += 1;
-        try activationIntersectionRejects(module, model, boundary);
-        site.* = original;
-        site.mappings = @intCast(model.evidence.nodes.len);
-        try activationIntersectionRejects(module, model, boundary);
-        site.* = original;
-        checked += 1;
-    }
-    try std.testing.expect(checked >= 10);
-    var capture_mutant = false;
-    for (@constCast(model.captures)) |*capture| {
-        if (!capture.demand_cell) continue;
-        capture.demand_cell = false;
-        try activationIntersectionRejects(module, model, boundary);
-        capture.demand_cell = true;
-        const original = capture.node;
-        capture.node = 0;
-        try activationIntersectionRejects(module, model, boundary);
-        capture.node = original;
-        capture_mutant = true;
-    }
-    try std.testing.expect(capture_mutant);
-    var producer_mutant = false;
-    for (@constCast(model.functions)) |*entry| {
-        if (entry.request != .closure or entry.request.closure.catalog == 0) continue;
-        var used = false;
-        for (proof.runtime.graph.contexts) |context| used = used or context.function == entry.function;
-        if (!used) continue;
-        const original = entry.request.closure.catalog;
-        entry.request.closure.catalog = 0;
-        try activationIntersectionRejects(module, model, boundary);
-        entry.request.closure.catalog = original;
-        producer_mutant = true;
-    }
-    try std.testing.expect(producer_mutant);
-    var row_mutant = false;
-    for (module.semantic_sites.items) |*site| {
-        const source_request = for (model.functions) |entry| {
-            if (entry.function == site.function) break entry.request;
-        } else continue;
-        if (source_request != .named or source_request.named.templates == 0) continue;
-        const producer = &model.units[source_request.named.target.unit - 1];
-        const body = producer.body(source_request.named.target.binding).?;
-        const parameter = producer.bodyParameters(body)[0];
-        const demand = producer.types.node(parameter.ty);
-        if (demand.tag != .demand or producer.types.row(demand.c).tail != .variable) continue;
-        const entries = try a.alloc(@import("../reuse/substitution_keys.zig").Entry, model.rows.entries.len + 1);
-        defer a.free(entries);
-        @memcpy(entries[0..model.rows.entries.len], model.rows.entries);
-        entries[model.rows.entries.len] = .{ .variable = producer.types.row(demand.c).tail.variable, .value = 0 };
-        const spans = try a.alloc(@import("../reuse/code_artifacts.zig").Span, model.rows.spans.len + 1);
-        defer a.free(spans);
-        @memcpy(spans[0..model.rows.spans.len], model.rows.spans);
-        spans[model.rows.spans.len] = .{ .start = @intCast(model.rows.entries.len), .len = 1 };
-        var wrong = model;
-        wrong.rows = .{ .entries = entries, .spans = spans };
-        const old_rows = site.rows;
-        site.rows = @intCast(spans.len);
-        try activationIntersectionRejects(module, wrong, boundary);
-        site.rows = old_rows;
-        row_mutant = true;
-        break;
-    }
-    try std.testing.expect(row_mutant);
-    var field_mutant = false;
-    for (proof.runtime.graph.sites, 0..) |site, id| {
-        if (site.kind != .ordinary or proof.runtime.members & (@as(u64, 1) << @intCast(id)) == 0) continue;
-        const body = &module.functions.items[site.function];
-        const annotations = @import("runtime_ir.zig").allocationAnnotations(body.instructions.items, site.at);
-        for (@constCast(annotations)) |*instruction| {
-            var marker: @import("runtime_ir.zig").Ownership = @bitCast(instruction.operand);
-            if (marker.kind != .words or marker.chunk != 0) continue;
-            const original = instruction.*;
-            marker.roles = (marker.roles & ~@as(u26, 12)) | (@as(u26, @backingInt(@import("runtime_ir.zig").Role.scalar)) << 2);
-            instruction.operand = @bitCast(marker);
-            try activationIntersectionRejects(module, model, boundary);
-            instruction.* = original;
-            field_mutant = true;
-            break;
-        }
-    }
-    try std.testing.expect(field_mutant);
-    const full = @import("fixtures").source("provider-fixtures/lifetime-cost.blot");
-    const changed = try std.mem.replaceOwned(u8, a, full, "get (func () => return $End)", "$End");
-    defer a.free(changed);
-    var changed_source = try lowerCatalog(a, changed, true);
-    defer changed_source.deinit(a);
-    var wrong_producer = model;
-    wrong_producer.units = &.{changed_source};
-    try activationIntersectionRejects(module, wrong_producer, boundary);
-}
-
-test "private semantic activation intersection contracts exact owned callable invocation contexts" {
-    var source = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
-    defer source.deinit(a);
-    var built = try backend.compileWithOptions(a, &.{source}, 1, .{ .inline_named = false, .retain_artifacts = true });
-    defer built.deinit(a);
-    const pools = &built.capture.?.metadata.pools.?;
-    var module = try built.capture.?.emission.materialize(a);
-    defer module.deinit();
-    var found = false;
-    for (pools.functions) |entry| {
-        if (entry.request != .named) continue;
-        var cohort = (try @import("activation_graph.zig").cohort(a, &module, entry.function)) orelse continue;
-        defer cohort.deinit(a);
-        const model: @import("activation_intersection.zig").Model = .{ .units = &.{source}, .functions = pools.functions, .evidence = pools.evaluator.evidence.view(), .rows = pools.rows, .templates = pools.templates, .captures = pools.captures, .operations = pools.operations };
-        var intersection = (try @import("activation_intersection.zig").analyze(a, &module, model, entry.function)).?;
-        defer intersection.deinit(a);
-        try std.testing.expectEqual(@as(u32, 3), @popCount(intersection.runtime.members));
-        try activationIntersectionMutants(&module, model, entry.function, &intersection);
-        try activationCorrespondenceOom(a, &module, model, &intersection.runtime, &intersection.semantic, entry.request.named.target);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, activationCorrespondenceOom, .{ &module, model, &intersection.runtime, &intersection.semantic, entry.request.named.target });
-        found = true;
-    }
-    try std.testing.expect(found);
-}
-
 test "cohort owner transfer protocol keeps the member outside the allocation journal" {
     var module = try @import("../runtime/cohort_fixture.zig").build(a);
     defer module.deinit();
     const bytes = try module.assembleWithOptions(.{ .export_memory = true });
     defer a.free(bytes);
-}
-
-fn closedOutgoingMutants(allocator: std.mem.Allocator, journal: *const @import("../reuse/artifact_emitter.zig").Recorder) !void {
-    const flow = @import("activation_graph.zig");
-    const ir = @import("runtime_ir.zig");
-    var module = try journal.materialize(allocator);
-    defer module.deinit();
-    var matched = false;
-    for (module.functions.items, 0..) |body, boundary| {
-        if (body.entry or body.provider_parameter != 1 or body.result_role != .scalar or body.parameter_roles != ir.packParameterRoles(&.{ .scalar, .reference })) continue;
-        var proof = (try flow.cohort(allocator, &module, @intCast(boundary))) orelse continue;
-        defer proof.deinit(allocator);
-        for (proof.graph.sites, 0..) |site, id| {
-            if (proof.members & (@as(u64, 1) << @intCast(id)) == 0 or site.kind != .memo) continue;
-            const producer = &module.functions.items[site.function];
-            const assigned = producer.instructions.items[site.at + 1];
-            try std.testing.expectEqual(ir.Op.local_set, assigned.op);
-            const original = producer.instructions;
-            defer producer.instructions = original;
-            var origin: ?@import("wasm.zig").Module.TableOrigin = null;
-            var end: ?usize = null;
-            for (module.table_origins.items) |entry| {
-                if (entry.function != site.function) continue;
-                const creation = @import("callable_origins.zig").construction(&module, entry) orelse continue;
-                if (creation.allocation != site.at) continue;
-                origin = entry;
-                end = creation.end;
-            }
-            try std.testing.expect(origin != null and end != null);
-            // The borrowed outer provider remains live beyond this activation.
-            // Even a later overwrite cannot erase this outgoing store history.
-            for ([_]bool{ false, true }) |resource| {
-                var changed: std.ArrayList(ir.Instruction) = .empty;
-                defer changed.deinit(allocator);
-                try changed.appendSlice(allocator, original.items[0..end.?]);
-                if (resource) {
-                    try changed.append(allocator, .{ .op = .resource_retire, .operand = assigned.operand });
-                } else {
-                    try changed.appendSlice(allocator, &.{ .{ .op = .local_get, .operand = assigned.operand }, .{ .op = .local_get, .operand = producer.provider_parameter }, .{ .op = .i32_load, .operand = @offsetOf(@import("../runtime/runtime_layout.zig").StateFrame, "outer") }, .{ .op = .i32_store, .operand = 4 } });
-                }
-                try changed.appendSlice(allocator, original.items[end.?..]);
-                producer.instructions = changed;
-                try std.testing.expect(@import("callable_origins.zig").construction(&module, origin.?) != null);
-                var rejected = try flow.cohort(allocator, &module, @intCast(boundary));
-                defer if (rejected) |*owned| owned.deinit(allocator);
-                try std.testing.expect(rejected == null);
-                producer.instructions = original;
-            }
-            matched = true;
-        }
-    }
-    try std.testing.expect(matched);
-}
-test "closed cohort destruction rejects outgoing provider history and resource obligations" {
-    var source = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
-    defer source.deinit(a);
-    var built = try backend.compileWithOptions(a, &.{source}, 1, .{ .inline_named = false, .retain_artifacts = true });
-    defer built.deinit(a);
-    try closedOutgoingMutants(a, &built.capture.?.emission);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, closedOutgoingMutants, .{&built.capture.?.emission});
 }
 
 fn regionPublicationFixture(allocator: std.mem.Allocator) !void {
@@ -2282,7 +1679,7 @@ fn regionPublicationFixture(allocator: std.mem.Allocator) !void {
     const bytes = try module.assembleWithOptions(.{ .export_memory = true });
     defer allocator.free(bytes);
 }
-test "region owner publication prepares reference endpoints and exceptional force records through OOM" {
+test "region owner publication prepares reference endpoints through OOM" {
     var module = try @import("../runtime/region_fixture.zig").build(a);
     defer module.deinit();
     const bytes = try module.assembleWithOptions(.{ .export_memory = true });
@@ -2290,115 +1687,19 @@ test "region owner publication prepares reference endpoints and exceptional forc
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, regionPublicationFixture, .{});
 }
 
-test "region publication declines overlapping owned fields and changed force cleanup bodies" {
+test "region publication declines overlapping owned fields" {
     const region = @import("../runtime/region_runtime.zig");
     const fixture = @import("../runtime/region_fixture.zig");
     var module = @import("wasm.zig").Module.init(a);
     defer module.deinit();
-    const arena = try module.ensureArena();
+    _ = try module.ensureArena();
     var invalid = fixture.plan;
     invalid.mask |= @as(u32, 1) << 5;
     try std.testing.expectError(error.InvalidRegion, region.install(&module, invalid));
     invalid = fixture.plan;
-    invalid.members = &.{ .{ .offset = 20, .bytes = 16, .demand = true }, .{ .offset = 32, .bytes = 20 } };
+    invalid.members = &.{ .{ .offset = 20, .bytes = 16 }, .{ .offset = 32, .bytes = 20 } };
     try std.testing.expectError(error.InvalidRegion, region.install(&module, invalid));
-    const runtime = try region.install(&module, fixture.plan);
-    const body = &module.functions.items[arena.root_pop];
-    var changed = false;
-    for (body.instructions.items, 0..) |*inst, at| {
-        if (inst.op != .i32_load or inst.operand != @offsetOf(@import("../runtime/runtime_layout.zig").Demand, "status") or at + 1 == body.instructions.items.len) continue;
-        const next = body.instructions.items[at + 1];
-        if (next.op != .i32_const or next.operand != @backingInt(@import("../runtime/runtime_layout.zig").DemandStatus.evaluating)) continue;
-        inst.operand = 12;
-        try std.testing.expectError(error.UnsupportedRootPop, region.forcePop(a, &module, runtime));
-        inst.operand = @offsetOf(@import("../runtime/runtime_layout.zig").Demand, "status");
-        changed = true;
-        break;
-    }
-    try std.testing.expect(changed);
-}
-
-fn uniqueRegionAssembly(allocator: std.mem.Allocator, journal: *const @import("../reuse/artifact_emitter.zig").Recorder, model: @import("activation_intersection.zig").Model) !void {
-    var source = try journal.materialize(allocator);
-    defer source.deinit();
-    var candidate = (try @import("region_candidate.zig").prepare(allocator, &source, model)) orelse return error.TestExpectedRegion;
-    defer candidate.deinit();
-    try std.testing.expect(try @import("provider_flow.zig").complete(allocator, &candidate.view.module));
-    try std.testing.expect(try @import("provider_flow.zig").protectedActivations(allocator, &candidate.view.module));
-    const bytes = try candidate.view.module.assembleCheckedWithOptions(.{});
-    defer allocator.free(bytes);
-    // Mismatched providers and logical roles cannot acquire interior authority
-    // merely because their machine signatures are still i32-compatible.
-    const scoped = &candidate.scopes[0];
-    const original_scope = scoped.*;
-    scoped.parameter = 0;
-    if (original_scope.parameter == 0) scoped.parameter = 1;
-    var invalid = try @import("runtime_pipeline.zig").Session.init(allocator, &candidate.view.module);
-    defer invalid.deinit();
-    try std.testing.expect(!invalid.roots);
-    scoped.* = original_scope;
-    const member_at = &candidate.view.module.functions.items[candidate.view.module.regions.?.runtime.member_at];
-    member_at.result_role = .scalar;
-    var wrong_role = try @import("runtime_pipeline.zig").Session.init(allocator, &candidate.view.module);
-    defer wrong_role.deinit();
-    try std.testing.expect(!wrong_role.roots);
-    member_at.result_role = .reference;
-    // An offset outside the owned member catalog cannot become a typed loan.
-    var changed = false;
-    for (candidate.view.module.functions.items) |*function| {
-        if (changed) break;
-        for (function.instructions.items, 0..) |instruction, at| {
-            if (instruction.op != .call or instruction.operand != candidate.view.module.regions.?.runtime.member_at or at == 0) continue;
-            const offset = &function.instructions.items[at - 1];
-            try std.testing.expect(offset.op == .i32_const);
-            const saved = offset.*;
-            offset.operand = 4;
-            try std.testing.expectError(error.IncompleteOwnership, candidate.view.module.assembleCheckedWithOptions(.{}));
-            offset.* = saved;
-            changed = true;
-            break;
-        }
-    }
-    try std.testing.expect(changed);
-}
-test "unique region storage consumes exact invocation owners before physical preparation" {
-    var source = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
-    defer source.deinit(a);
-    var built = try backend.compileWithOptions(a, &.{source}, 1, .{ .inline_named = false, .retain_artifacts = true });
-    defer built.deinit(a);
-    const pools = &built.capture.?.metadata.pools.?;
-    try uniqueRegionAssembly(a, &built.capture.?.emission, .{ .units = &.{source}, .functions = pools.functions, .evidence = pools.evaluator.evidence.view(), .rows = pools.rows, .templates = pools.templates, .captures = pools.captures, .operations = pools.operations });
-}
-
-fn regionConstruction(allocator: std.mem.Allocator, source: *const @import("wasm.zig").Module, proof: *const @import("activation_intersection.zig").Intersection) !void {
-    var candidate = try @import("region_candidate.zig").extensionForTest(allocator, source, proof);
-    defer candidate.deinit();
-    try std.testing.expect(candidate.view.module.regions.?.valid(&candidate.view.module));
-    try std.testing.expect(source.regions == null and source.cohorts == null);
-}
-fn regionPreparation(allocator: std.mem.Allocator, module: *const @import("wasm.zig").Module, function: u32) !void {
-    var session = try @import("runtime_pipeline.zig").Session.init(allocator, module);
-    defer session.deinit();
-    try std.testing.expect(session.roots);
-    var result = try session.optimize(&module.functions.items[function]);
-    defer if (result) |*owned| owned.deinit(allocator);
-}
-test "unique region constructor and owner-aware callers release every failed preparation allocation" {
-    var unit = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
-    defer unit.deinit(a);
-    var built = try backend.compileWithOptions(a, &.{unit}, 1, .{ .inline_named = false, .retain_artifacts = true });
-    defer built.deinit(a);
-    var source = try built.capture.?.emission.materialize(a);
-    defer source.deinit();
-    const pools = &built.capture.?.metadata.pools.?;
-    const model: @import("activation_intersection.zig").Model = .{ .units = &.{unit}, .functions = pools.functions, .evidence = pools.evaluator.evidence.view(), .rows = pools.rows, .templates = pools.templates, .captures = pools.captures, .operations = pools.operations };
-    var candidate = (try @import("region_candidate.zig").prepare(a, &source, model)).?;
-    defer candidate.deinit();
-    var proof = (try @import("activation_intersection.zig").analyze(a, &source, model, candidate.boundary)).?;
-    defer proof.deinit(a);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, regionConstruction, .{ &source, &proof });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, regionPreparation, .{ &candidate.view.module, candidate.boundary });
-    for (candidate.scopes) |entry| try @import("../allocation_failures.zig").checkAllAllocationFailures(a, regionPreparation, .{ &candidate.view.module, entry.function });
+    _ = try region.install(&module, fixture.plan);
 }
 
 test "public static host entry requires exact logical code reads and rejects captured or opaque receivers" {
@@ -2459,90 +1760,6 @@ test "public static host entry requires exact logical code reads and rejects cap
     try std.testing.expect(!host.confined(&source, target, stub, ty, 0));
     source.functions.items[target].instructions.replaceRangeAssumeCapacity(1, 2, &.{});
     try std.testing.expect(host.confined(&source, target, stub, ty, 0));
-}
-
-fn ownedRegionContext(allocator: std.mem.Allocator, context: @import("../runtime/region_runtime.zig").Prepared) !void {
-    var capture: @import("optimized_bodies.zig").Capture = .{ .allocator = allocator };
-    defer capture.deinit();
-    try capture.captureRegions(context);
-    try std.testing.expect(capture.regions.?.plan.members.ptr != context.plan.members.ptr);
-    try std.testing.expect(capture.regions.?.scopes.ptr != context.scopes.ptr);
-    try std.testing.expectEqualDeep(context.plan.members, capture.regions.?.plan.members);
-    try std.testing.expectEqualDeep(context.scopes, capture.regions.?.scopes);
-}
-fn regionContextWire(allocator: std.mem.Allocator, context: @import("../runtime/region_runtime.zig").Prepared) !void {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(35), .settings = @splat(36), .source = @splat(0), .dependencies = @splat(0) };
-    const bytes = try format.encode(allocator, key, context);
-    defer allocator.free(bytes);
-    var loaded = try format.decode(@import("../runtime/region_runtime.zig").Prepared, allocator, bytes, key);
-    defer format.deinit(allocator, &loaded);
-    try std.testing.expectEqualDeep(context, loaded);
-}
-fn validateRegionSnapshot(allocator: std.mem.Allocator, snapshot: *const @import("../reuse/optimized_archive.zig").Snapshot) !void {
-    try @import("../reuse/optimized_archive.zig").validateRegions(allocator, snapshot);
-}
-test "single region pipeline owns exact optimizer context and invalidates missing changed or forged portable facts through OOM" {
-    const bodies = @import("optimized_bodies.zig");
-    const archive = @import("../reuse/optimized_archive.zig");
-    const format = @import("../reuse/dependency_format.zig");
-    var source = try lowerCatalog(a, @import("fixtures").source("provider-fixtures/lifetime-cost.blot"), true);
-    defer source.deinit(a);
-    var built = try backend.compileWithOptions(a, &.{source}, 1, .{ .inline_named = false, .retain_artifacts = true, .artifact_replay = true });
-    defer built.deinit(a);
-    try std.testing.expect(built.diagnostic == null);
-    const captured = &built.capture.?.optimized.?;
-    const original = captured.regions orelse return error.TestExpectedRegionContext;
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, ownedRegionContext, .{original});
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, regionContextWire, .{original});
-    const bytes = try archive.encode(a, @splat(35), captured);
-    defer a.free(bytes);
-    var loaded = try archive.decode(a, @splat(35), bytes);
-    defer loaded.deinit();
-    try std.testing.expectEqualDeep(original, loaded.regions.?);
-    {
-        var same = try bodies.Matcher.init(a, &loaded, captured);
-        defer same.deinit();
-        for (captured.entries.items, 0..) |_, id| try std.testing.expect(same.matches(id));
-    }
-    const loaded_context = loaded.regions.?;
-    defer loaded.regions = loaded_context;
-    for (0..5) |mutation| {
-        loaded.regions = loaded_context;
-        const members = @constCast(loaded_context.plan.members);
-        const scopes = @constCast(loaded_context.scopes);
-        const first_member = members[0];
-        const first_scope = scopes[0];
-        defer members[0] = first_member;
-        defer scopes[0] = first_scope;
-        switch (mutation) {
-            0 => loaded.regions = null,
-            1 => loaded.regions.?.plan.mask ^= 1,
-            2 => members[0].offset += 4,
-            3 => scopes[0].parameter +%= 1,
-            4 => loaded.regions.?.runtime.store = loaded.regions.?.runtime.close,
-            else => unreachable,
-        }
-        var mismatch = try bodies.Matcher.init(a, &loaded, captured);
-        defer mismatch.deinit();
-        for (captured.entries.items, 0..) |_, id| try std.testing.expect(!mismatch.matches(id));
-    }
-    loaded.regions = loaded_context;
-    var snapshot = try format.decode(archive.Snapshot, a, bytes, archive.wireKey(@splat(35)));
-    defer format.deinit(a, &snapshot);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, validateRegionSnapshot, .{&snapshot});
-    const saved = snapshot.regions.?;
-    snapshot.regions.?.runtime.store = saved.runtime.close;
-    try std.testing.expectError(error.InvalidArtifact, archive.validate(a, &snapshot));
-    snapshot.regions = saved;
-    snapshot.regions.?.plan.bytes += 4;
-    try std.testing.expectError(error.InvalidArtifact, archive.validate(a, &snapshot));
-    snapshot.regions = saved;
-    const scopes = @constCast(snapshot.regions.?.scopes);
-    const scope = scopes[0];
-    scopes[0].parameter +%= 1;
-    try std.testing.expectError(error.InvalidArtifact, archive.validate(a, &snapshot));
-    scopes[0] = scope;
 }
 
 test "selected associated callback annotation retains current concrete method result" {

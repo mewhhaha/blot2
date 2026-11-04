@@ -35,7 +35,7 @@ pub fn main(init: std.process.Init) !void {
     try module.exportFunction(run, "run", .u32, .u32);
     inline for (.{ "create", "save", "restore", "drop" }) |name|
         try module.exportFunction(@field(functions, name), name, .u32, .u32);
-    inline for (.{ "root_enter", "root_leave", "root_allocate", "root_force", "store_word", "retain", "release_lease", "cycle_safe" }) |name|
+    inline for (.{ "root_enter", "root_leave", "root_allocate", "store_word", "retain", "release_lease", "cycle_safe" }) |name|
         try module.exportFunction(@field(arena, name), name, .u32, .u32);
     inline for (.{ "rc_enabled", "root_enabled", "root_count", "root_active", "root_frame", "root_page", "root_top", "heap" }) |name|
         try module.exportGlobal(@field(arena, name), name);

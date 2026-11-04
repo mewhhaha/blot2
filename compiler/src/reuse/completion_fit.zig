@@ -49,7 +49,7 @@ const Measure = struct {
                 try self.row(node.c, depth + 1);
             },
             .array, .list, .cursor, .resolver => try self.ty(node.a, depth + 1),
-            .demand, .provider => {
+            .provider => {
                 try self.ty(node.a, depth + 1);
                 try self.row(node.c, depth + 1);
             },

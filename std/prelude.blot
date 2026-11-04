@@ -231,9 +231,9 @@ const Maybe.filter = func predicate -> candidate => return case candidate of
 const Maybe.flatten = func candidate => return case candidate of
   $Some inner => inner
   $Nothing => $Nothing
-const Maybe.unwrap_or_else = func ~fallback -> candidate => return case candidate of
+const Maybe.unwrap_or_else = func fallback -> candidate => return case candidate of
   $Some value => value
-  $Nothing => @demand fallback
+  $Nothing => fallback ()
 const Maybe.to_result = func error -> candidate => return case candidate of
   $Some value => $Ok value
   $Nothing => $Err error
@@ -262,9 +262,9 @@ const Result.iterate = func initial -> step => return do:
 const Result.unwrap_or = func fallback -> candidate => return case candidate of
   $Ok value => value
   $Err _ => fallback
-const Result.unwrap_or_else = func ~fallback -> candidate => return case candidate of
+const Result.unwrap_or_else = func fallback -> candidate => return case candidate of
   $Ok value => value
-  $Err _ => @demand fallback
+  $Err _ => fallback ()
 const Result.to_maybe = func candidate => return case candidate of
   $Ok value => $Some value
   $Err _ => $Nothing

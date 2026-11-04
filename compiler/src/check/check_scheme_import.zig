@@ -237,7 +237,6 @@ pub const Copier = struct {
             .scoped => try self.destination.scoped(try self.copy(node.a, depth + 1), if (node.b == 0) .{ .unit = 0, .decl = try self.copy(node.c, depth + 1) } else try self.copyPhysical(.{ .unit = node.b, .decl = node.c })),
             .absent, .unit, .boolean, .u32, .f32, .never => id,
             .array, .list, .cursor => try self.destination.sequence(node.tag, try self.copy(node.a, depth + 1)),
-            .demand => try self.destination.demandWithEffects(try self.copy(node.a, depth + 1), try self.copyRow(node.c, depth + 1)),
             .provider => try self.destination.provider(try self.copy(node.a, depth + 1), try self.copyRow(node.c, depth + 1)),
             .state_provider => try self.destination.stateProvider(try self.copy(node.a, depth + 1), try self.copy(node.b, depth + 1), try self.copy(node.c, depth + 1)),
             .resolver => try self.destination.resolver(try self.copy(node.a, depth + 1)),

@@ -81,7 +81,7 @@ const Scan = struct {
                 try self.callResult(id, arrow_, value_, n.b, depth + 1);
                 try self.callRows(id, arrow_, value_, n.c, depth + 1);
             },
-            .demand, .provider => {
+            .provider => {
                 try self.callResult(id, arrow_, value_, n.a, depth + 1);
                 try self.callRows(id, arrow_, value_, n.c, depth + 1);
             },
@@ -237,7 +237,7 @@ const Scan = struct {
             }
             return true;
         }
-        if (node.tag != .record and node.tag != .product and node.tag != .closure and node.tag != .suspend_ and node.tag != .call and node.tag != .apply) return false;
+        if (node.tag != .record and node.tag != .product and node.tag != .closure and node.tag != .call and node.tag != .apply) return false;
         try values.add(id);
         return true;
     }
@@ -279,7 +279,7 @@ const Scan = struct {
             for (values.values[0..values.len]) |value| if (!try self.callbackCreators(value, expected, creators, depth + 1)) return false;
             return true;
         }
-        if (node.tag != .closure and node.tag != .suspend_ and node.tag != .call and node.tag != .apply) return false;
+        if (node.tag != .closure and node.tag != .call and node.tag != .apply) return false;
         for (self.facts[0..self.len]) |fact_| if (fact_.value == id and try self.arrow(fact_.arrow, expected)) {
             try creators.add(id);
             return true;
@@ -287,7 +287,7 @@ const Scan = struct {
         // A proven capture-only creator has an empty declaration set. It must
         // still participate in branch agreement instead of borrowing another
         // equal arrow's declarations or skipping the result relationship.
-        if (node.tag == .closure or node.tag == .suspend_) {
+        if (node.tag == .closure) {
             try require(node.a < self.module.closures.len);
             const closure = self.module.closures[node.a];
             try require(try self.arrow(node.ty, closure.function_type));
@@ -471,7 +471,7 @@ const Scan = struct {
                     try self.fact(arrow_, n.ty, value_);
                 }
             }
-            if (n.tag == .closure or n.tag == .suspend_) {
+            if (n.tag == .closure) {
                 arrow_ = n.ty;
                 value_ = id;
             }
@@ -514,7 +514,7 @@ const Scan = struct {
             return self.reachable(n.b, arrow_, depth + 1, remaining);
         }
         switch (n.tag) {
-            .usage, .array, .list, .cursor, .resolver, .demand, .provider => return self.reachable(n.a, arrow_, depth + 1, remaining),
+            .usage, .array, .list, .cursor, .resolver, .provider => return self.reachable(n.a, arrow_, depth + 1, remaining),
             .state_provider => for ([_]T.Id{ n.a, n.b, n.c }) |child| {
                 if (try self.reachable(child, arrow_, depth + 1, remaining)) return true;
             },

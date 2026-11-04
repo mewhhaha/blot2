@@ -8,15 +8,15 @@ bindings are public to other Blot modules. Import [text.blot](text.blot) for
 Unicode-scalar text operations, formatting, validation and a linear builder.
 Import [equality.blot](equality.blot) for structural equality contracts and
 [codec.blot](codec.blot) for explicit numeric-lane codecs; the
-[derivation guide](../docs/host/derive.md) shows opt-in equality, debug and codec
-generation from checked data declarations. Only the root module's `entry const`
-and `entry let` declarations become Wasm exports; they must fit the guest ABI,
-and Wasm emission keeps the declarations they reach. Unused source declarations
-are still checked. Use `{ prelude: null }` with `createCompiler` for a
-freestanding module, or `--prelude none` with the CLI. The project API and CLI
-resolve relative file imports and map `std/` to this directory. Configure
-additional directory aliases through `imports` or `--alias`. General module
-re-exports are not implemented yet.
+[derivation guide](../docs/host/derive.md) shows opt-in equality, debug and
+codec generation from checked data declarations. Only the root module's
+`entry const` and `entry let` declarations become Wasm exports; they must fit
+the guest ABI, and Wasm emission keeps the declarations they reach. Unused
+source declarations are still checked. Use `{ prelude: null }` with
+`createCompiler` for a freestanding module, or `--prelude none` with the CLI.
+The project API and CLI resolve relative file imports and map `std/` to this
+directory. Configure additional directory aliases through `imports` or
+`--alias`. General module re-exports are not implemented yet.
 
 All examples below use the default prelude. Values/functions use `snake_case`;
 types and constructors use `PascalCase`. Functions are curried:
@@ -58,8 +58,9 @@ entry const inferred = func () => return do:
 retain their mutable aliases. Pure local bindings generalize independently at
 each use. Higher-order functions propagate the inferred effect rows of
 callbacks. Creating an effectful closure is pure; calling it requires the
-corresponding provider. Demand parameters use `~` and are evaluated explicitly
-with `@demand`. See [effects and controlled IO](../docs/language/effects-and-io.md).
+corresponding provider. Deferred work uses ordinary Unit callbacks; `and` and
+`or` short-circuit their right operand directly. See
+[effects and controlled IO](../docs/language/effects-and-io.md).
 
 Plain `do:` blocks already return `()` when they fall through. No trailing
 `break ()` is needed, and their last expression statement is discarded. A
@@ -193,8 +194,8 @@ monad. This does not make arbitrary recursion stack safe. Blocks without loops
 do not require an `iterate` member.
 
 `unwrap_or` is eager. `Maybe.unwrap_or_else fallback candidate` and
-`Result.unwrap_or_else fallback candidate` have a demand parameter: they
-evaluate `fallback` only for `$Nothing` or `$Err`, once per captured argument.
+`Result.unwrap_or_else fallback candidate` take an ordinary Unit callback: they
+call `fallback ()` only for `$Nothing` or `$Err`, once per invocation.
 `Maybe.filter predicate candidate` keeps a matching `$Some`, and `Maybe.flatten`
 removes one nested `Maybe`.
 
@@ -337,8 +338,8 @@ not host calls. `sin`/`cos` support `|radians| <= 8192`; nonfinite/out-of-domain
 arguments produce NaN. `tan` divides those approximations and is ill-conditioned
 near its poles. Keep accumulated game angles wrapped. The compiled numeric
 regressions in
-[native prelude execution tests](../tests/guest/prelude_execution.test.ts)
-check native/JS parity and error over the supported domain.
+[native prelude execution tests](../tests/guest/prelude_execution.test.ts) check
+native/JS parity and error over the supported domain.
 
 Host scalar exports use actual Wasm `f32` parameters/results and return normal
 JavaScript numbers. There is no compiler-specific ECS storage ABI. See
@@ -435,8 +436,8 @@ bitwise selection, literal shuffles, dot products, bit reinterpretation, an
 opt-in relaxed multiply-add, checked array load/store, and ordered or explicitly
 pairwise reductions. Lane, rounding and relaxed-multiply-add contracts follow
 the language guide; source spelling does not guarantee a particular optimizer
-representation. [SIMD semantics](../docs/language/guide.md#simd) specify the exact
-arithmetic and admission limits.
+representation. [SIMD semantics](../docs/language/guide.md#simd) specify the
+exact arithmetic and admission limits.
 
 Named owners and lexical lifetime checks govern the owned-storage profile.
 Aliases share writes; retained independent data requires an explicit copy. The

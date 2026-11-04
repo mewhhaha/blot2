@@ -47,7 +47,7 @@ Deno.test("persistent versions survive aliases captures state calls and iterator
 type Cell value is data = $Cell value
 const stored = #[1, 2]
 const read = func values => return values[1]
-const delay = func ~value => return value
+const delay = func value => return func () => return value
 entry const alias = func () => return do:
   let values = #[1, 2]
   let before = values
@@ -62,7 +62,7 @@ entry const suspended = func () => return do:
   let values = #[1, 2]
   let before = delay values
   values[1] := 9
-  break @u32.add (@array.get (@demand before) 1) values[1]
+  break @u32.add (@array.get (before ()) 1) values[1]
 entry const iterator = func () => return do:
   let values = #[1, 2]
   let sum = 0

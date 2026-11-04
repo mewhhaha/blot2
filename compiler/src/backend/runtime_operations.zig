@@ -101,7 +101,7 @@ const Encoder = struct {
                 try self.ty(node.b, depth + 1);
                 try self.row(node.c, depth + 1);
             },
-            .demand, .provider => {
+            .provider => {
                 try self.ty(node.a, depth + 1);
                 try self.row(node.c, depth + 1);
             },

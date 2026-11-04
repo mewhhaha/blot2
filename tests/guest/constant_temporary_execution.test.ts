@@ -26,9 +26,9 @@ const bodies = [
   `  let cost = do (@effect.provider Read (func () => return base)):
     use result <- Read ()
     break result`,
-  `  let pending = delayed base
-  let cost = @demand pending
-  let again = @demand pending`,
+  `  let pending = delayed (func () => return base)
+  let cost = pending ()
+  let again = pending ()`,
   `  let cost = @effect.scope (func (state: State U32) => return base)`,
   `  let cost = @code.run (@code.quote (@code.lift base))`,
 ];
@@ -39,7 +39,7 @@ type State a is effect = {get: Unit -> a, set: a -> Unit}
 const described: Unit -> U32 ! {${row}} = func () => return Read ()
 type Box a is data = $Box a
 const Box.pure = func (value: U32) => return $Box value
-const delayed = func ~value => return value
+const delayed = func value => return value
 const base = ${base}
 ${
     bodies.map((body, index) =>
@@ -54,7 +54,7 @@ ${body}
 const values = #[${bodies.map((_, index) => `expensive_${index}`).join(", ")}]
 `;
 }
-Deno.test("constant receipts transport dead immutable temporaries while actual Scope demand provider and stage execution stay fresh", async () => {
+Deno.test("constant receipts transport dead immutable temporaries while actual Scope callback provider and stage execution stay fresh", async () => {
   const directory = await Deno.makeTempDir({
     prefix: "blot-constant-temporary-",
   });
@@ -151,7 +151,7 @@ entry const sibling = ${seed}
                   string,
                   number
                 >;
-                assert.equal(receipts.reused, 5, JSON.stringify(receipts));
+                assert.equal(receipts.reused, 6, JSON.stringify(receipts));
                 assert.ok(
                   receipts.source_steps_replayed > 8000,
                   JSON.stringify(receipts),

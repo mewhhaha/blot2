@@ -61,7 +61,7 @@ pub const Scan = struct {
                     try self.enqueue(.{ .id = n.b });
                     try self.enqueue(.{ .id = n.c, .row = true });
                 },
-                .demand, .provider => {
+                .provider => {
                     try self.enqueue(.{ .id = n.a });
                     try self.enqueue(.{ .id = n.c, .row = true });
                 },

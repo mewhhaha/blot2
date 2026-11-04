@@ -186,7 +186,7 @@ fn visitCarries(scope: Scope, builder: *Table(u32).Builder) void {
 /// the same node order.
 pub const Uses = struct {
     pub const Flags = packed struct(u8) {
-        /// Some closure or suspension captures the binding.
+        /// Some closure captures the binding.
         captured: bool = false,
         /// A merge takes the binding from one of its branches.
         merge_branch: bool = false,

@@ -33,7 +33,7 @@ fn authorityDepth(m: *const core.Module, id: T.Id, depth: usize, remaining: *usi
             return authorityDepth(m, n.a, depth + 1, remaining);
         },
         .function => return try authorityDepth(m, n.a, depth + 1, remaining) and try authorityDepth(m, n.b, depth + 1, remaining) and try authorityRow(m, n.c, depth + 1, remaining),
-        .demand, .provider => return try authorityDepth(m, n.a, depth + 1, remaining) and try authorityRow(m, n.c, depth + 1, remaining),
+        .provider => return try authorityDepth(m, n.a, depth + 1, remaining) and try authorityRow(m, n.c, depth + 1, remaining),
         .state_provider => return try authorityDepth(m, n.a, depth + 1, remaining) and try authorityDepth(m, n.b, depth + 1, remaining) and try authorityDepth(m, n.c, depth + 1, remaining),
         .nominal, .projection, .instance_selection => for (m.types.nominalArguments(n)) |child| {
             if (!try authorityDepth(m, child, depth + 1, remaining)) return false;
@@ -108,7 +108,7 @@ fn equalOwnedRows(m: *const core.Module, left: T.Id, right: T.Id, left_rows: T.L
             return true;
         },
         .state_provider => return try equalOwnedRows(m, a.a, b.a, left_rows, right_rows, depth + 1, remaining) and try equalOwnedRows(m, a.b, b.b, left_rows, right_rows, depth + 1, remaining) and try equalOwnedRows(m, a.c, b.c, left_rows, right_rows, depth + 1, remaining),
-        .usage, .array, .list, .cursor, .demand, .provider, .resolver => return a.b == b.b and a.c == b.c and try equalOwnedRows(m, a.a, b.a, left_rows, right_rows, depth + 1, remaining),
+        .usage, .array, .list, .cursor, .provider, .resolver => return a.b == b.b and a.c == b.c and try equalOwnedRows(m, a.a, b.a, left_rows, right_rows, depth + 1, remaining),
         else => return a.a == b.a and a.b == b.b and a.c == b.c,
     }
 }
@@ -1764,7 +1764,7 @@ const TaskCallSite = struct {
             self.found = true;
             return;
         }
-        if (n.tag == .closure or n.tag == .suspend_) {
+        if (n.tag == .closure) {
             const closure = &m.closures[n.a];
             var region_owner: Named.ScopeOwner = undefined;
             const prior_scope = self.proof.scope_owner;
@@ -2433,7 +2433,7 @@ const Effects = struct {
                 try self.visit(self.m.packageOpening(id).body, depth + 1);
             },
             .constant, .reference, .constructor_function, .primitive_function, .panic, .type_constructor, .effect_reflection => {},
-            .closure, .suspend_ => {
+            .closure => {
                 const closure = self.m.closures[n.a];
                 var shape = self.m.types.node(n.ty);
                 var qualifiers: usize = 0;
@@ -2443,11 +2443,11 @@ const Effects = struct {
                     qualifiers += 1;
                     shape = self.m.types.node(shape.a);
                 }
-                if (n.tag == .closure) try require(shape.tag == .function) else try require(shape.tag == .demand);
+                try require(shape.tag == .function);
                 var rows: Named.RowOwner = .{ .closed = self.closed_rows, .generic = .{}, .parent = self.row_owners };
                 var nested: Effects = .{ .workspace = self.workspace, .ambient = self.m.types.row(shape.c), .row_owners = &rows, .m = self.m, .units = self.units, .target_module = self.m, .target = self.m.types.row(shape.c), .closed_rows = closure.closed_rows, .remaining = self.remaining, .checked_calls = self.checked_calls, .variables = self.variables };
                 try require(nested.target.labels.len <= nested.seen.len);
-                // Defining a callable or demand does not execute its effects.
+                // Defining a callable does not execute its effects.
                 // Its own latent row still has to describe the actual body,
                 // independently of handlers surrounding its construction.
                 try nested.visit(closure.body, depth + 1);
@@ -2531,20 +2531,6 @@ const Effects = struct {
                 }
             },
             .call => try self.namedCall(id, depth),
-            .force => {
-                const shape = self.m.types.node(self.m.typeOf(n.a));
-                try require(shape.tag == .demand);
-                const producer = self.m.node(try self.resolve(n.a));
-                if (producer.tag == .suspend_) {
-                    try self.consumeLabels(self.m.types.row(shape.c));
-                    const closure = self.m.closures[producer.a];
-                    const caller_rows = self.closed_rows;
-                    self.closed_rows = closure.closed_rows;
-                    defer self.closed_rows = caller_rows;
-                    try self.visit(closure.body, depth + 1);
-                } else try self.consume(shape.c);
-                try self.visit(n.a, depth + 1);
-            },
             .scalar, .logical, .record_merge, .type_same, .effect_provider, .proof_guard => {
                 try self.visit(n.a, depth + 1);
                 try self.visit(n.b, depth + 1);
@@ -2750,8 +2736,6 @@ pub fn shapes(m: *const core.Module) Error!void {
         if (n.b == staging.code_identity.decl) {
             const shape = staging.codeInfo(&m.types, @intCast(id)) orelse return error.InvalidArtifact;
             try require(shape.result != 0);
-            const arguments = m.types.nominalArguments(n);
-            try require(m.types.node(arguments[1]).b == 0);
         } else {
             const target = staging.descriptorInfo(&m.types, @intCast(id)) orelse return error.InvalidArtifact;
             try require(target != 0);

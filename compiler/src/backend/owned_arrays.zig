@@ -141,9 +141,6 @@ pub const Proof = struct {
                 },
                 // A closure's consumer follows it; decide its captures below.
                 .closure => try closures.append(allocator, id),
-                .suspend_ => for (module.suspensionCaptures(id)) |binding| {
-                    states[binding].escaped = true;
-                },
                 .loop => {
                     const info = module.loopInfo(id);
                     for (module.loopCarries(id)) |carry| {
@@ -526,7 +523,6 @@ const Walk = struct {
             },
             // A closure body can name the parameter only through its captures.
             .closure => return !self.captures(id),
-            .suspend_ => return std.mem.findScalar(core.BindingId, m.suspensionCaptures(id), self.binding) == null,
             .call, .apply, .project => {
                 if (self.borrows.call(self.unit, id)) |call_| {
                     for (call_.arguments[0..call_.count], 0..) |argument, index| {

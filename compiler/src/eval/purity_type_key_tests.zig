@@ -38,7 +38,7 @@ fn caseType(store: *T.Store, name: []const u8) !T.Id {
     if (std.mem.eql(u8, name, "function_duplicate_sorted")) return store.functionWithEffects(T.u32_type, T.f32_type, try store.effects.row(&.{ zebra, alpha, zebra }, .closed));
     if (std.mem.eql(u8, name, "function_specialized")) return store.functionWithEffects(T.unit, T.u32_type, try store.effects.row(&.{ ask, alpha, ask }, .closed));
     if (std.mem.eql(u8, name, "higher_order")) return store.functionWithEffects(try store.functionWithEffects(T.unit, T.u32_type, try store.effects.row(&.{T.foreign_operation}, .closed)), try store.array(T.boolean), try store.effects.row(&.{ask}, .closed));
-    if (std.mem.eql(u8, name, "opaque_demand")) return store.demandWithEffects(T.u32_type, try store.effects.row(&.{ask}, .closed));
+    if (std.mem.eql(u8, name, "opaque_callback")) return store.functionWithEffects(T.unit, T.u32_type, try store.effects.row(&.{ask}, .closed));
     if (std.mem.eql(u8, name, "function_state")) {
         const read = try store.internOperation(T.builtin_state_read, &.{T.u32_type});
         const write = try store.internOperation(T.builtin_state_write, &.{T.u32_type});

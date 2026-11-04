@@ -1,7 +1,7 @@
 //! Exact immutable acyclic layout proofs behind the runtime `no_cycle` flag.
 //! Data values are immutable: a value is built from existing values, and an
 //! in-place write needs an owner that no other value reaches. Only State,
-//! closures, demands, providers, cursors and erased or unknown shapes can
+//! closures, providers, cursors and erased or unknown shapes can
 //! close a cycle, so they decline. Nominals of any unit check every
 //! constructor of their defining unit, including unused variants. Executable
 //! reuse requires equal type, nominal and constructor catalogs in every unit,

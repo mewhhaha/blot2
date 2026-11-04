@@ -158,7 +158,6 @@ export type LiteralKind =
   | ")"
   | "`"
   | "."
-  | "~"
   | "!"
   | "wherE"
   | "code"
@@ -307,7 +306,6 @@ export type RuleName =
   | "constraint_body"
   | "constraint_predicate"
   | "type_application"
-  | "demand_type"
   | "type_atom"
   | "storage_type"
   | "code_type"
@@ -657,7 +655,6 @@ export interface QualifiedNameCursor extends RuleCursorBase<"qualified_name"> {
 }
 
 export interface ParameterCursor extends RuleCursorBase<"parameter"> {
-  field(name: "demand"): TokenCursor<"literal", "~"> | null;
   field(name: "name"): SourceIdentifierCursor | null;
   field(name: "pattern"): PatternCursor | null;
   field(name: "typed"): TypedParameterCursor | null;
@@ -760,12 +757,6 @@ export interface ConstraintPredicateCursor extends RuleCursorBase<"constraint_pr
 export interface TypeApplicationCursor extends RuleCursorBase<"type_application"> {
   field(name: "arguments"): ReadonlyArray<TypeAtomCursor>;
   field(name: "head"): TypeAtomCursor;
-  field(name: string): CursorFieldValue | undefined;
-  fieldArray(name: string): readonly CursorFieldValue[];
-}
-
-export interface DemandTypeCursor extends RuleCursorBase<"demand_type"> {
-  field(name: "value"): TypeAtomCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1422,7 +1413,6 @@ export type AnyRuleCursor =
   | ConstraintBodyCursor
   | ConstraintPredicateCursor
   | TypeApplicationCursor
-  | DemandTypeCursor
   | TypeAtomCursor
   | StorageTypeCursor
   | CodeTypeCursor

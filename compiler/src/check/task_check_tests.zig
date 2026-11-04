@@ -300,16 +300,6 @@ test "structured task checking rejects overlapping unknown forged and escaping v
         \\    break @u32.add (@task.join first) (@task.join second)))
     , .use_after_move);
 }
-test "structured task checking rejects shared pending demand forcing and accepts ready immutable values" {
-    try law(std.testing.allocator,
-        \\const shared = func ~(value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return @demand value)))
-    , .task_demand_shared);
-    try law(std.testing.allocator,
-        \\const ready = func ~(value: U32) => return do:
-        \\  let computed = @demand value
-        \\  break @task.scope (func group => return @task.join (@task.spawn group (func () => return computed)))
-    , null);
-}
 
 test "structured tasks retain read loans whose enclosing borrow owns the group" {
     try law(std.testing.allocator,
@@ -324,18 +314,6 @@ test "structured tasks retain read loans whose enclosing borrow owns the group" 
     try law(std.testing.allocator,
         \\entry const bad = func (host: concurrent (U32 -> U32)) => return host 1
     , .task_host_contract);
-}
-
-test "structured tasks move one affine demand and reject its parent reuse" {
-    try law(std.testing.allocator,
-        \\const take = func ~(value: unique U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return @demand value)))
-    , null);
-    try law(std.testing.allocator,
-        \\const take = func ~(value: unique U32) => return @task.scope (func group => return do:
-        \\  let task = @task.spawn group (func () => return @demand value)
-        \\  let result = @task.join task
-        \\  break @demand value)
-    , .use_after_move);
 }
 
 test "structured task thunks preserve checked local once aliases" {

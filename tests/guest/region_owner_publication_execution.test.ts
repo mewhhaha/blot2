@@ -7,8 +7,8 @@ const fixture = new URL(
 );
 const bytes = await Deno.readFile(fixture);
 const module = new WebAssembly.Module(bytes);
-function runtime(wait: CallableFunction = () => {}) {
-  const e = new WebAssembly.Instance(module, { test: { wait } }).exports;
+function runtime() {
+  const e = new WebAssembly.Instance(module).exports;
   const memory = e["blot:memory"] as WebAssembly.Memory;
   const call = (name: string, ...args: number[]) =>
     Number((e[name] as CallableFunction)(...args)) >>> 0;
@@ -30,12 +30,12 @@ Deno.test("interior result publication moves its real owner before closing the p
   const r = runtime();
   r.call("root_open");
   r.call("root_open");
-  const owner = r.call("allocate"), memo = owner + 20;
-  r.put(memo, 42);
-  assert.equal(r.call("project", memo, owner), owner);
-  r.call("close", memo, owner);
+  const owner = r.call("allocate"), member = owner + 20;
+  r.put(member, 42);
+  assert.equal(r.call("project", member, owner), owner);
+  r.call("close", member, owner);
   assert.equal(r.count("destroyed"), 0);
-  assert.equal(r.word(memo), 42);
+  assert.equal(r.word(member), 42);
   assert.equal(r.word(owner - 16), 1);
   assert.equal(r.count("retains"), 0);
   r.call("root_close", 0);
@@ -59,34 +59,6 @@ Deno.test("interior aliases and changed carry slots own the enclosing region onc
   r.balanced();
   assert.equal(r.count("destroyed"), 1);
 });
-Deno.test("interior force unwind terminalizes raw Memo before freeing its owner", () => {
-  for (const status of [0, 1, 2]) {
-    const r = runtime();
-    r.call("root_enter");
-    r.call("root_open");
-    const owner = r.call("allocate"), memo = owner + 20;
-    r.call("force", memo, owner);
-    r.put(memo + 8, status);
-    assert.equal(r.word(owner - 16), 2);
-    r.call("root_leave", 1);
-    r.balanced();
-    let expected = status;
-    if (status === 1) expected = 3;
-    assert.equal(r.word(memo + 8), expected);
-    assert.equal(r.count("destroyed"), 1);
-  }
-});
-Deno.test("ordinary force records preserve terminalization beside interior records", () => {
-  const r = runtime();
-  r.call("root_enter");
-  const memo = r.call("root_allocate", 16, 10);
-  r.call("root_force", memo);
-  r.put(memo + 8, 1);
-  r.call("root_leave", 1);
-  r.balanced();
-  assert.equal(r.word(memo + 8), 3);
-  assert.equal(r.count("destroyed"), 1);
-});
 Deno.test("forged endpoints wrong owners and retired owners reject before publication", () => {
   const r = runtime();
   r.call("root_open");
@@ -97,11 +69,11 @@ Deno.test("forged endpoints wrong owners and retired owners reject before public
     WebAssembly.RuntimeError,
   );
   assert.throws(
-    () => r.call("force", first + 20, second),
+    () => r.call("close", first + 20, second),
     WebAssembly.RuntimeError,
   );
   assert.throws(
-    () => r.call("force", first + 36, first),
+    () => r.call("project", first + 37, first),
     WebAssembly.RuntimeError,
   );
   assert.throws(() => r.call("retain", first + 20), WebAssembly.RuntimeError);
@@ -134,45 +106,8 @@ Deno.test("region owner keeps its ordinary external Frame edge counted", () => {
   r.balanced();
   assert.equal(r.count("destroyed"), 2);
 });
-Deno.test("JSPI settlement rejection and reentry preserve the same interior force owner", async () => {
-  const jspi = WebAssembly as unknown as {
-    Suspending: new (fn: (owner: number) => Promise<void>) => CallableFunction;
-    promising(fn: CallableFunction): () => Promise<number>;
-  };
-  for (const rejection of [false, true]) {
-    let owner = 0, settle!: () => void, reject!: (reason: Error) => void;
-    const wait = new jspi.Suspending((value: number) => {
-      owner = value;
-      return new Promise<void>((resolve, failure) => {
-        settle = resolve;
-        reject = failure;
-      });
-    });
-    const r = runtime(wait);
-    r.call("root_enter");
-    const pending = jspi.promising(r.e.suspend as CallableFunction)();
-    await Promise.resolve();
-    assert(owner > 0);
-    assert.equal(r.word(owner + 28), 1);
-    assert.equal(r.word(owner - 16), 2);
-    assert.throws(() => r.call("root_enter"), WebAssembly.RuntimeError);
-    if (rejection) {
-      reject(new Error("suspended failure"));
-      await assert.rejects(pending, /suspended failure/);
-      r.call("root_leave", 1);
-      assert.equal(r.word(owner + 28), 3);
-    } else {
-      settle();
-      assert.equal(await pending, 0);
-      r.call("root_leave", 0);
-      assert.equal(r.word(owner + 28), 2);
-    }
-    r.balanced();
-    assert.equal(r.count("destroyed"), 1);
-  }
-});
 
-Deno.test("repeated region force cleanup preserves bounded physical storage", () => {
+Deno.test("repeated region cleanup preserves bounded physical storage", () => {
   const r = runtime();
   let settled = 0;
   for (let round = 0; round < 24; round++) {
@@ -180,8 +115,6 @@ Deno.test("repeated region force cleanup preserves bounded physical storage", ()
     for (let index = 0; index < 256; index++) {
       r.call("root_open");
       const owner = r.call("allocate");
-      r.call("force", owner + 20, owner);
-      r.put(owner + 28, 2);
       r.call("root_close", 0);
     }
     r.call("root_leave", 0);

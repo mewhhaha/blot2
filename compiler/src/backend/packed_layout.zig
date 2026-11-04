@@ -95,7 +95,7 @@ test "packed row plans flatten checked tuples and reject every reference represe
     try std.testing.expectEqualSlices(u32, &.{ 0, 4 }, plan.leaves[1].path[0..2]);
     try std.testing.expectEqualSlices(u32, &.{4}, plan.leaves[2].path[0..1]);
     try std.testing.expect(plan.leaves[0].floating);
-    for ([_]layout.Tag{ .array, .list, .cursor, .demand, .function, .provider, .nominal }) |tag| {
+    for ([_]layout.Tag{ .array, .list, .cursor, .function, .provider, .nominal }) |tag| {
         const reference = try layouts.intern(tag, 3, 3, &.{});
         const wrapped = try layouts.intern(.product, 0, 0, &.{ 3, reference });
         try std.testing.expect(analyze(&layouts, wrapped) == null);

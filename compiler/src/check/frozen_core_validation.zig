@@ -443,7 +443,7 @@ const Bounds = struct {
                 },
                 .type_constructor => try self.identity(.{ .unit = value.a, .decl = value.b }, false),
                 .array, .list, .cursor, .resolver => try self.ty(value.a),
-                .demand, .provider => {
+                .provider => {
                     try self.ty(value.a);
                     try self.row(value.c);
                 },
@@ -1259,7 +1259,7 @@ const Bounds = struct {
                     try require(value.b == try arrayArity(op));
                     try self.listNodes(.{ .start = value.a, .len = value.b });
                 },
-                .closure, .suspend_ => try index(self.m.closures.len, value.a),
+                .closure => try index(self.m.closures.len, value.a),
                 .apply, .associated, .record_merge, .type_same, .effect_provider, .handle => {
                     try self.node(value.a, false);
                     try self.node(value.b, value.tag == .associated and value.op != .none and try scalarArity(value.op) == 1);
@@ -1287,7 +1287,7 @@ const Bounds = struct {
                     try self.node(value.a, false);
                     try self.symbol(value.b, false);
                 },
-                .force, .computation => try self.node(value.a, false),
+                .computation => try self.node(value.a, false),
                 .resolver_op => try index(self.m.resolver_ops.len, value.a),
                 .operation_value => try index(self.m.operation_values.len, value.a),
                 .state_provider => {
@@ -1564,7 +1564,7 @@ pub const Graph = struct {
                         else => null,
                     },
                     .array, .list, .cursor, .resolver => if (slot == 0) self.vertex(.type_, v.a) else null,
-                    .demand, .provider => switch (slot) {
+                    .provider => switch (slot) {
                         0 => self.vertex(.type_, v.a),
                         1 => if (m.types.effects.rows.len == 0) null else self.vertex(.row, v.c),
                         else => null,
@@ -1609,8 +1609,8 @@ pub const Graph = struct {
                         else => null,
                     },
                     .package_pack => if (slot < m.children(@intCast(id)).len) self.vertex(.node, m.children(@intCast(id))[slot]) else null,
-                    .resource_release, .usage_share, .usage_read, .return_, .project, .force, .result_associated, .computation, .effect_scope => if (slot == 0) self.vertex(.node, v.a) else null,
-                    .closure, .suspend_ => if (slot == 0) self.vertex(.closure, v.a) else null,
+                    .resource_release, .usage_share, .usage_read, .return_, .project, .result_associated, .computation, .effect_scope => if (slot == 0) self.vertex(.node, v.a) else null,
+                    .closure => if (slot == 0) self.vertex(.closure, v.a) else null,
                     .match => if (slot == 0) self.vertex(.match_, v.a) else null,
                     .pattern_bind => switch (slot) {
                         0 => self.vertex(.pattern, v.a),
@@ -1902,7 +1902,7 @@ fn stagingScopes(graph: Graph, context: Context, scratch: Scratch, allocator: ?s
                                     break;
                                 }
                             }
-                            if ((node.tag == .closure or node.tag == .suspend_) and node.a == catalog) closure_node = id;
+                            if ((node.tag == .closure) and node.a == catalog) closure_node = id;
                         }
                         if (loan_count != 0) {
                             try require(closure_node != 0);
@@ -1947,7 +1947,7 @@ fn stagingScopes(graph: Graph, context: Context, scratch: Scratch, allocator: ?s
     for (m.nodes, 0..) |n, id| {
         const stage = scratch.colors[graph.vertex(.node, id)];
         if (stage == 0) continue;
-        if ((n.tag == .closure or n.tag == .suspend_) and stage > 1) {
+        if ((n.tag == .closure) and stage > 1) {
             const captures = m.closures[n.a].captures;
             for (m.extra[captures.start..][0..captures.len]) |binding_| {
                 const captured = m.bindings[binding_];

@@ -51,7 +51,7 @@ fn reads(m: *const core.Module, id: core.Id, wanted: core.Id, budget: *usize) ?u
         .block, .suite, .array, .product, .record, .array_op, .call, .contract_method, .break_ => {
             for (m.children(id)) |child| if (!addCount(&count, reads(m, child, wanted, budget))) return null;
         },
-        .bind, .construct, .project, .return_, .force => {
+        .bind, .construct, .project, .return_ => {
             const child = if (node.tag == .bind or node.tag == .construct) node.b else node.a;
             if (!addCount(&count, reads(m, child, wanted, budget))) return null;
         },

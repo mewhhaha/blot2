@@ -1,14 +1,14 @@
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
-Deno.test("providers handle operations through named calls, callbacks and demands", async () => {
+Deno.test("providers handle operations through named calls and callbacks", async () => {
   await compileAndRun(
     `
 effect Read: Unit -> U32
 const provider = @effect.provider Read (func () => return 42)
 const read = func () => return Read ()
 const invoke = func callback => return callback ()
-const force = func ~value => return @demand value
-const ignore = func ~value => return 42
+const force = func value => return value ()
+const ignore = func value => return 42
 entry const constant = do provider:
   break Read ()
 entry const direct = func () => return do provider:
@@ -16,8 +16,8 @@ entry const direct = func () => return do provider:
 entry const callback = func () => return do provider:
   break invoke (func () => return Read ())
 entry const delayed = func () => return do provider:
-  break force (Read ())
-entry const ignored = func () => return ignore (Read ())
+  break force (func () => return Read ())
+entry const ignored = func () => return ignore (func () => return Read ())
 `,
     (guest) => {
       equal(guest.read("constant"), 42);
@@ -105,23 +105,24 @@ entry const answer = func (value: U32) => return do first:
   );
 });
 
-Deno.test("named binary callbacks preserve demanded and required effect rows", async () => {
-  await compileAndRun(`
+Deno.test("named binary callbacks preserve deferred and required effect rows", async () => {
+  await compileAndRun(
+    `
 infixl 20 (<&>) = choose
 infixl 60 (%%) = combine
 effect Read: Unit -> U32
 effect Touch: U32 -> Unit
-const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
+const choose = func (left: Bool) => return func right => return if left then right () else false
 const combine = func (left: U32) => return func (right: U32) => return do:
   use Touch left
   break @u32.add left right
 const receive = func (flag: Bool) => return do:
-  let go = flag <&> false
+  let go = flag <&> (func () => return false)
   if go:
     break ()
   use Touch 7
   break ()
-const selected = func (flag: Bool) => return flag <&> (do:
+const selected = func (flag: Bool) => return flag <&> (func () => return do:
   use value <- Read ()
   break @u32.eq value 42)
 const merge = func () => return 20 %% 22
@@ -132,18 +133,20 @@ entry const answer = do touch:
   break 20 %% 22
 entry const loaded = do reader:
   break selected true
-entry const unforced = false <&> @panic "not demanded"
+entry const unforced = false <&> (func () => return @panic "unused callback")
 type Holder a is data = $Holder a
 const callbacks = $Holder receive
 entry const run = func (flag: Bool) : U32 => return do touch:
   let $Holder action = callbacks
   use action flag
   break 20 %% 22
-`, guest => {
-    equal(guest.read("answer"), 42);
-    equal(guest.read("loaded"), true);
-    equal(guest.read("unforced"), false);
-    equal(guest.call("run", true), 42);
-    equal(guest.call("run", false), 42);
-  });
+`,
+    (guest) => {
+      equal(guest.read("answer"), 42);
+      equal(guest.read("loaded"), true);
+      equal(guest.read("unforced"), false);
+      equal(guest.call("run", true), 42);
+      equal(guest.call("run", false), 42);
+    },
+  );
 });

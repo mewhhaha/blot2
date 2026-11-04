@@ -7,7 +7,7 @@ const Allocator = std.mem.Allocator;
 pub const none = std.math.maxInt(u32);
 pub const Origin = enum { named, anonymous, runtime_initializer };
 pub const Header = struct { function: u32, origin: Origin, unit: u32, identity: u32, complete: bool = false };
-pub const Kind = enum { request, runtime_global_request, cell_registration, retained_value, cached_demand, direct_call, imported_call, indirect_call_unknown, global_read };
+pub const Kind = enum { request, runtime_global_request, cell_registration, retained_value, direct_call, imported_call, indirect_call_unknown, global_read };
 pub const Event = struct { kind: Kind, caller: u32 = none, target: u32 = none, unit: u32 = 0, identity: u32 = 0, auxiliary: u32 = 0, flag: bool = false };
 pub const Snapshot = struct {
     headers: []Header,

@@ -8,10 +8,11 @@
 Normative design for 072–074. The compiler and guest adapter implement the
 cooperative task surface below; the current release evidence is recorded in
 [compiler status](STATUS.md). [Usage](USAGE_CONTRACTS.md),
-[scoped effects](SCOPED_EFFECTS.md),
-[demands](DEMANDS.md#completion-and-cancellation) and
-[suspension ownership](SUSPENDED_OWNERSHIP.md) keep their existing laws. Task
-scheduling is explicit; an effect label does not imply concurrency.
+[scoped effects](SCOPED_EFFECTS.md) and
+[suspension ownership](SUSPENDED_OWNERSHIP.md) keep their existing laws. The
+former demand completion contract is retired; its pinned historical design is
+linked from [deferred work](DEFERRED_WORK.md). Task scheduling is explicit; an
+effect label does not imply concurrency.
 
 ## Scope and task surface
 
@@ -31,24 +32,26 @@ checking, including when its source name is shadowed. It evaluates the callable
 and arguments in the parent and invokes them in the child. Nested ordinary
 helpers do not yet infer their caller's group.
 
-`const scope = func body => return @task.scope body` accepts a once callback universally
-quantified over a fresh region; its result cannot contain that region. Ordinary
-relays, currying, identity forwarding and renamed imports preserve that scope
-contract. `const spawn = func group => return func action => return @task.spawn group action` also
-works through direct aliases, imports and stored partial calls. Its exact body
-is validated, and each completed call checks the actual action's captures
+`const scope = func body => return @task.scope body` accepts a once callback
+universally quantified over a fresh region; its result cannot contain that
+region. Ordinary relays, currying, identity forwarding and renamed imports
+preserve that scope contract.
+`const spawn = func group => return func action => return @task.spawn group action`
+also works through direct aliases, imports and stored partial calls. Its exact
+body is validated, and each completed call checks the actual action's captures
 against the selected group's lifetime. Arbitrary higher-order transport of spawn
 helpers requires further transfer evidence and remains rejected.
 
-`const await = func source => return |source|` is an ordinary helper for either one task
-receiver or a tuple of task receivers. Its checked contract passes through
-global aliases and imports. `|(left, right)|`, a stored tuple and `await pair`
-have the same collect-all behavior: admit all dependencies together, retain
-partial results until completion, and transfer results in written order. On
-failure, drain affected children and release partial results exactly once.
-Collections contain one to sixteen handles. A single task with a tuple payload
-returns that payload without recursively receiving its fields. Generic receive
-helpers currently require a direct receive body or an alias of one.
+`const await = func source => return |source|` is an ordinary helper for either
+one task receiver or a tuple of task receivers. Its checked contract passes
+through global aliases and imports. `|(left, right)|`, a stored tuple and
+`await pair` have the same collect-all behavior: admit all dependencies
+together, retain partial results until completion, and transfer results in
+written order. On failure, drain affected children and release partial results
+exactly once. Collections contain one to sixteen handles. A single task with a
+tuple payload returns that payload without recursively receiving its fields.
+Generic receive helpers currently require a direct receive body or an alias of
+one.
 
 ```blot
 // Pure sibling tasks.
@@ -177,5 +180,5 @@ runtime performance or full concurrency completion is claimed here.
 Caller-region inference and generic capture-transfer evidence, general
 higher-order spawn forwarding, stream channels, select-one, scoped nonlocal
 exits, purity certification and CPU worker transport remain open in
-[the completion plan](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md). Task collect-all is implemented;
-comma-separated select-one syntax is not.
+[the completion plan](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md).
+Task collect-all is implemented; comma-separated select-one syntax is not.

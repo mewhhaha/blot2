@@ -109,7 +109,7 @@ pub fn validEvidence(evidence: types.View) bool {
                 if (loan != (node.c != 0) or (loan and !child(node.c, id))) return false;
             },
             .array, .list, .cursor, .resolver => if (!child(node.a, id) or node.b != 0 or node.c != 0) return false,
-            .demand, .provider => if (!child(node.a, id) or node.b != 0 or node.c >= rows) return false,
+            .provider => if (!child(node.a, id) or node.b != 0 or node.c >= rows) return false,
             .function => if (!child(node.a, id) or !child(node.b, id) or node.c >= rows) return false,
             .state_provider => if (!child(node.a, id) or !child(node.b, id) or !child(node.c, id)) return false,
             .type_constructor => if (node.a == 0 or node.b == 0 or node.c != 0) return false,

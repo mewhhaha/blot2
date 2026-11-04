@@ -5,7 +5,7 @@
 - **Status:** Complete — local implementation `2798ff9`.
 - **Dependencies:** [036](036-summarize-demand-control-flow.md)
 - **Originating requirements:** DEMANDS: Local memo scope, loops and acceptance
-  checks. Sources: [Demand evaluation](../docs/compiler/DEMANDS.md).
+  checks. Sources: [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -15,8 +15,8 @@ Place local demand memo state in its creation scope across branches and loops.
 
 ## Starting point
 
-[demand_inline.zig](../compiler/src/backend/demand_inline.zig) and
-[core_backend.zig](../compiler/src/backend/core_backend.zig) already lower
+[demand_inline.zig](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/compiler/src/backend/demand_inline.zig)
+and [core_backend.zig](../compiler/src/backend/core_backend.zig) already lower
 repeated admitted expression demands to invocation-local memo state; callee-loop
 cases still use runtime cells.
 

@@ -162,7 +162,7 @@ const Projector = struct {
                 break :blk .{ .tag = original.tag, .a = identity.unit, .b = identity.decl, .c = span.start };
             },
             .array, .list, .cursor, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
-            .demand, .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
+            .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
             .state_provider => .{ .tag = .state_provider, .a = try self.projectType(original.a, depth + 1), .b = try self.projectType(original.b, depth + 1), .c = try self.projectType(original.c, depth + 1) },
             else => .{ .tag = original.tag, .a = original.a, .b = original.b, .c = original.c },
         };

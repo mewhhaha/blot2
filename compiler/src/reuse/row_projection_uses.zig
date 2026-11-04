@@ -175,12 +175,12 @@ const Proof = struct {
             },
             .bind => return node.a != self.binding and self.visit(node.b, depth + 1),
             .construct => return self.visit(node.b, depth + 1),
-            .return_, .force, .result_associated => return self.visit(node.a, depth + 1),
+            .return_, .result_associated => return self.visit(node.a, depth + 1),
             .scalar, .associated, .logical, .record_merge => return self.visit(node.a, depth + 1) and self.visit(node.b, depth + 1),
             .apply => {
                 if (self.isRow(node.b)) {
                     const arrow = self.source.types.node(self.source.typeOf(node.a));
-                    if (arrow.tag != .function or self.source.types.node(arrow.a).tag == .demand) return false;
+                    if (arrow.tag != .function) return false;
                     return self.visit(node.a, depth + 1);
                 }
                 return self.visit(node.a, depth + 1) and self.visit(node.b, depth + 1);
@@ -221,7 +221,7 @@ const Proof = struct {
                 for (self.source.children(id)) |child| {
                     const arrow = self.source.types.node(callable);
                     if (self.isRow(child)) {
-                        if (arrow.tag != .function or self.source.types.node(arrow.a).tag == .demand) return false;
+                        if (arrow.tag != .function) return false;
                     } else if (!self.visit(child, depth + 1)) return false;
                     callable = 0;
                     if (arrow.tag == .function) callable = arrow.b;

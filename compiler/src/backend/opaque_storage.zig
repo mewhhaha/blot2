@@ -94,7 +94,7 @@ fn authoritativeExpression(source: F.Source, nominals: anytype, constructors: an
             }
             return .{};
         },
-        .array, .list, .cursor, .record, .product, .function, .demand, .provider, .state_provider => return .{ .kind = .reference },
+        .array, .list, .cursor, .record, .product, .function, .provider, .state_provider => return .{ .kind = .reference },
         .usage => {
             if (n.b == @backingInt(T.UsageKind.unique) or n.b == @backingInt(T.UsageKind.shared)) return .{ .kind = .reference };
             return authoritativeExpression(source, nominals, constructors, n.a, context, local_unit, resolver, depth + 1, remaining);
@@ -153,7 +153,7 @@ fn expression(source: F.Source, nominals: anytype, constructors: anytype, origin
             }
             return .{};
         },
-        .array, .list, .cursor, .record, .product, .function, .demand, .provider, .state_provider => return .{ .kind = .reference },
+        .array, .list, .cursor, .record, .product, .function, .provider, .state_provider => return .{ .kind = .reference },
         .usage => {
             if (n.b == @backingInt(T.UsageKind.unique) or n.b == @backingInt(T.UsageKind.shared)) return .{ .kind = .reference };
             return expression(source, nominals, constructors, n.a, context, depth + 1, remaining);

@@ -6,7 +6,6 @@ const wasm = @import("wasm.zig");
 const modes = @import("provider_modes.zig");
 const constructors = @import("callable_origins.zig");
 const providers = @import("provider_origins.zig");
-const demands = @import("../eval/demand_origins.zig");
 const A = std.mem.Allocator;
 const Error = A.Error || error{Unavailable};
 const absent = std.math.maxInt(u32);
@@ -19,31 +18,27 @@ const Value = struct {
     constant: ?u32 = 0,
     offset: u32 = 0,
     outside_head: bool = false,
-    cancellation: bool = false,
     local: ?u32 = null,
     version: u32 = 0,
     tag_field: bool = false,
     tag_test: ?TagTest = null,
-    condition_global: bool = false,
     fn merge(self: *Value, other: Value) bool {
         const previous = self.*;
         self.owners |= other.owners;
         self.codes |= other.codes;
         self.outside_head = self.outside_head or other.outside_head;
-        self.cancellation = self.cancellation or other.cancellation;
         if (self.constant != other.constant) self.constant = null;
         if (self.offset != other.offset) self.offset = absent;
         self.local = null;
         self.tag_field = false;
         self.tag_test = null;
-        self.condition_global = false;
         return !std.meta.eql(previous, self.*);
     }
     fn reference(self: Value) bool {
         return self.owners != 0 or self.outside_head;
     }
 };
-pub const Kind = enum { ordinary, closure, memo, frame, static_data };
+pub const Kind = enum { ordinary, closure, frame, static_data };
 pub const Site = struct { function: u32, at: u32, context: u32, bytes: u32, kind: Kind, provider: u64 = 0, children: u64 = 0, borrowed_head: bool = false };
 pub const Store = struct { function: u32, at: u32, context: u32, owners: u64, values: u64, offset: u32, outside_value: bool };
 pub const Call = struct { from: u32, at: u32, target: u32, indirect: bool };
@@ -72,15 +67,11 @@ const Object = struct {
     written: u16 = 0,
     observed: u16 = 0,
     frame: ?providers.Fact = null,
-    producer: ?u32 = null,
 };
 pub const Context = struct { parent: u32, at: u32, function: u32, provider: u64 = 0, outside_provider: bool = false };
 const Flow = struct {
     cells: [max_sites]?*const Value = @splat(null),
-    caches: [max_sites]?*const Value = @splat(null),
     written: u64 = 0,
-    ready: u64 = 0,
-    evaluating: u64 = 0,
 };
 const Frame = struct { end: u32, alternate: u32, height: usize, result: bool };
 const State = struct {
@@ -89,7 +80,6 @@ const State = struct {
     versions: []u32,
     stack: std.ArrayList(Value) = .empty,
     frames: std.ArrayList(Frame) = .empty,
-    guard: enum { unknown, clear, active } = .unknown,
     flow: Flow = .{},
     fn clone(self: State, a: A) A.Error!State {
         const locals = try a.dupe(Value, self.locals);
@@ -98,7 +88,7 @@ const State = struct {
         errdefer a.free(versions);
         var stack = try self.stack.clone(a);
         errdefer stack.deinit(a);
-        return .{ .pc = self.pc, .locals = locals, .versions = versions, .stack = stack, .frames = try self.frames.clone(a), .guard = self.guard, .flow = self.flow };
+        return .{ .pc = self.pc, .locals = locals, .versions = versions, .stack = stack, .frames = try self.frames.clone(a), .flow = self.flow };
     }
     fn deinit(self: *State, a: A) void {
         a.free(self.locals);
@@ -113,7 +103,7 @@ const State = struct {
         try self.stack.append(a, value);
     }
 };
-const Outcome = struct { value: Value, guard: @FieldType(State, "guard"), flow: Flow };
+const Outcome = struct { value: Value, flow: Flow };
 const Structure = struct { ends: []u32, alternates: []u32 };
 const Graph = struct {
     a: A,
@@ -125,7 +115,6 @@ const Graph = struct {
     contexts: std.ArrayList(Context) = .empty,
     stores: std.ArrayList(Store) = .empty,
     active: std.ArrayList(u32) = .empty,
-    guard_global: ?u32 = null,
     work: usize = 0,
     changed: bool = false,
     structures: []?Structure = &.{},
@@ -333,8 +322,6 @@ const Graph = struct {
         self.objects.items[id].site.provider |= head.owners;
         const bit = @as(u64, 1) << @intCast(id);
         flow.written &= ~bit;
-        flow.ready &= ~bit;
-        flow.evaluating &= ~bit;
         for (0..bytes / 4) |word| {
             const role = ir.Ownership.wordRole(annotations, word);
             if (role != .scalar and role != .reference) return self.fail(.instruction);
@@ -345,8 +332,7 @@ const Graph = struct {
             if (origin.function != function or origin.kind == .unknown) continue;
             const fact = constructors.construction(self.module, origin) orelse return self.fail(.instruction);
             if (fact.allocation != at) continue;
-            self.objects.items[id].site.kind = if (fact.kind == .demand) .memo else .closure;
-            self.objects.items[id].producer = fact.target;
+            self.objects.items[id].site.kind = .closure;
         }
         for (body.instructions.items, 0..) |inst, point| {
             if (inst.op != .ownership) continue;
@@ -385,7 +371,7 @@ const Graph = struct {
         }
         return result orelse self.fail(.receiver);
     }
-    fn invoke(self: *Graph, parent: u32, at: u32, function: u32, arguments: []const Value, guard: @FieldType(State, "guard"), input_flow: Flow) Error![]Outcome {
+    fn invoke(self: *Graph, parent: u32, at: u32, function: u32, arguments: []const Value, input_flow: Flow) Error![]Outcome {
         try self.spend(1);
         if (function >= self.module.functions.items.len or self.module.runtimeHelper(function) or self.active.items.len == 16) return self.fail(.instruction);
         for (self.active.items) |id| if (id == function) return self.fail(.recursion);
@@ -409,47 +395,11 @@ const Graph = struct {
         errdefer outcomes.deinit(self.a);
         var flow = input_flow;
         if (modes.readOperation(&self.catalog, body)) |mode| {
-            try outcomes.append(self.a, .{ .guard = guard, .value = try self.stateAccess(&flow, context_id, function, arguments[2], mode, .{}, 0), .flow = flow });
+            try outcomes.append(self.a, .{ .value = try self.stateAccess(&flow, context_id, function, arguments[2], mode, .{}, 0), .flow = flow });
         } else if (modes.writeOperation(self.module, &self.catalog, body)) |mode| {
-            try outcomes.append(self.a, .{ .guard = guard, .value = try self.stateAccess(&flow, context_id, function, arguments[2], mode, arguments[1], 0), .flow = flow });
-        } else if (demands.force(self.module, function)) |fact| {
-            if (fact.guard_global != null and self.guard_global != fact.guard_global) return self.fail(.control);
-            var cells = arguments[fact.cell_parameter].owners;
-            if (cells == 0 or arguments[fact.cell_parameter].outside_head or arguments[fact.cell_parameter].offset != 0) return self.fail(.receiver);
-            while (cells != 0) {
-                const id: usize = @intCast(@ctz(cells));
-                cells &= cells - 1;
-                const object_ = self.objects.items[id];
-                if (object_.site.kind != .memo or object_.producer != fact.producer) return self.fail(.receiver);
-                const bit = @as(u64, 1) << @intCast(id);
-                if (flow.ready & bit != 0) {
-                    try outcomes.append(self.a, .{ .guard = guard, .value = (flow.caches[id] orelse return self.fail(.receiver)).*, .flow = flow });
-                    continue;
-                }
-                if (flow.evaluating & bit != 0) continue;
-                var pending_flow = flow;
-                pending_flow.evaluating |= bit;
-                try self.recordCall(function, @intCast(fact.producer_call), fact.producer, false);
-                self.objects.items[id].observed |= 1 << 1;
-                const child = try self.invoke(context_id, @intCast(fact.producer_call), fact.producer, &.{ object_.words[1], .{}, arguments[fact.provider_parameter] }, guard, pending_flow);
-                for (child) |outcome| {
-                    var value = outcome.value;
-                    var result_flow = outcome.flow;
-                    result_flow.evaluating &= ~bit;
-                    if (fact.guard_global != null and outcome.guard == .active) {
-                        value = .{ .cancellation = true };
-                    } else {
-                        const mutable = &self.objects.items[id];
-                        result_flow.ready |= bit;
-                        result_flow.caches[id] = try self.freeze(value);
-                        mutable.site.children |= value.owners;
-                        try self.recordStore(context_id, function, @intCast(fact.cache_publication), @as(u64, 1) << @intCast(id), 12, value);
-                    }
-                    try outcomes.append(self.a, .{ .guard = outcome.guard, .value = value, .flow = result_flow });
-                }
-            }
+            try outcomes.append(self.a, .{ .value = try self.stateAccess(&flow, context_id, function, arguments[2], mode, arguments[1], 0), .flow = flow });
         } else {
-            outcomes = try self.scanBody(context_id, function, arguments, guard, flow);
+            outcomes = try self.scanBody(context_id, function, arguments, flow);
         }
         return outcomes.items;
     }
@@ -465,7 +415,7 @@ const Graph = struct {
         if (depth == state.frames.items.len) {
             var value: Value = .{};
             if (result != .none) value = try state.pop();
-            try outcomes.append(self.a, .{ .guard = state.guard, .value = value, .flow = state.flow });
+            try outcomes.append(self.a, .{ .value = value, .flow = state.flow });
             return false;
         }
         const index = state.frames.items.len - 1 - depth;
@@ -477,13 +427,6 @@ const Graph = struct {
     }
     fn constrain(self: *Graph, state: *State, value: Value, taken: bool) bool {
         if (value.constant) |constant| return (constant != 0) == taken;
-        if (value.condition_global) {
-            state.guard = if (taken) .active else .clear;
-            if (!taken) {
-                for (state.locals) |*local| local.cancellation = false;
-                for (state.stack.items) |*local| local.cancellation = false;
-            }
-        }
         if (value.tag_test) |test_| {
             if (test_.local >= state.locals.len or state.versions[test_.local] != test_.version) return true;
             var mask: u64 = 0;
@@ -500,7 +443,7 @@ const Graph = struct {
         }
         return true;
     }
-    fn scanBody(self: *Graph, context_id: u32, function: u32, arguments: []const Value, guard: @FieldType(State, "guard"), flow: Flow) Error!std.ArrayList(Outcome) {
+    fn scanBody(self: *Graph, context_id: u32, function: u32, arguments: []const Value, flow: Flow) Error!std.ArrayList(Outcome) {
         const source = &self.module.functions.items[function];
         const code = source.instructions.items;
         const count = std.math.add(usize, source.parameters.len, source.locals.items.len) catch return self.fail(.limit);
@@ -513,7 +456,7 @@ const Graph = struct {
         @memset(versions, 0);
         var pending: std.ArrayList(State) = .empty;
         defer pending.deinit(self.a);
-        try pending.append(self.a, .{ .locals = locals, .versions = versions, .guard = guard, .flow = flow });
+        try pending.append(self.a, .{ .locals = locals, .versions = versions, .flow = flow });
         var outcomes: std.ArrayList(Outcome) = .empty;
         var paths: usize = 0;
         while (pending.pop()) |input| {
@@ -555,16 +498,7 @@ const Graph = struct {
                     .f32_const => try state.push(self.a, .{ .constant = inst.operand }),
                     .global_get => {
                         if (inst.operand >= self.module.globals.items.len or self.module.globals.items[inst.operand].scalar.role() == .reference) return self.fail(.escape);
-                        var value: Value = .{ .constant = null };
-                        if (self.guard_global == inst.operand) {
-                            value.condition_global = true;
-                            value.constant = switch (state.guard) {
-                                .unknown => null,
-                                .clear => 0,
-                                .active => 1,
-                            };
-                        }
-                        try state.push(self.a, value);
+                        try state.push(self.a, .{ .constant = null });
                     },
                     .i32_load, .f32_load => {
                         const value = try self.load(&state.flow, try state.pop(), inst.operand);
@@ -643,8 +577,7 @@ const Graph = struct {
                     .return_ => {
                         var value: Value = .{};
                         if (source.result != .none) value = try state.pop();
-                        if (source.result_role == .reference and value.constant == 0 and state.guard == .active) value.cancellation = true;
-                        try outcomes.append(self.a, .{ .guard = state.guard, .value = value, .flow = state.flow });
+                        try outcomes.append(self.a, .{ .value = value, .flow = state.flow });
                         live = false;
                     },
                     .unreachable_ => live = false,
@@ -680,7 +613,7 @@ const Graph = struct {
                             var results: []const Outcome = undefined;
                             if (inst.op == .call) {
                                 try self.recordCall(function, state.pc, inst.operand, false);
-                                results = try self.invoke(context_id, state.pc, inst.operand, args[0..signature.parameters.len], state.guard, state.flow);
+                                results = try self.invoke(context_id, state.pc, inst.operand, args[0..signature.parameters.len], state.flow);
                             } else {
                                 if (selector.codes == 0 or selector.reference() or selector.constant != null) return self.fail(.receiver);
                                 var targets = selector.codes;
@@ -690,14 +623,13 @@ const Graph = struct {
                                     const target_id = self.targets.items[index];
                                     if (self.module.functions.items[target_id].signature != inst.operand) continue;
                                     try self.recordCall(function, state.pc, target_id, true);
-                                    try combined.appendSlice(self.a, try self.invoke(context_id, state.pc, target_id, args[0..signature.parameters.len], state.guard, state.flow));
+                                    try combined.appendSlice(self.a, try self.invoke(context_id, state.pc, target_id, args[0..signature.parameters.len], state.flow));
                                 }
                                 results = combined.items;
                             }
                             for (results) |outcome| {
                                 var continuation = try state.clone(self.a);
                                 continuation.pc += 1;
-                                continuation.guard = outcome.guard;
                                 continuation.flow = outcome.flow;
                                 if (signature.result != .none) try continuation.push(self.a, outcome.value);
                                 try pending.append(self.a, continuation);
@@ -720,7 +652,7 @@ const Graph = struct {
                 if (state.frames.items.len != 0) return self.fail(.control);
                 var value: Value = .{};
                 if (source.result != .none) value = try state.pop();
-                try outcomes.append(self.a, .{ .guard = state.guard, .value = value, .flow = state.flow });
+                try outcomes.append(self.a, .{ .value = value, .flow = state.flow });
             }
         }
         return outcomes;
@@ -747,15 +679,10 @@ pub fn analyze(a: A, module: *const wasm.Module, boundary: u32) A.Error!Report {
             }
         }
         if (catalog == null) break :admission;
-        for (module.functions.items, 0..) |_, id| if (demands.force(module, @intCast(id))) |fact| {
-            if (fact.guard_global == null) continue;
-            if (graph.guard_global != null and graph.guard_global != fact.guard_global) break :admission;
-            graph.guard_global = fact.guard_global;
-        };
         for (0..32) |_| {
             graph.changed = false;
             for (graph.objects.items) |*object_| object_.observed = 0;
-            const outcomes = graph.invoke(absent, absent, boundary, args[0..source.parameters.len], .unknown, .{}) catch |err| switch (err) {
+            const outcomes = graph.invoke(absent, absent, boundary, args[0..source.parameters.len], .{}) catch |err| switch (err) {
                 error.Unavailable => break :admission,
                 error.OutOfMemory => return error.OutOfMemory,
             };
@@ -829,7 +756,7 @@ pub fn cohort(a: A, module: *const wasm.Module, boundary: u32) A.Error!?Cohort {
     const owner_bit = @as(u64, 1) << owner_id;
     var members: u64 = 0;
     for (graph.sites, 0..) |site, id| {
-        if (site.kind != .memo) continue;
+        if (site.kind != .closure) continue;
         const bit = @as(u64, 1) << @intCast(id);
         var pending = reachable(graph.sites, bit);
         while (pending != 0) {
@@ -877,28 +804,18 @@ fn immutableFlowSnapshots(a: A) !void {
     var module = wasm.Module.init(scratch.allocator());
     defer module.deinit();
     var graph: Graph = .{ .a = scratch.allocator(), .module = &module, .catalog = .{} };
-    const first: Value = .{ .owners = 17, .codes = 8, .constant = null, .offset = 12, .outside_head = true, .cancellation = true, .local = 7, .version = 9, .tag_field = true, .tag_test = .{ .local = 6, .version = 4, .value = 3, .equal = true }, .condition_global = true };
+    const first: Value = .{ .owners = 17, .codes = 8, .constant = null, .offset = 12, .outside_head = true, .local = 7, .version = 9, .tag_field = true, .tag_test = .{ .local = 6, .version = 4, .value = 3, .equal = true } };
     var original: Flow = .{};
     original.cells[3] = try graph.freeze(first);
     original.written |= 8;
-    original.caches[5] = try graph.freeze(first);
-    original.ready |= 32;
-    original.evaluating = 64;
     const branch = original;
     original.cells[3] = try graph.freeze(.{ .owners = 2 });
-    original.caches[5] = try graph.freeze(.{ .constant = 42 });
     original.written = 0;
-    original.ready = 0;
-    original.evaluating = 0;
     try std.testing.expectEqualDeep(first, branch.cells[3].?.*);
-    try std.testing.expectEqualDeep(first, branch.caches[5].?.*);
     try std.testing.expectEqual(@as(u64, 8), branch.written);
-    try std.testing.expectEqual(@as(u64, 32), branch.ready);
-    try std.testing.expectEqual(@as(u64, 64), branch.evaluating);
     try std.testing.expect(branch.cells[3] != original.cells[3]);
-    try std.testing.expect(branch.caches[5] != original.caches[5]);
 }
-test "activation flow snapshots preserve branch cells cache metadata and guards through OOM" {
+test "activation flow snapshots preserve branch cells through OOM" {
     try immutableFlowSnapshots(std.testing.allocator);
     try std.testing.checkAllAllocationFailures(std.testing.allocator, immutableFlowSnapshots, .{});
 }

@@ -8,15 +8,16 @@ unfinished implementation dependencies. No implementation task is marked
 complete.
 
 Reviewed against [the current guide](../language/guide.md),
-[ownership/semantic contract](../compiler/CONTRACT.md), [scoped effects](../compiler/SCOPED_EFFECTS.md),
+[ownership/semantic contract](../compiler/CONTRACT.md),
+[scoped effects](../compiler/SCOPED_EFFECTS.md),
 [shared ownership](../compiler/SHARED_OWNERSHIP.md),
-[suspended ownership](../compiler/SUSPENDED_OWNERSHIP.md) and
-[demand completion](../compiler/DEMANDS.md#completion-and-cancellation). Once is at-most-
-once; demand retries cannot silently consume affine captures; raw Wasm traps use
-host journals, not promised source unwinding. Packages/quoted code/tasks retain
-borrow and capability footprints. Dynamic dictionaries and host task scheduling
-have explicit ABI requirements. Ordinary syntax, arrows and opaque boundaries
-keep their existing behavior until implementation qualification.
+[suspended ownership](../compiler/SUSPENDED_OWNERSHIP.md) and the
+[retired demand design](../compiler/DEFERRED_WORK.md). The demand completion
+rules in this dated record are historical; raw Wasm traps use host journals, not
+promised source unwinding. Packages/quoted code/tasks retain borrow and
+capability footprints. Dynamic dictionaries and host task scheduling have
+explicit ABI requirements. Ordinary syntax, arrows and opaque boundaries keep
+their existing behavior until implementation qualification.
 
 Validation: Deno 2.9.7 Markdown formatting plus local file/heading checks only.
 The generated check log/pins are preserved in ignored

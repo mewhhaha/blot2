@@ -63,8 +63,8 @@ fn discover(a: std.mem.Allocator, units: []const core.Module, roots: []const Nod
                 for (m.updateSelectors(current.id)) |selector| if (selector.kind == .index) try pending.append(a, .{ .unit = m.unit, .id = selector.index });
                 try pending.append(a, .{ .unit = m.unit, .id = info.value });
             },
-            .return_, .project, .force, .usage_read, .usage_share => try pending.append(a, .{ .unit = m.unit, .id = n.a }),
-            .closure, .suspend_ => try pending.append(a, .{ .unit = m.unit, .id = if (n.tag == .closure) m.closure(current.id).body else m.suspension(current.id).body }),
+            .return_, .project, .usage_read, .usage_share => try pending.append(a, .{ .unit = m.unit, .id = n.a }),
+            .closure => try pending.append(a, .{ .unit = m.unit, .id = m.closure(current.id).body }),
             .loop => {
                 const loop = m.loopInfo(current.id);
                 for ([_]core.Id{ loop.first, loop.end, loop.body }) |id| try pending.append(a, .{ .unit = m.unit, .id = id });

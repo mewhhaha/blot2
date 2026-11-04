@@ -203,11 +203,11 @@ Deno.test("editing an unrelated function preserves callers of an inlined body", 
   };
   const compiler = await createCompiler(options);
   const lib =
-    `const select = func (a: Bool) => return func ~(b: U32) => return if a then @demand b else 0
+    `const select = func (a: Bool) => return func b => return if a then b () else 0
 const work = func (count: U32) => return do:
   let total = 0
   for i in 0..count:
-    total := total + select true i
+    total := total + select true (func () => return i)
   break total
 const unrelated = func (x: U32) => return x + 1
 `;
@@ -219,7 +219,7 @@ const unrelated = func (x: U32) => return x + 1
         [lib, 45, false],
         [lib.replace("x + 1", "x + 2"), 45, true],
         [
-          lib.replace("then @demand b else 0", "then 0 else @demand b"),
+          lib.replace("then b () else 0", "then 0 else b ()"),
           0,
           false,
         ],

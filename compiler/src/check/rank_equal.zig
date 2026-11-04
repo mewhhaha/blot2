@@ -74,7 +74,7 @@ fn Walker(comptime Store: type) type {
                     return self.equal(a.a, b.a);
                 },
                 .function => return try self.equal(a.a, b.a) and try self.equal(a.b, b.b) and try self.row(a.c, b.c),
-                .demand, .provider => return try self.equal(a.a, b.a) and try self.row(a.c, b.c),
+                .provider => return try self.equal(a.a, b.a) and try self.row(a.c, b.c),
                 .array, .list, .cursor, .resolver => return self.equal(a.a, b.a),
                 .state_provider => return try self.equal(a.a, b.a) and try self.equal(a.b, b.b) and try self.equal(a.c, b.c),
                 .usage => return a.b == b.b and (a.c == 0) == (b.c == 0) and try self.equal(a.a, b.a) and (a.c == 0 or try self.equal(a.c, b.c)),

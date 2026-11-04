@@ -552,12 +552,6 @@
         }
       },
       {
-        "rule": "demand_type",
-        "boundary": {
-          "kind": "root"
-        }
-      },
-      {
         "rule": "constructor_reference",
         "boundary": {
           "kind": "root"

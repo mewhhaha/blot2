@@ -6,7 +6,7 @@
 - **Dependencies:** [031](031-implement-shared-reference-counting.md)
 - **Originating requirements:** PLAN: Earlier programs / escaping ownership;
   DEMANDS: Effects and lifetime. Sources: [PLAN.md](../PLAN.md),
-  [Demand evaluation](../docs/compiler/DEMANDS.md).
+  [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -18,9 +18,9 @@ aggregates and roots surviving guest calls.
 ## Starting point
 
 [core_backend.zig](../compiler/src/backend/core_backend.zig) materializes
-closures/demands and globals; [host/guest.ts](../host/guest.ts) manages
-guest invocation boundaries. Local lifetime proofs deliberately reject many
-escaping cases.
+closures/demands and globals; [host/guest.ts](../host/guest.ts) manages guest
+invocation boundaries. Local lifetime proofs deliberately reject many escaping
+cases.
 
 ## Implementation checklist
 

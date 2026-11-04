@@ -427,7 +427,7 @@ fn bodyFlow(a: A, module: *const wasm.Module, body: *const ir.Function, frame_ki
                     const values = stack.items[start..];
                     if (stack_heads and inst.op == .call) {
                         const arena = module.arena.?;
-                        inline for (.{ "root_open", "root_close", "root_leave", "root_pop", "root_enter", "root_store", "root_reserve", "root_force" }) |field| if (inst.operand == @field(arena, field)) return false;
+                        inline for (.{ "root_open", "root_close", "root_leave", "root_pop", "root_enter", "root_store", "root_reserve" }) |field| if (inst.operand == @field(arena, field)) return false;
                     }
                     if (stack_heads and !dead(controls.items, locals, versions, observed)) for (values, 0..) |value, index| {
                         if (!value.hasFrame() or inst.op != .call or index != 0) continue;

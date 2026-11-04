@@ -41,8 +41,8 @@ fn visit(m: *const core.Module, id: core.Id, uses: []u32, depth: usize, budget: 
             for (m.updateSelectors(id)) |selector| if (selector.kind == .index) try visit(m, selector.index, uses, depth + 1, budget);
             try visit(m, info.value, uses, depth + 1, budget);
         },
-        .return_, .project, .force, .usage_read, .usage_share => try visit(m, n.a, uses, depth + 1, budget),
-        .closure, .suspend_ => for (if (n.tag == .suspend_) m.suspensionCaptures(id) else m.closureCaptures(id)) |binding| {
+        .return_, .project, .usage_read, .usage_share => try visit(m, n.a, uses, depth + 1, budget),
+        .closure => for (m.closureCaptures(id)) |binding| {
             reference(m, .{ .binding = binding }, uses);
         },
         .loop => {

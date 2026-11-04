@@ -37,7 +37,6 @@ const Request = struct {
     dependencies: ?[]const u8 = null,
     profileBackend: bool = false,
     profileTrace: bool = false,
-    explainDemands: bool = false,
     explainAllocations: bool = false,
     codegenTier: @import("../compilation_tier.zig").Tier = .optimized,
     storage: ?@import("../backend/storage_plan.zig").Budgets = null,
@@ -152,7 +151,6 @@ const OpenProject = struct {
         errdefer session.deinit();
         session.compiler_identity = compiler;
         session.profile_backend = request.profileBackend;
-        session.explain_demands = request.explainDemands;
         session.explain_allocations = request.explainAllocations;
         session.policy.codegen_tier = request.codegenTier;
         session.policy.storage = request.storage orelse .{};
@@ -430,7 +428,6 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .phaseProfile = if (profile) |*owner| owner.record() else phase_profile.Record{},
                 .sessionHeap = if (profile != null or opened.profile_trace) session_heap.Heap.snapshot(a) else null,
                 .workCounters = result.result.compiled.counters,
-                .demandLowering = result.result.compiled.demand_lowering,
                 .allocationSites = result.result.compiled.allocation_emission,
                 .arrayCosts = result.array_costs,
                 .principals = result.result.compiled.principal,
@@ -656,7 +653,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
             },
             .build, .close, .checkpoint, .complete => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
-                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.profileTrace or request.explainDemands or request.explainAllocations or request.codegenTier != .optimized or request.shareMachineCode or request.profileMemory or request.requireCollectorFree or request.codegenWorkers != default_codegen_workers or request.checkpoint) return error.InvalidRequest;
+                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.profileTrace or request.explainAllocations or request.codegenTier != .optimized or request.shareMachineCode or request.profileMemory or request.requireCollectorFree or request.codegenWorkers != default_codegen_workers or request.checkpoint) return error.InvalidRequest;
                 if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
                 if (request.kind == .complete) {
                     if (request.snapshot == null or request.filename == null or request.position == null or request.filename.?.len > 4096 or !validPath(request.filename.?)) return error.InvalidCompletionRequest;

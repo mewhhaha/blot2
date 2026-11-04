@@ -21,9 +21,9 @@ checked/evaluated in the surrounding stage, then its owned typed graph is
 grafted into the quoted graph. `@code.lift value` inside quote embeds an already
 available closed immutable value. Only scalars and recursively closed
 aggregates/nominals with portable layouts are liftable. Live capabilities,
-borrows, resources, demands, host callbacks and local skolems reject crossing.
-Immutable asset references lift as symbolic manifest references tied to exact
-parsed bytes, never by reopening their origin.
+borrows, resources, host callbacks and local skolems reject crossing. Immutable
+asset references lift as symbolic manifest references tied to exact parsed
+bytes, never by reopening their origin.
 
 `@code.emit code` is a generation site: splice its typed body into the ordinary
 surrounding program, adding its latent effects to that site's row.
@@ -139,5 +139,6 @@ result crosses the boundary.
 General named pattern/request/resolver helpers, captured loans and general
 resource captures, general qualified producer transport and complete generated
 declaration/source map support remain unfinished. Full combined compiler and
-cost qualification remain open; [the staging record](../qualification/STAGING_QUALIFICATION.md)
-separates focused results from completion of 067/068.
+cost qualification remain open;
+[the staging record](../qualification/STAGING_QUALIFICATION.md) separates
+focused results from completion of 067/068.

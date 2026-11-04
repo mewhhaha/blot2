@@ -98,7 +98,8 @@ checking a demand chain still costs more than checking its explicit control.
 Accepted harness pins are `06fe73ac…522d10` / `5467bf2f…18c4f`; the rejected
 identical-predicate screen remains separate. Full pins and samples are in
 `chains/{compiler-report,manifest,guest-report-1,guest-report-2,guest-report-3,guest-summary}.json`.
-See [DEMANDS](../compiler/DEMANDS.md) for semantics and bounds.
+The former demand semantics and bounds are historical; see
+[deferred work](../compiler/DEFERRED_WORK.md).
 
 ## Task 055: completed associated members
 

@@ -118,36 +118,6 @@ Deno.test("task contexts count a parent capture while it is retained by another 
   r.call("drop", child);
 });
 
-Deno.test("task context failure makes only its evaluating demands terminal", async () => {
-  const r = await runtime();
-  function evaluating() {
-    const demand = r.call("root_allocate", 16, 2);
-    r.put(demand + 8, 1);
-    r.call("root_force", demand);
-    return demand;
-  }
-  const parent = r.call("create", 0);
-  r.call("root_enter");
-  const parentDemand = evaluating();
-  // Keep an external counted edge so terminal state remains observable.
-  r.call("retain", parentDemand);
-  r.call("save", parent);
-  const child = r.call("create", 0);
-  r.call("restore", child);
-  r.call("root_enter");
-  const childDemand = evaluating();
-  r.call("retain", childDemand);
-  r.call("root_leave", 1);
-  assert.equal(r.word(childDemand + 8), 3);
-  assert.equal(r.word(parentDemand + 8), 1);
-  r.call("save", child);
-  r.call("restore", parent);
-  r.call("root_leave", 1);
-  assert.equal(r.word(parentDemand + 8), 3);
-  r.call("save", parent);
-  r.call("drop", child);
-  r.call("drop", parent);
-});
 
 Deno.test("task context admission rejects an incomplete ownership runtime and live-frame retirement", async () => {
   const r = await runtime();

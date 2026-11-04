@@ -148,7 +148,7 @@ const Scan = struct {
                 }
                 return false;
             },
-            // Arithmetic, dispatch, handlers, mutable/usage data, suspensions
+            // Arithmetic, dispatch, handlers, mutable/usage data
             // and unowned references do not receive a totality certificate.
             else => return false,
         }

@@ -31,7 +31,7 @@ fn compile(allocator: std.mem.Allocator, source: []const u8) !backend.Result {
 const waiting_array =
     \\type Box is data = $Box U32
     \\const Box.read = func value => return 42
-    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const keep = func (value: Unit -> U32) => return value
     \\const helper = func () => return ($Box 1).read
     \\const pending = keep helper
     \\let first: U32 = @array.length #[pending]
@@ -39,49 +39,49 @@ const waiting_array =
 ;
 const ready_self =
     \\type Box is data = $Box U32
-    \\const Box.read = func value => return first
-    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const Box.read = func value => return 42
+    \\const keep = func (value: Unit -> U32) => return value
     \\const helper = func () => return ($Box 1).read
     \\const pending = keep helper
-    \\const cached = @demand pending
+    \\const cached = pending
     \\let first: U32 = cached ()
     \\entry const answer: Unit -> U32 = func () => return first
 ;
 const mixed_waiting =
     \\type Box is data = $Box U32
     \\const Box.read = func value => return second
-    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const keep = func (value: Unit -> U32) => return value
     \\const helper = func () => return ($Box 1).read
     \\const ready_pending = keep helper
     \\const waiting_pending = keep helper
-    \\const cached = @demand ready_pending
+    \\const cached = ready_pending
     \\let first: U32 = cached ()
-    \\let second: U32 = (@demand waiting_pending) ()
+    \\let second: U32 = (waiting_pending) ()
     \\entry const answer: Unit -> U32 = func () => return @u32.add first second
 ;
 const returned_waiting =
     \\type Box is data = $Box U32
     \\const Box.read = func value => return second
-    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const keep = func (value: Unit -> U32) => return value
     \\const helper = func () => return ($Box 1).read
     \\const ready_pending = keep helper
     \\const waiting_pending = keep helper
     \\const provide = func () => return waiting_pending
-    \\const cached = @demand ready_pending
+    \\const cached = ready_pending
     \\let first: U32 = cached ()
-    \\let second: U32 = (@demand (provide ())) ()
+    \\let second: U32 = ((provide ())) ()
     \\entry const answer: Unit -> U32 = func () => return @u32.add first second
 ;
 const array_waiting =
     \\type Box is data = $Box U32
     \\const Box.read = func value => return second
-    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const keep = func (value: Unit -> U32) => return value
     \\const helper = func () => return ($Box 1).read
     \\const ready_pending = keep helper
     \\const waiting_store = #[keep helper]
-    \\const cached = @demand ready_pending
+    \\const cached = ready_pending
     \\let first: U32 = cached ()
-    \\let second: U32 = (@demand (@array.get waiting_store 0)) ()
+    \\let second: U32 = ((@array.get waiting_store 0)) ()
     \\entry const answer: Unit -> U32 = func () => return @u32.add first second
 ;
 fn succeeds(allocator: std.mem.Allocator) !void {
@@ -114,18 +114,15 @@ fn waitingProof(allocator: std.mem.Allocator) !void {
     defer session.deinit();
     var pending: core_eval.ValueId = 0;
     for (module.bodies[1..]) |body| {
-        if (!body.is_function and !body.runtime and module.types.node(body.scheme.root).tag == .demand) pending = try session.richValue(.{ .unit = 1, .binding = body.binding });
+        if (!body.is_function and !body.runtime and std.mem.eql(u8, module.name(body.declaration_name), "pending")) pending = try session.richValue(.{ .unit = 1, .binding = body.binding });
     }
     try std.testing.expect(pending != 0);
-    try std.testing.expect(session.suspensionCached(pending) == null);
     const prior = session.valueInfo(pending);
     const evidence = session.valueEvidence(pending);
     const demanded = session.demanded;
-    const selected = try session.inferSuspension(pending);
-    try std.testing.expectEqual(core_eval.ValueKind.suspension, session.valueInfo(selected).kind);
+    const selected = try session.inferClosure(pending);
+    try std.testing.expectEqual(core_eval.ValueKind.closure, session.valueInfo(selected).kind);
     try std.testing.expect(session.valueEvidence(selected) != 0);
-    try std.testing.expect(session.suspensionCached(pending) == null);
-    try std.testing.expect(session.suspensionCached(selected) == null);
     try std.testing.expectEqual(prior, session.valueInfo(pending));
     try std.testing.expectEqual(evidence, session.valueEvidence(pending));
     try std.testing.expectEqual(demanded, session.demanded);
@@ -133,16 +130,16 @@ fn waitingProof(allocator: std.mem.Allocator) !void {
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
 }
-test "unforced waiting array keeps its demand pending while full retained bodies close representation rows" {
+test "uncalled callback arrays keep source values unchanged while retained bodies close representation rows" {
     try waitingProof(a);
 }
-test "full waiting demand inference and emission release every failed allocation" {
+test "full callback inference and emission release every failed allocation" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, waitingProof, .{});
 }
-test "fresh waiting region preserves an independently cached returned operand without weakening its own calls" {
-    const prefix = "type Box is data = $Box U32\nconst Box.read = func value => return second\nconst keep = func ~(value: Unit -> U32) => return value\nconst helper = func () => return ($Box 1).read\nconst ready_pending = keep helper\nconst cached = @demand ready_pending\nconst make = func (action: Unit -> U32) => return func () => return keep action\nconst fetch = make cached\n";
+test "returned callbacks keep their complete selected operand through startup" {
+    const prefix = "type Box is data = $Box U32\nconst Box.read = func value => return 42\nconst keep = func (value: Unit -> U32) => return value\nconst helper = func () => return ($Box 1).read\nconst ready_pending = keep helper\nconst cached = ready_pending\nconst make = func (action: Unit -> U32) => return func () => return keep action\nconst fetch = make cached\n";
     for ([_][]const u8{
-        prefix ++ "let second: U32 = (@demand (fetch ())) ()\nentry const answer: Unit -> U32 = func () => return second\n",
+        prefix ++ "let second: U32 = ((fetch ())) ()\nentry const answer: Unit -> U32 = func () => return second\n",
         prefix ++ "let second: U32 = @array.length #[fetch ()]\nentry const answer: Unit -> U32 = func () => return second\n",
     }) |source| {
         var result = try compile(a, source);
@@ -178,60 +175,51 @@ test "generic retained scalar context declines an uncovered runtime callable cyc
 test "generic retained scalar context releases every failed allocation" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, genericTaggedProof, .{});
 }
-fn nestedDemandProof(allocator: std.mem.Allocator) !void {
-    const source = "type Box is data = $Box U32\nconst Box.read=func value=> return 42\nconst keep=func ~(value:Unit->U32)=> return value\nconst helper=func ()=> return ($Box 1).read\nconst unforced=keep helper\nconst ready_pending=keep helper\nconst cached=@demand ready_pending\nconst make=func (action:Unit->U32)=> return func ()=> return keep action\nentry const fetch=make cached\n";
+fn nestedCallbackProof(allocator: std.mem.Allocator) !void {
+    const source = "type Box is data = $Box U32\nconst Box.read=func value=> return 42\nconst keep=func (value:Unit->U32)=> return value\nconst helper=func ()=> return ($Box 1).read\nconst unforced=keep helper\nconst ready_pending=keep helper\nconst cached=ready_pending\nconst make=func (action:Unit->U32)=> return func ()=> return keep action\nentry const fetch=make cached\n";
     var module = try lower(allocator, source);
     defer module.deinit(allocator);
     for ([_]bool{ true, false }) |recipes| {
         var session = try core_eval.Session.init(allocator, &.{module});
         defer session.deinit();
         session.options.reuse_body_recipes = recipes;
-        session.options.retain_source_suspensions = true;
         var unforced: core.BindingRef = undefined;
-        for (module.bodies[1..]) |body| if (module.types.node(body.scheme.root).tag == .demand) {
+        for (module.bodies[1..]) |body| if (std.mem.eql(u8, module.name(body.declaration_name), "unforced")) {
             unforced = .{ .unit = 1, .binding = body.binding };
             break;
         };
-        const pending = try session.richValue(unforced);
+        _ = try session.richValue(unforced);
         const fetch = for (module.bodies[1..]) |body| {
             if (body.exported) break core.BindingRef{ .unit = 1, .binding = body.binding };
         } else return error.MissingExport;
         const raw = try session.richValue(fetch);
-        const memo = try allocator.dupe(core_eval.Demand, session.storage.demands.items);
-        defer allocator.free(memo);
         const info = session.valueInfo(raw);
         const steps = session.steps;
-        const records = session.retained.source_suspensions.items.len;
         const inferred = try session.inferClosure(raw);
         try std.testing.expectEqual(steps, session.steps);
-        try std.testing.expectEqual(records, session.retained.source_suspensions.items.len);
-        try std.testing.expectEqualDeep(memo, session.storage.demands.items[0..memo.len]);
         try std.testing.expectEqual(info, session.valueInfo(raw));
-        try std.testing.expect(session.suspensionCached(pending) == null);
         const arrow = session.storage.evidence.node(session.valueEvidence(inferred));
         try std.testing.expectEqual(@import("../eval/type_evidence.zig").Tag.function, arrow.tag);
-        const demand = session.storage.evidence.node(arrow.b);
-        try std.testing.expectEqual(@import("../eval/type_evidence.zig").Tag.demand, demand.tag);
+        const callback = session.storage.evidence.node(arrow.b);
+        try std.testing.expectEqual(@import("../eval/type_evidence.zig").Tag.function, callback.tag);
         const wrong_callback = try session.storage.evidence.intern(.function, 1, 4, &.{});
-        const wrong_demand = try session.storage.evidence.intern(.demand, wrong_callback, 0, &.{});
-        const wrong = try session.storage.evidence.intern(.function, 1, wrong_demand, &.{});
+        const wrong = try session.storage.evidence.intern(.function, 1, wrong_callback, &.{});
         if (session.specializeClosure(raw, wrong)) |_| return error.ExpectedTypeMismatch else |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.Declined => {},
             error.RequestUnwind => return error.TestUnexpectedResult,
         }
         try std.testing.expectEqual(core_eval.Code.type_mismatch, session.diagnostic.?.code);
-        try std.testing.expectEqualDeep(memo, session.storage.demands.items[0..memo.len]);
     }
 }
-test "completed source demand bodies preserve memo state and selected type negatives with recipes on and off" {
-    try nestedDemandProof(a);
+test "completed source callback bodies preserve values and selected type negatives with recipes on and off" {
+    try nestedCallbackProof(a);
 }
-test "completed source demand body inference releases every failed allocation" {
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nestedDemandProof, .{});
+test "completed source callback body inference releases every failed allocation" {
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nestedCallbackProof, .{});
 }
-test "completed demand body cannot erase the returned callback latent effect" {
-    const source = "effect Read:Unit->U32\nconst keep=func ~value=> return value\nconst action=func ()=> return do:\n  use value<-Read ()\n  break value\nconst make=func action=> return func ()=> return keep action\nentry const fetch=make action\n";
+test "completed callback body cannot erase the returned callback latent effect" {
+    const source = "effect Read:Unit->U32\nconst keep=func value=> return value\nconst action=func ()=> return do:\n  use value<-Read ()\n  break value\nconst make=func action=> return func ()=> return keep action\nentry const fetch=make action\n";
     var module = try lower(a, source);
     defer module.deinit(a);
     var session = try core_eval.Session.init(a, &.{module});
@@ -242,21 +230,19 @@ test "completed demand body cannot erase the returned callback latent effect" {
     const raw = try session.richValue(fetch);
     const inferred = try session.inferClosure(raw);
     const arrow = session.storage.evidence.node(session.valueEvidence(inferred));
-    const demand = session.storage.evidence.node(arrow.b);
-    const callback = session.storage.evidence.node(demand.a);
+    const callback = session.storage.evidence.node(arrow.b);
     try std.testing.expect(session.storage.evidence.view().effects.rowLabels(callback.c).len != 0);
     const pure_callback = try session.storage.evidence.intern(.function, 1, 3, &.{});
-    const pure_demand = try session.storage.evidence.intern(.demand, pure_callback, 0, &.{});
-    const pure = try session.storage.evidence.intern(.function, 1, pure_demand, &.{});
+    const pure = try session.storage.evidence.intern(.function, 1, pure_callback, &.{});
     try std.testing.expectError(error.Declined, session.specializeClosure(raw, pure));
     try std.testing.expectEqual(core_eval.Code.effect_mismatch, session.diagnostic.?.code);
 }
 fn nestedArrayEmission(allocator: std.mem.Allocator) !void {
-    const source = "type Box is data= $Box U32\nconst Box.read=func value=> return second\nconst keep=func ~(value:Unit->U32)=> return value\nconst helper=func ()=> return ($Box 1).read\nconst pending=keep helper\nconst cached=@demand pending\nconst make=func (action:Unit->U32)=> return func ()=> return keep action\nconst fetch=make cached\nlet second:U32=@array.length #[fetch ()]\nentry const answer:Unit->U32=func ()=> return second\n";
+    const source = "type Box is data= $Box U32\nconst Box.read=func value=> return 42\nconst keep=func (value:Unit->U32)=> return value\nconst helper=func ()=> return ($Box 1).read\nconst pending=keep helper\nconst cached=pending\nconst make=func (action:Unit->U32)=> return func ()=> return keep action\nconst fetch=make cached\nlet second:U32=@array.length #[fetch ()]\nentry const answer:Unit->U32=func ()=> return second\n";
     var result = try compile(allocator, source);
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
 }
-test "nested pending demand representation emission releases every failed allocation" {
+test "nested callback representation emission releases every failed allocation" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nestedArrayEmission, .{});
 }

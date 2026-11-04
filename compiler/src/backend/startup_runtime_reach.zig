@@ -144,10 +144,6 @@ const Reach = struct {
                         .code, .staged_value => try self.children(value),
                         .package, .product, .record, .nominal, .array, .list, .cursor, .provider, .state_provider, .computation, .request_decision => try self.children(value),
                         .closure => try self.closure(value),
-                        .suspension => if (self.session.suspensionCached(value)) |cached|
-                            try self.work.append(self.allocator, .{ .value = cached })
-                        else
-                            try self.closure(value),
                     }
                 },
             }
@@ -155,8 +151,7 @@ const Reach = struct {
     }
 };
 /// No evaluation, representation inference or mutation of frozen Core occurs.
-/// Waiting demands contribute computation code; ready demands contribute the
-/// cached value. Function-only declaration SCCs remain ordinary executable code.
+/// Function-only declaration SCCs remain ordinary executable code.
 pub fn collect(allocator: Allocator, units: []const core.Module, declarations: *const graph.Graph, session: *eval.Session, selected: []const bool, entry: u32) Error!Result {
     if (selected.len != declarations.nodes.len) return error.InvalidDependencyGraph;
     const reached = try allocator.alloc(bool, selected.len);

@@ -61,7 +61,7 @@ pub fn scope(a: A, source: F.Source, contract: anytype, root: T.Id, member: bool
             .function => {
                 try work.appendSlice(a, &.{ .{ .id = n.a, .depth = item.depth + 1 }, .{ .id = n.b, .depth = item.depth + 1 }, .{ .id = n.c, .row = true, .depth = item.depth + 1 } });
             },
-            .demand, .provider => try work.appendSlice(a, &.{ .{ .id = n.a, .depth = item.depth + 1 }, .{ .id = n.c, .row = true, .depth = item.depth + 1 } }),
+            .provider => try work.appendSlice(a, &.{ .{ .id = n.a, .depth = item.depth + 1 }, .{ .id = n.c, .row = true, .depth = item.depth + 1 } }),
             .usage, .array, .list, .cursor, .resolver => try work.append(a, .{ .id = n.a, .depth = item.depth + 1 }),
             .state_provider => for ([_]u32{ n.a, n.b, n.c }) |id| try work.append(a, .{ .id = id, .depth = item.depth + 1 }),
             .product => for (source.list(.{ .start = n.a, .len = n.b })) |id| try work.append(a, .{ .id = id, .depth = item.depth + 1 }),

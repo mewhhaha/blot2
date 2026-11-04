@@ -89,7 +89,6 @@ pub const Cache = struct {
         // Backend tracing modes are supported, but remain exact key inputs.
         // Nonstandard budgets and alternative reuse policies decline sharing.
         ordinary.trace_runtime_dependencies = false;
-        ordinary.retain_source_suspensions = false;
         return self.enabled and session.receipt_tape == null and session.principal_reads == null and
             session.inquiry_regions == 0 and std.meta.eql(ordinary, eval.Options{}) and
             session.valueInfo(value).kind == .closure and
@@ -144,7 +143,7 @@ pub const Cache = struct {
         }
         for (session.storage.values.items[proof.values_before..]) |value| switch (value.kind) {
             .scalar, .product, .record, .nominal, .array, .list, .cursor, .closure => {},
-            // Creation and mutable demand/provider state need a stronger plan.
+            // Creation and mutable provider state need a stronger plan.
             else => return,
         };
         var result: Replay = .{ .selected = proof.selected };

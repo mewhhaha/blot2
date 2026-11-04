@@ -8,7 +8,7 @@ const repo = new URL("../../", import.meta.url).pathname;
 const prelude = `${repo}std/prelude.blot`;
 const stdRoot = `${repo}std`;
 
-// Body edits with unchanged types still change values, demand control flow
+// Body edits with unchanged types still change values, callback control flow
 // and effect traces. Semantic receipts may survive; executable callers must
 // follow the current bodies exactly like fresh builds.
 Deno.test("body edits with unchanged interfaces update executable callers", async () => {
@@ -17,7 +17,7 @@ Deno.test("body edits with unchanged interfaces update executable callers", asyn
   const options = { executable, entry, prelude, stdRoot };
   const variants = {
     helper: "x + 1",
-    pick: "if flag then @demand value else 7",
+    pick: "if flag then value () else 7",
     bump: "use State.set U32 (old + 1)",
   };
   const source = (edit: Partial<typeof variants>) => {
@@ -25,13 +25,13 @@ Deno.test("body edits with unchanged interfaces update executable callers", asyn
     return `type State a is effect = { get: Unit -> a, set: a -> Unit }
 const state = @effect.state (State.get U32) (State.set U32) 0
 const helper = func (x: U32) : U32 => return ${v.helper}
-const pick = func (flag: Bool) => return func ~(value: U32) => return ${v.pick}
+const pick = func (flag: Bool) => return func value => return ${v.pick}
 const bump = func () => return do:
   use old <- State.get U32 ()
   ${v.bump}
   break old
 entry const via_helper = func (x: U32) : U32 => return helper (helper x)
-entry const lazy = func (n: U32) : U32 => return pick (n == 0) (40 + 2)
+entry const lazy = func (n: U32) : U32 => return pick (n == 0) (func () => return 40 + 2)
 entry const effects = func () : U32 => return do:
   let (final, first) = do state:
     use a <- bump ()
@@ -53,7 +53,7 @@ entry const unrelated = func (x: U32) : U32 => return do:
     [{}, 1, [42, 7], 3],
     [{ helper: "x + 2" }, 2, [42, 7], 3],
     [{ helper: "2 + x" }, 2, [42, 7], 3],
-    [{ pick: "if flag then 7 else @demand value" }, 1, [7, 42], 3],
+    [{ pick: "if flag then 7 else value ()" }, 1, [7, 42], 3],
     [{ bump: twice }, 1, [42, 7], 6],
     [{ helper: "x +" }, 0, [0, 0], 0],
     [{}, 1, [42, 7], 3],
@@ -109,8 +109,8 @@ const edits: [string, string, string][] = [
   ["lists", "[1, 2, 3]", "[1, 2, 3, 4]"],
   [
     "syntax",
-    "if left then @demand right else false",
-    "if left then (@demand right) and left else false",
+    "if left then right () else false",
+    "if left then (right ()) and left else false",
   ],
   ["monads", "$Some 40", "$Some (40 + 0)"],
 ];

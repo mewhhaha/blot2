@@ -11,7 +11,7 @@ fn invocationActive(value: *const @import("frozen_dependency.zig").FrozenDepende
 }
 comptime {
     for (std.meta.tags(core.Tag)) |tag| switch (tag) {
-        .invalid, .constant, .reference, .scalar, .logical, .call, .if_value, .block, .suite, .bind, .return_, .if_stmt, .product, .record, .construct, .project, .match, .pattern_bind, .update, .array, .array_op, .closure, .apply, .constructor_function, .associated, .primitive_function, .panic, .loop, .break_, .type_same, .result_associated, .suspend_, .force, .type_constructor, .resolver_op, .operation_value, .effect_provider, .state_provider, .handle, .effect_reflection, .computation, .request_loop, .request_decision, .record_merge, .contract_method, .effect_scope, .proof_guard, .package_pack, .package_unpack, .staging, .usage_borrow, .usage_read, .resource_scope, .usage_share, .resource_acquire, .resource_release, .task, .storage => {},
+        .invalid, .constant, .reference, .scalar, .logical, .call, .if_value, .block, .suite, .bind, .return_, .if_stmt, .product, .record, .construct, .project, .match, .pattern_bind, .update, .array, .array_op, .closure, .apply, .constructor_function, .associated, .primitive_function, .panic, .loop, .break_, .type_same, .result_associated, .type_constructor, .resolver_op, .operation_value, .effect_provider, .state_provider, .handle, .effect_reflection, .computation, .request_loop, .request_decision, .record_merge, .contract_method, .effect_scope, .proof_guard, .package_pack, .package_unpack, .staging, .usage_borrow, .usage_read, .resource_scope, .usage_share, .resource_acquire, .resource_release, .task, .storage => {},
     };
 }
 fn unitField(comptime Record: type, comptime name: []const u8) bool {
@@ -64,7 +64,7 @@ const Inputs = struct {
             switch (value.tag) {
                 .nominal, .projection, .type_constructor, .instance_selection, .instance_version => self.add(value.a),
                 .scoped => self.add(value.b),
-                .absent, .unit, .boolean, .u32, .f32, .never, .variable, .function, .product, .record, .array, .list, .cursor, .demand, .resolver, .provider, .state_provider, .erased_proof, .forall, .existential, .bound, .rigid, .usage => {},
+                .absent, .unit, .boolean, .u32, .f32, .never, .variable, .function, .product, .record, .array, .list, .cursor, .resolver, .provider, .state_provider, .erased_proof, .forall, .existential, .bound, .rigid, .usage => {},
             }
             return;
         }

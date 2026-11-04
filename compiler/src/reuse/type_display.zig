@@ -91,12 +91,12 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
             try text(engine, bytes, "?t");
             try number(engine, bytes, node.a);
         },
-        .array, .list, .cursor, .demand => {
+        .array, .list, .cursor => {
             try text(engine, bytes, switch (node.tag) {
                 .array => "Array ",
                 .list => "List ",
                 .cursor => "Cursor ",
-                else => "~",
+                else => unreachable,
             });
             try render(engine, bytes, node.a, depth + 1, budget, stable);
         },

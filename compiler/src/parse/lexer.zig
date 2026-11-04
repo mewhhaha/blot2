@@ -89,7 +89,7 @@ fn hex(c: u8) bool {
     return digit(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F');
 }
 fn symbolic(c: u8) bool {
-    return std.mem.findScalar(u8, "+*$%=!<>^&|?-", c) != null;
+    return std.mem.findScalar(u8, "+*$%=!<>^&|?~-", c) != null;
 }
 
 const Number = struct { end: usize, tag: Tag };
@@ -312,7 +312,6 @@ fn scan(allocator: Allocator, source: []const u8, result: *Result) Allocator.Err
             '#' => .hash,
             '@' => .at,
             '`' => .backtick,
-            '~' => .tilde,
             ':' => if (at < source.len and source[at] == '=') blk: {
                 at += 1;
                 break :blk .colon_equal;

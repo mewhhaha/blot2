@@ -161,7 +161,7 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         },
         .type_constructor => try identity(.{ .unit = node.a, .decl = node.b }, symbol_count, unit_count),
         .array, .list, .cursor, .resolver => try ty(owner, node.a),
-        .demand, .provider => {
+        .provider => {
             try ty(owner, node.a);
             try require(node.c < owner.graph.rows.len);
         },
@@ -532,7 +532,7 @@ const GraphEdges = struct {
                     break :blk null;
                 },
                 .array, .list, .cursor, .resolver => if (index == 0) n.a else null,
-                .demand, .provider => switch (index) {
+                .provider => switch (index) {
                     0 => n.a,
                     1 => self.rowStart() + n.c,
                     else => null,

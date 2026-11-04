@@ -117,8 +117,6 @@ export interface ZigProjectCompilerOptions {
   profileBackend?: boolean;
   /** Stream bounded phase, module and region progress records over stderr. */
   profileTrace?: boolean;
-  /** Collect bounded source-site demand lowering decisions. */
-  explainDemands?: boolean;
   /** Collect bounded allocation sites and array ownership decisions. */
   explainAllocations?: boolean;
   /** Development skips optional scalar/vector passes; checking and cleanup remain. */
@@ -1501,7 +1499,6 @@ export async function createZigProjectCompiler(
     "dependencies",
     "profileBackend",
     "profileTrace",
-    "explainDemands",
     "explainAllocations",
     "codegenTier",
     "storage",
@@ -1585,12 +1582,6 @@ export async function createZigProjectCompiler(
     throw new TypeError("explainAllocations must be a boolean");
   }
   if (
-    options.explainDemands !== undefined &&
-    typeof options.explainDemands !== "boolean"
-  ) {
-    throw new TypeError("explainDemands must be a boolean");
-  }
-  if (
     options.codegenTier !== undefined &&
     options.codegenTier !== "optimized" && options.codegenTier !== "development"
   ) {
@@ -1655,7 +1646,6 @@ export async function createZigProjectCompiler(
     ...(checkpoint ? { checkpoint: true } : {}),
     ...(options.profileBackend ? { profileBackend: true } : {}),
     ...(options.profileTrace ? { profileTrace: true } : {}),
-    ...(options.explainDemands ? { explainDemands: true } : {}),
     ...(options.explainAllocations ? { explainAllocations: true } : {}),
     ...(options.codegenTier ? { codegenTier: options.codegenTier } : {}),
     ...(storage ? { storage } : {}),

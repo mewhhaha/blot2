@@ -10,7 +10,7 @@ const memory = @import("../runtime/memory.zig");
 const a = std.testing.allocator;
 
 fn effectFixture() !Fixture {
-    var fixture = try Fixture.init("entry const chronology = func () => return 42\nentry const principal = func ~(value: U32) => return @demand value\n");
+    var fixture = try Fixture.init("entry const chronology = func () => return 42\nentry const principal = func (value: Unit -> U32) => return value ()\n");
     errdefer fixture.deinit();
     var store = &fixture.checked.types;
     const early = try store.internOperation(.{ .unit = 7, .decl = 9 }, &.{types.u32_type});
@@ -29,8 +29,8 @@ fn effectFixture() !Fixture {
     const open = try store.freshEffects();
     const variable = store.effects.node(open).tail.variable;
     const qualified = try store.effects.row(&.{ late, early, late }, .{ .variable = variable });
-    const demand = try store.demandWithEffects(types.u32_type, qualified);
-    const principal = try store.functionWithEffects(demand, types.u32_type, qualified);
+    const callback = try store.functionWithEffects(types.unit, types.u32_type, qualified);
+    const principal = try store.functionWithEffects(callback, types.u32_type, qualified);
     const principal_global = fixture.binding(1);
     fixture.checked.bindings[principal_global].ty = principal;
     fixture.checked.bindings[principal_global].scheme.root = principal;
@@ -38,8 +38,8 @@ fn effectFixture() !Fixture {
     const lambda_source = fixture.tree.valueDecl(fixture.tree.roots.items[1]).body;
     const lambda = fixture.tree.node(lambda_source);
     fixture.checked.expr_types[lambda_source] = principal;
-    fixture.checked.expr_types[lambda.a] = demand;
-    fixture.checked.bindings[fixture.checked.resolved[lambda.a]].ty = demand;
+    fixture.checked.expr_types[lambda.a] = callback;
+    fixture.checked.bindings[fixture.checked.resolved[lambda.a]].ty = callback;
     return fixture;
 }
 fn verifyEffects(module: *const core.Module, chronology: core.BindingId, principal: core.BindingId) !void {
@@ -54,9 +54,9 @@ fn verifyEffects(module: *const core.Module, chronology: core.BindingId, princip
     try std.testing.expectEqual(types.Effects.Tail.closed, std.meta.activeTag(module.types.row(signature.c).tail));
     const scheme = module.binding(principal).scheme;
     const arrow = module.types.node(scheme.root);
-    const demand = module.types.node(arrow.a);
-    try std.testing.expectEqual(types.Tag.demand, demand.tag);
-    try std.testing.expectEqual(arrow.c, demand.c);
+    const callback = module.types.node(arrow.a);
+    try std.testing.expectEqual(types.Tag.function, callback.tag);
+    try std.testing.expectEqual(arrow.c, callback.c);
     const qualified = module.types.row(arrow.c);
     const quantified = module.types.list(scheme.row_variables);
     try std.testing.expectEqualSlices(u32, &.{qualified.tail.variable}, quantified);
@@ -423,12 +423,10 @@ test "typed core owns export bytes types spans and control after syntax teardown
 
 test "lowering preserves unreachable traps and lazy Boolean control without evaluation" {
     var fixture = try Fixture.init(
-        \\infixr 25 (<&>) = _fixity_and
         \\infix 30 (==) = _fixity_eq
         \\const unused = @u32.div 1 0
-        \\entry const safe = (@u32.eq 0 1) <&> (@u32.div 1 0 == 0)
+        \\entry const safe = (@u32.eq 0 1) and (@u32.div 1 0 == 0)
         \\entry const chosen = if @u32.eq 1 1 then 42 else @u32.div 1 0
-        \\const _fixity_and = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
         \\const _fixity_eq = func left => return func right => return @type.call "eq" left right
     );
     defer fixture.deinit();
@@ -437,10 +435,8 @@ test "lowering preserves unreachable traps and lazy Boolean control without eval
     try std.testing.expectEqual(@as(usize, 0), module.diagnostics.len);
     try std.testing.expectEqual(core.Op.div, module.node(module.body(fixture.binding(0)).?.root).op);
     const logical = module.node(module.body(fixture.binding(1)).?.root);
-    try std.testing.expectEqual(core.Tag.call, logical.tag);
-    const demand_call = module.call(module.body(fixture.binding(1)).?.root);
-    try std.testing.expectEqual(core.Tag.suspend_, module.node(demand_call.arguments[1]).tag);
-    try std.testing.expectEqual(core.Tag.if_value, module.node(module.body(demand_call.target.binding).?.root).tag);
+    try std.testing.expectEqual(core.Tag.logical, logical.tag);
+    try std.testing.expectEqual(core.Op.and_, logical.op);
     try std.testing.expectEqual(core.Tag.if_value, module.node(module.body(fixture.binding(2)).?.root).tag);
 }
 

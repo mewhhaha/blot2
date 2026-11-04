@@ -60,7 +60,7 @@ const Walker = struct {
                 if (try self.visit(node.a, depth + 1) or try self.visit(node.b, depth + 1)) return true;
                 return self.row(node.c, depth + 1);
             },
-            .demand, .provider => {
+            .provider => {
                 if (try self.visit(node.a, depth + 1)) return true;
                 return self.row(node.c, depth + 1);
             },

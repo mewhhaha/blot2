@@ -19,7 +19,7 @@ const IdentityMetadata = runtime_identity.Metadata;
 pub const max_parameters = 16;
 pub const Key = struct { dictionaries: bool = false, instance_arguments: u32 = 0, target: core.BindingRef, parameters: [max_parameters]layout.Id = @splat(1), count: u8 = 0, result: layout.Id = 1, effects: [max_parameters]u32 = @splat(0), templates: substitution_keys.Id = 0, template_result: bool = false };
 pub const ClosureKey = struct { scalar_environment: bool = false, dictionaries: bool = false, unit: u32, catalog: u32, ty: layout.Id, captures: layout.Id, templates: substitution_keys.Id = 0, evidence: u32 = 0, rows: substitution_keys.Id = 0, parameter_template: u32 = 0, template_result: bool = false, static_values: substitution_keys.Id = 0, staged: u32 = 0 };
-pub const CapturedTemplate = struct { scalar_environment: bool = false, callable_instances: u32 = 0, staged: u32 = 0, unit: u32 = 0, node: core.Id, captures: layout.Id, templates: substitution_keys.Id, has_environment: bool, demand_cell: bool = false, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
+pub const CapturedTemplate = struct { scalar_environment: bool = false, callable_instances: u32 = 0, staged: u32 = 0, unit: u32 = 0, node: core.Id, captures: layout.Id, templates: substitution_keys.Id, has_environment: bool, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
 pub const CallableKey = struct { dictionaries: bool = false, bound_dictionaries: bool = false, instance_arguments: u32 = 0, target: core.BindingRef, ty: layout.Id, applied: u32 = 0, templates: substitution_keys.Id = 0 };
 pub const ConstructorKey = struct { unit: u32, catalog: u32, ty: layout.Id };
 pub const PrimitiveKey = struct { unit: u32, catalog: u32, ty: layout.Id, applied: u32 = 0 };
@@ -196,7 +196,7 @@ pub const Operation = struct { key: []u8, foreign: bool, runtime: u32 };
 pub const OperationLocation = union(enum) { instruction: struct { function: u32, index: u32 }, word: u32 };
 pub const OperationRelocation = struct { operation: u32, location: OperationLocation };
 pub const Function = struct { request: Request, function: u32, result_template: ?u32 = null };
-pub const Serialized = struct { value: core_eval.ValueId, ty: layout.Id, suspension: bool, address: u32 };
+pub const Serialized = struct { value: core_eval.ValueId, ty: layout.Id, address: u32 };
 pub const RuntimeGlobal = struct { target: core.BindingRef, global: u32, initializer: u32, active: bool };
 pub const Slot = struct { state: u8, traced: bool, value: core_eval.ValueId };
 pub const RequestCell = struct { state: core_eval.ValueId, exit: core_eval.ValueId, status: core.RequestDecisionKind };
@@ -303,7 +303,7 @@ pub const Pools = struct {
         free(leases, allocator, .layout_rows, self.layouts.effects.rows);
         free(leases, allocator, .layout_labels, self.layouts.effects.labels);
         const evaluator = &self.evaluator;
-        inline for (.{ "code_origins", "values", "children", "closures", "value_evidence", "type_mappings", "row_mappings", "value_records", "record_layouts", "field_names", "demands" }) |name| free(leases, allocator, @field(pool_leases.Field, name), @field(evaluator, name));
+        inline for (.{ "code_origins", "values", "children", "closures", "value_evidence", "type_mappings", "row_mappings", "value_records", "record_layouts", "field_names" }) |name| free(leases, allocator, @field(pool_leases.Field, name), @field(evaluator, name));
         inline for (.{ "proofs", "arguments", "members", "edges" }) |name| free(leases, allocator, @field(pool_leases.Field, "implementation_" ++ name), @field(evaluator.implementation_proofs, name));
         free(leases, allocator, .evidence_nodes, evaluator.evidence.nodes);
         free(leases, allocator, .evidence_extra, evaluator.evidence.extra);
@@ -343,7 +343,6 @@ pub const Context = struct {
     function_jobs: std.ArrayList(u32) = .empty,
     global_jobs: std.ArrayList(u32) = .empty,
     pools: ?Pools = null,
-    demand_summaries: @import("../backend/demand_summary.zig").Table = .{},
     principal_queries: @import("principal_query.zig").Table = .{},
     principal_graphs: core_eval.RetainedPrincipalGraphs = .{},
     specialization_queries: @import("../eval/selected_query.zig").Table = .{},
@@ -353,7 +352,6 @@ pub const Context = struct {
         return .{ .allocator = allocator };
     }
     pub fn deinit(self: *Context) void {
-        self.demand_summaries.deinit(self.allocator);
         self.principal_queries.deinit(self.allocator);
         self.principal_graphs.deinit(self.allocator);
         self.specialization_queries.deinit(self.allocator);
@@ -1039,7 +1037,7 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
     const session = &generator.evaluator;
     const old_evaluator: ?*const core_eval.Snapshot = if (previous) |pools| &pools.evaluator else null;
     var evaluator: core_eval.Snapshot = undefined;
-    inline for (.{ "code_origins", "values", "children", "closures", "value_evidence", "type_mappings", "row_mappings", "value_records", "record_layouts", "field_names", "demands" }) |name| {
+    inline for (.{ "code_origins", "values", "children", "closures", "value_evidence", "type_mappings", "row_mappings", "value_records", "record_layouts", "field_names" }) |name| {
         const Item = std.meta.Elem(@FieldType(core_eval.Snapshot, name));
         @field(evaluator, name) = try shared.dupe(@field(pool_leases.Field, name), Item, @field(session.storage, name).items, if (old_evaluator) |old| @field(old, name) else null);
     }
@@ -1145,7 +1143,7 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
     defer allocator.free(serialized_source);
     var values = generator.static_data.cache.iterator();
     var value_index: usize = 0;
-    while (values.next()) |entry| : (value_index += 1) serialized_source[value_index] = .{ .value = entry.key_ptr.value, .ty = entry.key_ptr.ty, .suspension = entry.key_ptr.suspension, .address = entry.value_ptr.* };
+    while (values.next()) |entry| : (value_index += 1) serialized_source[value_index] = .{ .value = entry.key_ptr.value, .ty = entry.key_ptr.ty, .address = entry.value_ptr.* };
     const serialized = try shared.dupe(.serialized, Serialized, serialized_source, if (previous) |old| old.serialized else null);
     const globals_source = try allocator.alloc(RuntimeGlobal, generator.planning.runtime_globals.count());
     defer allocator.free(globals_source);

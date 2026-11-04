@@ -566,51 +566,6 @@ test "imported nominal families and associated schemes preserve structured ident
     try std.testing.expectEqual(types.f32_type, main.bindings[floating.binding].ty);
 }
 
-test "imported result and demand schemes keep owned quantified relations and numeric target identity" {
-    var fixture = try Fixture.init(&.{
-        .{ .name = "main.blot", .text =
-        \\import * as lib from "./library"
-        \\import { convert as from, delay as suspend } from "./library"
-        \\entry const integer=func()=> return do:
-        \\  let $lib.Box value:lib.Box U32=from 42
-        \\  break @demand (suspend value)
-        \\entry const floating=func()=> return do:
-        \\  let $lib.Box value:lib.Box F32=lib.convert 1.25
-        \\  break @demand (lib.delay value)
-        },
-        .{ .name = "library.blot", .text =
-        \\type Box value is data = $Box value
-        \\const Box.from=func value=> return $Box value
-        \\const convert=func value=> return @type.result "from" value
-        \\const delay=func ~value=> return value
-        },
-    });
-    defer fixture.deinit();
-    var checked = try project_check.checkProject(a, &fixture.source);
-    defer checked.deinit(a);
-    try requireValid(&checked);
-    const consumer = &checked.module(1).checked;
-    try std.testing.expectEqual(@as(usize, 3), consumer.imported_schemes);
-    const integer = try exported(&checked, &fixture.source, 1, "integer");
-    const floating = try exported(&checked, &fixture.source, 1, "floating");
-    try std.testing.expectEqual(types.u32_type, consumer.types.node(consumer.bindings[integer.binding].ty).b);
-    try std.testing.expectEqual(types.f32_type, consumer.types.node(consumer.bindings[floating.binding].ty).b);
-    var found = false;
-    for (consumer.bindings[1..]) |binding| if (binding.external != null) {
-        const function = consumer.types.node(binding.scheme.root);
-        if (function.tag == .function and consumer.types.node(function.a).tag == .demand) {
-            const input = consumer.types.node(function.a);
-            const output = consumer.types.node(function.b);
-            try std.testing.expectEqual(types.Tag.demand, output.tag);
-            try std.testing.expectEqual(consumer.types.node(input.a).a, consumer.types.node(output.a).a);
-            try std.testing.expectEqualDeep(consumer.types.row(input.c).tail, consumer.types.row(output.c).tail);
-            try std.testing.expectEqual(@as(u32, 1), binding.scheme.variables.len);
-            found = true;
-        }
-    };
-    try std.testing.expect(found);
-}
-
 test "generated monadic progress preserves designated prelude identity through local shadowing" {
     var fixture = try Fixture.initWithPrelude(&.{
         .{ .name = "main.blot", .text =
@@ -859,4 +814,48 @@ test "unused imported values stay absent while forwarded associated catalogs ret
     try std.testing.expectEqual(types.u32_type, main.bindings[integer.binding].ty);
     try std.testing.expectEqual(@as(usize, 1), main.associated.len);
     try std.testing.expectEqual(facade.bindings[facade.associated[0].binding].external.?, main.bindings[main.associated[0].binding].external.?);
+}
+
+test "imported result and callback schemes keep owned quantified relations and numeric target identity" {
+    var fixture = try Fixture.init(&.{
+        .{ .name = "main.blot", .text =
+        \\import * as lib from "./library"
+        \\import { convert as from, delay as suspend } from "./library"
+        \\entry const integer=func()=> return do:
+        \\  let $lib.Box value:lib.Box U32=from 42
+        \\  break (suspend value) ()
+        \\entry const floating=func()=> return do:
+        \\  let $lib.Box value:lib.Box F32=lib.convert 1.25
+        \\  break (lib.delay value) ()
+        },
+        .{ .name = "library.blot", .text =
+        \\type Box value is data = $Box value
+        \\const Box.from=func value=> return $Box value
+        \\const convert=func value=> return @type.result "from" value
+        \\const delay=func value=> return func()=>return value
+        },
+    });
+    defer fixture.deinit();
+    var checked = try project_check.checkProject(a, &fixture.source);
+    defer checked.deinit(a);
+    try requireValid(&checked);
+    const consumer = &checked.module(1).checked;
+    try std.testing.expectEqual(@as(usize, 3), consumer.imported_schemes);
+    const integer = try exported(&checked, &fixture.source, 1, "integer");
+    const floating = try exported(&checked, &fixture.source, 1, "floating");
+    try std.testing.expectEqual(types.u32_type, consumer.types.node(consumer.bindings[integer.binding].ty).b);
+    try std.testing.expectEqual(types.f32_type, consumer.types.node(consumer.bindings[floating.binding].ty).b);
+    var found = false;
+    for (consumer.bindings[1..]) |binding| if (binding.external != null) {
+        const function = consumer.types.node(binding.scheme.root);
+        if (function.tag == .function and consumer.types.node(function.b).tag == .function) {
+            const input = consumer.types.node(function.a);
+            const output = consumer.types.node(function.b);
+            try std.testing.expectEqual(types.Tag.function, output.tag);
+            try std.testing.expectEqual(input.a, consumer.types.node(output.b).a);
+            try std.testing.expectEqual(@as(u32, 1), binding.scheme.variables.len);
+            found = true;
+        }
+    };
+    try std.testing.expect(found);
 }

@@ -421,7 +421,7 @@ const Builder = struct {
             },
             .scoped => .{ .tag = .scoped, .a = try self.projectType(original.a, depth + 1), .b = original.b, .c = if (original.b == 0) try self.projectType(original.c, depth + 1) else original.c },
             .array, .list, .cursor, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
-            .demand, .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
+            .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
             .state_provider => .{ .tag = .state_provider, .a = try self.projectType(original.a, depth + 1), .b = try self.projectType(original.b, depth + 1), .c = try self.projectType(original.c, depth + 1) },
             else => original,
         };
@@ -989,7 +989,7 @@ const Builder = struct {
                 const ref = self.tables.references.items[value.a];
                 if (ref.unit == 0) try self.noteCapture(ref.binding, epoch, captures);
             },
-            .closure, .suspend_ => {
+            .closure => {
                 const range = self.tables.closures.items[value.a].captures;
                 for (self.tables.extra.items[range.start..][0..range.len]) |binding| try self.noteCapture(binding, epoch, captures);
             },
@@ -1002,7 +1002,7 @@ const Builder = struct {
                 self.scratch.definition_epochs[value.a] = epoch;
                 try self.nodeCaptures(value.b, epoch, captures, depth + 1);
             },
-            .return_, .result_associated, .force => try self.nodeCaptures(value.a, epoch, captures, depth + 1),
+            .return_, .result_associated => try self.nodeCaptures(value.a, epoch, captures, depth + 1),
             .block, .suite, .product, .record, .array, .array_op, .storage, .task => {
                 for (self.tables.extra.items[value.a..][0..value.b]) |child| try self.nodeCaptures(child, epoch, captures, depth + 1);
             },
@@ -1115,7 +1115,7 @@ const Builder = struct {
                     if (op == .quote) return walk.visit(node.a, stage + 1, at + 1);
                     if (op == .lift or op == .splice) return walk.visit(node.a, stage - 1, at + 1);
                 }
-                if (node.tag == .closure or node.tag == .suspend_) return walk.visit(walk.graph.closures[node.a].body, stage, at + 1);
+                if (node.tag == .closure) return walk.visit(walk.graph.closures[node.a].body, stage, at + 1);
                 const parent_stage = walk.stage;
                 const parent_depth = walk.depth;
                 walk.stage = stage;
@@ -1208,22 +1208,6 @@ const Builder = struct {
         if (old_len >= self.tables.bindings.items.len) return;
         epochs.* = try self.allocator.realloc(epochs.*, self.tables.bindings.items.len);
         @memset(epochs.*[old_len..], 0);
-    }
-    fn suspensionExpression(self: *Builder, source: ast.Id, ty: T.Id, depth: usize) Error!core.Id {
-        if (self.tables.type_nodes.items[ty].tag != .demand) return error.CoreLimit;
-        const previous = self.scratch.return_target;
-        self.scratch.return_target = 0;
-        const body = self.expression(source, depth + 1) catch |err| {
-            self.scratch.return_target = previous;
-            return err;
-        };
-        self.scratch.return_target = previous;
-        const demanded = self.tables.type_nodes.items[ty];
-        const function_type = try self.addType(.{ .tag = .function, .a = T.unit, .b = demanded.a, .c = demanded.c });
-        const index = try self.captureClosure(body, .{ .binding = 0, .ty = T.unit, .span = self.source.tree.span(source) }, function_type, source);
-        if (source < self.source.checked.lambda_closed_rows.len)
-            self.tables.closures.items[index].closed_rows = try self.projectedRowVariables(self.source.checked.lambda_closed_rows[source]);
-        return self.make(source, .{ .tag = .suspend_, .ty = ty, .a = index });
     }
     fn taggedExpression(self: *Builder, attributes: []const ast.Id, source: ast.Id, depth: usize) Error!core.Id {
         if (depth >= 1024) return error.CoreLimit;
@@ -1464,14 +1448,8 @@ const Builder = struct {
             },
             .apply => try self.application(source, depth + 1),
             .binary => blk: {
-                const left = if (self.source.checked.demand_binary_left[source])
-                    try self.suspensionExpression(syntax.b, try self.projectType(self.source.checked.demand_binary_left_types[source], 0), depth + 1)
-                else
-                    try self.expression(syntax.b, depth + 1);
-                const right = if (self.source.checked.demand_calls[source])
-                    try self.suspensionExpression(syntax.c, try self.projectType(self.source.checked.demand_types[source], 0), depth + 1)
-                else
-                    try self.expression(syntax.c, depth + 1);
+                const left = try self.expression(syntax.b, depth + 1);
+                const right = try self.expression(syntax.c, depth + 1);
                 const binding = self.source.checked.resolved[source];
                 if (binding != 0) break :blk try self.namedCall(source, binding, &.{ left, right }, ty);
                 const op = binaryOp(self.source.names.get(syntax.a)) orelse {
@@ -1805,14 +1783,6 @@ const Builder = struct {
             try self.tables.name_bytes.appendSlice(self.allocator, message);
             return self.make(source, .{ .tag = .panic, .ty = result, .a = start, .b = @intCast(message.len) });
         }
-        if (syntax.tag == .intrinsic and (std.mem.eql(u8, self.source.names.get(syntax.a), "@force") or std.mem.eql(u8, self.source.names.get(syntax.a), "@demand"))) {
-            if (backwards.items.len != 1) {
-                try self.diagnostic(.invalid_call, source);
-                return 0;
-            }
-            const operand = try self.expression(backwards.items[0].value, depth + 1);
-            return self.make(source, .{ .tag = .force, .ty = result, .a = operand });
-        }
         if (syntax.tag == .intrinsic and std.mem.eql(u8, self.source.names.get(syntax.a), "@record.merge")) {
             if (backwards.items.len != 2) {
                 try self.diagnostic(.invalid_call, source);
@@ -1872,10 +1842,7 @@ const Builder = struct {
         while (i != 0) {
             i -= 1;
             const argument = backwards.items[i];
-            const value = if (self.source.checked.demand_calls[argument.site])
-                try self.suspensionExpression(argument.value, try self.projectType(self.source.checked.demand_types[argument.site], 0), depth + 1)
-            else
-                try self.expression(argument.value, depth + 1);
+            const value = try self.expression(argument.value, depth + 1);
             try arguments.append(arguments_allocator, value);
         }
         if (syntax.tag == .constructor_ref) {

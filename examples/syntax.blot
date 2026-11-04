@@ -18,21 +18,18 @@ const Vec2.scaled = func value => return func factor => return do:
   let $Vec2 { x, y } = value
   break $Vec2 { x: x * factor, y: y * factor }
 
-// Demand parameters defer an expression and share its first result.
-const and_then = func left => return func ~right => return
-  if left then @demand right else false
-
-const unwrap_or_else = func candidate => return func ~fallback => return case candidate of
+// Deferred work is an ordinary Unit callback. Booleans short-circuit directly.
+const unwrap_or_else = func candidate => return func fallback => return case candidate of
   $Some value => value
-  $Nothing => @demand fallback
+  $Nothing => fallback ()
 
 entry const short_circuit = func () => return do:
   let empty: Array U32 = #[]
-  break and_then false (empty[0] > 0)
+  break false and (empty[0] > 0)
 
 entry const lazy_fallback = func () => return do:
   let empty: Array U32 = #[]
-  break unwrap_or_else ($Some 42) empty[0]
+  break unwrap_or_else ($Some 42) (func () => return empty[0])
 
 entry const factorial = func value => return do:
   if value <= 1:

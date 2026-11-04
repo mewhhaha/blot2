@@ -41,7 +41,6 @@
 (integer) @constant.numeric.integer
 (float) @constant.numeric.float
 (operator) @operator
-"~" @operator
 "=>" @operator
 (separator) @punctuation.delimiter
 (comment) @comment
@@ -56,8 +55,6 @@
 (lambda_header parameter: (identifier) @variable.parameter)
 (request_complete_header parameter: (identifier) @variable.parameter)
 (completion_constructor_pattern (identifier) @variable.parameter)
-(deferred_parameter (identifier) @variable.parameter)
-(deferred_parameter (parenthesized (identifier) @variable.parameter))
 (lambda_header parameter: (parenthesized (identifier) @variable.parameter))
 (record_field name: (identifier) @variable.other.member)
 (type_parameter_field name: (identifier) @variable.other.member)

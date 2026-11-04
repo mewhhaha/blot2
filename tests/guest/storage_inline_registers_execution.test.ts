@@ -155,7 +155,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
   });
 }
 
-const outlinedSource = `type Pair is data = $Pair {x: U32, y: U32}
+const plannedSource = `type Pair is data = $Pair {x: U32, y: U32}
 const pair = func (input: U32): Pair => return $Pair {x: input, y: @u32.add input 1}
 const calculate = func (counter: Array U32) -> (input: U32): U32 => return do:
   counter[0] := @u32.add counter[0] 1
@@ -169,9 +169,9 @@ ${"  total := @u32.add total 1\n".repeat(1000)}  let second = pair total
   @storage.push destination second.x
   @storage.push destination second.y
   return ()
-const exercise = func ~(value: U32) -> (destination: ResizeArray U32): Unit => return do:
+const exercise = func (value: U32) -> (destination: ResizeArray U32): Unit => return do:
   for index in 0 .. 3:
-    consume destination (func () => return @demand value)
+    consume destination (func () => return value)
   return ()
 entry const answer = func (input: U32): Array U32 => return do:
   let counter: Array U32 = #[0]
@@ -198,9 +198,9 @@ entry const rollback = func (input: U32): Array U32 => return do:
   return #[left[0], right[0], count]
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`inline return registers survive forced machine outlining and enclosing loops (${codegenTier})`, async () => {
+  Deno.test(`inline return registers survive reusable helpers and enclosing loops (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({
-      prefix: "blot-inline-registers-outline-",
+      prefix: "blot-inline-registers-helpers-",
     });
     const entry = `${directory}/main.blot`;
     const stdRoot = new URL("../../std", import.meta.url).pathname;
@@ -214,12 +214,12 @@ for (const codegenTier of ["development", "optimized"] as const) {
     });
     try {
       const result = await compiler.build({
-        sources: { [entry]: outlinedSource },
+        sources: { [entry]: plannedSource },
       });
       assert(result.success, JSON.stringify(result));
       const counters = result.stats.workCounters as Record<string, number>;
       assert(counters.scoped_inline_register_calls > 0);
-      assert(counters.scoped_outlined_regions > 0);
+      assert(counters.scoped_function_plan_definitions > 0, JSON.stringify(counters));
       assert(counters.scoped_completed_plan_rollbacks > 0);
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(result.bytes, { asynchronous });

@@ -363,13 +363,6 @@ pub fn runScoped(a: A, module: *const w.Module, source: *const ir.Function, fram
                             try out.emit(a, .call, module.regions.?.runtime.store);
                         } else try out.emit(a, .call, arena.root_store);
                     },
-                    6 => {
-                        try out.emit(a, .local_get, scope.roles);
-                        if (owner) |parameter| {
-                            try out.emit(a, .local_get, parameter);
-                            try out.emit(a, .call, module.regions.?.runtime.force);
-                        } else try out.emit(a, .call, arena.root_force);
-                    },
                     5 => {
                         try out.emit(a, .call, arena.root_reserve);
                         try out.emit(a, .local_get, scope.roles);

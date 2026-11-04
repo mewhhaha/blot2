@@ -27,7 +27,7 @@ pub fn build(allocator: std.mem.Allocator) !wasm.Module {
         if (found != 1) return error.UnrecognizedCycleGuard;
     }
     inline for (.{ "begin", "allocate", "retire_members" }) |name| try m.exportFunction(@field(runtime, name), name, .u32, .u32);
-    inline for (.{ "root_allocate", "root_open", "root_close", "root_enter", "root_leave", "root_force", "root_authority", "retain", "release", "release_lease", "retire", "store_word", "cycle_collect", "cycle_safe", "reset" }) |name| try m.exportFunction(@field(a, name), name, .u32, .u32);
+    inline for (.{ "root_allocate", "root_open", "root_close", "root_enter", "root_leave", "root_authority", "retain", "release", "release_lease", "retire", "store_word", "cycle_collect", "cycle_safe", "reset" }) |name| try m.exportFunction(@field(a, name), name, .u32, .u32);
     inline for (.{ "root_enabled", "rc_enabled", "root_count", "root_page", "heap", "cycle_head", "cycle_passes", "cycle_vertices", "cycle_edges" }) |name| try m.exportGlobal(@field(a, name), name);
     return m;
 }

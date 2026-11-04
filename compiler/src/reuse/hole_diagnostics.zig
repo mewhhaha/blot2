@@ -4,7 +4,7 @@ const std = @import("std");
 const T = @import("../check/types.zig");
 const ast = @import("../parse/ast.zig");
 const Allocator = std.mem.Allocator;
-pub const Kind = enum { truncated, absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, projection, array, list, cursor, demand, type_constructor, resolver, provider, state_provider, effects, operation, row_variable, row_parameter };
+pub const Kind = enum { truncated, absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, projection, array, list, cursor, type_constructor, resolver, provider, state_provider, effects, operation, row_variable, row_parameter };
 pub const Span = struct { start: u32 = 0, len: u32 = 0 };
 pub const Node = struct {
     kind: Kind,
@@ -170,9 +170,9 @@ const Builder = struct {
                     self.nodes.items[id].effects = effects;
                 }
             },
-            .array, .list, .cursor, .demand, .resolver, .provider => {
+            .array, .list, .cursor, .resolver, .provider => {
                 try children.append(self.allocator, .{ .type = try self.typeNode(engine, value.a, depth + 1) });
-                if (value.tag == .demand or value.tag == .provider) {
+                if (value.tag == .provider) {
                     const effects = try self.row(engine, value.c, depth + 1);
                     self.nodes.items[id].effects = effects;
                 }

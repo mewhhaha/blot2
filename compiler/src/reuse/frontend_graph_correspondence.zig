@@ -157,7 +157,7 @@ pub const Match = struct {
                 if (before.b != after.b or before.c != after.c) return self.decline(.content);
                 try self.typeDepth(before.a, after.a, depth + 1);
             },
-            .demand, .provider => {
+            .provider => {
                 if (before.b != after.b) return self.decline(.content);
                 try self.typeDepth(before.a, after.a, depth + 1);
                 try self.rowDepth(before.c, after.c, depth + 1);

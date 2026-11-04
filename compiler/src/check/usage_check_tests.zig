@@ -397,7 +397,7 @@ fn resourceArtifact(a: std.mem.Allocator, corrupt: bool, kind: enum { integer, u
         try std.testing.expectError(error.InvalidArtifact, @import("usage_core.zig").validate(&module));
         module.closures[module.node(node.b).a].body = saved_body;
         const saved_node = module.nodes[saved_body];
-        module.nodes[saved_body] = .{ .tag = .force, .a = saved_body, .ty = saved_node.ty };
+        module.nodes[saved_body] = .{ .tag = .computation, .a = saved_body, .ty = saved_node.ty };
         try std.testing.expectError(error.InvalidArtifact, @import("usage_core.zig").validate(&module));
         module.nodes[saved_body] = saved_node;
         module.nodes[saved_body] = .{ .tag = .project, .a = saved_body, .ty = saved_node.ty };
@@ -693,9 +693,9 @@ test "resource request cancellation admits invocation owners without closing unr
 fn resourceRequestArtifact(a: std.mem.Allocator, corrupt: bool) !void {
     const source =
         \\type Ask is effect = {ask: Unit -> U32}
-        \\const keep = func ~value => return func () => return @demand value
+        \\const keep = func value => return value
         \\entry const run = func () => return do:
-        \\  let delayed = keep (do:
+        \\  let delayed = keep (func () => return do:
         \\    use owner <- @resource.acquire (func () => return 9) (func resource => return ())
         \\    use value <- Ask.ask ()
         \\    break @usage.borrow owner (func loan => return @u32.add value (@usage.read loan))
@@ -731,7 +731,6 @@ fn resourceRequestArtifact(a: std.mem.Allocator, corrupt: bool) !void {
     const validation = @import("frozen_core_validation.zig");
     try validation.validate(a, &module, .{});
     if (!corrupt) return;
-    var found = false;
     for (module.nodes) |*node| {
         if (node.tag == .operation_value) {
             const original = node.*;
@@ -739,27 +738,7 @@ fn resourceRequestArtifact(a: std.mem.Allocator, corrupt: bool) !void {
             try std.testing.expectError(error.InvalidArtifact, @import("usage_core.zig").validate(&module));
             node.* = original;
         }
-        if (node.tag == .suspend_) {
-            found = true;
-            const original_type = node.ty;
-            node.ty = @intCast(module.types.nodes.len);
-            try std.testing.expectError(error.InvalidArtifact, @import("usage_core.zig").validate(&module));
-            node.ty = original_type;
-            const original_function = module.closures[node.a].function_type;
-            module.closures[node.a].function_type = @intCast(module.types.nodes.len);
-            try std.testing.expectError(error.InvalidArtifact, @import("usage_core.zig").validate(&module));
-            module.closures[node.a].function_type = original_function;
-            const index = module.closures[node.a].function_type;
-            const header = module.types.nodes[index];
-            module.types.nodes[index].a = T.u32_type;
-            try std.testing.expectError(error.InvalidArtifact, @import("usage_core.zig").validate(&module));
-            module.types.nodes[index] = header;
-            module.types.nodes[index].c = 0;
-            try std.testing.expectError(error.InvalidArtifact, @import("usage_core.zig").validate(&module));
-            module.types.nodes[index] = header;
-        }
     }
-    try std.testing.expect(found);
     try std.testing.expect(module.request_loops.len != 0);
     const loop = module.request_loops[0];
     module.request_loops[0].completion_body = 0;
@@ -770,16 +749,11 @@ fn resourceRequestArtifact(a: std.mem.Allocator, corrupt: bool) !void {
     module.request_loops[0] = loop;
     try validation.validate(a, &module, .{});
 }
-test "resource request cancellation rebuilds suspension and protocol contracts independently" {
+test "resource request cancellation rebuilds callback and protocol contracts independently" {
     try resourceRequestArtifact(std.testing.allocator, true);
 }
 test "resource request cancellation publication releases every allocation failure" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, resourceRequestArtifact, .{false});
-}
-
-test "resource retry demands reject consuming captured owners while creating fresh owners" {
-    try law("const keep = func ~value => return func () => return @demand value\nconst bad = func (owner: unique U32) => return keep owner\n", .duplicate_owner);
-    try law("const keep = func ~value => return func () => return @demand value\nconst bad = func (owner: unique U32) => return keep (@usage.share owner)\n", .duplicate_owner);
 }
 
 test "usage nominal payload affinity follows closed owning fields and nested families" {

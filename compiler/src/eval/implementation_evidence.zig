@@ -53,7 +53,7 @@ fn unrestrictedAssociatedNode(host: anytype, root: E.Id, depth: usize, completed
         .function => {
             height = 1 + @max(try unrestrictedAssociatedNode(host, node.a, depth + 1, completed), try unrestrictedAssociatedNode(host, node.b, depth + 1, completed));
         },
-        .array, .list, .cursor, .demand, .resolver, .provider, .state_provider, .scoped => height = 1 + try unrestrictedAssociatedNode(host, node.a, depth + 1, completed),
+        .array, .list, .cursor, .resolver, .provider, .state_provider, .scoped => height = 1 + try unrestrictedAssociatedNode(host, node.a, depth + 1, completed),
         .product, .nominal, .projection => for (host.evidenceStore().children(root)) |child| {
             height = @max(height, 1 + try unrestrictedAssociatedNode(host, child, depth + 1, completed));
         },

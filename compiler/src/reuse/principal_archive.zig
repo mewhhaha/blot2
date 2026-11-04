@@ -465,10 +465,9 @@ const Import = struct {
                 if (node.b > @backingInt(@import("../check/types.zig").UsageKind.cleanup) or node.c != 0) return error.InvalidEvidence;
                 left = try self.typeId(left, depth + 1);
             },
-            .array, .list, .cursor, .demand => {
-                if (right != 0 or (node.tag != .demand and node.c != 0)) return error.InvalidEvidence;
+            .array, .list, .cursor => {
+                if (right != 0 or node.c != 0) return error.InvalidEvidence;
                 left = try self.typeId(left, depth + 1);
-                if (node.tag == .demand) effects = try self.row(node.c, depth + 1);
             },
             .function => {
                 left = try self.typeId(left, depth + 1);

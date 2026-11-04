@@ -90,7 +90,6 @@ fn attemptThenDemand(allocator: std.mem.Allocator, module: *const core.Module) !
     const units = [_]core.Module{module.*};
     var session = try eval.Session.init(allocator, &units);
     defer session.deinit();
-    session.options.retain_source_suspensions = true;
     session.retain_specialization_receipts = true;
     const first = try session.sourceInterface(try target(module, "selected"));
     try std.testing.expect(!first.selected);
@@ -99,8 +98,8 @@ fn attemptThenDemand(allocator: std.mem.Allocator, module: *const core.Module) !
     try std.testing.expect(session.diagnostic == null);
     try std.testing.expectEqual(@as(usize, 0), session.owned_diagnostic_message.len);
     try std.testing.expectEqual(@as(usize, 1), session.storage.values.items.len);
-    inline for (.{ "children", "closures", "demands", "type_mappings", "row_mappings" }) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.storage, field).items.len);
-    inline for (.{ "source_suspensions", "specialization_receipts" }) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.retained, field).items.len);
+    inline for (.{ "children", "closures", "type_mappings", "row_mappings" }) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.storage, field).items.len);
+    inline for (.{"specialization_receipts"}) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.retained, field).items.len);
     try std.testing.expectEqual(@as(usize, 0), session.pending.items.len);
     inline for (.{ "validated_calls", "plain_nominals" }) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.specializations, field).count());
     inline for (.{ "typed_views", "specialized_closures" }) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.storage, field).count());

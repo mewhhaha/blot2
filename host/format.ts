@@ -274,7 +274,7 @@ export async function formatSource(source: string): Promise<string> {
             ["=", ":=", "=>", "->", "<-", ","].includes(previous.text);
         } else if (value === ".") space = !adjacent;
         else if (
-          previous.text === "." || previous.text === "~" ||
+          previous.text === "." ||
           previous.text === "#" || previous.text === "..." ||
           (previous.text === "$" && adjacent && /^[A-Za-z_]/.test(value))
         ) space = false;

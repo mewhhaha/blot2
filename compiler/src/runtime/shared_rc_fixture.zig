@@ -9,7 +9,7 @@ pub fn main(init: std.process.Init) !void {
     const tracing = try @import("fixture_tracing.zig").install(&module);
     const arena = try module.ensureArena();
     module.globals.items[arena.root_enabled].bits = 1;
-    inline for (.{ "root_allocate", "root_reserve", "root_open", "root_close", "root_enter", "root_leave", "root_force", "root_authority" }) |name|
+    inline for (.{ "root_allocate", "root_reserve", "root_open", "root_close", "root_enter", "root_leave", "root_authority" }) |name|
         try module.exportFunction(@field(arena, name), name, .u32, .u32);
     try module.exportGlobal(arena.root_count, "roots");
     inline for (.{ "cycle_head", "cycle_passes", "cycle_vertices", "cycle_edges", "cycle_bytes" }) |name| try module.exportGlobal(@field(arena, name), name);
@@ -17,8 +17,6 @@ pub fn main(init: std.process.Init) !void {
     module.globals.items[arena.rc_enabled].mutable = true;
     try module.exportGlobal(arena.rc_enabled, "allocator_mode");
     try module.exportConstant("root_capacity", .u32, @import("root_runtime.zig").slots_per_page);
-    const demand = try module.dataObject(@import("runtime_layout.zig").Demand{ .function = 0, .environment = 0, .status = .pending, .cached = 0 });
-    try module.exportGlobal(try module.addGlobal(.u32, demand, false), "static_demand");
     const wide_shape = try module.dataWords(&.{ 96, 0x80000000, 0x80000002, 0x80000001 });
     try module.exportGlobal(try module.addGlobal(.u32, wide_shape, false), "wide_shape");
     try module.exportFunction(arena.allocate_shaped, "allocate_shaped", .u32, .u32);

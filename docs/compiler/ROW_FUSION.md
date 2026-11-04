@@ -16,12 +16,12 @@ fields to reach ordinary scalar replacement in its consumer. There is no new
 emitter field, map, collection ABI or general interprocedural escape analysis.
 
 Direct Array loops now use the same checked view rule as List leaves. A call may
-use a bare row only through a known eager function arrow; demand parameters
-decline. A consumer that needs a whole value receives a newly owned row base,
-copied as raw 32-bit words in field order. It never receives an interior Array
-or List-leaf pointer. Aliases, captures, loop carries and unsupported forms keep
-the ordinary representation. Unknown calls may materialize a value; they grant
-no permission to borrow it across a call or defer its evaluation.
+use a bare row only through a known eager function arrow. A consumer that needs
+a whole value receives a newly owned row base, copied as raw 32-bit words in
+field order. It never receives an interior Array or List-leaf pointer. Aliases,
+captures, loop carries and unsupported forms keep the ordinary representation.
+Unknown calls may materialize a value; they grant no permission to borrow it
+across a call or defer its evaluation.
 
 Effects and arithmetic are emitted in source order. No reduction is reassociated
 and no callback/trap is hoisted. Callee body preparation records the existing
@@ -44,8 +44,8 @@ tiers (62 Array/List entry functions per tier), 600 rows, a 257-row slice
 crossing leaves, a saved original and individually rounded F32 operations.
 Cancellation, NaNs, infinities, subnormals and signed zero are included. Further
 laws cover U32 wrapping; composed producers; saved updates; early break/return;
-rows saved through calls, closures and demands; callback order; traps and
-recovery.
+historical rows saved through calls, closures and demand syntax; callback order;
+traps and recovery.
 
 Source and compiled dependencies each change the producer and consumer body,
 reject an invalid edit, recover and restart from an owned checkpoint. Successful

@@ -2842,7 +2842,7 @@ const Walker = struct {
                 const initializer = try self.lookupDefinition(reference.binding, depth + 1);
                 if (initializer != 0) return self.capturesOpening(initializer, depth + 1);
             },
-            .closure, .suspend_ => {
+            .closure => {
                 const closure = self.module.closures[node.a];
                 for (self.module.extra[closure.captures.start..][0..closure.captures.len]) |binding| {
                     const declaration = self.module.binding(binding);
@@ -2935,7 +2935,7 @@ const Walker = struct {
         try self.step(depth);
         const node = self.module.node(source);
         switch (node.tag) {
-            .reference, .closure, .suspend_ => return self.capturesOpening(source, depth + 1),
+            .reference, .closure => return self.capturesOpening(source, depth + 1),
             .package_pack => return false,
             .match => for (self.module.matchArms(source)) |arm| {
                 for (self.module.armRows(arm)) |row| for (self.module.rowPatterns(row)) |pattern_| if (try self.patternCaptures(pattern_, depth + 1)) return true;
@@ -3024,7 +3024,7 @@ const Walker = struct {
                 const kind = self.module.binding(reference.binding).kind;
                 if (kind == .local or kind == .parameter) try require(definitions.isSet(reference.binding));
             },
-            .closure, .suspend_ => {
+            .closure => {
                 const child = self.module.closures[node.a];
                 for (self.module.extra[child.captures.start..][0..child.captures.len]) |binding| try require(definitions.isSet(binding));
             },
@@ -3594,7 +3594,7 @@ const Walker = struct {
         // A call's checked producer establishes its instantiated result rows,
         // just as a reference does above. Validate that result only after the
         // complete call correspondence and actual operands have passed.
-        if (node.tag != .closure and node.tag != .suspend_ and node.tag != .call and node.tag != .apply) try self.scopes.visit(node.ty);
+        if (node.tag != .closure and node.tag != .call and node.tag != .apply) try self.scopes.visit(node.ty);
         switch (node.tag) {
             .package_pack => {
                 const witnesses = self.module.types.list(.{ .start = node.b, .len = node.c });
@@ -3664,13 +3664,6 @@ const Walker = struct {
                 try self.expression(node.a, depth + 1);
                 try self.strictSame(parameters[0], self.module.typeOf(node.a));
             },
-            .force => {
-                const shape = self.module.types.node(self.module.typeOf(node.a));
-                try require(shape.tag == .demand);
-                try self.expression(node.a, depth + 1);
-                try self.strictSame(node.ty, shape.a);
-                try self.allowedRow(shape.c, true);
-            },
             .operation_value => {
                 const operation = self.module.operationValue(source);
                 try self.operationAuthority(operation);
@@ -3696,7 +3689,7 @@ const Walker = struct {
                 }
                 if (!found) try require(operation.instance.decl == 0 and try self.operationGiven(source, operation, depth + 1));
             },
-            .closure, .suspend_ => {
+            .closure => {
                 const outer_return = self.return_owner;
                 const parent_call = self.call_owner;
                 self.call_owner = 0;
@@ -3720,16 +3713,7 @@ const Walker = struct {
                     self.scope_owner = &region_owner;
                 };
                 defer self.scope_owner = prior_scope;
-                var signature = node.ty;
-                if (node.tag == .suspend_) {
-                    const demand = self.module.types.node(node.ty);
-                    const arrow = self.module.types.node(closure.function_type);
-                    try require(demand.tag == .demand and arrow.tag == .function and arrow.a == T.unit);
-                    try self.strictSame(demand.a, arrow.b);
-                    var rows: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes };
-                    try rows.rows(demand.c, arrow.c);
-                    signature = closure.function_type;
-                }
+                const signature = node.ty;
                 const outer_rows = self.closed_rows;
                 const outer_pure = self.scopes.pure_rows;
                 const outer_closed = self.scopes.closed_rows;
@@ -3804,7 +3788,7 @@ const Walker = struct {
                     try self.expression(node.b, depth + 1);
                 }
                 const initializer = self.module.node(node.b);
-                if (initializer.tag == .closure or initializer.tag == .suspend_) {
+                if (initializer.tag == .closure) {
                     // Publish its closing facts only after independently
                     // reconstructing the actual initializer body above.
                     try self.closeRows(self.module.closures[initializer.a].closed_rows);
@@ -4009,7 +3993,7 @@ const Walker = struct {
                 defer self.scopes.popGeneric();
                 try self.expression(node.b, depth + 1);
                 const initializer = self.module.node(node.b);
-                if (initializer.tag == .closure or initializer.tag == .suspend_) try self.closeRows(self.module.closures[initializer.a].closed_rows);
+                if (initializer.tag == .closure) try self.closeRows(self.module.closures[initializer.a].closed_rows);
                 try self.same(binding.ty, self.module.typeOf(node.b));
                 if (binding.scheme.root != 0) try self.same(binding.ty, binding.scheme.root);
                 try self.scheme(binding.scheme);

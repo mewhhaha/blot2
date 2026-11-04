@@ -312,14 +312,14 @@ pub fn codeLength(instructions: []const Instruction) usize {
 pub const FunctionId = enum(u32) { _ };
 pub const LocalId = enum(u32) { _ };
 pub const SignatureId = enum(u32) { _ };
-pub const TableKind = enum(u2) { unknown, callable, demand };
+pub const TableKind = enum(u2) { unknown, callable };
 pub const Instruction = packed struct(u64) {
     operand: u32 = 0,
     op: Op,
     /// A table slot is a symbolic function target, never an integer literal.
     /// This flag occupies existing padding in the eight-byte instruction.
     table_reference: bool = false,
-    /// Checked constructor kind; physical Closure and Demand code fields differ.
+    /// Checked constructor kind; physical callable code fields.
     table_kind: TableKind = .unknown,
     /// Diagnostic source identity, assigned only in a detached assembly view.
     /// Zero is runtime/generated/unknown. This is never ownership authority.

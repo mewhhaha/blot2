@@ -184,28 +184,6 @@ Deno.test("trial deletion is allocation free at exhausted heap and weak candidat
   assert.equal(Number((r.exports.cycle_head as WebAssembly.Global).value), 0);
 });
 
-Deno.test("trial deletion keeps ready memo cycles alive through force and module journal roots", async () => {
-  const r = await runtime();
-  const demand = r.call("root_allocate", 16, 10);
-  const node = r.call("allocate_typed", 4, 1);
-  r.call("store_word", demand, demand + 12, node);
-  r.call("store_word", node, node, demand);
-  r.put(demand + 8, 2);
-  r.call("release_lease", node);
-  r.call("cycle_collect");
-  assert.equal(r.count("destroyed"), 0);
-  r.call("root_enter");
-  r.call("root_force", demand);
-  r.call("release_lease", demand);
-  r.call("cycle_collect");
-  assert.equal(r.count("destroyed"), 0);
-  assert.equal(r.word(demand + 8), 2);
-  assert.equal(r.word(r.word(demand + 12)), demand);
-  r.call("root_leave", 0);
-  assert.equal(r.count("destroyed"), 2);
-  assert.equal(r.roots(), 0);
-  r.call("root_leave", 2);
-});
 
 Deno.test("candidate discovery remains local and deduplicates repeated nonzero drops", async () => {
   const r = await runtime();
@@ -663,36 +641,6 @@ Deno.test("failed invocation frame reservation retires its empty prefix without 
   assert.equal(r.count("leases"), 0);
 });
 
-Deno.test("force records distinguish exceptional terminal demands from canceled pending and ready memos", async () => {
-  const r = await runtime();
-  const { exports: e } = r;
-  const memory = e["blot:memory"] as WebAssembly.Memory;
-  const view = () => new DataView(memory.buffer);
-  const force = e.root_force as CallableFunction;
-  const enter = e.root_enter as CallableFunction;
-  const leave = e.root_leave as CallableFunction;
-  const allocate = e.root_allocate as CallableFunction;
-  const staticDemand = Number((e.static_demand as WebAssembly.Global).value);
-  for (const [state, outcome, expected] of [[1, 1, 3], [0, 0, 0], [2, 1, 2]]) {
-    enter();
-    const demand = allocate(16, 2);
-    r.call("retain", demand);
-    force(demand);
-    view().setUint32(demand + 8, state, true);
-    leave(outcome);
-    assert.equal(view().getUint32(demand + 8, true), expected);
-    r.call("release", demand);
-    assert.equal((e.roots as WebAssembly.Global).value, 0);
-    assert.equal((e["blot:rc_leases"] as WebAssembly.Global).value, 0);
-  }
-  enter();
-  force(staticDemand);
-  view().setUint32(staticDemand + 8, 1, true);
-  leave(1);
-  assert.equal(view().getUint32(staticDemand + 8, true), 3);
-  assert.equal((e.roots as WebAssembly.Global).value, 0);
-  leave(2);
-});
 
 Deno.test("typed buffers initialize reused reference storage in counted and partial modes", async () => {
   for (const enabled of [0, 1]) {

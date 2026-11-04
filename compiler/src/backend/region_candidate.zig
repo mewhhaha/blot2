@@ -81,7 +81,7 @@ fn extend(a: A, source: *const w.Module, proof: *const intersection.Intersection
             if (site.function == previous.function and site.at == previous.at) return error.Unavailable;
         }
         offsets[id] = size;
-        try members.append(a, .{ .offset = size, .bytes = site.bytes, .demand = site.kind == .memo });
+        try members.append(a, .{ .offset = size, .bytes = site.bytes });
         size = std.math.add(u32, size, site.bytes) catch return error.Unavailable;
     }
     var mask: u32 = 0;
@@ -105,10 +105,6 @@ fn extend(a: A, source: *const w.Module, proof: *const intersection.Intersection
         for (graph.sites, 0..) |site, id| if (proof.runtime.members & (@as(u64, 1) << @intCast(id)) != 0 and site.function == function) {
             touched = true;
         };
-        const force = @import("../eval/demand_origins.zig").force(source, @intCast(function));
-        if (force != null) for (result.scopes) |scope| if (scope.function == function) {
-            touched = true;
-        };
         if (!touched) continue;
         const body = try result.view.own(@intCast(function));
         var replacement: std.ArrayList(ir.Instruction) = .empty;
@@ -125,20 +121,10 @@ fn extend(a: A, source: *const w.Module, proof: *const intersection.Intersection
                 var changed = instruction;
                 changed.operand = helpers.frame_allocate;
                 try replacement.append(a, changed);
-            } else if (force != null and instruction.op == .call and instruction.operand == source.arena.?.store_word) {
-                var changed = instruction;
-                changed.operand = helpers.raw_store;
-                try replacement.append(a, changed);
             } else try replacement.append(a, instruction);
         }
         body.instructions.deinit(a);
         body.instructions = replacement;
     }
-    const pop = try result.view.own(source.arena.?.root_pop);
-    const patched = try runtime.forcePop(a, &result.view.module, helpers);
-    pop.locals.deinit(a);
-    pop.instructions.deinit(a);
-    pop.locals = patched.locals;
-    pop.instructions = patched.instructions;
     return result;
 }

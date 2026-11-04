@@ -268,7 +268,7 @@ const Frontier = struct {
                 if (node.b > store.cursor()) self.add(future_clock);
                 continue;
             }
-            if (node.tag == .function or node.tag == .demand or node.tag == .provider) {
+            if (node.tag == .function or node.tag == .provider) {
                 const row = store.row(try store.resolveEffects(node.c, 0));
                 if (row.tail == .variable) self.add(@as(u64, row.tail.variable) * 2 + 1);
                 for (store.effects.list(row.labels)) |label| {
@@ -333,7 +333,7 @@ const Frontier = struct {
                     }
                     break :blk &.{};
                 },
-                .array, .list, .cursor, .resolver, .demand, .provider => blk: {
+                .array, .list, .cursor, .resolver, .provider => blk: {
                     local[0] = node.a;
                     break :blk local[0..1];
                 },

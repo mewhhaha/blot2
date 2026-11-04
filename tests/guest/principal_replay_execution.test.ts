@@ -65,14 +65,14 @@ entry const answer = func (extra: U32) : U32 => return callback extra
   }
 });
 
-Deno.test("retained nested source owners preserve unrelated edits consumed closures suspensions and error recovery", async () => {
+Deno.test("retained nested source owners preserve unrelated edits consumed closures callbacks and error recovery", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-source-owner-" });
   const entry = `${directory}/main.blot`;
   const library = `${directory}/library.blot`;
   const source = (divisor: number, unused: number) =>
-    `const force = func ~(value: U32) => return @demand value
+    `const force = func value => return value ()
 const make = func (seed: U32) => return do:
-  let captured = func (value: U32) => return @u32.div (@u32.add seed (force value)) ${divisor}
+  let captured = func (value: U32) => return @u32.div (@u32.add seed (force (func () => return value))) ${divisor}
   break captured
 const unrelated = func (value: U32) => return @u32.add value ${unused}
 `;

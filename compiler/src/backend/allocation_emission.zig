@@ -45,7 +45,7 @@ pub const Snapshot = struct {
 
 fn category(tag: core.Tag) Kind {
     return switch (tag) {
-        .closure, .suspend_ => .closure_storage,
+        .closure => .closure_storage,
         .construct => .constructor_storage,
         .product, .record, .record_merge => .aggregate_storage,
         .constant => .boxed_constant,

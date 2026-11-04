@@ -39,9 +39,12 @@ const request = func (host: U32 -> U32 ! {Foreign}) => return do:
 const effect_count = func () => return @effect.count (@effect.of scoped)
 const count = effect_count ()
 const rich = func (host: U32 -> U32 ! {Foreign}) => return @u32.add (@product.get (state seed) 1) (@u32.add (scoped ()) (@u32.add (borrow 40) (@u32.add (resource ()) (@u32.add (request host) count))))
-const both = func ~(left: U32) => return func ~(right: U32) => return @u32.add (@u32.add (@demand left) (@demand left)) (@demand right)
-const ignore = func ~(left: U32) => return func ~(right: U32) => return 7
-const operate = func (host: U32 -> U32 ! {Foreign}) => return @u32.add ((host seed) %% (host (@u32.add seed 1))) ((host 999) ?? (host 998))
+const both = func left => return func right => return do:
+  use first <- left ()
+  use second <- right ()
+  break @u32.add (@u32.add first first) second
+const ignore = func left => return func right => return 7
+const operate = func (host: U32 -> U32 ! {Foreign}) => return @u32.add ((func () => return host seed) %% (func () => return host (@u32.add seed 1))) ((func () => return host 999) ?? (func () => return host 998))
 const selected = func (flag: Bool) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   let choose = func () => return if flag then left else right
   let chosen = choose ()
@@ -101,7 +104,7 @@ async function observe(
     const guest = await instantiateGuest(bytes, { asynchronous });
     const trace: number[] = [];
     let fail = false;
-    const failure = new Error("binary demand host failed");
+    const failure = new Error("binary callback host failed");
     const implementation = {
       parameter: "U32" as const,
       result: "U32" as const,
@@ -177,7 +180,7 @@ async function observe(
   }
 }
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`general body receipts preserve binary demand effects method edits and owning records (${codegenTier})`, async () => {
+  Deno.test(`general body receipts preserve binary callback effects method edits and owning records (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-general-bodies-",
     });

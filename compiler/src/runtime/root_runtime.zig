@@ -47,7 +47,6 @@ pub fn emit(m: *w.Module, a: w.Arena) Error!void {
     try store(code(m, a.root_store), a);
     try publicAllocate(code(m, a.root_public_allocate), a);
     try publicReset(code(m, a.root_public_reset), a);
-    try force(code(m, a.root_force), a);
     try authority(code(m, a.root_authority), a);
 }
 fn reserve(c: Code, a: w.Arena) Error!void {
@@ -104,15 +103,6 @@ fn pop(c: Code, a: w.Arena) Error!void {
     // Detached owners and frame markers leave empty slots. They own nothing.
     try c.when(.{ .i32_eqz, value });
     try c.ret(slot);
-    try c.end();
-    // Interrupted forces become terminal before any of their owners retire.
-    // Language cancellation already reset its selected force to pending.
-    try c.when(.{ .i32_and, .{ .load, slot, 4 }, 1 });
-    try c.when(.{ .i32_and, .{ .global, a.root_active }, 1 });
-    try c.when(.{ .i32_eq, .{ .load, value, h.offset(h.Demand, "status") }, @backingInt(h.DemandStatus.evaluating) });
-    try c.store(value, h.offset(h.Demand, "status"), @backingInt(h.DemandStatus.terminal));
-    try c.end();
-    try c.end();
     try c.end();
     // Detach before destruction. Nested releases cannot consume this root twice.
     try c.store(slot, 0, 0);
@@ -343,9 +333,6 @@ pub fn hostCleanup(m: *w.Module, a: w.Arena) Error!void {
     try setGlobal(leave_, references.active, .{ .global, a.root_host_active });
 }
 
-// The low frame bit marks an active-force record. Static demand cells are
-// immortal references and need a record, but consume no dynamic strong count.
-// Scope records own their owner edge. Bit two is separate from active demands.
 fn authority(c: Code, a: w.Arena) Error!void {
     const value: Local = .{ .id = 0 };
     const slot = try c.temp();
@@ -378,14 +365,4 @@ fn revokeAuthorities(c: Code, a: w.Arena) Error!void {
     try c.set(page, .{ .load, page, 0 });
     try c.set(top, page_bytes);
     try c.again();
-}
-fn force(c: Code, a: w.Arena) Error!void {
-    const value: Local = .{ .id = 0 };
-    const slot = try c.temp();
-    try c.set(slot, .{ .call, a.root_reserve });
-    try c.value(.{ .call, a.root_store, slot, value });
-    try c.when(.{ .i32_lt_u, value, .{ .global, a.static_end } });
-    try c.store(slot, 0, value);
-    try c.end();
-    try c.store(slot, 4, .{ .i32_or, .{ .load, slot, 4 }, 1 });
 }

@@ -20,7 +20,7 @@ const ConstructorKey = code_artifacts.ConstructorKey;
 const PrimitiveKey = code_artifacts.PrimitiveKey;
 const OperationKey = code_artifacts.OperationKey;
 const Error = Allocator.Error || error{ Declined, ModuleTooLarge, InvalidFunctionReference, InvalidGlobalReference };
-const SerializedKey = struct { value: core_eval.ValueId, ty: layout.Id, suspension: bool = false };
+const SerializedKey = struct { value: core_eval.ValueId, ty: layout.Id };
 pub const State = struct {
     fn taskCallbackRows(source: *const core.Module, ty: types.Id, depth: usize) bool {
         if (depth >= 128) return false;
@@ -252,9 +252,8 @@ pub const State = struct {
             }
         }
         try g.planning.startup_facts.event(g.allocator, .{ .kind = .retained_value, .caller = g.planning.startup_facts.active, .target = id, .auxiliary = @backingInt(info.kind) });
-        if (info.kind == .suspension) if (g.evaluator.suspensionCached(id)) |cached| try g.planning.startup_facts.event(g.allocator, .{ .kind = .cached_demand, .caller = g.planning.startup_facts.active, .target = id, .auxiliary = cached });
         if (info.kind == .type_constructor or info.kind == .resolver) return 0;
-        const key: SerializedKey = .{ .value = if (info.kind == .suspension) @intCast(info.nominal) else id, .ty = ty, .suspension = info.kind == .suspension };
+        const key: SerializedKey = .{ .value = id, .ty = ty };
         if (self.cache.get(key)) |address| {
             try g.module.demandResource(.static_data, address, true);
             return address;
@@ -267,7 +266,6 @@ pub const State = struct {
         }
         if (info.kind == .computation or info.kind == .request_decision) return self.serializeDecision(g, id, ty, depth, info, key);
         if (info.kind == .provider or info.kind == .state_provider) return self.serializeProvider(g, id, ty, depth, info, key);
-        if (info.kind == .suspension) return self.serializeDemand(g, id, ty, depth, info, key);
         if (info.kind == .closure) return self.serializeClosureValue(g, id, ty, depth, info, key);
         if (info.kind == .cursor) {
             if (info.len != 1 or g.representations.store.node(ty).tag != .cursor) return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
@@ -336,42 +334,6 @@ pub const State = struct {
             try g.runtimeDataWord(address + heap.offset(heap.StateProvider, "write"), write);
             break :state address;
         };
-        try self.cache.put(g.allocator, key, address);
-        return address;
-    }
-    fn serializeDemand(self: *State, g: anytype, id: core_eval.ValueId, ty: layout.Id, depth: usize, _: core_eval.ValueInfo, key: SerializedKey) Error!u32 {
-        var selected = ty;
-        const expected = g.representations.toEvidence(g.evaluator.evidenceStore(), ty) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.UnresolvedType => inferred: {
-                var budget: usize = 100_000;
-                if (!g.retainedLayoutConcrete(ty, true, 0, &budget)) return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
-                const inferred = g.evaluator.inferSuspension(id) catch |failure| return if (failure == error.OutOfMemory) error.OutOfMemory else g.evaluationFailure();
-                const actual = g.representations.fromEvidence(g.evaluator.evidenceStore(), g.evaluator.valueEvidence(inferred)) catch |failure| return if (failure == error.OutOfMemory) error.OutOfMemory else g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
-                selected = try g.completeRetainedRows(ty, actual, 0);
-                break :inferred g.representations.toEvidence(g.evaluator.evidenceStore(), selected) catch |failure| return if (failure == error.OutOfMemory) error.OutOfMemory else g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
-            },
-            else => return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type),
-        };
-        const demanded = g.representations.store.node(selected);
-        if (demanded.tag != .demand) return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
-        const specialized = g.evaluator.specializeSuspension(id, expected) catch |err| switch (err) {
-            error.RequestUnwind => return g.evaluationFailure(),
-            error.Declined => return g.evaluationFailure(),
-            error.OutOfMemory => return error.OutOfMemory,
-        };
-        const function_type = try g.internLayoutWithEffects(.function, 1, demanded.a, demanded.c, &.{});
-        const closure_address = try self.serializeClosure(g, specialized, function_type, depth);
-        const function_id = std.mem.readInt(u32, g.module.data.items[closure_address..][0..4], .little);
-        const environment = std.mem.readInt(u32, g.module.data.items[closure_address + heap.offset(heap.Closure, "environment") ..][0..4], .little);
-        const cached = g.evaluator.suspensionCached(id);
-        const cached_word = if (cached) |value| try self.serialize(g, value, demanded.a, depth + 1) else 0;
-        const address = try g.module.dataObject(heap.Demand{ .function = function_id, .environment = environment, .status = if (cached != null) .ready else .pending, .cached = cached_word });
-        try g.module.staticField(address + heap.offset(heap.Demand, "status"), .scalar);
-        try g.module.staticField(address + heap.offset(heap.Demand, "cached"), g.layoutRole(demanded.a));
-        try g.module.dataReference(address, .{ .role = .demand_function, .value = function_id });
-        try g.module.dataReference(address + 4, .{ .role = .static_address, .value = environment });
-        if (cached) |value| try self.dataValueReference(g, address + heap.offset(heap.Demand, "cached"), value, cached_word);
         try self.cache.put(g.allocator, key, address);
         return address;
     }

@@ -640,7 +640,6 @@ const Parser = struct {
             return value;
         }
         if (self.at(.identifier) and self.peek(1) == .l_bracket and (self.word("forall") or self.word("exists"))) return self.quantifiedType();
-        if (self.eat(.tilde)) return self.add(.type_demand, try self.typeAtom(), 0, 0, start);
         if (self.at(.identifier) and typeAtomTag(self.peek(1))) {
             inline for (.{ "unique", "shared", "borrow", "borrow_mut", "once", "many", "cleanup", "concurrent" }) |kind| {
                 if (self.word(kind)) {
@@ -828,7 +827,6 @@ const Parser = struct {
         var count: usize = 0;
         while (true) {
             const item_start = self.current().start;
-            const demanded = self.eat(.tilde);
             var unit = false;
             var name: symbols.Symbol = 0;
             var annotation: Id = 0;
@@ -836,7 +834,6 @@ const Parser = struct {
             var pattern_parameter: Id = 0;
             if (self.eat(.l_paren)) {
                 if (self.eat(.r_paren)) unit = true else if (self.at(.hash)) {
-                    if (demanded) return self.fail(.unexpected_token);
                     pattern_parameter = try self.pattern();
                     _ = try self.expect(.r_paren);
                     name = try self.collectionName(item_start);
@@ -848,8 +845,8 @@ const Parser = struct {
                     _ = try self.expect(.r_paren);
                 }
             } else name = try self.lowerIdentifier();
-            const parameter = try self.add(.parameter, name, annotation, try self.extra(&.{ @as(u32, @intFromBool(demanded)) | (@as(u32, @intFromBool(unit)) << 1), constraints.predicates.start, constraints.predicates.len, constraints.node }), item_start);
-            if (pattern_parameter != 0) self.tree.extra.items[self.tree.node(parameter).c] |= 8;
+            const parameter = try self.add(.parameter, name, annotation, try self.extra(&.{ @as(u32, @intFromBool(unit)), constraints.predicates.start, constraints.predicates.len, constraints.node }), item_start);
+            if (pattern_parameter != 0) self.tree.extra.items[self.tree.node(parameter).c] |= 4;
             const item: Parameter = .{ .node = parameter, .pattern = pattern_parameter, .name = name, .start = item_start };
             if (count < fixed.len) {
                 fixed[count] = item;
@@ -867,7 +864,7 @@ const Parser = struct {
         if (!returned and !self.at(.kw_do)) return self.fail(.function_return_required);
         var body = try self.expression();
         const parameters = if (count <= fixed.len) fixed[0..count] else overflow.items;
-        if (!returned) self.tree.extra.items[self.tree.node(parameters[parameters.len - 1].node).c] |= 4;
+        if (!returned) self.tree.extra.items[self.tree.node(parameters[parameters.len - 1].node).c] |= 2;
         var index = parameters.len;
         while (index != 0) {
             index -= 1;
@@ -921,7 +918,7 @@ const Parser = struct {
         } else try self.intern(self.text(t));
         const found = self.lookupFixity(symbol, named);
         // The default dollar is a grouping form, not a higher-order apply.
-        // Keep primitive arity, scoped callbacks and demand checking on the
+        // Keep primitive arity, scoped callbacks and argument checking on the
         // exact same application tree as `f (argument)`. An explicit fixity
         // still selects the caller's ordinary operator implementation.
         if (found == null and !named and std.mem.eql(u8, self.pool.get(symbol), "$"))
@@ -1050,7 +1047,7 @@ const Parser = struct {
             const argument = try self.add(.name, argument_name, 0, 0, start);
             invocation = try self.add(.apply, invocation, argument, 0, start);
         }
-        const parameter = try self.add(.parameter, 0, 0, try self.extra(&.{ 2, 0, 0, 0 }), start);
+        const parameter = try self.add(.parameter, 0, 0, try self.extra(&.{ 1, 0, 0, 0 }), start);
         const thunk = try self.add(.lambda, parameter, invocation, 0, start);
         const group = try self.add(.task_region, 0, 0, 0, start);
         const spawn = try self.collectionIntrinsic("@task.spawn", &.{ group, thunk }, start);
@@ -1727,7 +1724,7 @@ fn atomTag(tag: Tag) bool {
 }
 fn typeAtomTag(tag: Tag) bool {
     return switch (tag) {
-        .identifier, .type_identifier, .intrinsic, .l_paren, .l_bracket, .l_brace, .tilde, .caret, .symbol => true,
+        .identifier, .type_identifier, .intrinsic, .l_paren, .l_bracket, .l_brace, .caret, .symbol => true,
         else => false,
     };
 }

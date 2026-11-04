@@ -7,7 +7,7 @@
   [033](033-own-suspended-effects-and-cancellation.md)
 - **Originating requirements:** DEMANDS: Predictable cost guarantee,
   diagnostics, acceptance and measurements. Sources:
-  [Demand evaluation](../docs/compiler/DEMANDS.md).
+  [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -19,9 +19,9 @@ bounded source-span explanations and counters.
 ## Starting point
 
 Direct bounded Boolean lowering and forwarding exist, but
-[docs/compiler/DEMANDS.md](../docs/compiler/DEMANDS.md) still requires a cost
-guarantee across aliases/imports/bundles, loop/callback coverage and
-explanations.
+[docs/compiler/DEFERRED_WORK.md](../docs/compiler/DEFERRED_WORK.md) still
+requires a cost guarantee across aliases/imports/bundles, loop/callback coverage
+and explanations.
 
 ## Implementation checklist
 
@@ -79,5 +79,5 @@ commands for focused development and the scenarios below.
 - Limits: bounded first-order proofs, source nesting limits, ordinary shared
   fallback for unknown/escaping/recursive control, report observation costs.
   These are the documented guarantee boundaries, not unresolved guarantees.
-- Durable evidence: [DEMANDS](../docs/compiler/DEMANDS.md) and
+- Durable evidence: [DEMANDS](../docs/compiler/DEFERRED_WORK.md) and
   [combined qualification](../docs/qualification/FRONTEND_OWNERSHIP_QUALIFICATION.md).

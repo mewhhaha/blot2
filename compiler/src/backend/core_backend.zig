@@ -51,7 +51,6 @@ pub const Diagnostic = struct {
 };
 pub const ArtifactSummary = struct { demands: usize, jobs: usize, functions: usize, helpers: usize, emission_events: usize, metadata_events: usize, operation_symbols: usize, templates: usize, pinned_modules: usize };
 pub const Result = struct {
-    demand_lowering: ?@import("demand_lowering.zig").Snapshot = null,
     allocation_emission: ?@import("allocation_emission.zig").Snapshot = null,
     timing: @import("backend_timing.zig").Stats = .{},
     /// Deterministic work counters for budgets; unlike timing, always recorded.
@@ -90,7 +89,6 @@ pub const Result = struct {
     explanation: ?dispatch_explanation.Explanation = null,
     startup_observation: ?startup_emission_facts.Snapshot = null,
     pub fn deinit(self: *Result, allocator: Allocator) void {
-        if (self.demand_lowering) |*snapshot| snapshot.deinit(allocator);
         if (self.allocation_emission) |*snapshot| snapshot.deinit(allocator);
         allocator.free(self.bytes);
         allocator.free(self.owned_message);
@@ -122,7 +120,6 @@ pub const Generator = struct {
     /// values. A failed compilation that did so retries without them.
     speculative_locals: bool = true,
     speculated: bool = false,
-    demand_lowering: @import("demand_lowering.zig").Store = .{},
     ragged_probe_limit: u32 = ragged_builder.probe_limit,
     work_timing: @import("backend_timing.zig").Work = .{},
     allocator: Allocator,
@@ -137,7 +134,6 @@ pub const Generator = struct {
     principal_stats: principal_evidence_reuse.Stats = .{},
     query_state: ?*completed_specialization_query.State = null,
     constant_state: ?*@import("../reuse/constant_receipt_reuse.zig").State = null,
-    demand_owner: ?*code_artifacts.Context = null,
     refinement_owner: ?*code_artifacts.Context = null,
     refinement_stats: refinement_receipt.Stats = .{},
     work: artifact_fragment.Stats = .{},
@@ -179,7 +175,6 @@ pub const Generator = struct {
         var evaluator = try core_eval.Session.init(allocator, units);
         errdefer evaluator.deinit();
         evaluator.options.trace_runtime_dependencies = true;
-        evaluator.options.retain_source_suspensions = true;
         var representations = try @import("backend_representations.zig").State.init(allocator, units);
         errdefer representations.deinit(allocator);
         var module = wasm.Module.init(allocator);
@@ -289,17 +284,11 @@ pub const Generator = struct {
         self.diagnostic_contexts.deinit(self.allocator);
         self.allocator.free(self.spawn_units);
         self.numeric_rows.deinit(self.allocator);
-        self.demand_lowering.deinit(self.allocator);
         self.planning.deinit(self.allocator);
         self.module.deinit();
         self.representations.deinit(self.allocator);
         self.evaluator.deinit();
         self.static_data.deinit(self.allocator);
-    }
-    pub fn demandSite(self: *Generator, unit_id: u32, id: core.Id, lowering: @import("demand_lowering.zig").Kind, reason: @import("demand_lowering.zig").Reason) Allocator.Error!void {
-        if (!self.demand_lowering.enabled) return;
-        const path = if (self.evaluator.diagnostic_context.identity) |identity| identity.owner(unit_id) orelse "" else "";
-        try self.demand_lowering.add(self.allocator, path, unit_id, self.unit(unit_id).span(id), lowering, reason);
     }
     pub fn unusedAggregate(self: *Generator, unit_id: u32, binding: core.BindingId) Error!bool {
         if (self.planning.discard_proofs.getPtr(unit_id)) |proof| return proof.admits(binding);
@@ -394,14 +383,14 @@ pub const Generator = struct {
         return failure;
     }
     /// The ownership role of a value with checked layout `id`. Every
-    /// aggregate, collection, closure, demand and provider is a heap
+    /// aggregate, collection, closure and provider is a heap
     /// reference or zero; scalars never are.
     pub fn layoutRole(self: *const Generator, id: layout.Id) ir.Role {
         const n = self.representations.store.node(id);
         if (n.tag == .nominal and self.representations.store.scalar(id) != null) return .scalar;
         return switch (n.tag) {
             .scoped, .unit, .boolean, .u32, .f32, .never, .type_constructor, .resolver, .erased_proof => .scalar,
-            .associated, .owning, .universal, .existential, .opened, .product, .record, .array, .list, .cursor, .function, .demand, .provider, .state_provider => .reference,
+            .associated, .owning, .universal, .existential, .opened, .product, .record, .array, .list, .cursor, .function, .provider, .state_provider => .reference,
             // Compiler-defined nominals keep their own representations.
             .nominal => nominal: {
                 if (n.a != std.math.maxInt(u32) or n.b == 5 or n.b == 6 or n.b == layout.capability_layout_decl) break :nominal .reference;
@@ -675,7 +664,7 @@ pub const Generator = struct {
             try self.module.emitReference(function_id, .{ .op = .i32_const, .operand = value.bits }, .static_address);
         } else try self.module.emit(function_id, .{ .op = if (value.scalar == .f32) .f32_const else .i32_const, .operand = value.bits });
     }
-    /// Fill unselected slots along a retained demand/function interface.
+    /// Fill unselected slots along a retained function interface.
     /// All selected types and rows remain the consumer's inputs to ordinary
     /// specialization. The proof comes from full body/capture inference.
     pub fn completeRetainedRows(self: *Generator, requested: layout.Id, actual: layout.Id, depth: usize) Error!layout.Id {
@@ -686,7 +675,6 @@ pub const Generator = struct {
         if (wanted.tag != proven.tag) return self.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
         switch (wanted.tag) {
             .function => return self.internLayoutWithEffects(.function, try self.completeRetainedRows(wanted.a, proven.a, depth + 1), try self.completeRetainedRows(wanted.b, proven.b, depth + 1), if (wanted.c == layout.unknown_row) proven.c else wanted.c, &.{}),
-            .demand => return self.internLayoutWithEffects(.demand, try self.completeRetainedRows(wanted.a, proven.a, depth + 1), 0, if (wanted.c == layout.unknown_row) proven.c else wanted.c, &.{}),
             else => return requested,
         }
     }
@@ -701,7 +689,6 @@ pub const Generator = struct {
             .associated, .universal, .existential, .opened, .invalid, .erased => return false,
             .unit, .boolean, .u32, .f32, .never, .type_constructor, .erased_proof => return true,
             .function => return (callable_rows or node.c != layout.unknown_row) and self.retainedLayoutConcrete(node.a, callable_rows, depth + 1, budget) and self.retainedLayoutConcrete(node.b, callable_rows, depth + 1, budget),
-            .demand => return (callable_rows or node.c != layout.unknown_row) and self.retainedLayoutConcrete(node.a, callable_rows, depth + 1, budget),
             .owning, .array, .list, .cursor, .resolver => return self.retainedLayoutConcrete(node.a, false, depth + 1, budget),
             .scoped => return node.b != 0 and node.c != 0 and self.retainedLayoutConcrete(node.a, false, depth + 1, budget),
             .provider => return node.c != layout.unknown_row and self.retainedLayoutConcrete(node.a, false, depth + 1, budget),
@@ -1136,7 +1123,7 @@ pub const Generator = struct {
             const local = parameter_locals[index];
             if (local == std.math.maxInt(u32)) continue;
             if (self.capturedTemplate(key.templates, parameter.binding)) |template| {
-                try emitter.templates.put(self.allocator, parameter.binding, .{ .unit = template.unit, .node = template.node, .environment = if (template.has_environment) local else null, .captures = template.captures, .templates = template.templates, .staged = template.staged, .scalar_environment = template.scalar_environment, .demand_cell = template.demand_cell, .computation = template.computation, .evidence = template.evidence, .rows = template.rows, .callable_instances = template.callable_instances });
+                try emitter.templates.put(self.allocator, parameter.binding, .{ .unit = template.unit, .node = template.node, .environment = if (template.has_environment) local else null, .captures = template.captures, .templates = template.templates, .staged = template.staged, .scalar_environment = template.scalar_environment, .computation = template.computation, .evidence = template.evidence, .rows = template.rows, .callable_instances = template.callable_instances });
             } else try emitter.locals.put(self.allocator, parameter.binding, local);
         };
         if (key.dictionaries) try emitter.installDictionary(body.root, runtime_count + 1, DictionaryOwner.forBinding(source, body.binding).?);
@@ -1198,7 +1185,7 @@ pub const Generator = struct {
         }
     }
     pub fn captureTemplate(self: *Generator, template: Template) Error!u32 {
-        const retained: CapturedTemplate = .{ .unit = template.unit, .node = template.node, .captures = template.captures, .templates = template.templates, .staged = template.staged, .has_environment = template.environment != null, .scalar_environment = template.scalar_environment, .demand_cell = template.demand_cell, .computation = template.computation, .evidence = template.evidence, .rows = template.rows, .callable_instances = template.callable_instances };
+        const retained: CapturedTemplate = .{ .unit = template.unit, .node = template.node, .captures = template.captures, .templates = template.templates, .staged = template.staged, .has_environment = template.environment != null, .scalar_environment = template.scalar_environment, .computation = template.computation, .evidence = template.evidence, .rows = template.rows, .callable_instances = template.callable_instances };
         if (self.planning.template_instances.get(retained)) |existing| return existing;
         if (self.planning.template_catalog.items.len >= std.math.maxInt(u32)) return error.ModuleTooLarge;
         const id: u32 = @intCast(self.planning.template_catalog.items.len + 1);
@@ -1239,7 +1226,7 @@ pub const Generator = struct {
         errdefer values.deinit(allocator);
         const source = self.unit(template.unit);
         const node = source.node(template.node);
-        if (node.tag == .closure or node.tag == .suspend_) {
+        if (node.tag == .closure) {
             const capture_list = source.extra[source.closures[node.a].captures.start..][0..source.closures[node.a].captures.len];
             for (capture_list, 0..) |captured, index| {
                 if (self.capturedTemplate(template.templates, captured)) |child| {
@@ -1353,7 +1340,7 @@ pub const Generator = struct {
         if (metadata.parameter.binding != 0) {
             if (key.parameter_template != 0) {
                 const template = self.planning.template_catalog.items[key.parameter_template - 1];
-                try emitter.templates.put(self.allocator, metadata.parameter.binding, .{ .unit = template.unit, .node = template.node, .environment = if (template.has_environment) 1 else null, .captures = template.captures, .templates = template.templates, .staged = template.staged, .scalar_environment = template.scalar_environment, .demand_cell = template.demand_cell, .computation = template.computation, .evidence = template.evidence, .rows = template.rows, .callable_instances = template.callable_instances });
+                try emitter.templates.put(self.allocator, metadata.parameter.binding, .{ .unit = template.unit, .node = template.node, .environment = if (template.has_environment) 1 else null, .captures = template.captures, .templates = template.templates, .staged = template.staged, .scalar_environment = template.scalar_environment, .computation = template.computation, .evidence = template.evidence, .rows = template.rows, .callable_instances = template.callable_instances });
             } else try emitter.locals.put(self.allocator, metadata.parameter.binding, 1);
         }
         for (captures, 0..) |binding, index| {
@@ -1368,7 +1355,7 @@ pub const Generator = struct {
             if (!key.scalar_environment) try emitter.emit(if (machine == .f32) .f32_load else .i32_load, @intCast(index * 4));
             try emitter.emit(.local_set, local);
             if (self.capturedTemplate(key.templates, binding)) |template| {
-                try emitter.templates.put(self.allocator, binding, .{ .unit = template.unit, .node = template.node, .environment = if (template.has_environment) local else null, .captures = template.captures, .templates = template.templates, .staged = template.staged, .scalar_environment = template.scalar_environment, .demand_cell = template.demand_cell, .computation = template.computation, .evidence = template.evidence, .rows = template.rows, .callable_instances = template.callable_instances });
+                try emitter.templates.put(self.allocator, binding, .{ .unit = template.unit, .node = template.node, .environment = if (template.has_environment) local else null, .captures = template.captures, .templates = template.templates, .staged = template.staged, .scalar_environment = template.scalar_environment, .computation = template.computation, .evidence = template.evidence, .rows = template.rows, .callable_instances = template.callable_instances });
             } else try emitter.locals.put(self.allocator, binding, local);
         }
         if (key.dictionaries) {
@@ -2346,7 +2333,6 @@ pub const CompileOptions = struct {
     /// Private ABI inspection control; avoids hiding callees through inlining.
     inline_named: bool = true,
     /// Collect bounded explanations; code is regenerated to observe every site.
-    explain_demands: bool = false,
     explain_allocations: bool = false,
     /// Private differential/qualification controls, never source language limits.
     ragged_builders: bool = true,
@@ -2509,7 +2495,6 @@ const CompileRun = struct {
         if (self.options.constant_limits.children) |limit| self.generator.evaluator.options.max_children = limit;
         if (self.options.constant_limits.depth) |limit| self.generator.evaluator.options.max_depth = limit;
         if (self.options.constant_limits.calls) |limit| self.generator.evaluator.options.max_call_depth = limit;
-        self.generator.demand_lowering.enabled = self.options.explain_demands;
         self.generator.ragged_probe_limit = self.options.ragged_probe_limit;
         if (!self.options.ragged_builders) self.generator.ragged_probe_limit = 0;
         self.generator.evaluator.ragged_probe_limit = self.generator.ragged_probe_limit;
@@ -2518,7 +2503,6 @@ const CompileRun = struct {
         self.generator.evaluator.timing = if (self.options.profile_backend) &self.generator.work_timing else null;
         // The replay gate destroys all mutable compiler state before materialization.
         if (self.recording) self.generator.artifacts = &self.metadata;
-        self.generator.demand_owner = &self.metadata;
         self.generator.refinement_owner = &self.metadata;
         self.generator_alive = true;
         self.generator.evaluator.diagnostic_context = .{ .identity = self.options.identity, .entry = self.entry, .prelude = self.options.diagnostic_prelude_unit, .source_mode = self.options.diagnostic_source_mode };
@@ -2534,11 +2518,10 @@ const CompileRun = struct {
     fn prepareReuse(self: *CompileRun, skip_constant_replay: bool) Error!void {
         const principal_previous = self.options.principal_previous orelse self.options.previous;
         const query_previous = self.options.query_previous orelse self.options.previous orelse if (self.options.checkpoint) |checkpoint| (if (checkpoint.semantic) |*owner| &owner.capture else null) else null;
-        if (if (self.options.explain_demands or self.options.policy.memory_profile) null else self.options.previous) |previous| {
+        if (if (self.options.policy.memory_profile) null else self.options.previous) |previous| {
             if (previous.emission.sealed and previous.metadata.pools != null) {
                 self.retained = try artifact_fragment.State.initWithStamps(self.allocator, previous, self.units, self.options.identity, self.options.cached_units, self.stamps);
                 self.generator.retained = &self.retained.?;
-                if (self.retained.?.importer.code_gate) |*gate| try @import("demand_summary.zig").retain(self.allocator, &self.metadata.demand_summaries, &previous.metadata.demand_summaries, gate, &self.generator.evaluator.counters);
             }
         }
         self.persisted_principals = if (self.options.checkpoint) |checkpoint| .{ .allocator = self.allocator, .archive = &checkpoint.principal, .units = self.units, .names = self.options.identity } else null;
@@ -2748,7 +2731,6 @@ const CompileRun = struct {
         result.optimization.split_accepted = self.generator.evaluator.split_accepted;
         result.optimization.split_declined = self.generator.evaluator.split_declined;
         result.counters = self.generator.evaluator.counters;
-        result.demand_lowering = try self.generator.demand_lowering.take(self.allocator);
         if (self.options.explain_allocations) result.allocation_emission = try @import("allocation_emission.zig").capture(self.allocator, self.units, self.options.identity, &self.generator.module, self.entry, self.options.diagnostic_prelude_unit);
         if (self.options.observe_startup) result.startup_observation = try self.generator.planning.startup_facts.capture(self.allocator, &self.generator.module);
         result.principal = self.generator.principalStats();

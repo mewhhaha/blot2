@@ -1,8 +1,8 @@
 # Blot executable language guide
 
 Read this before writing Blot. This describes the current executable language;
-[DESIGN.md](../../DESIGN.md) records the design direction. Each `blot` code block
-below is an independent, compilable module.
+[DESIGN.md](../../DESIGN.md) records the design direction. Each `blot` code
+block below is an independent, compilable module.
 
 The handwritten Zig compiler implements the source syntax in this guide. Current
 applications use the owned-storage profile described below: named owners, shared
@@ -544,8 +544,8 @@ unless an implementation explicitly accepts them. `/` supports F32 and U32; U32
 division truncates and a zero divisor fails/traps. Bool supports ordinary
 equality. Structural equality for arrays, records and algebraic data is opt-in
 through [std/equality](../../std/equality.blot) and the
-[derivation tool](../host/derive.md), which can also generate debug formatting and
-explicitly versioned codecs from checked declarations.
+[derivation tool](../host/derive.md), which can also generate debug formatting
+and explicitly versioned codecs from checked declarations.
 
 ```blot
 type Count is data = $Count U32
@@ -754,9 +754,8 @@ Runtime allocation/collector measurements from the retired backend are
 historical evidence, not cost guarantees for this profile. Preserve their exact
 source/binary identities in Git history. Qualify the current backend through
 executed ownership, bounds and numerical laws, then measure fresh release
-artifacts separately. See
-[storage requirements](../compiler/SCOPED_STORAGE.md) and
-[qualification](../../tasks/121-qualify-and-measure-owned-applications.md).
+artifacts separately. See [storage requirements](../compiler/SCOPED_STORAGE.md)
+and [qualification](../../tasks/121-qualify-and-measure-owned-applications.md).
 
 Import `std/array` for `generate`, `fill`, `length`, `is_empty`,
 `at index values`, `replace index value values`, `get index values`,
@@ -1095,24 +1094,24 @@ before an open tail. Instantiation preserves their exact declaration and family
 arguments. Reflection still requires complete closed descriptors; unresolved
 arguments cannot become a closed reflected effect set.
 
-[Scoped effect identities](../compiler/SCOPED_EFFECTS.md) specifies the
-checked representation: symbolic family arguments, distinct same-typed
-capabilities and checked scope/capture lifetimes. The direct annotated-family
-subset accepts `@effect.scope (func (state: State U32) => return body)`, with
-member operations such as `state.get ()`. Each entry creates fresh authority.
-Local aliases and providers preserve its identity; its operations must be
-handled before exit. Generic scope factories may use symbolic family payloads
-such as `State a`; returning the same inherited payload shape retains its
-original lifetime. A longer-lived outer capability may pass through an inner
-scope in structural data; only the exiting owner is forbidden in that result.
-Primitive and structural data may return; callable, demand, provider, nominal
-and unresolved results or transferred arguments conservatively reject. Direct
-source closures may return when a bounded capture proof excludes the exiting
-owner; unknown captures still reject. A direct anonymous adapter whose whole
-body invokes its callback may borrow a capturing callable with a structural
-result. Exact generic identity and Unit callback helpers own validated public
-flow contracts. A single annotated capability parameter may read a Unit
-operation through source or compiled helpers, for example
+[Scoped effect identities](../compiler/SCOPED_EFFECTS.md) specifies the checked
+representation: symbolic family arguments, distinct same-typed capabilities and
+checked scope/capture lifetimes. The direct annotated-family subset accepts
+`@effect.scope (func (state: State U32) => return body)`, with member operations
+such as `state.get ()`. Each entry creates fresh authority. Local aliases and
+providers preserve its identity; its operations must be handled before exit.
+Generic scope factories may use symbolic family payloads such as `State a`;
+returning the same inherited payload shape retains its original lifetime. A
+longer-lived outer capability may pass through an inner scope in structural
+data; only the exiting owner is forbidden in that result. Primitive and
+structural data may return; nominal and unresolved results or transferred
+arguments conservatively reject. Direct source closures may return when a
+bounded capture proof excludes the exiting owner; unknown captures still reject.
+A direct anonymous adapter whose whole body invokes its callback may borrow a
+capturing callable with a structural result. Exact generic identity and Unit
+callback helpers own validated public flow contracts. A single annotated
+capability parameter may read a Unit operation through source or compiled
+helpers, for example
 `func (state: State a) : a ! {state.get} => return state.get ()`; calls
 substitute the argument's exact identity in that row. Exact curried callback
 helpers also preserve it, for example
@@ -1412,15 +1411,15 @@ type witnesses preserve opacity. Token remains distinct from U32 inside its
 producer. Public signatures cannot expose private nominal/effect identities or
 predicate implementations. Scalar and reference representations erase the opaque
 wrapper without adding a runtime allocation or tag. See
-[module abstraction](../compiler/MODULE_ABSTRACTION.md) for import and
-artifact rules.
+[module abstraction](../compiler/MODULE_ABSTRACTION.md) for import and artifact
+rules.
 
 Hosts can register typed parsers for external files through `createCompiler`'s
 `assets` option. Source imports those virtual modules normally, for example
 `import { value } from "./settings.json"`. Parsers return type descriptions and
 values, or types and references to host resource snapshots. See
-[typed asset imports](../host/assets.md) for JSON and shader integration. This is an
-explicit host parser boundary; the native CLI alone does not choose file
+[typed asset imports](../host/assets.md) for JSON and shader integration. This
+is an explicit host parser boundary; the native CLI alone does not choose file
 parsers.
 
 `entry const` and `entry let` mark host entrypoints. Exactly the entry module's
@@ -1507,11 +1506,11 @@ Not yet executable: collection patterns, general text, F64, general type-valued
 computation, and exposed continuation values. Do not infer availability from
 editor highlighting or design examples.
 
-Hosts use `host/guest.ts`. The owned-storage integration uses guest ABI 8
-and session protocol 2. Ordinary programs can still emit earlier profiles while
-the legacy backend is being retired; the host rejects mixed-profile modules.
-Numeric arrays cross as copied typed arrays; host callbacks are explicit scalar
-or numeric-array capabilities. Async capabilities suspend a guest invocation
+Hosts use `host/guest.ts`. The owned-storage integration uses guest ABI 8 and
+session protocol 2. Ordinary programs can still emit earlier profiles while the
+legacy backend is being retired; the host rejects mixed-profile modules. Numeric
+arrays cross as copied typed arrays; host callbacks are explicit scalar or
+numeric-array capabilities. Async capabilities suspend a guest invocation
 without discarding its local state. A guest closure capturing a host callback
 stays bound to that invocation: calling it after the invocation ends fails; a
 later host argument cannot rebind it. Records, general arrays and persistent
@@ -1556,56 +1555,26 @@ Type names and explicit type arguments stay unmarked.
 ordinary prelude declarations. For longer builder sequences, `:=` keeps each
 step on its own line.
 
-## Demand parameters
+## Deferred work
 
-`func ~value => return body` captures an argument without evaluating it. A typed
-parameter is `func ~(value: U32) => return body`. `@demand value` evaluates the
-captured expression once; later demands share its result. Returning a closure
-that captures a demand is supported. Merely referencing a demand does not force
-it.
+Use an ordinary Unit callback for work that should run only when selected. `and`
+and `or` are primitive short-circuit operators; their right operand runs only
+when needed. Function arguments otherwise evaluate eagerly.
 
 ```blot
-const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
-const call_lazy = func (callback: ~U32 -> U32) => return callback (20 + 1)
-entry const answer = func () => return call_lazy twice
-entry const skipped = false and (@panic "unreachable")
+const choose = func enabled -> callback => return
+  if enabled then callback () else 42
+entry const answer = func () => return
+  choose false (func () => return @panic "unused callback")
+entry const fallback = func () => return
+  Maybe.unwrap_or_else (func () => return 42) $Nothing
 ```
 
-Demand mode is part of the function type and survives aliases and partial
-application. `~T` denotes a demand for a result of type `T`; latent effects are
-inferred. Forcing requires those effects in the surrounding function, using the
-providers active at the first force. An unused demand needs no provider. To
-forward an existing demand to another lazy parameter, pass `@demand value`. Unit
-callbacks remain available for work that should run on every call.
-
-A delayed argument is checked by its actual construction captures. Capture-free
-work can be delayed inside a scoped effect, including work that creates its own
-scope when forced. Capturing a fresh capability or operation still retains that
-authority, even when the expression returns a scalar or its memo is already
-ready.
-
-A request handler's `break value`, `return value`, or bare `break` cancels an
-unfinished demand and makes it pending again. Its next demand starts the
-expression again under the then active providers. Effects already performed are
-not rolled back. A handler's `yield` resumes evaluation; only normal completion
-publishes the shared result. Recursive forcing fails. If a Wasm trap or host
-exception interrupts a demand, that demand remains terminal: later attempts fail
-without running its expression again. Other entry calls remain usable.
-
-Known, fully applied small functions can use branches and local values without a
-heap cell. Admitted bodies include primitive scalar and collection operations,
-conditionals, local aliases and structured range, collection and forever loops.
-This includes aliases, custom operators and equivalent user functions, including
-acyclic forwarding through available imported or compiled bodies and immutable
-compile-time captures. Both codegen tiers use this proof. A memo created outside
-a callee loop survives all its iterations; a call inside a loop creates fresh
-state on each execution. Aliases share the first normally completed result.
-Known lexical callbacks and local aliases can share those same memo locals when
-the complete bounded proof establishes every use and capture. Zero iterations
-and unchosen branches perform no demand. Escaping demands, provider changes,
-arbitrary callbacks and bodies outside the bounded proof retain the shared
-runtime cell. Evaluation order, capture versions and first-demand providers are
-the same in both cases.
+`Maybe.unwrap_or_else` and `Result.unwrap_or_else` take a Unit callback as their
+fallback. A selected callback runs once in these helpers. Calling an ordinary
+callback again runs its body again; there is no implicit memoization or demand
+cell. Callback effect rows and owner lifetimes follow the ordinary rules. The
+former `~` parameter/type syntax and `@demand` intrinsic are removed.
 
 ## Pattern alternatives and layout
 

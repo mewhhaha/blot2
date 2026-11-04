@@ -14,7 +14,7 @@ pub const boolean: Id = 2;
 pub const u32_type: Id = 3;
 pub const f32_type: Id = 4;
 pub const never: Id = 5;
-pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider, projection, scoped, instance_selection, erased_proof, forall, existential, bound, rigid, usage, instance_version };
+pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, type_constructor, resolver, provider, state_provider, projection, scoped, instance_selection, erased_proof, forall, existential, bound, rigid, usage, instance_version };
 pub const UsageKind = @import("../parse/ast.zig").UsageKind;
 pub const Node = struct {
     tag: Tag,
@@ -367,7 +367,7 @@ pub const Store = struct {
         var height: u8 = 0;
         switch (n.tag) {
             .absent, .variable, .forall, .existential, .bound, .rigid => return 0,
-            .function, .demand, .provider => {
+            .function, .provider => {
                 const row_height = self.closedRowHeight(n.c);
                 if (row_height == 0) return 0;
                 height = self.closedHeight(n.a);
@@ -647,13 +647,6 @@ pub const Store = struct {
         std.debug.assert(tag == .array or tag == .list or tag == .cursor);
         try self.dataKind(element);
         return self.add(.{ .tag = tag, .a = element });
-    }
-    pub fn demand(self: *Store, element: Id) Error!Id {
-        return self.demandWithEffects(element, 0);
-    }
-    pub fn demandWithEffects(self: *Store, element: Id, effect_row: Effects.Id) Error!Id {
-        try self.dataKind(element);
-        return self.add(.{ .tag = .demand, .a = element, .c = effect_row });
     }
     pub fn typeConstructor(self: *Store, identity: NominalIdentity) Error!Id {
         return self.add(.{ .tag = .type_constructor, .a = identity.unit, .b = identity.decl });
@@ -953,7 +946,7 @@ pub const Store = struct {
                 if (variable.first == none and n.b > self.cursor()) certificate.future_clock = self.cursor();
                 continue;
             }
-            if (n.tag == .function or n.tag == .demand or n.tag == .provider) {
+            if (n.tag == .function or n.tag == .provider) {
                 const row_ = self.row(n.c);
                 for (self.rowLabels(n.c)) |label| {
                     const arguments = self.operationArguments(label);
@@ -985,7 +978,7 @@ pub const Store = struct {
                     if (n.b == 0) break :blk children[0..2];
                     break :blk children[0..1];
                 },
-                .array, .list, .cursor, .resolver, .demand, .provider => blk: {
+                .array, .list, .cursor, .resolver, .provider => blk: {
                     children[0] = n.a;
                     break :blk children[0..1];
                 },
@@ -1187,10 +1180,10 @@ pub const Store = struct {
                 const child = try self.resolveDepth(value.a, position, depth + 1);
                 return if (child == value.a) id else if (value.tag == .resolver) self.resolver(child) else self.sequence(value.tag, child);
             },
-            .demand, .provider => {
+            .provider => {
                 const child = try self.resolveDepth(value.a, position, depth + 1);
                 const effect_row = try self.resolveOperationRow(value.c, position, depth + 1);
-                return if (child == value.a and effect_row == value.c) id else if (value.tag == .provider) self.provider(child, effect_row) else self.demandWithEffects(child, effect_row);
+                return if (child == value.a and effect_row == value.c) id else self.provider(child, effect_row);
             },
             .state_provider => {
                 const read = try self.resolveDepth(value.a, position, depth + 1);
@@ -1268,7 +1261,7 @@ pub const Store = struct {
             self.occurs_steps += 1;
             if (self.closedHeight(id) != 0) continue;
             const value = self.node(id);
-            if (value.tag == .function or value.tag == .demand or value.tag == .provider)
+            if (value.tag == .function or value.tag == .provider)
                 for (self.rowLabels(value.c)) |label| {
                     try pending.appendSlice(scratch_allocator, self.operationArguments(label));
                     const instance = self.operation(label).instance;
@@ -1292,7 +1285,7 @@ pub const Store = struct {
                         inline for (.{ "ty", "other", "result", "signature" }) |field| if (@field(goal, field) != 0) try pending.append(scratch_allocator, @field(goal, field));
                     }
                 },
-                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(scratch_allocator, value.a),
+                .array, .list, .cursor, .resolver, .provider => try pending.append(scratch_allocator, value.a),
                 .state_provider => try pending.appendSlice(scratch_allocator, &.{ value.a, value.b, value.c }),
                 .record => for (0..value.b) |i| {
                     try pending.append(scratch_allocator, self.recordField(value, i).ty);
@@ -1590,7 +1583,7 @@ pub const Store = struct {
         }
         if (depth == 0) return hash;
         switch (n.tag) {
-            .array, .list, .cursor, .resolver, .demand, .provider, .usage, .scoped => hash = mixShape(hash, self.operationTypeShape(n.a, depth - 1)),
+            .array, .list, .cursor, .resolver, .provider, .usage, .scoped => hash = mixShape(hash, self.operationTypeShape(n.a, depth - 1)),
             .function => {
                 hash = mixShape(hash, self.operationTypeShape(n.a, depth - 1));
                 hash = mixShape(hash, self.operationTypeShape(n.b, depth - 1));
@@ -1739,7 +1732,7 @@ pub const Store = struct {
                 .variable => {
                     if (!symbolic or a.a != b.a or a.b != b.b) return false;
                 },
-                .function, .demand, .provider => {
+                .function, .provider => {
                     const ar = self.effects.node(a.c);
                     const br = self.effects.node(b.c);
                     if (symbolic) {
@@ -1974,7 +1967,7 @@ pub const Store = struct {
                     }
                 },
                 .array, .list, .cursor, .resolver => try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a }),
-                .demand, .provider => {
+                .provider => {
                     try pending.append(scratch_allocator, .{ .a = an.c, .b = bn.c, .effect_row = true });
                     try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
                 },
@@ -2072,7 +2065,7 @@ pub const Store = struct {
             const entry = try seen.getOrPut(temporary, id);
             if (entry.found_existing) continue;
             const value = self.node(id);
-            if (value.tag == .function or value.tag == .demand or value.tag == .provider)
+            if (value.tag == .function or value.tag == .provider)
                 for (self.rowLabels(value.c)) |label| {
                     try pending.appendSlice(temporary, self.operationArguments(label));
                     const instance = self.operation(label).instance;
@@ -2096,7 +2089,7 @@ pub const Store = struct {
                         inline for (.{ "ty", "other", "result", "signature" }) |field| if (@field(goal, field) != 0) try pending.append(temporary, @field(goal, field));
                     }
                 },
-                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, value.a),
+                .array, .list, .cursor, .resolver, .provider => try pending.append(temporary, value.a),
                 .state_provider => try pending.appendSlice(temporary, &.{ value.a, value.b, value.c }),
                 .record => for (0..value.b) |i| {
                     try pending.append(temporary, self.recordField(value, i).ty);
@@ -2132,7 +2125,7 @@ pub const Store = struct {
             switch (n.tag) {
                 .projection => return true,
                 .function => try pending.appendSlice(self.allocator, &.{ .{ .root = n.a }, .{ .root = n.b }, .{ .root = n.c, .row = true } }),
-                .demand, .provider => try pending.appendSlice(self.allocator, &.{ .{ .root = n.a }, .{ .root = n.c, .row = true } }),
+                .provider => try pending.appendSlice(self.allocator, &.{ .{ .root = n.a }, .{ .root = n.c, .row = true } }),
                 .usage => {
                     try pending.append(self.allocator, .{ .root = n.a });
                     if (n.c != 0) try pending.append(self.allocator, .{ .root = n.c });
@@ -2283,7 +2276,7 @@ pub const Store = struct {
                 if (child == value.a) return root;
                 return self.sequence(value.tag, child);
             },
-            // Nominal arguments and Demand's latent computation are invariant.
+            // Nominal arguments are invariant.
             else => return root,
         }
     }
@@ -2309,7 +2302,7 @@ pub const Store = struct {
                 try self.unionInto(out, free);
                 try self.covariantInputsSeen(value.b, out, depth + 1, seen);
             },
-            .nominal, .demand, .state_provider => {
+            .nominal, .state_provider => {
                 const free = try self.freeRowVariables(root);
                 defer self.allocator.free(free);
                 try self.unionInto(out, free);
@@ -2463,7 +2456,7 @@ pub const Store = struct {
             const entry = try seen.getOrPut(temporary, (@as(u64, id) << 32) | at);
             if (entry.found_existing) continue;
             const value = self.node(id);
-            if (value.tag == .function or value.tag == .demand or value.tag == .provider) {
+            if (value.tag == .function or value.tag == .provider) {
                 var row_ = self.effects.node(value.c);
                 var row_at = @max(at, row_.cursor);
                 while (true) {
@@ -2495,7 +2488,7 @@ pub const Store = struct {
                         inline for (.{ "ty", "other", "result", "signature" }) |field| if (@field(goal, field) != 0) try pending.append(temporary, .{ .id = @field(goal, field), .at = at, .depth = work.depth + 1 });
                     }
                 },
-                .scoped, .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, .{ .id = value.a, .at = at, .depth = work.depth + 1 }),
+                .scoped, .array, .list, .cursor, .resolver, .provider => try pending.append(temporary, .{ .id = value.a, .at = at, .depth = work.depth + 1 }),
                 .state_provider => {
                     try pending.append(temporary, .{ .id = value.a, .at = at, .depth = work.depth + 1 });
                     try pending.append(temporary, .{ .id = value.b, .at = at, .depth = work.depth + 1 });
@@ -2716,7 +2709,6 @@ pub const Store = struct {
                 return self.product(fields.items);
             },
             .array, .list, .cursor => return self.sequence(value.tag, try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1)),
-            .demand => return self.demandWithEffects(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1), try self.substitutedRow(value.c, substitution, copied, scratch, depth + 1)),
             .provider => return self.provider(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1), try self.substitutedRow(value.c, substitution, copied, scratch, depth + 1)),
             .state_provider => return self.stateProvider(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1), try self.substituteDepth(value.b, substitution, copied, scratch, depth + 1), try self.substituteDepth(value.c, substitution, copied, scratch, depth + 1)),
             .resolver => return self.resolver(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1)),

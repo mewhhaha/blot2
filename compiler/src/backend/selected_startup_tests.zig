@@ -77,9 +77,9 @@ test "selected startup cyclic graph releases every backend allocation failure" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{ &module, @as(?backend.Code, .initialization_cycle), @as(?u32, 121) });
 }
 
-const ready_demand = "const keep = func ~(value: Unit -> U32) => return value\nconst helper = func () => return first\nconst pending = keep helper\nconst cached = @demand pending\nlet first: U32 = cached ()\nentry const answer: Unit -> U32 = func () => return first\n";
+const ready_callback = "const keep = func (value: Unit -> U32) => return value\nconst helper = func () => return 42\nconst pending = keep helper\nconst cached = pending\nlet first: U32 = cached ()\nentry const answer: Unit -> U32 = func () => return first\n";
 test "selected startup global allocation precedes recursive initializer helper emission" {
-    var module = try lower(a, ready_demand);
+    var module = try lower(a, ready_callback);
     defer module.deinit(a);
     try emit(a, &module, null, null);
 }
@@ -96,7 +96,7 @@ test "selected startup global emission preserves real direct cycles and legal fu
 }
 
 test "selected startup allocated slots and initializer emission release every allocation failure" {
-    for ([_][]const u8{ ready_demand, separate_instances }) |text| {
+    for ([_][]const u8{ ready_callback, separate_instances }) |text| {
         var module = try lower(a, text);
         defer module.deinit(a);
         const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -250,14 +250,14 @@ test "selected startup same owner pattern projection cannot hide a method cycle 
     try std.testing.expectEqualSlices(u8, &before, &@import("../check/core_snapshot_tests.zig").stamp(module));
 }
 
-test "selected startup empty plan entry selection preserves guarded on demand cells" {
+test "selected startup empty plan entry selection preserves guarded runtime globals" {
     {
         var module = try lower(a, "type Box is data = $Box U32\nconst Box.read = func value => return second\nconst pick = func value => return value.read\nlet second: U32 = 42\nentry const answer: Unit -> U32 = func () => return pick ($Box 1)\n");
         defer module.deinit(a);
         try emit(a, &module, null, null);
     }
     {
-        var module = try lower(a, "const keep = func ~(value: Unit -> U32) => return value\nconst helper = func () => return first\nconst pending = keep helper\nconst cached = @demand pending\nconst sentinel: U32 = 0\nconst make = func () => return func (value: U32) : U32 => return case value of\n  ^sentinel => 42\n  _ => 0\nentry const extra: U32 -> U32 = make ()\nlet first: U32 = cached ()\nentry const answer: Unit -> U32 = func () => return first\n");
+        var module = try lower(a, "const keep = func (value: Unit -> U32) => return value\nconst helper = func () => return 42\nconst pending = keep helper\nconst cached = pending\nconst sentinel: U32 = 0\nconst make = func () => return func (value: U32) : U32 => return case value of\n  ^sentinel => 42\n  _ => 0\nentry const extra: U32 -> U32 = make ()\nlet first: U32 = cached ()\nentry const answer: Unit -> U32 = func () => return first\n");
         defer module.deinit(a);
         try emit(a, &module, null, null);
     }

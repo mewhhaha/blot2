@@ -132,7 +132,7 @@ const Scan = struct {
             if (!found) return error.Declined;
         }
         // The declaration-to-use relation preserves owned symbolic row tails.
-        // Source physical substitutions may erase a specialized Demand row;
+        // Source physical substitutions may erase a specialized effect row;
         // they cannot close or rename the logical caller's row variable.
         const origin = node.target orelse return error.Declined;
         const producer = try self.unit(origin.unit);
@@ -174,40 +174,6 @@ const Scan = struct {
             };
             if (!matched and entry.value != 0) return error.Declined;
         }
-        const request_ = try self.request(site.function);
-        if (request_ == .named and request_.named.templates != 0 and body.parameters.len != 0) {
-            const parameter = producer.bodyParameters(body)[0];
-            const parameter_type = producer.types.node(parameter.ty);
-            if (parameter_type.tag == .demand) {
-                const row = producer.types.row(parameter_type.c);
-                if (row.tail != .variable) return error.Declined;
-                try self.demandRow(site.function, callable, row.tail.variable);
-            }
-        }
-    }
-    fn demandRow(self: *Scan, function: u32, callable: L.Id, variable: u32) Error!void {
-        const request_ = try self.request(function);
-        if (request_ != .named) return error.Declined;
-        const key = request_.named;
-        const producer = try self.unit(key.target.unit);
-        const body = producer.body(key.target.binding) orelse return error.Declined;
-        if (key.templates == 0 or key.templates > self.model.templates.spans.len or body.parameters.len != 2) return error.Declined;
-        const span = self.model.templates.spans[key.templates - 1];
-        if (span.start > self.model.templates.entries.len or span.len > self.model.templates.entries.len - span.start or span.len != 1) return error.Declined;
-        const template = self.model.templates.entries[span.start];
-        const parameter = producer.bodyParameters(body)[0];
-        if (template.variable != parameter.binding or parameter.ty >= producer.types.nodes.len or template.value == 0 or template.value > self.model.captures.len) return error.Declined;
-        const demand = producer.types.node(parameter.ty);
-        if (demand.tag != .demand or demand.c >= producer.types.effects.rows.len or producer.types.row(demand.c).tail != .variable or producer.types.row(demand.c).tail.variable != variable) return error.Declined;
-        const memo_id = try self.edge(callable, .capture, 1);
-        const memo = self.semantic.nodes[memo_id];
-        const capture = self.model.captures[template.value - 1];
-        if (memo.kind != .memo or memo.closure == null or capture.unit != memo.site.unit or capture.node != memo.site.node or !capture.demand_cell or !capture.has_environment or capture.computation or capture.templates != 0 or capture.staged != 0 or capture.rows != 0 or capture.evidence != 0) return error.Declined;
-        const owner = try self.unit(capture.unit);
-        if (capture.node == 0 or capture.node >= owner.nodes.len or owner.node(capture.node).tag != .suspend_ or owner.node(capture.node).a != memo.closure.?) return error.Declined;
-        const force = @import("../eval/demand_origins.zig").force(self.source, function) orelse return error.Declined;
-        if (force.cell_parameter != 0) return error.Declined;
-        try self.target(try self.request(force.producer), memo_id);
     }
     fn rowEntries(self: *Scan, id: u32) Error![]const @import("../reuse/substitution_keys.zig").Entry {
         if (id == 0) return &.{};
@@ -376,16 +342,6 @@ const Scan = struct {
             const context = self.contexts[site.context];
             var value: L.Id = undefined;
             switch (site.kind) {
-                .memo => {
-                    const receipt_ = (try self.receipt(site.function, site.at)) orelse return error.Declined;
-                    if (receipt_.kind != .allocation) return error.Declined;
-                    value = try self.semanticAt(receipt_, context.invocation, .memo);
-                    if (!self.semantic.nodes[value].ready) return error.Declined;
-                    const fact = try self.construction(site);
-                    if (fact.kind != .demand or fact.environment != .zero or site.bytes != fact.bytes) return error.Declined;
-                    try self.target(try self.request(fact.target), value);
-                    for (self.semantic.edges) |edge_| if (edge_.from == value and edge_.kind == .capture and edge_.to != 0) return error.Declined;
-                },
                 .closure => {
                     value = context.creation orelse return error.Declined;
                     const fact = @import("callable_origins.zig").resultConstruction(self.source, site.function) orelse return error.Declined;
@@ -437,17 +393,6 @@ const Scan = struct {
                         continue;
                     }
                 } else switch (physical.kind) {
-                    .memo => {
-                        if (store.offset == 4) {
-                            if (store.values != 0) return error.Declined;
-                            continue;
-                        }
-                        if (store.offset != 12) {
-                            if (store.values != 0) return error.Declined;
-                            continue;
-                        }
-                        expected = self.semantic.nodes[semantic].contents;
-                    },
                     .closure => {
                         if (store.offset != 4) {
                             if (store.values != 0) return error.Declined;
@@ -464,8 +409,6 @@ const Scan = struct {
                     },
                     else => return error.Declined,
                 }
-                // A null initialization does not publish a completed cache.
-                if (physical.kind == .memo and store.values == 0) continue;
                 var values = store.values;
                 var owns_expected = false;
                 while (values != 0) {

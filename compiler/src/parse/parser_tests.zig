@@ -90,6 +90,9 @@ test "functions require explicit return and reject whitespace separated paramete
         "const identity = func x => x\n",
         "const add = func x y => return @u32.add x y\n",
         "const typed = func (x: U32) -> U32 => return x\n",
+        "const lazy = func ~value => return value\n",
+        "const lazy = func ~(value: U32) => return value\n",
+        "const lazy: ~U32 -> U32 = func value => return 42\n",
     }) |source| {
         var pool: symbols.Pool = .{};
         defer pool.deinit(std.testing.allocator);
@@ -310,6 +313,15 @@ test "spark and receive lower to checked task operations with bounded syntax" {
         spawns += @intFromBool(std.mem.eql(u8, name, "@task.spawn"));
         joins += @intFromBool(std.mem.eql(u8, name, "@task.receive"));
     };
+    var implicit_units: usize = 0;
+    for (tree.nodes.items, 0..) |node, id| {
+        if (node.tag != .parameter or node.a != 0) continue;
+        const parameter = tree.parameter(@intCast(id));
+        try std.testing.expect(parameter.is_unit);
+        try std.testing.expect(!parameter.requires_return);
+        implicit_units += 1;
+    }
+    try std.testing.expect(implicit_units >= 2);
     try std.testing.expectEqual(@as(usize, 1), spawns);
     try std.testing.expectEqual(@as(usize, 1), joins);
     for ([_]struct { source: []const u8, code: ast.Code }{

@@ -173,9 +173,8 @@ test "scoped copy coalescing declines hidden and flagged local identities anywhe
     });
     defer source.deinit(a);
     for ([_]ir.Instruction{
-        .{ .op = .ownership },                        .{ .op = .resource_retire },                    .{ .op = .wide_layouts },
-        .{ .op = .local_get, .operand = 2 },          .{ .op = .local_get, .table_reference = true }, .{ .op = .local_set, .table_kind = .callable },
-        .{ .op = .local_tee, .table_kind = .demand },
+        .{ .op = .ownership },               .{ .op = .resource_retire },                    .{ .op = .wide_layouts },
+        .{ .op = .local_get, .operand = 2 }, .{ .op = .local_get, .table_reference = true }, .{ .op = .local_set, .table_kind = .callable },
     }) |hidden| {
         source.instructions.items[3] = hidden;
         try std.testing.expect((try coalesce.run(a, &source, &single(&source))) == null);

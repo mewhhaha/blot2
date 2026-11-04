@@ -195,13 +195,10 @@ Deno.test("cohort roots spill pages and unwind invocation traps with bounded ret
     for (let group = 0; group < 16; group++) {
       const p = r.owner();
       for (let i = 0; i < 40; i++) {
-        // A real force record publishes this Memo-shaped member. Its
-        // environment edge is a local self-cycle, and failure terminalizes
-        // evaluating status before releasing the journal owner.
+        // An ordinary authority record publishes another member owner.
         const a = r.call("allocate", 16, 2, p);
         r.put(a + 4, a);
-        r.put(a + 8, 1);
-        r.call("root_force", a);
+        r.call("root_authority", a);
         assert.equal(r.word(a - 16), 2);
       }
     }
@@ -220,20 +217,18 @@ Deno.test("cohort roots spill pages and unwind invocation traps with bounded ret
   assert.equal(r.count("destroyed"), 24 * 16 * 41);
 });
 
-for (const journal of ["root_force", "root_authority"]) {
-  Deno.test(`a cohort owner cannot retire before a member's ${journal} record`, () => {
+Deno.test("a cohort owner cannot retire before a member authority record", () => {
     const r = runtime();
     r.call("root_open");
     const p = r.owner();
-    let bytes = 4;
-    if (journal === "root_force") bytes = 16;
+    const bytes = 4;
     const a = r.call("allocate", bytes, 0, p);
     assert.equal(r.word(a - 16), 1);
     assert.equal(r.global("root_count"), 1);
     assert.equal(r.count("leases"), 1);
     // These actual runtime records, not forged strong counts or lease bits,
     // publish an additional owner of the member.
-    r.call(journal, a);
+    r.call("root_authority", a);
     assert.equal(r.word(a - 16), 2);
     assert.equal(r.global("root_count"), 2);
     assert.equal(r.count("leases"), 1);
@@ -248,8 +243,7 @@ for (const journal of ["root_force", "root_authority"]) {
     r.call("retire", p);
     r.balanced();
     assert.equal(r.count("destroyed"), 2);
-  });
-}
+});
 
 Deno.test("dropping a live member pin cannot bypass cohort retirement", () => {
   const r = runtime();

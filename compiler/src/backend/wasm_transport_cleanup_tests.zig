@@ -114,7 +114,7 @@ test "scoped transport conserves packed flags declines hidden operands and alloc
     }
     source.instructions.items[2] = .{ .op = .i32_const };
     for (0..2) |which| {
-        for ([_]ir.Instruction{ .{ .op = .local_get, .table_reference = true }, .{ .op = .local_get, .table_kind = .callable }, .{ .op = .local_get, .table_kind = .demand } }) |flagged| {
+        for ([_]ir.Instruction{ .{ .op = .local_get, .table_reference = true }, .{ .op = .local_get, .table_kind = .callable } }) |flagged| {
             source.instructions.items[0] = .{ .op = .local_get };
             source.instructions.items[1] = .{ .op = .local_set };
             source.instructions.items[which] = flagged;

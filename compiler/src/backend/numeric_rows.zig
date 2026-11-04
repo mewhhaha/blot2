@@ -157,7 +157,7 @@ test "numeric row plans preserve physical paths and reject references and excess
     try std.testing.expectEqual(@as(u16, 1), plan.storage[0].references);
     try std.testing.expectEqualDeep(Leaf{ .owner = 1, .offset = 4, .floating = true, .word = 1 }, plan.leaves[1]);
     try std.testing.expectEqualDeep(Leaf{ .owner = 0, .offset = 4, .floating = false, .word = 2 }, plan.leaves[2]);
-    for ([_]layout.Tag{ .array, .list, .cursor, .function, .demand, .provider, .nominal }) |tag| {
+    for ([_]layout.Tag{ .array, .list, .cursor, .function, .provider, .nominal }) |tag| {
         const reference = try store.intern(tag, 3, 3, &.{});
         const wrapped = try store.intern(.product, 0, 0, &.{ 3, reference });
         try std.testing.expect(try analyze(&g, wrapped) == null);

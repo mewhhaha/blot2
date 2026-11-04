@@ -43,7 +43,7 @@ const OperationKey = code_artifacts.OperationKey;
 const Code = @import("../check/diagnostic_code.zig").Code;
 pub const Error = Allocator.Error || error{ Declined, ModuleTooLarge, InvalidFunctionReference, InvalidGlobalReference };
 pub const CarrierKey = struct { from: layout.Id, to: layout.Id };
-pub const Template = struct { scalar_environment: bool = false, callable_instances: u32 = 0, staged: u32 = 0, unit: u32 = 0, node: core.Id, environment: ?u32 = null, captures: layout.Id = 0, templates: substitution_keys.Id = 0, demand_cell: bool = false, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
+pub const Template = struct { scalar_environment: bool = false, callable_instances: u32 = 0, staged: u32 = 0, unit: u32 = 0, node: core.Id, environment: ?u32 = null, captures: layout.Id = 0, templates: substitution_keys.Id = 0, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
 const Generator = @import("core_backend.zig").Generator;
 pub const Owner = struct {
     const Emitter = @This();
@@ -95,8 +95,6 @@ pub const Owner = struct {
         admitted: [max_parameters]bool = @splat(false),
         result: Template,
     };
-    const DemandPlan = struct { uses: [max_parameters]u8 };
-    const DemandDecision = struct { plan: ?DemandPlan = null, reason: @import("demand_lowering.zig").Reason };
     const DictionaryMemberPlan = struct { offset: usize, signature: layout.Id };
     const NamedPlan = struct {
         call: resolved_call.Named,
@@ -104,7 +102,6 @@ pub const Owner = struct {
         evaluated: ?*EvaluatedNamed = null,
         dictionary_owner: ?DictionaryOwner = null,
         dictionary_member: ?DictionaryMemberPlan = null,
-        demand: ?DemandPlan = null,
         factory: ?FactoryPlan = null,
         fn deinit(self: *NamedPlan, a: Allocator) void {
             if (self.evaluated) |value| a.destroy(value);
@@ -130,7 +127,6 @@ pub const Owner = struct {
         universal: ?layout.Id = null,
         quantifier: types.Id = 0,
         never: bool = false,
-        local_callback: core.Id = 0,
         fn deinit(self: *ApplyPlan, a: Allocator) void {
             if (self.evaluated) |value| a.destroy(value);
             if (self.static_closure) |*closure_| closure_.deinit(a);
@@ -306,7 +302,6 @@ pub const Owner = struct {
     computation_values: std.AutoHashMapUnmanaged(core.BindingId, layout.Id) = .empty,
     result_template: ?u32 = null,
     factory_template: bool = false,
-    inline_demands: []const InlineDemand = &.{},
     owned_edit: ?core.Id = null,
     inline_depth: u8 = 0,
     inline_loop: bool = false,
@@ -609,7 +604,7 @@ pub const Owner = struct {
                     self.type_count += 1;
                     return true;
                 },
-                .function, .demand, .provider => {
+                .function, .provider => {
                     if (n.tag == .function and !self.visit(n.b, depth + 1)) return false;
                     return self.row(n.c, depth + 1) and self.visit(n.a, depth + 1);
                 },
@@ -735,8 +730,8 @@ pub const Owner = struct {
     }
     /// A producer built only from pure construction, calls, applications and
     /// local reads. Pure `let` initializers generalize, so repeating one per
-    /// instance repeats no effect. Blocks, matches, effects, usage operations,
-    /// suspensions and any value of a usage-contract type decline. Possible
+    /// instance repeats no effect. Blocks, matches, effects, usage operations
+    /// and values of a usage-contract type decline. Possible
     /// in-place collection edits are collected for the exact ownership proof.
     const ProducerScan = struct {
         source: *const core.Module,
@@ -824,7 +819,7 @@ pub const Owner = struct {
             body.has_owners = true;
             break;
         };
-        var preparer: Emitter = .{ .generator = g, .unit_id = self.unit_id, .function_id = self.function_id, .mappings = body.mappings, .row_mappings = body.rows, .factory_template = self.factory_template, .inline_demands = self.inline_demands, .preparation_depth = self.preparation_depth + 1, .preparing = true, .staged = self.staged };
+        var preparer: Emitter = .{ .generator = g, .unit_id = self.unit_id, .function_id = self.function_id, .mappings = body.mappings, .row_mappings = body.rows, .factory_template = self.factory_template, .preparation_depth = self.preparation_depth + 1, .preparing = true, .staged = self.staged };
         defer preparer.deinit();
         preparer.dictionary_local = self.dictionary_local;
         preparer.dictionary_owner = self.dictionary_owner;
@@ -1279,7 +1274,7 @@ pub const Owner = struct {
                 if (try self.prepareCollectionStep(body, id, depth)) |step| break :pattern step;
                 break :pattern try self.preparePrivateCursorPattern(body, id);
             },
-            .closure, .suspend_ => .{ .template = try self.prepareTemplate(id) },
+            .closure => .{ .template = try self.prepareTemplate(id) },
             .reference => .{ .reference = try self.prepareReference(id) },
             .project => .{ .projection = try self.prepareProjection(body, id, depth) },
             .update => .{ .update_locations = try self.prepareUpdateLocations(id) },
@@ -1393,7 +1388,7 @@ pub const Owner = struct {
                 try self.prepareNode(body, n.a, depth + 1, false);
                 try self.prepareNode(body, n.b, depth + 1, false);
             },
-            .resource_release, .usage_share, .project, .force, .result_associated, .computation, .effect_scope, .usage_read => try self.prepareNode(body, n.a, depth + 1, false),
+            .resource_release, .usage_share, .project, .result_associated, .computation, .effect_scope, .usage_read => try self.prepareNode(body, n.a, depth + 1, false),
             .construct => try self.prepareNode(body, n.b, depth + 1, false),
             .effect_provider => {
                 if (self.scopedProvider(n.ty)) try self.prepareNode(body, n.a, depth + 1, false);
@@ -1576,7 +1571,7 @@ pub const Owner = struct {
         if (try self.staticCallableTemplate(id)) |template| return template;
         const source = self.generator.unit(self.unit_id);
         const node = source.node(id);
-        if (node.tag == .closure or node.tag == .suspend_) return body.get(id).template.metadata;
+        if (node.tag == .closure) return body.get(id).template.metadata;
         if (node.tag == .primitive_function or node.tag == .constructor_function) return .{ .unit = self.unit_id, .node = id, .callable_instances = try self.scopedCallableInstances(id) };
         if (node.tag != .reference) return null;
         const reference = source.reference(id);
@@ -1694,7 +1689,7 @@ pub const Owner = struct {
             try g.resolveClosureMappings(key, &mappings, &rows);
             for (producer.extra[metadata.captures.start..][0..metadata.captures.len], 0..) |binding, index| {
                 if (g.capturedTemplate(key.templates, binding)) |captured| {
-                    try preparer.templates.put(g.allocator, binding, .{ .unit = captured.unit, .node = captured.node, .environment = if (captured.has_environment) 0 else null, .captures = captured.captures, .templates = captured.templates, .scalar_environment = captured.scalar_environment, .demand_cell = captured.demand_cell, .computation = captured.computation, .evidence = captured.evidence, .rows = captured.rows });
+                    try preparer.templates.put(g.allocator, binding, .{ .unit = captured.unit, .node = captured.node, .environment = if (captured.has_environment) 0 else null, .captures = captured.captures, .templates = captured.templates, .scalar_environment = captured.scalar_environment, .computation = captured.computation, .evidence = captured.evidence, .rows = captured.rows });
                 } else {
                     _ = index;
                     try preparer.locals.put(g.allocator, binding, 0);
@@ -1725,290 +1720,6 @@ pub const Owner = struct {
         const result = try g.codeLayoutWithRows(self.unit_id, ty, self.mappings, self.row_mappings, span);
         slot.* = .{ .ty = ty, .value = result };
         return result;
-    }
-
-    const InlineDemand = struct {
-        binding: core.BindingId,
-        caller: *Emitter,
-        expression: core.Id,
-        value: ?u32 = null,
-        ready: ?u32 = null,
-        root_slot: ?u32 = null,
-        machine: wasm.ValueType,
-        role: ir.Role,
-
-        fn root(self: InlineDemand) ?u32 {
-            if (self.role == .scalar) return null;
-            return self.value;
-        }
-    };
-
-    // Every forwarded call must keep its demand arguments as local expressions.
-    // Check their concrete signatures before emitting any outer arguments, so a
-    // later fallback cannot try to materialize an elided outer demand cell.
-    fn demandCallShapes(self: *Emitter, unit_id: u32, plan: *const @import("demand_inline.zig").Plan, mappings: []const Mapping, rows: []const RowMapping, depth: usize) Error!bool {
-        if (depth >= 96) return false;
-        const g = self.generator;
-        const source = g.unit(unit_id);
-        for (plan.calls[0..plan.call_count]) |id| {
-            const call = source.call(id);
-            const key = try g.signature(call.target, call.callee_type, unit_id, mappings, rows, source.span(id), false);
-            const target = g.unit(key.target.unit);
-            const body = target.body(key.target.binding) orelse return false;
-            if (key.count != call.arguments.len or key.count != body.parameters.len) return false;
-            const analysis = @import("demand_inline.zig").Plan.analyzeGraph(g.units, target, body);
-            g.evaluator.counters.demand_inline_nodes += analysis.visited;
-            const child = analysis.plan orelse return false;
-            for (call.arguments, 0..) |argument, i| {
-                if (self.hasErasedType(key.parameters[i], 0)) return false;
-                if (g.representations.store.node(key.parameters[i]).tag == .demand and source.node(argument).tag != .suspend_) return false;
-            }
-            var next_mappings: std.ArrayList(Mapping) = .empty;
-            var next_rows: std.ArrayList(RowMapping) = .empty;
-            defer next_mappings.deinit(g.allocator);
-            defer next_rows.deinit(g.allocator);
-            try g.seedNamedInstance(key, &next_mappings);
-            for (target.bodyParameters(body), 0..) |parameter, i| {
-                try g.mapTypeDepth(key.target.unit, &next_mappings, &next_rows, parameter.ty, key.parameters[i], body.span, 0);
-            }
-            try g.mapTypeDepth(key.target.unit, &next_mappings, &next_rows, target.typeOf(body.root), key.result, body.span, 0);
-            if (!try self.demandCallShapes(key.target.unit, &child, next_mappings.items, next_rows.items, depth + 1)) return false;
-        }
-        return true;
-    }
-
-    fn demandSummary(self: *Emitter, target: core.BindingRef) Error!?*const @import("demand_summary.zig").Summary {
-        std.debug.assert(self.preparing);
-        const demand = @import("demand_summary.zig");
-        const g = self.generator;
-        const owner = g.demand_owner orelse return null;
-        const table = &owner.demand_summaries;
-        const key = demand.keyFor(g.units, target, .{});
-        var cursor = table.candidates(demand.fingerprint(key), .oldest_first);
-        while (cursor.next()) |position| {
-            const record = &table.records.items[position];
-            if (!std.meta.eql(record.key, key)) continue;
-            g.evaluator.counters.demand_summary_hits += 1;
-            return &record.value;
-        }
-        const analysis = try demand.analyzeCached(g.allocator, g.units, target, key.limits, &g.evaluator.counters, table);
-        const installed = try demand.insert(g.allocator, table, key, analysis.dependencies, analysis.summary) orelse return null;
-        return &table.records.items[installed].value;
-    }
-
-    fn prepareDemandCall(self: *Emitter, key: Key, arguments: []const core.Id) Error!DemandDecision {
-        std.debug.assert(self.preparing);
-        const g = self.generator;
-        const source = g.unit(key.target.unit);
-        const body = source.body(key.target.binding) orelse return .{ .reason = .unavailable_body };
-        if (body.parameters.len != key.count) return .{ .reason = .unresolved_shape };
-        var has_demand = false;
-        for (source.bodyParameters(body)) |parameter| if (source.types.node(parameter.ty).tag == .demand) {
-            has_demand = true;
-        };
-        if (!has_demand) return .{ .reason = .unresolved_shape };
-        const analysis = @import("demand_inline.zig").Plan.analyzeGraph(g.units, source, body);
-        g.evaluator.counters.demand_inline_nodes += analysis.visited;
-        const shape = analysis.plan orelse {
-            _ = try self.demandSummary(key.target);
-            return .{ .reason = analysis.reason };
-        };
-        if (arguments.len != key.count) return .{ .reason = .unresolved_shape };
-        var uses = shape.uses;
-        if (try self.demandSummary(key.target)) |facts| {
-            var summary_uses: [max_parameters]u8 = @splat(0);
-            var known = true;
-            for (source.bodyParameters(body), 0..) |parameter, i| {
-                if (source.types.node(parameter.ty).tag != .demand) continue;
-                const fact = facts.parameter(i);
-                // The summary conservatively treats closure captures as an
-                // escape. A complete lexical-callback proof checks every use.
-                if (fact.outcome() == .escaping) {
-                    if (!shape.local_callbacks) return .{ .reason = .escaping_use };
-                    known = false;
-                }
-                if (fact.outcome() == .unknown) known = false;
-                summary_uses[i] = fact.count;
-            }
-            if (known) uses = summary_uses;
-        }
-        const caller = g.unit(self.unit_id);
-        for (arguments, 0..) |argument, i| {
-            if (self.hasErasedType(key.parameters[i], 0)) return .{ .reason = .unresolved_shape };
-            if (g.representations.store.node(key.parameters[i]).tag == .demand and caller.node(argument).tag != .suspend_) return .{ .reason = .unresolved_shape };
-        }
-        var mappings: std.ArrayList(Mapping) = .empty;
-        var rows: std.ArrayList(RowMapping) = .empty;
-        defer mappings.deinit(g.allocator);
-        defer rows.deinit(g.allocator);
-        try g.seedNamedInstance(key, &mappings);
-        for (source.bodyParameters(body), 0..) |parameter, i| try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
-        try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
-        if (!try self.demandCallShapes(key.target.unit, &shape, mappings.items, rows.items, 0)) return .{ .reason = .unresolved_control };
-        if (g.artifacts) |artifacts| {
-            try artifacts.readInlineBody(key.target);
-            if (g.demand_owner) |owner| {
-                const demand = @import("demand_summary.zig");
-                const summary_key = demand.keyFor(g.units, key.target, .{});
-                var cursor = owner.demand_summaries.candidates(demand.fingerprint(summary_key), .oldest_first);
-                while (cursor.next()) |position| {
-                    const record = &owner.demand_summaries.records.items[position];
-                    if (!std.meta.eql(record.key, summary_key)) continue;
-                    for (record.dependencies.bodies) |dependency| try artifacts.readInlineBody(dependency);
-                    break;
-                }
-            }
-        }
-        return .{ .plan = .{ .uses = uses }, .reason = .proved_local };
-    }
-    fn inlineDemandCall(self: *Emitter, key: Key, arguments: []const core.Id, prepared: ?DemandPlan, depth: usize) Error!bool {
-        const plan = prepared orelse return false;
-        const g = self.generator;
-        const source = g.unit(key.target.unit);
-        const body = source.body(key.target.binding).?;
-        const caller = g.unit(self.unit_id);
-        var mappings: std.ArrayList(Mapping) = .empty;
-        var rows: std.ArrayList(RowMapping) = .empty;
-        defer mappings.deinit(g.allocator);
-        defer rows.deinit(g.allocator);
-        try g.seedNamedInstance(key, &mappings);
-        for (source.bodyParameters(body), 0..) |parameter, i| {
-            try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
-        }
-        try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
-        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .diagnostic_context = try self.inlineContext(), .labels = self.labels };
-        defer emitter.deinit();
-        var demands: [max_parameters]InlineDemand = undefined;
-        var count: usize = 0;
-        // Eager arguments still run once, left to right. Deferred expressions
-        // retain the caller's immutable binding versions, without an object.
-        for (arguments, source.bodyParameters(body), 0..) |argument, parameter, i| {
-            const ty = g.representations.store.node(key.parameters[i]);
-            if (ty.tag != .demand) {
-                const local = try self.capture(argument, depth);
-                if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, local);
-                continue;
-            }
-            const uses = plan.uses[i];
-            if (uses == 0) {
-                g.evaluator.counters.demand_eliminated += 1;
-                try g.demandSite(self.unit_id, argument, .eliminated, .unused);
-            } else if (uses == 1) {
-                g.evaluator.counters.demand_direct += 1;
-                try g.demandSite(self.unit_id, argument, .direct, .proved_local);
-            } else {
-                g.evaluator.counters.demand_local_memo_slots += 2;
-                try g.demandSite(self.unit_id, argument, .local_memo, .repeated_local);
-            }
-            const machine = g.representations.store.machine(ty.a);
-            const memo = uses > 1;
-            var memo_value: ?u32 = null;
-            var memo_ready: ?u32 = null;
-            var memo_root: ?u32 = null;
-            if (memo) {
-                memo_value = try self.temporary(machine);
-                memo_ready = try self.temporary(.i32);
-                if (g.layoutRole(ty.a) == .reference) {
-                    // A first force inside a callee iteration must survive
-                    // that iteration. Reserve its owner in the caller frame.
-                    memo_root = try self.temporary(.i32);
-                    g.evaluator.counters.demand_local_memo_slots += 1;
-                    try self.rootDirective(3, memo_root.?);
-                }
-            }
-            demands[count] = .{
-                .binding = parameter.binding,
-                .caller = self,
-                .expression = caller.closures[caller.node(argument).a].body,
-                .value = memo_value,
-                .ready = memo_ready,
-                .root_slot = memo_root,
-                .machine = machine,
-                .role = g.layoutRole(ty.a),
-            };
-            // The call may occur inside a loop; Wasm local initialization alone
-            // would incorrectly share a result across successive invocations.
-            if (demands[count].ready) |ready| {
-                if (demands[count].role != .scalar) {
-                    if (machine == .f32) {
-                        try self.emit(.f32_const, 0);
-                    } else {
-                        try self.emit(.i32_const, 0);
-                    }
-                    try self.emit(.local_set, demands[count].value.?);
-                }
-                try self.emit(.i32_const, 0);
-                try self.emit(.local_set, ready);
-            }
-            count += 1;
-        }
-        emitter.inline_demands = demands[0..count];
-        try emitter.bodyExpression(body.root, depth + 1, false);
-        return true;
-    }
-
-    fn memoParent(self: *const Emitter) ?*const Emitter {
-        if (self.inline_demands.len == 0) return null;
-        return self.inline_demands[0].caller;
-    }
-
-    fn inlineDemandBinding(self: *const Emitter, binding: core.BindingId) ?*const InlineDemand {
-        const source = self.generator.unit(self.unit_id);
-        var current = binding;
-        for (0..64) |_| {
-            for (self.inline_demands) |*demand| if (demand.binding == current) return demand;
-            const initializer = source.binding(current).initializer;
-            if (initializer == 0 or source.node(initializer).tag != .reference) return null;
-            const reference = source.reference(initializer);
-            if (reference.unit != 0 and reference.unit != self.unit_id) return null;
-            current = reference.binding;
-        }
-        return null;
-    }
-
-    fn inlineDemand(self: *Emitter, id: core.Id, depth: usize) Error!bool {
-        const source = self.generator.unit(self.unit_id);
-        const operand = source.node(id).a;
-        if (source.node(operand).tag != .reference) return false;
-        const reference = source.reference(operand);
-        if (reference.unit != 0 and reference.unit != self.unit_id) return false;
-        if (self.inlineDemandBinding(reference.binding)) |demand| {
-            if (demand.ready) |ready| {
-                try self.emit(.local_get, ready);
-                try self.emit(.if_, @backingInt(demand.machine));
-                self.labels += 1;
-                try self.emit(.local_get, demand.value.?);
-                try self.emit(.else_, 0);
-            }
-            // Preserve creation-time binding versions while borrowing the
-            // force site's provider, labels and cancellation obligations. The
-            // snapshot includes callee loop scratch, without a parent cycle.
-            const inherited = try self.cleanups.snapshot(self.generator.allocator);
-            const saved_cleanups = demand.caller.cleanups;
-            demand.caller.cleanups = inherited;
-            defer {
-                demand.caller.cleanups.deinit(self.generator.allocator);
-                demand.caller.cleanups = saved_cleanups;
-            }
-            const saved_labels = demand.caller.labels;
-            demand.caller.labels = self.labels;
-            defer demand.caller.labels = saved_labels;
-            const saved_provider = demand.caller.provider_local;
-            demand.caller.provider_local = self.provider_local;
-            defer demand.caller.provider_local = saved_provider;
-            try demand.caller.bodyExpression(demand.expression, depth + 1, false);
-            if (demand.ready) |ready| {
-                try self.emit(.local_set, demand.value.?);
-                if (demand.root_slot) |slot| try self.rootDirective(4, slot | (demand.value.? << 13));
-                try self.emit(.i32_const, 1);
-                try self.emit(.local_set, ready);
-                try self.emit(.local_get, demand.value.?);
-                self.labels -= 1;
-                try self.emit(.end, 0);
-            }
-            return true;
-        }
-        return false;
     }
 
     fn inlineCollectionEdit(self: *Emitter, id: core.Id, key: Key, depth: usize) Error!bool {
@@ -2141,7 +1852,7 @@ pub const Owner = struct {
         }
         const inline_cost = facts.inline_cost orelse (if (numeric_limit != 0) @import("inline_body.zig").numericCost(source, body.root) else null) orelse return null;
         if (inline_cost > @max(ordinary_limit, numeric_limit) or self.hasErasedType(key.result, 0)) return null;
-        for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0) or g.representations.store.node(ty).tag == .demand) return null;
+        for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0)) return null;
         try g.seedNamedInstance(key, mappings);
         var source_type = try g.functionRoot(key.target.unit, source.binding(key.target.binding).ty, body.span);
         for (key.parameters[0..key.count], 0..) |ty, i| {
@@ -2420,7 +2131,7 @@ pub const Owner = struct {
         return switch (node.tag) {
             .erased, .invalid => true,
             .function => self.hasErasedType(node.a, depth + 1) or self.hasErasedType(node.b, depth + 1),
-            .array, .list, .cursor, .demand, .provider, .resolver => self.hasErasedType(node.a, depth + 1),
+            .array, .list, .cursor, .provider, .resolver => self.hasErasedType(node.a, depth + 1),
             .state_provider => self.hasErasedType(node.a, depth + 1) or self.hasErasedType(node.b, depth + 1) or self.hasErasedType(node.c, depth + 1),
             .product, .nominal => blk: {
                 for (layouts.children(ty)) |child| if (self.hasErasedType(child, depth + 1)) break :blk true;
@@ -2459,7 +2170,7 @@ pub const Owner = struct {
     }
     fn prepareEvaluatedNamedInner(self: *Emitter, id: core.Id) Error!?*EvaluatedNamed {
         const g = self.generator;
-        if (!g.inline_named or self.dictionary_owner != null or self.factory_template or self.inline_demands.len != 0) return null;
+        if (!g.inline_named or self.dictionary_owner != null or self.factory_template) return null;
         const source = g.unit(self.unit_id);
         var arguments: [max_parameters]core.Id = undefined;
         var count: usize = 0;
@@ -2525,7 +2236,7 @@ pub const Owner = struct {
         var key: Key = .{ .target = .{ .unit = header.unit, .binding = header.identity }, .count = @intCast(definition.parameters.len), .result = 0 };
         for (0..key.count) |index| {
             const arrow = g.representations.store.node(full);
-            if (arrow.tag != .function or self.hasErasedType(arrow.a, 0) or g.representations.store.node(arrow.a).tag == .universal or g.representations.store.node(arrow.a).tag == .demand) {
+            if (arrow.tag != .function or self.hasErasedType(arrow.a, 0) or g.representations.store.node(arrow.a).tag == .universal) {
                 return null;
             }
             key.parameters[index] = arrow.a;
@@ -2922,7 +2633,7 @@ pub const Owner = struct {
         return local;
     }
     /// Storage is unobservable only for a proven unused binding. Eager
-    /// operands still execute in source order, and callable/demand bodies
+    /// operands still execute in source order, and callable bodies
     /// remain deferred until invocation rather than receiving an invented ABI.
     fn discardAggregateValue(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
@@ -2934,7 +2645,7 @@ pub const Owner = struct {
             .product, .record, .array => for (source.children(id)) |child| try self.discardAggregateValue(child, depth + 1),
             .construct => try self.discardAggregateValue(node.b, depth + 1),
             .constant, .constructor_function, .primitive_function => {},
-            .closure, .suspend_ => {
+            .closure => {
                 if (!g.discardableClosure(self.unit_id, node.a)) {
                     try self.expression(id, depth + 1);
                     try self.emit(.drop, 0);
@@ -6158,23 +5869,6 @@ pub const Owner = struct {
         try self.emit(.i32_store, heap.offset(heap.Closure, "environment"));
         try self.emit(.local_get, address);
     }
-    fn demandDescriptor(self: *Emitter, function_id: u32, environment: ?u32) Error!void {
-        self.generator.evaluator.counters.demand_allocations += 1;
-        const cached_role = self.generator.module.functions.items[function_id].result_role;
-        const address = try self.allocate(@sizeOf(heap.Demand), .{ .words = &.{ .scalar, .reference, .scalar, cached_role } });
-        try self.emit(.local_get, address);
-        try self.referenceConstant(function_id, .demand_function);
-        try self.emit(.i32_store, heap.offset(heap.Demand, "function"));
-        try self.emit(.local_get, address);
-        if (environment) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
-        try self.emit(.i32_store, heap.offset(heap.Demand, "environment"));
-        for ([_]u32{ heap.offset(heap.Demand, "status"), heap.offset(heap.Demand, "cached") }) |offset| {
-            try self.emit(.local_get, address);
-            try self.emit(.i32_const, 0);
-            try self.emit(.i32_store, offset);
-        }
-        try self.emit(.local_get, address);
-    }
     fn callableImplementationLayout(self: *Emitter, id: core.Id) Error!layout.Id {
         const source = self.generator.unit(self.unit_id);
         const value = try self.codeLayout(source.typeOf(id), source.span(id));
@@ -6187,7 +5881,7 @@ pub const Owner = struct {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const n = unit_.node(id);
-        const captures = if (n.tag == .suspend_) unit_.suspensionCaptures(id) else unit_.closureCaptures(id);
+        const captures = unit_.closureCaptures(id);
         var capture_types: std.ArrayList(layout.Id) = .empty;
         defer capture_types.deinit(g.allocator);
         var templates: std.ArrayList(substitution_keys.Entry) = .empty;
@@ -6272,7 +5966,7 @@ pub const Owner = struct {
             return .{ .unit = self.unit_id, .node = id, .callable_instances = try self.scopedCallableInstances(id) };
         }
         if (n.tag == .constructor_function or n.tag == .primitive_function) return .{ .unit = self.unit_id, .node = id, .callable_instances = try self.scopedCallableInstances(id) };
-        const captures = if (n.tag == .suspend_) unit_.suspensionCaptures(id) else unit_.closureCaptures(id);
+        const captures = unit_.closureCaptures(id);
         const prepared = self.resolvedPlan(id).template;
         const capture_types = prepared.capture_types;
         const capture_roles = prepared.capture_roles;
@@ -6400,7 +6094,7 @@ pub const Owner = struct {
             const result = try self.sourceArgumentLayout(wanted.b, given.b, depth + 1);
             return g.internLayoutWithEffects(.function, parameter, result, wanted.c, &.{});
         }
-        if (wanted.tag == .array or wanted.tag == .list or wanted.tag == .demand) {
+        if (wanted.tag == .array or wanted.tag == .list) {
             return g.internLayoutWithEffects(wanted.tag, try self.sourceArgumentLayout(wanted.a, given.a, depth + 1), wanted.b, wanted.c, &.{});
         }
         if (wanted.tag == .product or wanted.tag == .nominal) {
@@ -6454,7 +6148,7 @@ pub const Owner = struct {
         return try self.newTemplate(id);
     }
     /// Opaque computations keep action source and declaration-time capture
-    /// values. A factory runs once and returns that environment; each demand
+    /// values. A factory runs once and returns that environment; each computation
     /// selects its own checked action signature through the callable proof.
     fn computationTemplate(self: *Emitter, id: core.Id) Error!?Template {
         const g = self.generator;
@@ -6574,11 +6268,6 @@ pub const Owner = struct {
     }
     fn templateValue(self: *Emitter, template: Template, requested: layout.Id) Error!void {
         const g = self.generator;
-        if (template.demand_cell) {
-            const demanded = g.representations.store.node(requested);
-            if (demanded.tag != .demand or template.environment == null) return g.fail(self.unit_id, template.node, .unresolved_type);
-            return self.emit(.local_get, template.environment.?);
-        }
         var ty = requested;
         var dictionaries = false;
         if (template.computation) {
@@ -6591,18 +6280,6 @@ pub const Owner = struct {
             const principal = producer.typeOf(template.node);
             dictionaries = producer.types.node(principal).tag == .forall and producer.types.quantifierGoals(principal).len != 0;
             ty = g.representations.store.node(ty).a;
-        }
-        const owner = if (template.unit == 0) self.unit_id else template.unit;
-        const unit_ = g.unit(owner);
-        const n = unit_.node(template.node);
-        if (n.tag == .suspend_) {
-            try g.demandSite(owner, template.node, .stored, .unresolved_control);
-            const demanded = g.representations.store.node(ty);
-            if (demanded.tag != .demand) return g.fail(self.unit_id, template.node, .unresolved_type);
-            const fn_type = try g.internLayoutWithEffects(.function, 1, demanded.a, demanded.c, &.{});
-            const function_id = try g.closureFunction(.{ .unit = owner, .catalog = n.a, .ty = fn_type, .captures = template.captures, .templates = template.templates, .staged = template.staged, .evidence = template.evidence, .rows = if (template.rows != 0) template.rows else if (owner == self.unit_id) self.body.?.rows_evidence else 0 });
-            try self.demandDescriptor(function_id, template.environment);
-            return;
         }
         try self.descriptor(try self.templateFunction(template, ty, dictionaries), template.environment);
     }
@@ -6943,83 +6620,10 @@ pub const Owner = struct {
         try self.emit(.end, 0);
         try self.cleanupTo(checkpoint);
     }
-    fn forceDemand(self: *Emitter, id: core.Id, depth: usize) Error!void {
-        const g = self.generator;
-        const n = g.unit(self.unit_id).node(id);
-        const demand = try self.capture(n.a, depth);
-        const arena = try g.module.ensureArena();
-        const result = try self.scalar(id);
-        const cached = try self.temporary(result.machine());
-        try self.emit(.local_get, demand);
-        try self.emit(.i32_load, heap.offset(heap.Demand, "status"));
-        try self.emit(.i32_const, 2);
-        try self.emit(.i32_eq, 0);
-        try self.emit(.if_, 0);
-        self.labels += 1;
-        try self.emit(.local_get, demand);
-        try self.emit(if (result == .f32) .f32_load else .i32_load, heap.offset(heap.Demand, "cached"));
-        try self.emit(.local_set, cached);
-        try self.emit(.else_, 0);
-        try self.emit(.local_get, demand);
-        try self.emit(.i32_load, heap.offset(heap.Demand, "status"));
-        try self.emit(.if_, 0);
-        try self.emit(.unreachable_, 0);
-        try self.emit(.end, 0);
-        // Reserve the force owner before publishing evaluating state.
-        try self.rootDirective(6, demand);
-        try self.storeTypedWord(demand, heap.offset(heap.Demand, "status"), null, .u32, 1);
-        try self.emit(.local_get, demand);
-        try self.emit(.i32_load, heap.offset(heap.Demand, "environment"));
-        try self.emit(.i32_const, 0);
-        try self.providerHead();
-        var known: ?u32 = null;
-        const operand = g.unit(self.unit_id).node(n.a);
-        if (operand.tag == .reference) {
-            const reference = g.unit(self.unit_id).reference(n.a);
-            if (reference.unit == 0 or reference.unit == self.unit_id) if (self.templates.get(reference.binding)) |template| if (template.demand_cell) {
-                const owner = if (template.unit == 0) self.unit_id else template.unit;
-                const suspended = g.unit(owner).node(template.node);
-                if (suspended.tag != .suspend_) return g.fail(self.unit_id, id, .unresolved_type);
-                const demanded = g.representations.store.node(try self.codeLayout(g.unit(self.unit_id).typeOf(n.a), g.unit(self.unit_id).span(id)));
-                const ty = try g.internLayoutWithEffects(.function, 1, demanded.a, demanded.c, &.{});
-                const target = try g.closureFunction(.{ .unit = owner, .catalog = suspended.a, .ty = ty, .captures = template.captures, .templates = template.templates, .staged = template.staged, .evidence = template.evidence, .rows = template.rows });
-                const body = g.module.functions.items[target];
-                if (body.entry or body.signature != try g.module.internType(&.{ .i32, .i32, .i32 }, result.machine()) or body.parameter_roles != g.closureRoles(1) or body.result_role != result.role()) return g.fail(self.unit_id, id, .unresolved_type);
-                known = target;
-            };
-        }
-        if (known) |target| {
-            try self.emitUnguarded(.call, target);
-        } else {
-            g.evaluator.counters.demand_indirect_calls += 1;
-            try self.emit(.local_get, demand);
-            try self.emit(.i32_load, heap.offset(heap.Demand, "function"));
-            try self.emitUnguarded(.call_indirect, try g.module.internType(&.{ .i32, .i32, .i32 }, result.machine()));
-        }
-        try self.emit(.local_set, cached);
-        if (g.request_owner) |owner| {
-            const checkpoint = self.cleanups.mark();
-            defer self.cleanups.restore(checkpoint);
-            try self.cleanups.append(g.allocator, .{ .reset_demand = @fromBackingInt(@intCast(demand)) });
-            try request_runtime.guard(&g.module, self.function_id, owner, &self.cleanups);
-        }
-        try self.storeTypedWord(demand, heap.offset(heap.Demand, "cached"), cached, result, 0);
-        try self.storeTypedWord(demand, heap.offset(heap.Demand, "status"), null, .u32, 2);
-        try self.emit(.local_get, demand);
-        try self.emit(.global_get, arena.base);
-        try self.emit(.i32_lt_u, 0);
-        try self.emit(.if_, 0);
-        try self.emit(.global_get, arena.heap);
-        try self.emit(.global_set, arena.base);
-        try self.emit(.end, 0);
-        self.labels -= 1;
-        try self.emit(.end, 0);
-        try self.emit(.local_get, cached);
-    }
-    pub fn storeTypedWord(self: *Emitter, demand: u32, offset: u32, local: ?u32, scalar_: Scalar, literal: u32) Error!void {
+    pub fn storeTypedWord(self: *Emitter, owner: u32, offset: u32, local: ?u32, scalar_: Scalar, literal: u32) Error!void {
         const arena = try self.generator.module.ensureArena();
-        try self.emit(.local_get, demand);
-        try self.emit(.local_get, demand);
+        try self.emit(.local_get, owner);
+        try self.emit(.local_get, owner);
         try self.emit(.i32_const, offset);
         try self.emit(.i32_add, 0);
         if (local) |value| {
@@ -7187,9 +6791,6 @@ pub const Owner = struct {
         const node = source.node(id);
         if (try self.prepareSpawnApplication(id)) |spawn| return .{ .spawn = spawn };
         if (source.types.node(source.typeOf(node.a)).tag == .never) return .{ .never = true };
-        if (self.inline_demands.len != 0) if (@import("demand_inline.zig").localClosure(source, node.a)) |closure_id| {
-            return .{ .local_callback = closure_id, .arrow = try self.prepareIndirect(node.a, id) };
-        };
         var result: ApplyPlan = .{};
         errdefer result.deinit(g.allocator);
         if (try self.universalCallee(node.a, id)) |stored| {
@@ -7246,70 +6847,11 @@ pub const Owner = struct {
             const result = try self.carrierValue(output, abstract.b, concrete.result, 0);
             return self.emit(.local_get, result);
         }
-        if (prepared.local_callback != 0) {
-            const metadata = unit_.closure(prepared.local_callback);
-            const arrow = prepared.arrow.?;
-            var mappings: std.ArrayList(Mapping) = .empty;
-            var rows: std.ArrayList(RowMapping) = .empty;
-            defer mappings.deinit(g.allocator);
-            defer rows.deinit(g.allocator);
-            try mappings.appendSlice(g.allocator, self.mappings);
-            try rows.appendSlice(g.allocator, self.row_mappings);
-            if (metadata.function_type != 0) {
-                const ty = try g.internLayoutWithEffects(.function, arrow.parameter, arrow.result, arrow.row, &.{});
-                try g.mapCapturedFunction(self.unit_id, metadata.function_type, ty, &mappings, &rows, unit_.span(metadata.body));
-            } else {
-                try g.mapTypeDepth(self.unit_id, &mappings, &rows, metadata.parameter.ty, arrow.parameter, metadata.parameter.span, 0);
-                try g.mapTypeDepth(self.unit_id, &mappings, &rows, unit_.typeOf(metadata.body), arrow.result, unit_.span(metadata.body), 0);
-            }
-            const argument = try self.capture(n.b, depth);
-            var callback: Emitter = .{
-                .generator = g,
-                .unit_id = self.unit_id,
-                .function_id = self.function_id,
-                .provider_local = self.provider_local,
-                .mappings = mappings.items,
-                .row_mappings = rows.items,
-                .cleanups = .{ .parent = &self.cleanups },
-                .diagnostic_context = try self.inlineContext(),
-                .labels = self.labels,
-                .inline_demands = self.inline_demands,
-            };
-            defer callback.deinit();
-            callback.locals = try self.locals.clone(g.allocator);
-            callback.static_values = try self.static_values.clone(g.allocator);
-            if (metadata.parameter.binding != 0) try callback.locals.put(g.allocator, metadata.parameter.binding, argument);
-            try callback.bodyExpression(metadata.body, depth + 1, false);
-            return;
-        }
         if (prepared.never) {
             try self.expression(n.a, depth + 1);
             try self.emit(.unreachable_, 0);
             return;
         }
-        if (prepared.arrow) |arrow| if (g.representations.store.node(arrow.parameter).tag == .demand and unit_.node(n.b).tag == .suspend_ and unit_.node(n.a).tag == .reference) {
-            const ref = unit_.reference(n.a);
-            const owner = if (ref.unit == 0) self.unit_id else ref.unit;
-            const kind = g.unit(owner).binding(ref.binding).kind;
-            if (kind == .global or kind == .external) {
-                const target = try g.normalize(self.unit_id, ref);
-                const producer = g.unit(target.unit);
-                if (producer.body(target.binding)) |body| if (body.is_function and body.parameters.len != 0) {
-                    var metadata = self.resolvedPlan(n.b).template.metadata;
-                    metadata.environment = 0;
-                    metadata.demand_cell = true;
-                    const retained = try g.captureTemplate(metadata);
-                    const templates = g.representations.template_keys.intern(&.{.{ .variable = producer.bodyParameters(body)[0].binding, .value = retained }}) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity);
-                    const function = try g.callable(.{ .target = target, .ty = try self.codeLayout(unit_.typeOf(n.a), unit_.span(id)), .templates = templates });
-                    const argument = try self.capture(n.b, depth);
-                    try self.emit(.i32_const, 0);
-                    try self.emit(.local_get, argument);
-                    try self.providerHead();
-                    try self.emit(.call, function);
-                    return;
-                };
-            }
-        };
         if (prepared.evaluated) |plan| if (try self.emitEvaluatedNamed(plan, depth)) return;
         if (try self.staticApply(id, depth)) return;
         if (prepared.partial) |partial| if (try self.inlineStaticCall(partial.key, partial.arguments[0..partial.count], depth)) return;
@@ -7678,7 +7220,7 @@ pub const Owner = struct {
             },
             // Immutable callable environments use the exact capture schema
             // through taskMoveTemplate, rather than their arrow type.
-            .function, .demand => return error.Declined,
+            .function => return error.Declined,
             .nominal => {
                 if (n.a == std.math.maxInt(u32) and n.b == layout.capability_layout_decl) return;
                 if (g.representations.store.scalar(ty) != null) return;
@@ -7718,54 +7260,16 @@ pub const Owner = struct {
         if (depth >= 128) return error.Declined;
         const source = g.unit(metadata.unit);
         const n = source.node(metadata.node);
-        if (n.tag != .closure and n.tag != .suspend_) return;
+        if (n.tag != .closure) return;
         if (metadata.scalar_environment) return;
-        const captures = if (n.tag == .closure) source.closureCaptures(metadata.node) else source.suspensionCaptures(metadata.node);
+        const captures = source.closureCaptures(metadata.node);
         for (captures, g.representations.store.children(metadata.captures), 0..) |binding, ty, index| {
             const child = try self.temporary(.i32);
             if (g.capturedTemplate(metadata.templates, binding)) |nested| {
                 try self.emit(.local_get, environment);
                 try self.emit(.i32_load, @intCast(index * 4));
                 try self.emit(.local_set, child);
-                if (nested.demand_cell) {
-                    // A captured cell is a descriptor, while an ordinary
-                    // captured template slot stores only its environment.
-                    try self.emit(.local_get, child);
-                    try self.emit(.i32_load, heap.offset(heap.Demand, "status"));
-                    try self.emit(.i32_const, 1);
-                    try self.emit(.i32_and, 0);
-                    try self.emit(.if_, 0);
-                    try self.emit(.unreachable_, 0);
-                    try self.emit(.end, 0);
-                    const environment_ = try self.temporary(.i32);
-                    try self.emit(.local_get, child);
-                    try self.emit(.i32_load, heap.offset(heap.Demand, "environment"));
-                    try self.emit(.local_set, environment_);
-                    try self.taskMoveTemplate(nested, environment_, depth + 1);
-                    var result: ?layout.Id = null;
-                    var instances = g.planning.closures.iterator();
-                    while (instances.next()) |instance| {
-                        const key = instance.key_ptr.*;
-                        if (key.unit != nested.unit or key.catalog != g.unit(nested.unit).node(nested.node).a or key.captures != nested.captures or key.templates != nested.templates or key.staged != nested.staged or key.evidence != nested.evidence or key.rows != nested.rows) continue;
-                        const payload = g.representations.store.node(key.ty).b;
-                        if (result != null and result.? != payload) return error.Declined;
-                        result = payload;
-                    }
-                    const payload = result orelse return error.Declined;
-                    if (g.layoutRole(payload) == .reference) {
-                        try self.emit(.local_get, child);
-                        try self.emit(.i32_load, heap.offset(heap.Demand, "status"));
-                        try self.emit(.i32_const, 2);
-                        try self.emit(.i32_eq, 0);
-                        try self.emit(.if_, 0);
-                        const cached = try self.temporary(.i32);
-                        try self.emit(.local_get, child);
-                        try self.emit(.i32_load, heap.offset(heap.Demand, "cached"));
-                        try self.emit(.local_set, cached);
-                        try self.taskMove(payload, cached, depth + 1);
-                        try self.emit(.end, 0);
-                    }
-                } else try self.taskMoveTemplate(nested, child, depth + 1);
+                try self.taskMoveTemplate(nested, child, depth + 1);
             } else if (g.layoutRole(ty) == .reference) {
                 const semantic = source.types.node(source.binding(binding).ty);
                 if (semantic.tag == .usage and (semantic.b == @backingInt(types.UsageKind.concurrent) or semantic.b == @backingInt(types.UsageKind.borrow))) continue;
@@ -9048,12 +8552,8 @@ pub const Owner = struct {
                 }
             }
         }
-        const decision = try self.prepareDemandCall(plan.key, call.arguments);
-        if (g.demand_lowering.enabled and decision.plan == null) for (call.arguments) |argument| {
-            if (unit_.node(argument).tag == .suspend_) try g.demandSite(self.unit_id, argument, .stored, decision.reason);
-        };
         const evaluated = if (!plan.key.dictionaries and dictionary_member == null) try self.prepareEvaluatedNamed(id) else null;
-        return .{ .call = plan, .evaluated = evaluated, .demand = decision.plan, .dictionary_owner = dictionary_owner, .dictionary_member = dictionary_member };
+        return .{ .call = plan, .evaluated = evaluated, .dictionary_owner = dictionary_owner, .dictionary_member = dictionary_member };
     }
     /// A closure applied through its table entry, typed by the callee.
     fn prepareIndirect(self: *Emitter, callee: core.Id, id: core.Id) Error!resolved_call.Arrow {
@@ -9061,18 +8561,6 @@ pub const Owner = struct {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const application = unit_.node(id);
-        if (g.demand_lowering.enabled and application.tag == .apply and unit_.node(application.b).tag == .suspend_) {
-            var reason: @import("demand_lowering.zig").Reason = .unknown_callee;
-            if (@import("known_call.zig").resolve(g.units, self.unit_id, id)) |known| {
-                // A known partial application transports the demand into its
-                // returned closure. Its pending state escapes this call stage.
-                const target = try g.normalize(self.unit_id, known.target);
-                if (g.unit(target.unit).body(target.binding)) |body| {
-                    if (known.count < body.parameters.len) reason = .escaping_use;
-                }
-            }
-            try g.demandSite(self.unit_id, application.b, .stored, reason);
-        }
         var signature_type = unit_.typeOf(callee);
         if (application.c != 0) signature_type = application.c;
         const node = g.representations.store.node(try self.codeLayout(signature_type, unit_.span(id)));
@@ -9096,24 +8584,7 @@ pub const Owner = struct {
         const plan = prepared.call;
         g.evaluator.counters.prepared_named_calls += 1;
         g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
-        var key = plan.key;
-        // An affine demand carries the actual construction catalog, so moving
-        // it into a task never infers hidden captures from its result type.
-        var templates: std.ArrayList(substitution_keys.Entry) = .empty;
-        defer templates.deinit(g.allocator);
-        for (call.arguments[0..key.count], key.parameters[0..key.count], 0..) |argument, parameter, index| {
-            if (g.representations.store.node(parameter).tag != .demand or unit_.node(argument).tag != .suspend_) continue;
-            const affine = @import("../check/usage_check.zig").affineNominal(&unit_.types, unit_.nominals, unit_.typeOf(argument)) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, argument, .complexity);
-            if (!affine) continue;
-            var metadata = self.resolvedPlan(argument).template.metadata;
-            metadata.environment = 0;
-            metadata.demand_cell = true;
-            const body = g.unit(key.target.unit).body(key.target.binding) orelse return g.fail(self.unit_id, id, .unsupported);
-            const formal = g.unit(key.target.unit).bodyParameters(body)[index].binding;
-            if (templates.items.len == 0) try templates.appendSlice(g.allocator, g.representations.template_keys.get(key.templates));
-            try templates.append(g.allocator, .{ .variable = formal, .value = try g.captureTemplate(metadata) });
-        }
-        if (templates.items.len != 0) key.templates = g.representations.template_keys.intern(templates.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity);
+        const key = plan.key;
         if (prepared.dictionary_member) |member| {
             var arrows: std.ArrayList(resolved_call.Arrow) = .empty;
             defer arrows.deinit(g.allocator);
@@ -9133,7 +8604,6 @@ pub const Owner = struct {
         if (!key.dictionaries) {
             if (try self.inlineCollectionEdit(id, key, depth)) return;
             if (try self.inlineSimdCall(id, key, depth)) return;
-            if (try self.inlineDemandCall(key, call.arguments, prepared.demand, depth)) return;
             if (try self.inlineStaticCall(key, call.arguments, depth)) return;
             if (try self.inlineNamedCall(key, call.arguments, depth)) return;
         }
@@ -10158,8 +9628,7 @@ pub const Owner = struct {
             .array => try self.array(id, depth),
             .array_op => try self.arrayOperation(id, depth),
             .storage => return g.fail(self.unit_id, id, .storage_unsupported),
-            .closure, .suspend_ => try self.closure(id),
-            .force => if (!try self.inlineDemand(id, depth)) try self.forceDemand(id, depth),
+            .closure => try self.closure(id),
             .apply => try self.apply(id, depth),
             .constructor_function => {
                 const ty = try self.codeLayout(n.ty, unit_.span(id));
@@ -10299,8 +9768,6 @@ pub const Owner = struct {
                     if (try self.emitCollectionStep(statement, depth)) continue;
                     if (try self.bindPrivateRow(statement)) continue;
                     if (try self.bindPrivateCursor(statement, depth)) continue;
-                    if (self.inlineDemandBinding(n.a) != null) continue;
-                    if (self.inline_demands.len != 0 and @import("demand_inline.zig").localClosure(unit_, n.b) != null) continue;
                     if (self.smallCollectionCandidate(n.b)) {
                         if (function_facts.privateBinding(unit_, self.analysis_root, n.a)) if (try self.captureSmallCollection(n.b, depth)) |values| {
                             try self.small_values.put(g.allocator, n.a, values);

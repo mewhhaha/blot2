@@ -70,7 +70,7 @@ const Fixture = struct {
     }
     fn lambda(self: *Fixture, parameter_name: []const u8, body: ast.Id, annotation: ast.Id) !ast.Id {
         const unit = parameter_name.len == 0;
-        const parameter = try self.add(.{ .tag = .parameter, .a = if (unit) 0 else try self.symbol(parameter_name), .b = annotation, .c = try self.extra(&.{ if (unit) 2 else 0, 0, 0, 0 }) });
+        const parameter = try self.add(.{ .tag = .parameter, .a = if (unit) 0 else try self.symbol(parameter_name), .b = annotation, .c = try self.extra(&.{ if (unit) 1 else 0, 0, 0, 0 }) });
         return self.add(.{ .tag = .lambda, .a = parameter, .b = body });
     }
     fn declaration(self: *Fixture, declaration_name: []const u8, body: ast.Id) !ast.Id {
@@ -538,4 +538,9 @@ fn resourceResultSourceLaw(allocator: std.mem.Allocator) !void {
 test "resource callback result footprints preserve older captures and reject younger loan cleanup and sink escapes through OOM" {
     try resourceResultSourceLaw(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, resourceResultSourceLaw, .{});
+}
+
+test "retired lazy argument intrinsics are unknown" {
+    try rankSourceExpected(a, "const force = @demand\n", false, .unknown_intrinsic);
+    try rankSourceExpected(a, "const force = @force\n", false, .unknown_intrinsic);
 }

@@ -51,7 +51,7 @@ pub fn collect(store: *T.Store, allocator: std.mem.Allocator, root: T.Id, binder
             }
             try pending.appendSlice(allocator, &.{ node.a, node.b });
         } else switch (node.tag) {
-            .usage, .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(allocator, node.a),
+            .usage, .array, .list, .cursor, .resolver, .provider => try pending.append(allocator, node.a),
             .state_provider => try pending.appendSlice(allocator, &.{ node.a, node.b, node.c }),
             .product => try pending.appendSlice(allocator, store.list(.{ .start = node.a, .len = node.b })),
             .record => for (0..node.b) |index| try pending.append(allocator, store.recordField(node, index).ty),

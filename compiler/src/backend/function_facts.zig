@@ -179,12 +179,12 @@ pub fn behavior(m: *const core.Module, id: core.Id, budget: *usize) Behavior {
             result.diverges = result.diverges or loop.kind == .forever;
         },
         .panic => result.traps = true,
-        .closure, .suspend_, .constructor_function, .primitive_function => result.allocates = true,
+        .closure, .constructor_function, .primitive_function => result.allocates = true,
         .construct => {
             result = behavior(m, n.b, budget);
             result.allocates = true;
         },
-        .effect_scope, .operation_value, .effect_provider, .state_provider, .handle, .request_loop, .request_decision, .force, .resolver_op => result = .{ .unknown = true, .effects = true },
+        .effect_scope, .operation_value, .effect_provider, .state_provider, .handle, .request_loop, .request_decision, .resolver_op => result = .{ .unknown = true, .effects = true },
         else => result.unknown = true,
     }
     return result;

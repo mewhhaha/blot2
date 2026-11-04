@@ -60,7 +60,7 @@ pub const Observation = struct {
         self.regions += 1;
         self.scopes += region.scratch.sources.items.len;
         self.nodes += region.solver.nodes.items.len;
-        self.complete = self.complete and !region.source_interface and !region.retain_selected and !region.complete_demand_bodies;
+        self.complete = self.complete and !region.source_interface and !region.retain_selected;
         for (region.scratch.constraints.items) |constraint| self.complete = self.complete and constraint.solved;
     }
 };
@@ -362,7 +362,7 @@ fn sameShape(left: expectation.View, l: u32, right: expectation.View, r: u32, de
         .usage => return a.b == b.b and sameShape(left, a.a, right, b.a, depth + 1, budget),
         .type_constructor => return a.a == b.a and a.b == b.b,
         .function => return sameShape(left, a.a, right, b.a, depth + 1, budget) and sameShape(left, a.b, right, b.b, depth + 1, budget),
-        .array, .list, .cursor, .resolver, .demand, .provider => return sameShape(left, a.a, right, b.a, depth + 1, budget),
+        .array, .list, .cursor, .resolver, .provider => return sameShape(left, a.a, right, b.a, depth + 1, budget),
         .state_provider => return sameShape(left, a.a, right, b.a, depth + 1, budget) and sameShape(left, a.b, right, b.b, depth + 1, budget) and sameShape(left, a.c, right, b.c, depth + 1, budget),
         .product, .record, .nominal => {
             if (a.tag == .nominal and (a.a != b.a or a.b != b.b)) return false;
@@ -408,7 +408,7 @@ pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, se
     defer storageStats(g, &owner.refinement_queries);
     const gate = &state.gate;
     const a = g.allocator;
-    const ordinary: eval.Options = .{ .trace_runtime_dependencies = true, .retain_source_suspensions = true };
+    const ordinary: eval.Options = .{ .trace_runtime_dependencies = true };
     if (!gate.enabled or g.evaluator.receipt_tape != null or !std.meta.eql(g.evaluator.options, ordinary) or g.evaluator.depth != 0 or gate.units.ptr != g.evaluator.units.ptr or gate.units.len != g.evaluator.units.len or state.allocator.ptr != a.ptr or state.allocator.vtable != a.vtable) {
         decline(g, .mode);
         return null;

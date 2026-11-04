@@ -58,7 +58,7 @@ const Comparison = struct {
                 if (a.b != b.b or (a.c == 0) != (b.c == 0) or !try self.equal(a.a, b.a, local, depth + 1)) return false;
                 return a.c == 0 or try self.equal(a.c, b.c, local, depth + 1);
             },
-            .demand, .provider => return try self.equal(a.a, b.a, local, depth + 1) and try self.row(a.c, b.c, local, depth + 1),
+            .provider => return try self.equal(a.a, b.a, local, depth + 1) and try self.row(a.c, b.c, local, depth + 1),
             .array, .list, .cursor, .resolver => return self.equal(a.a, b.a, local, depth + 1),
             .state_provider => return try self.equal(a.a, b.a, local, depth + 1) and try self.equal(a.b, b.b, local, depth + 1) and try self.equal(a.c, b.c, local, depth + 1),
             .projection, .nominal, .product, .record => {

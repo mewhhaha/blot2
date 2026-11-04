@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const extra = `
-const delayed = func ~value => return value
+const delayed = func value => return func () => return value
 entry const edit_source = func (size: U32) => return do:
   let saved = array.generate size (func index => return index + 1)
   let copied = array.generate saved.length (func index => return saved[index])
@@ -30,7 +30,7 @@ entry const suspended_copy = func (size: U32) => return do:
   let copied = array.generate saved.length (func index => return saved[index])
   let before = delayed copied
   saved[0] := 99
-  break (@demand before)[0]
+  break (before ())[0]
 entry const nested_copy = func (size: U32) => return do:
   let saved = array.generate size (func index => return #[index + 1])
   let copied = array.generate saved.length (func index => return saved[index])
@@ -50,7 +50,7 @@ entry const wrong_index = func (size: U32) => return do:
 `;
 
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`identity arrays preserve escaping snapshots captures suspension and bits (${codegenTier})`, async () => {
+  Deno.test(`identity arrays preserve escaping snapshots captures callbacks and bits (${codegenTier})`, async () => {
     const fixture = new URL(
       "../../benchmarks/runtime-boundaries/",
       import.meta.url,

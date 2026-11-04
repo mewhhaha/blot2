@@ -96,7 +96,7 @@ const Pinned = struct {
         a.free(self.pools.modules);
     }
 };
-const Inputs = struct { demand: u32, row: u32, unsupported: [7]u32, state_row: u32, nested_state: u32 };
+const Inputs = struct { callback: u32, row: u32, unsupported: [7]u32, state_row: u32, nested_state: u32 };
 fn inputs(generator: *Generator, fixture: *const Fixture) !Inputs {
     const store = &generator.evaluator.storage.evidence;
     const record = try store.intern(.record, 0, 0, &.{ fixture.field, 3 });
@@ -105,7 +105,7 @@ fn inputs(generator: *Generator, fixture: *const Fixture) !Inputs {
     const operation = try store.effects.internOperation(.{ .unit = 1, .decl = fixture.operation }, &.{record});
     const row = try store.effects.internRow(&.{ operation, operation });
     const function = try store.internWithEffects(.function, record, product, row, &.{});
-    const demand = try store.internWithEffects(.demand, function, 0, row, &.{});
+    const callback = try store.internWithEffects(.function, 1, function, row, &.{});
     const read = try store.intern(.nominal, std.math.maxInt(u32), 1, &.{3});
     const write = try store.intern(.nominal, std.math.maxInt(u32), 2, &.{3});
     const type_constructor = try store.intern(.type_constructor, 1, fixture.nominal, &.{});
@@ -115,7 +115,7 @@ fn inputs(generator: *Generator, fixture: *const Fixture) !Inputs {
     const state_operation = try store.effects.internOperation(.{ .unit = std.math.maxInt(u32), .decl = 1 }, &.{3});
     const state_row = try store.effects.internRow(&.{state_operation});
     return .{
-        .demand = demand,
+        .callback = callback,
         .row = row,
         .unsupported = .{ read, type_constructor, resolver, provider, try store.internStateProvider(read, write, 3), try store.intern(.nominal, 999, 1, &.{}), try store.intern(.array, resolver, 0, &.{}) },
         .state_row = state_row,
@@ -132,17 +132,17 @@ fn importScenario(allocator: Allocator, old: *const artifacts.Pools, input: Inpu
     var graphs = try importer.Importer.init(allocator, old, &fixture.units, fixture.names.view(), 1);
     defer graphs.deinit();
     try std.testing.expect(graphs.stable[0]);
-    var solved = (try graphs.importPrincipalEvidence(&generator, 1, &.{.{ .variable = fixture.variable, .evidence = input.demand }}, &.{.{ .variable = 0, .evidence = input.row }})).?;
+    var solved = (try graphs.importPrincipalEvidence(&generator, 1, &.{.{ .variable = fixture.variable, .evidence = input.callback }}, &.{.{ .variable = 0, .evidence = input.row }})).?;
     defer solved.deinit(allocator);
     const store = &generator.evaluator.storage.evidence;
     try std.testing.expectEqual(fixture.variable, solved.types[0].variable);
-    const demand = store.node(solved.types[0].evidence);
-    try std.testing.expectEqual(evidence.Tag.demand, demand.tag);
-    const function = store.node(demand.a);
+    const callback = store.node(solved.types[0].evidence);
+    try std.testing.expectEqual(evidence.Tag.function, callback.tag);
+    const function = store.node(callback.b);
     try std.testing.expectEqual(evidence.Tag.function, function.tag);
     const call_target: core.BindingRef = .{ .unit = 1, .binding = fixture.units[0].bodies[1].binding };
-    const old_arrow = old.evaluator.evidence.view().node(input.demand).a;
-    try std.testing.expectEqual(@as(?u32, demand.a), try graphs.importPrincipalCall(&generator, call_target, old_arrow));
+    const old_arrow = old.evaluator.evidence.view().node(input.callback).b;
+    try std.testing.expectEqual(@as(?u32, callback.b), try graphs.importPrincipalCall(&generator, call_target, old_arrow));
     try std.testing.expectEqualSlices(u32, &.{ fixture.field, 3 }, store.children(function.a));
     const children = store.children(function.b);
     try std.testing.expectEqual(@as(u32, 1), store.node(children[1]).a);
@@ -150,7 +150,7 @@ fn importScenario(allocator: Allocator, old: *const artifacts.Pools, input: Inpu
     try std.testing.expectEqual(@as(usize, 2), labels.len);
     try std.testing.expectEqual(labels[0], labels[1]);
     try std.testing.expectEqual(@as(u32, 0), solved.rows[0].variable);
-    try std.testing.expectEqual(solved.rows[0].evidence, demand.c);
+    try std.testing.expectEqual(solved.rows[0].evidence, callback.c);
     try std.testing.expectEqual(evidence.Tag.array, store.node(prior).tag);
     try std.testing.expectEqual(@as(u32, 4), store.node(prior).a);
     try std.testing.expectEqual(values, generator.evaluator.storage.values.items.len);
@@ -214,7 +214,7 @@ test "principal import declines duplicate foreign-owner malformed and nested Sta
     const call_target: core.BindingRef = .{ .unit = 1, .binding = fixture.units[0].bodies[1].binding };
     try std.testing.expect((try graphs.importPrincipalCall(&generator, call_target, input.nested_state)) == null);
     try std.testing.expect((try graphs.importPrincipalCall(&generator, call_target, 3)) == null);
-    try std.testing.expect((try graphs.importPrincipalCall(&generator, .{ .unit = 1, .binding = 0 }, input.demand)) == null);
+    try std.testing.expect((try graphs.importPrincipalCall(&generator, .{ .unit = 1, .binding = 0 }, input.callback)) == null);
     try std.testing.expectEqual(nodes, generator.evaluator.storage.evidence.nodes.items.len);
     try std.testing.expectEqual(rows, generator.evaluator.storage.evidence.effects.rows.items.len);
 }

@@ -318,7 +318,6 @@ fn workWithOptions(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: boo
         rejected = true;
     }
     if (rejected) return false;
-    if (result.compiled.demand_lowering) |snapshot| try emit(writer, .{ .kind = "demand_lowering", .sites = snapshot.sites, .omitted = snapshot.omitted });
     metrics.wasm_bytes = result.compiled.bytes.len;
     try publish(io, output, result.compiled.bytes);
     return true;

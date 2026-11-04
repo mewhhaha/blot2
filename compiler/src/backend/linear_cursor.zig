@@ -114,11 +114,11 @@ const Search = struct {
                 if (!self.pattern(loop.pattern, depth + 1) or !self.visit(loop.first, depth + 1) or !self.visit(loop.end, depth + 1) or !self.visit(loop.body, depth + 1)) return false;
             },
             .if_stmt, .if_value => if (!self.visit(node.a, depth + 1) or !self.visit(node.b, depth + 1) or !self.visit(node.c, depth + 1)) return false,
-            .return_, .project, .force, .result_associated => if (!self.visit(node.a, depth + 1)) return false,
+            .return_, .project, .result_associated => if (!self.visit(node.a, depth + 1)) return false,
             .bind, .construct => if (!self.visit(node.b, depth + 1)) return false,
             .pattern_bind => if (!self.pattern(node.a, depth + 1) or !self.visit(node.b, depth + 1) or !self.visit(node.c, depth + 1)) return false,
             .scalar, .logical, .apply, .associated, .record_merge => if (!self.visit(node.a, depth + 1) or !self.visit(node.b, depth + 1)) return false,
-            .constant, .reference, .panic, .constructor_function, .primitive_function, .type_constructor, .closure, .suspend_, .break_ => {},
+            .constant, .reference, .panic, .constructor_function, .primitive_function, .type_constructor, .closure, .break_ => {},
             else => return false,
         }
         return true;

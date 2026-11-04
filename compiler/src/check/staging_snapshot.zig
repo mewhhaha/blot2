@@ -78,7 +78,7 @@ fn Shapes(comptime Units: type) type {
                     defer self.formal = null;
                     result = self.store.intern(.existential, try self.evidence(n.a, depth + 1), n.b, &.{}) catch |err| return failure(err);
                 },
-                .function, .demand => result = self.store.internWithEffects(n.tag, try self.evidence(n.a, depth + 1), if (n.tag == .function) try self.evidence(n.b, depth + 1) else 0, try self.row(n.c, depth + 1), &.{}) catch |err| return failure(err),
+                .function => result = self.store.internWithEffects(n.tag, try self.evidence(n.a, depth + 1), try self.evidence(n.b, depth + 1), try self.row(n.c, depth + 1), &.{}) catch |err| return failure(err),
                 .array, .list => result = self.store.intern(n.tag, try self.evidence(n.a, depth + 1), 0, &.{}) catch |err| return failure(err),
                 .product, .record, .nominal => {
                     if (n.tag == .nominal and !staging.isIdentity(n.a, n.b)) _ = try self.nominal(n.a, n.b, view.children(id).len);
@@ -100,7 +100,7 @@ fn Shapes(comptime Units: type) type {
             switch (n.tag) {
                 .unit, .boolean, .u32, .f32, .never => {},
                 .existential => self.store.view().body(n.a, self.store.children(id), depth + 1, &self.remaining, null) catch |err| return failure(err),
-                .array, .list, .demand => try self.admitted(n.a, depth + 1),
+                .array, .list => try self.admitted(n.a, depth + 1),
                 .function => {
                     try self.admitted(n.a, depth + 1);
                     try self.admitted(n.b, depth + 1);
@@ -114,7 +114,7 @@ fn Shapes(comptime Units: type) type {
                 },
                 else => return error.InvalidArtifact,
             }
-            if (n.tag == .function or n.tag == .demand) {
+            if (n.tag == .function) {
                 for (self.store.effects.view().rowLabels(n.c)) |label| {
                     const operation = self.store.effects.view().operation(label);
                     try require(operation.instance.unit != 0 or operation.instance.decl == 0);
@@ -322,7 +322,7 @@ pub fn validate(allocator: std.mem.Allocator, snapshot: *const eval.Snapshot, un
             const args = evidence.children(snapshot.value_evidence[id]);
             try require(args.len == 2);
             const latent = evidence.node(args[1]);
-            try require(latent.tag == .demand and latent.a == @import("types.zig").unit);
+            try require(latent.tag == .function and latent.a == @import("types.zig").unit and latent.b == @import("types.zig").unit);
         }
         const expected = try shapes.source(producer, closure, closure.ty);
         if (snapshot.value_evidence[id] != 0) try require(expected == try shapes.evidence(snapshot.value_evidence[id], 0));

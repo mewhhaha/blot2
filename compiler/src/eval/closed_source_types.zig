@@ -26,7 +26,7 @@ pub const Facts = struct {
             .instance_version, .usage, .forall, .existential, .bound, .rigid, .absent, .variable, .projection, .scoped, .instance_selection, .erased_proof => false,
             .unit, .boolean, .u32, .f32, .never, .type_constructor => true,
             .array, .list, .cursor, .resolver => try self.closed(a, units, owner, n.a, depth + 1),
-            .function, .demand, .provider => try self.closed(a, units, owner, n.a, depth + 1) and
+            .function, .provider => try self.closed(a, units, owner, n.a, depth + 1) and
                 (n.tag != .function or try self.closed(a, units, owner, n.b, depth + 1)) and
                 try self.closedRow(a, units, owner, n.c, depth + 1),
             .state_provider => try self.closed(a, units, owner, n.a, depth + 1) and

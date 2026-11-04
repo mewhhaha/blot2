@@ -57,7 +57,7 @@ test "Requests: cancellation skips array allocation and generator construction" 
     defer module.deinit(a);
     try scenario(a, &module, 42);
 }
-test "Requests: cancelled demand forcing remains suspended for a later handler" {
+test "Requests: cancelled delayed calls remain callable under a later handler" {
     var module = try lower(@import("fixtures").source("request-fixtures/3.blot"));
     defer module.deinit(a);
     try scenario(a, &module, 82);

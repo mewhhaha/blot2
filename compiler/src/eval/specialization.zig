@@ -476,7 +476,6 @@ pub const Service = struct {
             .array => representation.tag == .array,
             .list => representation.tag == .list,
             .cursor => representation.tag == .cursor,
-            .demand => representation.tag == .demand,
             .type_constructor => representation.tag == .type_constructor and n.a == representation.a and n.b == representation.b,
             .resolver => representation.tag == .resolver,
             .provider => representation.tag == .provider,
@@ -488,10 +487,10 @@ pub const Service = struct {
         };
         if (!valid) return self.decline(unit_id, span, .unresolved_type);
         switch (n.tag) {
-            .function, .array, .list, .cursor, .demand, .resolver, .provider => {
+            .function, .array, .list, .cursor, .resolver, .provider => {
                 try self.mapTypeDepth(unit_id, mappings, rows, n.a, representation.a, span, depth + 1);
                 if (n.tag == .function) try self.mapTypeDepth(unit_id, mappings, rows, n.b, representation.b, span, depth + 1);
-                if ((n.tag == .function or n.tag == .demand or n.tag == .provider) and rows != null) try self.mapRow(unit_id, mappings, rows.?, n.c, representation.c, span, false);
+                if ((n.tag == .function or n.tag == .provider) and rows != null) try self.mapRow(unit_id, mappings, rows.?, n.c, representation.c, span, false);
             },
             .state_provider => {
                 try self.mapTypeDepth(unit_id, mappings, rows, n.a, representation.a, span, depth + 1);

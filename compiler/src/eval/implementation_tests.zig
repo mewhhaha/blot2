@@ -161,20 +161,6 @@ test "implementation declared row binders are classified from written head use" 
     try scenario(a, "type Callable f is contract = { type Run, const keep: f -> (Callable.Run f) }\nimpl Bad : Callable U32 = { type Run = U32, const keep = func value => return value + 1 }\n", .unknown_operator);
 }
 
-test "implementation caller dependence includes operation argument variables in latent rows" {
-    const T = @import("../check/types.zig");
-    var store = try T.Store.init(a);
-    defer store.deinit();
-    const variable = try store.fresh();
-    const label = try store.internSymbolicOperation(.{ .unit = 7, .decl = 19 }, &.{variable});
-    const row = try store.effects.row(&.{label}, .closed);
-    const roots = [_]T.Id{ try store.functionWithEffects(T.unit, T.unit, row), try store.demandWithEffects(T.unit, row), try store.provider(T.unit, row) };
-    const source: @import("../check/core.zig").Types = .{ .nodes = store.nodes.items, .extra = store.extra.items, .operations = store.operations.items, .effects = .{ .rows = store.effects.rows.items, .labels = store.effects.labels.items } };
-    for (roots) |root| try std.testing.expect(@import("core_eval.zig").callerDependent(&source, root, 0));
-    try std.testing.expect(!@import("core_eval.zig").callerDependent(&source, T.unit, 0));
-    try std.testing.expect(!@import("core_eval.zig").callerDependent(&source, roots[0], 256));
-}
-
 pub const symbolic_source = "type State a is effect = { get: Unit -> a, set: a -> Unit }\nconst read: Unit -> a ! {State.get a} = func () => return State.get ()\ntype Callable f is contract = { type Run, const keep: f -> f }\nimpl Callback a : Callable (Unit -> a ! {State.get a}) = { type Run = a, const keep = func value => return value }\n";
 test "implementation symbolic operation head arguments specialize complete selected evidence" {
     const source = symbolic_source ++ "entry const answer = @product.get (@effect.run State.get State.set 42 (func () => return Callable.keep read ())) 1\n";
@@ -584,4 +570,18 @@ test "implementation bounded origins never truncate candidate selection" {
     try std.testing.expect(std.meta.eql(module.implementations[6].identity, session.implementation_proofs.proofs.items[proof].implementation));
     try std.testing.expect(session.implementation_proofs.trace.truncated and session.implementation_proofs.trace.len == 4);
     try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+test "implementation caller dependence includes operation argument variables in latent rows" {
+    const T = @import("../check/types.zig");
+    var store = try T.Store.init(a);
+    defer store.deinit();
+    const variable = try store.fresh();
+    const label = try store.internSymbolicOperation(.{ .unit = 7, .decl = 19 }, &.{variable});
+    const row = try store.effects.row(&.{label}, .closed);
+    const roots = [_]T.Id{ try store.functionWithEffects(T.unit, T.unit, row), try store.provider(T.unit, row) };
+    const source: @import("../check/core.zig").Types = .{ .nodes = store.nodes.items, .extra = store.extra.items, .operations = store.operations.items, .effects = .{ .rows = store.effects.rows.items, .labels = store.effects.labels.items } };
+    for (roots) |root| try std.testing.expect(@import("core_eval.zig").callerDependent(&source, root, 0));
+    try std.testing.expect(!@import("core_eval.zig").callerDependent(&source, T.unit, 0));
+    try std.testing.expect(!@import("core_eval.zig").callerDependent(&source, roots[0], 256));
 }

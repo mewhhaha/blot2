@@ -194,7 +194,7 @@ const Proof = struct {
             if (id == step.pattern) return self.visit(node.c, depth + 1);
         };
         switch (node.tag) {
-            .constant, .panic, .constructor_function, .primitive_function, .type_constructor, .closure, .suspend_ => return true,
+            .constant, .panic, .constructor_function, .primitive_function, .type_constructor, .closure => return true,
             .reference => return !self.cursor(id),
             .bind => {
                 if (self.contains(node.a)) {
@@ -217,7 +217,7 @@ const Proof = struct {
                 for (self.source.breakValues(id)) |value| if (!self.cursor(value) and !self.visit(value, depth + 1)) return false;
                 return true;
             },
-            .project, .force, .result_associated => return self.visit(node.a, depth + 1),
+            .project, .result_associated => return self.visit(node.a, depth + 1),
             .construct => return self.visit(node.b, depth + 1),
             .scalar, .logical, .apply, .associated, .record_merge => return self.visit(node.a, depth + 1) and self.visit(node.b, depth + 1),
             .if_value, .if_stmt => return self.visit(node.a, depth + 1) and self.visit(node.b, depth + 1) and self.visit(node.c, depth + 1),

@@ -107,7 +107,7 @@ fn field(owner: *const @import("code_artifacts.zig").Pools, comptime which: pool
         .implementation_arguments => std.mem.sliceAsBytes(owner.evaluator.implementation_proofs.arguments),
         .implementation_members => std.mem.sliceAsBytes(owner.evaluator.implementation_proofs.members),
         .implementation_edges => std.mem.sliceAsBytes(owner.evaluator.implementation_proofs.edges),
-        .code_origins, .values, .children, .closures, .value_evidence, .type_mappings, .row_mappings, .value_records, .record_layouts, .field_names, .demands => std.mem.sliceAsBytes(@field(owner.evaluator, @tagName(which))),
+        .code_origins, .values, .children, .closures, .value_evidence, .type_mappings, .row_mappings, .value_records, .record_layouts, .field_names => std.mem.sliceAsBytes(@field(owner.evaluator, @tagName(which))),
         else => std.mem.sliceAsBytes(@field(owner, @tagName(which))),
     };
     return value;

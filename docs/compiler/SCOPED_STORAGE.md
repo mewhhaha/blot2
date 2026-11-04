@@ -59,11 +59,6 @@ are supported. Records preserve source evaluation order and use UTF-8 field-name
 order for physical storage. General runtime function values cannot be stored in
 arrays or exported as callbacks.
 
-Local scalar demands use invocation-local cache flags and scalar locals. They
-evaluate once even when several branches force them, preserving
-`and`/`or` short-circuit behavior without heap memo cells. Demands created by an
-invocation cannot escape it; aggregate demand results remain unsupported.
-
 The operations remain compiler intrinsics: `@storage.push`, `pop`, `truncate`,
 `freeze`, `copy`, `length`, `read`, `load` and `write`. Ordinary indexing reads
 arrays and views. Copy creates an independent owner; aliases share explicit
@@ -119,14 +114,15 @@ retain every possible root behind a selected value.
 
 The current integration configures 2 MiB temporary storage, 256 KiB persistent
 storage, 2 MiB transport scratch and 4096 owner slots. These are the unchanged
-budgets used for the inspected Gdev first frame; see [CONTINUE.md](../../CONTINUE.md).
-Unconfigured compiler defaults in `backend/storage_plan.zig` use 1 MiB each for
-temporary, grower and persistent storage, 2 MiB transport and 4096 owners.
-Per-pool persistent lane budgets and explicit reserve requests select the planned
-region capacities without increasing the configured limits.
+budgets used for the inspected Gdev first frame; see
+[CONTINUE.md](../../CONTINUE.md). Unconfigured compiler defaults in
+`backend/storage_plan.zig` use 1 MiB each for temporary, grower and persistent
+storage, 2 MiB transport and 4096 owners. Per-pool persistent lane budgets and
+explicit reserve requests select the planned region capacities without
+increasing the configured limits.
 
-Wasm memory holds the region table and 28-byte owner entries, rounded up to a
-64 KiB boundary, followed by the planned region capacities. Initial and maximum
+Wasm memory holds the region table and 28-byte owner entries, rounded up to a 64
+KiB boundary, followed by the planned region capacities. Initial and maximum
 memory sizes are equal. Bounds, arithmetic overflow, overlapping growth and
 exhaustion trap before publishing a change. A later invocation recovers storage
 after a trap. The split generation counter traps on exhaustion rather than
@@ -150,17 +146,17 @@ validated before emission.
 
 Direct self-recursion is supported for closed named functions taking U32 and
 fixed `Array U32` inputs and returning Unit. Existing initialized owners retain
-identity through every self call. This covers the unchanged Goose merge-sort
-and quicksort helpers. Recursive bodies and reached helpers cannot allocate,
-resize, freeze, transfer owners, capture global owners, suspend or call indirectly.
+identity through every self call. This covers the unchanged Goose merge-sort and
+quicksort helpers. Recursive bodies and reached helpers cannot allocate, resize,
+freeze, transfer owners, capture global owners, suspend or call indirectly.
 Mutual recursion and broader recursive layouts remain outside this slice. The
 [implementation contract](CONTRACT.md) specifies frozen headers, finite access
 replay, transactional publication and outline-bank safety.
 
 Fixed one-through-eight-round U32 loops may use an exact composed bit transform
-after normal source/owner checks. The proof rejects effects, memory, iterator use,
-additional live carries, nonlinear operations and instruction coordinates. This
-changes emitted work, not source semantics or storage budgets; see
+after normal source/owner checks. The proof rejects effects, memory, iterator
+use, additional live carries, nonlinear operations and instruction coordinates.
+This changes emitted work, not source semantics or storage budgets; see
 [the compiler contract](CONTRACT.md) for transactional replacement.
 
 Exact indexed scalar copy/fill loops may use guarded bulk memory operations.
@@ -170,34 +166,36 @@ scope, with the scalar stride known statically. Ownership and per-access bounds
 checks remain; see [the compiler contract](CONTRACT.md).
 
 The new path contains no counted allocator, retain/release hooks or collector.
-Its runtime emitter is [data_stacks.zig](../../compiler/src/runtime/data_stacks.zig).
+Its runtime emitter is
+[data_stacks.zig](../../compiler/src/runtime/data_stacks.zig).
 `region_runtime.zig` is a counted-heap optimization; the evaluator's
 `region_arena.zig` is host compiler scratch. Neither proves the new source
 storage contract.
 
 ## Remaining rewrite
 
-The following still require broader implementation or qualification and must
-not be advertised as complete:
+The following still require broader implementation or qualification and must not
+be advertised as complete:
 
 - Variable-sized inline elements, single resizable aggregate tails, nominal
   graph-node layouts, and sequential traversal of variable-sized elements.
-- Complete source admission for lists, sum-type patterns, broader recursion,
-  all generic layout instances, effects and the remaining collection APIs.
-- Complete library/game coverage beyond the inspected Gdev first frame, including
-  broader aggregate initialization, loop carries and generic call layouts. Host
-  packets support numeric arrays; arbitrary records and borrowed host pointers
-  are excluded.
+- Complete source admission for lists, sum-type patterns, broader recursion, all
+  generic layout instances, effects and the remaining collection APIs.
+- Complete library/game coverage beyond the inspected Gdev first frame,
+  including broader aggregate initialization, loop carries and generic call
+  layouts. Host packets support numeric arrays; arbitrary records and borrowed
+  host pointers are excluded.
 - Broader qualification of packed regions, reusable destination calls and
   root/last-use summaries across the remaining fixtures.
 - Making this planner the default and removing the legacy counted backend,
   followed by full compiler and browser/Pen qualification.
 
-The previous agreed cuts remain: no arbitrary runtime escaping closures,
-escaping memoized demands, or general task execution. Unsupported forms produce
-a diagnostic, not a counted-heap fallback. Ink and Gdev now use named owners and copied packets, and one real Gdev main
-frame passed in native Pen. Broader gameplay, recovery, browser and performance
-qualification remain pending; exact evidence lives in CONTINUE.md.
+The previous agreed cuts remain: no arbitrary runtime escaping closures or
+general task execution. Unsupported forms produce a diagnostic, not a
+counted-heap fallback. Ink and Gdev now use named owners and copied packets, and
+one real Gdev main frame passed in native Pen. Broader gameplay, recovery,
+browser and performance qualification remain pending; exact evidence lives in
+CONTINUE.md.
 
 ## Relative links
 

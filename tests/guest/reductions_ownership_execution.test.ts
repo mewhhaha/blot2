@@ -1,47 +1,36 @@
 import { strict as assert } from "node:assert";
 import { compileAndRun } from "./reduction_helpers.ts";
 
-Deno.test("rolling streams and current summary versions bound owned cyclic storage", async () => {
+Deno.test("rolling streams and current summary versions bound owned callback storage", async () => {
   await compileAndRun(
     `
 import * as rolling from "std/rolling"
 import * as summary from "std/summary"
 import * as iter from "std/iter"
-type State a is effect = {get: Unit -> a, set: a -> Unit}
-type Node is data = $End | $Next (Unit -> Node ! {State.get Node})
-const keep = func ~value => return func () => return @demand value
-const get = func (witness: Unit -> a) : a => return State.get ()
-const cycle = func () => return do:
-  let (_, result) = @effect.run State.get State.set $End (func () => return do:
-    let delayed = keep (get (func () => return $End))
-    use State.set ($Next delayed)
-    use ready <- delayed ()
-    use State.set $End
-    break ready
-  )
-  break result
+type Node is data = $End | $Next (Unit -> Node)
+const retained_node = func () => return do:
+  let saved = $End
+  break $Next (func () => return saved)
 const combine = func (left: {sum: U32, node: Node}) => return func (right: {sum: U32, node: Node}) => return {sum: @u32.add left.sum right.sum, node: left.node}
 const inverse = func (value: {sum: U32, node: Node}) => return {sum: @u32.sub 0 value.sum, node: value.node}
 const add = func (left: U32) => return func (right: U32) => return @u32.add left right
 const validate = func (node: Node) => return case node of
-  $End => @panic "summary lost its cycle"
-  $Next delayed => do:
-    let (_, value) = @effect.run State.get State.set $End (func () => return delayed ())
-    break case value of
-      $End => @panic "summary lost its ready memo"
-      $Next _ => 0
+  $End => @panic "summary lost its callback"
+  $Next delayed => case delayed () of
+    $End => 0
+    $Next _ => @panic "summary changed its captured node"
 entry const monoid = func (count: U32) => return do:
-  let node = cycle ()
+  let node = retained_node ()
   let values = iter.map (func index => return {sum: index, node}) (iter.range 0 count)
   let total = iter.fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.monoid combine {sum: 0, node} 31 values)
   break @u32.add total (validate node)
 entry const group = func (count: U32) => return do:
-  let node = cycle ()
+  let node = retained_node ()
   let values = iter.map (func index => return {sum: index, node}) (iter.range 0 count)
   let total = iter.fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.group combine inverse {sum: 0, node} 31 values)
   break @u32.add total (validate node)
 entry const update = func (count: U32) => return do:
-  let node = cycle ()
+  let node = retained_node ()
   let initial = {sum: 0, node}
   let original = summary.build combine initial (iter.map (func index => return {sum: index, node}) (iter.range 0 31))
   let tree = original

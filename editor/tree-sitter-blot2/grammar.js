@@ -127,10 +127,7 @@ export default grammar({
         $.parenthesized,
         $.bracketed,
         $.braced,
-        $.deferred_parameter,
       ),
-
-    deferred_parameter: ($) => seq("~", choice($.identifier, $.parenthesized)),
 
     binding_keyword: (_) => choice("const", "let"),
 

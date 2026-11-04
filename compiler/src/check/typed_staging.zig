@@ -20,7 +20,7 @@ pub fn isIdentity(unit: u32, declaration: u32) bool {
     return unit == code_identity.unit and (declaration == code_identity.decl or declaration == descriptor_identity.decl);
 }
 pub fn code(store: *T.Store, result: T.Id, effects: T.Effects.Id) T.Error!T.Id {
-    const latent = try store.demandWithEffects(T.unit, effects);
+    const latent = try store.functionWithEffects(T.unit, T.unit, effects);
     return store.nominal(code_identity, &.{ result, latent });
 }
 pub fn descriptor(store: *T.Store, target: T.Id) T.Error!T.Id {
@@ -33,7 +33,7 @@ pub fn codeInfo(source: anytype, id: T.Id) ?Code {
     const arguments = source.nominalArguments(node);
     if (arguments.len != 2) return null;
     const latent = source.node(arguments[1]);
-    if (latent.tag != .demand or latent.a != T.unit) return null;
+    if (latent.tag != .function or latent.a != T.unit or latent.b != T.unit) return null;
     return .{ .result = arguments[0], .effects = latent.c };
 }
 pub fn descriptorInfo(source: anytype, id: T.Id) ?T.Id {
@@ -67,7 +67,7 @@ fn compileOnlyDepth(source: anytype, raw: T.Id, depth: usize, remaining: *usize)
             if (try compileOnlyDepth(source, source.recordField(node, index).ty, depth + 1, remaining)) return true;
         },
         .function => return try compileOnlyDepth(source, node.a, depth + 1, remaining) or try compileOnlyDepth(source, node.b, depth + 1, remaining),
-        .usage, .array, .list, .cursor, .demand, .forall, .existential => return compileOnlyDepth(source, node.a, depth + 1, remaining),
+        .usage, .array, .list, .cursor, .forall, .existential => return compileOnlyDepth(source, node.a, depth + 1, remaining),
         else => {},
     }
     return false;

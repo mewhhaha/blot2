@@ -122,7 +122,7 @@ pub const Relocation = struct {
         self.remaining -= 1;
         const node = self.source.types.node(root);
         switch (node.tag) {
-            .function, .demand, .provider => {
+            .function, .provider => {
                 try require(node.c < self.source.types.effects.rows.len);
                 const row_ = self.source.types.row(node.c);
                 if (row_.tail == .variable and row_.tail.variable == variable) return true;
@@ -271,7 +271,7 @@ pub const Relocation = struct {
                 try self.tyOpened(a.b, b.b, depth + 1, opened);
                 try self.rowOpened(a.c, b.c, depth + 1, opened);
             },
-            .demand, .provider => {
+            .provider => {
                 try self.ty(a.a, b.a, depth + 1);
                 try self.rowOpened(a.c, b.c, depth + 1, opened and a.tag == .provider);
             },

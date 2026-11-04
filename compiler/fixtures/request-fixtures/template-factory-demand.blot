@@ -1,5 +1,5 @@
 type Tick is effect = { read: Unit -> F32 }
-const keep = func ~value => return func () => return @demand value
+const keep = func action => return func () => return action ()
 const handled = func computation => return do:
   for request in @requests computation:
     case request of
@@ -8,7 +8,7 @@ const handled = func computation => return do:
       complete value =>
         break value
 const create = func action => return do:
-  let delayed = keep (action ())
+  let delayed = keep action
   break @computation (func () => return delayed ())
 entry const answer = func () => return do:
   let computation = create (func () => return Tick.read ())

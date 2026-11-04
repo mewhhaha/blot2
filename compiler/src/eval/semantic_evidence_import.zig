@@ -42,7 +42,7 @@ pub const Importer = struct {
             if (node.tag != .record or index % 2 != 0) child.* = try self.ty(child.*, depth + 1);
         }
         const a = switch (node.tag) {
-            .usage, .scoped, .forall, .existential, .function, .array, .list, .cursor, .demand, .resolver, .provider, .state_provider => try self.ty(node.a, depth + 1),
+            .usage, .scoped, .forall, .existential, .function, .array, .list, .cursor, .resolver, .provider, .state_provider => try self.ty(node.a, depth + 1),
             .bound, .nominal, .type_constructor => node.a,
             else => 0,
         };
@@ -52,7 +52,7 @@ pub const Importer = struct {
             else => 0,
         };
         const c = switch (node.tag) {
-            .function, .demand, .provider => try self.row(node.c, depth + 1),
+            .function, .provider => try self.row(node.c, depth + 1),
             .state_provider => try self.ty(node.c, depth + 1),
             .usage => if (node.c == 0) 0 else try self.ty(node.c, depth + 1),
             .bound, .scoped => node.c,

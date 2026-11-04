@@ -3,105 +3,95 @@
 ## Current frontier
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
-The next latency gate is below five seconds; subsecond compilation and 1–2MB
-Wasm remain goals. Reachable throughput targets are 50k source lines in 0.5s,
-then one million lines/second. None of these Main goals is complete.
+Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.
+Reachable throughput targets are 50k source lines in 0.5s, then one million
+lines/second.
 
-The repository now separates the Zig compiler (`compiler/`), Deno host
-(`host/`), tests, benchmarks and reference documentation. See the
-[repository map](docs/README.md) and
-[layout validation](benchmarks/evidence/integration/2026-11-04-repository-layout.json).
-Production compiler identity, Blot sources and Main Wasm remain unchanged. The
-relocated syntax development check passes in 9.64s; full qualification remains
-pending after the bounded full gate. Pen, Ink, Gdev and installed Helix callers
-use the new paths.
+Memoized `~` parameters/types and `@demand`/`@force` are removed throughout the
+compiler, evaluator, runtime, std and source tools. `and`/`or` remain primitive
+short-circuit operators. Other deferred work uses ordinary Unit callbacks;
+explicit local bindings share computed values. `Maybe.unwrap_or_else` and
+`Result.unwrap_or_else` take callbacks. Typed Code retains its latent effects
+through an ordinary Unit-to-Unit function carrier. Declaration reachability,
+field-demand analysis and resource journal demand events are different concepts
+and remain. See [deferred work](docs/compiler/DEFERRED_WORK.md) and
+[the evidence](benchmarks/evidence/integration/2026-11-04-demand-retirement.json).
 
-The [array-loop checkpoint](benchmarks/goose/results/2026-11-04-sort-hills.md)
-removes dominated fixed-array readiness guards, specializes scalar strides and
-adds guarded bulk copy/fill loops after ordinary source/owner checks. Unsafe
-ranges retain the exact scalar loop, including valid-prefix writes before a
-later bounds trap. See `docs/compiler/CONTRACT.md`.
+Three fresh uncached LLVM-release pairs measure **5.409 → 5.474s**, with paired
+changes **-12 / +302 / +101ms**: no compile-speed gain. Gdev remains
+byte-identical at **10,049,963B**. The frozen before compiler uses its frozen
+std; the candidate uses the migrated std with the same application source,
+settings and runner. Main still contains 9,440 functions and 6.51MB of
+local/global instructions. Removing this language feature simplifies the
+implementation; it does not solve the representation hill.
 
-Five fresh release pairs improve unchanged merge sort **1.64x**, quicksort
-**1.35x**, and Sieve **2.43x**. Custom hash regresses **4–5%**; CRC32, Fannkuch
-and F32 Mandelbrot have no material runtime gain. Goose advanced independently
-to `0d1715ce`; a fresh comparison leaves merge **2.00x**, quick **1.11x**, Sieve
-**2.31x**, CRC **1.32x** and custom hash **7.37x** behind it. All seven adapted
-pairs pass. Original F64 and the other 43 catalog tasks remain outside paired
-coverage. Direct Blot wins use its frozen preceding release, not old Goose gaps.
+`List T` and `[]` remain. The
+[packed-sequence pilot](docs/compiler/PACKED_SEQUENCES.md) keeps immutable
+construction, concatenation and sequential cursors separate from indexable
+mutable Arrays. A standalone native witness packs 100,000 mixed enum elements
+into **260,000 bytes**, against **1,200,000 modeled fixed-union bytes**; it
+reserves **900,000 bytes**. Five representation tests pass. This is not yet the
+production List emitter, nor a measured Blot runtime/Wasm/compile-time win.
+Contiguous concatenation copies O(total bytes); repeated concat needs a builder
+path or a separately qualified chunk representation.
 
-Main shrinks **10,097,652 → 10,049,963B (-0.47%)**, with declared locals
-**336,753 → 335,682** and 9,440 functions unchanged. Three fresh uncached pairs
-measure **5.555 → 5.545s**, with changes **+2 / -93 / -10ms**: no compile-speed
-win. Local/global instructions still occupy **6.51MB**. Main admits ten bulk
-copies and three fills; representation work remains the large hill.
-
-A separate exact-artifact profile records backend **4.430s**, checking
-**0.500s**, lowering **0.124s**, validation **0.102s**, cumulative backend
-allocation requests **5.324GB**, and process RSS **1,110,332KiB**. Requested
-bytes are not peak memory; overlapping timing families do not add. Scoped
-backend engine subtimers remain unavailable.
-
-All **3,001 native laws compile without LLVM**. All **438 affected laws** pass
-sampled faults on the final native binary; five focused full-fault laws include
-three exhaustive sweeps. The development family passes **271 native / 250 guests
-in 76.3s**. All **330 affected release guests** pass, including same-array reads
-after bulk loops, skipped reads, exact float bits, aliases and prefix traps.
-Formatting, types and Zig lint pass. The full gate passes smoke/harness and 282
-native laws without failures, then reaches its 180s budget. **Full qualification
-remains pending.** The later [repository cleanup](docs/repository-cleanup.md)
-also runs the broad guest-only gate: it stops on the existing
-`acyclic_updates_execution.test.ts` `storage_unsupported` gap, reproduced by the
-frozen preceding release. Nested memory-profile fixtures have the same existing
-storage-admission limitation. The 75 affected tooling/retained-State checks
-pass, and Gdev remains byte-identical.
+The final native inventory has **2,949 laws**, all compiled without LLVM. The
+migrated engine family has **231 passes and four failures**, each reproduced on
+the frozen preceding native binary. The 39-file migrated guest batch has **276
+passes and 19 classified baseline failures**. Five new executed laws cover
+Boolean short-circuiting, selected callbacks, repeated work and explicit
+sharing. Code archive portability and generated Unit-thunk parameter flags have
+focused regressions. A migrated native receipt fixture now expects ordinary
+callback reuse: both compilers show 0/1/0 reuse for
+initial/unrelated/captured-base edits. The final function-syntax development
+check passes **8 native / 26 guests** in **28.41s**, including complete native
+compilation. Full qualification remains pending; consult the evidence for the
+bounded full gate and baseline failures. Types, formatting, Zig lint,
+parser/editor, package API and publication dry-run checks pass. Publication was
+not performed.
 
 Release compiler SHA256:
-`dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7`. Main SHA256:
+`4a2be13d0e1b09816c51cc6aa3ae1059fc3aaf4b8554ceeee323e345b2bdf60c`. Main SHA256:
 `8a5bc671b85bba52b8989abe4c2165e26d1e379c659e3db9666dd60ad7e5127b`. A fresh
-inspected NVIDIA frame passes original budgets and matches the preceding
-PNG/trace byte for byte; see
-[frame evidence](benchmarks/evidence/integration/2026-11-04-sort-hills-frame.json).
-Broader gameplay/software-adapter qualification remains pending. Pen's normal
-source bridge still omits inferenceBudget; the bounded Deno runner builds Main
-and Pen loads that reviewed artifact. Sibling source/assets remain unchanged:
-Gdev `38af070`, Ink `ccaf08f`, Pen `d159492`.
+inspected NVIDIA frame passes the original budgets and matches the preceding
+PNG/trace byte for byte. Broader gameplay/software-adapter qualification remains
+pending. Pen's normal source bridge still omits inferenceBudget; the bounded
+Deno runner builds Main and Pen loads that reviewed artifact. Only Gdev's
+language compatibility test source changes in the siblings; Ink/Pen and
+application assets remain unchanged. Its broad collection fixture retains the
+same fixed-inline-layout admission failure on both compilers.
 
 The
-[preceding shared hills](benchmarks/goose/results/2026-11-04-shared-hills.md)
-retain CRC composition, zero-allocation fold probes, copy proofs and rejected
-scalar inlining.
-[Direct recursion](benchmarks/goose/results/2026-11-04-recursive-calls.md)
-retains fixed Array U32/U32/Unit headers and finite invariant owner access;
-broader recursion stays excluded.
-[Addressed inputs](benchmarks/goose/results/2026-11-04-addressed-inputs.md)
-retain the rejected per-call snapshot rollout. Current runtime changes do not
-complete the owned-storage rewrite.
+[preceding array-loop measurements](benchmarks/goose/results/2026-11-04-sort-hills.md)
+retain merge/quick/Sieve gains, the hash regression, fresh Goose controls and
+limited coverage. The
+[pinned preceding handoff](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/CONTINUE.md)
+retains exact prior qualification and profiling identities. Earlier results do
+not qualify this candidate.
 
-## Next Main lever
+## Next representation levers
 
-Attribute materialization by record shape and operation: construction, call,
-result, join, loop and row load. Measure distinct creations, repeated
-expansions, actual demanded fields and final encoded bytes before redesigning
-representation. The preceding checkpoint’s argument counts suggest repeated
-shape work but do not establish its exclusive CPU cost.
+Integrate one bounded packed List element plan into the owned backend: dense tag
+plus active payload, append/freeze, byte-position/count cursors and one terminal
+nested scalar tail. Preserve owner lifetime evidence, complete append checks,
+exact scalar bits and original budgets. Measure scalar controls, live versus
+reserved bytes, bytes copied, construction/traversal time and emitted Wasm. Keep
+production status explicit until executed Blot witnesses pass.
 
-With Astra, compare two bounded pilots: creation-backed immutable
-`world_storage.FrameAccess` with borrowed private pointers/lazy field loads,
-versus shared semantic shapes and transitive field demand. Keep a backing from
-creation through helpers/branches/loops, rather than serializing a new packet at
-each call. Keep small math records inline. A representative pilot should remove
-about 20% of Main bytes or 10% of compile time while preserving snapshots,
-owner/callback evidence, lifetimes and current budgets. A pointer hiding the
-full eager Value tree would leave much compiler cost intact. Reject the approach
-if eligible records account for little output or stores/loads replace the same
-work.
+For Main, attribute materialization by record shape and operation before
+changing representation: construction, call, result, join, loop and row load.
+Compare creation-backed immutable `world_storage.FrameAccess` with borrowed
+private pointers/lazy field loads against shared semantic shapes and transitive
+field demand. Keep backing through helpers/branches/loops and small math records
+inline. Target roughly 20% fewer Main bytes or 10% less compile time while
+retaining snapshots, checked authority and budgets; reject designs that replace
+stores and loads with equivalent work.
 
-The nearer sub-five-second lever needs scoped backend allocation/CPU
-attribution; the current broad profile does not split generation, outlining and
-assembly. Hash lane batching and dominated bounds/load elimination remain
-separate runtime hills. Preserve valid-iteration effects before an eventual
-bounds trap.
+The preceding exact-artifact profile records backend 4.430s, checking 0.500s,
+lowering 0.124s, validation 0.102s, cumulative backend allocation requests
+5.324GB and process RSS 1,110,332KiB. Requested bytes are not peak memory;
+overlapping timing families do not add. Scoped backend engine subtimers remain
+unavailable.
 
 Use the private checked-IR capture/replay for short backend iterations:
 
@@ -113,9 +103,8 @@ compiler/zig-out-native-dev/bin/blot-outline-replay build/bench/outline-capture 
 
 Capture a fresh pinned artifact. Replay builds in about 0.5s and finalizes in
 about 3s; it is engine evidence, not arbitrary-IR or whole-runtime authority.
-Use `benchmarks/tools/capture_scaling.ts`, `aggregate_scaling.ts` and
-`compiler_throughput.ts` for bounded controls. Small controls do not predict
-Main.
+Small controls do not predict Main. Hash lane batching and dominated bounds/load
+elimination remain separate runtime hills; preserve prefix effects before traps.
 
 ## Contracts and remaining qualification
 
@@ -132,24 +121,23 @@ The owned-storage rewrite and ordinary legacy-backend retirement are unfinished;
 exports, nonfunction/global export support, block-break inference, broader
 library/game/save/recovery/browser qualification and `#run` build effects remain
 pending. A successful first frame or source inventory does not complete them.
-
-The
-[preceding checkpoint](https://github.com/mewhhaha/blot2/blob/b69ecfe38fc056bf5648e2dcb152f49ea2a0eeed/CONTINUE.md)
-preserves earlier contracts, historical 2.08MB recovery, measurements, held
-experiments and remaining requirements. Documentation cleanup is not completion.
+The [repository map](docs/README.md) records the current layout. Historical
+2.08MB recovery, held experiments and earlier requirements remain in pinned
+history; documentation cleanup is not completion.
 
 ## Iteration and delivery
 
-Use Zig 0.17.0 and `-Dllvm=false` for development/native tests. Recent native
-compiler/inventory rebuilds take about 7–13s / 16–20s; the final development
-family takes 76s. This batch used one five-minute LLVM release candidate. Do not
-repeat unchanged long diagnostics or the old 36-minute build; LLVM is reserved
-for meaningful final release measurements.
+Use Zig 0.17.0 and `-Dllvm=false` for development/native tests. This feature
+removal rebuilt the development compiler in 17s and native inventory in 54s; the
+final test-only inventory rebuild is recorded in the development check. The
+final LLVM release build took about five minutes. Two premature LLVM builds were
+stopped; freeze production source before the final release build and keep
+ordinary iterations on the native backend.
 
-Use `deno task check:dev --area scoped-storage` for the current regression
-family and `deno task test:compiler` before compiler commits. Full qualification
-is separate. Recheck real integration after semantic changes with the tracked
+Use `deno task check:dev --area function-syntax` for this regression family and
+`deno task test:compiler` before compiler commits. Full qualification is
+separate. Recheck real integration after semantic changes with the tracked
 `build_gdev.ts` and `run_pen.py` runners, and inspect the actual PNG. Preserve
-unrelated work and existing sibling checkouts; no new worktrees. Commit/push
-coherent checked batches to main and verify the remote. Environment publication
-and upstream comments require explicit requests.
+unrelated work and existing siblings; no new worktrees. Commit/push coherent
+checked batches to main and verify the remote. Environment publication and
+upstream comments require explicit requests.

@@ -2335,22 +2335,6 @@ test "runtime dependency tracing demands named constants without executing runti
     try std.testing.expectEqual(evaluator.Code.const_runtime_dependency, result.diagnostic.?.code);
 }
 
-test "global dead-branch references are demanded but direct unselected traps are skipped" {
-    var direct = try lowerPreludeProducer("infixr 25 (<&>) = _fixity_and\ninfix 30 (==) = _fixity_eq\nentry const selected = if false then @u32.div 1 0 else 42\nentry const logical = false <&> (@u32.div 1 0 == 0)\nconst _fixity_and = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false\nconst _fixity_eq = func left => return func right => return @type.call \"eq\" left right\n", &.{.eq});
-    defer direct.deinit(a);
-    try expectValue(&direct, "selected", .{ .scalar = .u32, .bits = 42 });
-    try expectValue(&direct, "logical", .{ .scalar = .bool, .bits = 0 });
-    var referenced = try lower("const failure = @u32.div 1 0\nentry const selected = if false then failure else 42\nentry const function = func () : U32 => return if false then failure else 42\n");
-    defer referenced.deinit(a);
-    const result = try evaluator.evaluate(a, &.{referenced}, target(&referenced, "selected"), .{});
-    try std.testing.expectEqual(evaluator.Code.integer_divide_by_zero, result.diagnostic.?.code);
-    try std.testing.expectEqual(@as(u32, 1), result.diagnostic.?.unit);
-    var session = try evaluator.Session.init(a, &.{referenced});
-    defer session.deinit();
-    try std.testing.expectError(error.Declined, session.prepare(target(&referenced, "function")));
-    try std.testing.expectEqual(evaluator.Code.integer_divide_by_zero, session.diagnostic.?.code);
-}
-
 test "rebindings merges and suite returns retain their enclosing block boundary" {
     var module = try lowerPreludeProducer(
         \\infixl 60 (+) = _fixity_add
@@ -3445,121 +3429,6 @@ test "closure evidence region resolves nested accessor fields and captured aggre
     try std.testing.expectEqual(size, session.snapshot().values.len);
 }
 
-test "demand evaluation skips bodies, caches aliases and retains lexical capture versions" {
-    var module = try lower(
-        \\const delay = func ~value=> return value
-        \\const ignore = func ~(value:U32)=> return 42
-        \\const pending = delay (@u32.add 20 1)
-        \\const before = func start=> return do:
-        \\  let value=start
-        \\  let deferred=delay value
-        \\  value:=@u32.add self 1
-        \\  break @demand deferred
-        \\entry const suspension=pending
-        \\entry const first=@demand pending
-        \\entry const second=@demand pending
-        \\entry const ignored=ignore (@panic "unused")
-        \\entry const captured=before 42
-    );
-    defer module.deinit(a);
-    var session = try evaluator.Session.init(a, &.{module});
-    defer session.deinit();
-    const pending = try session.richValue(target(&module, "suspension"));
-    try std.testing.expectEqual(evaluator.ValueKind.suspension, session.valueInfo(pending).kind);
-    try std.testing.expect(session.suspensionCached(pending) == null);
-    try std.testing.expectEqual(@as(u32, 21), (try session.value(target(&module, "first"))).bits);
-    const memo = session.suspensionCached(pending).?;
-    const steps = session.steps;
-    try std.testing.expectEqual(@as(u32, 21), (try session.value(target(&module, "second"))).bits);
-    try std.testing.expectEqual(steps + 2, session.steps);
-    try std.testing.expectEqual(memo, session.suspensionCached(pending).?);
-    try std.testing.expectEqual(@as(u32, 42), (try session.value(target(&module, "ignored"))).bits);
-    try std.testing.expectEqual(@as(u32, 42), (try session.value(target(&module, "captured"))).bits);
-}
-
-fn demandAllocationScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var session = try evaluator.Session.init(allocator, &.{module.*});
-    defer session.deinit();
-    const closure = try session.richValue(target(module, "function"));
-    const actual = try session.storage.evidence.intern(.function, 1, 3, &.{});
-    const specialized = try session.specializeClosure(closure, actual);
-    const pending = session.valueChildren(specialized)[0];
-    try std.testing.expectEqual(evaluator.ValueKind.suspension, session.valueInfo(pending).kind);
-    try std.testing.expect(session.suspensionCached(pending) == null);
-    try std.testing.expectEqual(@as(u32, 42), (try session.value(target(module, "answer"))).bits);
-    try std.testing.expect(session.suspensionCached(pending) != null);
-    var snapshot = try session.copySnapshot(allocator);
-    defer snapshot.deinit(allocator);
-    try std.testing.expectEqual(evaluator.DemandState.cached, snapshot.demands[@intCast(snapshot.values[pending].nominal)].state);
-}
-
-test "staged closures preserve shared demand memo slots through specialization and every allocation failure" {
-    var module = try lower(
-        \\const capture = func ~value=> return func ()=> return @demand value
-        \\const ready=capture (@u32.add 40 2)
-        \\entry const function=ready
-        \\entry const answer=ready ()
-    );
-    defer module.deinit(a);
-    try demandAllocationScenario(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, demandAllocationScenario, .{&module});
-}
-
-test "forcing a demand traces named dependencies lazily and never publishes failed memo values" {
-    var module = try lower(
-        \\const delay=func ~(value:U32)=> return value
-        \\const bad=@panic "named deferred failure"
-        \\const pending=delay (if false then bad else 42)
-        \\entry const suspension=pending
-        \\entry const forced=@demand pending
-        \\entry const direct=@demand (delay (if false then @panic "unselected" else 42))
-    );
-    defer module.deinit(a);
-    try expectValue(&module, "direct", .{ .scalar = .u32, .bits = 42 });
-    var session = try evaluator.Session.init(a, &.{module});
-    defer session.deinit();
-    const pending = try session.richValue(target(&module, "suspension"));
-    try std.testing.expectEqual(@as(usize, 0), session.storage.demands.items[@intCast(session.valueInfo(pending).nominal)].value);
-    try std.testing.expectError(error.Declined, session.richValue(target(&module, "forced")));
-    try std.testing.expectEqual(evaluator.Code.const_panic, session.diagnostic.?.code);
-    try std.testing.expectEqualStrings("named deferred failure", session.diagnostic.?.detail);
-    try std.testing.expectEqual(evaluator.DemandState.pending, session.storage.demands.items[@intCast(session.valueInfo(pending).nominal)].state);
-    try std.testing.expect(session.suspensionCached(pending) == null);
-    var budget = try evaluator.Session.init(a, &.{module});
-    defer budget.deinit();
-    const unforced = try budget.richValue(target(&module, "suspension"));
-    budget.options.max_steps = budget.steps + 1;
-    try std.testing.expectError(error.Declined, budget.richValue(target(&module, "forced")));
-    try std.testing.expectEqual(evaluator.Code.constant_fuel, budget.diagnostic.?.code);
-    try std.testing.expect(budget.suspensionCached(unforced) == null);
-}
-
-test "owned demand snapshots retain aggregate memo values after source and session teardown" {
-    var module = try lower(
-        \\const delay=func ~value=> return value
-        \\const pending=delay #[20,22]
-        \\entry const suspension=pending
-        \\entry const forced=@demand pending
-    );
-    var session = try evaluator.Session.init(a, &.{module});
-    const pending = try session.richValue(target(&module, "suspension"));
-    const expected = try session.storage.evidence.intern(.demand, try session.storage.evidence.intern(.array, 3, 0, &.{}), 0, &.{});
-    const alias = try session.specializeSuspension(pending, expected);
-    try std.testing.expectEqual(session.valueInfo(pending).nominal, session.valueInfo(alias).nominal);
-    _ = try session.richValue(target(&module, "forced"));
-    const memo = session.suspensionCached(alias).?;
-    var snapshot = try session.copySnapshot(a);
-    defer snapshot.deinit(a);
-    session.deinit();
-    module.deinit(a);
-    try std.testing.expectEqual(expected, snapshot.value_evidence[alias]);
-    try std.testing.expectEqual(evaluator.DemandState.cached, snapshot.demands[@intCast(snapshot.values[alias].nominal)].state);
-    const info = snapshot.values[memo];
-    try std.testing.expectEqual(evaluator.ValueKind.array, info.kind);
-    try std.testing.expectEqual(@as(u32, 20), snapshot.values[snapshot.children[info.start]].bits);
-    try std.testing.expectEqual(@as(u32, 22), snapshot.values[snapshot.children[info.start + 1]].bits);
-}
-
 test "closure evidence writable fields ignore associated read members" {
     var module = try lower(
         \\type Box value is data= $Box {value:value}
@@ -4193,24 +4062,24 @@ const provider_execution_source =
     \\const provider = @effect.provider Read (func () => return 42)
     \\const read = func () => return Read ()
     \\const invoke = func callback => return callback ()
-    \\const force = func ~value => return @demand value
-    \\const ignore = func ~value => return 42
+    \\const force = func value => return value ()
+    \\const ignore = func value => return 42
     \\const direct = func () => return do provider:
     \\  break read ()
     \\const callback = func () => return do provider:
     \\  break invoke (func () => return Read ())
     \\const delayed = func () => return do provider:
-    \\  break force (Read ())
+    \\  break force (func () => return Read ())
     \\entry const constant = do provider:
     \\  break Read ()
     \\entry const named_answer = direct ()
     \\entry const callback_answer = callback ()
     \\entry const delayed_answer = delayed ()
-    \\entry const ignored_answer = ignore (Read ())
+    \\entry const ignored_answer = ignore (func () => return Read ())
     \\entry const function = func () => return do provider:
     \\  break read ()
 ;
-test "source providers handle named callbacks and demands in evaluation and private proof" {
+test "source providers handle named callbacks and delayed calls in evaluation and private proof" {
     var module = try lower(provider_execution_source);
     defer module.deinit(a);
     var session = try evaluator.Session.init(a, &.{module});
@@ -4578,49 +4447,6 @@ fn namedBinaryEffectScenario(allocator: std.mem.Allocator, module: *const core.M
     try std.testing.expectEqual(@as(u32, 42), (try session.value(target(module, "answer"))).bits);
     try std.testing.expectEqual(@as(u32, 1), (try session.value(target(module, "loaded"))).bits);
     try std.testing.expectEqual(@as(u32, 0), (try session.value(target(module, "unforced"))).bits);
-}
-
-test "named binary calls retain producer effect and demanded operand rows" {
-    var module = try lower(
-        \\infixl 20 (<&>) = choose
-        \\infixl 60 (%%) = combine
-        \\effect Read: Unit -> U32
-        \\effect Touch: U32 -> Unit
-        \\const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
-        \\const combine = func (left: U32) => return func (right: U32) => return do:
-        \\  use Touch left
-        \\  break @u32.add left right
-        \\entry const receive = func (flag: Bool) => return do:
-        \\  let go = flag <&> false
-        \\  if go:
-        \\    break ()
-        \\  use Touch 7
-        \\  break ()
-        \\entry const selected = func (flag: Bool) => return flag <&> (do:
-        \\  use value <- Read ()
-        \\  break @u32.eq value 42)
-        \\entry const merge = func () => return 20 %% 22
-        \\const reader = @effect.provider Read (func () => return 42)
-        \\const touch = @effect.provider Touch (func value => return ())
-        \\entry const answer = do touch:
-        \\  use receive true
-        \\  break 20 %% 22
-        \\entry const loaded = do reader:
-        \\  break selected true
-        \\entry const unforced = false <&> @panic "not demanded"
-    );
-    defer module.deinit(a);
-    const frozen_nodes = try a.dupe(core.Node, module.nodes);
-    defer a.free(frozen_nodes);
-    const frozen_types = try a.dupe(types.Node, module.types.nodes);
-    defer a.free(frozen_types);
-    const frozen_rows = try a.dupe(types.Effects.Row, module.types.effects.rows);
-    defer a.free(frozen_rows);
-    try namedBinaryEffectScenario(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, namedBinaryEffectScenario, .{&module});
-    try std.testing.expectEqualDeep(frozen_nodes, module.nodes);
-    try std.testing.expectEqualDeep(frozen_types, module.types.nodes);
-    try std.testing.expectEqualDeep(frozen_rows, module.types.effects.rows);
 }
 
 fn cachedScalarReferenceScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
@@ -5225,49 +5051,6 @@ test "lexical summary inputs preserve shared aggregate slots instead of merging 
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lexicalAliasScenario, .{&module});
 }
 
-fn lexicalDemandScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var session = try evaluator.Session.init(allocator, &.{module.*});
-    defer session.deinit();
-    var keys: lexical_inputs.Cache = .{};
-    defer keys.deinit(allocator);
-    const selected: lexical_inputs.Interfaces = .empty;
-    var identifiers: [2]u32 = undefined;
-    var captures: [2]evaluator.ValueId = undefined;
-    for ([_][]const u8{ "first", "other" }, 0..) |name, index| {
-        const value = try session.richValue(target(module, name));
-        const steps = session.steps;
-        const ready = try session.inferClosure(value);
-        try std.testing.expectEqual(steps, session.steps);
-        captures[index] = session.valueChildren(ready)[0];
-        try std.testing.expectEqual(evaluator.ValueKind.suspension, session.valueInfo(captures[index]).kind);
-        try std.testing.expect(session.suspensionCached(captures[index]) == null);
-        const examined = session.specializations.canonical_specializations.examined_words;
-        try std.testing.expectEqual(@as(?lexical_inputs.Inputs, null), try session.specializations.canonical_specializations.key(&session, ready));
-        try std.testing.expectEqual(examined, session.specializations.canonical_specializations.examined_words);
-        try std.testing.expect(session.counters.canonical_specialization_prefiltered > 0);
-        identifiers[index] = try keys.intern(allocator, &session, ready, &selected) orelse return error.ExpectedCompleteCaptureInputs;
-    }
-    try std.testing.expect(identifiers[0] != identifiers[1]);
-    try std.testing.expect(captures[0] != captures[1]);
-    try std.testing.expectEqual(@as(u32, 42), (try session.value(target(module, "answer"))).bits);
-    try std.testing.expect(session.suspensionCached(captures[0]) != null);
-    const value = try session.inferClosure(try session.richValue(target(module, "first")));
-    try std.testing.expectEqual(@as(?u32, null), try keys.intern(allocator, &session, value, &selected));
-    try std.testing.expectEqual(@as(usize, 2), keys.inputs.items.len);
-}
-
-test "lexical keys distinguish pending demand creation and decline changed cached memo state" {
-    var module = try lower(
-        \\const make = func ~(value: U32) => return func () => return @demand value
-        \\entry const first = make (@u32.add 40 2)
-        \\entry const other = make (@u32.add 40 2)
-        \\entry const answer = first ()
-    );
-    defer module.deinit(a);
-    try lexicalDemandScenario(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lexicalDemandScenario, .{&module});
-}
-
 fn lexicalProviderScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var session = try evaluator.Session.init(allocator, &.{module.*});
     defer session.deinit();
@@ -5414,7 +5197,6 @@ fn canonicalScalarScenario(allocator: std.mem.Allocator, module: *const core.Mod
     defer session.deinit();
     session.specializations.canonical_specializations.force_collision = collision;
     session.options.trace_runtime_dependencies = true;
-    session.options.retain_source_suspensions = true;
     const expected = try session.storage.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
     const first = try session.richValue(target(module, "first"));
     _ = try session.specializeClosure(first, expected);
@@ -5534,14 +5316,14 @@ fn canonicalHitRetry(module: *const core.Module, offset: ?usize) !usize {
         const first = try session.richValue(target(module, "first"));
         const again = try session.richValue(target(module, "again"));
         _ = try session.specializeClosure(first, expected);
-        const sizes = .{ session.storage.values.items.len, session.storage.children.items.len, session.storage.closures.items.len, session.storage.type_mappings.items.len, session.storage.row_mappings.items.len, session.storage.demands.items.len, session.storage.typed_views.count(), session.storage.specialized_closures.count(), session.specializations.validated_calls.count(), session.specializations.plain_nominals.count(), session.retained.specialization_receipts.items.len };
+        const sizes = .{ session.storage.values.items.len, session.storage.children.items.len, session.storage.closures.items.len, session.storage.type_mappings.items.len, session.storage.row_mappings.items.len, session.storage.typed_views.count(), session.storage.specialized_closures.count(), session.specializations.validated_calls.count(), session.specializations.plain_nominals.count(), session.retained.specialization_receipts.items.len };
         const regions = session.counters.inference_regions;
         const start = failing.alloc_index;
         if (offset) |index| failing.fail_index = start + index;
         const selected = session.specializeClosure(again, expected) catch |err| retry: {
             try std.testing.expectEqual(error.OutOfMemory, err);
             try std.testing.expect(failing.has_induced_failure);
-            try std.testing.expectEqual(sizes, .{ session.storage.values.items.len, session.storage.children.items.len, session.storage.closures.items.len, session.storage.type_mappings.items.len, session.storage.row_mappings.items.len, session.storage.demands.items.len, session.storage.typed_views.count(), session.storage.specialized_closures.count(), session.specializations.validated_calls.count(), session.specializations.plain_nominals.count(), session.retained.specialization_receipts.items.len });
+            try std.testing.expectEqual(sizes, .{ session.storage.values.items.len, session.storage.children.items.len, session.storage.closures.items.len, session.storage.type_mappings.items.len, session.storage.row_mappings.items.len, session.storage.typed_views.count(), session.storage.specialized_closures.count(), session.specializations.validated_calls.count(), session.specializations.plain_nominals.count(), session.retained.specialization_receipts.items.len });
             try std.testing.expectEqual(regions, session.counters.inference_regions);
             try std.testing.expectEqual(@as(usize, 0), session.specializations.canonical_specializations.reused);
             failing.fail_index = std.math.maxInt(usize);
@@ -6233,4 +6015,63 @@ test "selected callable aliases retain handled effects and reject missing provid
     defer checked.deinit(a);
     try std.testing.expectEqual(@as(usize, 1), checked.diagnostics.len);
     try std.testing.expectEqual(checker.Code.const_effect, checked.diagnostics[0].code);
+}
+
+test "global dead-branch references are demanded but direct unselected traps are skipped" {
+    var direct = try lowerPreludeProducer("infixr 25 (<&>) = _fixity_and\ninfix 30 (==) = _fixity_eq\nentry const selected = if false then @u32.div 1 0 else 42\nentry const logical = false and (@u32.div 1 0 == 0)\nconst _fixity_and = func (left: Bool) => return func (right: Bool) => return left and right\nconst _fixity_eq = func left => return func right => return @type.call \"eq\" left right\n", &.{.eq});
+    defer direct.deinit(a);
+    try expectValue(&direct, "selected", .{ .scalar = .u32, .bits = 42 });
+    try expectValue(&direct, "logical", .{ .scalar = .bool, .bits = 0 });
+    var referenced = try lower("const failure = @u32.div 1 0\nentry const selected = if false then failure else 42\nentry const function = func () : U32 => return if false then failure else 42\n");
+    defer referenced.deinit(a);
+    const result = try evaluator.evaluate(a, &.{referenced}, target(&referenced, "selected"), .{});
+    try std.testing.expectEqual(evaluator.Code.integer_divide_by_zero, result.diagnostic.?.code);
+    try std.testing.expectEqual(@as(u32, 1), result.diagnostic.?.unit);
+    var session = try evaluator.Session.init(a, &.{referenced});
+    defer session.deinit();
+    try std.testing.expectError(error.Declined, session.prepare(target(&referenced, "function")));
+    try std.testing.expectEqual(evaluator.Code.integer_divide_by_zero, session.diagnostic.?.code);
+}
+
+test "named binary calls retain producer effect and ordinary operand rows" {
+    var module = try lower(
+        \\infixl 20 (<&>) = choose
+        \\infixl 60 (%%) = combine
+        \\effect Read: Unit -> U32
+        \\effect Touch: U32 -> Unit
+        \\const choose = func (left: Bool) => return func (right: Bool) => return left and right
+        \\const combine = func (left: U32) => return func (right: U32) => return do:
+        \\  use Touch left
+        \\  break @u32.add left right
+        \\entry const receive = func (flag: Bool) => return do:
+        \\  let go = flag <&> false
+        \\  if go:
+        \\    break ()
+        \\  use Touch 7
+        \\  break ()
+        \\entry const selected = func (flag: Bool) => return flag <&> (do:
+        \\  use value <- Read ()
+        \\  break @u32.eq value 42)
+        \\entry const merge = func () => return 20 %% 22
+        \\const reader = @effect.provider Read (func () => return 42)
+        \\const touch = @effect.provider Touch (func value => return ())
+        \\entry const answer = do touch:
+        \\  use receive true
+        \\  break 20 %% 22
+        \\entry const loaded = do reader:
+        \\  break selected true
+        \\entry const unforced = false and @panic "unselected"
+    );
+    defer module.deinit(a);
+    const frozen_nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(frozen_nodes);
+    const frozen_types = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(frozen_types);
+    const frozen_rows = try a.dupe(types.Effects.Row, module.types.effects.rows);
+    defer a.free(frozen_rows);
+    try namedBinaryEffectScenario(a, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, namedBinaryEffectScenario, .{&module});
+    try std.testing.expectEqualDeep(frozen_nodes, module.nodes);
+    try std.testing.expectEqualDeep(frozen_types, module.types.nodes);
+    try std.testing.expectEqualDeep(frozen_rows, module.types.effects.rows);
 }

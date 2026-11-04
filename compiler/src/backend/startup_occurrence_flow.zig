@@ -1,6 +1,6 @@
 //! Private, bounded startup occurrence evidence. This interpreter observes
 //! immutable Core and completed Session values; it never evaluates a Session
-//! binding or changes a demand memo. Unsupported flow declines the whole proof.
+//! binding. Unsupported flow declines the whole proof.
 const std = @import("std");
 const core = @import("../check/core.zig");
 const core_eval = @import("../eval/core_eval.zig");
@@ -18,7 +18,7 @@ pub const Edge = struct {
     unit: u32,
     node: core.Id,
 };
-pub const FactKind = enum { node, body_enter, body_complete, ready_witness, value_retained };
+pub const FactKind = enum { node, body_enter, body_complete, value_retained };
 pub const Fact = struct {
     root: core.BindingRef,
     kind: FactKind,
@@ -40,7 +40,7 @@ pub const Result = struct {
 
 const ValueId = u32;
 const Provenance = enum { inherit, ready, waiting };
-const Kind = enum { scalar, product, record, nominal, array, closure, suspension };
+const Kind = enum { scalar, product, record, nominal, array, closure };
 const Value = struct {
     kind: Kind = .scalar,
     scalar: core_eval.Value = .{ .scalar = .unit, .bits = 0 },
@@ -51,7 +51,6 @@ const Value = struct {
     tag: u32 = 0,
     closure: core_eval.ClosureValue = .{ .unit = 0, .identity = 0, .origin = .anonymous },
     actual: ?core_eval.ValueId = null,
-    cached: ?core_eval.ValueId = null,
     provenance: Provenance = .inherit,
 };
 const Frame = struct {
@@ -85,7 +84,6 @@ const Walk = struct {
     fields: std.ArrayList(u32) = .empty,
     constants: std.AutoHashMapUnmanaged(core.BindingRef, ValueId) = .empty,
     preparing: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty,
-    replay_producer: ?core.BindingRef = null,
     expansions: std.ArrayList(Expansion) = .empty,
     steps: usize = 0,
     depth: usize = 0,
@@ -217,9 +215,6 @@ const Walk = struct {
         const actual = cached orelse return error.Incomplete;
         try self.preparing.put(self.allocator, target, {});
         defer _ = self.preparing.remove(target);
-        const previous_producer = self.replay_producer;
-        self.replay_producer = target;
-        defer self.replay_producer = previous_producer;
         var frame: Frame = .{};
         defer frame.deinit(self.allocator);
         const result = try self.expression(owner, declaration.root, &frame, false, false);
@@ -242,18 +237,16 @@ const Walk = struct {
             .nominal => .nominal,
             .array, .list => .array,
             .closure => .closure,
-            .suspension => .suspension,
             else => return error.Incomplete,
         };
         if (kind != value.kind or info.len != value.children.len) return error.Incomplete;
         if (kind == .scalar) {
             if (!value.known or value.scalar.scalar != info.scalar or value.scalar.bits != info.bits) return error.Incomplete;
-        } else if (kind == .closure or kind == .suspension) {
+        } else if (kind == .closure) {
             const metadata = self.session.closureInfo(actual);
             const source = value.closure;
             if (metadata.origin != source.origin or metadata.unit != source.unit or metadata.identity != source.identity or metadata.applied != source.applied) return error.Incomplete;
             value.closure = metadata;
-            if (kind == .suspension) value.cached = self.session.suspensionCached(actual);
         } else if (kind == .nominal) {
             if (value.nominal.unit != @as(u32, @truncate(info.nominal >> 32)) or value.nominal.decl != @as(u32, @truncate(info.nominal)) or value.tag != info.bits) return error.Incomplete;
         }
@@ -290,7 +283,7 @@ const Walk = struct {
     fn invokeScalarInterface(self: *Walk, function: ValueId, arguments: []const ValueId, site: Site, inherited: bool, observe: bool, retention: bool, expected: ?ScalarInterface) Error!ValueId {
         try self.charge();
         const value = self.values.items[function];
-        if (value.kind != .closure and value.kind != .suspension) return error.Incomplete;
+        if (value.kind != .closure) return error.Incomplete;
         const weak = mode(value, inherited);
         const metadata = value.closure;
         const owner = try self.ownerOf(metadata.unit, null);
@@ -371,25 +364,6 @@ const Walk = struct {
         return self.context(outcome.value, weak);
     }
 
-    fn force(self: *Walk, demand: ValueId, site: Site, observe: bool) Error!ValueId {
-        const value = self.values.items[demand];
-        if (value.kind != .suspension) return error.Incomplete;
-        if (!observe and self.replay_producer != null and value.actual == null) return error.Incomplete;
-        // Source replay recovers the cached result's exact bound value flow;
-        // the old computation is not an occurrence in the ready use region.
-        const ready = value.cached != null;
-        const strong_demand = try self.boundary(demand, .waiting);
-        const result = try self.invoke(strong_demand, &.{0}, site, false, if (ready) false else observe, false);
-        if (value.cached) |actual| {
-            const aligned = try self.alignActual(actual, result);
-            try self.fact(site, .ready_witness, true, value.closure.identity, value.actual, observe);
-            return self.boundary(aligned, .ready);
-        }
-        // Waiting execution resets the region, while a returned operand can
-        // independently own a complete cached-result witness. Preserve only
-        // that explicit boundary; inherited fresh results stay strong.
-        return if (self.values.items[result].provenance == .ready) result else self.boundary(result, .waiting);
-    }
     fn retain(self: *Walk, id: ValueId, site: Site, inherited: bool, observe: bool) Error!void {
         return self.retainScalarInterface(id, site, inherited, observe, null);
     }
@@ -404,10 +378,6 @@ const Walk = struct {
         switch (value.kind) {
             .scalar => {},
             .product, .record, .nominal, .array => for (0..value.children.len) |i| try self.retain(self.children.items[value.children.start + i], site, weak, true),
-            .suspension => {
-                const result = try self.force(id, site, true);
-                try self.retain(result, site, value.cached != null, true);
-            },
             .closure => {
                 if (value.closure.origin == .primitive or value.closure.origin == .constructor) {
                     for (0..value.children.len) |i| try self.retain(self.children.items[value.children.start + i], site, weak, true);
@@ -645,8 +615,8 @@ const Walk = struct {
     fn arrayValues(self: *Walk, operation: core.ArrayOp, arguments: []const ValueId, site: Site, weak: bool, observe: bool) Error!ValueId {
         const arity = @import("collection_ops.zig").arity(operation);
         if (arguments.len != arity) return error.Incomplete;
-        // Aggregate emission retains every waiting computation, even when
-        // length/get does not force an element at runtime.
+        // Aggregate emission retains every member, including those a
+        // length/get operation does not read at runtime.
         for (arguments) |argument| try self.retain(argument, site, weak, observe);
         if (operation == .identity) return arguments[0];
         if (operation != .length and operation != .get and operation != .set) return error.Incomplete;
@@ -852,23 +822,14 @@ const Walk = struct {
                 if (argument != .value) return argument;
                 return .{ .value = try self.invoke(function.value, &.{argument.value}, site, weak, observe, false) };
             },
-            .closure, .suspend_ => {
+            .closure => {
                 if (n.a >= module.closures.len) return error.Incomplete;
                 const template = module.closures[n.a];
                 const captures = try self.allocator.alloc(ValueId, template.captures.len);
                 defer self.allocator.free(captures);
                 for (module.extra[template.captures.start..][0..template.captures.len], 0..) |binding, i| captures[i] = frame.values.get(binding) orelse return error.Incomplete;
-                var result = try self.aggregate(.{ .kind = if (n.tag == .closure) .closure else .suspension, .closure = .{ .unit = self.unitId(owner), .identity = n.a, .origin = .anonymous }, .provenance = if (n.tag == .suspend_) .waiting else .inherit }, captures, &.{});
-                if (n.tag == .suspend_ and !observe) if (self.replay_producer) |producer| {
-                    if (self.session.singleSourceSuspension(producer, self.unitId(owner), id)) |actual| result = try self.alignActual(actual, result);
-                };
-                if (n.tag == .suspend_) try self.retain(result, site, false, observe);
+                const result = try self.aggregate(.{ .kind = .closure, .closure = .{ .unit = self.unitId(owner), .identity = n.a, .origin = .anonymous } }, captures, &.{});
                 return .{ .value = result };
-            },
-            .force => {
-                const operand = try self.expression(owner, n.a, frame, weak, observe);
-                if (operand != .value) return operand;
-                return .{ .value = try self.force(operand.value, site, observe) };
             },
             .block, .suite => {
                 for (module.children(id)) |child| {
@@ -988,7 +949,7 @@ pub fn collect(allocator: Allocator, units: []const core.Module, session: *core_
     if (session.units.ptr != units.ptr or session.units.len != units.len) return error.Incomplete;
     var walk: Walk = .{ .allocator = allocator, .units = units, .session = session };
     defer walk.deinit();
-    _ = try walk.add(.{}); // Exact Unit, also the argument to a demand body.
+    _ = try walk.add(.{}); // Exact Unit.
     for (roots) |root| {
         walk.root = try walk.normalize(null, root);
         const owner = try walk.ownerOf(walk.root.unit, null);

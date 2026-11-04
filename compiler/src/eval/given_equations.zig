@@ -89,14 +89,13 @@ pub const Rewrite = struct {
                 if (a == n.a and b == n.b and row == n.c) return id;
                 return self.store.functionWithEffects(a, b, row);
             },
-            .array, .list, .cursor, .resolver, .demand, .provider => {
+            .array, .list, .cursor, .resolver, .provider => {
                 const a = try self.ty(n.a, memo, depth + 1);
                 var row = n.c;
-                if (n.tag == .demand or n.tag == .provider) row = try self.effectRow(n.c, memo, depth + 1);
+                if (n.tag == .provider) row = try self.effectRow(n.c, memo, depth + 1);
                 if (a == n.a and row == n.c) return id;
                 return switch (n.tag) {
                     .resolver => self.store.resolver(a),
-                    .demand => self.store.demandWithEffects(a, row),
                     .provider => self.store.provider(a, row),
                     else => self.store.sequence(n.tag, a),
                 };

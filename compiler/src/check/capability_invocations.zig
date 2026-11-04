@@ -75,7 +75,7 @@ const Scan = struct {
                 if (n.b == 0) return false;
                 return self.authority(n.b, scoped, depth + 1);
             },
-            .closure, .suspend_ => {
+            .closure => {
                 const closure = self.module.closures[n.a];
                 for (self.module.extra[closure.captures.start..][0..closure.captures.len]) |binding| {
                     const capture = self.module.bindings[binding];
@@ -115,7 +115,7 @@ const Scan = struct {
             const right = try self.noStore(n.c, arity, depth + 1);
             return left and right;
         }
-        if (n.tag != .closure and n.tag != .suspend_) {
+        if (n.tag != .closure) {
             var value: terms.Store = .{};
             defer value.deinit(self.allocator);
             const root = @import("capability_contract_core.zig").callableValue(self.allocator, &value, self.module, id, self.owners) catch |err| {

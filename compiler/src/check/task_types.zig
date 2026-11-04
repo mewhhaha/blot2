@@ -52,7 +52,7 @@ fn mentionsRegion(store: anytype, raw: T.Id, binder: T.Id, remaining: *usize, de
         .scoped => return (node.b == 0 and mentionsRegion(store, node.c, binder, remaining, depth + 1)) or mentionsRegion(store, node.a, binder, remaining, depth + 1),
         .function => return mentionsRegion(store, node.a, binder, remaining, depth + 1) or mentionsRegion(store, node.b, binder, remaining, depth + 1) or rowMentionsRegion(store, node.c, binder, remaining, depth + 1),
         .usage => return mentionsRegion(store, node.a, binder, remaining, depth + 1) or mentionsRegion(store, node.c, binder, remaining, depth + 1),
-        .demand, .provider => return mentionsRegion(store, node.a, binder, remaining, depth + 1) or rowMentionsRegion(store, node.c, binder, remaining, depth + 1),
+        .provider => return mentionsRegion(store, node.a, binder, remaining, depth + 1) or rowMentionsRegion(store, node.c, binder, remaining, depth + 1),
         .state_provider => return mentionsRegion(store, node.a, binder, remaining, depth + 1) or mentionsRegion(store, node.b, binder, remaining, depth + 1) or mentionsRegion(store, node.c, binder, remaining, depth + 1),
         .array, .list, .cursor, .resolver, .forall, .existential => return mentionsRegion(store, node.a, binder, remaining, depth + 1),
         .product => for (store.list(.{ .start = node.a, .len = node.b })) |child| {
@@ -190,7 +190,7 @@ fn readLoanData(store: anytype, raw: T.Id, remaining: *usize, depth: usize) T.Er
     }
 }
 
-pub const CaptureIssue = enum { transfer, capability, demand, host, budget };
+pub const CaptureIssue = enum { transfer, capability, host, budget };
 pub fn captureIssue(store: anytype, root: T.Id, owning: bool, remaining: *usize, depth: usize) T.Error!?CaptureIssue {
     return captureIssueWithRows(store, root, owning, remaining, depth, &.{});
 }
@@ -221,12 +221,6 @@ pub fn captureIssueWithRows(store: anytype, root: T.Id, owning: bool, remaining:
             }
             if (kind == .borrow_mut) return .capability;
             return captureIssueWithRows(store, node.a, kind == .unique or kind == .once, remaining, depth + 1, closed_rows);
-        },
-        .demand => {
-            if (!owning and !try @import("usage_check.zig").affine(store, node.a)) return .demand;
-            const row = store.row(node.c);
-            if (!closed(row, closed_rows) or store.rowLabels(node.c).len != 0) return .host;
-            return captureIssueWithRows(store, node.a, true, remaining, depth + 1, closed_rows);
         },
         .function => {
             const row = store.row(node.c);

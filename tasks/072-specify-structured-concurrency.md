@@ -9,7 +9,7 @@
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 10 / structured
   concurrency; DEMANDS: concurrent forcing boundary. Sources:
   [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md),
-  [Demand evaluation](../docs/compiler/DEMANDS.md).
+  [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -22,8 +22,8 @@ disjoint access and host execution.
 
 The runtime supports synchronous/JSPI guest calls but not general structured
 tasks. Tasks 059/062 provide capability and cleanup contracts;
-[docs/compiler/DEMANDS.md](../docs/compiler/DEMANDS.md) explicitly leaves concurrent
-forcing unspecified.
+[docs/compiler/DEFERRED_WORK.md](../docs/compiler/DEFERRED_WORK.md) explicitly
+leaves concurrent forcing unspecified.
 
 ## Implementation checklist
 

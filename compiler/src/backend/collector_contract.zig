@@ -17,7 +17,7 @@ pub const Certificate = struct {
     assumption: []const u8 = "Call source exports through the ownership ABI; do not mutate raw memory, tables or runtime globals or invoke private helpers.",
 };
 fn helper(a: w.Arena, id: u32) bool {
-    inline for (.{ "allocate_scalar", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement", "recycle", "reset", "root_reserve", "root_pop", "root_open", "root_close", "root_enter", "root_leave", "root_store", "root_force", "root_authority", "cycle_safe", "cycle_collect", "mark_acyclic" }) |name| if (id == @field(a, name)) return true;
+    inline for (.{ "allocate_scalar", "retain", "release", "release_lease", "retire", "free", "store_word", "copy_words", "decrement", "recycle", "reset", "root_reserve", "root_pop", "root_open", "root_close", "root_enter", "root_leave", "root_store", "root_authority", "cycle_safe", "cycle_collect", "mark_acyclic" }) |name| if (id == @field(a, name)) return true;
     return false;
 }
 pub fn analyze(module: *const w.Module, bodies: anytype) std.mem.Allocator.Error!Certificate {

@@ -280,7 +280,7 @@ fn inside(module: *const C.Module, root: C.Id, target: C.Id, remaining: *usize, 
     remaining.* -= 1;
     if (root == target) return true;
     const node = module.node(root);
-    if (node.tag == .closure or node.tag == .suspend_) return inside(module, module.closures[node.a].body, target, remaining, depth + 1);
+    if (node.tag == .closure) return inside(module, module.closures[node.a].body, target, remaining, depth + 1);
     const Visitor = struct {
         module: *const C.Module,
         target: C.Id,
@@ -397,7 +397,7 @@ fn enclosing(module: *const C.Module, raw: T.Id, destination: C.Id, remaining: *
             }
             try enclosing(module, node.a, destination, remaining, depth + 1);
         },
-        .array, .list, .cursor, .demand => try enclosing(module, node.a, destination, remaining, depth + 1),
+        .array, .list, .cursor => try enclosing(module, node.a, destination, remaining, depth + 1),
         .product => for (module.types.list(.{ .start = node.a, .len = node.b })) |child| try enclosing(module, child, destination, remaining, depth + 1),
         .record => for (0..node.b) |index| try enclosing(module, module.types.recordField(node, index).ty, destination, remaining, depth + 1),
         .nominal => for (module.types.nominalArguments(node)) |child| try enclosing(module, child, destination, remaining, depth + 1),
@@ -546,7 +546,7 @@ const Captures = struct {
         try self.step(depth);
         const node = self.module.node(id);
         if (node.tag == .bind) try self.local(node.a);
-        if (node.tag == .closure or node.tag == .suspend_) {
+        if (node.tag == .closure) {
             try self.local(self.module.closures[node.a].parameter.binding);
             return self.definitions(self.module.closures[node.a].body, depth + 1);
         }
@@ -595,7 +595,7 @@ const Captures = struct {
             }
             return;
         }
-        if (node.tag == .closure or node.tag == .suspend_) {
+        if (node.tag == .closure) {
             const closure = self.module.closures[node.a];
             const previous = self.row_count;
             try self.rows(closure.closed_rows);

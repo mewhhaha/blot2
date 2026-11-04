@@ -325,14 +325,14 @@ const build = func (count: U32) => return do:
 Deno.test("Maybe and Result deferred fallbacks skip work on success and run on failure", async () => {
   await compileAndRun(
     `
-entry const some = Maybe.unwrap_or_else (@panic "unused fallback") ($Some 42)
-entry const ok = Result.unwrap_or_else (@panic "unused fallback") ($Ok 42)
-entry const nothing = Maybe.unwrap_or_else 42 $Nothing
-entry const error = Result.unwrap_or_else 42 ($Err false)
+entry const some = Maybe.unwrap_or_else (func () => return @panic "unused fallback") ($Some 42)
+entry const ok = Result.unwrap_or_else (func () => return @panic "unused fallback") ($Ok 42)
+entry const nothing = Maybe.unwrap_or_else (func () => return 42) $Nothing
+entry const error = Result.unwrap_or_else (func () => return 42) ($Err false)
 entry const success = func (host: Unit -> U32 ! {Foreign}) => return
-  Result.unwrap_or_else (host ()) ($Ok 42)
+  Result.unwrap_or_else (func () => return host ()) ($Ok 42)
 entry const failure = func (host: Unit -> U32 ! {Foreign}) => return
-  Result.unwrap_or_else (host ()) ($Err false)
+  Result.unwrap_or_else (func () => return host ()) ($Err false)
 `,
     (guest) => {
       for (const name of ["some", "ok", "nothing", "error"]) {

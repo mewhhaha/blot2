@@ -111,7 +111,7 @@ pub const Key = struct {
     }
 };
 
-pub const Reason = enum(u4) { unsupported, runtime_source, call_read, call_publication, evaluate, specialize, suspension, scalar_domain, changed_input, read_limit };
+pub const Reason = enum(u4) { unsupported, runtime_source, call_read, call_publication, evaluate, specialize, scalar_domain, changed_input, read_limit };
 pub const Recorder = struct {
     rejected: u16 = 0,
     eligible: bool,

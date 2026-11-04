@@ -2,9 +2,10 @@
 
 Specification for tasks 030–035, based on qualified compiler `d9172ec`. This
 specifies replacement behavior; it does not claim implemented RC or removal of
-tracing. The [language guide](../language/guide.md),
-[demand completion contract](DEMANDS.md#completion-and-cancellation) and
-existing [cycle law](../../tests/guest/arena_gc_execution.test.ts) remain authoritative.
+tracing. The [language guide](../language/guide.md) and existing
+[cycle law](../../tests/guest/arena_gc_execution.test.ts) remain authoritative.
+The former demand completion contract is retired; its pinned historical design
+is linked from [deferred work](DEFERRED_WORK.md).
 
 ## Invariants and representation
 
@@ -215,21 +216,19 @@ structure is acyclic under every allowed mutation. Scalar-only allocations
 qualify immediately. List trees qualify from their immutable height-decreasing
 branches and downward descriptor/cache links when their elements are scalar or
 carry an exact element proof. Data records, products, nominal families of any
-unit, Arrays and Lists qualify when every reachable layout is such data:
-values are built from existing values, and an in-place write needs an owner
-that no other value reaches. Publication, updates and helpers must preserve the
-proof; otherwise the whole descriptor remains cycle-capable. Immutable storage
-alone is insufficient: State, closures, demands, providers, cursors and erased
-or unknown shapes remain candidates, as does every container or family that
-can reach one. Never infer the proof from count 1, machine words or a
-uniqueness token.
+unit, Arrays and Lists qualify when every reachable layout is such data: values
+are built from existing values, and an in-place write needs an owner that no
+other value reaches. Publication, updates and helpers must preserve the proof;
+otherwise the whole descriptor remains cycle-capable. Immutable storage alone is
+insufficient: State, closures, demands, providers, cursors and erased or unknown
+shapes remain candidates, as does every container or family that can reach one.
+Never infer the proof from count 1, machine words or a uniqueness token.
 
 Skip candidate enqueue only for a proven `no_cycle` object; ordinary zero-count
 destruction still releases its children. A cycle pass reached from another
 candidate stops at that object: no cycle passes through it, and its unsubtracted
 edges only keep children live. Every actual cycle therefore retains candidate
-discovery.
-The stop-the-mutator pass is:
+discovery. The stop-the-mutator pass is:
 
 1. Drain the candidate list and build the union of their outgoing strong
    closures. Record each member once using header flags and intrusive

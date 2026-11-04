@@ -1,5 +1,4 @@
-import { deepStrictEqual, ok, throws } from "node:assert/strict";
-import { instantiateGuest } from "../../host/guest.ts";
+import { deepStrictEqual, throws } from "node:assert/strict";
 import {
   compileAndRun,
   compileExpectedFailure,
@@ -205,54 +204,26 @@ Deno.test("ragged empty and rejected branches retain complete payload checking",
   );
 });
 
-Deno.test("ragged inert reference copies preserve closures strong memo sharing and cyclic children", async () => {
+Deno.test("ragged inert reference copies preserve closures and shared callback captures", async () => {
   await compileAndRun(
     `
-const delay = func ~value => return value
-entry const memo = func (seed: U32) : U32 => return do:
+const delay = func value => return func () => return value
+entry const captured = func (seed: U32) : U32 => return do:
   let pending = delay (@array.fill 3 seed)
-  let first = @demand pending
+  let first = pending ()
   let values = #[pending, pending]
   let copied = #[value | value <- values, true]
-  break (@demand copied[0])[0] + (@demand copied[1])[2] + first[1]
+  break (copied[0] ())[0] + (copied[1] ())[2] + first[1]
 entry const closures = func (seed: U32) : U32 => return do:
   let callback = func value => return value + seed
   let values = #[callback, callback]
   let copied = @array.from_list [value | value <- values, true]
   break copied[0] 1 + copied[1] 2
-type State a is effect = { get: Unit -> a, set: a -> Unit }
-type Node is data = $End | $Next (Unit -> Node ! {State.get Node})
-const keep = func ~value => return func () => return @demand value
-const get = func (witness: Unit -> a) : a => return State.get ()
-const cycle = func (seed: U32) => return do:
-  let (_, result) = @effect.run State.get State.set $End (func () => return do:
-    let delayed = keep (get (func () => return $End))
-    use State.set ($Next delayed)
-    use first <- delayed ()
-    let values = #[first, first]
-    let copied = @array.from_list [value | value <- values, true]
-    use State.set $End
-    break case copied[1] of
-      $End => @panic "copied cycle disappeared"
-      $Next same => do:
-        use again <- same ()
-        break case again of
-          $End => @panic "copied memo disappeared"
-          $Next _ => seed
-  )
-  break result
-entry const cyclic = func (count: U32) : U32 => return do:
-  let total = 0
-  for i in 0..count:
-    total := self + cycle i
-  break total
 `,
     (guest) => {
-      equal(guest.call("memo", 14), 42);
+      equal(guest.call("captured", 14), 42);
       equal(guest.call("closures", 20), 43);
-      equal(guest.call("cyclic", 64), 63 * 64 / 2);
-      equal(guest.call("cyclic", 512), 511 * 512 / 2);
-      equal(guest.call("memo", 7), 21);
+      equal(guest.call("captured", 7), 21);
     },
   );
 });
@@ -307,167 +278,4 @@ entry const triangle = func (count: U32) => return do:
       equal(saved(), 22);
     },
   );
-});
-
-Deno.test("ragged demanded bounds guards payloads and opaque callbacks decline runtime and staged counting", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-ragged-demand-" });
-  try {
-    const input = `${directory}/main.blot`;
-    const output = `${directory}/main.wasm`;
-    await Deno.writeTextFile(
-      input,
-      `const bounds = func ~(limit: U32) => return do:
-  let values: List U32 = []
-  for x in 0..(@demand limit):
-    values := [...self, x]
-  break @array.from_list values
-const guard = func (input: Array U32) => return func ~(decision: U32) => return #[x | x <- input, @u32.lt 0 (@demand decision)]
-entry const bound = func (host: U32 -> U32 ! {Foreign}) => return bounds (host 3)
-entry const guarded = func (host: U32 -> U32 ! {Foreign}) => return guard #[1,2,3] (host 1)
-entry const empty_guard = func (host: U32 -> U32 ! {Foreign}) => return guard #[] (host 1)
-const payload = func ~(value: U32) => return do:
-  let values: List U32 = []
-  for x in 0..3:
-    use current <- @demand value
-    values := [...self, current]
-  break @array.from_list values
-entry const filled = func (host: U32 -> U32 ! {Foreign}) => return payload (host 3)
-const keep = func ~(value: U32) => return func () => return @demand value
-const dynamic_payload = func (callback: Unit -> U32 ! {Foreign}) => return do:
-  let values: List U32 = []
-  for x in 0..3:
-    use current <- callback ()
-    values := [...self, current]
-  break @array.from_list values
-entry const dynamic = func (host: U32 -> U32 ! {Foreign}) => return dynamic_payload (keep (host 3))
-let first = bounds 3
-entry const staged_bound = func () => return first
-let second = guard #[1,2,3] 1
-entry const staged_guard = func () => return second
-let third = payload 3
-entry const staged_payload = func () => return third
-
-const dynamic_first = func ~(value: U32) => return do:
-  let values: List U32 = []
-  for x in 0..(@demand value):
-    values := [...self, x]
-  break @array.from_list values
-const dynamic_second = func ~(value: U32) => return do:
-  let values: List U32 = []
-  for x in 0..3:
-    if @u32.lt 0 x and @u32.lt x (@demand value):
-      values := [...self, x]
-  break @array.from_list values
-let dynamic_input = #[0,1,2]
-const dynamic_third = func ~(value: U32) => return #[@demand value | x <- dynamic_input, true]
-const invoke = func (next: ~U32 -> Array U32) => return next 3
-entry const opaque_demand = func (host: U32 -> U32 ! {Foreign}) => return do:
-  use choice <- host 0
-  let selected = case choice of
-    0 => dynamic_first
-    1 => dynamic_second
-    _ => dynamic_third
-  break invoke selected
-`,
-    );
-    const result = await new Deno.Command(
-      Deno.args[0] ?? new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
-      {
-        args: [
-          "build",
-          input,
-          output,
-          "--prelude",
-          new URL("../../std/prelude.blot", import.meta.url).pathname,
-        ],
-        stdout: "piped",
-        stderr: "piped",
-      },
-    ).output();
-    const text = new TextDecoder().decode(result.stdout);
-    ok(result.success, text + new TextDecoder().decode(result.stderr));
-    const metrics = text.trim().split("\n").map((line) => JSON.parse(line))
-      .find((item) => item.kind === "compilation");
-    equal(metrics.work_counters.ragged_runtime_regions, 0);
-    equal(metrics.work_counters.ragged_staged_regions, 0);
-    equal(metrics.memory.live_bytes, 0);
-    const guest = await instantiateGuest(await Deno.readFile(output));
-    try {
-      const seen: number[] = [];
-      const host = guest.capability({
-        parameter: "U32",
-        result: "U32",
-        call(value: number) {
-          seen.push(value);
-          return value;
-        },
-      });
-      for (const name of ["bound", "guarded", "filled", "dynamic"]) {
-        seen.length = 0;
-        let expected = [3, 3, 3];
-        let charge = 3;
-        if (name === "bound") expected = [0, 1, 2];
-        if (name === "guarded") {
-          expected = [1, 2, 3];
-          charge = 1;
-        }
-        deepStrictEqual(guest.call(name, host), Uint32Array.from(expected));
-        deepStrictEqual(seen, [charge]);
-      }
-      seen.length = 0;
-      deepStrictEqual(guest.call("empty_guard", host), new Uint32Array());
-      deepStrictEqual(seen, []);
-      seen.length = 0;
-      deepStrictEqual(
-        guest.call("opaque_demand", host),
-        Uint32Array.of(0, 1, 2),
-      );
-      deepStrictEqual(seen, [0]);
-      const selectedSeen: number[] = [];
-      const other = guest.capability({
-        parameter: "U32",
-        result: "U32",
-        call(value: number) {
-          selectedSeen.push(value);
-          return 2;
-        },
-      });
-      seen.length = 0;
-      deepStrictEqual(
-        guest.call("opaque_demand", other),
-        Uint32Array.of(3, 3, 3),
-      );
-      deepStrictEqual(selectedSeen, [0]);
-      const guardSeen: number[] = [];
-      const guardHost = guest.capability({
-        parameter: "U32",
-        result: "U32",
-        call(value: number) {
-          guardSeen.push(value);
-          return 1;
-        },
-      });
-      deepStrictEqual(
-        guest.call("opaque_demand", guardHost),
-        Uint32Array.of(1, 2),
-      );
-      deepStrictEqual(guardSeen, [0]);
-      deepStrictEqual(
-        guest.call("staged_bound", null),
-        Uint32Array.of(0, 1, 2),
-      );
-      deepStrictEqual(
-        guest.call("staged_guard", null),
-        Uint32Array.of(1, 2, 3),
-      );
-      deepStrictEqual(
-        guest.call("staged_payload", null),
-        Uint32Array.of(3, 3, 3),
-      );
-    } finally {
-      guest.dispose();
-    }
-  } finally {
-    await Deno.remove(directory, { recursive: true });
-  }
 });

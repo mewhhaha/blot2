@@ -155,17 +155,6 @@ test "body check cache revokes type generic interface privacy and runtime reads"
     try parity(text, "let seed = 2\nconst sibling = func (value: U32) : U32 => return @u32.add value seed\nentry const run = func (argument: U32) : U32 => return sibling argument\n", 2);
 }
 
-test "body check cache keeps recursive components ordinary and retains demand boundaries" {
-    const recursive = "const first = func (n: U32) : U32 => return if @u32.eq n 0 then 4 else second (@u32.sub n 1)\nconst second = func (n: U32) : U32 => return if @u32.eq n 0 then 5 else first (@u32.sub n 1)\nentry const run = func (n: U32) : U32 => return first n\nconst unrelated = 7\n";
-    var before = try prepare(a, recursive, null);
-    defer before.deinit(a);
-    var retained = try prepare(a, recursive, &before.bodies);
-    defer retained.deinit(a);
-    try std.testing.expect(retained.elaborations >= 2);
-    const demanded = "const force = func ~(x: U32) : U32 => return @demand x\nentry const run = func (n: U32) : U32 => return force n\nconst unrelated = 7\n";
-    try parity(demanded, demanded, 0);
-}
-
 fn cloneScenario(allocator: A, previous: *const cache.Cache) !void {
     var copied = try previous.clone(allocator);
     defer copied.deinit(allocator);
@@ -1251,23 +1240,23 @@ test "body check cache reconstructs transitive forwarded shared requirements thr
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, source, expected.bytes, @as(usize, 1) });
 }
 
-const binary_demand_source =
+const binary_argument_source =
     \\infixl 60 (++) = right
     \\infixl 60 (**) = left
     \\infixl 60 (%%) = both
     \\const seed = 2
-    \\const right = func (value: U32) => return func ~(other: U32) => return @u32.add value (@demand other)
-    \\const left = func ~(value: U32) => return func (other: U32) => return @u32.add (@demand value) other
-    \\const both = func ~(value: U32) => return func ~(other: U32) => return @u32.add (@demand value) (@demand other)
+    \\const right = func (value: U32) => return func (other: U32) => return @u32.add value other
+    \\const left = func (value: U32) => return func (other: U32) => return @u32.add value other
+    \\const both = func (value: U32) => return func (other: U32) => return @u32.add value other
     \\const apply = func (value: U32) => return @u32.add (value ++ seed) (@u32.add (value ** seed) (value %% seed))
     \\entry const run = func (value: U32) => return apply value
 ;
 
-test "body check cache owns both binary demand arguments through unchanged interfaces and OOM" {
-    var before = try prepare(a, binary_demand_source, null);
+test "body check cache owns both binary arguments through unchanged interfaces and OOM" {
+    var before = try prepare(a, binary_argument_source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("apply") != null);
-    const source = try std.mem.replaceOwned(u8, a, binary_demand_source, "const seed = 2", "const seed = 3");
+    const source = try std.mem.replaceOwned(u8, a, binary_argument_source, "const seed = 2", "const seed = 3");
     defer a.free(source);
     var fresh = try prepare(a, source, null);
     defer fresh.deinit(a);
@@ -2272,20 +2261,20 @@ test "body check cache restores mixed nominal Array updates and leaf self identi
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, capturePathUpdates, .{});
 }
 
-const demanded_body_source =
+const callback_body_source =
     \\const seed = 2
-    \\const force = func ~(value: U32) : U32 => return @demand value
+    \\const force = func (value: Unit -> U32) : U32 => return value ()
     \\const twice = func (value: U32) => return do:
-    \\  let delayed = func ~(input: U32) => return @u32.add (@demand input) (@demand input)
-    \\  break delayed (@u32.add value seed)
-    \\entry const run = func (value: U32) => return @u32.add (force value) (twice value)
+    \\  let delayed = func (input: Unit -> U32) => return @u32.add (input ()) (input ())
+    \\  break delayed (func () => return @u32.add value seed)
+    \\entry const run = func (value: U32) => return @u32.add (force (func () => return value)) (twice value)
 ;
-test "body check cache demand call reconstruction owns fresh and replayed suspension metadata through OOM" {
-    var before = try prepare(a, demanded_body_source, null);
+test "body check cache callback reconstruction owns fresh and replayed closure metadata through OOM" {
+    var before = try prepare(a, callback_body_source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("force") != null);
     try std.testing.expect(before.bodies.find("twice") != null);
-    const changed = try std.mem.replaceOwned(u8, a, demanded_body_source, "seed = 2", "seed = 3");
+    const changed = try std.mem.replaceOwned(u8, a, callback_body_source, "seed = 2", "seed = 3");
     defer a.free(changed);
     var fresh = try prepare(a, changed, null);
     defer fresh.deinit(a);
@@ -2446,14 +2435,6 @@ test "body check cache static operation calls reject retargeted imported aliases
     var changed_origin = try importedUserBody(a, 3, @splat(8), false, false, &before.bodies, true);
     defer changed_origin.deinit(a);
     try std.testing.expectEqual(@as(usize, 1), changed_origin.elaborations);
-}
-
-test "body check cache user operation rows traverse demand boundaries" {
-    const source = "effect Read: Unit -> U32\nconst force = func ~(value: U32) => return @demand value\nconst invoke = func (callback: Unit -> U32 ! {Read}) => return force (callback ())\nentry const answer = 42\n";
-    try parity(source, source, 0);
-    const changed = try std.mem.replaceOwned(u8, a, source, "effect Read: Unit -> U32", "effect Read: Bool -> Bool");
-    defer a.free(changed);
-    try parity(source, changed, 1);
 }
 
 test "body check cache user operation rows reject unknown ambiguous and malformed catalog authority" {
@@ -2871,4 +2852,21 @@ test "body check cache transports actual task view binding versions through relo
     var inserted_expected = try compile(a, &fresh_inserted);
     defer inserted_expected.deinit(a);
     try compare(a, &before.bodies, inserted, inserted_expected.bytes, 2);
+}
+
+test "body check cache keeps recursive components ordinary" {
+    const recursive = "const first = func (n: U32) : U32 => return if @u32.eq n 0 then 4 else second (@u32.sub n 1)\nconst second = func (n: U32) : U32 => return if @u32.eq n 0 then 5 else first (@u32.sub n 1)\nentry const run = func (n: U32) : U32 => return first n\nconst unrelated = 7\n";
+    var before = try prepare(a, recursive, null);
+    defer before.deinit(a);
+    var retained = try prepare(a, recursive, &before.bodies);
+    defer retained.deinit(a);
+    try std.testing.expect(retained.elaborations >= 2);
+}
+
+test "body check cache user operation rows traverse callback boundaries" {
+    const source = "effect Read: Unit -> U32\nconst force = func value => return value ()\nconst invoke = func (callback: Unit -> U32 ! {Read}) => return force callback\nentry const answer = 42\n";
+    try parity(source, source, 0);
+    const changed = try std.mem.replaceOwned(u8, a, source, "effect Read: Unit -> U32", "effect Read: Bool -> Bool");
+    defer a.free(changed);
+    try parity(source, changed, 1);
 }

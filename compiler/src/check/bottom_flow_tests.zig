@@ -69,8 +69,6 @@ const cases = [_]Case{
     .{ .name = "guard-call-generate-one-body", .source = "type Maybe a is data= $Some a| $None\nentry const answer=func(flag:Bool)=> return do:\n  let $Some value=if flag then $Some 42 else $None else:\n    let stop=@array.generate 1 (func(index:U32):U32=> return @panic \"stop\")\n  break value\n", .code = .guard_fallthrough },
     .{ .name = "guard-call-generate-zero-callee", .source = "type Maybe a is data= $Some a| $None\nentry const answer=func(flag:Bool)=> return do:\n  let $Some value=if flag then $Some 42 else $None else:\n    let stop=@array.generate 0 (@panic \"stop\")\n  break value\n", .code = null },
     .{ .name = "guard-call-generate-count", .source = "type Maybe a is data= $Some a| $None\nentry const answer=func(flag:Bool)=> return do:\n  let $Some value=if flag then $Some 42 else $None else:\n    let stop=@array.generate (@panic \"stop\") (func(index:U32):U32=> return index)\n  break value\n", .code = null },
-    .{ .name = "guard-call-demand-ignore", .source = "type Maybe a is data= $Some a| $None\nconst ignore=func ~(value:U32)=> return 42\nentry const answer=func(flag:Bool)=> return do:\n  let $Some value=if flag then $Some 42 else $None else:\n    let stop=ignore (@panic \"stop\")\n  break value\n", .code = .guard_fallthrough },
-    .{ .name = "guard-call-demand-force", .source = "type Maybe a is data= $Some a| $None\nconst force=func ~(value:U32)=> return @demand value\nentry const answer=func(flag:Bool)=> return do:\n  let $Some value=if flag then $Some 42 else $None else:\n    let stop=force (@panic \"stop\")\n  break value\n", .code = .guard_fallthrough },
     .{ .name = "bound-panic-closure-is-value", .source = "entry const answer=func()=> return do:\n  let stop=func():U32=> return @panic \"stop\"\n  break 42\n", .code = null },
     .{ .name = "provider-aggregate", .source = "effect Read:Unit->U32\nconst provider=@effect.provider Read (func()=> return 42)\nentry const answer:Bool->U32=func flag=> return do provider:\n  let stop=(@panic \"stop\",0)\n  break 42\n", .code = null },
     .{ .name = "provider-rebind", .source = "effect Read:Unit->U32\nconst provider=@effect.provider Read (func()=> return 42)\nentry const answer:Bool->U32=func flag=> return do provider:\n  let value=42\n  if flag:\n    value:=@panic \"stop\"\n  break value\n", .code = null },
@@ -101,7 +99,7 @@ const cases = [_]Case{
     .{ .name = "generic-bottom-curried", .source = "const stop=func value=> return func next=> return @panic \"generic-body\"\nentry const answer:Unit->F32=func()=> return stop 1 2\n", .code = null },
     .{ .name = "generic-bottom-captured", .source = "const factory=func value=> return func()=> return do:\n  let captured=value\n  @panic \"generic-body\"\nconst stop=factory 41\nentry const answer:Unit->F32=func()=> return stop ()\n", .code = null },
     .{ .name = "generic-bottom-higher-order", .source = "const stop=func()=> return @panic \"generic-body\"\nconst invoke=func callback=> return callback ()\nentry const answer:Unit->F32=func()=> return invoke stop\n", .code = null },
-    .{ .name = "generic-bottom-demanded", .source = "const stop=func ~(value:U32)=> return @panic \"generic-body\"\nentry const answer:Unit->F32=func()=> return stop 1\n", .code = null },
+    .{ .name = "generic-bottom-callback", .source = "const stop=func (value:Unit->U32)=> return @panic \"generic-body\"\nentry const answer:Unit->F32=func()=> return stop (func()=> return 1)\n", .code = null },
     .{ .name = "generic-bottom-distinct-uses", .source = "const stop=func()=> return @panic \"generic-body\"\nentry const answer:Bool->F32=func flag=> return if flag then stop () else 1.5\nentry const integer:Unit->U32=func()=> return stop ()\nentry const array:Unit->Array U32=func()=> return stop ()\n", .code = null },
     .{ .name = "explicit-bottom-f32", .source = "const stop:Unit->F32=func()=> return @panic \"typed-body\"\nentry const answer:Unit->F32=func()=> return stop ()\n", .code = null },
     .{ .name = "never-callee-keeps-later-arg", .source = "entry const answer:Unit->U32=func()=> return do:\n  let value=(@panic \"first-body\") (@panic \"later-arg\")\n  break 42\n", .code = null },
@@ -178,7 +176,7 @@ fn emit(allocator: std.mem.Allocator, module: *const core.Module) !void {
 }
 test "eager bottom flow keeps every later type effect annotation and qualified requirement" {
     for (cases) |case| try checking(a, case);
-    for ([_][]const u8{ "guard-product-first", "guard-array-last", "rebind-type-change", "monad-rebind", "provider-rebind", "call-scalar-later-invalid", "aggregate-prefix-later-type-error", "explicit-annotation-after-bottom", "guard-call-demand-ignore", "guard-call-generate-zero-body" }) |name|
+    for ([_][]const u8{ "guard-product-first", "guard-array-last", "rebind-type-change", "monad-rebind", "provider-rebind", "call-scalar-later-invalid", "aggregate-prefix-later-type-error", "explicit-annotation-after-bottom", "guard-call-generate-zero-body" }) |name|
         try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checking, .{named(name)});
 }
 test "Never applications retain owned arguments and exact result types through every failed Core publication" {

@@ -2,7 +2,6 @@
 //! A backedge cannot replace an owner or widen a borrow's possible roots: the
 //! body was checked using the incoming root set, not a later iteration's set.
 pub fn fixedCarry(value: anytype) bool {
-    if (value.demand != null) return false;
     switch (value.tag) {
         .callable => return false,
         .array => if (value.root == null) return false,

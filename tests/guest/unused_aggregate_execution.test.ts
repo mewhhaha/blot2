@@ -37,7 +37,7 @@ for (const asynchronous of [false, true]) {
       `type Count value is data = $Count value
 const witness = func () : Count U32 => return @panic "witness ran"
 const identity = func value => return value
-const keep = func ~value => return func () => return @demand value
+const keep = func value => return value
 const mark = func (digit: U32) => return do:
   use previous <- @state.get witness
   let $Count old = previous
@@ -45,7 +45,7 @@ const mark = func (digit: U32) => return do:
   break @u32.to_f32 digit
 entry const answer = func () => return do:
   let ($Count count, _) = @state.run ($Count 0) (func () => return do:
-    let delayed = keep (mark 7)
+    let delayed = keep (func () => return mark 7)
     use ignored <- (identity, (mark 1, #[mark 2, mark 3], #[mark 4, mark 5, mark 6], delayed (), @array.fill 2 (mark 8), func () => return @panic "unused body ran"))
     break ()
   )

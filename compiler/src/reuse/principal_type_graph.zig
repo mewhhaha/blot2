@@ -426,7 +426,6 @@ fn Copier(comptime Source: type, comptime frozen: bool) type {
                 .scoped => try self.destination.scoped(try self.ty(node.a, depth + 1), .{ .unit = node.b, .decl = if (node.b == 0) try self.ty(node.c, depth + 1) else node.c }),
                 .function => try self.destination.functionWithEffects(try self.ty(node.a, depth + 1), try self.ty(node.b, depth + 1), try self.row(node.c, depth + 1)),
                 .array, .list, .cursor => try self.destination.sequence(node.tag, try self.ty(node.a, depth + 1)),
-                .demand => try self.destination.demandWithEffects(try self.ty(node.a, depth + 1), try self.row(node.c, depth + 1)),
                 .provider => try self.destination.provider(try self.ty(node.a, depth + 1), try self.row(node.c, depth + 1)),
                 .resolver => try self.destination.resolver(try self.ty(node.a, depth + 1)),
                 .state_provider => try self.destination.stateProvider(try self.ty(node.a, depth + 1), try self.ty(node.b, depth + 1), try self.ty(node.c, depth + 1)),

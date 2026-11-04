@@ -322,30 +322,6 @@ entry const bad = func () => return do:
   );
 });
 
-Deno.test("local scalar demands memoize once on either branch and preserve short circuiting", async () => {
-  await compileAndRun(
-    `
-const calls: GrowArray U32 = #[0]
-const bump = func () => return do:
-  let changed = @storage.write (&calls[0]) (calls[0] + 1)
-  return 42
-const twice = func ~(value: U32) -> (flag: Bool) => return do:
-  let first = if flag then @demand value else 0
-  return first + @demand value
-entry const answer = func (flag: Bool): Array U32 => return do:
-  let guarded = (false and (@panic "unreachable right")) or (true or (@panic "unreachable right"))
-  let result = twice (bump ()) flag
-  return #[result, calls[0], if guarded then 1 else 0]
-`,
-    (guest) => {
-      assert.deepEqual(
-        guest.call("answer", false),
-        new Uint32Array([42, 1, 1]),
-      );
-      assert.deepEqual(guest.call("answer", true), new Uint32Array([84, 2, 1]));
-    },
-  );
-});
 
 Deno.test("local optional owners retain selected descriptors across branches and calls", async () => {
   await compileAndRun(

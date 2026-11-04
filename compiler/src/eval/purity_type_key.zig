@@ -166,22 +166,7 @@ pub const Context = struct {
                 return std.mem.concat(self.allocator, u8, &.{ "p", key });
             },
             .function => return self.functionKey(node.a, node.b, node.c, fuel),
-            .demand => {
-                // Native Demand owns payload+row; frozen AppliedTy owns one
-                // Unit callback. Encode its exact logical source representation.
-                if (rest == 0) return error.SpecializationLimit;
-                const computation = try self.functionKey(T.unit, node.a, node.c, rest - 1);
-                defer self.allocator.free(computation);
-                const argument = try self.pack(computation);
-                defer self.allocator.free(argument);
-                const arguments_key = try self.pack(argument);
-                defer self.allocator.free(arguments_key);
-                const identity = try self.fixed("blot:compiler", "Demand");
-                defer identity.deinit(self.allocator);
-                const nominal_key = try self.nominal(identity);
-                defer self.allocator.free(nominal_key);
-                return std.mem.concat(self.allocator, u8, &.{ "n", nominal_key, arguments_key });
-            },
+
             else => return error.AmbiguousTypeKey,
         }
     }

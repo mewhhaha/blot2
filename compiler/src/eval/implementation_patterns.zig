@@ -32,13 +32,13 @@ fn chargeGraph(store: *T.Store, root: T.Id) T.Error!void {
             continue;
         }
         const value = store.node(store.head(work.id, 0));
-        if (value.tag == .function or value.tag == .demand or value.tag == .provider) try pending.append(store.allocator, .{ .id = value.c, .row = true, .depth = work.depth + 1 });
+        if (value.tag == .function or value.tag == .provider) try pending.append(store.allocator, .{ .id = value.c, .row = true, .depth = work.depth + 1 });
         switch (value.tag) {
             .function => {
                 try pending.append(store.allocator, .{ .id = value.a, .depth = work.depth + 1 });
                 try pending.append(store.allocator, .{ .id = value.b, .depth = work.depth + 1 });
             },
-            .array, .list, .cursor, .resolver, .provider, .demand => try pending.append(store.allocator, .{ .id = value.a, .depth = work.depth + 1 }),
+            .array, .list, .cursor, .resolver, .provider => try pending.append(store.allocator, .{ .id = value.a, .depth = work.depth + 1 }),
             .state_provider => for ([_]T.Id{ value.a, value.b, value.c }) |child| try pending.append(store.allocator, .{ .id = child, .depth = work.depth + 1 }),
             .product => for (store.list(.{ .start = value.a, .len = value.b })) |child| try pending.append(store.allocator, .{ .id = child, .depth = work.depth + 1 }),
             .record => for (0..value.b) |index| try pending.append(store.allocator, .{ .id = store.recordField(value, index).ty, .depth = work.depth + 1 }),

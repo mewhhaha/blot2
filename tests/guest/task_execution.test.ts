@@ -109,10 +109,10 @@ entry const discard_owner = func (cleanup: cleanup (unique U32 -> Unit ! {Foreig
   break @resource.scope (func () => return 5) cleanup (func loan => return @task.scope (func group => return do:
     let child = @task.spawn group (func () => return moved)
     break 42))
-const demand_child = func ~(value: unique U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return @demand value)))
-entry const demand_owner = func (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => return do:
+const owned_child = func (value: unique U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return value)))
+entry const callback_owner = func (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => return do:
   use owner <- @resource.acquire (func () => return 9) cleanup
-  let result = demand_child owner
+  let result = owned_child owner
   break @usage.borrow result (func loan => return @usage.read loan)
 entry const named_owner = func (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => return do:
   use owner <- @resource.acquire (func () => return 9) cleanup
@@ -202,7 +202,7 @@ Deno.test("structured source tasks execute sync JSPI affine join cancel and nest
             "returned",
             "cancel_owner",
             "lexical_cleanup",
-            "demand_owner",
+            "callback_owner",
             "named_owner",
           ]
         ) {
@@ -223,13 +223,13 @@ Deno.test("structured source tasks execute sync JSPI affine join cancel and nest
           assert.equal(
             result,
             name === "transfer" || name === "returned" ||
-              name === "demand_owner" || name === "named_owner"
+              name === "callback_owner" || name === "named_owner"
               ? 9
               : 42,
           );
           assert.deepEqual(
             cleanups,
-            name === "demand_owner" || name === "named_owner"
+            name === "callback_owner" || name === "named_owner"
               ? [9]
               : name === "returned"
               ? [5, 9]

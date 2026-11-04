@@ -469,7 +469,7 @@ pub fn deriveInputFunctionWithFunctions(allocator: A, store: *terms.Store, tree:
             if (err == error.Unavailable) return null;
             return @errorCast(err);
         };
-        if (lambda.tag != .lambda or (tree.parameter(lambda.a).name == 0 and !tree.parameter(lambda.a).is_unit) or tree.parameter(lambda.a).demanded) {
+        if (lambda.tag != .lambda or (tree.parameter(lambda.a).name == 0 and !tree.parameter(lambda.a).is_unit)) {
             store.rollback(checkpoint);
             return null;
         }

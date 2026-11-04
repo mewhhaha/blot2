@@ -138,34 +138,6 @@ test "immutable lifetime State installations own exact store lifetimes and reder
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stateLaw, .{});
 }
 
-fn graphReaches(report: *const lifetime.Report, from: lifetime.Id, target: lifetime.Id) bool {
-    var seen: [4096]bool = @splat(false);
-    var pending: [4096]lifetime.Id = undefined;
-    var count: usize = 1;
-    pending[0] = from;
-    seen[from] = true;
-    while (count != 0) {
-        count -= 1;
-        const current = pending[count];
-        if (current == target) return true;
-        const node = report.nodes[current];
-        if ((node.kind == .memo or node.kind == .cell) and !seen[node.contents]) {
-            seen[node.contents] = true;
-            pending[count] = node.contents;
-            count += 1;
-        }
-        var cursor = node.first_edge;
-        while (cursor) |index| {
-            const edge = report.edges[index];
-            cursor = edge.next;
-            if (edge.kind == .store or edge.kind == .call or seen[edge.to]) continue;
-            seen[edge.to] = true;
-            pending[count] = edge.to;
-            count += 1;
-        }
-    }
-    return false;
-}
 fn cycleLaw(allocator: std.mem.Allocator) !void {
     const source = @import("fixtures").source("provider-fixtures/lifetime-cost.blot");
     var module = try lower(allocator, source);
@@ -179,24 +151,15 @@ fn cycleLaw(allocator: std.mem.Allocator) !void {
     var result = try lifetime.analyze(allocator, &module, &.{}, .{ .binding = boundary });
     defer result.deinit(allocator);
     try std.testing.expect(result.complete);
-    var memo: lifetime.Id = 0;
-    var memos: usize = 0;
+    var callables: usize = 0;
     var cells: usize = 0;
-    for (result.nodes, 0..) |node, index| {
+    for (result.nodes) |node| {
         try std.testing.expect(node.context < result.invocations.len);
-        if (node.kind == .memo and node.ready and node.contents != 0) {
-            memo = @intCast(index);
-            memos += 1;
-        }
+        if (node.kind == .callable) callables += 1;
         if (node.kind == .cell) cells += 1;
     }
-    try std.testing.expectEqual(1, memos);
+    try std.testing.expect(callables != 0);
     try std.testing.expectEqual(1, cells);
-    var members: usize = 0;
-    for (result.nodes, 0..) |_, id| if (graphReaches(&result, memo, @intCast(id)) and graphReaches(&result, @intCast(id), memo)) {
-        members += 1;
-    };
-    try std.testing.expectEqual(3, members);
     for (result.invocations[1..], 1..) |invocation, index| {
         try std.testing.expect(invocation.parent.? < index);
         const callable = result.nodes[invocation.callable];
@@ -227,77 +190,12 @@ fn cycleLaw(allocator: std.mem.Allocator) !void {
     };
     try std.testing.expect(changed);
 }
-test "immutable lifetime cycle report preserves constructor selection Memo cache and installed State edges through OOM" {
+test "immutable lifetime report preserves constructor selection callables and installed State edges through OOM" {
     try cycleLaw(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, cycleLaw, .{});
 }
 
-const memo_source = header ++
-    \\const delay = func ~value => return value
-    \\entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
-    \\  let ignored = s
-    \\  let pending = delay (do:
-    \\    let discarded = 0
-    \\    break 42
-    \\  )
-    \\  use finished <- @demand pending
-    \\  break 42
-    \\)
-;
-fn memoCaptureLaw(allocator: std.mem.Allocator) !void {
-    var module = try lower(allocator, memo_source);
-    defer module.deinit(allocator);
-    var positive = try lifetime.analyze(allocator, &module, &.{}, .{ .binding = try entry(&module) });
-    defer positive.deinit(allocator);
-    var receiver: C.Id = 0;
-    var scope_body: C.Id = 0;
-    for (module.nodes) |node| if (node.tag == .effect_scope) {
-        const callback = module.closures[module.node(node.a).a];
-        scope_body = callback.body;
-        for (module.nodes, 0..) |candidate, id| if (candidate.tag == .reference and module.reference(@intCast(id)).binding == callback.parameter.binding) {
-            receiver = @intCast(id);
-            break;
-        };
-    };
-    var memo_body: C.Id = 0;
-    var memo_binding: u32 = 0;
-    for (module.nodes) |node| if (node.tag == .suspend_) {
-        memo_body = module.closures[node.a].body;
-    };
-    for (module.nodes) |node| if (node.tag == .force) {
-        memo_binding = module.reference(node.a).binding;
-    };
-    try std.testing.expect(receiver != 0 and memo_body != 0 and memo_binding != 0);
-    var memo_reference: C.Id = 0;
-    for (module.nodes, 0..) |node, id| if (node.tag == .reference and module.reference(@intCast(id)).binding == memo_binding) {
-        memo_reference = @intCast(id);
-    };
-    var changed_capture = false;
-    for (module.extra[module.node(memo_body).a..][0..module.node(memo_body).b]) |child| {
-        if (module.node(child).tag != .bind) continue;
-        module.nodes[child].b = receiver;
-        const binding = module.nodes[child].a;
-        module.bindings[binding].initializer = receiver;
-        module.bindings[binding].ty = module.node(receiver).ty;
-        module.bindings[binding].scheme.root = module.node(receiver).ty;
-        changed_capture = true;
-        break;
-    }
-    var changed_return = false;
-    for (module.extra[module.node(scope_body).a..][0..module.node(scope_body).b]) |child| {
-        if (module.node(child).tag != .return_) continue;
-        module.nodes[child].a = memo_reference;
-        changed_return = true;
-    }
-    try std.testing.expect(changed_capture and changed_return);
-    try rejected(allocator, &module);
-}
-test "immutable lifetime forced scalar Memo retains its actual producer captures through OOM" {
-    try memoCaptureLaw(a);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, memoCaptureLaw, .{});
-}
-
-const control_header = header ++ box ++ "const delay = func ~value => return value\n";
+const control_header = header ++ box;
 const logical_source = control_header ++
     \\entry const answer = func (flag: Bool) => return @effect.scope (func (s: State U32) => return do:
     \\  let ignored = s
@@ -313,23 +211,6 @@ const logical_source = control_header ++
     \\    use later <- Box.get ()
     \\    break later ()
     \\  let saved = stored
-    \\  break result
-    \\)
-;
-const memo_branch_source = control_header ++
-    \\entry const answer = func (flag: Bool) => return @effect.scope (func (s: State U32) => return do:
-    \\  let ignored = s
-    \\  let (stored, result) = do (@effect.state Box.get Box.set (func () => return 0)):
-    \\    let captured = func () => return do:
-    \\      let discarded = 0
-    \\      break 42
-    \\    let pending = delay (do:
-    \\      use Box.set captured
-    \\      break true
-    \\    )
-    \\    use if flag then @demand pending else do (@effect.provider Box.set (func callback => return ())):
-    \\      break @demand pending
-    \\    break 42
     \\  break result
     \\)
 ;
@@ -391,14 +272,8 @@ fn controlLaw(allocator: std.mem.Allocator) !void {
     }
     try std.testing.expect(changed_return);
     try rejected(allocator, &logical);
-    var memo = try lower(allocator, memo_branch_source);
-    defer memo.deinit(allocator);
-    var baseline = try lifetime.analyze(allocator, &memo, &.{}, .{ .binding = try entry(&memo) });
-    defer baseline.deinit(allocator);
-    _ = try addActualCapture(&memo);
-    try rejected(allocator, &memo);
 }
-test "immutable lifetime short circuit and branch Memo state cannot erase alternate storage sinks through OOM" {
+test "immutable lifetime short circuit cannot erase alternate storage sinks through OOM" {
     try controlLaw(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, controlLaw, .{});
 }
@@ -794,11 +669,11 @@ fn deferredMigrateCase(allocator: std.mem.Allocator, source: []const u8) !void {
 
 fn deferredMigrateLaw(allocator: std.mem.Allocator) !void {
     try deferredMigrateCase(allocator, deferred_migrate_source);
-    const demand_body = try std.mem.replaceOwned(u8, allocator, deferred_migrate_source, "@f32.mul values[index] 2.0", "keep (@f32.mul values[index] 2.0)");
-    defer allocator.free(demand_body);
-    const demanded = try allocator.print("const keep = func ~value => return @demand value\n{s}", .{demand_body});
-    defer allocator.free(demanded);
-    try deferredMigrateCase(allocator, demanded);
+    const callback_body = try std.mem.replaceOwned(u8, allocator, deferred_migrate_source, "@f32.mul values[index] 2.0", "keep (func () => return @f32.mul values[index] 2.0)");
+    defer allocator.free(callback_body);
+    const callback = try allocator.print("const keep = func value => return value ()\n{s}", .{callback_body});
+    defer allocator.free(callback);
+    try deferredMigrateCase(allocator, callback);
     const associated = try std.mem.replaceOwned(u8, allocator, deferred_migrate_source, "@f32.mul values[index] 2.0", "@type.call \"mul\" values[index] 2.0");
     defer allocator.free(associated);
     try deferredMigrateCase(allocator, associated);

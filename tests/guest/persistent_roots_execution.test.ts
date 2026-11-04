@@ -224,18 +224,18 @@ entry const trapped = func (end: U32) => return do:
   }
 });
 
-Deno.test("startup reference globals retain captures and ready demand results until teardown", async () => {
+Deno.test("startup reference globals retain captures and captured callback results until teardown", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-const delay = func ~value => return value
+const delay = func value => return func () => return value
 let values = @array.fill 3 40
 let saved = (func (capture: Array U32) => return func (index: U32) => return capture[index]) values
 let pending = delay (@array.fill 3 (saved 0))
 let alias = pending
 entry const run = func (value: U32) => return do:
-  let before = @demand pending
-  let after = @demand alias
+  let before = pending ()
+  let after = alias ()
   let changed = @array.set values 0 value
   break saved 2 + before[1] + after[2] + changed[0]
 entry const pressure = func (count: U32) => return do:
@@ -294,62 +294,6 @@ entry const pressure = func (count: U32) => return do:
   }
 });
 
-Deno.test("source State preserves the old graph held by a strong ready demand memo", async () => {
-  const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const source = `
-type Cell value is data = $Cell value
-const delay = func ~value => return value
-entry const run = func (value: U32) => return do:
-  let (_, result) = @state.run ($Cell #[value]) (func () => return do:
-    let pending = delay (do:
-      use cell <- @state.get (func () => return $Cell #[0])
-      let $Cell values = cell
-      break values)
-    use before <- @demand pending
-    use @state.set ($Cell #[value + 100])
-    use after <- @demand pending
-    break before[0] + after[0])
-  break result
-`;
-  try {
-    for (const tier of ["development", "optimized"] as const) {
-      const compiler = await createZigProjectCompiler({
-        executable,
-        entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
-        cacheDirectory: false,
-        codegenTier: tier,
-      });
-      try {
-        const result = await compiler.build({ sources: { [entry]: source } });
-        assert(result.success, JSON.stringify(result));
-        const module = new WebAssembly.Module(result.bytes);
-        assert.deepEqual([
-          ...new Uint8Array(
-            WebAssembly.Module.customSections(module, "blot:ownership")[0],
-          ),
-        ], [2, 2, 0]);
-        const raw = new WebAssembly.Instance(module).exports;
-        for (const value of [41, 7, 41]) {
-          assert.equal((raw.run as CallableFunction)(value), value * 2);
-          assert.equal((raw["blot:rc_roots"] as WebAssembly.Global).value, 0);
-          assert.equal((raw["blot:rc_leases"] as WebAssembly.Global).value, 0);
-        }
-        const guest = await instantiateGuest(module);
-        try {
-          assert.equal(guest.call("run", 41), 82);
-        } finally {
-          guest.dispose();
-        }
-      } finally {
-        await compiler.dispose();
-      }
-    }
-  } finally {
-    await Deno.remove(directory, { recursive: true });
-  }
-});
 
 Deno.test("public scalar Arrays own marshalled inputs and copy results before invocation leave", async () => {
   const directory = await Deno.makeTempDir();
@@ -440,17 +384,17 @@ entry const trapped = func (values: Array U32) => return values[values[0]]
   }
 });
 
-Deno.test("static demands and List caches publish exact persistent reference roots", async () => {
+Deno.test("static callbacks and List caches publish exact persistent reference roots", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-const delay = func ~value => return value
+const delay = func value => return func () => return value
 const pending = delay (@array.fill 3 40)
 const alias = pending
 const values = [#[10, 11], #[20, 21], #[30, 31]]
 entry const run = func (index: U32) => return do:
-  let before = @demand pending
-  let after = @demand alias
+  let before = pending ()
+  let after = alias ()
   let total = 0
   for selected in values:
     total := self + selected[1]
@@ -508,11 +452,11 @@ entry const pressure = func (count: U32) => return do:
   }
 });
 
-Deno.test("persistent records in Lists and Arrays own closure captures and shared demand results", async () => {
+Deno.test("persistent records in Lists and Arrays own closure captures and shared callback captures", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-const delay = func ~value => return value
+const delay = func value => return func () => return value
 const build = func () => return do:
   let children = #[40, 41]
   let pending = delay children
@@ -525,8 +469,8 @@ entry const run = func (value: U32) => return do:
   values[0] := {pending: delay #[value, value + 1], read: func (index: U32) => return value + index}
   let old = before[0]
   let changed = values[0]
-  let cached = @demand old.pending
-  let current = @demand changed.pending
+  let cached = old.pending ()
+  let current = changed.pending ()
   break cached[1] + current[1] + old.read 1 + changed.read 1
 `;
   try {

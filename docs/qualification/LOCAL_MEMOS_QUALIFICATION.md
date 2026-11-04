@@ -32,7 +32,9 @@ completion precedes the ready-bit store.
 - Local-memo binary:
   `e6a1cd2129b7ee8fc492ed86f2e071e751b4170804c4dcb60942a1cc2d11ca85` (37,738,168
   bytes).
-- Reproduction: [bench_local_memos.ts](../../benchmarks/tools/bench_local_memos.ts). Run
+- Historical reproduction tool:
+  [bench_local_memos.ts at 742f1cae](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/benchmarks/tools/bench_local_memos.ts).
+  Its original invocation was
   `taskset -c 6 deno run -A scripts/bench_local_memos.ts BASELINE CANDIDATE OUTPUT`.
 
 Raw inputs, all distributions, source/binary/script SHA-256 pins and logs are

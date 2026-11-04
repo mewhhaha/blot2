@@ -79,7 +79,7 @@ const Builder = struct {
             .type_name => return terms.typeName(self.pool.get(node.a)) != null,
             .type_apply, .type_effect => return try self.contains(node.a, depth + 1) or try self.contains(node.b, depth + 1),
             .type_function => return try self.contains(node.a, depth + 1) or try self.contains(node.b, depth + 1) or try self.contains(node.c, depth + 1),
-            .group, .type_demand => return self.contains(node.a, depth + 1),
+            .group => return self.contains(node.a, depth + 1),
             .type_binder, .type_field => return self.contains(node.b, depth + 1),
             .type_array, .type_product, .type_record, .effect_row => {
                 for (self.tree.children(id)) |child| if (try self.contains(child, depth + 1)) return true;

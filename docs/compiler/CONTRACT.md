@@ -108,9 +108,9 @@ A recursive function reserves its complete direct i32 header before constructing
 its body. Semantic input-owner aliases remain in its identity; physical word
 aliases, caller constants, local IDs and empty-owner hints do not. Recursive
 headers never narrow parameters or use addressed/packed transport. A private
-provisional header resolves only its own direct self edge; complete body checking
-and reserved publication capacity precede cache completion. Failed construction
-rolls back dependent functions, plans and committed counters.
+provisional header resolves only its own direct self edge; complete body
+checking and reserved publication capacity precede cache completion. Failed
+construction rolls back dependent functions, plans and committed counters.
 
 Recursive access uses a finite invariant footprint per canonical plain owner,
 separate from ordinary ordered writer events. Existing accessed rows must be
@@ -125,11 +125,11 @@ ordinary cycles are allowed only when disjoint from the bank root and all its
 extracted helpers. Any reachable indirect call or cyclic component containing a
 bank member rejects publication; recursion alone does not grant bank reentry.
 
-Machine copy coalescing retains a dominating i32 snapshot through nested
-blocks and branches. Append-only scope identities end arm-local visibility at
+Machine copy coalescing retains a dominating i32 snapshot through nested blocks
+and branches. Append-only scope identities end arm-local visibility at
 `else`/`end`; source write versions never roll back. Loops and jumps remain
-barriers for mutable sources. A source with no writes, or whose unique write
-has already occurred outside every active loop, stays immutable across those
+barriers for mutable sources. A source with no writes, or whose unique write has
+already occurred outside every active loop, stays immutable across those
 barriers. Logical helpers inherit their caller's loop depth and scopes. Helper
 returns and branches to their implicit function label decline the proof; traps
 and root returns have no continuing path. Every original read must still be
@@ -154,21 +154,22 @@ Detached output and all local/instruction capacity are reserved before replacing
 the canonical loop suffix; pending outline or semantic coordinates reject it.
 
 A fixed range loop with one U32 carry may compose one through eight pure bit
-rounds into an exact affine transform. Normal source checking, ownership,
-escape and backedge validation finish first. The bounded machine interpreter
-admits only closed scalar bit operations, exact pure helpers and affine branch
-joins; iterator use, another live carry, effects, memory, arithmetic traps,
-nonlinear operations and escaping control retain the original loop. The exact
-header/tail must contain no runtime cleanup. A suffix rewrite also rejects
-scanned instructions, pending copies, changed outline helpers or semantic/table
+rounds into an exact affine transform. Normal source checking, ownership, escape
+and backedge validation finish first. The bounded machine interpreter admits
+only closed scalar bit operations, exact pure helpers and affine branch joins;
+iterator use, another live carry, effects, memory, arithmetic traps, nonlinear
+operations and escaping control retain the original loop. The exact header/tail
+must contain no runtime cleanup. A suffix rewrite also rejects scanned
+instructions, pending copies, changed outline helpers or semantic/table
 coordinates. Detached output and capacity reservation precede mutation; snapshot
 caches are invalidated and committed counters participate in rollback.
 
 The non-scoped emitter may lower a statically selected, saturated scalar
 primitive alias directly to its existing scalar opcode. Its complete type/effect
-arrow, exact arity, input/result machines and hidden provider ABI remain checked.
-Partial applications and unsupported primitives retain their ordinary closure
-path; the optimization does not establish a general allocation-free closure ABI.
+arrow, exact arity, input/result machines and hidden provider ABI remain
+checked. Partial applications and unsupported primitives retain their ordinary
+closure path; the optimization does not establish a general allocation-free
+closure ABI.
 
 Private named calls retain their complete semantic Value tree and owner/event
 contracts. Exact caller-local equality becomes a normalized input partition in
@@ -267,21 +268,21 @@ scope cleanup. Packet bytes can remain below live results, but packet owner
 slots close immediately. Bare borrowed escapes and fresh borrows stored into
 input owners remain rejected. Input freeze, reserve, pop and truncate retain
 their separate barriers. A helper's input-root prefix precedes every cleanup
-range, so its token locals are immutable through joins; local owners, loop
-carriers and demand caches retain their mutable marking. This exemption does not
-apply to exports. Direct results with complete input-alias recipes need no
-caller result slot or rewind. The logical result-pointer mask position remains
-present; an unchanged signature receives an unread zero pointer. Partial results
-retain allocation, and packed packets keep their existing layout and allocation.
+range, so its token locals are immutable through joins; local owners and loop
+carriers retain their mutable marking. This exemption does not apply to exports.
+Direct results with complete input-alias recipes need no caller result slot or
+rewind. The logical result-pointer mask position remains present; an unchanged
+signature receives an unread zero pointer. Partial results retain allocation,
+and packed packets keep their existing layout and allocation.
 
 Checked aggregate joins reserve edge copies and materialize only lanes whose
 physical origins differ. Multiple edges may share only a dominating immutable
 local; a sole continuing edge may keep a branch-local definition. Normal
-fallthrough, owner tokens, loop carriers and demand caches retain fresh capture
-storage. Tagged, host, demand and unowned-reference subtrees keep ordinary
-transport while independent siblings may share. Every incoming Value still
-passes complete type, owner, read and variant checks. Outlining cannot extract
-across an unresolved copy reservation; final assembly removes released nops.
+fallthrough, owner tokens and loop carriers retain fresh capture storage.
+Tagged, host and unowned-reference subtrees keep ordinary transport while
+independent siblings may share. Every incoming Value still passes complete type,
+owner, read and variant checks. Outlining cannot extract across an unresolved
+copy reservation; final assembly removes released nops.
 
 Completed buffered helper results may reuse an original argument word only when
 it names a formal local that the finished helper never writes. Logical ordinals
@@ -553,11 +554,11 @@ Finite closed local data can instead retain its evaluator value, including
 independent generic uses and captures. The proof checks exact constructor
 wrappers and capture-free pure closures, recursively rejects authority-bearing
 types, and records every selected body dependency. Runtime captures, effects,
-traps and demands decline promotion. The promoted initializer's executable owner
-remains fresh and retains exact wrapper body reads. Captured closures may reuse
-through static-key graph admission, which compares current values, evidence,
-callable sources and capture relationships before importing code. These graphs
-do not authorize independent solved principal mapping receipts.
+traps decline promotion. The promoted initializer's executable owner remains
+fresh and retains exact wrapper body reads. Captured closures may reuse through
+static-key graph admission, which compares current values, evidence, callable
+sources and capture relationships before importing code. These graphs do not
+authorize independent solved principal mapping receipts.
 
 Copied static data also restores its serializer sharing bindings. Each binding
 requires an exact current value graph and an imported physical layout. Old
@@ -685,16 +686,16 @@ and the original argument witnesses. They must solve before a closed judgment is
 published. Type-only associated/member selection and result-selected
 construction may use that same checked scheme: the fresh scope already owns the
 imported predicates and selected signature. The source receipt records the
-implementation; selected capture/emission and complete demand checking still
+implementation; selected capture/emission and complete body checking still
 collect its body. No caller-selected fact becomes a principal proof. Transitive
 job admission classifies each reachable scheme once per immutable Session and
 reserves capacity before publishing the complete classification. Source shape
 and active-recursion checks remain local to the requesting job; a cached graph
 classification does not override them. Computed values still require capture
 proofs, and predicate-free source-interface checking, selected captures and
-complete demand-body checking retain ordinary collection. Unsupported lexical
-captures and incomplete callback boundaries keep ordinary collection. Active
-recursive targets share their inline region. Failed speculative jobs publish no
+complete body checking retain ordinary collection. Unsupported lexical captures
+and incomplete callback boundaries keep ordinary collection. Active recursive
+targets share their inline region. Failed speculative jobs publish no
 diagnostic; fallback preserves the caller's argument witness sites and
 deferred-member context. An independently completed callee proof may survive an
 enclosing caller's failed qualification.
@@ -757,19 +758,19 @@ decline. Cycles currently decline optional principal publication.
 Live lexical summary inputs own ordered capture bindings, complete interfaces,
 alias ordinals, source/body identities, stored mappings and exact semantic graph
 words. Source identities belong to the immutable session version; portable
-revision keys remain separate work. Scalar bits, nested executable bodies,
-provider creation identities and pending demand identities participate in key
-equality. Unsupported, cyclic or incomplete graphs retain ordinary collection.
-Aggregate examined-word/interface-visit budgets include declined admissions.
-Interface selection projects only the scopes of values reachable from the
-closure's captures; a capture-free closure has no key.
+revision keys remain separate work. Scalar bits, nested executable bodies and
+provider creation identities participate in key equality. Unsupported, cyclic or
+incomplete graphs retain ordinary collection. Aggregate
+examined-word/interface-visit budgets include declined admissions. Interface
+selection projects only the scopes of values reachable from the closure's
+captures; a capture-free closure has no key.
 
 Each lexical job imports those inputs into a private solver and exports only a
 complete session-owned arrow. Its owner still checks executable captured values.
 It publishes no capture-free global principal proof or call receipt. Source
-interface, complete demand-body and receipt/refinement observer paths retain
-ordinary checking. Entry-interface and full-body view caches have distinct keys.
-Complete monomorphic views preserve value aliases; generic views freshen.
+interface, complete body and receipt/refinement observer paths retain ordinary
+checking. Entry-interface and full-body view caches have distinct keys. Complete
+monomorphic views preserve value aliases; generic views freshen.
 
 Allocation failure abandons pending summary jobs without allocation, rebuilds
 keys for independently finished jobs, and clears active state. It never caches
@@ -858,22 +859,8 @@ Private provider heads and State/request cell IDs never enter source values or
 closures. `runtime_cleanup.Stack` records their releases at construction and
 tracks a checkpoint at each return/break target. A normal exit emits its suffix;
 a cancellation emits all active scopes, including inherited inlining scopes. The
-cleanup calls bypass cancellation guards. Demand forcing registers a reset only
-on its cancellation path. Releasing private storage does not release its
-payload: callbacks, State values and demand memo results may outlive that scope.
-
-Admitted local demands use the prepared dynamic use counts: never/once need no
-memo slots; repeated uses share a ready bit and typed result local. Reset both
-at each call-site execution, outside any callee loop. Reference-only aliases
-borrow that same state. Commit the result before setting ready, only after
-normal completion. Encoding borrows the lexical emitter for deferred bindings,
-with a flattened snapshot of force-site cleanup obligations; the snapshot owns
-its action array and preserves cancellation order without a parent cycle.
-Managed memo results join the typed roots of forever-loop collection, including
-active enclosing admitted calls. Emitter parent links and inline-demand slices
-are synchronous stack borrows and never enter retained plans, Core or runtime
-values. Unknown use summaries keep the bounded preparation proof; escaping
-summaries and incomplete admission retain ordinary cells.
+cleanup calls bypass cancellation guards. Releasing private storage does not
+release its payload: callbacks and State values may outlive that scope.
 
 All optimizer passes use `runtime_ir` opcode/call contracts. New opcodes require
 an exhaustive stack/effect definition; there is no fallback binary arity. Memory
@@ -897,11 +884,8 @@ owner-table geometry; start bodies cannot reuse an old table size. ABI 3 private
 entry/leave hooks preserve the public value set and copy numeric results before
 leave. [Suspended ownership](SUSPENDED_OWNERSHIP.md) admits exact generated host
 imports and checked request graphs with the same counted journal through JSPI.
-Failed leave terminalizes active evaluating demands before retirement; request
-cancellation resets them to pending. Externref cleanup and revoked-descriptor
-checks prevent a strong ready memo from rebinding an old host closure. Unknown
-imports outside the checked ownership contracts reject production emission; they
-do not enable a tracing fallback.
+Unknown imports outside the checked ownership contracts reject production
+emission; they do not enable a tracing fallback.
 
 Optimized body captures own their inputs and outputs. Reuse requires exact local
 instructions and types, called bodies, call signatures, arena roles and
@@ -1020,14 +1004,6 @@ host cleanup copies reconstruct checked logical records and nominal values
 without guest aliases. [Numeric layouts](NUMERIC_LAYOUTS.md) specifies the
 bounds, call ABI and separate allocation-free-boundary limitation.
 
-State plus memoized demands can construct real cycles: a demand may read a
-closure from State and cache a result that reaches that same demand. Clearing
-the State cell must not clear the cached result. The cycle-reclamation law in
-`tests/arena_gc_execution.test.ts` preserves this behavior and bounds discarded
-cycles in a long-running loop. RC without cyclic ownership handling is not a
-valid collector replacement. In particular, do not weaken memo fields, clear
-memoized results on State writes, or assume closure graphs are always acyclic.
-
 [Shared and cyclic ownership](SHARED_OWNERSHIP.md) specifies typed
 strong/borrowed roots, iterative destruction, suspension ownership and localized
 trial deletion for tasks 030–035. Production source compilation uses counted
@@ -1076,11 +1052,11 @@ copies; unmarked reads, unknown uses, incomplete initialization and escapes
 retain their ordinary values.
 
 Compiler-only collection carriers may disappear in owning mode when their exact
-scalar/reference fields duplicate the journal and contain no demand memo roots.
-Only the root argument of collect/recycle is admitted. Observed, incomplete,
-unknown or escaping carriers preserve all their stored children. Removed empty
-constructor facts are consumed with their static address, so a later pass cannot
-reinterpret the inserted scalar tag as another static cell.
+scalar/reference fields duplicate the journal without adding roots. Only the
+root argument of collect/recycle is admitted. Observed, incomplete, unknown or
+escaping carriers preserve all their stored children. Removed empty constructor
+facts are consumed with their static address, so a later pass cannot reinterpret
+the inserted scalar tag as another static cell.
 
 Copied field slots need no additional edge if every publication is zero, an
 explicit relocated static address, or an annotated initial allocation held by
@@ -1449,9 +1425,9 @@ reserving them everywhere.
 
 The default `$` parses to ordinary application at precedence zero, right
 associative. It does not route through a generic helper: primitive arity, scoped
-callbacks, demands and ownership therefore use the parenthesized call path. An
-explicit local or inherited `$` fixity still selects ordinary binary operator
-dispatch. The prelude does not override this default.
+callbacks and ownership therefore use the parenthesized call path. An explicit
+local or inherited `$` fixity still selects ordinary binary operator dispatch.
+The prelude does not override this default.
 
 The following task contracts describe the retained legacy backend. Language
 tasks are retired from the owned-storage model, which uses copied-packet host
@@ -1683,8 +1659,8 @@ pool slice must release its lease, never free it. See
 A retained fragment may replay an aggregate constant child when the current
 value is already evaluated and its complete graph matches the old one; the child
 is re-serialized in the current owner through the ordinary constant path, and
-only the caller's exact root-address operands are relocated. Demand cells and
-other generative or operational values rebuild their callers. See
+only the caller's exact root-address operands are relocated. Generative or
+operational values rebuild their callers. See
 [retained constants](RETAINED_CONSTANTS.md).
 
 An edited module that is not structurally equal keeps the reuse gate enabled
@@ -1802,19 +1778,19 @@ The source emitter may mark a fresh record, product, algebraic node, Array or
 List as immutable and acyclic only when its exact layout closes over scalar
 fields and other immutable shapes (`backend/acyclic_layout.zig`). Data values
 are immutable and in-place writes need an owner no other value reaches, so only
-State, callables, demands, providers, cursors and erased or unknown fields can
-close a cycle; they decline, as do exhausted proofs. A nominal of any unit,
-including the prelude and std, checks every constructor of its defining unit,
-including unused variants. Executable reuse (retained fragments, the semantic
-gate and restart checkpoints) requires equal type, nominal and constructor
-catalogs in every unit, and optimizer records compare complete machine inputs,
-so editing a foreign definition re-emits every claim that depends on it. Array
-and List edges follow their element layout. Repeated nominal layouts close an
-immutable recursive type proof; they do not assert runtime pointer uniqueness.
-The checked canonical allocation receives the existing no-cycle flag. Its typed
-edges, counts and iterative destructor remain unchanged. Trial discovery stops
-at the flag, because the proof excludes every cycle through the object. A wrong
-flag could only leak a cycle, never free a live object.
+State, callables, providers, cursors and erased or unknown fields can close a
+cycle; they decline, as do exhausted proofs. A nominal of any unit, including
+the prelude and std, checks every constructor of its defining unit, including
+unused variants. Executable reuse (retained fragments, the semantic gate and
+restart checkpoints) requires equal type, nominal and constructor catalogs in
+every unit, and optimizer records compare complete machine inputs, so editing a
+foreign definition re-emits every claim that depends on it. Array and List edges
+follow their element layout. Repeated nominal layouts close an immutable
+recursive type proof; they do not assert runtime pointer uniqueness. The checked
+canonical allocation receives the existing no-cycle flag. Its typed edges,
+counts and iterative destructor remain unchanged. Trial discovery stops at the
+flag, because the proof excludes every cycle through the object. A wrong flag
+could only leak a cycle, never free a live object.
 
 Arrays with a proven reference element layout take the flag at allocation:
 literals, `generate`/`fill`, exact builders, `set`/`append`/`concat`/`slice`
@@ -1839,9 +1815,9 @@ portable optimizer meaning distinguishes the direct representation.
 A nonescaping scalar-only object may keep its fields in independent locals when
 all allocations in its version/copy group have exact scalar roles. Anonymous
 roots and acyclic flags for the removed object disappear; scope boundaries and
-carry-slot clearing retain their original order. Unknown/owning fields and
-demand-force markers decline. Source arithmetic, eager operands and F32 bits
-remain exact; this grants no semantic or value-cache validity. See
+carry-slot clearing retain their original order. Unknown/owning fields decline.
+Source arithmetic, eager operands and F32 bits remain exact; this grants no
+semantic or value-cache validity. See
 [iterator state qualification](ITERATOR_STATE.md).
 
 A version/copy group of 16-byte scalar-only objects accessed through whole v128

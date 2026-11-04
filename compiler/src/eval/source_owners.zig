@@ -51,8 +51,8 @@ const Index = struct {
                 remaining -= 1;
                 Index.record(result_.nodes, id, body.binding);
                 const node = module.node(id);
-                if (node.tag == .closure or node.tag == .suspend_) {
-                    const closure = if (node.tag == .closure) module.closure(id) else module.suspension(id);
+                if (node.tag == .closure) {
+                    const closure = module.closure(id);
                     Index.record(result_.bindings, closure.parameter.binding, body.binding);
                     work.append(a, closure.body) catch |err| switch (err) {
                         error.OutOfMemory => return error.OutOfMemory,

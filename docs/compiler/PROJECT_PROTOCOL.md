@@ -6,7 +6,8 @@ the child's stdin and stdout in length-prefixed frames. This document is enough
 to write a host without `@mewhhaha/blot`. It describes protocol version 1 as
 implemented by this repository:
 
-- the server: [zig_project_server.zig](../../compiler/src/reuse/zig_project_server.zig) and
+- the server:
+  [zig_project_server.zig](../../compiler/src/reuse/zig_project_server.zig) and
   [zig_project_frames.zig](../../compiler/src/reuse/zig_project_frames.zig);
 - the reference client:
   [host/zig_project_client.ts](../../host/zig_project_client.ts), behind
@@ -159,7 +160,6 @@ It allows 30 s by default (1 to 300 s) for the hello and the open together.
 | `imports`          | array of `{prefix, root}`        | more directory aliases                                                     |
 | `dependencies`     | path or null                     | a `.blotdep` bundle from `blot dependencies`                               |
 | `profileBackend`   | boolean                          | detailed backend and build phase timings (default false)                   |
-| `explainDemands`   | boolean                          | bounded demand-lowering report (default false)                             |
 | `codegenTier`      | `"optimized"` or `"development"` | default `"optimized"`; development skips optional scalar and vector passes |
 | `shareMachineCode` | boolean                          | prototype; default false                                                   |
 | `codegenWorkers`   | integer 1..16                    | default 4                                                                  |
@@ -268,7 +268,6 @@ the reference client rejects an empty or invalid module.
     "cachedModules": 0,
     "restartCacheLoaded": false,
     "restartCacheWrite": null,
-    "demandLowering": null,
     "frontend": {},
     "backend": {},
     "optimization": {},
@@ -310,23 +309,17 @@ the revision.
 - `restartCacheWrite`: null, or the report the cache's last writer left in the
   `.lock` file when this process opened (see the restart cache below).
 
-`demandLowering` is null by default. With `explainDemands: true`, it is
-`{sites, omitted}`: up to 256 owned source-site decisions and a count of omitted
-recording attempts. Sites carry filename/truncation, unit, UTF8 byte span,
-lowering and reason. Reporting preserves executable bytes. See
-[DEMANDS.md](DEMANDS.md) for the decisions, bounds and retained span behavior.
-
 `explainAllocations: true` requires the advertised `allocation-explanations-v1`
 capability. It enables `allocationSites` and `arrayCosts` in successful build
-stats; both are null by default and otherwise contain `{sites, omitted}`.
-Each report is bounded to 16,384 sites with UTF8 source spans and filename
-truncation flags. The first reports emitted allocation calls, requested bytes
-when statically known, and emission counts. The second reports array edits as
-`reuse_eligible` or `copy_required` with the ownership proof's reason. These
-are compiler decisions before final optimization, not measured allocation
-traffic, live memory, or a recommended heap budget. Native asset projects use
-the same interface. Cached replies own their reports; trivia changes refresh
-source spans. Explained outputs are not persisted in the restart output cache.
+stats; both are null by default and otherwise contain `{sites, omitted}`. Each
+report is bounded to 16,384 sites with UTF8 source spans and filename truncation
+flags. The first reports emitted allocation calls, requested bytes when
+statically known, and emission counts. The second reports array edits as
+`reuse_eligible` or `copy_required` with the ownership proof's reason. These are
+compiler decisions before final optimization, not measured allocation traffic,
+live memory, or a recommended heap budget. Native asset projects use the same
+interface. Cached replies own their reports; trivia changes refresh source
+spans. Explained outputs are not persisted in the restart output cache.
 
 `phaseProfile` is empty unless the session opened with `profileBackend`. A
 profiled build reports `total_us`, the process's `peak_rss_kib` and exclusive
@@ -346,10 +339,10 @@ profiling observation; ordinary allocation/free operations gain no traversal.
 
 The objects are measurements for people, and their insides are not part of the
 contract. The reference client validates the four integers as nonnegative safe
-integers, the required named statistic objects as objects, and `restartCacheLoaded` as a
-boolean. It refuses `const_steps` and `remaining_steps` anywhere in `stats`
-(source fuel, which this protocol does not support), and it validates the Wasm
-before accepting it.
+integers, the required named statistic objects as objects, and
+`restartCacheLoaded` as a boolean. It refuses `const_steps` and
+`remaining_steps` anywhere in `stats` (source fuel, which this protocol does not
+support), and it validates the Wasm before accepting it.
 
 **Rejection.** There is no payload. This example is illustrative; the fictitious
 source is ASCII, so its byte and UTF-16 offsets coincide:
@@ -441,9 +434,9 @@ or null, `children` is a span in `edges`, and `effects` is a node index or null.
 Child spans of different nodes do not overlap. Function children are
 parameter/result; record edges are named. Kinds are `truncated`, `absent`,
 `unit`, `boolean`, `u32`, `f32`, `never`, `variable`, `function`, `product`,
-`record`, `nominal`, `array`, `list`, `cursor`, `demand`, `type_constructor`,
-`resolver`, `provider`, `state_provider`, `effects`, `operation`, `row_variable`
-and `row_parameter`.
+`record`, `nominal`, `array`, `list`, `cursor`, `type_constructor`, `resolver`,
+`provider`, `state_provider`, `effects`, `operation`, `row_variable` and
+`row_parameter`.
 
 Every requirement is
 `{kind, name, subject, argument, result, signature,
@@ -469,8 +462,8 @@ lookup order. `operand` is string or null, at most 256 UTF-8 bytes. `side` is
 `result_mismatch` when its result conflicts with the destination.
 
 The reference decoders, `readTypedHole` and `readDispatchExplanation` in
-[host/type_diagnostics.ts](../../host/type_diagnostics.ts), enforce these
-bounds before exposing convenience fields to callers.
+[host/type_diagnostics.ts](../../host/type_diagnostics.ts), enforce these bounds
+before exposing convenience fields to callers.
 
 **Failed operations.** An error while preparing the revision, or while encoding
 or bounding its reply, is reported as a rejection with `stage`
@@ -495,12 +488,11 @@ keyed also by the project settings), and a `.lock` file.
 
 - **Restored output.** The first build of a process whose inputs equal the saved
   revision's exactly (every source byte, path resolution and import, the open
-  settings, entry, codegen tier, workers and machine-code sharing, without
-  `explainDemands`) replies with the saved Wasm without compiling, under the
-  same rule as an unchanged build in one session. Its `attemptStats` has
-  `restored_output` true, it keeps no retained state, and the next build that
-  differs compiles in full. Otherwise the checkpoint and the seed are read then,
-  before compiling.
+  settings, entry, codegen tier, workers and machine-code sharing) replies with
+  the saved Wasm without compiling, under the same rule as an unchanged build in
+  one session. Its `attemptStats` has `restored_output` true, it keeps no
+  retained state, and the next build that differs compiles in full. Otherwise
+  the checkpoint and the seed are read then, before compiling.
 - **Seed.** Without `dependencies` at open, the first build that compiles starts
   from the saved seed, as if opened with it: dependencies whose sources are
   unchanged are not checked or lowered again, and changed ones and their
@@ -628,8 +620,8 @@ client rejects a wrong hello version with
 `ZigProjectProtocolError("Zig project hello mismatch")` and reaps the child.
 
 The independent conformance host is
-[zig_project_protocol.test.ts](../../tests/guest/zig_project_protocol.test.ts). Run it
-against any compiler with
+[zig_project_protocol.test.ts](../../tests/guest/zig_project_protocol.test.ts).
+Run it against any compiler with
 `deno test --allow-read --allow-write --allow-run
 tests/guest/zig_project_protocol.test.ts -- /absolute/path/to/blotc`.
 
@@ -639,10 +631,10 @@ Implementation revision: `4eabecb`. Zig 0.17.0. The full compiler gate passes
 the native suite and 690 guest/client tests. Zero analyzer findings are required
 for the local milestone.
 
-[The independent wire host](../../tests/guest/zig_project_protocol.test.ts) imports neither
-the production client nor its frame codec. It covers version admission,
-canonical request/reply fields, malformed and oversized frames, ordering,
-epochs/revisions, source ranges, positioned Unicode diagnostics, owned
+[The independent wire host](../../tests/guest/zig_project_protocol.test.ts)
+imports neither the production client nor its frame codec. It covers version
+admission, canonical request/reply fields, malformed and oversized frames,
+ordering, epochs/revisions, source ranges, positioned Unicode diagnostics, owned
 hole/dispatch details, rejection recovery, checkpoints, cancellation and close.
 Client tests separately cover malformed peers, required stats objects and
 booleans, and disposal.

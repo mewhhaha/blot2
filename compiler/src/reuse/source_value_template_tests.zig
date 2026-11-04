@@ -129,7 +129,6 @@ const Generator = struct {
         errdefer evaluator.deinit();
         // Mirror the backend's startup source-creation mode. Receipt option
         // equality remains exact; this test consumer is the same kind of owner.
-        evaluator.options.retain_source_suspensions = true;
         return .{ .allocator = allocator, .evaluator = evaluator, .representations = .fromStore(allocator, try layout.Store.init(allocator)), .planning = .{ .runtime_operations = runtime_operations.Store.initProject(allocator, fixture.names.view()) } };
     }
     fn deinit(self: *Generator) void {
@@ -283,14 +282,14 @@ fn oomImport(allocator: Allocator, fixture: *const Fixture, old: *const capture.
     const children = g.evaluator.storage.children.items.len;
     const closures = g.evaluator.storage.closures.items.len;
     const records = g.evaluator.storage.record_layouts.items.len;
-    const parallel = .{ g.evaluator.storage.value_evidence.items.len, g.evaluator.storage.value_records.items.len, g.evaluator.storage.type_mappings.items.len, g.evaluator.storage.row_mappings.items.len, g.evaluator.storage.field_names.items.len, g.evaluator.storage.demands.items.len, g.evaluator.storage.specialized_closures.count(), g.evaluator.specializations.validated_calls.count() };
+    const parallel = .{ g.evaluator.storage.value_evidence.items.len, g.evaluator.storage.value_records.items.len, g.evaluator.storage.type_mappings.items.len, g.evaluator.storage.row_mappings.items.len, g.evaluator.storage.field_names.items.len, g.evaluator.storage.specialized_closures.count(), g.evaluator.specializations.validated_calls.count() };
     const slots = artifacts.stamp(g.evaluator.slots);
     const imported = plan.materialize(&g) catch |err| {
         try std.testing.expectEqual(values, g.evaluator.storage.values.items.len);
         try std.testing.expectEqual(children, g.evaluator.storage.children.items.len);
         try std.testing.expectEqual(closures, g.evaluator.storage.closures.items.len);
         try std.testing.expectEqual(records, g.evaluator.storage.record_layouts.items.len);
-        const now = .{ g.evaluator.storage.value_evidence.items.len, g.evaluator.storage.value_records.items.len, g.evaluator.storage.type_mappings.items.len, g.evaluator.storage.row_mappings.items.len, g.evaluator.storage.field_names.items.len, g.evaluator.storage.demands.items.len, g.evaluator.storage.specialized_closures.count(), g.evaluator.specializations.validated_calls.count() };
+        const now = .{ g.evaluator.storage.value_evidence.items.len, g.evaluator.storage.value_records.items.len, g.evaluator.storage.type_mappings.items.len, g.evaluator.storage.row_mappings.items.len, g.evaluator.storage.field_names.items.len, g.evaluator.storage.specialized_closures.count(), g.evaluator.specializations.validated_calls.count() };
         inline for (parallel, now) |previous, actual| try std.testing.expectEqual(previous, actual);
         try std.testing.expectEqualSlices(u8, &slots, &artifacts.stamp(g.evaluator.slots));
         try std.testing.expectEqualSlices(u8, &old_stamp, &artifacts.stamp(old.metadata.pools.?.evaluator.values));
@@ -402,36 +401,6 @@ test "source template declines actual provider and State captures instead of pre
         try std.testing.expect(rows.plan == null);
         try std.testing.expect(rows.stats.unsupported_kinds[@backingInt(case.kind)] > 0);
     }
-}
-test "source template declines active waiting values before admitting an independent scalar root" {
-    const pending_source =
-        \\entry const scalar: U32 = 42
-        \\const keep = func ~(value: U32) => return value
-        \\const pending = keep 42
-        \\entry const schema: U32 = 7
-        \\entry const answer = func () => return @demand pending
-    ;
-    var before = try Fixture.init(pending_source);
-    defer before.deinit();
-    var after = try Fixture.init(pending_source);
-    defer after.deinit();
-    editSchema(&after);
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
-    defer initial.deinit(a);
-    try successful(&initial);
-    var gate = try gate_api.Gate.init(a, &initial.capture.?.metadata.pools.?, after.units, after.names.view());
-    defer gate.deinit();
-    try std.testing.expect(gate.enabled);
-    const found = try graph.Plan.inspect(a, &initial.capture.?.metadata.pools.?, &gate, after.target("pending"));
-    try std.testing.expectEqual(graph.Reason.open_evidence, found.reason);
-    try std.testing.expect(found.plan == null);
-    try std.testing.expect(found.stats.unsupported_kinds[@backingInt(eval.ValueKind.suspension)] > 0);
-    var scalar = try inspect(a, &initial.capture.?, &gate, after.target("scalar"));
-    defer scalar.deinit(a);
-    var g = try Generator.init(&after);
-    defer g.deinit();
-    const imported = try scalar.materialize(&g);
-    try std.testing.expectEqual(@as(u32, 42), g.evaluator.valueScalar(imported).?.bits);
 }
 
 test "source template rejects independently valid old pools even when source identity ordinals collide" {
@@ -1050,10 +1019,10 @@ fn anchorOom(allocator: Allocator, fixture: *const Fixture, old: *const capture.
     _ = try g.evaluator.richValue(fixture.target("bundle"));
     var plan = try inspect(allocator, old, gate, fixture.target("bundle"));
     defer plan.deinit(allocator);
-    const counts = .{ g.evaluator.storage.values.items.len, g.evaluator.storage.value_evidence.items.len, g.evaluator.storage.value_records.items.len, g.evaluator.storage.children.items.len, g.evaluator.storage.closures.items.len, g.evaluator.storage.type_mappings.items.len, g.evaluator.storage.row_mappings.items.len, g.evaluator.storage.record_layouts.items.len, g.evaluator.storage.field_names.items.len, g.evaluator.storage.demands.items.len, g.evaluator.storage.specialized_closures.count(), g.evaluator.specializations.validated_calls.count() };
+    const counts = .{ g.evaluator.storage.values.items.len, g.evaluator.storage.value_evidence.items.len, g.evaluator.storage.value_records.items.len, g.evaluator.storage.children.items.len, g.evaluator.storage.closures.items.len, g.evaluator.storage.type_mappings.items.len, g.evaluator.storage.row_mappings.items.len, g.evaluator.storage.record_layouts.items.len, g.evaluator.storage.field_names.items.len, g.evaluator.storage.specialized_closures.count(), g.evaluator.specializations.validated_calls.count() };
     const slots = artifacts.stamp(g.evaluator.slots);
     _ = plan.materializeWithGlobalAnchors(&g, fixture.entry) catch |err| {
-        const now = .{ g.evaluator.storage.values.items.len, g.evaluator.storage.value_evidence.items.len, g.evaluator.storage.value_records.items.len, g.evaluator.storage.children.items.len, g.evaluator.storage.closures.items.len, g.evaluator.storage.type_mappings.items.len, g.evaluator.storage.row_mappings.items.len, g.evaluator.storage.record_layouts.items.len, g.evaluator.storage.field_names.items.len, g.evaluator.storage.demands.items.len, g.evaluator.storage.specialized_closures.count(), g.evaluator.specializations.validated_calls.count() };
+        const now = .{ g.evaluator.storage.values.items.len, g.evaluator.storage.value_evidence.items.len, g.evaluator.storage.value_records.items.len, g.evaluator.storage.children.items.len, g.evaluator.storage.closures.items.len, g.evaluator.storage.type_mappings.items.len, g.evaluator.storage.row_mappings.items.len, g.evaluator.storage.record_layouts.items.len, g.evaluator.storage.field_names.items.len, g.evaluator.storage.specialized_closures.count(), g.evaluator.specializations.validated_calls.count() };
         inline for (counts, now) |left, right| try std.testing.expectEqual(left, right);
         try std.testing.expectEqualSlices(u8, &slots, &artifacts.stamp(g.evaluator.slots));
         return err;

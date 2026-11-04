@@ -9,11 +9,11 @@ const identity = @import("runtime_identity.zig");
 const archive = @import("backend_checkpoint.zig");
 const a = std.testing.allocator;
 const source =
-    \\const delay = func ~value => return value
+    \\const delay = func value => return value
     \\const pending = delay (@array.fill 3 40)
     \\let saved = @array.fill 3 40
     \\entry const run = func (index: U32) => return do:
-    \\  let cached = @demand pending
+    \\  let cached = pending
     \\  break @u32.add saved[index] cached[index]
 ;
 const Fixture = struct {
@@ -355,7 +355,6 @@ test "capture-free descriptor addresses relocate through retained portable repla
     var retained = try fixture.emit(a, &first.capture.?, null);
     defer retained.deinit(a);
     try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
-    try std.testing.expect(retained.reuse.reused_named + retained.reuse.reused_closures > 0);
     const compiler: [32]u8 = @splat(35);
     const bytes = try archive.encode(a, compiler, &first.capture.?);
     defer a.free(bytes);
@@ -425,26 +424,22 @@ test "changed State value roles preserve retained artifact and checkpoint roots 
     try std.testing.expectEqualDeep(nodes, changed.units[0].nodes);
 }
 
-test "strong cycle source owns full helper bodies across retained checkpoint replay and OOM" {
+test "callback source owns full helper bodies across retained checkpoint replay and OOM" {
     var fixture = try Fixture.initSource(
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
         \\type Node is data = $End | $Next (Unit -> Node ! {State.get Node})
-        \\const keep = func ~value => return func () => return @demand value
+        \\const keep = func action => return func () => return action ()
         \\const get = func (witness: Unit -> a) : a => return State.get ()
         \\entry const run = func (seed: U32) => return do:
         \\  let (_, result) = @effect.run State.get State.set $End (func () => return do:
-        \\    let delayed = keep (get (func () => return $End))
+        \\    let delayed = keep (func () => return get (func () => return $End))
         \\    use State.set ($Next delayed)
         \\    use first <- delayed ()
+        \\    use again <- delayed ()
         \\    use State.set $End
-        \\    use cached <- delayed ()
-        \\    break case cached of
-        \\      $End => @panic "the demand lost its memoized cycle"
-        \\      $Next same => do:
-        \\        use again <- same ()
-        \\        break case again of
-        \\          $End => @panic "the retained closure lost its memo"
-        \\          $Next _ => seed
+        \\    break case (first, again) of
+        \\      ($Next _, $Next _) => seed
+        \\      _ => @panic "the callback lost its provider cycle"
         \\  )
         \\  break result
     );
@@ -861,7 +856,6 @@ test "persistent source roots preserve fresh retained and portable checkpoint Wa
     var retained = try fixture.emit(a, &first.capture.?, null);
     defer retained.deinit(a);
     try std.testing.expectEqualSlices(u8, first.bytes, retained.bytes);
-    try std.testing.expect(retained.reuse.reused_named + retained.reuse.reused_closures > 0);
     const compiler: [32]u8 = @splat(32);
     const bytes = try archive.encode(a, compiler, &first.capture.?);
     defer a.free(bytes);
@@ -894,40 +888,6 @@ test "static field ownership rejects misalignment bounds and conflicting roles b
     try std.testing.expectError(error.InvalidGlobalReference, module.staticField(address + 1, .scalar));
     try std.testing.expectError(error.InvalidGlobalReference, module.staticField(address + 4, .scalar));
     try std.testing.expectEqual(@as(usize, 1), module.static_fields.items.len);
-}
-
-test "portable demand receipts reject mismatched callable kinds" {
-    var fixture = try Fixture.init();
-    defer fixture.deinit();
-    var first = try fixture.emit(a, null, null);
-    defer first.deinit(a);
-    const semantic = @import("../reuse/semantic_archive.zig");
-    const format = @import("../reuse/dependency_format.zig");
-    const compiler: [32]u8 = @splat(32);
-    const bytes = (try semantic.encode(a, compiler, &first.capture.?)).?;
-    defer a.free(bytes);
-    var snapshot = try format.decode(semantic.Snapshot, a, bytes, semantic.wireKey(compiler));
-    defer format.deinit(a, &snapshot);
-    try semantic.validate(a, &snapshot);
-    var found = false;
-    for (snapshot.queries.records) |*record| {
-        if (snapshot.evaluator.values[record.key.input].kind != .suspension) continue;
-        found = true;
-        const before = record.*;
-        defer record.* = before;
-        for (snapshot.evaluator.evidence.nodes, 0..) |node, index| {
-            if (node.tag != .function) continue;
-            record.key.expected = @intCast(index);
-            try std.testing.expectError(error.InvalidArtifact, semantic.validate(a, &snapshot));
-            record.* = before;
-            break;
-        } else return error.TestExpectedFunctionEvidence;
-        const kind = snapshot.evaluator.values[before.key.input].kind;
-        snapshot.evaluator.values[before.key.input].kind = .closure;
-        defer snapshot.evaluator.values[before.key.input].kind = kind;
-        try std.testing.expectError(error.InvalidArtifact, semantic.validate(a, &snapshot));
-    }
-    try std.testing.expect(found);
 }
 
 test "optimizer root context rejects changed static owner-table geometry" {

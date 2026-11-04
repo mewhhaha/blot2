@@ -296,13 +296,13 @@ const Scan = struct {
                 try self.node(n.a);
                 try self.node(n.b);
             },
-            .force, .computation, .effect_scope, .result_associated => try self.node(n.a),
+            .computation, .effect_scope, .result_associated => try self.node(n.a),
             .project => {
                 try self.node(n.a);
                 try self.projection(n.b);
             },
             .construct => try self.node(n.b),
-            .closure, .suspend_ => {
+            .closure => {
                 const value = try self.projectedItem(core.ClosureInfo, self.old.closures, self.current.closures, n.a);
                 if (self.closures) |list| try list.append(self.allocator, n.a);
                 try self.binding(value.qualifier);

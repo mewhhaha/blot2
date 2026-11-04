@@ -3,7 +3,7 @@ import {compileAndRun, compileExpectedFailure, equal} from './compile_helpers.ts
 export const bottomFlowSource = `
 type Maybe a is data= $Some a| $None
 const stop=func value=> return @panic "first-body"
-const ignore=func ~(value:U32)=> return 42
+const ignore=func value=> return 42
 entry const direct:Unit->U32=func()=> return do:
   let value=(@panic "callee") 1
   break 42
@@ -28,7 +28,7 @@ entry const changing=func(flag:Bool)=> return do:
   else:
     value:=1.5
   break value
-entry const demand=func()=> return ignore (@panic "suspended")
+entry const deferred=func()=> return ignore (func()=> return @panic "suspended")
 entry const empty=func()=> return @array.length (@array.generate 0 (func(index:U32):U32=> return @panic "callback"))
 entry const ordered: (U32->U32 ! {Foreign}) -> U32 ! {Foreign}=func io=> return do:
   use (do:
@@ -53,7 +53,7 @@ for(const asynchronous of [false,true])Deno.test(`bottom values preserve eager o
    equal(await call('array',true),42);
    equal(await call('merge',false),42);
    equal(await call('changing',false),1.5);
-   equal(await call('demand',null),42);
+   equal(await call('deferred',null),42);
    equal(await call('empty',null),0);
    for(const name of ['direct','strict'])await trap(name,null);
    for(const name of ['product','array'])await trap(name,false);
@@ -73,7 +73,7 @@ Deno.test('bottom prefixes keep static suffix errors and exact guard boundaries'
   ['entry const answer:Unit->U32=func()=> return do:\n  let stop=(@panic "stop",0)\n  let bad:U32=true\n  break 42\n','type_mismatch'],
   ['entry const answer:Unit->U32=func()=> return @u32.add (@panic "stop") true\n','type_mismatch'],
   ['entry const answer=func()=> return do:\n  let value=42 else:\n    let stop=@array.generate 0 (func(index:U32):U32=> return @panic "callback")\n  break value\n','guard_fallthrough'],
-  ['const ignore=func ~(value:U32)=> return 42\nentry const answer=func()=> return do:\n  let value=42 else:\n    let stop=ignore (@panic "suspended")\n  break value\n','guard_fallthrough'],
+  ['const ignore=func value=> return 42\nentry const answer=func()=> return do:\n  let value=42 else:\n    let stop=ignore (func()=> return @panic "suspended")\n  break value\n','guard_fallthrough'],
   ['entry const answer=func(flag:Bool)=> return do:\n  let value=42\n  if flag:\n    value:=@panic "stop"\n  else:\n    value:=@panic "stop"\n  break 42\n','entry_type'],
  ]as const)await compileExpectedFailure(source,code,undefined,{prelude:'none'});
 });

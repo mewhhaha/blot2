@@ -7,7 +7,7 @@ const runtime = @import("../runtime/cohort_runtime.zig");
 const A = std.mem.Allocator;
 pub fn possible(source: *const wasm.Module) bool {
     if (source.arena == null or source.semantic_sites.items.len == 0 or source.cohorts != null) return false;
-    for (source.table_origins.items) |origin| if (origin.kind == .demand) return true;
+    for (source.table_origins.items) |origin| if (origin.kind == .callable) return true;
     return false;
 }
 /// Search exact private State installation boundaries, in stable function

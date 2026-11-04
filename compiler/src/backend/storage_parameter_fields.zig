@@ -114,8 +114,8 @@ const Walk = struct {
                 if (std.mem.findScalar(u32, self.fields.names.items, projection.field) == null) try self.fields.names.append(self.allocator, projection.field);
                 return;
             },
-            .closure, .suspend_ => {
-                const captures = if (node.tag == .closure) m.closureCaptures(id) else m.suspensionCaptures(id);
+            .closure => {
+                const captures = m.closureCaptures(id);
                 for (captures) |binding| self.wholeBinding(binding);
                 return;
             },

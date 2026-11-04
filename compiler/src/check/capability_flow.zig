@@ -13,7 +13,7 @@ pub fn taskSpawnSource(tree: *const ast.Tree, pool: *const @import("../parse/sym
     if (inner.tag != .lambda) return false;
     const group = tree.parameter(outer.a);
     const action = tree.parameter(inner.a);
-    if (group.name == 0 or action.name == 0 or group.name == action.name or group.demanded or action.demanded or group.is_unit or action.is_unit) return false;
+    if (group.name == 0 or action.name == 0 or group.name == action.name or group.is_unit or action.is_unit) return false;
     const call = tree.node(unwrap(tree, inner.b) orelse return false);
     if (call.tag != .apply) return false;
     const first = tree.node(unwrap(tree, call.a) orelse return false);
@@ -37,7 +37,7 @@ fn taskUnarySource(tree: *const ast.Tree, pool: *const @import("../parse/symbols
     const lambda = tree.node(expression);
     if (lambda.tag != .lambda) return false;
     const parameter = tree.parameter(lambda.a);
-    if (parameter.name == 0 or parameter.demanded or parameter.is_unit) return false;
+    if (parameter.name == 0 or parameter.is_unit) return false;
     const body = tree.node(unwrap(tree, lambda.b) orelse return false);
     if (body.tag != .apply) return false;
     const callee = tree.node(unwrap(tree, body.a) orelse return false);
@@ -50,7 +50,7 @@ pub fn source(tree: *const ast.Tree, initial: ast.Id) Contract {
     const lambda = tree.node(expression);
     if (lambda.tag != .lambda) return .unknown;
     const parameter = tree.parameter(lambda.a);
-    if (parameter.name == 0 or parameter.demanded or parameter.is_unit) return .unknown;
+    if (parameter.name == 0 or parameter.is_unit) return .unknown;
     const body = unwrap(tree, lambda.b) orelse return .unknown;
     const value = tree.node(body);
     if (value.tag == .name and value.a == parameter.name) return .identity;
@@ -76,7 +76,7 @@ pub fn memberSource(tree: *const ast.Tree, pool: *const @import("../parse/symbol
     const lambda = tree.node(expression);
     if (lambda.tag != .lambda) return false;
     const parameter = tree.parameter(lambda.a);
-    if (parameter.name == 0 or parameter.demanded) return false;
+    if (parameter.name == 0) return false;
     const body = unwrap(tree, lambda.b) orelse return false;
     const value = tree.node(body);
     if (value.tag != .apply) return false;
@@ -98,7 +98,7 @@ pub fn curriedUnitSource(tree: *const ast.Tree, initial: ast.Id) bool {
     const lambda = tree.node(expression);
     if (lambda.tag != .lambda) return false;
     const parameter = tree.parameter(lambda.a);
-    if (parameter.name == 0 or parameter.demanded or parameter.is_unit) return false;
+    if (parameter.name == 0 or parameter.is_unit) return false;
     return tree.node(lambda.b).tag == .lambda and source(tree, lambda.b) == .invoke_unit;
 }
 
@@ -109,7 +109,7 @@ pub fn pairMemberSource(tree: *const ast.Tree, pool: *const @import("../parse/sy
     if (inner.tag != .lambda) return null;
     const left = tree.parameter(outer.a);
     const right = tree.parameter(inner.a);
-    if (left.name == 0 or right.name == 0 or left.demanded or right.demanded or left.is_unit or right.is_unit) return null;
+    if (left.name == 0 or right.name == 0 or left.is_unit or right.is_unit) return null;
     const call = tree.node(unwrap(tree, inner.b) orelse return null);
     if (call.tag != .apply or tree.node(unwrap(tree, call.b) orelse return null).tag != .unit) return null;
     var receiver: @import("../parse/symbols.zig").Symbol = 0;
@@ -218,7 +218,7 @@ pub fn parameterArity(tree: *const ast.Tree, initial: ast.Id, annotation_: ast.I
         if (lambda.tag != .lambda) break;
         const parameter = tree.parameter(lambda.a);
         if (parameter.is_unit and count != 0) return 0;
-        if (count == 16 or (parameter.name == 0 and !parameter.is_unit) or parameter.demanded) return 0;
+        if (count == 16 or (parameter.name == 0 and !parameter.is_unit)) return 0;
         count += 1;
         source_id = lambda.b;
         var result = lambda.c;
@@ -259,7 +259,7 @@ pub fn parameterSourceWithContracts(tree: *const ast.Tree, pool: *const @import(
         const lambda = tree.node(expression);
         if (lambda.tag != .lambda) break;
         const parameter = tree.parameter(lambda.a);
-        if (parameter.is_unit and !parameter.demanded and count != 0) {
+        if (parameter.is_unit and count != 0) {
             // The backend's sixteen parameters include the final Unit binder.
             if (count == names.len) return capturedSource(tree, pool, expression, names[0..count]);
             const member = unwrap(tree, lambda.b) orelse return capturedSource(tree, pool, expression, names[0..count]);
@@ -280,7 +280,7 @@ pub fn parameterSourceWithContracts(tree: *const ast.Tree, pool: *const @import(
             return .{ .kind = .member_closure_unit, .inputs = @intCast(count), .mask = selected };
         }
         if (count == names.len) return .{};
-        if (parameter.name == 0 or parameter.demanded or parameter.is_unit) return .{};
+        if (parameter.name == 0 or parameter.is_unit) return .{};
         names[count] = parameter.name;
         count += 1;
         expression = lambda.b;
@@ -447,7 +447,7 @@ pub fn localSourceCall(tree: *const ast.Tree, initial: ast.Id) ?LocalSourceCall 
         const lambda = tree.node(body);
         if (lambda.tag != .lambda) return null;
         const parameter = tree.parameter(lambda.a);
-        if (parameter.name == 0 or parameter.demanded or parameter.is_unit) return null;
+        if (parameter.name == 0 or parameter.is_unit) return null;
         result.parameters[index] = parameter.name;
         body = lambda.b;
     }
@@ -1257,7 +1257,7 @@ fn coreCaptures(module: anytype, source_id: u32, parameters: anytype, aliases: [
             if (value.b == 0) return left;
             return left | (coreCaptures(module, value.b, parameters, aliases, ignored, remaining, depth + 1, closed_rows) orelse return null);
         },
-        .project, .return_, .force => return coreCaptures(module, value.a, parameters, aliases, ignored, remaining, depth + 1, closed_rows),
+        .project, .return_ => return coreCaptures(module, value.a, parameters, aliases, ignored, remaining, depth + 1, closed_rows),
         .construct => return coreCaptures(module, value.b, parameters, aliases, ignored, remaining, depth + 1, closed_rows),
         .closure => {
             if (value.a >= module.closures.len or ignored.len == 64) return null;

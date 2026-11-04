@@ -586,7 +586,7 @@ pub const Loops = struct {
 };
 pub const Rebinding = struct { position: u32, root: u32, self_binding: u32 };
 pub const Projection = struct { position: u32, index: u32, owner: u32 = 0 };
-pub const Signature = struct { position: u32, ty: T.Id, kind: enum { dispatch, demand, demand_left } = .dispatch, once: bool = false };
+pub const Signature = struct { position: u32, ty: T.Id };
 /// A covered predicate was proven by a written top-level clause. Replay
 /// appends it like a residual so the clause covers it again.
 pub const Predicate = struct { value: T.Obligation, position: u32, local: bool = false, covered: bool = false, name: []u8 };
@@ -916,7 +916,7 @@ fn typeHash(source: F.Source, ty: T.Id, hash: *std.crypto.hash.Blake3, budget: *
             }
             return allow_open_rows;
         },
-        .function, .demand, .provider => {
+        .function, .provider => {
             const row = source.row(node.c);
             hashWord(hash, row.labels.len);
             for (source.rowLabels(row.labels)) |label| {
@@ -1220,7 +1220,7 @@ fn closedPaths(source: F.Source, ty: T.Id, target: u32, pool: *const symbols.Poo
     budget.* -= 1;
     const node = source.node(source.head(ty, 0));
     switch (node.tag) {
-        .function, .demand, .provider => {
+        .function, .provider => {
             const tail = source.row(node.c).tail;
             if (tail == .variable and tail.variable == target) {
                 if (count.* == paths.len) return false;
@@ -1776,13 +1776,12 @@ const Shape = struct {
             .parameter => blk: {
                 const p = self.tree.parameter(id);
                 self.name(p.name);
-                self.word(@intFromBool(p.demanded));
                 self.word(@intFromBool(p.is_unit));
                 break :blk self.edges(&.{ p.annotation, p.where_node });
             },
             .apply, .index_access, .type_apply, .type_effect, .type_code => self.edges(&.{ n.a, n.b }),
             .type_function => self.edges(&.{ n.a, n.b, n.c }),
-            .group, .type_demand, .type_witness, .type_descriptor, .forever_stmt, .attribute => self.edge(n.a),
+            .group, .type_witness, .type_descriptor, .forever_stmt, .attribute => self.edge(n.a),
             .name, .intrinsic, .string, .selector, .type_name, .pattern_name, .pattern_value, .constructor_ref => blk: {
                 self.name(n.a);
                 break :blk true;
@@ -2306,7 +2305,7 @@ fn bodyReads(a: A, graph: *const F.Graph, body: *const Body, names: []const []co
                     bytes += @sizeOf(IdentityRead) + nominals[node.a - 1].name.len;
                 }
             },
-            .function, .demand, .provider => {
+            .function, .provider => {
                 const row = source.row(node.c);
                 bytes += @sizeOf(T.Effects.Row) + row.labels.len * 4;
                 for (source.rowLabels(row.labels)) |label| {
@@ -2405,7 +2404,7 @@ const CheckedFields = blk: {
 };
 fn checkedField(comptime name: []const u8) CheckedField {
     return switch (@field(CheckedFields, name)) {
-        .types, .expr_types, .resolved, .bindings, .merges, .obligations, .body_closed_rows, .lambda_closed_rows, .dispatch_signatures, .covered_requirements, .operation_uses, .operation_refs, .constructor_resolved, .projections, .access_paths, .access_nodes, .access_types, .projection_resolved, .projection_catalog, .rebindings, .loop_carries, .loop_ranges, .demand_calls, .demand_once, .demand_types, .demand_binary_left_types, .demand_binary_left, .loop_exits => .facts,
+        .types, .expr_types, .resolved, .bindings, .merges, .obligations, .body_closed_rows, .lambda_closed_rows, .dispatch_signatures, .covered_requirements, .operation_uses, .operation_refs, .constructor_resolved, .projections, .access_paths, .access_nodes, .access_types, .projection_resolved, .projection_catalog, .rebindings, .loop_carries, .loop_ranges, .loop_exits => .facts,
         .proof_contracts, .capability_contracts, .parameter_patterns, .effect_families, .effect_templates, .associated, .nominals, .contracts, .contract_predicates, .contract_members, .implementations, .implementation_predicates, .implementation_members, .member_templates, .selected_proofs, .selected_members, .selected_edges, .selected_uses, .constructors, .tag_origins, .unit => .catalog,
         .editor, .initializer_rejected, .diagnostics, .body_elaborations, .imported_schemes, .counters => .transient,
         .usage_loans, .dictionary_selections, .dictionary_uses, .function_exit_lambdas => .source_records,
@@ -2646,26 +2645,7 @@ fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []c
             needs_selection = true;
             try scratch.signatures.append(a, .{ .position = @intCast(position_), .ty = checked.dispatch_signatures[id] });
         }
-        if (checked.demand_calls[id]) {
-            // Keep the original call classification and its exact suspended
-            // type. Later inference alone cannot recreate this boundary.
-            if (tree.node(id).tag != .apply and tree.node(id).tag != .binary) return null;
-            var proof: std.crypto.hash.Blake3 = .init(.{});
-            var budget: usize = 4096;
-            const suspended = checked.demand_types[id];
-            if (checked.types.node(checked.types.head(suspended, 0)).tag != .demand or !typeHash(.{ .store = &checked.types }, suspended, &proof, &budget, 0, true, &.{}, &.{}, catalog)) return null;
-            type_work += 4096 - budget;
-            try scratch.signatures.append(a, .{ .position = @intCast(position_), .ty = suspended, .kind = .demand, .once = checked.demand_once[id] });
-        }
-        if (checked.demand_binary_left[id]) {
-            if (tree.node(id).tag != .binary) return null;
-            var proof: std.crypto.hash.Blake3 = .init(.{});
-            var budget: usize = 4096;
-            const suspended = checked.demand_binary_left_types[id];
-            if (checked.types.node(checked.types.head(suspended, 0)).tag != .demand or !typeHash(.{ .store = &checked.types }, suspended, &proof, &budget, 0, true, &.{}, &.{}, catalog)) return null;
-            type_work += 4096 - budget;
-            try scratch.signatures.append(a, .{ .position = @intCast(position_), .ty = suspended, .kind = .demand_left });
-        }
+
         const ty = checked.expr_types[id];
         var proof: std.crypto.hash.Blake3 = .init(.{});
         var budget: usize = 4096;
@@ -3412,7 +3392,7 @@ fn eagerClosedPaths(source: F.Source, ty: T.Id, target: u32, pool: *const symbol
     budget.* -= 1;
     const node = source.node(source.head(ty, 0));
     switch (node.tag) {
-        .function, .demand, .provider => {
+        .function, .provider => {
             const tail = source.row(node.c).tail;
             if (tail == .variable and tail.variable == target) {
                 if (count.* == paths.len) return false;
@@ -3511,55 +3491,6 @@ test "lazy closed row paths preserve sparse dense and shared certificate bytes w
     std.debug.print("BLOT_CLOSED_PATH_HASHES sparse={d}/{d} dense={d}/{d} absent={d}/{d} (lazy/eager)\n", .{ sparse_work.lazy_hashes, sparse_work.eager_hashes, dense_work.lazy_hashes, dense_work.eager_hashes, absent.lazy_hashes, absent.eager_hashes });
 }
 
-test "lazy closed row paths retain every role and certificate sorting across live and frozen sources" {
-    const a = std.testing.allocator;
-    var types = try T.Store.init(a);
-    defer types.deinit();
-    var pool: symbols.Pool = .{};
-    defer pool.deinit(a);
-    const left = try pool.intern(a, "left");
-    const right = try pool.intern(a, "right");
-    const first = try types.freshEffects();
-    const second = try types.freshEffects();
-    const targets = [_]u32{ types.row(first).tail.variable, types.row(second).tail.variable };
-    const callback = try types.functionWithEffects(T.unit, T.u32_type, first);
-    const alternate = try types.provider(callback, second);
-    const scoped = try types.scoped(callback, .{ .unit = 1, .decl = 9 });
-    const parameter = try types.capabilityParameter(alternate);
-    const region = try types.freshRegion();
-    const binder = try types.boundType(0, 0);
-    const goals = [_]T.Obligation{.{ .kind = .field, .ty = callback, .other = alternate, .result = scoped, .signature = parameter, .source = 0 }};
-    const forms = [_]T.Id{
-        try types.demandWithEffects(alternate, first),
-        try types.nominal(.{ .unit = 1, .decl = 7 }, &.{ callback, alternate }),
-        try types.projection(.{ .unit = 1, .decl = 8 }, left, &.{ callback, alternate }),
-        try types.instanceSelection(.{ .unit = 1, .decl = 3 }, &.{ scoped, parameter }),
-        try types.usage(callback, .borrow, region),
-        try types.quantifiedWithGoals(.forall, callback, &.{binder}, &goals),
-        try types.quantifiedWithGoals(.existential, alternate, &.{binder}, &goals),
-        try types.stateProvider(callback, alternate, callback),
-        try types.array(callback),
-        try types.sequence(.list, callback),
-        try types.sequence(.cursor, alternate),
-        try types.resolver(callback),
-    };
-    const raw = try types.record(&.{ .{ .name = right, .ty = try types.product(&forms) }, .{ .name = left, .ty = callback } });
-    const reversed = try types.record(&.{ .{ .name = left, .ty = callback }, .{ .name = right, .ty = try types.product(&forms) } });
-    const closed = try types.saveList(&.{ targets[1], targets[0], targets[0] });
-    const public = try types.saveList(targets[0..1]);
-    const graph: F.Graph = .{ .nodes = types.nodes.items, .extra = types.extra.items, .rows = types.effects.rows.items, .labels = types.effects.labels.items, .operations = types.operations.items, .row_variable_count = @intCast(types.effects.variables.items.len), .quantifier_goals = types.quantifier_goals.items, .quantifier_obligations = types.quantifier_obligations.items };
-    for ([_]F.Source{ .{ .store = &types }, .{ .frozen = &graph } }) |source| {
-        for (targets) |target| _ = try compareClosedPaths(source, raw, target, &pool, 4096);
-        for ([_]T.List{ .{}, public }) |binders| {
-            const principal: T.Scheme = .{ .root = raw, .row_variables = binders, .closed_rows = closed };
-            const eager = eagerClosedRowsDigest(source, raw, principal, &pool);
-            try std.testing.expect(eager != null);
-            try std.testing.expectEqual(eager, closedRowsDigest(source, raw, principal, &pool));
-            try std.testing.expectEqual(eager, closedRowsDigest(source, reversed, principal, &pool));
-        }
-    }
-}
-
 test "lazy closed row paths preserve work depth path capacity and missing-field rejection boundaries" {
     const a = std.testing.allocator;
     var types = try T.Store.init(a);
@@ -3600,5 +3531,54 @@ test "lazy closed row paths preserve work depth path capacity and missing-field 
         const eager = eagerClosedRowsDigest(.{ .store = &types }, callback, principal, &pool);
         try std.testing.expectEqual(count == 128, eager != null);
         try std.testing.expectEqual(eager, closedRowsDigest(.{ .store = &types }, callback, principal, &pool));
+    }
+}
+
+test "lazy closed row paths retain every role and certificate sorting across live and frozen sources" {
+    const a = std.testing.allocator;
+    var types = try T.Store.init(a);
+    defer types.deinit();
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    const left = try pool.intern(a, "left");
+    const right = try pool.intern(a, "right");
+    const first = try types.freshEffects();
+    const second = try types.freshEffects();
+    const targets = [_]u32{ types.row(first).tail.variable, types.row(second).tail.variable };
+    const callback = try types.functionWithEffects(T.unit, T.u32_type, first);
+    const alternate = try types.provider(callback, second);
+    const scoped = try types.scoped(callback, .{ .unit = 1, .decl = 9 });
+    const parameter = try types.capabilityParameter(alternate);
+    const region = try types.freshRegion();
+    const binder = try types.boundType(0, 0);
+    const goals = [_]T.Obligation{.{ .kind = .field, .ty = callback, .other = alternate, .result = scoped, .signature = parameter, .source = 0 }};
+    const forms = [_]T.Id{
+        try types.functionWithEffects(T.unit, alternate, first),
+        try types.nominal(.{ .unit = 1, .decl = 7 }, &.{ callback, alternate }),
+        try types.projection(.{ .unit = 1, .decl = 8 }, left, &.{ callback, alternate }),
+        try types.instanceSelection(.{ .unit = 1, .decl = 3 }, &.{ scoped, parameter }),
+        try types.usage(callback, .borrow, region),
+        try types.quantifiedWithGoals(.forall, callback, &.{binder}, &goals),
+        try types.quantifiedWithGoals(.existential, alternate, &.{binder}, &goals),
+        try types.stateProvider(callback, alternate, callback),
+        try types.array(callback),
+        try types.sequence(.list, callback),
+        try types.sequence(.cursor, alternate),
+        try types.resolver(callback),
+    };
+    const raw = try types.record(&.{ .{ .name = right, .ty = try types.product(&forms) }, .{ .name = left, .ty = callback } });
+    const reversed = try types.record(&.{ .{ .name = left, .ty = callback }, .{ .name = right, .ty = try types.product(&forms) } });
+    const closed = try types.saveList(&.{ targets[1], targets[0], targets[0] });
+    const public = try types.saveList(targets[0..1]);
+    const graph: F.Graph = .{ .nodes = types.nodes.items, .extra = types.extra.items, .rows = types.effects.rows.items, .labels = types.effects.labels.items, .operations = types.operations.items, .row_variable_count = @intCast(types.effects.variables.items.len), .quantifier_goals = types.quantifier_goals.items, .quantifier_obligations = types.quantifier_obligations.items };
+    for ([_]F.Source{ .{ .store = &types }, .{ .frozen = &graph } }) |source| {
+        for (targets) |target| _ = try compareClosedPaths(source, raw, target, &pool, 4096);
+        for ([_]T.List{ .{}, public }) |binders| {
+            const principal: T.Scheme = .{ .root = raw, .row_variables = binders, .closed_rows = closed };
+            const eager = eagerClosedRowsDigest(source, raw, principal, &pool);
+            try std.testing.expect(eager != null);
+            try std.testing.expectEqual(eager, closedRowsDigest(source, raw, principal, &pool));
+            try std.testing.expectEqual(eager, closedRowsDigest(source, reversed, principal, &pool));
+        }
     }
 }

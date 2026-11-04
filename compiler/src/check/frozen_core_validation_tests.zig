@@ -638,7 +638,7 @@ test "portable typed staging resource bodies retain cleanup loan and effect owne
         var remaining: usize = 65536;
         const saved_types = try a.dupe(T.Node, m.types.nodes);
         defer a.free(saved_types);
-        for (m.types.nodes) |*node| if (node.tag == .function or node.tag == .demand) {
+        for (m.types.nodes) |*node| if (node.tag == .function) {
             node.c = 0;
         };
         try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").quoteEffects(&m, quote, m.bodies[1].closed_rows, &remaining));
@@ -790,7 +790,7 @@ test "portable typed staging reconstructs handled callback effects despite coord
     const rows = m.bodies[m.bodies.len - 1].closed_rows;
     const saved_types = try a.dupe(T.Node, m.types.nodes);
     defer a.free(saved_types);
-    for (m.types.nodes) |*node| if (node.tag == .function or node.tag == .demand or node.tag == .provider) {
+    for (m.types.nodes) |*node| if (node.tag == .function or node.tag == .provider) {
         node.c = 0;
     };
     var remaining: usize = 65536;
@@ -806,7 +806,7 @@ test "portable typed staging reconstructs uncalled future closure effects despit
     );
     defer m.deinit(a);
     try verified(a, &m);
-    for (m.types.nodes) |*node| if (node.tag == .function or node.tag == .demand) {
+    for (m.types.nodes) |*node| if (node.tag == .function) {
         node.c = 0;
     };
     try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
@@ -911,7 +911,7 @@ test "portable typed staging reconstructs future local scope effects despite coo
     const saved_types = try a.dupe(T.Node, m.types.nodes);
     defer a.free(saved_types);
     for (m.types.nodes) |*node| {
-        if (node.tag == .function or node.tag == .demand) node.c = 0;
+        if (node.tag == .function) node.c = 0;
     }
     remaining = 65536;
     try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").quoteEffects(&m, quote, .{}, &remaining));
@@ -972,10 +972,10 @@ test "typed staging declaration projection retains exact inputs and invalidates 
     try std.testing.expect(try projection.definitionEqual(a, &before, &after, before.bodies[1].binding));
 }
 
-test "portable typed staging rejects forged pure rows on quoted operations and forced demands" {
+test "portable typed staging rejects forged pure rows on quoted operations and invoked callbacks" {
     const sources = [_][]const u8{
         "effect Read: Unit -> U32\nconst generated = @code.quote (Read ())\n",
-        "effect Read: Unit -> U32\nconst generated = @code.quote ((func ~value => return @demand value) (Read ()))\n",
+        "effect Read: Unit -> U32\nconst generated = @code.quote ((func callback => return callback ()) (func () => return Read ()))\n",
     };
     for (sources) |source| {
         var m = try lower(a, source);
@@ -994,9 +994,9 @@ test "portable typed staging rejects forged pure rows on quoted operations and f
         }
         try std.testing.expect(forged != 0);
         // Coordinated signature edits also cannot hide the operation actually
-        // requested, or the operation in the force's actual suspension body.
+        // requested, including the invoked callback's actual body.
         for (m.types.nodes) |*ty| {
-            if (ty.tag == .function or ty.tag == .demand) ty.c = 0;
+            if (ty.tag == .function) ty.c = 0;
         }
         try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
     }
@@ -1008,7 +1008,7 @@ test "portable typed staging admits named operation calls and rejects forged pur
     try V.validateBounds(&m, .{});
     try verified(a, &m);
     for (m.types.nodes) |*ty| {
-        if (ty.tag == .function or ty.tag == .demand) ty.c = 0;
+        if (ty.tag == .function) ty.c = 0;
     }
     try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
 }
@@ -1389,7 +1389,7 @@ test "caller scratch handles deep forward structural DAG without a fixed depth p
     @memset(m.merge_ranges, .{});
     @memset(m.dispatch_signatures, 0);
     m.nodes[0] = .{ .tag = .invalid };
-    for (m.nodes[1 .. count - 1], 1..) |*n, i| n.* = .{ .tag = .force, .ty = T.u32_type, .a = @intCast(i + 1) };
+    for (m.nodes[1 .. count - 1], 1..) |*n, i| n.* = .{ .tag = .computation, .ty = T.u32_type, .a = @intCast(i + 1) };
     m.nodes[count - 1] = .{ .tag = .constant, .ty = T.u32_type, .a = 42 };
     m.bodies[1].root = 1;
     const size = try V.scratchSize(&m);
@@ -1399,7 +1399,7 @@ test "caller scratch handles deep forward structural DAG without a fixed depth p
     defer a.free(path);
     try V.validateWithScratch(&m, .{}, .{ .colors = colors, .path = path });
     try std.testing.expectError(error.InvalidArtifact, V.validateWithScratch(&m, .{}, .{ .colors = colors[0 .. size - 1], .path = path }));
-    m.nodes[count - 1] = .{ .tag = .force, .ty = T.u32_type, .a = 1 };
+    m.nodes[count - 1] = .{ .tag = .computation, .ty = T.u32_type, .a = 1 };
     try std.testing.expectError(error.InvalidArtifact, V.validateWithScratch(&m, .{}, .{ .colors = colors, .path = path }));
 }
 
@@ -3108,4 +3108,10 @@ test "portable named qualified resolver composition owns actual predicates in ta
     defer m.deinit(a);
     try verified(a, &m);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, verified, .{&m});
+}
+
+test "portable Code quotes validate their ordinary latent function carrier" {
+    var module = try lower(a, "const generated = @code.quote 42\n");
+    defer module.deinit(a);
+    try verified(a, &module);
 }

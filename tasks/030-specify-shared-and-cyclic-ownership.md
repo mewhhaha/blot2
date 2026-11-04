@@ -6,7 +6,7 @@
 - **Dependencies:** [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier programs / runtime ownership;
   DEMANDS: Effects and lifetime. Sources: [PLAN.md](../PLAN.md),
-  [Demand evaluation](../docs/compiler/DEMANDS.md).
+  [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,8 +17,8 @@ cycle-reclamation strategy.
 
 ## Starting point
 
-[docs/compiler/CONTRACT.md](../docs/compiler/CONTRACT.md) describes tracing, local
-lifetime groups and the State → closure → cached-demand cycle.
+[docs/compiler/CONTRACT.md](../docs/compiler/CONTRACT.md) describes tracing,
+local lifetime groups and the State → closure → cached-demand cycle.
 [runtime_layout.zig](../compiler/src/runtime/runtime_layout.zig),
 [arena_runtime.zig](../compiler/src/runtime/arena_runtime.zig) and
 [tests/arena_gc_execution.test.ts](../tests/guest/arena_gc_execution.test.ts)

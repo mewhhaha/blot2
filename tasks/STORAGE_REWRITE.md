@@ -11,17 +11,25 @@ bulk copy/fill loops. Unchanged merge/quick/Sieve improve **1.64 / 1.35 /
 The independently newer Goose reference and all timing/size tradeoffs remain
 explicit.
 
-All **3,001 native laws compile without LLVM**. All **438 affected native laws**
-pass sampled faults; five focused full-fault laws include three exhaustive
-sweeps. The development family passes 271 native / 250 guests in 76.3s; all 330
-affected guests pass on the release compiler. Full qualification remains
-pending: the full gate reaches 180s after smoke/harness and 282 native passes
-without failures. A fresh inspected NVIDIA frame matches the preceding PNG/trace
-under original budgets; see
-[frame evidence](../benchmarks/evidence/integration/2026-11-04-sort-hills-frame.json).
-Broader gameplay/software-adapter checks and Pen's normal source bridge remain
-pending. Sibling source/assets remain Gdev `38af070`, Ink `ccaf08f`, Pen
-`d159492`.
+The latest
+[feature retirement](../benchmarks/evidence/integration/2026-11-04-demand-retirement.json)
+removes memoized `~` demands in favor of primitive Boolean operators and
+ordinary Unit callbacks. All 2,949 native laws compile without LLVM; the
+affected checks and baseline failures are recorded in that evidence. The final
+function-syntax development family passes 8 native / 26 guests in 28.41s. Full
+qualification remains pending. Three uncached release pairs measure 5.409 →
+5.474s with byte-identical Main: no speed or Wasm-size gain from this deletion.
+A fresh inspected NVIDIA frame matches the prior PNG/trace under original
+budgets. Only Gdev's language compatibility test changes in the siblings; its
+broad collection fixture retains the same admission failure on both compilers.
+
+Keep `List T` and `[]` for immutable building, concatenation and traversal.
+[The packed-sequence pilot](../docs/compiler/PACKED_SEQUENCES.md) models active
+enum payloads and copied scalar tails; its standalone native witness is not yet
+production compiler support. Task 112 must retain List behavior, borrowed views,
+explicit copies and capacity failure semantics while changing representation.
+Indexed mutation remains an Array operation. Measure actual live/reserved bytes
+and source-level execution before accepting the packed backend.
 
 Next measure representation work by record shape and operation, then compare
 creation-backed immutable FrameAccess with shared semantic shapes/transitive

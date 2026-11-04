@@ -164,10 +164,10 @@ test "retained row certificate publication releases every failed allocation" {
 }
 fn ambientReadScenario(allocator: std.mem.Allocator) !void {
     const text =
-        \\const ignore = func ~value => return 42
-        \\const force = func ~value => return @demand value
-        \\entry const ignored = ignore (read ())
-        \\entry const forced = func () => return force (read ())
+        \\const ignore = func value => return 42
+        \\const force = func value => return value ()
+        \\entry const ignored = ignore (func () => return read ())
+        \\entry const forced = func () => return force (func () => return read ())
     ;
     var tokens = try lexer.lex(allocator, text);
     defer tokens.deinit(allocator);
@@ -201,7 +201,7 @@ fn ambientReadScenario(allocator: std.mem.Allocator) !void {
         if (binding.name == pool.lookup("force").?) {
             const function = checked.types.node(binding.scheme.root);
             const argument = checked.types.node(function.a);
-            try std.testing.expectEqual(T.Tag.demand, argument.tag);
+            try std.testing.expectEqual(T.Tag.function, argument.tag);
             try std.testing.expectEqualDeep(checked.types.row(argument.c).tail, checked.types.row(function.c).tail);
             try std.testing.expectEqual(@as(u32, 1), binding.scheme.row_variables.len);
             verified += 1;
@@ -209,10 +209,10 @@ fn ambientReadScenario(allocator: std.mem.Allocator) !void {
     }
     try std.testing.expectEqual(@as(usize, 3), verified);
 }
-test "ordinary ambient rows preserve forced demand effects while ignored demand effects stay latent" {
+test "ordinary ambient rows preserve invoked callback effects while ignored callback effects stay latent" {
     try ambientReadScenario(a);
 }
-test "ambient and demanded row inference releases every failed allocation" {
+test "ambient and callback row inference releases every failed allocation" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, ambientReadScenario, .{});
 }
 test "pure initializer and callback constraints retain their distinct effect diagnostics" {
@@ -457,15 +457,15 @@ fn providerSource(allocator: std.mem.Allocator) !void {
         \\const provider = @effect.provider Read (func () => return 42)
         \\const read = func () => return Read ()
         \\const invoke = func callback => return callback ()
-        \\const force = func ~value => return @demand value
-        \\const ignore = func ~value => return 42
+        \\const force = func value => return value ()
+        \\const ignore = func value => return 42
         \\entry const direct = func () => return do provider:
         \\  break read ()
         \\entry const callback = func () => return do provider:
         \\  break invoke (func () => return Read ())
         \\entry const delayed = func () => return do provider:
-        \\  break force (Read ())
-        \\entry const ignored = func () => return ignore (Read ())
+        \\  break force (func () => return Read ())
+        \\entry const ignored = func () => return ignore (func () => return Read ())
         \\type State a is effect = { get:Unit -> a, set:a -> Unit }
         \\const state_provider = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[41]
         \\entry const stateful = func () => return do state_provider:
@@ -516,7 +516,7 @@ fn providerSource(allocator: std.mem.Allocator) !void {
 test "ordinary providers and State blocks retain exact ambient rows and separate public results" {
     try providerSource(a);
 }
-test "provider constructors blocks and latent demand captures release every failed allocation" {
+test "provider constructors blocks and latent callback captures release every failed allocation" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, providerSource, .{});
 }
 test "provider primitive targets arity sealed labels and signatures match source restrictions" {
@@ -1052,7 +1052,7 @@ test "scoped effect operation aliases and local callbacks remain usable" {
     try checkScopedSource(a, scoped_state_header ++ "entry const answer = func () => return @effect.scope (func (s: State U32) => return do:\n  let capability = s\n  let read = capability.get\n  let write = capability.set\n  let local = func () => return read ()\n  let (state, result) = do (@effect.state read write 7):\n    break local ()\n  break result\n)\n", null);
 }
 
-test "scoped effect rejects operation aggregate demand and generic authority escapes" {
+test "scoped effect rejects operation aggregate callback and generic authority escapes" {
     const suffixes = [_][]const u8{
         "s.get",
         "#[s]",
@@ -1837,15 +1837,15 @@ test "scoped effect direct scope callback preserves an older State cell without 
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, directScopeOlderStateLaw, .{});
 }
 
-fn demandedConstructionLaw(allocator: std.mem.Allocator) !void {
-    const prefix = scoped_state_header ++ "const delay = func ~value => return value\n";
+fn callbackConstructionLaw(allocator: std.mem.Allocator) !void {
+    const prefix = scoped_state_header ++ "const delay = func value => return value\n";
     try checkScopedSource(allocator, prefix ++
         \\entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
         \\  let ignored = s
-        \\  let pending = delay (@effect.scope (func (local: State U32) => return do (@effect.state local.get local.set 42):
+        \\  let pending = delay (func () => return @effect.scope (func (local: State U32) => return do (@effect.state local.get local.set 42):
         \\    break local.get ()
         \\  ))
-        \\  use result <- @demand pending
+        \\  use result <- pending ()
         \\  let (state, value) = result
         \\  break value
         \\)
@@ -1853,38 +1853,38 @@ fn demandedConstructionLaw(allocator: std.mem.Allocator) !void {
     try checkScopedSource(allocator, prefix ++
         \\entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
         \\  let ignored = s
-        \\  let pending = delay (do:
+        \\  let pending = delay (func () => return do:
         \\    let local = 42
         \\    break local
         \\  )
-        \\  use finished <- @demand pending
+        \\  use finished <- pending ()
         \\  break finished
         \\)
     , null);
     try checkScopedSource(allocator, prefix ++
         \\entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
-        \\  let pending = delay (do:
+        \\  let pending = delay (func () => return do:
         \\    let captured = s
         \\    break 42
         \\  )
-        \\  use finished <- @demand pending
-        \\  break finished
+        \\  use finished <- pending ()
+        \\  break pending
         \\)
     , .capability_escape);
     try checkScopedSource(allocator, prefix ++
         \\entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
-        \\  let pending = delay (do:
+        \\  let pending = delay (func () => return do:
         \\    let captured = s.get
         \\    break 42
         \\  )
-        \\  use finished <- @demand pending
-        \\  break finished
+        \\  use finished <- pending ()
+        \\  break pending
         \\)
     , .capability_escape);
 }
-test "demand construction capture proof admits local values and rejects fresh authority independently of scalar result" {
-    try demandedConstructionLaw(a);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, demandedConstructionLaw, .{});
+test "callbacks retain local values and reject escaping fresh authority" {
+    try callbackConstructionLaw(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, callbackConstructionLaw, .{});
 }
 
 const generic_local_state_source = scoped_state_header ++

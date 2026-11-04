@@ -511,26 +511,6 @@ test "artifact imports decline malformed identity fresh producers changed bodies
     }
 }
 
-test "artifact demand cell descriptors reject forged ordinary callable source without mutating retained facts" {
-    var fixture = try Fixture.init(false);
-    defer fixture.deinit();
-    var producer = try Generator.init(&fixture);
-    defer producer.deinit();
-    _ = try buildInputs(&producer, &fixture);
-    var pools = try capture(&producer, &fixture);
-    defer pools.deinit(a);
-    pools.captures[0].demand_cell = true;
-    try std.testing.expect(fixture.units[1].node(pools.captures[0].node).tag != .suspend_);
-    const before = artifacts.stamp(pools.captures);
-    var consumer = try Generator.init(&fixture);
-    defer consumer.deinit();
-    var imports = try importer.Importer.init(a, &pools, fixture.units, fixture.names.view(), 2);
-    defer imports.deinit();
-    try std.testing.expectEqual(@as(?u32, null), try imports.importResultTemplate(&consumer, 1));
-    try std.testing.expectEqual(before, artifacts.stamp(pools.captures));
-    try std.testing.expectEqual(@as(usize, 0), consumer.planning.template_catalog.items.len);
-}
-
 fn callableEndpointImport(allocator: Allocator, old: *const artifacts.Pools, inputs: Inputs, fixture: *const Fixture) !void {
     var current = try Generator.initAt(allocator, fixture);
     defer current.deinit();
@@ -693,7 +673,7 @@ fn referenceLayout(store: *const layout.Store, id: u32, depth: usize) bool {
     return switch (n.tag) {
         .invalid, .erased => false,
         .function => referenceRow(store, n.c, depth + 1) and referenceLayout(store, n.a, depth + 1) and referenceLayout(store, n.b, depth + 1),
-        .demand, .provider => referenceRow(store, n.c, depth + 1) and referenceLayout(store, n.a, depth + 1),
+        .provider => referenceRow(store, n.c, depth + 1) and referenceLayout(store, n.a, depth + 1),
         .array, .list, .cursor, .resolver => referenceLayout(store, n.a, depth + 1),
         .state_provider => referenceLayout(store, n.a, depth + 1) and referenceLayout(store, n.b, depth + 1) and referenceLayout(store, n.c, depth + 1),
         .product, .record, .nominal => blk: {

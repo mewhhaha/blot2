@@ -90,7 +90,7 @@ fn NominalStore(comptime Store: type, comptime Nominals: type) type {
             const storage = self.store.extra;
             const values = if (comptime @hasField(@TypeOf(storage), "items")) storage.items else storage;
             switch (value.tag) {
-                .usage, .array, .list, .cursor, .demand, .forall, .existential, .resolver, .provider, .scoped => if (!self.valid(value.a)) return error.TypeLimit,
+                .usage, .array, .list, .cursor, .forall, .existential, .resolver, .provider, .scoped => if (!self.valid(value.a)) return error.TypeLimit,
                 .function => if (!self.valid(value.a) or !self.valid(value.b)) return error.TypeLimit,
                 else => {},
             }
@@ -219,7 +219,7 @@ fn inspectWithMemo(store: anytype, root: T.Id, comptime mode: Mode, work: *Work,
         }
         var children: [1]T.Id = .{node.a};
         const edges: []const T.Id = switch (node.tag) {
-            .usage, .array, .list, .cursor, .demand, .forall, .existential => &children,
+            .usage, .array, .list, .cursor, .forall, .existential => &children,
             .product => store.list(.{ .start = node.a, .len = node.b }),
             .nominal, .projection => store.nominalArguments(node),
             .function => blk: {
@@ -640,31 +640,6 @@ fn Walker(comptime Engine: type) type {
                 _ = try self.expression(node.b, depth + 1);
                 return .live;
             };
-            if (node.tag == .apply and self.engine.demand_types[source] != 0) {
-                if (try self.expression(node.a, depth + 1) == .exit) return .exit;
-                var captured: std.ArrayList(u32) = .empty;
-                defer captured.deinit(self.engine.allocator);
-                try self.captures(node.b, source, self.engine.demand_once[source], &captured, depth + 1);
-                const prior = try self.snapshot();
-                defer self.engine.allocator.free(prior);
-                // The delayed body owns moved captures in its new environment.
-                // Restore the consumed outer state after checking that body.
-                for (captured.items) |binding| if (self.state(binding)) |entry| {
-                    entry.first = 0;
-                };
-                const outer_returns = self.returns;
-                const outer_breaks = self.breaks;
-                self.returns = null;
-                self.breaks = null;
-                defer {
-                    self.states.shrinkRetainingCapacity(prior.len);
-                    @memcpy(self.states.items, prior);
-                    self.returns = outer_returns;
-                    self.breaks = outer_breaks;
-                }
-                _ = try self.expression(node.b, depth + 1);
-                return .live;
-            }
             switch (node.tag) {
                 .name, .task_region => try self.use(self.engine.resolved[source], source),
                 .lambda => try self.lambda(source, depth + 1),
@@ -696,7 +671,7 @@ fn Walker(comptime Engine: type) type {
                     var callee_source = node.a;
                     while (self.engine.tree.node(callee_source).tag == .group) callee_source = self.engine.tree.node(callee_source).a;
                     const callee_node = self.engine.tree.node(callee_source);
-                    if (node.tag == .apply and callee_node.tag == .intrinsic and (std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@usage.share") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@resource.release") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@demand") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@demand"))) return self.expression(node.b, depth + 1);
+                    if (node.tag == .apply and callee_node.tag == .intrinsic and (std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@usage.share") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@resource.release"))) return self.expression(node.b, depth + 1);
                     if (node.tag == .apply and callee_node.tag == .intrinsic and (std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@usage.read") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@usage.length"))) {
                         var operand = node.b;
                         while (self.engine.tree.node(operand).tag == .group) operand = self.engine.tree.node(operand).a;

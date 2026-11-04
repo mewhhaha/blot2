@@ -495,7 +495,7 @@ fn Builder(comptime Module: type) type {
                     try self.capture(value.a, environment, captures, count, depth + 1);
                     if (value.b != 0) try self.capture(value.b, environment, captures, count, depth + 1);
                 },
-                .resource_release, .usage_share, .usage_read, .project, .return_, .force => try self.capture(value.a, environment, captures, count, depth + 1),
+                .resource_release, .usage_share, .usage_read, .project, .return_ => try self.capture(value.a, environment, captures, count, depth + 1),
                 .task => for (self.module.children(source)) |operand| try self.capture(operand, environment, captures, count, depth + 1),
                 .resource_scope => {
                     try self.capture(value.a, environment, captures, count, depth + 1);
@@ -511,7 +511,7 @@ fn Builder(comptime Module: type) type {
                     if ((self.module.constructors[value.a].payload == 0) != (value.b == 0)) return error.Unavailable;
                     if (value.b != 0) try self.capture(value.b, environment, captures, count, depth + 1);
                 },
-                .closure, .suspend_ => {
+                .closure => {
                     if (value.a >= self.module.closures.len) return error.Unavailable;
                     const closure = self.module.closures[value.a];
                     var nested = environment.*;
@@ -661,7 +661,7 @@ pub fn deriveInputFunctionClosureWithOwners(allocator: A, store: *terms.Store, m
             return root;
         }
         const next = builder.node(closure.body, 0) catch return null;
-        if ((next.tag != .closure and next.tag != .suspend_) or next.a >= module.closures.len) return null;
+        if ((next.tag != .closure) or next.a >= module.closures.len) return null;
         closure = module.closures[next.a];
     }
     return null;

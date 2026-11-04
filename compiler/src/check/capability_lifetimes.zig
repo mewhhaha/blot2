@@ -9,8 +9,8 @@ pub const Id = u32;
 pub const Error = A.Error || error{ InvalidArtifact, LifetimeEscape, AnalysisLimit, Unsupported };
 pub const Site = struct { unit: u32 = 0, binding: u32 = 0, node: C.Id = 0 };
 pub const TypeOrigin = struct { unit: u32, ty: T.Id };
-pub const Kind = enum { scalar, unknown, capability, product, record, wrapper, selection, callable, memo, operation, provider, state_provider, cell, scope, activation, nominal, event, external };
-pub const Node = struct { site: Site, context: u32 = 0, invocation: ?u32 = null, closure: ?u32 = null, kind: Kind, owner: Id, depth: u32, field: u32 = 0, contents: Id = 0, first_edge: ?u32 = null, ready: bool = false, nominal: T.NominalIdentity = .{ .unit = 0, .decl = 0 }, target: ?Site = null, signature: ?TypeOrigin = null, mappings: C.List = .{}, actual_mappings: C.List = .{} };
+pub const Kind = enum { scalar, unknown, capability, product, record, wrapper, selection, callable, operation, provider, state_provider, cell, scope, activation, nominal, event, external };
+pub const Node = struct { site: Site, context: u32 = 0, invocation: ?u32 = null, closure: ?u32 = null, kind: Kind, owner: Id, depth: u32, field: u32 = 0, contents: Id = 0, first_edge: ?u32 = null, nominal: T.NominalIdentity = .{ .unit = 0, .decl = 0 }, target: ?Site = null, signature: ?TypeOrigin = null, mappings: C.List = .{}, actual_mappings: C.List = .{} };
 pub const EdgeKind = enum { value, capture, store, result, call };
 pub const Edge = struct { from: Id, to: Id, kind: EdgeKind, field: u32 = 0, next: ?u32 = null };
 pub const Invocation = struct { parent: ?u32, caller: Site, callable: Id };
@@ -59,51 +59,34 @@ const Environment = struct {
     }
 };
 const ActiveCall = struct { module: *const C.Module, body: C.Id, parent: ?*const ActiveCall };
-const Callable = struct { value: Id, module: *const C.Module, binding: u32, body: C.Id, parameters: []const C.Parameter, environment: Environment, arguments: [16]Id = undefined, count: usize = 0, runtime: bool = false, memo_state: enum { pending, forcing, cached } = .pending, cached: Id = 0 };
+const Callable = struct { value: Id, module: *const C.Module, binding: u32, body: C.Id, parameters: []const C.Parameter, environment: Environment, arguments: [16]Id = undefined, count: usize = 0, runtime: bool = false };
 const Operation = struct { value: Id, module: *const C.Module, metadata: C.OperationValue, receiver: Id, arguments: [16]E.Id = undefined, argument_count: usize = 0 };
 const Provider = struct { read: Id, write: Id = 0, initial: Id, callback: Id = 0 };
 const Frame = struct { read: Id, write: Id, cell: Id, depth: u32, callback: Id, outer: usize };
 const Exit = struct { module: *const C.Module, target: C.Id, value: Id };
 const Control = struct { module: *const C.Module, target: C.Id, depth: u32 };
-const MemoSnapshot = struct { state: @FieldType(Callable, "memo_state"), value: Id };
 const Locations = struct {
     before: []Id,
     joined: []Id,
-    memos: []MemoSnapshot,
-    joined_memos: []MemoSnapshot,
     started: bool = false,
     fn init(scan: *Scan) Error!Locations {
         if (scan.nodes.items.len > scan.remaining) return error.AnalysisLimit;
         scan.remaining -= scan.nodes.items.len;
-        if (scan.callables.items.len > scan.remaining) return error.AnalysisLimit;
-        scan.remaining -= scan.callables.items.len;
         const before = try scan.a.alloc(Id, scan.nodes.items.len);
         errdefer scan.a.free(before);
         const joined = try scan.a.alloc(Id, before.len);
         errdefer scan.a.free(joined);
-        const memos = try scan.a.alloc(MemoSnapshot, scan.callables.items.len);
-        errdefer scan.a.free(memos);
-        const joined_memos = try scan.a.alloc(MemoSnapshot, memos.len);
         for (scan.nodes.items, before) |value_, *slot| slot.* = value_.contents;
-        for (scan.callables.items, memos) |callable, *slot| slot.* = .{ .state = callable.memo_state, .value = callable.cached };
-        return .{ .before = before, .joined = joined, .memos = memos, .joined_memos = joined_memos };
+        return .{ .before = before, .joined = joined };
     }
     fn deinit(self: Locations, a: A) void {
         a.free(self.before);
         a.free(self.joined);
-        a.free(self.memos);
-        a.free(self.joined_memos);
     }
     fn reset(self: Locations, scan: *Scan) Error!void {
         for (scan.nodes.items[0..self.before.len], self.before) |*value_, slot| {
             try scan.step(0);
             value_.contents = slot;
-        }
-        for (scan.callables.items[0..self.memos.len], self.memos) |*callable, saved| {
-            try scan.step(0);
-            callable.memo_state = saved.state;
-            callable.cached = saved.value;
-            scan.nodes.items[callable.value].ready = saved.state == .cached;
         }
     }
     fn collect(self: *Locations, scan: *Scan, module: *const C.Module, source: C.Id) Error!void {
@@ -112,14 +95,6 @@ const Locations = struct {
             const actual = scan.nodes.items[index].contents;
             if (!self.started or self.joined[index] == actual) self.joined[index] = actual else self.joined[index] = try scan.aggregate(module, source, .selection, &.{ self.joined[index], actual });
         }
-        for (scan.callables.items[0..self.memos.len], 0..) |callable, index| {
-            try scan.step(0);
-            const actual: MemoSnapshot = .{ .state = callable.memo_state, .value = callable.cached };
-            if (!self.started) self.joined_memos[index] = actual else {
-                if (self.joined_memos[index].state != actual.state) return error.Unsupported;
-                if (actual.state == .cached) self.joined_memos[index].value = self.joined[callable.value];
-            }
-        }
         self.started = true;
     }
     fn finish(self: Locations, scan: *Scan) Error!void {
@@ -127,12 +102,6 @@ const Locations = struct {
         for (scan.nodes.items[0..self.joined.len], self.joined) |*value_, slot| {
             try scan.step(0);
             value_.contents = slot;
-        }
-        for (scan.callables.items[0..self.joined_memos.len], self.joined_memos) |*callable, saved| {
-            try scan.step(0);
-            callable.memo_state = saved.state;
-            callable.cached = saved.value;
-            scan.nodes.items[callable.value].ready = saved.state == .cached;
         }
     }
 };
@@ -251,7 +220,7 @@ const Scan = struct {
                 if (owner) |wanted| if (current.owner == wanted) return true;
                 if (younger) |depth| if (current.depth > depth) return true;
             }
-            if ((current.kind == .cell or current.kind == .memo) and !seen[current.contents]) {
+            if (current.kind == .cell and !seen[current.contents]) {
                 seen[current.contents] = true;
                 pending[len] = current.contents;
                 len += 1;
@@ -364,10 +333,10 @@ const Scan = struct {
         var slot: usize = 0;
         while (graph.edge(vertex, slot)) |child| : (slot += 1) try self.captureBindings(graph, child, environment, depth + 1);
     }
-    fn closure(self: *Scan, module: *const C.Module, source: C.Id, catalog: u32, environment: *const Environment, memo: bool, depth: usize) Error!Id {
+    fn closure(self: *Scan, module: *const C.Module, source: C.Id, catalog: u32, environment: *const Environment, depth: usize) Error!Id {
         if (catalog >= module.closures.len) return error.InvalidArtifact;
         const closure_ = module.closures[catalog];
-        const result = try self.value(module, source, if (memo) .memo else .callable);
+        const result = try self.value(module, source, .callable);
         const mappings_ = try self.mappings(environment.types[0..environment.type_len]);
         self.nodes.items[result].closure = catalog;
         self.nodes.items[result].target = .{ .unit = module.unit, .binding = self.binding, .node = closure_.body };
@@ -496,7 +465,7 @@ const Scan = struct {
             }
             return try self.sink(module, source, &.{ function, argument });
         }
-        for (self.callables.items, 0..) |callable, index| {
+        for (self.callables.items) |callable| {
             try self.step(depth);
             if (callable.value != function) continue;
             var invocation = callable;
@@ -532,11 +501,6 @@ const Scan = struct {
                 try self.callables.append(self.a, invocation);
                 return partial;
             }
-            if (self.nodes.items[function].kind == .memo) {
-                if (callable.memo_state == .cached) return callable.cached;
-                if (callable.memo_state == .forcing) return error.Unsupported;
-                self.callables.items[index].memo_state = .forcing;
-            }
             if (callable.runtime) return try self.sink(module, source, invocation.arguments[0..invocation.count]);
             // Recursive execution is outside this finite value graph's proof
             // domain. It supplies no complete confinement report; the other
@@ -569,13 +533,6 @@ const Scan = struct {
             if (evaluated == null) self.complete = false;
             const result = evaluated orelse 0;
             try self.edge(call, result, .result, 0);
-            if (self.nodes.items[function].kind == .memo) {
-                self.callables.items[index].memo_state = .cached;
-                self.callables.items[index].cached = result;
-                self.nodes.items[function].contents = result;
-                self.nodes.items[function].ready = true;
-                try self.edge(function, result, .result, 0);
-            }
             return result;
         }
         return try self.sink(module, source, &.{ function, argument });
@@ -688,7 +645,7 @@ const Scan = struct {
             // These forms reconstruct an existing value, without reexecuting
             // outside stores or arbitrary initialization calls in this scope.
             switch (initial.tag) {
-                .constant, .type_constructor, .reference, .closure, .suspend_, .record, .product, .array, .construct => {},
+                .constant, .type_constructor, .reference, .closure, .record, .product, .array, .construct => {},
                 else => return error.Unsupported,
             }
             const actual = (try self.expression(module, binding.initializer, environment, depth + 1)) orelse return error.Unsupported;
@@ -829,11 +786,7 @@ const Scan = struct {
                 _ = (try self.expression(module, n.a, environment, depth + 1)) orelse return null;
                 return self.branches(module, source, n.b, 0, environment, depth + 1);
             },
-            .closure, .suspend_ => return try self.closure(module, source, n.a, environment, n.tag == .suspend_, depth),
-            .force => {
-                const demand = (try self.expression(module, n.a, environment, depth + 1)) orelse return null;
-                return try self.invoke(module, source, demand, 0, depth + 1);
-            },
+            .closure => return try self.closure(module, source, n.a, environment, depth),
             .apply => {
                 const function = (try self.expression(module, n.a, environment, depth + 1)) orelse return null;
                 const argument = (try self.expression(module, n.b, environment, depth + 1)) orelse return null;

@@ -1,11 +1,13 @@
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
-Deno.test("default dollar preserves primitive arity, demand and nested callback boundaries", async () => {
+Deno.test("default dollar preserves primitive arity and nested callback boundaries", async () => {
   await compileAndRun(`
-const ignore = func ~(value: U32) => return 42
-const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
-entry const skipped = func () => return ignore $ @panic "unused demand"
-entry const repeated = func (value: U32) => return twice $ @u32.add value 1
+const ignore = func value => return 42
+const twice = func value => return do:
+  let saved = value ()
+  break @u32.add saved saved
+entry const skipped = func () => return ignore $ func () => return @panic "unused callback"
+entry const repeated = func (value: U32) => return twice $ func () => return @u32.add value 1
 entry const generated = func (value: U32) => return do:
   let values = @array.generate 3 $ func index => return do:
     if @u32.eq index 0:

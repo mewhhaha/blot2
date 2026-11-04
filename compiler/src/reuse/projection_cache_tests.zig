@@ -120,34 +120,6 @@ test "subtree projection keys belong to both source and semantic owners" {
     try std.testing.expectEqual(try another.project(&first, list, &.{}), moved);
 }
 
-test "subtree projection shares all semantic forms while preserving phantom and effect arguments" {
-    const a = std.testing.allocator;
-    var source = try T.Store.initWithOptions(a, .{ .closed_graphs = true });
-    defer source.deinit();
-    var target = try E.Store.init(a);
-    defer target.deinit();
-    var cache: Cache = .{};
-    defer cache.deinit(a);
-    const integer = try source.nominal(.{ .unit = 3, .decl = 7 }, &.{T.u32_type});
-    const floating = try source.nominal(.{ .unit = 3, .decl = 7 }, &.{T.f32_type});
-    const read = try source.nominal(.{ .unit = 3, .decl = 8 }, &.{integer});
-    const write = try source.nominal(.{ .unit = 3, .decl = 9 }, &.{integer});
-    const operation = try source.internOperation(.{ .unit = 3, .decl = 8 }, &.{integer});
-    const row = try source.effects.row(&.{operation}, .closed);
-    const constructor = try source.typeConstructor(.{ .unit = 3, .decl = 7 });
-    const shapes = [_]u32{
-        T.unit,                                                 T.boolean,                                                                               T.u32_type,                                 T.f32_type,                     T.never,                                        integer,     floating,
-        try source.array(integer),                              try source.sequence(.list, integer),                                                     try source.demandWithEffects(integer, row), try source.provider(read, row), try source.stateProvider(read, write, integer), constructor, try source.resolver(constructor),
-        try source.functionWithEffects(floating, integer, row), try source.record(&.{ .{ .name = 11, .ty = integer }, .{ .name = 3, .ty = floating } }),
-    };
-    const root = try source.product(&shapes);
-    const expected = try compare(&cache, &source, &target, root);
-    try std.testing.expectEqual(expected, try compare(&cache, &source, &target, root));
-    try std.testing.expect(try compare(&cache, &source, &target, integer) != try compare(&cache, &source, &target, floating));
-    source.effects.physical_epoch = std.math.maxInt(u64);
-    try std.testing.expectEqual(expected, try compare(&cache, &source, &target, root));
-}
-
 fn ownedLabelsScenario(a: Allocator) !void {
     var source = try T.Store.initWithOptions(a, .{ .closed_graphs = true });
     defer source.deinit();
@@ -234,4 +206,32 @@ test "owned projection label hits charge exact argument visits and depth" {
         if (expected) |value| try std.testing.expectEqual(value, try actual) else |err| try std.testing.expectError(err, actual);
         if (k == 1022 - 100) try std.testing.expectError(error.EvidenceLimit, actual);
     }
+}
+
+test "subtree projection shares all semantic forms while preserving phantom and effect arguments" {
+    const a = std.testing.allocator;
+    var source = try T.Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer source.deinit();
+    var target = try E.Store.init(a);
+    defer target.deinit();
+    var cache: Cache = .{};
+    defer cache.deinit(a);
+    const integer = try source.nominal(.{ .unit = 3, .decl = 7 }, &.{T.u32_type});
+    const floating = try source.nominal(.{ .unit = 3, .decl = 7 }, &.{T.f32_type});
+    const read = try source.nominal(.{ .unit = 3, .decl = 8 }, &.{integer});
+    const write = try source.nominal(.{ .unit = 3, .decl = 9 }, &.{integer});
+    const operation = try source.internOperation(.{ .unit = 3, .decl = 8 }, &.{integer});
+    const row = try source.effects.row(&.{operation}, .closed);
+    const constructor = try source.typeConstructor(.{ .unit = 3, .decl = 7 });
+    const shapes = [_]u32{
+        T.unit,                                                 T.boolean,                                                                               T.u32_type,                                           T.f32_type,                     T.never,                                        integer,     floating,
+        try source.array(integer),                              try source.sequence(.list, integer),                                                     try source.functionWithEffects(T.unit, integer, row), try source.provider(read, row), try source.stateProvider(read, write, integer), constructor, try source.resolver(constructor),
+        try source.functionWithEffects(floating, integer, row), try source.record(&.{ .{ .name = 11, .ty = integer }, .{ .name = 3, .ty = floating } }),
+    };
+    const root = try source.product(&shapes);
+    const expected = try compare(&cache, &source, &target, root);
+    try std.testing.expectEqual(expected, try compare(&cache, &source, &target, root));
+    try std.testing.expect(try compare(&cache, &source, &target, integer) != try compare(&cache, &source, &target, floating));
+    source.effects.physical_epoch = std.math.maxInt(u64);
+    try std.testing.expectEqual(expected, try compare(&cache, &source, &target, root));
 }

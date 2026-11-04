@@ -36,7 +36,7 @@ fn ordinaryControl(allocator: std.mem.Allocator) !void {
     try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
 }
 
-test "package ordinary composition retains actual Scope request loan and demand owners" {
+test "package ordinary composition retains actual Scope request loan and callback owners" {
     var module = try portableFixture(std.testing.allocator, "package/mixed-composition.blot");
     defer module.deinit(std.testing.allocator);
     try validatePortable(std.testing.allocator, &module);
@@ -93,7 +93,7 @@ test "package symbolic nominal getters retain exact public member authority and 
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, symbolicNominalGetterScenario, .{});
 }
 
-test "package ordinary control keeps request decision loop pattern update and demand owners through OOM" {
+test "package ordinary control keeps request decision loop pattern update and callback owners through OOM" {
     try ordinaryControl(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ordinaryControl, .{});
 }

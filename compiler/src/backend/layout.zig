@@ -12,7 +12,7 @@ pub const erased: Id = 6;
 /// Unknown effects are representation-only facts, distinct from closed empty.
 pub const capability_layout_decl: u32 = 7;
 pub const unknown_row: u32 = std.math.maxInt(u32);
-pub const Tag = enum(u8) { invalid, unit, boolean, u32, f32, never, product, record, nominal, array, list, cursor, function, demand, type_constructor, resolver, erased, provider, state_provider, erased_proof, existential, opened, universal, scoped, owning, associated };
+pub const Tag = enum(u8) { invalid, unit, boolean, u32, f32, never, product, record, nominal, array, list, cursor, function, type_constructor, resolver, erased, provider, state_provider, erased_proof, existential, opened, universal, scoped, owning, associated };
 pub const Node = struct { tag: Tag, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
 pub const Mapping = struct { variable: types.Id, layout: Id, instance: types.NominalIdentity = .{ .unit = 0, .decl = 0 } };
 pub fn mappedInstance(original: types.NominalIdentity, mappings: []const Mapping) types.NominalIdentity {
@@ -191,7 +191,7 @@ pub const Store = struct {
             if (n.tag == .owning) return true;
             const direct = [_]Id{ n.a, n.b, n.c };
             const children_: []const Id = switch (n.tag) {
-                .array, .list, .cursor, .resolver, .demand, .provider, .scoped, .universal, .existential => direct[0..1],
+                .array, .list, .cursor, .resolver, .provider, .scoped, .universal, .existential => direct[0..1],
                 .function => direct[0..2],
                 .state_provider => &direct,
                 .product, .nominal, .record => self.children(id),
@@ -240,7 +240,7 @@ pub const Store = struct {
                 return self.intern(a.tag, body, a.b, self.children(left));
             },
             .array, .list, .cursor, .resolver => return self.intern(a.tag, try self.mergePartialDepth(a.a, b.a, depth + 1, budget), 0, &.{}),
-            .function, .demand, .provider => {
+            .function, .provider => {
                 var row = a.c;
                 if (row == unknown_row) row = b.c;
                 if (b.c != unknown_row and row != b.c) return error.TypeMismatch;
@@ -429,7 +429,7 @@ pub const Store = struct {
     fn internFieldsWithDictionaries(self: *Store, tag: Tag, a: u32, b: u32, row: u32, values: []const u32, slots: ?[]const Id) Error!Id {
         if (tag == .nominal and a == @import("../check/task_types.zig").handle.unit and b == @import("../check/task_types.zig").handle.decl) return self.intern(.product, 0, 0, &.{ types.u32_type, types.u32_type });
         if (tag == .nominal and @import("../check/typed_staging.zig").isIdentity(a, b)) return error.UnresolvedType;
-        if (tag != .state_provider and tag != .scoped and tag != .opened and tag != .associated and ((row != unknown_row and row >= self.effects.rows.items.len) or (row != 0 and tag != .function and tag != .demand and tag != .provider))) return error.TypeMismatch;
+        if (tag != .state_provider and tag != .scoped and tag != .opened and tag != .associated and ((row != unknown_row and row >= self.effects.rows.items.len) or (row != 0 and tag != .function and tag != .provider))) return error.TypeMismatch;
         if (tag == .owning and (a == 0 or a >= self.nodes.items.len or row != 0 or values.len != 0 or (b != @backingInt(types.UsageKind.unique) and b != @backingInt(@import("../check/types.zig").UsageKind.shared)))) return error.TypeMismatch;
         if (tag == .scoped and (a == 0 or a >= self.nodes.items.len or self.node(a).tag != .nominal or b == 0 or row == 0 or values.len != 0)) return error.TypeMismatch;
         if (tag == .state_provider and (a == 0 or b == 0 or row == 0 or a >= self.nodes.items.len or b >= self.nodes.items.len or row >= self.nodes.items.len or values.len != 0)) return error.TypeMismatch;
@@ -565,9 +565,8 @@ pub const Store = struct {
                 .cursor => .cursor,
                 else => .resolver,
             }, try self.fromSolverDepth(source, n.a, depth + 1, budget), 0, &.{}),
-            .function, .demand, .provider => return self.internWithEffects(switch (n.tag) {
+            .function, .provider => return self.internWithEffects(switch (n.tag) {
                 .function => .function,
-                .demand => .demand,
                 else => .provider,
             }, try self.fromSolverDepth(source, n.a, depth + 1, budget), if (n.tag == .function) try self.fromSolverDepth(source, n.b, depth + 1, budget) else 0, try self.fromSolverRow(source, n.c, depth + 1, budget), &.{}),
             .state_provider => return self.internStateProvider(try self.fromSolverDepth(source, n.a, depth + 1, budget), try self.fromSolverDepth(source, n.b, depth + 1, budget), try self.fromSolverDepth(source, n.c, depth + 1, budget)),
@@ -670,7 +669,6 @@ pub const Store = struct {
             .array => return target.intern(.array, try self.toEvidenceDepth(target, n.a, depth + 1, budget, bound_arity), 0, &.{}),
             .list => return target.intern(.list, try self.toEvidenceDepth(target, n.a, depth + 1, budget, bound_arity), 0, &.{}),
             .cursor => return target.intern(.cursor, try self.toEvidenceDepth(target, n.a, depth + 1, budget, bound_arity), 0, &.{}),
-            .demand => return target.internWithEffects(.demand, try self.toEvidenceDepth(target, n.a, depth + 1, budget, bound_arity), 0, try self.toEvidenceRow(target, n.c, depth + 1, budget, bound_arity), &.{}),
             .type_constructor => return target.intern(.type_constructor, n.a, n.b, &.{}),
             .resolver => return target.intern(.resolver, try self.toEvidenceDepth(target, n.a, depth + 1, budget, bound_arity), 0, &.{}),
             .scoped => return target.internWithEffects(.scoped, try self.toEvidenceDepth(target, n.a, depth + 1, budget, bound_arity), n.b, n.c, &.{}),
@@ -726,7 +724,6 @@ pub const Store = struct {
             .array => return self.internExpectation(target, .array, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
             .list => return self.internExpectation(target, .list, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
             .cursor => return self.internExpectation(target, .cursor, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
-            .demand => return self.internExpectation(target, .demand, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
             .type_constructor => return self.internExpectation(target, .type_constructor, n.a, n.b, &.{}),
             .resolver => return self.internExpectation(target, .resolver, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
             .provider => return self.internExpectation(target, .provider, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
@@ -775,7 +772,6 @@ pub const Store = struct {
             .array => return self.intern(.array, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, &.{}),
             .list => return self.intern(.list, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, &.{}),
             .cursor => return self.intern(.cursor, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, &.{}),
-            .demand => return self.internWithEffects(.demand, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, try self.fromEvidenceRow(view, n.c, depth + 1, budget), &.{}),
             .type_constructor => return self.intern(.type_constructor, n.a, n.b, &.{}),
             .resolver => return self.intern(.resolver, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, &.{}),
             .scoped => return self.intern(.nominal, std.math.maxInt(u32), capability_layout_decl, &.{}),
@@ -893,7 +889,6 @@ pub const Store = struct {
             .array => return self.intern(.array, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .list => return self.intern(.list, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .cursor => return self.intern(.cursor, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
-            .demand => return self.internWithEffects(.demand, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, try self.fromTypeRow(module, n.c, mappings, rows, depth + 1, allow_erased), &.{}),
             .type_constructor => return self.intern(.type_constructor, n.a, n.b, &.{}),
             .resolver => return self.intern(.resolver, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .provider => return self.internWithEffects(.provider, try self.fromTypeToken(module, n.a, mappings, rows, depth + 1, allow_erased), 0, try self.fromTypeRow(module, n.c, mappings, rows, depth + 1, allow_erased), &.{}),
@@ -1079,18 +1074,18 @@ test "unresolved latent effects retain representation without asserting purity" 
     defer semantic.deinit();
     var partial = try code_expectation.Store.init(std.testing.allocator);
     defer partial.deinit();
-    const demand = try layouts.internWithEffects(.demand, types.u32_type, 0, unknown_row, &.{});
-    const function = try layouts.internWithEffects(.function, types.unit, demand, unknown_row, &.{});
-    const pure_demand = try layouts.intern(.demand, types.u32_type, 0, &.{});
-    try std.testing.expect(demand != pure_demand);
-    try std.testing.expectEqual(wasm.ValueType.i32, layouts.machine(demand));
-    try std.testing.expectEqual(@as(?wasm.Scalar, null), layouts.abi(demand));
-    try std.testing.expectError(error.UnresolvedType, layouts.toEvidence(&semantic, demand));
+    const latent = try layouts.internWithEffects(.function, types.unit, types.u32_type, unknown_row, &.{});
+    const function = try layouts.internWithEffects(.function, types.unit, latent, unknown_row, &.{});
+    const pure_latent = try layouts.intern(.function, types.unit, types.u32_type, &.{});
+    try std.testing.expect(latent != pure_latent);
+    try std.testing.expectEqual(wasm.ValueType.i32, layouts.machine(latent));
+    try std.testing.expectEqual(@as(?wasm.Scalar, null), layouts.abi(latent));
+    try std.testing.expectError(error.UnresolvedType, layouts.toEvidence(&semantic, latent));
     try std.testing.expectError(error.UnresolvedType, layouts.toEvidence(&semantic, function));
     try std.testing.expectError(error.UnresolvedType, layouts.rowToEvidence(&semantic, unknown_row));
     const expectation = try layouts.toCodeExpectation(&partial, function);
     try std.testing.expectEqual(code_expectation.Tag.function, partial.view().node(expectation).tag);
-    try std.testing.expectEqual(code_expectation.Tag.demand, partial.view().node(partial.view().node(expectation).b).tag);
+    try std.testing.expectEqual(code_expectation.Tag.function, partial.view().node(partial.view().node(expectation).b).tag);
     try std.testing.expectEqual(@as(usize, 6), semantic.nodes.items.len);
 }
 
@@ -1100,8 +1095,8 @@ fn effectLayoutScenario(allocator: Allocator) !void {
     const phantom = try semantic.intern(.nominal, 3, 9, &.{types.f32_type});
     const operation = try semantic.effects.internOperation(.{ .unit = 2, .decl = 8 }, &.{phantom});
     const row = try semantic.effects.internRow(&.{ operation, operation });
-    const demand = try semantic.internWithEffects(.demand, types.u32_type, 0, row, &.{});
-    const function = try semantic.internWithEffects(.function, demand, types.u32_type, row, &.{});
+    const latent = try semantic.internWithEffects(.function, types.unit, types.u32_type, row, &.{});
+    const function = try semantic.internWithEffects(.function, latent, types.u32_type, row, &.{});
     var layouts = try Store.init(allocator);
     defer layouts.deinit();
     _ = try layouts.intern(.record, 0, 0, &.{ 100, types.boolean });

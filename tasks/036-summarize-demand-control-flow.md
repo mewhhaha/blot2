@@ -6,7 +6,7 @@
 - **Dependencies:** [007](007-infer-recursive-components-jointly.md),
   [014](014-specify-unified-query-table.md)
 - **Originating requirements:** DEMANDS: Compiler plan and retained
-  dependencies. Sources: [Demand evaluation](../docs/compiler/DEMANDS.md).
+  dependencies. Sources: [Demand evaluation](../docs/compiler/DEFERRED_WORK.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,8 +17,8 @@ loops and control/provider boundaries.
 
 ## Starting point
 
-[demand_inline.zig](../compiler/src/backend/demand_inline.zig) uses a bounded
-96-node `Plan` for known acyclic expression forwarding.
+[demand_inline.zig](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/compiler/src/backend/demand_inline.zig)
+uses a bounded 96-node `Plan` for known acyclic expression forwarding.
 [core.zig](../compiler/src/check/core.zig) retains `suspend_`/`force`; broader
 retained-body analysis is not implemented.
 
@@ -73,7 +73,7 @@ commands for focused development and the scenarios below.
 - Remaining limitations: Graph-wide read sets conservatively invalidate extra
   consumers; forwarded memo counts can overestimate; portable checkpoints
   reanalyze summaries. Unknown and escaping uses preserve fallback.
-- Durable record: [DEMAND_SUMMARIES.md](../docs/compiler/DEMAND_SUMMARIES.md) and
-  the shared
+- Durable record: [DEMAND_SUMMARIES.md](../docs/compiler/DEMAND_SUMMARIES.md)
+  and the shared
   [qualification](../docs/compiler/RESOLVED_BODIES.md#qualification-11-october-2026),
   including exact compiler/input/harness hashes and median distributions.

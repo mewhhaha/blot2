@@ -63,14 +63,7 @@ rejects affine arguments rather than assuming one call.
 Closure creation transfers owning affine captures or records bounded loans.
 Invoking a once closure transfers its captures to the invocation; abandoning it
 drops them. Many closures cannot hide an affine owned capture. Capturing a
-capability preserves its exact identity and owner region. Demand creation moves
-its captured owners into the demand. Cancellation may retry a demand, so its
-body cannot consume an affine capture without a restart-safe checked protocol. A
-demand parameter moves its captured owners once only when the callee declares it
-affine before generic instantiation (`~(value: unique T)`); a generic demand
-parameter such as `keep = func ~value` stays retryable, so a consuming capture is
-rejected there. This is fixed at the call as `demand_once`. Ready demands retain
-their strong results; usage contracts never weaken memos.
+capability preserves its exact identity and owner region.
 
 ## Resources and exits
 
@@ -82,17 +75,17 @@ lexical loan form. It evaluates the three arguments in written order, calls the
 unit acquisition thunk once, registers the returned unique resource and cleanup
 adapter before exposing a loan to the callback, then ends the loan and attempts
 cleanup exactly once. Acquisition failure registers nothing. Callback evaluation
-uses a fresh region; a returned closure, package, demand or aggregate retaining
-it is rejected. Nested resources clean up in reverse registration order.
-Transfers move the cleanup obligation; loans never move it.
-`@resource.release owner` consumes an explicitly transferred resource and
-invalidates all its capabilities before invoking its registered adapter.
+uses a fresh region; a returned closure, package or aggregate retaining it is
+rejected. Nested resources clean up in reverse registration order. Transfers
+move the cleanup obligation; loans never move it. `@resource.release owner`
+consumes an explicitly transferred resource and invalidates all its capabilities
+before invoking its registered adapter.
 
 Cleanup adapters may use pure operations and synchronous host cleanup authority;
-they cannot suspend, force demands or rely on a source provider that has already
-unwound. Unknown adapters require explicit verified cleanup evidence. This is
-not ordinary function effect inference: host metadata must promise the cleanup
-ABI and synchronous completion. Cleanup must also carry a finite call/iteration
+they cannot suspend or rely on a source provider that has already unwound.
+Unknown adapters require explicit verified cleanup evidence. This is not
+ordinary function effect inference: host metadata must promise the cleanup ABI
+and synchronous completion. Cleanup must also carry a finite call/iteration
 bound; unbounded loops, recursive cycles and unknown higher-order calls are
 rejected. A host adapter supplies a bounded completion contract rather than a
 source termination guess. A cleanup failure records the first failure and
@@ -129,17 +122,17 @@ modules keep their previous representation. Usage/body/adapter edits invalidate
 both semantic contracts and executable cleanup users; failed revisions publish
 nothing.
 
-| Acceptance case                                                    | Result                                               |
-| ------------------------------------------------------------------ | ---------------------------------------------------- |
-| Move `unique T` into a once closure, then call once or discard     | Accept; one owner/drop path.                         |
-| Store the same unique value in two fields                          | Reject duplicate owner.                              |
+| Acceptance case                                                             | Result                                               |
+| --------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Move `unique T` into a once closure, then call once or discard              | Accept; one owner/drop path.                         |
+| Store the same unique value in two fields                                   | Reject duplicate owner.                              |
 | `@usage.borrow value (func loan => return inspect loan)` returning U32      | Accept if inspect has a read-loan contract.          |
 | Return `loan`, `func () => return inspect loan`, or a package containing it | Reject borrow escape.                                |
-| Conditionally invoke once, then invoke it after the branch         | Reject possible second invocation.                   |
-| Resource scopes A then B, callback returns or cancels              | Trace acquire A, acquire B, drop B, drop A.          |
-| Trap/host failure while B lives                                    | Host leave attempts B then A; no stale callback use. |
-| Drop B fails                                                       | Still attempt A; report B failure once.              |
-| Imported function hides duplication or missing cleanup metadata    | Reject before calling it.                            |
+| Conditionally invoke once, then invoke it after the branch                  | Reject possible second invocation.                   |
+| Resource scopes A then B, callback returns or cancels                       | Trace acquire A, acquire B, drop B, drop A.          |
+| Trap/host failure while B lives                                             | Host leave attempts B then A; no stale callback use. |
+| Drop B fails                                                                | Still attempt A; report B failure once.              |
+| Imported function hides duplication or missing cleanup metadata             | Reject before calling it.                            |
 
 061 qualifies source/checker, aliases, branches, loops and imported
 multiplicity. 062 qualifies emitted cleanup, sync/JSPI/trap journals, transfer,
@@ -181,7 +174,7 @@ The initial 062 scope slice admits `@resource.scope` only with direct
 acquisition, cleanup and loan callbacks, with Unit/Bool/U32/F32 payloads or
 Array/List payloads containing only those unqualified primitive elements. A
 finite pure cleanup recipe is checked independently in source and Core; loops,
-named or unknown calls, projections, demands and host cleanup authority require
+named or unknown calls, projections and host cleanup authority require
 additional evidence. This includes qualified names that encode an implicit
 member invocation. Cleanup qualifiers require an owning scope and an actual
 finite executable adapter; a type spelling alone grants no authority. The
@@ -223,13 +216,14 @@ verified backend and zero findings. Source admission and runtime emission must
 integrate as one pair; these focused results do not replace combined release
 qualification.
 
-Regression owners are [usage_check_tests.zig](../../compiler/src/check/usage_check_tests.zig),
+Regression owners are
+[usage_check_tests.zig](../../compiler/src/check/usage_check_tests.zig),
 [usage_backend_tests.zig](../../compiler/src/check/usage_backend_tests.zig),
 [usage_execution.test.ts](../../tests/guest/usage_execution.test.ts),
 [resource_execution.test.ts](../../tests/guest/resource_execution.test.ts),
 [resource_guest.test.ts](../../tests/host/resource_guest.test.ts) and
-[resource_journal.test.ts](../../tests/host/resource_journal.test.ts). Tasks 061 and
-062 remain in progress pending their broader nominal, generic, transfer and
+[resource_journal.test.ts](../../tests/host/resource_journal.test.ts). Tasks 061
+and 062 remain in progress pending their broader nominal, generic, transfer and
 cleanup requirements and the combined release gate. No performance qualification
 is claimed.
 
@@ -422,8 +416,8 @@ the earlier invocation-only qualifications. ABI 6 publishes `unique T` or
 `shared T` results as opaque instance-bound `GuestOwner` handles. `T` must
 satisfy the independently reconstructed closed-storage contract: primitives,
 products, records, Array/List and producer-owned nominal/opaque data, including
-substituted and recursive families. Loans, providers, demands, nested usage and
-callable payloads cannot acquire authority through this boundary.
+substituted and recursive families. Loans, providers, nested usage and callable
+payloads cannot acquire authority through this boundary.
 
 Private typed leases retain a real counted owner edge outside invocation frames.
 They carry an exact payload layout and usage kind, monotonic nonreused IDs and a

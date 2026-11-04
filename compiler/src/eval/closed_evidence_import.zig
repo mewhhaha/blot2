@@ -73,7 +73,6 @@ pub const Importer = struct {
                 .list => .list,
                 else => .cursor,
             }, try self.ty(node.a, depth + 1)),
-            .demand => try self.destination.demandWithEffects(try self.ty(node.a, depth + 1), try self.row(node.c, depth + 1)),
             .resolver => try self.destination.resolver(try self.ty(node.a, depth + 1)),
             .provider => try self.destination.provider(try self.ty(node.a, depth + 1), try self.row(node.c, depth + 1)),
             .state_provider => try self.destination.stateProvider(try self.ty(node.a, depth + 1), try self.ty(node.b, depth + 1), try self.ty(node.c, depth + 1)),

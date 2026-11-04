@@ -562,8 +562,7 @@ export class TaskGuest {
       if (!this.#destination || !this.#moves) {
         invalid("No checked task transfer");
       }
-      // A ready demand can retain the same owner in its old environment and
-      // memo. Both edges denote one obligation in this checked transfer.
+      // Multiple captured edges can denote one checked ownership obligation.
       token >>>= 0;
       if (this.#moves.includes(token)) return;
       // Record allocation precedes the allocation-free journal transaction.

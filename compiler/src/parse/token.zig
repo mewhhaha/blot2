@@ -31,7 +31,6 @@ pub const Tag = enum(u32) {
     at,
     ellipsis,
     backtick,
-    tilde,
     dollar,
     star,
     caret,

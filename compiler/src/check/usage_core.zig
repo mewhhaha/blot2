@@ -120,7 +120,7 @@ const Walker = struct {
                 }
                 try self.liveLoans(node.a, depth + 1);
             },
-            .array, .list, .cursor, .demand => try self.liveLoans(node.a, depth + 1),
+            .array, .list, .cursor => try self.liveLoans(node.a, depth + 1),
             .product => for (self.module.types.list(.{ .start = node.a, .len = node.b })) |child| try self.liveLoans(child, depth + 1),
             .record => for (0..node.b) |index| try self.liveLoans(self.module.types.recordField(node, index).ty, depth + 1),
             .nominal => for (self.module.types.nominalArguments(node)) |child| try self.liveLoans(child, depth + 1),
@@ -135,7 +135,7 @@ const Walker = struct {
                 for (self.regions[0..self.region_count]) |region| if (node.c == region) return true;
                 return self.activeType(node.a, depth + 1);
             },
-            .array, .list, .cursor, .demand => return self.activeType(node.a, depth + 1),
+            .array, .list, .cursor => return self.activeType(node.a, depth + 1),
             .function => return try self.activeType(node.a, depth + 1) or try self.activeType(node.b, depth + 1),
             .product => for (self.module.types.list(.{ .start = node.a, .len = node.b })) |child| {
                 if (try self.activeType(child, depth + 1)) return true;
@@ -163,12 +163,12 @@ const Walker = struct {
         switch (node.tag) {
             .reference => return self.carriesLoan(source, excluded, depth + 1),
             .constant, .primitive_function, .constructor_function, .type_constructor, .panic => return false,
-            .closure, .suspend_ => {
+            .closure => {
                 const value = self.module.closures[node.a];
                 return self.capturedLoan(value.body, value.parameter.binding, depth + 1);
             },
             .apply, .scalar, .logical, .record_merge, .proof_guard, .resource_acquire, .usage_borrow => return try self.capturedLoan(node.a, excluded, depth + 1) or try self.capturedLoan(node.b, excluded, depth + 1),
-            .resource_release, .usage_share, .usage_read, .project, .return_, .force, .package_pack => return self.capturedLoan(node.a, excluded, depth + 1),
+            .resource_release, .usage_share, .usage_read, .project, .return_, .package_pack => return self.capturedLoan(node.a, excluded, depth + 1),
             .effect_scope => {
                 if (node.a == 0 or node.a >= self.module.nodes.len) return error.InvalidArtifact;
                 return self.capturedLoan(node.a, excluded, depth + 1);
@@ -220,12 +220,12 @@ const Walker = struct {
             .usage_share => return self.carriesLoan(node.a, excluded, depth + 1),
             .resource_release, .primitive_function, .constructor_function, .type_constructor, .usage_read => {},
             .resource_acquire => return false,
-            .scalar, .logical, .call, .apply, .force => {
+            .scalar, .logical, .call, .apply => {
                 // Their arguments are checked independently at invocation;
                 // a checked primitive result cannot itself retain a loan.
                 if (!self.scalar(node.ty)) return error.InvalidArtifact;
             },
-            .closure, .suspend_ => {
+            .closure => {
                 const value = self.module.closures[node.a];
                 return self.capturedLoan(value.body, value.parameter.binding, depth + 1);
             },
@@ -363,14 +363,14 @@ const Walker = struct {
         if (!live) return .exit;
         return .live;
     }
-    fn closure(self: *Walker, index: u32, ty: T.Id, affine_demand: bool, depth: usize) Error!void {
+    fn closure(self: *Walker, index: u32, ty: T.Id, depth: usize) Error!void {
         if (index >= self.module.closures.len) return error.InvalidArtifact;
         const value = self.module.closures[index];
         const qualifier = self.module.types.node(ty);
         // A concurrent host contract is imported through an input boundary;
         // a source closure cannot manufacture it by changing its annotation.
         if (qualifier.tag == .usage and qualifier.b == @backingInt(T.UsageKind.concurrent)) return error.InvalidArtifact;
-        const once = affine_demand or (qualifier.tag == .usage and qualifier.b == @backingInt(T.UsageKind.once));
+        const once = qualifier.tag == .usage and qualifier.b == @backingInt(T.UsageKind.once);
         const count = self.len;
         // Discover physical free references, then check the closure in its new
         // environment. A claimed capture table cannot suppress a physical read.
@@ -446,7 +446,7 @@ const Walker = struct {
                 };
                 return;
             },
-            .closure, .suspend_ => {
+            .closure => {
                 if (node.a >= self.module.closures.len) return error.InvalidArtifact;
                 return self.capture(self.module.closures[node.a].body, found, depth + 1);
             },
@@ -774,7 +774,7 @@ const Walker = struct {
                     callee = try self.argumentArrow(callee.b);
                 }
             },
-            .project, .force, .package_pack => {
+            .project, .package_pack => {
                 if (try self.expression(node.a, depth + 1) == .exit) return .exit;
             },
             .construct => {
@@ -823,18 +823,7 @@ const Walker = struct {
                 if (try self.expression(child, depth + 1) == .exit) return .exit;
             },
             .match => return self.cases(node.a, depth + 1),
-            .closure => try self.closure(node.a, node.ty, false, depth + 1),
-            .suspend_ => {
-                if (node.a >= self.module.closures.len or node.b != 0 or node.c != 0 or node.op != .none) return error.InvalidArtifact;
-                const suspension = self.module.suspension(source);
-                if (suspension.function_type == 0 or suspension.function_type >= self.module.types.nodes.len) return error.InvalidArtifact;
-                const demand = self.module.types.node(node.ty);
-                const arrow = self.module.types.node(suspension.function_type);
-                if (demand.tag != .demand or arrow.tag != .function or arrow.a != T.unit or arrow.c != demand.c or !(@import("rank_equal.zig").equal(&self.module.types, arrow.b, demand.a, true) catch return error.InvalidArtifact)) return error.InvalidArtifact;
-                // An affine cell moves its captures and is consumed on force.
-                // Other cells retain the ordinary retryable many-body proof.
-                try self.closure(node.a, suspension.function_type, try self.affine(node.ty), depth + 1);
-            },
+            .closure => try self.closure(node.a, node.ty, depth + 1),
             .computation => {
                 if (node.a == 0 or node.b != 0 or node.c != 0 or node.op != .none) return error.InvalidArtifact;
                 _ = try self.expression(node.a, depth + 1);
@@ -928,7 +917,7 @@ fn relevant(module: *const core.Module, body: core.Body) Error!bool {
         const node = module.nodes[id];
         if (node.ty >= module.types.nodes.len) return error.InvalidArtifact;
         if (usage.containsNominal(&module.types, module.nominals, node.ty) catch return error.InvalidArtifact) return true;
-        if (node.tag == .closure or node.tag == .suspend_) {
+        if (node.tag == .closure) {
             if (node.a >= module.closures.len) return error.InvalidArtifact;
             walk.append(allocator, module.closures[node.a].body) catch return error.InvalidArtifact;
         }
@@ -1035,7 +1024,7 @@ fn validateRegions(module: *const core.Module) Error!void {
         var values: []const T.Id = &.{};
         switch (node.tag) {
             .function => values = &edges,
-            .usage, .array, .list, .cursor, .demand, .resolver, .provider, .scoped => values = edges[0..1],
+            .usage, .array, .list, .cursor, .resolver, .provider, .scoped => values = edges[0..1],
             .product => values = module.types.list(.{ .start = node.a, .len = node.b }),
             .nominal => values = module.types.nominalArguments(node),
             .record => for (0..node.b) |index| {

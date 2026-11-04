@@ -39,7 +39,7 @@ entry const run = func (amount: U32) : U32 => return do:
 });
 
 Deno.test("startup cycles retain original branches and metadata after all ordinary entry constants", async () => {
-  await compileAndRun(`let base = 1\nconst saved = 41\nconst delay = func ~value => return value\nentry const answer = func () => return @u32.add base (@demand (delay saved))\n`, guest => equal(guest.call("answer", null), 42));
+  await compileAndRun(`let base = 1\nconst saved = 41\nconst delay = func value => return func () => return value\nentry const answer = func () => return @u32.add base ((delay saved) ())\n`, guest => equal(guest.call("answer", null), 42));
   const cycle = `let first: U32 = second\nlet second = first\n`;
   await compileExpectedFailure(cycle + `entry const answer = if true then 42 else first\n`, "initialization_cycle");
   await compileExpectedFailure(cycle + `const read: Unit -> U32 = func () => return first\nentry const answer = @effect.count (@effect.of read)\n`, "initialization_cycle");

@@ -135,19 +135,21 @@ entry const captured = func () => return do:
   );
 });
 
-Deno.test("user constructor demand matches and known callbacks preserve effects and lexical captures", async () => {
+Deno.test("user constructor callback matches and known callbacks preserve effects and lexical captures", async () => {
   await compileAndRun(
     `
 type Choice a is data = $Chosen a | $Absent
-const select = func ~(fallback: U32) => return func choice => return case choice of
+const select = func fallback => return func choice => return case choice of
   $Chosen value if @u32.lt 0 value => value
-  $Chosen _ => @u32.add (@demand fallback) (@demand fallback)
-  $Absent => @demand fallback
+  $Chosen _ => do:
+    use cached <- fallback ()
+    break @u32.add cached cached
+  $Absent => fallback ()
 const generate = func count => return func callback => return @array.generate count callback
-entry const demand = func (host: U32 -> U32 ! {Foreign}) => return do:
-  use a <- select (host 10) ($Chosen 42)
-  use b <- select (host 11) ($Chosen 0)
-  use c <- select (host 12) $Absent
+entry const selected = func (host: U32 -> U32 ! {Foreign}) => return do:
+  use a <- select (func () => return host 10) ($Chosen 42)
+  use b <- select (func () => return host 11) ($Chosen 0)
+  use c <- select (func () => return host 12) $Absent
   break #[a, b, c]
 entry const callback = func (host: U32 -> U32 ! {Foreign}) => return do:
   use amount <- host 10
@@ -169,7 +171,7 @@ entry const untouched = func (host: U32 -> U32 ! {Foreign}) => return generate (
         },
       });
       assert.deepEqual(
-        guest.call("demand", host),
+        guest.call("selected", host),
         new Uint32Array([42, 22, 12]),
       );
       assert.deepEqual(calls, [11, 12]);

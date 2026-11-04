@@ -243,9 +243,9 @@ const Maybe.filter = func predicate => return func candidate => return case cand
 const Maybe.flatten = func candidate => return case candidate of
   $Some inner => inner
   $Nothing => $Nothing
-const Maybe.unwrap_or_else = func ~fallback => return func candidate => return case candidate of
+const Maybe.unwrap_or_else = func fallback => return func candidate => return case candidate of
   $Some value => value
-  $Nothing => @demand fallback
+  $Nothing => fallback ()
 const Maybe.to_result = func error => return func candidate => return case candidate of
   $Some value => $Ok value
   $Nothing => $Err error

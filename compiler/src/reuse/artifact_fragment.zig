@@ -45,7 +45,7 @@ pub const State = struct {
     enabled: bool,
     stats: Stats = .{},
     static_matches: std.AutoHashMapUnmanaged(artifacts.StaticRead, u32) = .empty,
-    /// Old non-suspension serialized roots by value and layout.
+    /// Old serialized roots by value and layout.
     serialized_roots: std.AutoHashMapUnmanaged(u64, u32) = .empty,
     /// Index into the immutable old serialized entries, ordered by address.
     serialized_order: []u32,
@@ -94,7 +94,7 @@ pub const State = struct {
         };
         var roots: std.AutoHashMapUnmanaged(u64, u32) = .empty;
         errdefer roots.deinit(a);
-        for (old.metadata.pools.?.serialized) |entry| if (!entry.suspension) try roots.put(a, rootKey(entry.value, entry.ty), entry.address);
+        for (old.metadata.pools.?.serialized) |entry| try roots.put(a, rootKey(entry.value, entry.ty), entry.address);
         const serialized_order = try a.alloc(u32, old.metadata.pools.?.serialized.len);
         errdefer a.free(serialized_order);
         for (serialized_order, 0..) |*index, i| index.* = @intCast(i);
@@ -209,7 +209,7 @@ pub const State = struct {
         while (i < self.serialized_order.len) : (i += 1) {
             const candidate = entries[self.serialized_order[i]];
             if (candidate.address != entry.address) break;
-            if (candidate.suspension or candidate.value == entry.value or candidate.value >= source.values.len) continue;
+            if (candidate.value == entry.value or candidate.value >= source.values.len) continue;
             const info = source.values[candidate.value];
             if (info.kind != .closure or info.len != 0) continue;
             const other = source.closures[info.bits];
@@ -233,7 +233,6 @@ pub const State = struct {
             const index = self.serialized_order[i];
             const entry = entries[index];
             if (entry.address - address >= len) break;
-            if (entry.suspension) return false;
             const binding = (try self.serializedBinding(g, entry)) orelse return false;
             if (g.static_data.cache.contains(.{ .value = binding.value, .ty = binding.ty })) return false;
             const key = rootKey(binding.value, binding.ty);
@@ -258,7 +257,7 @@ pub const State = struct {
             slot.value_ptr.* = relocated;
         }
     }
-    /// A completed non-scalar, non-suspension constant whose old serialized
+    /// A completed non-scalar constant whose old serialized
     /// root address is known. Demand cells keep their creation identity and
     /// always rebuild.
     fn aggregateRoot(old: *const capture.Capture, roots: *const std.AutoHashMapUnmanaged(u64, u32), job: artifacts.Job) ?u32 {
@@ -267,7 +266,7 @@ pub const State = struct {
         const values = old.metadata.pools.?.evaluator.values;
         if (result.value >= values.len) return null;
         switch (values[result.value].kind) {
-            .scalar, .suspension, .computation, .request_decision, .type_constructor, .resolver, .provider, .state_provider => return null,
+            .scalar, .computation, .request_decision, .type_constructor, .resolver, .provider, .state_provider => return null,
             else => {},
         }
         return roots.get(rootKey(result.value, result.layout));
@@ -431,7 +430,7 @@ pub const State = struct {
             .static_address => self.localAddress(operand.value, owner) or std.mem.findScalar(u32, roots, operand.value) != null,
             .global => self.knownGlobal(operand.value, g.request_owner),
             .operation => try self.importer.admitOperation(g, operand.value),
-            .function, .table_function, .callable_function, .demand_function => blk: {
+            .function, .table_function, .callable_function => blk: {
                 if (operand.value >= self.old.emission.functions.len) break :blk false;
                 const function = self.old.emission.functions[operand.value];
                 if (self.staticHelper(function, owner)) break :blk true;
@@ -763,7 +762,7 @@ pub const State = struct {
                 if (g.representations.store.node(ty).tag != .function or ty >= 1 << 26) return error.InvalidFunctionReference;
                 break :blk ty;
             },
-            .function, .table_function, .callable_function, .demand_function => self.resolveFunction(g, value.value),
+            .function, .table_function, .callable_function => self.resolveFunction(g, value.value),
             .signature => self.signature(g, value.value),
             .import_ => self.importFunction(g, value.value),
             .global => self.global(g, value.value),

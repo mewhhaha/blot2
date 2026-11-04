@@ -26,8 +26,7 @@ pub fn construction(module: *const wasm.Module, origin: wasm.Module.TableOrigin)
     if (target.callable_layout == 0 or target.callable_layout >= 1 << 26 or target.entry) return null;
     const environment_role = target.parameterRole(0);
     if (environment_role != .reference and environment_role != .scalar) return null;
-    if (origin.kind == .demand and environment_role != .reference) return null;
-    const bytes: u32 = if (origin.kind == .callable) 8 else 16;
+    const bytes: u32 = 8;
     var result: Construction = .{ .target = origin.target, .kind = origin.kind, .layout = target.callable_layout, .bytes = bytes, .end = 0, .environment = .zero };
     if (origin.function) |id| {
         if (id >= module.functions.items.len) return null;
@@ -50,7 +49,6 @@ pub fn construction(module: *const wasm.Module, origin: wasm.Module.TableOrigin)
         if (at != alloc + 3 or code[alloc - 1].op != .i32_const or code[alloc - 1].operand != bytes) return null;
         const roles = ir.allocationAnnotations(code, alloc);
         if (ir.Ownership.wordRole(roles, 0) != .scalar or ir.Ownership.wordRole(roles, 1) != environment_role) return null;
-        if (origin.kind == .demand and (ir.Ownership.wordRole(roles, 2) != .scalar or ir.Ownership.wordRole(roles, 3) != target.result_role)) return null;
         var point = at + 2;
         for (1..bytes / 4) |word| {
             if (point + 2 >= code.len or code[point].op != .local_get or code[point].operand != local or code[point + 2].op != .i32_store or code[point + 2].operand != word * 4) return null;

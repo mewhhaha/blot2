@@ -17,7 +17,7 @@ pub const Name = struct { start: u32 = 0, len: u32 = 0 };
 /// Only record field spellings survive in this compact symbol projection.
 /// Physical layouts use spelling, never the incidental interning order.
 pub const FieldName = struct { symbol: u32, spelling: Name };
-pub const Tag = enum(u8) { invalid, constant, reference, scalar, logical, call, if_value, block, suite, bind, return_, if_stmt, product, record, construct, project, match, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop, break_, type_same, result_associated, suspend_, force, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task, storage };
+pub const Tag = enum(u8) { invalid, constant, reference, scalar, logical, call, if_value, block, suite, bind, return_, if_stmt, product, record, construct, project, match, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop, break_, type_same, result_associated, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task, storage };
 pub const ArrayOp = @import("../backend/collection_ops.zig").Op;
 pub const PrimitiveKind = enum(u8) { scalar, array };
 pub const Primitive = struct { kind: PrimitiveKind, op: Op = .none, array_op: ArrayOp = .length, arity: u8 };
@@ -47,7 +47,6 @@ pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less,
 /// loop a=loop catalog; break_ a=target loop Id,b=current carried-value IR start,c=len;
 /// op=continue_ routes the values through the loop backedge instead of its exit.
 /// result_associated a=operand,b=member Symbol; ty supplies the expected-result owner.
-/// suspend_ a=closure catalog with Unit parameter; force a=demanded value.
 /// type_constructor has its exact owner in ty; resolver_op a=owned protocol catalog.
 /// effect_provider a=operation,b=callback; state_provider a=read,b=write,c=initial.
 /// handle a=provider,b=inner expression,c=optional HandleEffects catalog index+1.
@@ -609,15 +608,6 @@ pub const Module = struct {
     }
     pub fn closureCaptures(self: *const Module, id: Id) []const BindingId {
         const range = self.closure(id).captures;
-        return self.extra[range.start..][0..range.len];
-    }
-    pub fn suspension(self: *const Module, id: Id) ClosureInfo {
-        const value = self.node(id);
-        std.debug.assert(value.tag == .suspend_);
-        return self.closures[value.a];
-    }
-    pub fn suspensionCaptures(self: *const Module, id: Id) []const BindingId {
-        const range = self.suspension(id).captures;
         return self.extra[range.start..][0..range.len];
     }
     pub fn resolverInfo(self: *const Module, id: Id) ResolverInfo {

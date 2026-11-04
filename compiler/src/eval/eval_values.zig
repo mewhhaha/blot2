@@ -9,13 +9,7 @@ const collection_growth = @import("eval_collection_growth.zig");
 const Allocator = std.mem.Allocator;
 pub const Value = @import("../backend/scalar_ops.zig").Value;
 pub const ValueId = u32;
-pub const ValueKind = enum(u8) { scalar, product, record, nominal, array, list, closure, suspension, type_constructor, resolver, provider, state_provider, effect_set, effect_descriptor, computation, request_decision, cursor, proof, package, code, descriptor, staged_value, capability };
-pub const DemandState = enum { pending, evaluating, cached };
-pub const Demand = struct { state: DemandState = .pending, value: ValueId = 0 };
-/// A creation identity within one completed source constant evaluation. This
-/// record is not a ready certificate: consumers must match exact captures and
-/// inspect the current demand memo after completing their body/read proof.
-pub const SourceSuspension = struct { producer: core.BindingRef, unit: u32, node: core.Id, value: ValueId };
+pub const ValueKind = enum(u8) { scalar, product, record, nominal, array, list, closure, type_constructor, resolver, provider, state_provider, effect_set, effect_descriptor, computation, request_decision, cursor, proof, package, code, descriptor, staged_value, capability };
 pub const ClosureOrigin = enum(u8) { named, anonymous, constructor, primitive, operation };
 /// Anonymous identities index core.Module.closures; named identities are binding
 /// IDs; constructor identities index its constructor catalog. Children store
@@ -44,7 +38,6 @@ pub const Snapshot = struct {
     value_records: []u32,
     record_layouts: []core.List,
     field_names: []u32,
-    demands: []Demand,
     implementation_proofs: implementation_evidence.Snapshot = .{},
     pub fn deinit(self: *Snapshot, allocator: Allocator) void {
         allocator.free(self.code_origins);
@@ -58,12 +51,11 @@ pub const Snapshot = struct {
         allocator.free(self.value_records);
         allocator.free(self.record_layouts);
         allocator.free(self.field_names);
-        allocator.free(self.demands);
         self.implementation_proofs.deinit(allocator);
         self.* = undefined;
     }
 };
-pub const View = struct { code_origins: []const @import("../check/staging_origins.zig").Record = &.{}, values: []const ValueInfo, children: []const ValueId, closures: []const ClosureValue, value_evidence: []const type_evidence.Id, type_mappings: []const type_evidence.Mapping, row_mappings: []const type_evidence.RowMapping, evidence: type_evidence.View, value_records: []const u32, record_layouts: []const core.List, field_names: []const u32, demands: []const Demand, implementation_proofs: implementation_evidence.View = .{} };
+pub const View = struct { code_origins: []const @import("../check/staging_origins.zig").Record = &.{}, values: []const ValueInfo, children: []const ValueId, closures: []const ClosureValue, value_evidence: []const type_evidence.Id, type_mappings: []const type_evidence.Mapping, row_mappings: []const type_evidence.RowMapping, evidence: type_evidence.View, value_records: []const u32, record_layouts: []const core.List, field_names: []const u32, implementation_proofs: implementation_evidence.View = .{} };
 pub const ViewKey = struct { value: ValueId, evidence: type_evidence.Id, entry_interface: bool = false };
 // Offsets remain stable when field_names grows. The context is supplied for
 // every lookup, so no hash-table key borrows a reallocatable slice pointer.
@@ -92,7 +84,6 @@ pub const Store = struct {
     children: std.ArrayList(ValueId) = .empty,
     collection_buffers: collection_growth.Store = .{},
     closures: std.ArrayList(ClosureValue) = .empty,
-    demands: std.ArrayList(Demand) = .empty,
     code_origins: std.ArrayList(@import("../check/staging_origins.zig").Record) = .empty,
     value_evidence: std.ArrayList(type_evidence.Id) = .empty,
     type_mappings: std.ArrayList(type_evidence.Mapping) = .empty,
@@ -128,7 +119,6 @@ pub const Store = struct {
         self.children.deinit(allocator);
         self.collection_buffers.deinit(allocator);
         self.closures.deinit(allocator);
-        self.demands.deinit(allocator);
         self.code_origins.deinit(allocator);
         self.value_evidence.deinit(allocator);
         self.type_mappings.deinit(allocator);
@@ -175,7 +165,7 @@ pub const Store = struct {
         return id;
     }
     pub fn view(self: *const Store, proofs: implementation_evidence.View) View {
-        return .{ .code_origins = self.code_origins.items, .values = self.values.items, .children = self.children.items, .closures = self.closures.items, .value_evidence = self.value_evidence.items, .type_mappings = self.type_mappings.items, .row_mappings = self.row_mappings.items, .evidence = self.evidence.view(), .value_records = self.value_records.items, .record_layouts = self.record_layouts.items, .field_names = self.field_names.items, .demands = self.demands.items, .implementation_proofs = proofs };
+        return .{ .code_origins = self.code_origins.items, .values = self.values.items, .children = self.children.items, .closures = self.closures.items, .value_evidence = self.value_evidence.items, .type_mappings = self.type_mappings.items, .row_mappings = self.row_mappings.items, .evidence = self.evidence.view(), .value_records = self.value_records.items, .record_layouts = self.record_layouts.items, .field_names = self.field_names.items, .implementation_proofs = proofs };
     }
     pub fn copySnapshot(self: *const Store, allocator: Allocator, proofs: *const implementation_evidence.Store) Allocator.Error!Snapshot {
         const code_origins = try allocator.dupe(@import("../check/staging_origins.zig").Record, self.code_origins.items);
@@ -198,10 +188,8 @@ pub const Store = struct {
         errdefer allocator.free(record_layouts);
         const field_names = try allocator.dupe(u32, self.field_names.items);
         errdefer allocator.free(field_names);
-        const demands = try allocator.dupe(Demand, self.demands.items);
-        errdefer allocator.free(demands);
         var selected = try proofs.copyOwned(allocator);
         errdefer selected.deinit(allocator);
-        return .{ .code_origins = code_origins, .implementation_proofs = selected, .values = values, .children = children, .closures = closures, .value_evidence = value_evidence, .type_mappings = type_mappings, .row_mappings = row_mappings, .evidence = try self.evidence.copyOwned(allocator), .value_records = value_records, .record_layouts = record_layouts, .field_names = field_names, .demands = demands };
+        return .{ .code_origins = code_origins, .implementation_proofs = selected, .values = values, .children = children, .closures = closures, .value_evidence = value_evidence, .type_mappings = type_mappings, .row_mappings = row_mappings, .evidence = try self.evidence.copyOwned(allocator), .value_records = value_records, .record_layouts = record_layouts, .field_names = field_names };
     }
 };

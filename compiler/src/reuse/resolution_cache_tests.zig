@@ -75,7 +75,7 @@ fn fingerprint(store: *const T.Store, root: T.Id, hash: *std.hash.Wyhash, depth:
             hash.update(std.mem.asBytes(&n.a));
             hash.update(std.mem.asBytes(&n.b));
         },
-        .function, .demand, .provider => {
+        .function, .provider => {
             try fingerprint(store, n.a, hash, depth + 1);
             if (n.tag == .function) try fingerprint(store, n.b, hash, depth + 1);
             const row = store.row(n.c);
@@ -134,7 +134,7 @@ fn paired(seed: u64) !void {
         for (&rows[s]) |*row| row.* = try store.freshEffects();
         const fn_type = try store.functionWithEffects(variables[s][0], variables[s][1], rows[s][0]);
         const product = try store.product(&.{ fn_type, try store.array(variables[s][2]), try store.nominal(.{ .unit = 7, .decl = 11 }, &.{variables[s][3]}) });
-        roots[s] = try store.record(&.{ .{ .name = 3, .ty = product }, .{ .name = 19, .ty = try store.demandWithEffects(variables[s][0], rows[s][1]) } });
+        roots[s] = try store.record(&.{ .{ .name = 3, .ty = product }, .{ .name = 19, .ty = try store.functionWithEffects(T.unit, variables[s][0], rows[s][1]) } });
     }
     for (0..80) |iteration| {
         const marks = [_]T.Mark{ cached.mark(), plain.mark() };

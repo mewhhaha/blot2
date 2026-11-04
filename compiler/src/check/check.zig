@@ -336,7 +336,7 @@ pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
 pub const StatementArm = struct { node: ast.Id };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { function_return_required, task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, continue_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, return_outside_function, return_across_continuation, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
+pub const Code = enum { function_return_required, task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, continue_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, return_outside_function, return_across_continuation, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
 pub const PurityWitness = @import("../reuse/purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -380,7 +380,6 @@ pub const Diagnostic = struct {
             .task_handle_consumed => "The task handle was already joined, cancelled or moved",
             .task_capture_transfer => "Task captures require an owning transfer or checked immutable sharing",
             .task_capability_shared => "A task capture shares a writable or scoped capability",
-            .task_demand_shared => "A pending demand can move to one task but cannot be shared between tasks",
             .task_regions_overlap => "Task regions need one owner version and proved disjoint ranges",
             .task_host_contract => "Task host execution requires an explicit concurrent capability contract",
             .task_budget => "Task analysis exceeds its bounded state budget",
@@ -509,7 +508,7 @@ pub const Diagnostic = struct {
             .break_scope => "Break requires an enclosing loop in this function",
             .continue_scope => "Continue requires an enclosing loop in this function",
             .function_return_required => "Every path through a function do block must return explicitly",
-            .invalid_return => "Loop control cannot escape a suspended argument",
+            .invalid_return => "Control cannot cross an enclosing computation boundary",
             .unreachable_statement => switch (self.source_terminator) {
                 .return_, .break_, .yield_ => "statement after return in the same suite",
                 .none => "A statement follows an unconditional return or break",
@@ -652,11 +651,6 @@ pub const Checked = struct {
     resolver_loop_ids: []u32 = &.{},
     loop_carries: []LoopCarry = &.{},
     loop_ranges: []T.List = &.{},
-    demand_calls: []bool = &.{},
-    demand_once: []bool = &.{},
-    demand_types: []T.Id = &.{},
-    demand_binary_left_types: []T.Id = &.{},
-    demand_binary_left: []bool = &.{},
     loop_exits: []LoopExit = &.{},
     statement_arms: []StatementArm = &.{},
     pub fn reflection(self: *const Checked, id: ast.Id) ?Reflection {
@@ -751,11 +745,6 @@ pub const Checked = struct {
         allocator.free(self.resolver_loop_ids);
         allocator.free(self.loop_carries);
         allocator.free(self.loop_ranges);
-        allocator.free(self.demand_calls);
-        allocator.free(self.demand_once);
-        allocator.free(self.demand_types);
-        allocator.free(self.demand_binary_left_types);
-        allocator.free(self.demand_binary_left);
         allocator.free(self.loop_exits);
         allocator.free(self.statement_arms);
         self.* = undefined;
@@ -980,7 +969,6 @@ const Engine = struct {
     proof_owner: ast.Id = 0,
     return_target: T.Id = 0,
     ambient: T.Effects.Id = 0,
-    suspended_loop_escape: bool = false,
     resolver_scope: ResolverScope = .{},
     counter: u32 = 0,
     depth: usize = 0,
@@ -1054,11 +1042,6 @@ const Engine = struct {
     loop_carries: std.ArrayList(LoopCarry) = .empty,
     iterator_bodies: []ast.Id = &.{},
     loop_ranges: []T.List = &.{},
-    demand_calls: []bool = &.{},
-    demand_once: []bool = &.{},
-    demand_types: []T.Id = &.{},
-    demand_binary_left_types: []T.Id = &.{},
-    demand_binary_left: []bool = &.{},
     loop_exits: std.ArrayList(LoopExit) = .empty,
     statement_arms: std.ArrayList(StatementArm) = .empty,
     loop_stack: std.ArrayList(LoopFrame) = .empty,
@@ -2348,7 +2331,7 @@ const Engine = struct {
                 try self.collectAnnotationNames(node.c, depth + 1);
                 try self.collectAnnotationNames(node.b, depth + 1);
             },
-            .group, .type_demand, .type_witness, .field_access, .return_stmt, .yield_stmt, .forever_stmt => try self.collectAnnotationNames(node.a, depth + 1),
+            .group, .type_witness, .field_access, .return_stmt, .yield_stmt, .forever_stmt => try self.collectAnnotationNames(node.a, depth + 1),
             .field, .unary, .operator_tail => try self.collectAnnotationNames(node.b, depth + 1),
             .type_usage => try self.collectAnnotationNames(node.b, depth + 1),
             .type_field, .type_binder => {
@@ -2788,7 +2771,7 @@ const Engine = struct {
                 try self.implementationRowNames(node.a, names, depth + 1);
                 try self.implementationRowNames(node.b, names, depth + 1);
             },
-            .group, .type_demand => try self.implementationRowNames(node.a, names, depth + 1),
+            .group => try self.implementationRowNames(node.a, names, depth + 1),
             .type_product, .type_array, .type_record => for (self.tree.children(id)) |child| try self.implementationRowNames(child, names, depth + 1),
             .type_field => try self.implementationRowNames(node.b, names, depth + 1),
             .effect_row => {
@@ -4494,13 +4477,12 @@ const Engine = struct {
                 if (!changed) break :blk id;
                 break :blk try self.types.record(fields.items);
             },
-            .array, .list, .cursor, .resolver, .demand, .provider => blk: {
+            .array, .list, .cursor, .resolver, .provider => blk: {
                 const child = try self.normalizeAssociatedNode(n.a, source, requirements, memo, active, depth + 1);
-                const row = if (n.tag == .demand or n.tag == .provider) try self.normalizeAssociatedRow(n.c, source, requirements, memo, active, depth + 1) else n.c;
+                const row = if (n.tag == .provider) try self.normalizeAssociatedRow(n.c, source, requirements, memo, active, depth + 1) else n.c;
                 if (child == n.a and row == n.c) break :blk id;
                 break :blk switch (n.tag) {
                     .resolver => try self.types.resolver(child),
-                    .demand => try self.types.demandWithEffects(child, row),
                     .provider => try self.types.provider(child, row),
                     else => try self.types.sequence(n.tag, child),
                 };
@@ -5712,15 +5694,8 @@ const Engine = struct {
         self.expr_types[specialized] = ty;
         for (reverse.items[count..]) |application| {
             const syntax = self.tree.node(application);
-            const function = self.types.node(try self.types.resolve(ty, 0));
-            const lazy = function.tag == .function and self.types.node(self.types.head(function.a, 0)).tag == .demand;
-            const argument = try self.checkArgument(syntax.b, lazy);
-            if (self.active_effect_scopes != 0 and try self.scopeFootprint(argument, 0) and (!lazy or try self.demandCaptureFootprint(syntax.b)) and !try self.localStateStore(syntax.a, syntax.b, argument)) try self.diagnostic(.capability_escape, syntax.b);
-            self.demand_calls[application] = lazy;
-            if (lazy) {
-                self.demand_types[application] = function.a;
-                self.demand_once[application] = try self.declaredAffineDemand(function.a);
-            }
+            const argument = try self.checkArgument(syntax.b);
+            if (self.active_effect_scopes != 0 and try self.scopeFootprint(argument, 0) and !try self.localStateStore(syntax.a, syntax.b, argument)) try self.diagnostic(.capability_escape, syntax.b);
             const result = try self.types.fresh();
             try self.constrain(ty, try self.invocation(argument, result), application);
             ty = result;
@@ -5795,13 +5770,6 @@ const Engine = struct {
                 if (boundary.loan != 0 and value.c == boundary.loan) return true;
                 return self.scopeFootprintDepth(value.a, depth + 1, remaining, inherited, boundary);
             },
-            .demand => {
-                if (boundary.task_group == 0) return true;
-                var budget: usize = remaining.*;
-                if (try self.taskCaptureType(resolved, false, &budget, depth + 1) != null) return true;
-                remaining.* = budget;
-                return self.scopeFootprintDepth(value.a, depth + 1, remaining, inherited, boundary);
-            },
             .array, .list, .cursor => return self.scopeFootprintDepth(value.a, depth + 1, remaining, inherited, boundary),
             .product => {
                 const children = try self.allocator.dupe(T.Id, self.types.list(.{ .start = value.a, .len = value.b }));
@@ -5844,10 +5812,6 @@ const Engine = struct {
             }
         }
         return false;
-    }
-    fn demandCaptureFootprint(self: *Engine, source: ast.Id) T.Error!bool {
-        var remaining: usize = 65_536;
-        return self.closureCaptureFootprint(source, source, .{ .capture_usage = true }, &.{}, &remaining, 0);
     }
     fn closureCaptureFootprint(self: *Engine, source: ast.Id, closure: ast.Id, boundary: FootprintBoundary, inherited: []const T.Id, remaining: *usize, depth: usize) T.Error!bool {
         if (source == 0) return false;
@@ -6799,7 +6763,7 @@ const Engine = struct {
         var source = callee;
         while (self.tree.node(source).tag == .group) source = self.tree.node(source).a;
         const lambda = self.tree.node(source);
-        if (lambda.tag != .lambda or self.tree.parameter(lambda.a).demanded) return false;
+        if (lambda.tag != .lambda) return false;
         var body = lambda.b;
         while (self.tree.node(body).tag == .group) body = self.tree.node(body).a;
         const call = self.tree.node(body);
@@ -6907,7 +6871,7 @@ const Engine = struct {
                 }
                 return self.taskLoanEncloses(node.a, group, remaining, depth + 1);
             },
-            .array, .list, .cursor, .demand => return self.taskLoanEncloses(node.a, group, remaining, depth + 1),
+            .array, .list, .cursor => return self.taskLoanEncloses(node.a, group, remaining, depth + 1),
             .product => for (self.types.list(.{ .start = node.a, .len = node.b })) |child| {
                 if (!try self.taskLoanEncloses(child, group, remaining, depth + 1)) return false;
             },
@@ -6998,29 +6962,11 @@ const Engine = struct {
         } else try self.diagnostic(.task_capture_transfer, action);
     }
     fn taskCaptureType(self: *Engine, root: T.Id, owning: bool, remaining: *usize, depth: usize) T.Error!?Code {
-        var cell = root;
-        for (0..128) |_| {
-            const shape = self.types.node(self.types.head(cell, 0));
-            if (shape.tag == .usage) {
-                cell = shape.a;
-                continue;
-            }
-            if (shape.tag == .demand and (owning or try @import("usage_check.zig").affine(&self.types, shape.a))) {
-                // Moving a deferred input requires a closed latent contract.
-                // An unsolved row is constrained here, not trusted as pure.
-                self.types.unifyEffects(shape.c, 0) catch |err| switch (err) {
-                    error.EffectMismatch, error.InfiniteEffect => return .task_host_contract,
-                    else => return err,
-                };
-            }
-            break;
-        }
         const resolved = try self.types.resolve(root, 0);
         const issue = try @import("task_types.zig").captureIssue(&self.types, resolved, owning, remaining, depth) orelse return null;
         return switch (issue) {
             .transfer => .task_capture_transfer,
             .capability => .task_capability_shared,
-            .demand => .task_demand_shared,
             .host => .task_host_contract,
             .budget => .task_budget,
         };
@@ -7312,7 +7258,7 @@ const Engine = struct {
             return try self.types.fresh();
         }
         const parameter = self.tree.parameter(lambda.a);
-        if (parameter.name == 0 or parameter.demanded or parameter.annotation == 0) {
+        if (parameter.name == 0 or parameter.annotation == 0) {
             try self.diagnostic(.effect_identity_scope, lambda.a);
             return try self.types.fresh();
         }
@@ -7721,7 +7667,7 @@ const Engine = struct {
                     self.diagnostics.items[self.diagnostics.items.len - 1].span.end = self.tree.span(source).start;
                 }
             },
-            .group, .type_demand => try self.argumentTypeNames(node.a, depth + 1),
+            .group => try self.argumentTypeNames(node.a, depth + 1),
             .type_apply, .type_function => {
                 try self.argumentTypeNames(node.a, depth + 1);
                 try self.argumentTypeNames(node.b, depth + 1);
@@ -9430,7 +9376,6 @@ const Engine = struct {
             },
             .type_code => return staging.code(&self.types, try self.annotation(node.a), try self.annotationEffects(node.b)),
             .type_descriptor => return staging.descriptor(&self.types, try self.annotation(node.a)),
-            .type_demand => return self.types.demand(try self.annotation(node.a)),
             .type_function => {
                 const input = self.tree.node(node.a);
                 if (input.tag == .type_binder) {
@@ -10563,7 +10508,6 @@ const Engine = struct {
         qualification_scope: ast.Id,
         target: T.Id,
         loops: std.ArrayList(LoopFrame),
-        escape: bool,
         resolver: ResolverScope,
         ambient: T.Effects.Id,
         annotation_binding: ast.Id,
@@ -10613,7 +10557,6 @@ const Engine = struct {
             if (self.loops_changed) {
                 engine.loop_stack.deinit(engine.allocator);
                 engine.loop_stack = self.loops;
-                engine.suspended_loop_escape = self.escape;
             }
             engine.resolver_scope = self.resolver;
             engine.ambient = self.ambient;
@@ -10675,7 +10618,6 @@ const Engine = struct {
             .qualification_scope = self.qualification_scope,
             .target = self.return_target,
             .loops = self.loop_stack,
-            .escape = self.suspended_loop_escape,
             .resolver = self.resolver_scope,
             .ambient = self.ambient,
             .annotation_binding = self.annotation_binding,
@@ -10690,7 +10632,6 @@ const Engine = struct {
         self.ambient = try self.types.freshEffects();
         self.resolver_scope = .{};
         self.loop_stack = .empty;
-        self.suspended_loop_escape = false;
         context.loops_changed = true;
         const type_env = try self.type_env.toOwnedSlice(self.allocator);
         context.type_env = type_env;
@@ -11271,18 +11212,7 @@ const Engine = struct {
         for (body.signatures) |signature| {
             const id = shape.ids[signature.position];
             const ty = try copier.copy(signature.ty, 0);
-            switch (signature.kind) {
-                .dispatch => self.dispatch_signatures[id] = ty,
-                .demand => {
-                    self.demand_calls[id] = true;
-                    self.demand_once[id] = signature.once;
-                    self.demand_types[id] = ty;
-                },
-                .demand_left => {
-                    self.demand_binary_left[id] = true;
-                    self.demand_binary_left_types[id] = ty;
-                },
-            }
+            self.dispatch_signatures[id] = ty;
         }
         if (body.auxiliary) |owner| try self.replayAuxiliary(owner, shape.ids, mapped, &copier, fields, &identities, &operations);
         if (self.tree.has_numeric_proofs or self.types.has_proof_kinds) for (shape.ids) |id| {
@@ -11628,7 +11558,7 @@ const Engine = struct {
             self.computation_annotations.items.len == 0 and self.loop_stack.items.len == 0 and
             std.meta.eql(self.request_scope, RequestScope{}) and std.meta.eql(self.resolver_scope, ResolverScope{}) and
             self.return_target == 0 and self.owner == 0 and self.qualification_scope == 0 and
-            !self.suspended_loop_escape and self.annotation_binding == 0 and self.inherited_types == 0 and
+            self.annotation_binding == 0 and self.inherited_types == 0 and
             self.inherited_rows == 0 and self.local_qualification_scope == 0 and
             self.local_requirements_start == 0 and self.diagnostics.items.len == 0;
     }
@@ -11753,54 +11683,8 @@ const Engine = struct {
     fn preparedGlobalReference(self: *Engine, binding: BindingId, id: ast.Id) T.Error!T.Id {
         if (self.staging_depth != 0 and !self.bindings.items[binding].named_function and self.types.node(self.types.head(self.bindings.items[binding].ty, 0)).tag != .function) try self.diagnostic(.stage_unavailable, id);
         if (self.bindings.items[binding].kind == .global and self.bindings.items[binding].scheme.root == 0) try self.qualification_uses.append(self.allocator, .{ .scope = self.qualification_scope, .owner = self.current, .target = binding, .source = id });
-        try self.recursiveDemandShape(binding, id);
         self.resolved[id] = binding;
         return self.instantiate(binding, id);
-    }
-    /// An active recursive declaration has no scheme yet. Its lambda header
-    /// still determines argument evaluation mode; expose only that monomorphic
-    /// shape before a recursive application can assume its arguments are eager.
-    fn recursiveDemandShape(self: *Engine, binding: BindingId, id: ast.Id) T.Error!void {
-        const item = self.bindings.items[binding];
-        if (item.kind != .global or item.scheme.root != 0) return;
-        const state = self.global_states.get(binding) orelse return;
-        if (!state.on_stack or self.types.node(try self.types.resolve(item.ty, 0)).tag != .variable) return;
-        var cursor = self.tree.valueDecl(item.declaration).body;
-        var demanded = false;
-        while (true) {
-            const node = self.tree.node(cursor);
-            if (node.tag == .group) {
-                cursor = node.a;
-                continue;
-            }
-            if (node.tag != .lambda) break;
-            const parameter = self.tree.parameter(node.a);
-            demanded = demanded or parameter.demanded;
-            cursor = node.b;
-        }
-        if (!demanded) return;
-        var parameters: std.ArrayList(bool) = .empty;
-        defer parameters.deinit(self.allocator);
-        cursor = self.tree.valueDecl(item.declaration).body;
-        while (true) {
-            const node = self.tree.node(cursor);
-            if (node.tag == .group) {
-                cursor = node.a;
-                continue;
-            }
-            if (node.tag != .lambda) break;
-            try parameters.append(self.allocator, self.tree.parameter(node.a).demanded);
-            cursor = node.b;
-        }
-        var shape = try self.types.fresh();
-        var index = parameters.items.len;
-        while (index > 0) {
-            index -= 1;
-            var input = try self.types.fresh();
-            if (parameters.items[index]) input = try self.types.demandWithEffects(input, try self.types.freshEffects());
-            shape = try self.types.functionWithEffects(input, shape, try self.types.freshEffects());
-        }
-        try self.constrain(item.ty, shape, id);
     }
     fn exactIntrinsicArity(name: []const u8) ?usize {
         if (std.mem.startsWith(u8, name, "@u32.") or std.mem.startsWith(u8, name, "@f32.")) return null;
@@ -11832,7 +11716,7 @@ const Engine = struct {
         if (std.mem.eql(u8, name, "@type.same") or std.mem.eql(u8, name, "@type.result")) return 2;
         const binary_primitives = [_][]const u8{ "@u32.add", "@u32.sub", "@u32.mul", "@u32.div", "@u32.rem", "@u32.bit_and", "@u32.bit_or", "@u32.bit_xor", "@u32.shl", "@u32.shr", "@u32.eq", "@u32.lt", "@f32.add", "@f32.sub", "@f32.mul", "@f32.div", "@f32.eq", "@f32.ne", "@f32.lt", "@f32.le", "@f32.gt", "@f32.ge", "@array.get", "@array.fill", "@array.generate", "@product.get" };
         for (binary_primitives) |member| if (std.mem.eql(u8, name, member)) return 2;
-        const unary = [_][]const u8{ "@u32.to_f32", "@f32.to_u32", "@f32.neg", "@f32.abs", "@f32.sqrt", "@f32.floor", "@f32.ceil", "@f32.trunc", "@array.length", "@panic", "@force", "@demand", "@do.monad" };
+        const unary = [_][]const u8{ "@u32.to_f32", "@f32.to_u32", "@f32.neg", "@f32.abs", "@f32.sqrt", "@f32.floor", "@f32.ceil", "@f32.trunc", "@array.length", "@panic", "@do.monad" };
         for (unary) |member| if (std.mem.eql(u8, name, member)) return 1;
         if (std.mem.eql(u8, name, "@array.set") or std.mem.eql(u8, name, "@type.call")) return 3;
         return null;
@@ -11880,10 +11764,6 @@ const Engine = struct {
         if (exactIntrinsicArity(text) != null and self.permitted_intrinsic != id) {
             try self.diagnostic(.call_arity, id);
             return self.types.fresh();
-        }
-        if ((std.mem.eql(u8, text, "@force") or std.mem.eql(u8, text, "@demand"))) {
-            const element = try self.types.fresh();
-            return self.types.function(try self.types.demand(element), element);
         }
         if (std.mem.eql(u8, text, "@record.merge")) {
             const left = try self.types.fresh();
@@ -12337,7 +12217,7 @@ const Engine = struct {
             _ = self.scope_lifetimes.pop();
             self.active_effect_scopes -= 1;
         };
-        const parameter_ty = if (parameter.demanded) try self.types.demandWithEffects(element_ty, try self.types.freshEffects()) else element_ty;
+        const parameter_ty = element_ty;
         const saved_frames = self.storage_frames;
         const has_frames = saved_frames.items.len != 0 and !scoped;
         if (has_frames) self.storage_frames = .empty;
@@ -12362,7 +12242,6 @@ const Engine = struct {
         const saved_function_exit_target = self.function_exit_target;
         const saved_function_result_expected = self.function_result_expected;
         const saved_loops = self.loop_stack;
-        const saved_escape = self.suspended_loop_escape;
         const saved_resolver = self.resolver_scope;
         const saved_requests = self.request_scope;
         self.request_scope = .{};
@@ -12370,11 +12249,9 @@ const Engine = struct {
         self.resolver_scope = .{};
         defer self.resolver_scope = saved_resolver;
         self.loop_stack = .empty;
-        self.suspended_loop_escape = false;
         defer {
             self.loop_stack.deinit(self.allocator);
             self.loop_stack = saved_loops;
-            self.suspended_loop_escape = saved_escape;
         }
         self.owner = id;
         self.proof_owner = id;
@@ -12527,12 +12404,6 @@ const Engine = struct {
             try self.appendPending(.{ .owner = self.current, .metadata = op, .value = .{ .kind = .monad_factory, .ty = token, .result = result, .source = id } });
             return result;
         }
-        if (head.tag == .intrinsic and (std.mem.eql(u8, self.pool.get(head.a), "@force") or std.mem.eql(u8, self.pool.get(head.a), "@demand"))) {
-            const suspended = try self.expression(node.b);
-            const result = try self.types.fresh();
-            try self.constrain(suspended, try self.types.demandWithEffects(result, self.ambient), id);
-            return result;
-        }
         if (head.tag == .intrinsic and std.mem.eql(u8, self.pool.get(head.a), "@panic")) {
             var argument = node.b;
             while (self.tree.node(argument).tag == .group) argument = self.tree.node(argument).a;
@@ -12566,12 +12437,11 @@ const Engine = struct {
         self.expr_types[node.a] = function_ty;
         if (cleanup_call or concurrent_call) self.expr_types[node.a] = qualified_id;
         const function = self.types.node(try self.types.resolve(function_ty, 0));
-        const lazy = function.tag == .function and self.types.node(self.types.head(function.a, 0)).tag == .demand;
         const saved_exact = self.exact_argument_types;
         self.exact_argument_types = saved_exact or try self.evidenceCall(node.a, 0);
         const argument = blk_argument: {
             if (function.tag == .function and (self.types.node(try self.types.resolve(function.a, 0)).tag == .forall or self.types.node(self.types.head(function.a, 0)).tag == .usage or storage_types.isArray(&self.types, self.types.head(function.a, 0)))) break :blk_argument try self.contextualLambda(node.b, function.a);
-            break :blk_argument self.checkArgument(node.b, lazy);
+            break :blk_argument self.checkArgument(node.b);
         } catch |err| {
             self.exact_argument_types = saved_exact;
             return err;
@@ -12607,13 +12477,8 @@ const Engine = struct {
             try self.diagnostic(.proof_runtime_use, node.b);
             return try self.types.fresh();
         }
-        if (self.active_effect_scopes != 0 and try self.scopeFootprint(argument, 0) and (!lazy or try self.demandCaptureFootprint(node.b)) and !try self.capabilityFlowUse(node.a, argument) and !self.intrinsicRead(node.a) and !try self.directCallbackUse(node.a, argument) and !try self.localStateStore(node.a, node.b, argument)) try self.diagnostic(.capability_escape, node.b);
+        if (self.active_effect_scopes != 0 and try self.scopeFootprint(argument, 0) and !try self.capabilityFlowUse(node.a, argument) and !self.intrinsicRead(node.a) and !try self.directCallbackUse(node.a, argument) and !try self.localStateStore(node.a, node.b, argument)) try self.diagnostic(.capability_escape, node.b);
         const parameter = argument;
-        self.demand_calls[id] = lazy;
-        if (lazy) {
-            self.demand_types[id] = function.a;
-            self.demand_once[id] = try self.declaredAffineDemand(function.a);
-        }
         var result = try self.types.fresh();
         if (function.tag == .function) {
             const result_kind = self.types.node(self.types.head(function.b, 0)).tag;
@@ -12635,12 +12500,6 @@ const Engine = struct {
 
         if (self.has_tasks and pending_begin != self.pending.items.len) try self.solveFieldsFrom(pending_begin);
         return try self.applicationFlow(id, function_ty, argument, try self.freshFormalInvocation(id, result));
-    }
-    // Only a demand parameter declared affine before instantiation may move
-    // its captures. A generic `~value` body may retry the suspension, so a
-    // later affine instance must not consume captured owners.
-    fn declaredAffineDemand(self: *Engine, parameter: T.Id) T.Error!bool {
-        return @import("usage_check.zig").affineNominal(&self.types, self.nominals.items, parameter);
     }
     fn productExpression(self: *Engine, id: ast.Id) T.Error!T.Id {
         var fields: std.ArrayList(T.Id) = .empty;
@@ -13014,44 +12873,18 @@ const Engine = struct {
         }
         return false;
     }
-    fn checkArgument(self: *Engine, id: ast.Id, lazy: bool) T.Error!T.Id {
-        if (!lazy) {
-            const actual = try self.expression(id);
-            if (!self.exact_argument_types) return actual;
-            var certified: std.ArrayList(u32) = .empty;
-            defer certified.deinit(self.allocator);
-            for (self.body_closed_rows.items) |decision| {
-                if (!try self.associatedStep(id)) return actual;
-                if (decision.owner == self.current) try certified.append(self.allocator, decision.variable);
-            }
-            // A known evidence input may use its lambda's recorded pure row.
-            // Closing this copied type cannot change the executable ambient.
-            return self.types.closeCovariant(try self.types.resolve(actual, 0), certified.items, &.{});
+    fn checkArgument(self: *Engine, id: ast.Id) T.Error!T.Id {
+        const actual = try self.expression(id);
+        if (!self.exact_argument_types) return actual;
+        var certified: std.ArrayList(u32) = .empty;
+        defer certified.deinit(self.allocator);
+        for (self.body_closed_rows.items) |decision| {
+            if (!try self.associatedStep(id)) return actual;
+            if (decision.owner == self.current) try certified.append(self.allocator, decision.variable);
         }
-        const saved_ambient = self.ambient;
-        self.ambient = try self.types.freshEffects();
-        defer self.ambient = saved_ambient;
-        const latent = self.ambient;
-        try self.row_sources.put(self.allocator, self.types.row(latent).tail.variable, id);
-        const saved_loops = self.loop_stack;
-        const saved_escape = self.suspended_loop_escape;
-        self.loop_stack = .empty;
-        self.suspended_loop_escape = saved_escape or saved_loops.items.len != 0;
-        defer {
-            self.loop_stack.deinit(self.allocator);
-            self.loop_stack = saved_loops;
-            self.suspended_loop_escape = saved_escape;
-        }
-        const saved_proof_owner = self.proof_owner;
-        self.proof_owner = id;
-        defer self.proof_owner = saved_proof_owner;
-        const result = try self.expression(id);
-        try self.certifyLambda(id, try self.types.functionWithEffects(T.unit, result, latent), saved_ambient);
-        return self.types.demandWithEffects(result, latent);
-    }
-    fn demandCallee(self: *Engine, ty: T.Id) T.Error!bool {
-        const node = self.types.node(try self.types.resolve(ty, 0));
-        return node.tag == .function and self.types.node(self.types.head(node.a, 0)).tag == .demand;
+        // A known evidence input may use its lambda's recorded pure row.
+        // Closing this copied type cannot change the executable ambient.
+        return self.types.closeCovariant(try self.types.resolve(actual, 0), certified.items, &.{});
     }
     fn binary(self: *Engine, id: ast.Id) T.Error!T.Id {
         const node = self.tree.node(id);
@@ -13082,18 +12915,12 @@ const Engine = struct {
                 function_ty = try self.globalReference(binding, id);
             if (function_ty) |ty| {
                 self.dispatch_signatures[id] = ty;
-                const lazy_left = try self.demandCallee(ty);
-                if (lazy_left) self.demand_binary_left_types[id] = self.types.node(try self.types.resolve(ty, 0)).a;
-                const left = try self.checkArgument(node.b, lazy_left);
+                const left = try self.checkArgument(node.b);
                 const after_left = try self.types.fresh();
                 try self.constrain(ty, try self.invocation(left, after_left), id);
-                const lazy_right = try self.demandCallee(after_left);
-                if (lazy_right) self.demand_types[id] = self.types.node(try self.types.resolve(after_left, 0)).a;
-                const right = try self.checkArgument(node.c, lazy_right);
+                const right = try self.checkArgument(node.c);
                 const result = try self.types.fresh();
                 try self.constrain(after_left, try self.invocation(right, result), id);
-                self.demand_binary_left[id] = lazy_left;
-                self.demand_calls[id] = lazy_right;
                 return result;
             }
             _ = try self.expression(node.b);
@@ -14084,7 +13911,7 @@ const Engine = struct {
     fn loopExitStatement(self: *Engine, id: ast.Id, continues: bool) T.Error!Flow {
         self.expr_types[id] = T.never;
         if (self.loop_stack.items.len == 0) {
-            try self.diagnostic(if (self.suspended_loop_escape) .invalid_return else if (continues) .continue_scope else .break_scope, id);
+            try self.diagnostic(if (continues) .continue_scope else .break_scope, id);
             return .{ .exits = true, .breaks = true };
         }
         const frame_index = self.loop_stack.items.len - 1;
@@ -15168,12 +14995,6 @@ const Engine = struct {
         for (self.expr_types) |*id| if (id.* != 0) {
             id.* = try self.types.resolve(id.*, 0);
         };
-        for (self.demand_types) |*id| if (id.* != 0) {
-            id.* = try self.types.resolve(id.*, 0);
-        };
-        for (self.demand_binary_left_types) |*id| if (id.* != 0) {
-            id.* = try self.types.resolve(id.*, 0);
-        };
         for (self.dispatch_signatures) |*id| if (id.* != 0) {
             id.* = try self.types.resolve(id.*, 0);
         };
@@ -15881,11 +15702,6 @@ noinline fn deinitEngine(engine: *Engine, published: bool) void {
         allocator.free(engine.resolver_join_ids);
         allocator.free(engine.resolver_op_ids);
         allocator.free(engine.resolver_block_ids);
-        allocator.free(engine.demand_binary_left);
-        allocator.free(engine.demand_binary_left_types);
-        allocator.free(engine.demand_types);
-        allocator.free(engine.demand_once);
-        allocator.free(engine.demand_calls);
         allocator.free(engine.iterator_bodies);
         allocator.free(engine.loop_ranges);
         allocator.free(engine.rebindings);
@@ -16056,16 +15872,6 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     @memset(engine.loop_ranges, .{});
     engine.iterator_bodies = try allocator.alloc(ast.Id, tree.nodes.items.len);
     @memset(engine.iterator_bodies, 0);
-    engine.demand_calls = try allocator.alloc(bool, tree.nodes.items.len);
-    @memset(engine.demand_calls, false);
-    engine.demand_once = try allocator.alloc(bool, tree.nodes.items.len);
-    @memset(engine.demand_once, false);
-    engine.demand_types = try allocator.alloc(T.Id, tree.nodes.items.len);
-    @memset(engine.demand_types, 0);
-    engine.demand_binary_left_types = try allocator.alloc(T.Id, tree.nodes.items.len);
-    @memset(engine.demand_binary_left_types, 0);
-    engine.demand_binary_left = try allocator.alloc(bool, tree.nodes.items.len);
-    @memset(engine.demand_binary_left, false);
     engine.resolver_block_ids = try allocator.alloc(u32, tree.nodes.items.len);
     @memset(engine.resolver_block_ids, 0);
     engine.resolver_op_ids = try allocator.alloc(u32, tree.nodes.items.len);
@@ -16127,11 +15933,6 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         .resolver_block_ids = engine.resolver_block_ids,
         .resolver_op_ids = engine.resolver_op_ids,
         .resolver_join_ids = engine.resolver_join_ids,
-        .demand_calls = engine.demand_calls,
-        .demand_once = engine.demand_once,
-        .demand_types = engine.demand_types,
-        .demand_binary_left_types = engine.demand_binary_left_types,
-        .demand_binary_left = engine.demand_binary_left,
         .loop_ranges = engine.loop_ranges,
         .unit = unit,
         .constructor_resolved = engine.constructor_resolved,

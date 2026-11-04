@@ -206,7 +206,7 @@ fn buildChecked(allocator: Allocator, session: anytype, value: u32, selected: *c
                 try append(allocator, &words, &.{ 1, ordinal, @backingInt(info.kind), @backingInt(info.scalar), interface(view, selected, current.value), info.len }, limit, examined);
                 switch (info.kind) {
                     .scalar, .product, .record, .nominal, .array, .list, .cursor => try append(allocator, &words, &.{ info.nominal, info.bits }, limit, examined),
-                    .closure, .suspension => {
+                    .closure => {
                         if (info.bits >= view.closures.len) return error.Declined;
                         const metadata = view.closures[info.bits];
                         if (metadata.staged != 0) return error.Declined;
@@ -214,16 +214,6 @@ fn buildChecked(allocator: Allocator, session: anytype, value: u32, selected: *c
                         for (view.type_mappings[metadata.mappings.start..][0..metadata.mappings.len]) |mapping| try append(allocator, &words, &.{ mapping.variable, mapping.evidence }, limit, examined);
                         try append(allocator, &words, &.{metadata.row_mappings.len}, limit, examined);
                         for (view.row_mappings[metadata.row_mappings.start..][0..metadata.row_mappings.len]) |row| try append(allocator, &words, &.{ row.variable, row.evidence }, limit, examined);
-                        if (info.kind == .suspension) {
-                            if (info.nominal >= view.demands.len) return error.Declined;
-                            const memo = view.demands[@intCast(info.nominal)];
-                            // Cached/evaluating demands require an owned memo
-                            // result and staging dependencies, not only a state.
-                            if (memo.state != .pending) return error.Declined;
-                            // Creation identity and consumed memo state are semantic
-                            // inputs, rather than alpha-renamable alias ordinals.
-                            try append(allocator, &words, &.{ current.value, info.nominal, @backingInt(memo.state), memo.value }, limit, examined);
-                        }
                     },
                     .provider, .state_provider => try append(allocator, &words, &.{ current.value, info.nominal, info.bits }, limit, examined),
                     .code, .descriptor, .staged_value, .package, .type_constructor, .resolver, .effect_set, .effect_descriptor, .computation, .request_decision, .proof, .capability => return error.Declined,

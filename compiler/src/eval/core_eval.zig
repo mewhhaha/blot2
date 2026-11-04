@@ -66,9 +66,6 @@ pub const PrincipalProvider = struct {
     record: *const fn (*anyopaque, core.BindingRef, Options, SolvedEvidence, ?*const principal_inputs.Key) Allocator.Error!void,
 };
 pub const ValueKind = value_storage.ValueKind;
-pub const DemandState = value_storage.DemandState;
-pub const Demand = value_storage.Demand;
-pub const SourceSuspension = value_storage.SourceSuspension;
 pub const ClosureOrigin = value_storage.ClosureOrigin;
 pub const ClosureValue = value_storage.ClosureValue;
 pub const ValueInfo = value_storage.ValueInfo;
@@ -95,7 +92,6 @@ pub const Options = struct {
     /// Code generation traces initializer dependencies without executing runtime
     /// globals. Constant reads remain forbidden independently of this option.
     trace_runtime_dependencies: bool = false,
-    retain_source_suspensions: bool = false,
 };
 pub const Code = @import("../check/diagnostic_code.zig").Code;
 /// The candidates of a failed dispatch in the order selection considered
@@ -142,7 +138,7 @@ pub fn sourceInvocationOrigin(previous: ?SourceLocation, entry: u32, caller: u32
 pub fn callerDependent(source: *const core.Types, ty: types.Id, depth: usize) bool {
     if (ty == 0 or depth >= 256) return false;
     const n = source.node(ty);
-    if (n.tag == .function or n.tag == .demand or n.tag == .provider) {
+    if (n.tag == .function or n.tag == .provider) {
         for (source.rowLabels(n.c)) |label| for (source.operationArguments(label)) |argument| {
             if (callerDependent(source, argument, depth + 1)) return true;
         };
@@ -151,7 +147,7 @@ pub fn callerDependent(source: *const core.Types, ty: types.Id, depth: usize) bo
         .variable, .bound => return true,
         .usage, .forall => return callerDependent(source, n.a, depth + 1),
         .function, .provider => return callerDependent(source, n.a, depth + 1) or callerDependent(source, n.b, depth + 1),
-        .array, .list, .cursor, .demand, .resolver => return callerDependent(source, n.a, depth + 1),
+        .array, .list, .cursor, .resolver => return callerDependent(source, n.a, depth + 1),
         .state_provider => return callerDependent(source, n.a, depth + 1) or callerDependent(source, n.b, depth + 1) or callerDependent(source, n.c, depth + 1),
         .product => for (source.list(.{ .start = n.a, .len = n.b })) |child| {
             if (callerDependent(source, child, depth + 1)) return true;
@@ -1628,13 +1624,11 @@ const SpecializationCaches = struct {
 const RetainedRecords = struct {
     constant_records: std.ArrayList(@import("../reuse/constant_receipt.zig").Record) = .empty,
     specialization_receipts: std.ArrayList(receipt.Record) = .empty,
-    source_suspensions: std.ArrayList(SourceSuspension) = .empty,
     fn deinit(self: *RetainedRecords, allocator: Allocator) void {
         for (self.constant_records.items) |*record| record.deinit(allocator);
         self.constant_records.deinit(allocator);
         for (self.specialization_receipts.items) |*record| record.deinit(allocator);
         self.specialization_receipts.deinit(allocator);
-        self.source_suspensions.deinit(allocator);
     }
 };
 
@@ -1739,7 +1733,6 @@ pub const Session = struct {
     ragged_region: ?*RaggedRegion = null,
     ragged_probe_limit: usize = ragged.probe_limit,
     ragged_reserved_children: usize = 0,
-    source_producer: ?Target = null,
     generator_origin: ?@import("../check/staging_origins.zig").Source = null,
     staging_trace: @import("../check/staging_origins.zig").Trace = .{},
     implementation_proofs: @import("implementation_evidence.zig").Store,
@@ -1922,31 +1915,8 @@ pub const Session = struct {
     }
     pub fn closureInfo(self: *const Session, id: ValueId) ClosureValue {
         const info = self.valueInfo(id);
-        std.debug.assert(info.kind == .closure or info.kind == .suspension);
+        std.debug.assert(info.kind == .closure);
         return self.storage.closures.items[info.bits];
-    }
-    pub fn suspensionInfo(self: *const Session, id: ValueId) ClosureValue {
-        std.debug.assert(self.valueInfo(id).kind == .suspension);
-        return self.closureInfo(id);
-    }
-    pub fn suspensionCached(self: *const Session, id: ValueId) ?ValueId {
-        const info = self.valueInfo(id);
-        std.debug.assert(info.kind == .suspension);
-        const memo = self.storage.demands.items[@intCast(info.nominal)];
-        return if (memo.state == .cached) memo.value else null;
-    }
-    pub fn singleSourceSuspension(self: *const Session, producer: core.BindingRef, unit: u32, node: core.Id) ?ValueId {
-        if (self.principal_reads) |reads| reads.invalidate(.suspension);
-        // Startup creation history is not part of a completed specialization
-        // receipt. A future caller under that tape must take the fresh path.
-        if (self.receipt_tape) |tape| tape.unknown = true;
-        var found: ?ValueId = null;
-        for (self.retained.source_suspensions.items) |source| {
-            if (!std.meta.eql(source.producer, producer) or source.unit != unit or source.node != node) continue;
-            if (found != null) return null;
-            found = source.value;
-        }
-        return found;
     }
     pub fn valueEvidence(self: *const Session, id: ValueId) type_evidence.Id {
         return self.storage.value_evidence.items[id];
@@ -1972,12 +1942,6 @@ pub const Session = struct {
     /// The selected header owns its evidence; the original alias is unchanged.
     pub fn inferClosure(self: *Session, value_: ValueId) Error!ValueId {
         if (self.valueInfo(value_).kind != .closure) return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
-        return (try self.inferClosureMode(value_, false)) orelse self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
-    }
-    /// A waiting demand keeps its memo unchanged. Only its complete retained
-    /// body and capture proof can supply an unselected representation row.
-    pub fn inferSuspension(self: *Session, value_: ValueId) Error!ValueId {
-        if (self.valueInfo(value_).kind != .suspension) return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
         return (try self.inferClosureMode(value_, false)) orelse self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
     }
     /// A generic public interface is an export rejection, distinct from an
@@ -2039,7 +2003,7 @@ pub const Session = struct {
         if (self.principal_reads) |reads| reads.invalidate(.specialize);
         if (self.receipt_tape) |tape| tape.nested = true;
         const kind = self.valueInfo(value_).kind;
-        if (kind != .closure and (kind != .suspension or entry_interface)) return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
+        if (kind != .closure) return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
         const metadata = self.closureInfo(value_);
         const owner = self.findUnit(metadata.unit, null) orelse return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
         const module = &self.units[owner];
@@ -2102,10 +2066,6 @@ pub const Session = struct {
         }
         return inferred;
     }
-    pub fn specializeSuspension(self: *Session, value_: ValueId, expected: type_evidence.Id) Error!ValueId {
-        if (self.valueInfo(value_).kind != .suspension) return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
-        return self.specializeRetained(value_, expected);
-    }
     fn specializeRetained(self: *Session, value_: ValueId, expected: type_evidence.Id) Error!ValueId {
         const outer = self.constant_recorder orelse return self.specializeRetainedInner(value_, expected);
         try outer.beforeRead(self.allocator, self);
@@ -2135,7 +2095,7 @@ pub const Session = struct {
             .named => (module.body(metadata.identity) orelse return self.fail(owner, .{ .start = 0, .end = 0 }, .unsupported)).span,
             .constructor, .primitive, .operation => core.Span{ .start = 0, .end = 0 },
         };
-        const expected_kind: type_evidence.Tag = if (self.valueInfo(value_).kind == .suspension) .demand else .function;
+        const expected_kind: type_evidence.Tag = .function;
         if (expected == 0 or self.storage.evidence.node(expected).tag != expected_kind) return self.fail(owner, span, .unsupported);
         const key: ViewKey = .{ .value = value_, .evidence = expected };
         if (self.principal_reads) |reads| reads.invalidate(.specialize);
@@ -2184,7 +2144,7 @@ pub const Session = struct {
             .collected = tape.collected,
             .source_scopes = region.scratch.sources.items.len,
             .solver_nodes = region.solver.nodes.items.len,
-            .complete = region.allConstraintsSolved() and self.steps == steps_before and !region.source_interface and !region.retain_selected and !region.complete_demand_bodies,
+            .complete = region.allConstraintsSolved() and self.steps == steps_before and !region.source_interface and !region.retain_selected,
             .sources = &.{},
             .scalar_reads = &.{},
             .call_reads = &.{},
@@ -2243,7 +2203,7 @@ pub const Session = struct {
         var frozen = region.scratch.frozen.valueIterator();
         while (frozen.next()) |value_| {
             const kind = self.valueInfo(value_.*).kind;
-            if (kind != .closure and kind != .suspension) continue;
+            if (kind != .closure) continue;
             self.storage.specialized_closures.putAssumeCapacity(.{ .value = value_.*, .evidence = self.valueEvidence(value_.*) }, value_.*);
         }
     }
@@ -2436,7 +2396,7 @@ pub const Session = struct {
                     try work.append(self.allocator, .{ .owner = key.owner, .node = id });
                 },
                 .bind => try work.append(self.allocator, .{ .owner = key.owner, .node = n.b }),
-                .return_, .force, .computation => try work.append(self.allocator, .{ .owner = key.owner, .node = n.a }),
+                .return_, .computation => try work.append(self.allocator, .{ .owner = key.owner, .node = n.a }),
                 .construct => try work.append(self.allocator, .{ .owner = key.owner, .node = n.b }),
                 .pattern_bind => {
                     if (!try self.startupPatternsFree(key.owner, &.{n.a})) return false;
@@ -2459,7 +2419,7 @@ pub const Session = struct {
                 .break_ => for (module.breakValues(key.node)) |id| {
                     try work.append(self.allocator, .{ .owner = key.owner, .node = id });
                 },
-                .closure, .suspend_ => try work.append(self.allocator, .{ .owner = key.owner, .node = module.closures[n.a].body }),
+                .closure => try work.append(self.allocator, .{ .owner = key.owner, .node = module.closures[n.a].body }),
                 .effect_reflection => {
                     const kind: checked_types.ReflectionKind = @fromBackingInt(@intCast(n.a));
                     if (kind == .count or kind == .has or kind == .same) try work.append(self.allocator, .{ .owner = key.owner, .node = n.b });
@@ -2638,10 +2598,8 @@ pub const Session = struct {
         if (self.storage.closures.items.len >= std.math.maxInt(u32)) return self.failNode(owner, source, .constant_fuel);
         const index: u32 = @intCast(self.storage.closures.items.len);
         try self.storage.closures.ensureUnusedCapacity(self.allocator, 1);
-        try self.storage.demands.ensureUnusedCapacity(self.allocator, 1);
         const id = try self.makeAggregate(owner, source, .closure, 0, index, captures);
         self.storage.closures.appendAssumeCapacity(metadata);
-        self.storage.demands.appendAssumeCapacity(.{});
         return id;
     }
     fn makeScalar(self: *Session, owner: usize, source: core.Id, value_: Value) Error!ValueId {
@@ -2665,7 +2623,6 @@ pub const Session = struct {
         try self.storage.children.ensureUnusedCapacity(self.allocator, info.len);
         if (metadata != null) {
             try self.storage.closures.ensureUnusedCapacity(self.allocator, 1);
-            try self.storage.demands.ensureUnusedCapacity(self.allocator, 1);
         }
         const id: ValueId = @intCast(self.storage.values.items.len);
         const start: u32 = @intCast(self.storage.children.items.len);
@@ -2678,7 +2635,6 @@ pub const Session = struct {
         self.storage.value_records.appendAssumeCapacity(0);
         if (metadata) |closure_| {
             self.storage.closures.appendAssumeCapacity(closure_);
-            self.storage.demands.appendAssumeCapacity(.{});
         }
         if (@import("../check/staging_origins.zig").generator(self.storage.code_origins.items, original)) |origin| try self.storage.code_origins.append(self.allocator, .{ .value = id, .generator = origin });
         self.counters.frozen_capture_published_bytes += info.len * @sizeOf(ValueId);
@@ -3292,11 +3248,7 @@ pub const Session = struct {
                         try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } });
                     },
                     .constant, .primitive_function, .panic => {},
-                    .suspend_ => if (self.options.trace_runtime_dependencies) {
-                        // Source selection retains named declarations inside a
-                        // waiting demand, without forcing its expression/value.
-                        try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = module.suspension(operation.id).body } });
-                    },
+
                     .reference => try work.append(self.allocator, .{ .binding = try self.target(operation.unit, module.reference(operation.id)) }),
                     .resource_acquire, .usage_borrow, .scalar, .logical, .associated, .record_merge, .type_same, .effect_provider, .handle, .proof_guard => {
                         if (n.b != 0) try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.b } });
@@ -3317,7 +3269,7 @@ pub const Session = struct {
                         try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } });
                     },
                     .bind => try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.b } }),
-                    .resource_release, .return_, .result_associated, .force => try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } }),
+                    .resource_release, .return_, .result_associated => try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } }),
                     .construct => if (n.b != 0) try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.b } }),
                     .project => try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } }),
                     .closure => try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = module.closure(operation.id).body } }),
@@ -3551,9 +3503,6 @@ pub const Session = struct {
         if (previous == .complete) return self.slot(resolved).value;
         if (previous == .evaluating) return self.fail(resolved.unit, body.span, .cycle);
         const reference: core.BindingRef = .{ .unit = self.unitId(resolved.unit), .binding = resolved.binding };
-        const previous_producer = self.source_producer;
-        self.source_producer = resolved;
-        defer self.source_producer = previous_producer;
         self.slot(resolved).state = .evaluating;
         errdefer self.slot(resolved).state = .unseen;
         if (body.is_function) {
@@ -3760,7 +3709,7 @@ pub const Session = struct {
                 while (index < fields.len) : (index += 2) if (try self.containsReflectionType(owner, id, fields[index], depth + 1)) return true;
             },
             .function => return try self.containsReflectionType(owner, id, n.a, depth + 1) or try self.containsReflectionType(owner, id, n.b, depth + 1),
-            .array, .demand, .provider => return self.containsReflectionType(owner, id, n.a, depth + 1),
+            .array, .provider => return self.containsReflectionType(owner, id, n.a, depth + 1),
             .state_provider => return try self.containsReflectionType(owner, id, n.a, depth + 1) or try self.containsReflectionType(owner, id, n.b, depth + 1) or try self.containsReflectionType(owner, id, n.c, depth + 1),
             else => {},
         }
@@ -4141,28 +4090,6 @@ pub const Session = struct {
         for (bindings, 0..) |binding, index| captures[index] = frame.values.get(binding) orelse return self.failNode(owner, id, .unsupported);
         return .{ .value = try self.makeClosure(owner, id, .{ .origin = .anonymous, .unit = self.unitId(owner), .identity = n.a, .staged = frame.staged orelse 0, .mappings = try self.captureMappings(owner, id, frame.mappings.items), .row_mappings = try self.captureRowMappings(owner, id, frame.row_mappings.items) }, captures) };
     }
-    fn suspensionExpression(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
-        self.declineConstant();
-        const module = &self.units[owner];
-        const n = self.units[owner].node(id);
-        const bindings = module.suspensionCaptures(id);
-        var storage_buffer: [256]u8 align(@alignOf(usize)) = undefined;
-        var storage: std.heap.BufferFirstAllocator = .init(&storage_buffer, self.allocator);
-        const scratch = storage.allocator();
-        const captures = try scratch.alloc(ValueId, bindings.len);
-        defer scratch.free(captures);
-        for (bindings, 0..) |binding, index| captures[index] = frame.values.get(binding) orelse return self.failNode(owner, id, .unsupported);
-        const producer = if (self.options.retain_source_suspensions) self.source_producer else null;
-        if (producer != null) {
-            if (self.receipt_tape) |tape| tape.unknown = true;
-        }
-        if (producer != null) try self.retained.source_suspensions.ensureUnusedCapacity(self.allocator, 1);
-        const demand = try self.makeClosure(owner, id, .{ .origin = .anonymous, .staged = frame.staged orelse 0, .unit = self.unitId(owner), .identity = n.a, .mappings = try self.captureMappings(owner, id, frame.mappings.items), .row_mappings = try self.captureRowMappings(owner, id, frame.row_mappings.items) }, captures);
-        self.storage.values.items[demand].kind = .suspension;
-        self.storage.values.items[demand].nominal = self.storage.values.items[demand].bits;
-        if (producer) |target_| self.retained.source_suspensions.appendAssumeCapacity(.{ .producer = .{ .unit = self.unitId(target_.unit), .binding = target_.binding }, .unit = self.unitId(owner), .node = id, .value = demand });
-        return .{ .value = demand };
-    }
     fn reflectionExpression(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
         const module = &self.units[owner];
         const n = self.units[owner].node(id);
@@ -4444,12 +4371,6 @@ pub const Session = struct {
             .array_op => return self.arrayOperation(owner, id, frame),
             .storage => return self.fail(owner, self.units[owner].span(id), .stage_unavailable),
             .closure => return self.closureExpression(owner, id, frame),
-            .suspend_ => return self.suspensionExpression(owner, id, frame),
-            .force => {
-                const operand = try self.expression(owner, n.a, frame);
-                if (operand != .value) return operand;
-                return self.forceValue(owner, id, operand.value, frame.providers);
-            },
             .type_constructor => return self.typeConstructorExpression(owner, id, frame),
             .computation => {
                 const action = try self.expression(owner, n.a, frame);
@@ -4749,7 +4670,7 @@ pub const Session = struct {
                     continue;
                 }
             }
-            if (node.tag == .closure or node.tag == .suspend_) {
+            if (node.tag == .closure) {
                 try pending.append(self.allocator, module.closures[node.a].body);
             } else if (node.tag == .operation_value) {
                 try pending.append(self.allocator, module.operation_values[node.a].witness);
@@ -4777,11 +4698,9 @@ pub const Session = struct {
         const metadata: ClosureValue = .{ .unit = self.unitId(owner), .identity = root, .origin = .anonymous, .ty = module.typeOf(id), .mappings = try self.captureMappings(owner, id, frame.mappings.items), .row_mappings = try self.captureRowMappings(owner, id, rows.items) };
         const index: u32 = @intCast(self.storage.closures.items.len);
         try self.storage.closures.ensureUnusedCapacity(self.allocator, 1);
-        try self.storage.demands.ensureUnusedCapacity(self.allocator, 1);
         if (self.generator_origin != null) try self.storage.code_origins.ensureUnusedCapacity(self.allocator, 1);
         const value_ = try self.makeAggregate(owner, id, .code, root, index, replacements.items);
         self.storage.closures.appendAssumeCapacity(metadata);
-        self.storage.demands.appendAssumeCapacity(.{});
         if (self.generator_origin) |origin| self.storage.code_origins.appendAssumeCapacity(.{ .value = value_, .generator = origin });
         return value_;
     }
@@ -5474,7 +5393,7 @@ pub const Session = struct {
                 .collected = tape.collected,
                 .source_scopes = region.scratch.sources.items.len,
                 .solver_nodes = region.solver.nodes.items.len,
-                .complete = region.allConstraintsSolved() and self.steps == steps_before and !region.source_interface and !region.retain_selected and !region.complete_demand_bodies and self.summary_graph_work == summary_work and self.principal_graph_nodes == principal_nodes and self.principal_graph_edges == principal_edges and std.meta.eql(query_budgets, @import("../reuse/constant_receipt.zig").queryBudgets(self)),
+                .complete = region.allConstraintsSolved() and self.steps == steps_before and !region.source_interface and !region.retain_selected and self.summary_graph_work == summary_work and self.principal_graph_nodes == principal_nodes and self.principal_graph_edges == principal_edges and std.meta.eql(query_budgets, @import("../reuse/constant_receipt.zig").queryBudgets(self)),
                 .sources = &.{},
                 .scalar_reads = &.{},
                 .call_reads = &.{},
@@ -6242,40 +6161,6 @@ pub const Session = struct {
         }
         return outcome;
     }
-    fn forceValue(self: *Session, owner: usize, source: core.Id, value_: ValueId, head: provider_chain.Head) Error!Flow {
-        self.declineConstant();
-        const info = self.valueInfo(value_);
-        if (info.kind != .suspension) return self.failNode(owner, source, .unsupported);
-        const slot_index: usize = @intCast(info.nominal);
-        const actual = self.valueEvidence(value_);
-        const result = if (actual != 0) blk: {
-            const n = self.storage.evidence.node(actual);
-            if (n.tag != .demand) return self.failNode(owner, source, .unsupported);
-            break :blk n.a;
-        } else 0;
-        if (self.storage.demands.items[slot_index].state == .cached) return .{ .value = try self.typedView(owner, source, self.storage.demands.items[slot_index].value, result) };
-        if (self.storage.demands.items[slot_index].state == .evaluating) return self.failNode(owner, source, .cycle);
-        self.storage.demands.items[slot_index].state = .evaluating;
-        errdefer self.storage.demands.items[slot_index].state = .pending;
-        const metadata = self.suspensionInfo(value_);
-        const producer = self.findUnit(metadata.unit, null) orelse return self.failNode(owner, source, .unsupported);
-        const template = self.units[producer].closures[metadata.identity];
-        try self.prepareWork(.{ .node = .{ .unit = producer, .id = template.body } });
-        // An ordinary internal thunk header shares numeric code/capture identity;
-        // the source demand keeps its independent semantic tag and memo slot.
-        const captures = try self.allocator.dupe(ValueId, self.valueChildren(value_));
-        defer self.allocator.free(captures);
-        const function = try self.makeClosure(owner, source, metadata, captures);
-        const expected = if (result != 0) self.storage.evidence.internWithEffects(.function, types.unit, result, self.storage.evidence.node(actual).c, &.{}) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            else => return self.failNode(owner, source, .unsupported),
-        } else 0;
-        const typed = try self.typedView(owner, source, function, expected);
-        const outcome = try self.applyValue(owner, source, typed, 0, head);
-        if (outcome != .value) return self.failNode(owner, source, .unsupported);
-        self.storage.demands.items[slot_index] = .{ .state = .cached, .value = outcome.value };
-        return outcome;
-    }
     /// Dedicated capability values carry only invocation-local authority.
     /// Their nominal word names their original allocation, including typed aliases.
     fn capabilityIdentity(self: *Session, owner: usize, source: core.Id, value_: ValueId) Error!u32 {
@@ -6314,7 +6199,6 @@ pub const Session = struct {
                 else => {},
             }
             try work.appendSlice(self.allocator, self.valueChildren(current));
-            if (info.kind == .suspension) if (self.suspensionCached(current)) |cached| try work.append(self.allocator, cached);
         }
         return false;
     }
@@ -6854,7 +6738,6 @@ const ClosureRegion = struct {
         remove: ?Target = null,
         lexical_caller: ?u32 = null,
         lexical_scheme: types.Scheme = .{},
-        demand: ?CompletedDemand = null,
     };
     const CollectionFrame = struct {
         scope: u32,
@@ -6883,7 +6766,6 @@ const ClosureRegion = struct {
     const RowVariable = struct { scope: u32, variable: u32 };
     const ImportedRowVariable = struct { source: RowVariable, region: types.Effects.Id, next: u32 = std.math.maxInt(u32) };
     const RowParameter = struct { owner: usize, parameter: u32 };
-    const CompletedDemand = struct { scope: u32, node: core.Id, body: core.Id, root: types.Id };
     const Variable = struct { source: Import, region: types.Id, next: u32 = std.math.maxInt(u32) };
     const Edge = struct { parent: u32, child: u32, slot: u32, formal: types.Id };
     const DataAlias = struct { instance: types.Id, principal: types.Id, solved: bool = false };
@@ -6944,7 +6826,6 @@ const ClosureRegion = struct {
         target_scopes: std.AutoHashMapUnmanaged(Target, u32) = .empty,
         components: scope_components.Graph = .{},
         source_functions: std.ArrayList(types.Id) = .empty,
-        completed_demands: std.ArrayList(CompletedDemand) = .empty,
         witness_inputs: std.AutoHashMapUnmanaged(types.Id, types.Id) = .empty,
         principal_references: std.ArrayList(Target) = .empty,
         principal_actions: std.ArrayList(PrincipalGraph.Action) = .empty,
@@ -6998,7 +6879,6 @@ const ClosureRegion = struct {
     principal_only_used: bool = false,
     speculative_source_entry: bool = false,
     source_selection_failed: bool = false,
-    complete_demand_bodies: bool = false,
     source_entry: ?Target = null,
     // A generic nested lambda selects its members in its own concrete code
     // instance. Its enclosing proof still gathers mandatory effect equations.
@@ -7344,7 +7224,7 @@ const ClosureRegion = struct {
             if (!self.source_selection_failed) return err;
             // Solver mappings and instance/body facts belong to this disposable
             // region. Selection never finishes/publishes callable validation,
-            // values, captures, readiness or completed suspension facts.
+            // values, captures or readiness facts.
             self.session.diagnostic = null;
             self.session.allocator.free(self.session.owned_diagnostic_message);
             self.session.owned_diagnostic_message = &.{};
@@ -7527,7 +7407,7 @@ const ClosureRegion = struct {
         }
         try self.seedRows(scope, capture.rows);
         if (capture.signature_only) return self.scratch.sources.items[scope].root;
-        const capture_list = if (node.tag == .closure or node.tag == .suspend_) module.closures[node.a].captures else core.List{};
+        const capture_list = if (node.tag == .closure) module.closures[node.a].captures else core.List{};
         const captured = module.extra[capture_list.start..][0..capture_list.len];
         for (capture.values) |value| {
             if (value.binding == 0 or value.binding >= module.bindings.len or value.evidence >= self.session.storage.evidence.nodes.items.len or std.mem.findScalar(core.BindingId, captured, value.binding) == null) return error.UnresolvedType;
@@ -7538,16 +7418,8 @@ const ClosureRegion = struct {
             const actual = try self.importRetainedCapture(child, depth + 1);
             try self.unify(try self.importType(scope, module.binding(child.binding).ty, 0), try self.solver.openCovariant(try self.solver.resolve(actual, 0)));
         }
-        if (node.tag == .closure or node.tag == .suspend_) {
-            const closure_ = module.closures[node.a];
-            if (node.tag == .closure) {
-                try self.alignClosure(scope, capture.node);
-            } else {
-                const demanded = self.solver.node(try self.solver.resolve(self.scratch.sources.items[scope].root, 0));
-                if (demanded.tag != .demand) return error.TypeMismatch;
-                try self.unify(demanded.a, try self.importType(scope, module.typeOf(closure_.body), 0));
-                if (closure_.function_type != 0) try self.unify(try self.importType(scope, closure_.function_type, 0), try self.solver.functionWithEffects(types.unit, demanded.a, demanded.c));
-            }
+        if (node.tag == .closure) {
+            try self.alignClosure(scope, capture.node);
         } else if (node.tag != .reference and node.tag != .constructor_function and node.tag != .primitive_function) return error.UnresolvedType;
         const actual = self.scratch.sources.items[scope].root;
         return if (capture.computation) try self.solver.nominal(.{ .unit = std.math.maxInt(u32), .decl = 5 }, &.{actual}) else actual;
@@ -7587,7 +7459,7 @@ const ClosureRegion = struct {
         return self.exportSolved(scope);
     }
     // This first retention path only admits interfaces containing plain data.
-    // Higher-order arguments, demands, providers and nominal payloads need a
+    // Higher-order arguments, providers and nominal payloads need a
     // richer evidence key. A complete prior region proves all imported source
     // bodies under their exact semantic arrow, including effect rows.
     fn firstOrderData(self: *ClosureRegion, evidence: type_evidence.Id, depth: usize) RegionError!bool {
@@ -7858,7 +7730,7 @@ const ClosureRegion = struct {
                 if (declared.b != shape.b) return error.TypeMismatch;
                 return self.matchCodeShape(declared.a, view, shape.a, depth + 1);
             },
-            .array, .list, .cursor, .demand, .provider, .resolver => return self.matchCodeShape(declared.a, view, shape.a, depth + 1),
+            .array, .list, .cursor, .provider, .resolver => return self.matchCodeShape(declared.a, view, shape.a, depth + 1),
             .product, .nominal => {
                 var children: []const types.Id = undefined;
                 if (shape.tag == .product) children = self.solver.list(.{ .start = declared.a, .len = declared.b }) else {
@@ -7989,7 +7861,6 @@ const ClosureRegion = struct {
                 .cursor => .cursor,
                 else => .array,
             }, try self.importCodeExpectation(view, node.a, depth + 1)),
-            .demand => self.solver.demandWithEffects(try self.importCodeExpectation(view, node.a, depth + 1), try self.solver.freshEffects()),
             .provider => self.solver.provider(try self.importCodeExpectation(view, node.a, depth + 1), try self.solver.freshEffects()),
             .state_provider => self.solver.stateProvider(try self.importCodeExpectation(view, node.a, depth + 1), try self.importCodeExpectation(view, node.b, depth + 1), try self.importCodeExpectation(view, node.c, depth + 1)),
             .resolver => self.solver.resolver(try self.importCodeExpectation(view, node.a, depth + 1)),
@@ -8136,7 +8007,6 @@ const ClosureRegion = struct {
             .function => try self.solver.functionWithEffects(try self.importType(scope, node.a, depth + 1), try self.importType(scope, node.b, depth + 1), try self.importRow(scope, node.c, depth + 1)),
             .usage => try self.solver.usage(try self.importType(scope, node.a, depth + 1), @fromBackingInt(@intCast(node.b)), if (node.c == 0) 0 else try self.importType(scope, node.c, depth + 1)),
             .array, .list, .cursor => try self.solver.sequence(node.tag, try self.importType(scope, node.a, depth + 1)),
-            .demand => try self.solver.demandWithEffects(try self.importType(scope, node.a, depth + 1), try self.importRow(scope, node.c, depth + 1)),
             .provider => try self.solver.provider(try self.importType(scope, node.a, depth + 1), try self.importRow(scope, node.c, depth + 1)),
             .state_provider => try self.solver.stateProvider(try self.importType(scope, node.a, depth + 1), try self.importType(scope, node.b, depth + 1), try self.importType(scope, node.c, depth + 1)),
             .resolver => try self.solver.resolver(try self.importType(scope, node.a, depth + 1)),
@@ -8355,7 +8225,6 @@ const ClosureRegion = struct {
                 .cursor => .cursor,
                 else => .array,
             }, try self.importEvidence(node.a, depth + 1)),
-            .demand => self.solver.demandWithEffects(try self.importEvidence(node.a, depth + 1), try self.importEvidenceRow(node.c, depth + 1)),
             .provider => self.solver.provider(try self.importEvidence(node.a, depth + 1), try self.importEvidenceRow(node.c, depth + 1)),
             .state_provider => self.solver.stateProvider(try self.importEvidence(node.a, depth + 1), try self.importEvidence(node.b, depth + 1), try self.importEvidence(node.c, depth + 1)),
             .resolver => self.solver.resolver(try self.importEvidence(node.a, depth + 1)),
@@ -8473,7 +8342,7 @@ const ClosureRegion = struct {
                 try self.normalizeProjection(node.b, depth + 1);
                 if (node.tag == .state_provider) try self.normalizeProjection(node.c, depth + 1);
             },
-            .array, .list, .cursor, .demand, .provider, .resolver => try self.normalizeProjection(node.a, depth + 1),
+            .array, .list, .cursor, .provider, .resolver => try self.normalizeProjection(node.a, depth + 1),
             .product, .nominal, .projection => {
                 var children: []const types.Id = undefined;
                 if (node.tag == .product) {
@@ -8586,7 +8455,7 @@ const ClosureRegion = struct {
         // values still instantiate independently at every use.
         if (self.scratch.value_scopes.get(value_)) |prior| return prior;
         const kind = self.session.valueInfo(value_).kind;
-        if (kind != .closure and kind != .suspension) return self.addAggregate(value_, depth);
+        if (kind != .closure) return self.addAggregate(value_, depth);
         const metadata = self.session.closureInfo(value_);
         const owner = self.session.findUnit(metadata.unit, null) orelse return error.UnresolvedType;
         const module = &self.session.units[owner];
@@ -8600,13 +8469,10 @@ const ClosureRegion = struct {
                 self.scratch.sources.items[scope].closed_rows = template.closed_rows;
                 if (template.function_type != 0) {
                     const function = try self.importImplementation(scope, template.function_type);
-                    if (kind != .suspension) break :blk function;
-                    const signature = self.solver.node(function);
-                    if (signature.tag != .function) return error.TypeMismatch;
-                    break :blk try self.solver.demandWithEffects(signature.b, signature.c);
+                    break :blk function;
                 }
                 const result = try self.importType(scope, module.typeOf(template.body), 0);
-                break :blk if (kind == .suspension) try self.solver.demand(result) else try self.solver.function(try self.importType(scope, template.parameter.ty, 0), result);
+                break :blk try self.solver.function(try self.importType(scope, template.parameter.ty, 0), result);
             },
             .named => blk: {
                 const definition = module.body(metadata.identity) orelse return error.UnresolvedType;
@@ -8684,7 +8550,7 @@ const ClosureRegion = struct {
         return scope;
     }
     fn deferLexicalBody(self: *ClosureRegion, scope: u32, value: ValueId) RegionError!bool {
-        if (!self.session.options.reuse_lexical_summaries or self.building_principal or self.source_interface or self.retain_selected or self.complete_demand_bodies or self.session.valueInfo(value).kind != .closure) return false;
+        if (!self.session.options.reuse_lexical_summaries or self.building_principal or self.source_interface or self.retain_selected or self.session.valueInfo(value).kind != .closure) return false;
         // Portable receipts require explicit replay of every observation.
         // Their current ordinary path retains the complete source/capture proof.
         if (self.session.receipt_tape != null or self.session.recordingConstant() or self.session.principal_reads != null or self.session.refinement_observation != null) return false;
@@ -8794,7 +8660,7 @@ const ClosureRegion = struct {
                 if (info.bits == 0) return error.UnresolvedType;
                 break :blk try self.importEvidence(info.bits, 0);
             },
-            .closure, .suspension => return error.UnresolvedType,
+            .closure => return error.UnresolvedType,
         };
         const existing = self.session.valueEvidence(value_);
         if (existing != 0) {
@@ -8929,13 +8795,13 @@ const ClosureRegion = struct {
         }
         // Input-keyed jobs already bound repeated concrete calls. An eager
         // interface import must not expand their shared callee graph again.
-        const completed_interface = self.session.reuse_principal_graphs and self.partial_principal and !self.retain_selected and !self.complete_demand_bodies and
+        const completed_interface = self.session.reuse_principal_graphs and self.partial_principal and !self.retain_selected and
             definition != null and definition.?.is_function and binding.kind == .global and
             binding.scheme.obligations.len != 0 and !try self.summaryEligible(target_) and try self.completedInterface(target_);
         // Source checking proves a declared body under its written requirements.
         // Import those requirements with fresh variables; do not recollect the
         // body or publish a closed call proof before its predicates are solved.
-        if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and (completed_interface or try self.checkedSchemeReusable(target_))) {
+        if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and definition != null and definition.?.is_function and binding.kind == .global and (completed_interface or try self.checkedSchemeReusable(target_))) {
             // This branch consumes the freshly checked scheme, not its body.
             // Requirement producers are checked headers too. Record the entire
             // reachable header graph, even when checkedRequirements hit its
@@ -9357,7 +9223,7 @@ const ClosureRegion = struct {
                         .instance_version, .forall, .existential, .bound, .rigid, .absent, .projection, .scoped, .instance_selection, .erased_proof => return false,
                         .unit, .boolean, .u32, .f32, .never, .type_constructor => {},
                         .usage, .array, .list, .cursor, .resolver => try pending.append(self.scratch_allocator, .{ .ty = node.a }),
-                        .function, .demand, .provider => {
+                        .function, .provider => {
                             try pending.append(self.scratch_allocator, .{ .ty = node.a });
                             if (node.tag == .function) try pending.append(self.scratch_allocator, .{ .ty = node.b });
                             try pending.append(self.scratch_allocator, .{ .row = node.c });
@@ -10605,7 +10471,7 @@ const ClosureRegion = struct {
         // Captures are explicit selected inputs here, never an open principal
         // qualifier whose complete global arrow can be freshened by a caller.
         if (self.lexical_summary_job != 0) return null;
-        if (self.building_principal or self.summary_job or !self.session.reuse_principal_graphs or !self.include_callables or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return null;
+        if (self.building_principal or self.summary_job or !self.session.reuse_principal_graphs or !self.include_callables or self.retain_selected or self.speculative_source_entry) return null;
         // Quota-bound inquiries keep their original collector and its exact
         // prefix/limit diagnostics. Templates are an optional sharing policy.
         if (self.session.options.max_values < 4096 or self.session.options.max_type_depth < 64) return null;
@@ -10684,7 +10550,7 @@ const ClosureRegion = struct {
         return graph;
     }
     fn resultPrincipalEligible(self: *ClosureRegion, target_: Target, deferred: bool) RegionError!bool {
-        if (!self.session.reuse_principal_graphs or (self.summary_job and !self.result_summary_job) or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return false;
+        if (!self.session.reuse_principal_graphs or (self.summary_job and !self.result_summary_job) or self.retain_selected or self.speculative_source_entry) return false;
         if (self.unkeyed_capture_inputs and self.higherOrderBody(target_)) return false;
         if (self.session.options.max_values < 4096 or self.session.options.max_type_depth < 64) return false;
         const root: PrincipalGraph.Key = .{ .target = target_, .source_interface = self.source_interface, .deferred_member = deferred, .options = self.session.options };
@@ -10738,7 +10604,7 @@ const ClosureRegion = struct {
         return result_directed;
     }
     fn retainOpenPrincipal(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
-        if (!self.session.reuse_principal_graphs or self.summary_job or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return false;
+        if (!self.session.reuse_principal_graphs or self.summary_job or self.retain_selected or self.speculative_source_entry) return false;
         if (self.unkeyed_capture_inputs and self.higherOrderBody(constraint.target)) return false;
         if (self.session.options.max_values < 4096 or self.session.options.max_type_depth < 64) return false;
         const key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member, .options = self.session.options };
@@ -11244,10 +11110,7 @@ const ClosureRegion = struct {
             const id = try frame.walk.next(allocator) orelse {
                 if (frame.exit.remove) |target_| _ = self.scratch.unresolved_calls.remove(target_);
                 if (frame.exit.lexical_caller) |caller| try self.shareLexical(frame.scope, caller, frame.exit.lexical_scheme);
-                if (frame.exit.demand) |demand| {
-                    if (self.scratch.completed_demands.items.len >= self.session.options.max_values) return error.TypeLimit;
-                    try self.scratch.completed_demands.append(self.scratch_allocator, demand);
-                }
+
                 continue;
             };
             if (frame.walk.count > self.session.options.max_values) return error.TypeLimit;
@@ -11357,7 +11220,7 @@ const ClosureRegion = struct {
                 try self.packPayloadNode(scope, pack_id, node.b, depth + 1);
                 if (node.tag == .state_provider) try self.packPayloadNode(scope, pack_id, node.c, depth + 1);
             },
-            .usage, .array, .list, .cursor, .demand, .provider, .resolver => try self.packPayloadNode(scope, pack_id, node.a, depth + 1),
+            .usage, .array, .list, .cursor, .provider, .resolver => try self.packPayloadNode(scope, pack_id, node.a, depth + 1),
             .product, .nominal => {
                 var children: []const types.Id = undefined;
                 if (node.tag == .product) children = self.solver.list(.{ .start = node.a, .len = node.b }) else children = self.solver.nominalArguments(node);
@@ -11562,21 +11425,6 @@ const ClosureRegion = struct {
             try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, projection.source_type, 0), .result = try self.importType(scope, projection.result_type, 0), .projection = projection_index, .kind = .field, .writable = true, .deferred_member = self.defer_members });
         };
     }
-    fn collectSuspensionNode(self: *ClosureRegion, scope: u32, id: core.Id) RegionError!void {
-        const module = &self.session.units[self.scratch.sources.items[scope].owner];
-        const n = module.node(id);
-        if (self.retain_selected and !try self.session.startupSelectorFree(self.scratch.sources.items[scope].owner, module.closures[n.a].body)) self.startup_coverage_complete = false;
-        if (self.complete_demand_bodies) {
-            const closure = module.closures[n.a];
-            const actual = try self.importType(scope, n.ty, 0);
-            const demanded = self.solver.node(try self.solver.resolve(actual, 0));
-            if (demanded.tag != .demand) return error.TypeMismatch;
-            try self.unify(demanded.a, try self.importType(scope, module.typeOf(closure.body), 0));
-            if (closure.function_type != 0) try self.unify(try self.importType(scope, closure.function_type, 0), try self.solver.functionWithEffects(types.unit, demanded.a, demanded.c));
-            if (closure.qualifier != 0 and closure.qualifier != self.scratch.sources.items[scope].binding) try self.importScheme(scope, module.binding(closure.qualifier).scheme, closure.body);
-            try self.collectWithExit(scope, closure.body, .{ .demand = .{ .scope = scope, .node = id, .body = closure.body, .root = actual } });
-        }
-    }
     fn collectClosureNode(self: *ClosureRegion, scope: u32, id: core.Id) RegionError!void {
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
         const qualifier = self.definitionIndex().get(.{ .owner = self.scratch.sources.items[scope].owner, .node = id }) orelse module.closure(id).qualifier;
@@ -11631,7 +11479,7 @@ const ClosureRegion = struct {
                 if (module.types.node(binding.ty).tag != .function) try self.importScheme(scope, binding.scheme, n.b);
                 try work.append(self.session.allocator, n.b);
             },
-            .return_, .project, .result_associated, .force => try work.append(self.session.allocator, n.a),
+            .return_, .project, .result_associated => try work.append(self.session.allocator, n.a),
             .construct => try work.append(self.session.allocator, n.b),
             .pattern_bind => {
                 try self.collectStartupPatterns(scope, &.{n.a});
@@ -11674,7 +11522,6 @@ const ClosureRegion = struct {
                 try work.appendSlice(self.session.allocator, &.{ metadata.computation, metadata.completion_body });
                 for (module.requestArms(id)) |arm| try work.append(self.session.allocator, arm.callback);
             },
-            .suspend_ => try self.collectSuspensionNode(scope, id),
             .constant, .reference, .constructor_function, .primitive_function, .panic, .type_constructor => {},
             .invalid => return error.UnresolvedType,
         }
@@ -11701,7 +11548,7 @@ const ClosureRegion = struct {
         const n = module.node(id);
         if (self.building_principal) {
             switch (n.tag) {
-                .closure, .suspend_, .force, .request_loop, .request_decision, .resolver_op, .invalid => return error.UnresolvedType,
+                .closure, .request_loop, .request_decision, .resolver_op, .invalid => return error.UnresolvedType,
                 else => {},
             }
             if (n.tag == .reference) {
@@ -11715,11 +11562,7 @@ const ClosureRegion = struct {
         }
         if (self.session.receipt_tape) |tape| {
             tape.collected += 1;
-            // A complete refinement query owns this checked demand header,
-            // without collecting or creating its suspended value/body. Actual
-            // creation/history reads still revoke the tape at their own sites.
-            const refinement_header = n.tag == .suspend_ and self.session.refinement_observation != null and !self.source_interface and !self.building_principal and !self.retain_selected and !self.complete_demand_bodies;
-            if (!refinement_header and (n.tag == .suspend_ or n.tag == .request_loop or n.tag == .request_decision)) tape.unknown = true;
+            if (n.tag == .request_loop or n.tag == .request_decision) tape.unknown = true;
         }
         if (n.tag == .reference) try self.collectReference(scope, id);
         const source_signature = module.dispatchSignature(id);
@@ -11784,7 +11627,7 @@ const ClosureRegion = struct {
         const use = self.solver.node(try self.solver.resolve(instance, 0));
         if (source.tag == .variable) return false;
         if (source.tag == .usage and source.c == 0 and (source.b == @backingInt(types.UsageKind.once) or source.b == @backingInt(types.UsageKind.many)) and self.solver.node(try self.solver.resolve(source.a, 0)).tag == .function) return true;
-        if (source.tag == .function or source.tag == .demand or source.tag == .provider or source.tag == .state_provider or source.tag == .resolver or source.tag == .type_constructor) return true;
+        if (source.tag == .function or source.tag == .provider or source.tag == .state_provider or source.tag == .resolver or source.tag == .type_constructor) return true;
         if (use.tag == .variable) return false;
         if (source.tag != use.tag) return error.TypeMismatch;
         switch (source.tag) {
@@ -12421,8 +12264,8 @@ const ClosureRegion = struct {
             try self.scratch.call_instances.put(self.scratch_allocator, key, scope);
         }
         // callableScope already imported this instance's written requirements.
-        // Emission and complete demand checking still collect the actual body.
-        if (!self.retain_selected and !self.complete_demand_bodies) {
+        // Emission still collects the actual body.
+        if (!self.retain_selected) {
             const module = &self.session.units[target_.unit];
             const binding = module.binding(target_.binding);
             if (binding.kind == .global and binding.scheme.obligations.len != 0 and try self.checkedSchemeReusable(target_)) {
@@ -12801,7 +12644,7 @@ const ClosureRegion = struct {
             index += 1;
         };
         const value_kind = self.session.valueInfo(source.value).kind;
-        if (value_kind != .closure and value_kind != .suspension) {
+        if (value_kind != .closure) {
             const info = self.session.valueInfo(source.value);
             if (info.kind == .scalar) return self.session.typedView(source.owner, source.body, source.value, actual);
             const result = try self.session.copyFrozenAggregate(source.owner, source.body, source.value, replacements, null);
@@ -12816,10 +12659,7 @@ const ClosureRegion = struct {
         metadata.mappings = try self.session.captureMappings(source.owner, source.body, solved.types);
         metadata.row_mappings = try self.session.captureRowMappings(source.owner, source.body, solved.rows);
         const header = try self.session.copyFrozenAggregate(source.owner, source.body, source.value, replacements, metadata);
-        if (value_kind == .suspension) {
-            self.session.storage.values.items[header].kind = .suspension;
-            self.session.storage.values.items[header].nominal = self.session.valueInfo(source.value).nominal;
-        }
+
         const result = try self.session.typedView(source.owner, source.body, header, actual);
         try self.scratch.frozen.put(self.scratch_allocator, scope, result);
         return result;
@@ -12849,48 +12689,27 @@ const ClosureRegion = struct {
         var changed = true;
         while (changed) {
             changed = false;
-            for (self.scratch.completed_demands.items) |demand| {
-                const module = &self.session.units[self.scratch.sources.items[demand.scope].owner];
-                const node = module.node(demand.node);
-                if (node.tag != .suspend_ or module.closures[node.a].body != demand.body) return error.UnresolvedType;
-                const arrow = self.solver.node(try self.solver.resolve(demand.root, 0));
-                if (arrow.tag != .demand or try self.project(arrow.a) == 0) continue;
-                const row = try self.solver.resolveEffects(arrow.c, 0);
-                if (self.solver.row(row).tail != .variable) continue;
-                const closed = self.solver.effects.row(self.solver.rowLabels(row), .closed) catch |err| return types.effectError(err);
-                try self.solver.unifyEffects(row, closed);
-                changed = true;
-            }
+
             for (self.scratch.sources.items) |source| {
                 if (source.value == 0) continue;
                 const kind = self.session.valueInfo(source.value).kind;
-                if (kind != .closure and kind != .suspension) continue;
-                const arrow = self.solver.node(try self.solver.resolve(source.root, 0));
-                if (kind == .closure) {
-                    const metadata = self.session.closureInfo(source.value);
-                    const parameters = if (metadata.origin == .named) count: {
-                        const body = self.session.units[source.owner].body(metadata.identity) orelse return error.UnresolvedType;
-                        if (metadata.applied > body.parameters.len) return error.UnresolvedType;
-                        break :count body.parameters.len - metadata.applied;
-                    } else if (metadata.origin == .anonymous) count: {
-                        // `func a => return func b => return ...` is curried like a named body:
-                        // a closure literal that is the whole body is this
-                        // closure's own arrow, not a returned callback.
-                        const module = &self.session.units[source.owner];
-                        var count: usize = 1;
-                        var body = module.closures[metadata.identity].body;
-                        while (module.node(body).tag == .closure and count < self.session.options.max_type_depth) : (count += 1) body = module.closure(body).body;
-                        break :count count;
-                    } else 1;
-                    changed = try self.closeRetainedFunctionRows(source.root, parameters) or changed;
-                    continue;
-                } else if (source.body == 0 or arrow.tag != .demand or try self.project(arrow.a) == 0) continue;
-                const row = try self.solver.resolveEffects(arrow.c, 0);
-                if (self.solver.row(row).tail != .variable) continue;
-                // A complete concrete body proves only its own remaining ambient.
-                const closed = self.solver.effects.row(self.solver.rowLabels(row), .closed) catch |err| return types.effectError(err);
-                try self.solver.unifyEffects(row, closed);
-                changed = true;
+                if (kind != .closure) continue;
+                const metadata = self.session.closureInfo(source.value);
+                const parameters = if (metadata.origin == .named) count: {
+                    const body = self.session.units[source.owner].body(metadata.identity) orelse return error.UnresolvedType;
+                    if (metadata.applied > body.parameters.len) return error.UnresolvedType;
+                    break :count body.parameters.len - metadata.applied;
+                } else if (metadata.origin == .anonymous) count: {
+                    // `func a => return func b => return ...` is curried like a named body:
+                    // a closure literal that is the whole body is this
+                    // closure's own arrow, not a returned callback.
+                    const module = &self.session.units[source.owner];
+                    var count: usize = 1;
+                    var body = module.closures[metadata.identity].body;
+                    while (module.node(body).tag == .closure and count < self.session.options.max_type_depth) : (count += 1) body = module.closure(body).body;
+                    break :count count;
+                } else 1;
+                changed = try self.closeRetainedFunctionRows(source.root, parameters) or changed;
             }
         }
     }
@@ -12949,7 +12768,6 @@ const ClosureRegion = struct {
     }
     fn infer(self: *ClosureRegion, value_: ValueId) RegionError!ValueId {
         self.include_callables = true;
-        self.complete_demand_bodies = true;
         const scope = try self.addValue(value_, 0);
         try self.solve();
         if (!self.allConstraintsSolved()) return error.UnresolvedType;
@@ -13954,9 +13772,6 @@ fn principalSourceOwnerScenario(a: Allocator, module: *const core.Module) !void 
     }
     try std.testing.expect(found);
     try std.testing.expectEqual(@as(usize, 0), reads.source_units.items.len);
-    var has_suspension = false;
-    for (module.nodes) |node| has_suspension = has_suspension or node.tag == .suspend_;
-    try std.testing.expect(has_suspension);
     for (module.closures) |closure| {
         if (closure.body == 0) continue;
         const owner = (try session.regions.principal_source_owners.node(a, session.units, 0, closure.body, session.options.max_values)) orelse return error.TestUnexpectedResult;
@@ -14007,20 +13822,6 @@ test "Session unit lookup preserves dense implicit sparse and duplicate first ow
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, unitIndexScenario, .{&module});
 }
 
-test "principal source containment owns nested closures and local reads with bounded allocation failure cleanup" {
-    var module = try bodyRecipeLower(
-        \\const first = func (x: U32) => return do:
-        \\  let captured = func (y: U32) => return @u32.add x y
-        \\  break captured
-        \\const second = func (x: U32) => return @u32.sub x 1
-        \\const force = func ~(value: U32) => return @demand value
-        \\entry const delayed = force (@u32.add 1 2)
-        \\entry const answer = 7
-    );
-    defer module.deinit(std.testing.allocator);
-    try principalSourceOwnerScenario(std.testing.allocator, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, principalSourceOwnerScenario, .{&module});
-}
 test "region arena exports own projected evidence across region ID recycling teardown and OOM" {
     try solverCapacityExportsScenario(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, solverCapacityExportsScenario, .{});
@@ -14789,4 +14590,19 @@ fn localCapabilityExitScenario(allocator: Allocator) !void {
 test "compile time capability scope exit follows provider tokens and reflected keys through OOM" {
     try localCapabilityExitScenario(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, localCapabilityExitScenario, .{});
+}
+
+test "principal source containment owns nested closures and local reads with bounded allocation failure cleanup" {
+    var module = try bodyRecipeLower(
+        \\const first = func (x: U32) => return do:
+        \\  let captured = func (y: U32) => return @u32.add x y
+        \\  break captured
+        \\const second = func (x: U32) => return @u32.sub x 1
+        \\const force = func (value: U32) => return value
+        \\entry const delayed = force (@u32.add 1 2)
+        \\entry const answer = 7
+    );
+    defer module.deinit(std.testing.allocator);
+    try principalSourceOwnerScenario(std.testing.allocator, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, principalSourceOwnerScenario, .{&module});
 }

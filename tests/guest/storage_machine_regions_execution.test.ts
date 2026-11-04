@@ -2,9 +2,8 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-// The large consumer runs repeatedly inside one invocation. Forcing a captured
-// demand creates its result local inside this consumer's emission range, while
-// its ready flag already belongs to the outer scope. Both must persist together.
+// The large consumer runs repeatedly inside one invocation. Its callback
+// captures an outer scalar that must survive every reused consumer call.
 const padding = 2000;
 function sourceFor(scalar: "U32" | "F32"): string {
   return `const calculate = func (counter: Array U32) -> (input: ${scalar}): ${scalar} => return do:
@@ -18,9 +17,9 @@ ${
       : "  total := @f32.neg total\n").repeat(padding)
   }  @storage.push destination total
   return ()
-const exercise = func ~(value: ${scalar}) -> (destination: ResizeArray ${scalar}): Unit => return do:
+const exercise = func (value: ${scalar}) -> (destination: ResizeArray ${scalar}): Unit => return do:
   for index in 0 .. 3:
-    consume destination (func () => return @demand value)
+    consume destination (func () => return value)
   return ()
 entry const answer = func (input: ${scalar}) => return do:
   let counter: Array U32 = #[0]
@@ -34,7 +33,7 @@ entry const answer = func (input: ${scalar}) => return do:
 
 for (const scalar of ["U32", "F32"] as const) {
   for (const codegenTier of ["development", "optimized"] as const) {
-    Deno.test(`machine regions retain captured ${scalar} demand state through enclosing loops (${codegenTier})`, async () => {
+    Deno.test(`reusable helpers retain captured ${scalar} values through enclosing loops (${codegenTier})`, async () => {
       const directory = await Deno.makeTempDir({
         prefix: "blot-machine-regions-",
       });
@@ -54,8 +53,7 @@ for (const scalar of ["U32", "F32"] as const) {
         });
         assert(result.success, JSON.stringify(result));
         const counters = result.stats.workCounters as Record<string, number>;
-        assert(counters.scoped_outlined_regions > 0, JSON.stringify(counters));
-        assert(counters.scoped_outlined_globals > 0, JSON.stringify(counters));
+        assert.equal(counters.scoped_function_plan_definitions, 3);
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(result.bytes, { asynchronous });
           try {

@@ -42,14 +42,6 @@ pub const HostClosure = extern struct {
     handle: u32,
     pub const roles = [_]Role{ .table_function, .owner_token, .scalar };
 };
-pub const DemandStatus = enum(u32) { pending, evaluating, ready, terminal };
-pub const Demand = extern struct {
-    function: u32,
-    environment: u32,
-    status: DemandStatus,
-    cached: u32,
-    pub const roles = [_]Role{ .table_function, .reference, .scalar, .value };
-};
 pub const Pair = extern struct {
     first: u32,
     second: u32,
@@ -227,7 +219,7 @@ pub fn fields(comptime T: type) [T.roles.len]Field {
 }
 
 comptime {
-    for (.{ Closure, HostClosure, Demand, Pair, Cursor, ProviderFrame, StateCell, StateFrame, Provider, StateProvider, RequestCell, RequestFrame, ScopedRequestFrame, Decision, Array, ListDescriptor, ListNode, ListBranch, ArenaHeader }) |T| {
+    for (.{ Closure, HostClosure, Pair, Cursor, ProviderFrame, StateCell, StateFrame, Provider, StateProvider, RequestCell, RequestFrame, ScopedRequestFrame, Decision, Array, ListDescriptor, ListNode, ListBranch, ArenaHeader }) |T| {
         _ = fields(T);
     }
     for (@typeInfo(ListNode).@"struct".field_names) |name|
@@ -237,7 +229,6 @@ comptime {
     for (.{ "outer", "kind" }) |name|
         std.debug.assert(offset(StateFrame, name) == offset(ProviderFrame, name));
     for (@typeInfo(Closure).@"struct".field_names) |name| {
-        std.debug.assert(offset(Closure, name) == offset(Demand, name));
         std.debug.assert(offset(Closure, name) == offset(HostClosure, name));
     }
     for (@typeInfo(RequestFrame).@"struct".field_names) |name|

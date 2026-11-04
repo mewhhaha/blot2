@@ -852,40 +852,6 @@ test "enclosing constant member judgment subfloor keeps ordinary selected reuse 
     try std.testing.expectEqual(@as(usize, 0), actual.constant_receipts.owned_payload_bytes);
 }
 
-test "enclosing constant member judgment cannot absorb prior unowned inference" {
-    const text = try enclosingSource("1", "2", "0", "#[]", false);
-    defer a.free(text);
-    var fixture = try Fixture.init(text);
-    defer fixture.deinit();
-    var session = try @import("../eval/core_eval.zig").Session.init(a, fixture.units);
-    defer session.deinit();
-    session.retain_specialization_receipts = true;
-    session.options.trace_runtime_dependencies = true;
-    session.options.retain_source_suspensions = true;
-    _ = try session.richValue(.{ .unit = 1, .binding = 3 });
-    _ = try session.richValue(.{ .unit = 1, .binding = 2 });
-    _ = try session.specializations.body_recipes.get(a, session.units, .{ .owner = 0, .body = session.units[0].body(2).?.root, .callables = true }, session.options.max_values);
-    try std.testing.expect(session.memberReceiptEligible(.{ .unit = 1, .binding = 2 }));
-    var parent = @import("constant_receipt.zig").Recorder.init(&session);
-    defer parent.deinit(a);
-    // A child frame runs while its enclosing recorder is suspended. Its real
-    // inference observation cannot be reassigned to a later member callback.
-    const value = try session.richValue(.{ .unit = 1, .binding = 4 });
-    try std.testing.expect(session.constant_inference_serial > parent.inference_serial);
-    try std.testing.expect(session.retained.specialization_receipts.items.len != 0);
-    const complete = session.retained.specialization_receipts.items.len - 1;
-    try std.testing.expect(session.retained.specialization_receipts.items[complete].complete);
-    try parent.beforeRead(a, &session);
-    try std.testing.expect(!parent.eligible);
-    try std.testing.expect(try parent.finish(a, &session, .{ .unit = 1, .binding = 4 }, value, .{}) == null);
-    session.constant_inference_serial = std.math.maxInt(u64);
-    var saturated = @import("constant_receipt.zig").Recorder.init(&session);
-    defer saturated.deinit(a);
-    try saturated.beforeRead(a, &session);
-    try std.testing.expect(!saturated.eligible);
-    try std.testing.expect(try saturated.finish(a, &session, .{ .unit = 1, .binding = 4 }, value, .{}) == null);
-}
-
 fn compoundAliasesSource(sibling: []const u8, seed: []const u8, delta: []const u8) ![]u8 {
     var expression = try a.dupe(u8, "1");
     defer a.free(expression);
@@ -1607,9 +1573,10 @@ const temporary_programs = [_]struct { body: []const u8, hits: usize, changed_hi
     , .hits = 0 },
     .{ .body =
     \\  let pending = delayed base
-    \\  let cost = @demand pending
-    \\  let again = @demand pending
-    , .hits = 0 },
+    \\  let cost = pending ()
+    \\  let again = pending ()
+    // The callback captures a plain reusable graph; changing base still misses.
+    , .hits = 1 },
     .{ .body =
     \\  let cost = @effect.scope (func (state: State U32) => return base)
     , .hits = 0 },
@@ -1624,7 +1591,7 @@ fn temporarySource(seed: []const u8, base: []const u8, body: []const u8) ![]u8 {
         \\const described: Unit -> U32 ! {{Read}} = func () => return Read ()
         \\type Box a is data = $Box a
         \\const Box.pure = func (value: U32) => return $Box value
-        \\const delayed = func ~value => return value
+        \\const delayed = func value => return func () => return value
         \\const base = {s}
         \\const expensive = do:
         \\{s}
@@ -1680,4 +1647,37 @@ test "constant receipts use actual execution boundaries for dead immutable tempo
         defer fresh.deinit(a);
         try replayTemporaries(a, &altered, &initial, &fresh, program.changed_hits);
     }
+}
+
+test "enclosing constant member judgment cannot absorb prior unowned inference" {
+    const text = try enclosingSource("1", "2", "0", "#[]", false);
+    defer a.free(text);
+    var fixture = try Fixture.init(text);
+    defer fixture.deinit();
+    var session = try @import("../eval/core_eval.zig").Session.init(a, fixture.units);
+    defer session.deinit();
+    session.retain_specialization_receipts = true;
+    session.options.trace_runtime_dependencies = true;
+    _ = try session.richValue(.{ .unit = 1, .binding = 3 });
+    _ = try session.richValue(.{ .unit = 1, .binding = 2 });
+    _ = try session.specializations.body_recipes.get(a, session.units, .{ .owner = 0, .body = session.units[0].body(2).?.root, .callables = true }, session.options.max_values);
+    try std.testing.expect(session.memberReceiptEligible(.{ .unit = 1, .binding = 2 }));
+    var parent = @import("constant_receipt.zig").Recorder.init(&session);
+    defer parent.deinit(a);
+    // A child frame runs while its enclosing recorder is suspended. Its real
+    // inference observation cannot be reassigned to a later member callback.
+    const value = try session.richValue(.{ .unit = 1, .binding = 4 });
+    try std.testing.expect(session.constant_inference_serial > parent.inference_serial);
+    try std.testing.expect(session.retained.specialization_receipts.items.len != 0);
+    const complete = session.retained.specialization_receipts.items.len - 1;
+    try std.testing.expect(session.retained.specialization_receipts.items[complete].complete);
+    try parent.beforeRead(a, &session);
+    try std.testing.expect(!parent.eligible);
+    try std.testing.expect(try parent.finish(a, &session, .{ .unit = 1, .binding = 4 }, value, .{}) == null);
+    session.constant_inference_serial = std.math.maxInt(u64);
+    var saturated = @import("constant_receipt.zig").Recorder.init(&session);
+    defer saturated.deinit(a);
+    try saturated.beforeRead(a, &session);
+    try std.testing.expect(!saturated.eligible);
+    try std.testing.expect(try saturated.finish(a, &session, .{ .unit = 1, .binding = 4 }, value, .{}) == null);
 }

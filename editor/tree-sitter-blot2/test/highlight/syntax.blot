@@ -188,21 +188,15 @@ const Int.add = func (left: Int) => return func (right: Int) => return @int.add 
 @f32.sqrt value
 // <- function.builtin
 
-const either = func left => return func ~right => return do:
+const either = func left => return func right => return do:
 //             ^ keyword.function
 //    ^ function
-//                                      ^ operator
-//                                       ^ variable.parameter
   if left:
     break true
-  break @demand right
-//       ^ function.builtin
+  break right ()
 
-const force = func ~value => return @demand value
+const force = func value => return value ()
 //    ^ function
-//                 ^ operator
-//                  ^ variable.parameter
-//                                  ^ function.builtin
 
 let point = Vec2 { x: 1.0, y: 2.0 }
 // <- keyword.storage.type

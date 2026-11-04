@@ -10,9 +10,12 @@ infixl 60 (??) = ignore
 ${prefix}const seed = ${seed}
 type Number is data = $Number U32
 const Number.next = func ($Number value) => return @u32.add value ${delta}
-const both = func ~(left: U32) => return func ~(right: U32) => return @u32.add (@u32.add (@demand left) (@demand left)) (@demand right)
-const ignore = func ~(left: U32) => return func ~(right: U32) => return 7
-const operate = func (host: U32 -> U32 ! {Foreign}) => return @u32.add ((host seed) %% (host (@u32.add seed 1))) ((host 999) ?? (host 998))
+const both = func left => return func right => return do:
+  use first <- left ()
+  use second <- right ()
+  break @u32.add (@u32.add first first) second
+const ignore = func left => return func right => return 7
+const operate = func (host: U32 -> U32 ! {Foreign}) => return @u32.add ((func () => return host seed) %% (func () => return host (@u32.add seed 1))) ((func () => return host 999) ?? (func () => return host 998))
 const describe = func (value: U32) => return do:
   let record = {value, values: #[value, seed]}
   record.value := @u32.add self 1
@@ -34,7 +37,7 @@ async function observe(
     const guest = await instantiateGuest(bytes, { asynchronous });
     const trace: number[] = [];
     let fail = false;
-    const failure = new Error("binary demand host failed");
+    const failure = new Error("binary callback host failed");
     const implementation = {
       parameter: "U32" as const,
       result: "U32" as const,
@@ -81,7 +84,7 @@ async function observe(
   }
 }
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`general body receipts preserve binary demand effects method edits and owning records (${codegenTier})`, async () => {
+  Deno.test(`general body receipts preserve binary callback effects method edits and owning records (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-general-bodies-",
     });

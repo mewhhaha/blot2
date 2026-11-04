@@ -65,7 +65,7 @@ pub fn required(allocator: std.mem.Allocator, units: []const core.Module, entry:
             if (target.binding >= producer.bindings.len) return true;
             if (producer.body(target.binding)) |body| try pending.append(allocator, .{ .unit = target.unit, .id = body.root });
         }
-        if (n.tag == .closure or n.tag == .suspend_) {
+        if (n.tag == .closure) {
             try pending.append(allocator, .{ .unit = m.unit, .id = m.closures[n.a].body });
         }
         const Visitor = struct {
@@ -121,7 +121,6 @@ const Value = struct {
     // Set only after a complete anonymous-formal footprint. Semantic type
     // evidence remains complete; this bit describes the physical parameter.
     projected_parameter_fields: bool = false,
-    demand: ?*Demand = null,
 };
 const ZeroSource = struct {
     function: ?u32 = null,
@@ -183,7 +182,6 @@ test "default zero source checkpoints never retain a rolled back local" {
     try code.value(zero);
     try std.testing.expectEqual(@as(usize, 2), module.functions.items[0].locals.items.len);
 }
-const Demand = struct { ready: Local, result: ?Value = null, building: bool = false };
 const Callable = struct {
     unit: u32,
     node: core.Id = 0,
@@ -1059,11 +1057,11 @@ const Generator = struct {
     fn fixedScalarSpan(self: *Generator, value: Value) Error!?FixedSpan {
         // Private helpers cannot cross the host boundary or close input owners.
         // Match immutable physical descriptors, never only a possible root set.
-        if (self.writer_trace == null or value.tag != .array or value.mode != .fixed or value.other_roots.len != 0 or value.host != null or value.demand != null) return null;
+        if (self.writer_trace == null or value.tag != .array or value.mode != .fixed or value.other_roots.len != 0 or value.host != null) return null;
         const root_id = value.root orelse return null;
         const owner = &self.roots.items[root_id];
         if (owner.imported_global and owner.global_ready == null) return null;
-        if (!owner.live or owner.element.tag != .scalar or owner.element.fields.len != 0 or owner.element.root != null or owner.element.host != null or owner.element.demand != null) return null;
+        if (!owner.live or owner.element.tag != .scalar or owner.element.fields.len != 0 or owner.element.root != null or owner.element.host != null) return null;
         if (value.word.id != owner.word.id or value.token.id != owner.token.id or value.epoch_low.id != owner.epoch_low.id or value.epoch_high.id != owner.epoch_high.id) return null;
         if (owner.fixed_span == null) {
             // Locals recreated in a loop need a fresh create receipt, not a
@@ -1328,7 +1326,7 @@ const Generator = struct {
         target.literal = null;
         target.constant_bits = null;
         if (target.tag != value.tag or target.fields.len != value.fields.len or target.mode != value.mode or target.floating != value.floating) return self.unsupported(m, id);
-        if (!std.meta.eql(target.nominal, value.nominal) or target.demand != value.demand) return self.unsupported(m, id);
+        if (!std.meta.eql(target.nominal, value.nominal)) return self.unsupported(m, id);
         if (!std.meta.eql(target.host, value.host)) return self.unsupported(m, id);
         if (target.tag == .callable and target.host == null and (target.callable.?.unit != value.callable.?.unit or target.callable.?.node != value.callable.?.node or target.callable.?.target != value.callable.?.target)) return self.fail(m, id, .storage_unsupported, "A callback must have a statically known function body");
         if (target.tag == .ref and target.root == null and !target.pool_borrow) {
@@ -1360,7 +1358,7 @@ const Generator = struct {
         return .{ .physical = deferred_join.Join.init(self.c) };
     }
     fn shareableNode(value: Value) bool {
-        if (value.variant_tags.len != 0 or value.host != null or value.demand != null) return false;
+        if (value.variant_tags.len != 0 or value.host != null) return false;
         if ((value.tag == .ref or value.tag == .view or value.tag == .link) and value.root == null and !value.pool_borrow) return false;
         return true;
     }
@@ -1452,7 +1450,7 @@ const Generator = struct {
     fn finishJoin(self: *Generator, join: *ValueJoin, fallthrough: bool) Error!?Value {
         if (!join.selective) return join.value;
         // Root tokens remain mutable after release. Index each appended root
-        // once; loop carriers and demand storage are marked when created.
+        // once; loop carriers are marked when created.
         for (self.roots.items[self.indexed_mutable_roots..]) |owner| try self.mutable_join_words.put(self.allocator, owner.token.id, {});
         self.indexed_mutable_roots = self.roots.items.len;
         const shared = join.physical.finish(self.arena.allocator(), self.c, self.outlining, &self.mutable_join_words, fallthrough) catch |err| return joinFailure(err);
@@ -1481,7 +1479,6 @@ const Generator = struct {
         try self.checkEscape(m, id, value.*, boundary);
     }
     fn checkEscape(self: *Generator, m: *const core.Module, id: core.Id, value: Value, boundary: usize) Error!void {
-        if (value.demand != null and value.depth >= boundary) return self.fail(m, id, .storage_escape, "Memoized demands must remain within their defining invocation");
         if (value.tag == .ref or value.tag == .view or value.tag == .link) {
             if (value.root == null) {
                 if (value.depth >= boundary) return self.fail(m, id, .storage_escape, "A borrowed result would outlive its local value");
@@ -2277,7 +2274,6 @@ const Generator = struct {
         return self.invoke(target, arguments, depth);
     }
     fn callableType(self: *Generator, value: Value) Error!?TypeRef {
-        if (value.demand != null) return null;
         const callable = value.callable orelse return null;
         const owner = try self.unit(callable.unit);
         var signature = callable.signature(owner);
@@ -2424,7 +2420,7 @@ const Generator = struct {
         const n = m.node(id);
         const function = (try self.planValue(m, n.a, remaining, depth + 1)) orelse return null;
         const callable = function.callable orelse return null;
-        if (function.host != null or function.demand != null) return null;
+        if (function.host != null) return null;
         const owner = try self.unit(callable.unit);
         if (callable.kind(owner) == .primitive) {
             if (function.fields.len + 1 >= owner.primitive(callable.node).arity) return null;
@@ -2675,7 +2671,7 @@ const Generator = struct {
     }
     fn plannedCallback(self: *Generator, function: Value, argument: Value, remaining: *usize, active: *[128]core.BindingRef, used: usize, depth: usize) Error!bool {
         const callable = function.callable orelse return false;
-        if (function.demand != null or function.host != null or used == active.len) return false;
+        if (function.host != null or used == active.len) return false;
         const owner = try self.unit(callable.unit);
         if (callable.kind(owner) == .primitive) {
             if (function.fields.len + 1 != owner.primitive(callable.node).arity) return false;
@@ -2747,7 +2743,7 @@ const Generator = struct {
         };
     }
     fn plainInlineValue(value: Value) bool {
-        if ((value.tag != .scalar and value.tag != .aggregate) or value.root != null or value.other_roots.len != 0 or value.host != null or value.demand != null or value.callable != null or value.pool_borrow) return false;
+        if ((value.tag != .scalar and value.tag != .aggregate) or value.root != null or value.other_roots.len != 0 or value.host != null or value.callable != null or value.pool_borrow) return false;
         for (value.fields) |field| if (!plainInlineValue(field)) return false;
         return true;
     }
@@ -3494,10 +3490,7 @@ const Generator = struct {
             self.traceDescriptorBarrier(null, 0, value, "descriptor.reader.host-callback", false);
             return false;
         }
-        if (value.demand != null) {
-            self.traceDescriptorBarrier(null, 0, value, "descriptor.reader.demand", false);
-            return false;
-        }
+
         remaining.* -= 1;
         switch (value.tag) {
             .scalar => return true,
@@ -3737,7 +3730,7 @@ const Generator = struct {
         return result;
     }
     fn retainReaderResult(self: *Generator, source: Value, inputs: usize, copies: *EnvironmentCopies, reachable: bool, depth: usize) Error!Value {
-        if (depth > 128 or source.host != null or source.demand != null or source.tag == .callable) return error.Declined;
+        if (depth > 128 or source.host != null or source.tag == .callable) return error.Declined;
         if (source.tag != .scalar and source.tag != .aggregate) {
             if (source.root) |input| {
                 if (input >= inputs) return error.Declined;
@@ -4178,12 +4171,12 @@ const Generator = struct {
         for (try self.writableFields(value)) |*field| try self.graphInputShape(field, graph);
     }
     fn graphResultLayout(value: Value) bool {
-        if (value.host != null or value.demand != null or value.tag == .callable) return false;
+        if (value.host != null or value.tag == .callable) return false;
         for (value.fields) |field| if (!graphResultLayout(field)) return false;
         return true;
     }
     fn retainGraphShape(self: *Generator, source: Value, inputs: usize, copies: *EnvironmentCopies, depth: usize) Error!Value {
-        if (depth > 128 or source.host != null or source.demand != null or source.tag == .callable) return error.Declined;
+        if (depth > 128 or source.host != null or source.tag == .callable) return error.Declined;
         // Retained graphs contain only checked owner roles. Fresh result
         // owners are numbered before this copy; writer events stay input-only.
         if ((source.tag == .array and source.root == null) or (source.root != null and source.root.? >= inputs)) {
@@ -4243,14 +4236,14 @@ const Generator = struct {
         var prepared: PreparedArguments = .{ .values = original };
         var word_work: usize = 4096;
         for (m.bodyParameters(body), original, 0..) |parameter, argument, index| {
-            if (argument.tag != .aggregate or argument.variant_tags.len != 0 or argument.host != null or argument.demand != null or argument.root != null) continue;
+            if (argument.tag != .aggregate or argument.variant_tags.len != 0 or argument.host != null or argument.root != null) continue;
             const fields = @import("storage_parameter_fields.zig");
             var nominal: ?fields.NominalRecord = null;
             var record = &argument;
             if (argument.nominal != null) {
                 if (argument.fields.len != 1 or argument.other_roots.len != 0 or argument.callable != null or argument.pool_borrow or argument.sequence) continue;
                 record = &argument.fields[0];
-                if (record.tag != .aggregate or record.nominal != null or record.variant_tags.len != 0 or record.host != null or record.demand != null or record.root != null or record.other_roots.len != 0 or record.callable != null or record.pool_borrow or record.sequence) continue;
+                if (record.tag != .aggregate or record.nominal != null or record.variant_tags.len != 0 or record.host != null or record.root != null or record.other_roots.len != 0 or record.callable != null or record.pool_borrow or record.sequence) continue;
             }
             // Callback presence selects work, never authority. Large plain
             // records use the same complete footprint and physical-root guards.
@@ -4575,7 +4568,7 @@ const Generator = struct {
             try child.roots.append(self.allocator, .{ .word = .{ .id = 0 }, .token = .{ .id = 0 }, .epoch_low = .{ .id = 0 }, .epoch_high = .{ .id = 0 }, .stack = self.fixed_region, .depth = 0, .element = row, .element_initialized = original.element_initialized, .known_empty = original.known_empty, .frozen = original.frozen, .live = original.live, .persistent = original.persistent, .dedicated = false });
         }
         // Input owners precede every helper cleanup boundary. Only new local
-        // owners can have their token cleared; loops/demands mark separately.
+        // owners can have their token cleared; loops mark separately.
         child.indexed_mutable_roots = owners.len;
         const assigned = try child.arena.allocator().alloc(bool, owners.len);
         @memset(assigned, false);
@@ -4927,7 +4920,7 @@ const Generator = struct {
         defer if (!keep) evidence.deinit(self.allocator);
         self.emission_work.scoped_function_plan_preparations +|= 1;
         var scalar_inputs = true;
-        for (arguments) |argument| if (argument.tag != .scalar or argument.callable != null or argument.demand != null or argument.host != null or argument.root != null or argument.other_roots.len != 0 or argument.fields.len != 0 or argument.variant_tags.len != 0) {
+        for (arguments) |argument| if (argument.tag != .scalar or argument.callable != null or argument.host != null or argument.root != null or argument.other_roots.len != 0 or argument.fields.len != 0 or argument.variant_tags.len != 0) {
             scalar_inputs = false;
             break;
         };
@@ -5139,7 +5132,7 @@ const Generator = struct {
         try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 18, @intCast(arguments.len), @intCast(graph.owners.items.len) });
         var words: usize = 0;
         for (arguments) |argument| {
-            if (argument.callable != null or argument.host != null or argument.demand != null or argument.fields.len != 0 or argument.variant_tags.len != 0 or argument.other_roots.len != 0) return null;
+            if (argument.callable != null or argument.host != null or argument.fields.len != 0 or argument.variant_tags.len != 0 or argument.other_roots.len != 0) return null;
             if (argument.tag == .scalar) {
                 if (argument.floating or argument.root != null) return null;
                 try evidence.append(self.allocator, std.math.maxInt(u32));
@@ -5600,7 +5593,7 @@ const Generator = struct {
         var height: usize = 0;
         try keys.descriptorWord(descriptor, @backingInt(node.tag));
         switch (node.tag) {
-            .array, .list, .cursor, .demand, .resolver, .provider => try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, descriptor, keys, depth, &height),
+            .array, .list, .cursor, .resolver, .provider => try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, descriptor, keys, depth, &height),
             .usage => {
                 try keys.descriptorWord(descriptor, node.b);
                 try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, descriptor, keys, depth, &height);
@@ -5808,7 +5801,6 @@ const Generator = struct {
         try self.finishSelectedTypes(m, id, evidence, &keys);
     }
     fn reusableClosure(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value, checked_use: bool) Error!?Value {
-        if (function.demand != null) return null;
         const callable = function.callable.?;
         const owner = try self.unit(callable.unit);
         const closure = owner.closure(callable.node);
@@ -6008,7 +6000,7 @@ const Generator = struct {
             return self.invokeAt(m, id, .{ .unit = callable.unit, .binding = callable.target }, args, depth + 1);
         }
         const owner = try self.unit(callable.unit);
-        const closure = if (function.demand != null) owner.suspension(callable.node) else owner.closure(callable.node);
+        const closure = owner.closure(callable.node);
         if (try self.callableType(argument)) |signature| {
             try self.mapTypesUnder(.{ .unit = owner.unit, .ty = closure.parameter.ty }, signature, argument.callable.?.types, 0);
         } else try self.mapValueTypes(.{ .unit = owner.unit, .ty = closure.parameter.ty }, argument, 0);
@@ -6355,7 +6347,7 @@ const Generator = struct {
             .variable, .bound => {
                 return error.Declined;
             },
-            .array, .list, .cursor, .demand, .resolver => try children.append(self.allocator, node.a),
+            .array, .list, .cursor, .resolver => try children.append(self.allocator, node.a),
             .function => try children.appendSlice(self.allocator, &.{ node.a, node.b }),
             .product => try children.appendSlice(self.allocator, owner.types.list(.{ .start = node.a, .len = node.b })),
             .nominal => try children.appendSlice(self.allocator, owner.types.nominalArguments(node)),
@@ -7054,9 +7046,9 @@ const Generator = struct {
             found = input.value;
         };
         const value = found orelse return null;
-        if (value.tag != .array or value.mode != .fixed or value.other_roots.len != 0 or value.host != null or value.demand != null) return null;
+        if (value.tag != .array or value.mode != .fixed or value.other_roots.len != 0 or value.host != null) return null;
         const owner = self.roots.items[value.root orelse return null];
-        if (!owner.live or owner.imported_global or owner.element.tag != .scalar or owner.element.fields.len != 0 or owner.element.root != null or owner.element.host != null or owner.element.demand != null) return null;
+        if (!owner.live or owner.imported_global or owner.element.tag != .scalar or owner.element.fields.len != 0 or owner.element.root != null or owner.element.host != null) return null;
         if (owner.element.floating != (scalar_type == T.f32_type)) return null;
         if (value.word.id != owner.word.id or value.token.id != owner.token.id or value.epoch_low.id != owner.epoch_low.id or value.epoch_high.id != owner.epoch_high.id) return null;
         return .{ .word = value.word.id, .token = value.token.id, .epoch_low = value.epoch_low.id, .epoch_high = value.epoch_high.id };
@@ -7104,7 +7096,7 @@ const Generator = struct {
             const fixed_array = incoming.tag == .array and incoming.mode == .fixed and incoming.root != null and incoming.other_roots.len == 0;
             if (transport) |index| if (incoming.tag == .aggregate or fixed_array) {
                 reuse.whole = try index.invariant(id, ordinal);
-                if (incoming.tag == .aggregate and !reuse.whole and !self.scalar_admission.hasScalarReferences() and incoming.variant_tags.len == 0 and incoming.nominal == null and incoming.host == null and incoming.demand == null and incoming.root == null) {
+                if (incoming.tag == .aggregate and !reuse.whole and !self.scalar_admission.hasScalarReferences() and incoming.variant_tags.len == 0 and incoming.nominal == null and incoming.host == null and incoming.root == null) {
                     var named = incoming.fields.len != 0;
                     for (incoming.fields) |field| {
                         if (field.name.len == 0) named = false;
@@ -7212,7 +7204,7 @@ const Generator = struct {
             const start_node = m.node(info.first);
             const end_node = m.node(info.end);
             const value = values[0];
-            const exact_u32 = m.types.node(m.binding(carries[0].iteration).ty).tag == .u32 and value.tag == .scalar and !value.floating and value.fields.len == 0 and value.root == null and value.other_roots.len == 0 and value.host == null and value.demand == null;
+            const exact_u32 = m.types.node(m.binding(carries[0].iteration).ty).tag == .u32 and value.tag == .scalar and !value.floating and value.fields.len == 0 and value.root == null and value.other_roots.len == 0 and value.host == null;
             if (exact_u32 and start_node.tag == .constant and end_node.tag == .constant and start_node.ty == T.u32_type and end_node.ty == T.u32_type and end_node.a > start_node.a and end_node.a - start_node.a <= 8) {
                 const recurrence = @import("wasm_bit_recurrence.zig");
                 const machine = &self.module.functions.items[self.c.function];
@@ -7362,38 +7354,13 @@ const Generator = struct {
                 value.word = (try self.unitValue()).word;
                 return value;
             },
-            .closure, .suspend_ => {
-                const captures = if (n.tag == .suspend_) m.suspensionCaptures(id) else m.closureCaptures(id);
+            .closure => {
+                const captures = m.closureCaptures(id);
                 const values = try self.arena.allocator().alloc(Value, captures.len);
                 for (captures, values) |capture, *value| value.* = try self.snapshot(try self.bindingValue(m, capture));
-                const demand: ?*Demand = if (n.tag == .suspend_) try self.arena.allocator().create(Demand) else null;
-                if (demand) |memo| {
-                    memo.* = .{ .ready = (try self.constant(0)).word };
-                    try self.mutable_join_words.put(self.allocator, memo.ready.id, {});
-                }
-                return .{ .tag = .callable, .word = (try self.unitValue()).word, .callable = try self.boxCallable(.{ .unit = m.unit, .node = id, .captures = captures, .goals = self.active_goals, .types = try self.captureTypes() }), .fields = values, .demand = demand, .depth = self.depth };
+                return .{ .tag = .callable, .word = (try self.unitValue()).word, .callable = try self.boxCallable(.{ .unit = m.unit, .node = id, .captures = captures, .goals = self.active_goals, .types = try self.captureTypes() }), .fields = values, .depth = self.depth };
             },
-            .force => {
-                const pending = try self.expression(m, n.a, depth + 1);
-                if (pending.terminated) return pending;
-                const memo = pending.demand orelse return self.unsupported(m, id);
-                if (memo.building) return self.unsupported(m, id);
-                memo.building = true;
-                defer memo.building = false;
-                try self.c.when(.{ .i32_eqz, memo.ready });
-                self.nesting += 1;
-                const computed = try self.apply(m, id, pending, try self.constant(0), depth + 1);
-                if (computed.tag != .scalar) return self.fail(m, id, .storage_unsupported, "A local memoized demand currently requires a scalar result");
-                if (memo.result == null) {
-                    memo.result = try self.temporary(computed);
-                    try self.markMutableWords(memo.result.?, &self.mutable_join_words);
-                }
-                try self.assign(m, id, &memo.result.?, computed);
-                try self.c.set(memo.ready, 1);
-                self.nesting -= 1;
-                try self.c.end();
-                return memo.result.?;
-            },
+
             .panic => {
                 try self.c.op(.unreachable_, 0);
                 return self.terminated();

@@ -5,7 +5,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
 
-Deno.test("lexical summary captures preserve snapshots aliases demands and provider identity through retained edits", async () => {
+Deno.test("lexical summary captures preserve snapshots aliases callbacks and provider identity through retained edits", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const library = `${directory}/library.blot`;
@@ -16,7 +16,7 @@ type Other is effect = Unit -> U32
 const make: U32 -> (U32 -> U32 ! {}) = func amount => return func value => return @u32.add amount value
 const boxes = func left => return func right => return func (value: U32) => return @u32.add value (@u32.add left.value right.value)
 const nested = func callback => return func (value: U32) => return callback value
-const delayed = func ~(value: U32) => return func () => return @demand value
+const delayed = func value => return value
 const provided: (Unit -> U32 ! {}) -> (Unit -> U32 ! {}) = func implementation => return do:
   let provider = @effect.provider Tick implementation
   break func () => return do provider:
@@ -36,7 +36,7 @@ const pair = library.boxes box ${
       shared ? "box" : `($library.Box { value: ${amount + 1} })`
     }
 const transformed = library.nested (library.make ${amount + 2})
-const deferred = library.delayed (@u32.add ${amount} 2)
+const deferred = library.delayed (func () => return @u32.add ${amount} 2)
 const provider = library.provided (func () => return ${
       invalid === "provider" ? "library.Other ()" : amount + 3
     })
@@ -45,7 +45,7 @@ entry const aliases = func (value: U32) => return pair value
 entry const callback = func (value: U32) => return transformed ${
       invalid === "body" ? "true" : "value"
     }
-entry const demand = func () => return deferred ()
+entry const delayed_value = func () => return deferred ()
 entry const handled = func () => return provider ()
 entry const snapshots = func (start: U32) => return do:
   let value = start
@@ -126,7 +126,7 @@ entry const folded = captured 5
                 assert.equal(guest.call("snapshots", value), 2 * value + 12);
               }
               for (let repeat = 0; repeat < 3; repeat++) {
-                assert.equal(guest.call("demand", null), amount + 2);
+                assert.equal(guest.call("delayed_value", null), amount + 2);
                 assert.equal(guest.call("handled", null), amount + 3);
               }
               assert.equal(guest.read("folded"), 10 + 2 * amount + 1);

@@ -118,13 +118,13 @@ entry const returned = func (count: U32) => return do:
   );
 });
 
-Deno.test("rows escaping through ordinary calls, closures and demands keep owned bases", async () => {
+Deno.test("rows escaping through ordinary calls and closures keep owned bases", async () => {
   await compileAndRun(
     `
 const consume = func row => return @u32.add row.a row.b
 const store = func row => return #[row]
 const capture = func row => return func () => return consume row
-const defer_row = func ~row => return func () => return consume (@demand row)
+const defer_row = func row => return func () => return consume (row ())
 entry const stored = func (count: U32) => return do:
   let rows = @list.generate count (func index => return {a: index, b: @u32.add index 1})
   let saved = #[]
@@ -143,7 +143,7 @@ entry const deferred = func (count: U32) => return do:
   let rows = @list.generate count (func index => return {a: index, b: @u32.add index 1})
   let saved = #[]
   for row in rows:
-    saved := #[...saved, defer_row row]
+    saved := #[...saved, defer_row (func () => return row)]
   let pressure = @array.fill 8192 99
   break #[read () | read <- saved]
 `,

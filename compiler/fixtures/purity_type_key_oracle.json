@@ -89,7 +89,7 @@
       "$": "AppliedTy",
       "identity": {
         "$": "TypeId",
-        "module_name": "space 雪😀%.blot",
+        "module_name": "space \u96ea\ud83d\ude00%.blot",
         "declaration": "Packet"
       },
       "arguments": {
@@ -99,7 +99,7 @@
     "fuel": "65536",
     "frozen": {
       "$": "Done",
-      "value": "n14:space 雪😀%.blot6:Packet0:"
+      "value": "n14:space \u96ea\ud83d\ude00%.blot6:Packet0:"
     }
   },
   {
@@ -396,51 +396,37 @@
     }
   },
   {
-    "name": "opaque_demand",
+    "name": "opaque_callback",
     "ty": {
-      "$": "AppliedTy",
-      "identity": {
-        "$": "TypeId",
-        "module_name": "blot:compiler",
-        "declaration": "Demand"
+      "$": "FunctionTy",
+      "parameter": {
+        "$": "UnitTy"
       },
-      "arguments": {
-        "$": "Con",
-        "head": {
-          "$": "FunctionTy",
-          "parameter": {
-            "$": "UnitTy"
+      "result": {
+        "$": "U32Ty"
+      },
+      "effects": {
+        "$": "EffectRow",
+        "operations": {
+          "$": "Con",
+          "head": {
+            "$": "TypeId",
+            "module_name": "producer.blot",
+            "declaration": "ask<1:i>"
           },
-          "result": {
-            "$": "U32Ty"
-          },
-          "effects": {
-            "$": "EffectRow",
-            "operations": {
-              "$": "Con",
-              "head": {
-                "$": "TypeId",
-                "module_name": "producer.blot",
-                "declaration": "ask<1:i>"
-              },
-              "tail": {
-                "$": "Nil"
-              }
-            },
-            "tail": {
-              "$": "ClosedRow"
-            }
+          "tail": {
+            "$": "Nil"
           }
         },
         "tail": {
-          "$": "Nil"
+          "$": "ClosedRow"
         }
       }
     },
     "fuel": "65536",
     "frozen": {
       "$": "Done",
-      "value": "n13:blot:compiler6:Demand42:39:c1:u1:i29:26:13:producer.blot8:ask<1:i>"
+      "value": "c1:u1:i29:26:13:producer.blot8:ask<1:i>"
     }
   },
   {

@@ -90,15 +90,14 @@ test "restart cache: a restored output publishes only on equal inputs and equals
         try fixture.write("dep.blot", original);
     }
     // Each difference declines before anything is published.
-    const Case = struct { options: project.Options = .{}, identity: ?[]const u8 = null, tier: @import("../compilation_tier.zig").Tier = .optimized, explain: bool = false, source: ?[]const u8 = null };
-    const cases = [_]Case{ .{ .source = edited }, .{ .options = .{ .prelude_path = fixture.prelude } }, .{ .identity = "/other.wasm" }, .{ .tier = .development }, .{ .explain = true } };
+    const Case = struct { options: project.Options = .{}, identity: ?[]const u8 = null, tier: @import("../compilation_tier.zig").Tier = .optimized, source: ?[]const u8 = null };
+    const cases = [_]Case{ .{ .source = edited }, .{ .options = .{ .prelude_path = fixture.prelude } }, .{ .identity = "/other.wasm" }, .{ .tier = .development } };
     for (cases) |case| {
         if (case.source) |text| try fixture.write("dep.blot", text);
         defer fixture.write("dep.blot", original) catch {};
         var session = try restoredSession(bytes);
         defer session.deinit();
         session.policy.codegen_tier = case.tier;
-        session.explain_demands = case.explain;
         try std.testing.expect(try session.prepareRestored(io, fixture.path, case.identity, case.options, &.{}) == null);
         try std.testing.expectEqual(@as(usize, 0), session.revisions);
     }

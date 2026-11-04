@@ -268,30 +268,7 @@ test "aggregate occurs checks and rejected shapes leave the complete region unch
     try std.testing.expectEqual(u32_type, try types.resolve(variable, 0));
 }
 
-test "demand types preserve chronological children and reject eager function modes" {
-    var store = try Store.init(std.testing.allocator);
-    defer store.deinit();
-    const variable = try store.fresh();
-    const suspended = try store.demand(variable);
-    try store.unify(variable, u32_type);
-    const resolved = store.node(try store.resolve(suspended, 0));
-    try std.testing.expectEqual(Tag.demand, resolved.tag);
-    try std.testing.expectEqual(u32_type, resolved.a);
-    const lazy = try store.function(try store.demand(u32_type), u32_type);
-    const eager = try store.function(u32_type, u32_type);
-    const before = store.mark();
-    try std.testing.expectError(error.TypeMismatch, store.unify(lazy, eager));
-    try std.testing.expectEqual(before, store.mark());
-    const generic = try store.fresh();
-    const scheme = try store.demand(generic);
-    const integer = try store.substitute(scheme, &.{generic}, &.{u32_type});
-    const floating = try store.substitute(scheme, &.{generic}, &.{f32_type});
-    try std.testing.expectEqual(u32_type, store.node(integer).a);
-    try std.testing.expectEqual(f32_type, store.node(floating).a);
-    try std.testing.expectEqual(Tag.variable, store.node(store.node(scheme).a).tag);
-}
-
-test "type and row replacements share one history cursor through function and demand children" {
+test "type and row replacements share one history cursor through nested function children" {
     var store = try Store.init(std.testing.allocator);
     defer store.deinit();
     const ty = try store.fresh();
@@ -307,12 +284,12 @@ test "type and row replacements share one history cursor through function and de
     try std.testing.expectEqualSlices(u32, &.{later_label}, store.effects.list(store.effects.node(resolved.c).labels));
     try std.testing.expectEqual(@as(u32, 3), store.cursor());
     const suspended = try store.fresh();
-    const demand_row = try store.freshEffects();
-    try store.effects.appendVersion(store.effects.node(demand_row).tail.variable, first); // 3
-    try store.appendVersion(suspended, try store.demandWithEffects(u32_type, demand_row)); // 4
-    try store.effects.appendVersion(store.effects.node(demand_row).tail.variable, later); // 5
-    const demand_node = store.node(try store.resolve(suspended, 0));
-    try std.testing.expectEqualSlices(u32, &.{later_label}, store.effects.list(store.effects.node(demand_node.c).labels));
+    const callback_row = try store.freshEffects();
+    try store.effects.appendVersion(store.effects.node(callback_row).tail.variable, first); // 3
+    try store.appendVersion(suspended, try store.functionWithEffects(unit, u32_type, callback_row)); // 4
+    try store.effects.appendVersion(store.effects.node(callback_row).tail.variable, later); // 5
+    const callback_node = store.node(try store.resolve(suspended, 0));
+    try std.testing.expectEqualSlices(u32, &.{later_label}, store.effects.list(store.effects.node(callback_node.c).labels));
     try std.testing.expectEqual(@as(u32, 6), store.cursor());
 }
 
@@ -348,7 +325,7 @@ test "value and effect quantifiers freshen independently without accidental nume
     defer store.deinit();
     const ty = try store.fresh();
     const effect_row = try store.freshEffects();
-    const root = try store.functionWithEffects(ty, try store.demandWithEffects(ty, effect_row), effect_row);
+    const root = try store.functionWithEffects(ty, try store.functionWithEffects(unit, ty, effect_row), effect_row);
     const rows = try store.freeRowVariables(root);
     defer store.allocator.free(rows);
     try std.testing.expectEqualSlices(u32, &.{0}, rows);
@@ -369,10 +346,10 @@ fn effectAllocationFailures(allocator: std.mem.Allocator) !void {
     defer store.deinit();
     const a = try store.fresh();
     const effect_row = try store.freshEffects();
-    const function = try store.functionWithEffects(a, try store.demandWithEffects(a, effect_row), effect_row);
+    const function = try store.functionWithEffects(a, try store.functionWithEffects(unit, a, effect_row), effect_row);
     const instantiated = try store.substituteWithRows(function, &.{a}, &.{u32_type}, &.{0}, &.{try store.freshEffects()});
     const point = store.mark();
-    try store.unify(instantiated, try store.functionWithEffects(u32_type, try store.demandWithEffects(u32_type, try store.effects.row(&.{1}, .closed)), try store.effects.row(&.{1}, .closed)));
+    try store.unify(instantiated, try store.functionWithEffects(u32_type, try store.functionWithEffects(unit, u32_type, try store.effects.row(&.{1}, .closed)), try store.effects.row(&.{1}, .closed)));
     _ = try store.resolve(instantiated, 0);
     store.rollback(point);
 }
@@ -395,7 +372,7 @@ fn rowObservationScenario(allocator: std.mem.Allocator) !void {
     try store.effects.appendVersion(second_variable, 0);
     try store.effects.appendVersion(first_variable, second);
     const record_ = try store.record(&.{.{ .name = 1, .ty = indirect }});
-    const root = try store.product(&.{ callable, indirect, record_, try store.array(indirect), try store.nominal(.{ .unit = 1, .decl = 1 }, &.{indirect}), try store.demandWithEffects(indirect, first), try store.resolver(indirect) });
+    const root = try store.product(&.{ callable, indirect, record_, try store.array(indirect), try store.nominal(.{ .unit = 1, .decl = 1 }, &.{indirect}), try store.functionWithEffects(unit, indirect, first), try store.resolver(indirect) });
     const before = store.mark();
     const views = store.variable_views.count();
     // Direct access sees the first closed replacement. The composite type
@@ -520,22 +497,22 @@ test "covariant certificates record only owned positive tails and leave raw body
     const pure = try store.freshEffects();
     const callback = try store.freshEffects();
     const protected = try store.freshEffects();
-    const demand_row = try store.freshEffects();
+    const callback_row = try store.freshEffects();
     const pure_type = try store.functionWithEffects(unit, u32_type, pure);
     const connected_type = try store.functionWithEffects(try store.functionWithEffects(unit, u32_type, callback), u32_type, callback);
     const protected_type = try store.functionWithEffects(unit, u32_type, protected);
-    const delayed_type = try store.demandWithEffects(u32_type, demand_row);
+    const delayed_type = try store.functionWithEffects(unit, u32_type, callback_row);
     const root = try store.product(&.{ pure_type, connected_type, protected_type, delayed_type });
     const free = try store.freeRowVariables(root);
     defer store.allocator.free(free);
     const raw_mark = store.effects.mark();
     const closed = try store.closeCovariantCertified(root, free, &.{store.row(protected).tail.variable});
-    try std.testing.expectEqualSlices(u32, &.{store.row(pure).tail.variable}, store.list(closed.closed_rows));
+    try std.testing.expectEqualSlices(u32, &.{ store.row(pure).tail.variable, store.row(callback_row).tail.variable }, store.list(closed.closed_rows));
     const parts = store.list(.{ .start = store.node(closed.root).a, .len = store.node(closed.root).b });
     try std.testing.expectEqual(Effects.Tail.closed, store.row(store.node(parts[0]).c).tail);
     try std.testing.expectEqualDeep(store.row(callback).tail, store.row(store.node(parts[1]).c).tail);
     try std.testing.expectEqualDeep(store.row(protected).tail, store.row(store.node(parts[2]).c).tail);
-    try std.testing.expectEqualDeep(store.row(demand_row).tail, store.row(store.node(parts[3]).c).tail);
+    try std.testing.expectEqual(Effects.Tail.closed, store.row(store.node(parts[3]).c).tail);
     try std.testing.expectEqualDeep(store.row(pure).tail, store.row(store.node(pure_type).c).tail);
     try std.testing.expectEqual(raw_mark.versions, store.effects.mark().versions);
     try std.testing.expectEqual(raw_mark.next_position, store.effects.mark().next_position);
@@ -661,7 +638,7 @@ fn preparedSubstitutionStore(allocator: std.mem.Allocator, binders: usize, prepa
         try store.functionWithEffects(old.items[0], shared, latent),
         try store.functionWithEffects(old.items[binders / 2], old.items[binders - 1], formal_row),
         u32_type,
-        try store.demandWithEffects(all, try store.freshEffects()),
+        try store.functionWithEffects(unit, all, try store.freshEffects()),
     };
     if (prepared) {
         var substitution = try store.prepareSubstitution(old.items, fresh.items, old_rows.items, fresh_rows.items);
@@ -1094,7 +1071,6 @@ fn erasedProofKindLaw(allocator: std.mem.Allocator) !void {
     try proofKindMismatch(store.product(&.{ marker, u32_type }));
     try proofKindMismatch(store.record(&.{.{ .name = 1, .ty = marker }}));
     try proofKindMismatch(store.nominal(.{ .unit = 1, .decl = 1 }, &.{marker}));
-    try proofKindMismatch(store.demand(marker));
     try proofKindMismatch(store.stateProvider(unit, unit, marker));
     try proofKindMismatch(store.internSymbolicOperation(.{ .unit = 1, .decl = 2 }, &.{marker}));
     const associated = try store.projection(.{ .unit = 1, .decl = 2 }, 3, &.{});

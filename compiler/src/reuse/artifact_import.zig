@@ -758,11 +758,7 @@ pub const Importer = struct {
                 try self.principalType(n.b, depth + 1, remaining);
                 try self.principalRow(n.c, depth + 1, remaining);
             },
-            .demand => {
-                if (n.b != 0) return error.Declined;
-                try self.principalType(n.a, depth + 1, remaining);
-                try self.principalRow(n.c, depth + 1, remaining);
-            },
+
             .product, .record, .nominal => {
                 if (n.tag == .nominal) {
                     if (n.a == std.math.maxInt(u32) or n.b == 0) return error.Declined;
@@ -858,7 +854,7 @@ pub const Importer = struct {
                 if (b != 0 or c != 0) return error.Declined;
                 a = try self.shape(g, a, depth + 1);
             },
-            .demand, .provider => {
+            .provider => {
                 if (b != 0) return error.Declined;
                 a = try self.shape(g, a, depth + 1);
                 c = try self.row(g, .layout, c, depth + 1);
@@ -925,7 +921,7 @@ pub const Importer = struct {
                 if (b != 0 or c != 0) return error.Declined;
                 a = try self.semanticType(g, a, depth + 1);
             },
-            .demand, .provider => {
+            .provider => {
                 if (b != 0) return error.Declined;
                 a = try self.semanticType(g, a, depth + 1);
                 c = try self.row(g, .semantic, c, depth + 1);
@@ -1063,7 +1059,6 @@ pub const Importer = struct {
         if (old_capture.callable_instances != 0) return error.Declined;
         const owner = try self.expressionUnit(old_capture.unit, old_capture.node);
         if (old_capture.node == 0 or old_capture.node >= self.units[owner - 1].nodes.len) return error.Declined;
-        if (old_capture.demand_cell and (!old_capture.has_environment or old_capture.computation or self.units[owner - 1].node(old_capture.node).tag != .suspend_)) return error.Declined;
         const imported: artifacts.CapturedTemplate = .{
             .unit = owner,
             .node = old_capture.node,
@@ -1071,13 +1066,12 @@ pub const Importer = struct {
             .templates = try self.templateKey(g, old_capture.unit, old_capture.templates, depth + 1),
             .has_environment = old_capture.has_environment,
             .scalar_environment = old_capture.scalar_environment,
-            .demand_cell = old_capture.demand_cell,
             .computation = old_capture.computation,
             .evidence = try self.mappingEvidence(g, old_capture.unit, old_capture.evidence, depth + 1),
             .rows = try self.rowKey(g, old_capture.unit, old_capture.rows, depth + 1),
         };
         if (!try self.knowledge.knownLayout(self.allocator, &g.representations.store, imported.captures)) return error.Declined;
-        if (imported.scalar_environment and (!imported.has_environment or imported.demand_cell or imported.templates != 0 or !g.representations.store.scalarEnvironment(imported.captures) or self.units[owner - 1].node(imported.node).tag != .closure)) return error.Declined;
+        if (imported.scalar_environment and (!imported.has_environment or imported.templates != 0 or !g.representations.store.scalarEnvironment(imported.captures) or self.units[owner - 1].node(imported.node).tag != .closure)) return error.Declined;
         const mapped = if (g.planning.template_instances.get(imported)) |existing| existing else blk: {
             if (g.planning.template_catalog.items.len >= std.math.maxInt(u32)) return error.Declined;
             try g.planning.template_catalog.ensureUnusedCapacity(self.allocator, 1);
@@ -1428,7 +1422,7 @@ pub const Knowledge = struct {
                 2 => .{ .kind = .layout, .id = n.b },
                 else => null,
             },
-            .demand, .provider => return switch (index) {
+            .provider => return switch (index) {
                 0 => .{ .kind = .row, .id = n.c },
                 1 => .{ .kind = .layout, .id = n.a },
                 else => null,

@@ -266,3 +266,21 @@ test "typed staging row widening retains missing handlers callback rows and pure
     try law(a, "effect Read: Unit -> U32\nconst generated = @code.quote (Read ())\nconst answer = @code.run generated", .const_effect);
     try law(a, "const generated = @code.quote (func (host: Unit -> Unit ! {Foreign}) => return host ())\nconst emitted = @code.run generated\nconst pure: (Unit -> Unit ! {}) -> Unit = emitted", .effect_mismatch);
 }
+
+test "Code latent effects use an ordinary Unit to Unit function" {
+    const T = @import("types.zig");
+    const staging = @import("typed_staging.zig");
+    var store = try T.Store.init(std.testing.allocator);
+    defer store.deinit();
+    const effects = try store.freshEffects();
+    const value = try staging.code(&store, T.u32_type, effects);
+    const info = staging.codeInfo(&store, value).?;
+    try std.testing.expectEqual(T.u32_type, info.result);
+    try std.testing.expectEqual(effects, info.effects);
+    const carrier = store.node(store.nominalArguments(store.node(value))[1]);
+    try std.testing.expectEqual(T.Tag.function, carrier.tag);
+    try std.testing.expectEqual(T.unit, carrier.a);
+    try std.testing.expectEqual(T.unit, carrier.b);
+    const malformed = try store.nominal(staging.code_identity, &.{ T.u32_type, try store.functionWithEffects(T.unit, T.u32_type, effects) });
+    try std.testing.expect(staging.codeInfo(&store, malformed) == null);
+}

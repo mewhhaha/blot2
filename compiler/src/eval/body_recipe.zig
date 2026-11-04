@@ -47,7 +47,7 @@ pub fn appendChildren(work: anytype, allocator: Allocator, module: *const core.M
         .resource_scope, .if_value, .if_stmt, .state_provider => try work.appendSlice(allocator, &.{ n.a, n.b, n.c }),
         .task, .block, .suite, .product, .record, .array, .array_op, .storage, .call, .contract_method => try work.appendSlice(allocator, module.children(id)),
         .bind => try work.append(allocator, n.b),
-        .return_, .project, .result_associated, .force => try work.append(allocator, n.a),
+        .return_, .project, .result_associated => try work.append(allocator, n.a),
         .construct => try work.append(allocator, n.b),
         .pattern_bind => try work.appendSlice(allocator, &.{ n.b, n.c }),
         .match => {
@@ -87,7 +87,7 @@ pub fn appendChildren(work: anytype, allocator: Allocator, module: *const core.M
                 if (arm.selector != 0) try work.append(allocator, arm.selector);
             }
         },
-        .closure, .operation_value, .suspend_, .constant, .reference, .constructor_function, .primitive_function, .panic, .type_constructor, .invalid => {},
+        .closure, .operation_value, .constant, .reference, .constructor_function, .primitive_function, .panic, .type_constructor, .invalid => {},
     }
 }
 
@@ -123,7 +123,7 @@ pub const Cache = struct {
             try seen.put(allocator, id, {});
             try recipe.visits.append(allocator, id);
             const tag = module.node(id).tag;
-            if ((tag == .closure or tag == .suspend_) and module.closures[module.node(id).a].captures.len != 0) recipe.has_lexical_captures = true;
+            if ((tag == .closure) and module.closures[module.node(id).a].captures.len != 0) recipe.has_lexical_captures = true;
             // No later node can execute after this source error. Avoid reading
             // unreachable malformed descendants of intentionally invalid Core.
             if (module.node(id).tag == .invalid) break;

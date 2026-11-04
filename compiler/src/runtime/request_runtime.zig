@@ -14,7 +14,7 @@ pub fn dummy(module: *wasm.Module, function: u32, cleanups: *const cleanup.Stack
     try module.emit(function, .{ .op = .return_ });
 }
 /// A called expression may leave any typed operand stack. Return unwinds that
-/// stack using the caller's own result type. Demand forcing first resets state.
+/// stack using the caller's own result type.
 pub fn guard(module: *wasm.Module, function: u32, owner: u32, cleanups: *const cleanup.Stack) !void {
     try module.emit(function, .{ .op = .global_get, .operand = owner });
     try module.emit(function, .{ .op = .if_ });

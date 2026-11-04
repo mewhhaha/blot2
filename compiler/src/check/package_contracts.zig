@@ -47,7 +47,7 @@ fn quantifiedDepth(types: *const core.Types, root: T.Id, remaining: *usize, dept
     switch (node.tag) {
         .forall, .existential => return true,
         .function => return try quantifiedDepth(types, node.a, remaining, depth + 1) or try quantifiedDepth(types, node.b, remaining, depth + 1),
-        .array, .list, .cursor, .usage, .demand, .resolver, .provider, .scoped => return quantifiedDepth(types, node.a, remaining, depth + 1),
+        .array, .list, .cursor, .usage, .resolver, .provider, .scoped => return quantifiedDepth(types, node.a, remaining, depth + 1),
         .state_provider => for ([_]T.Id{ node.a, node.b, node.c }) |child| if (try quantifiedDepth(types, child, remaining, depth + 1)) return true,
         .product => for (try span(types, .{ .start = node.a, .len = node.b })) |child| if (try quantifiedDepth(types, child, remaining, depth + 1)) return true,
         .record => {
@@ -194,7 +194,7 @@ pub const Context = struct {
         const node = self.types.node(root);
         switch (node.tag) {
             .variable => try self.instance_variables.set(root),
-            .array, .list, .cursor, .demand, .resolver => try self.sourceInstance(node.a, depth + 1),
+            .array, .list, .cursor, .resolver => try self.sourceInstance(node.a, depth + 1),
             .function => {
                 try self.sourceInstance(node.a, depth + 1);
                 try self.sourceInstance(node.b, depth + 1);
@@ -391,7 +391,7 @@ pub const Context = struct {
                 if (node.c != 0 and try self.goalFootprint(node.c, owner, opened, sealed, depth + 1)) return true;
                 return self.goalFootprint(node.a, owner, opened, sealed, depth + 1);
             },
-            .demand, .provider => return try self.goalFootprint(node.a, owner, opened, sealed, depth + 1) or try self.rowFootprint(node.c, owner, opened, sealed, depth + 1),
+            .provider => return try self.goalFootprint(node.a, owner, opened, sealed, depth + 1) or try self.rowFootprint(node.c, owner, opened, sealed, depth + 1),
             .array, .list, .cursor, .resolver => return self.goalFootprint(node.a, owner, opened, sealed, depth + 1),
             .state_provider => return try self.goalFootprint(node.a, owner, opened, sealed, depth + 1) or try self.goalFootprint(node.b, owner, opened, sealed, depth + 1) or try self.goalFootprint(node.c, owner, opened, sealed, depth + 1),
             .scoped => {
@@ -562,7 +562,7 @@ pub const Context = struct {
                 }
             },
             .array, .list, .cursor, .resolver => try self.walk(node.a, depth + 1),
-            .demand, .provider => {
+            .provider => {
                 try require(!self.witness);
                 try self.validateRow(node.c, depth + 1);
                 try self.walk(node.a, depth + 1);
@@ -1400,7 +1400,7 @@ pub const Principal = struct {
                 for (left_choices, right_choices) |x, y| try self.match(x, y, depth + 1);
             },
             .array, .list, .cursor => try self.match(a.a, b.a, depth + 1),
-            .demand, .provider => {
+            .provider => {
                 try require(a.b == 0 and b.b == 0);
                 try self.matchRow(a.c, b.c, depth + 1);
                 try self.match(a.a, b.a, depth + 1);

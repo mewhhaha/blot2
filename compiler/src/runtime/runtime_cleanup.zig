@@ -1,4 +1,4 @@
-//! Lexical cleanup obligations for private runtime storage and demand forcing.
+//! Lexical cleanup obligations for private runtime storage.
 //! Branch exits discharge only scopes they leave. Cancellation discharges the
 //! entire current function, including scopes inherited by an inlined body.
 //! Payload values are not released: private provider/request cells cannot
@@ -10,24 +10,11 @@ const heap = @import("runtime_layout.zig");
 const A = std.mem.Allocator;
 
 pub const Mark = enum(usize) { _ };
-pub const Action = union(enum) { task_group: struct { owner: ir.LocalId, close: u32 }, resource: struct { token: ir.LocalId, release: u32 }, release: ir.LocalId, release_if_nonzero: ir.LocalId, reset_demand: ir.LocalId, root_scope: void, revoke_effect: ir.LocalId };
+pub const Action = union(enum) { task_group: struct { owner: ir.LocalId, close: u32 }, resource: struct { token: ir.LocalId, release: u32 }, release: ir.LocalId, release_if_nonzero: ir.LocalId, root_scope: void, revoke_effect: ir.LocalId };
 pub const Stack = struct {
     parent: ?*const Stack = null,
     actions: std.ArrayList(Action) = .empty,
 
-    /// Snapshot the active force-site obligations before borrowing a lexical
-    /// emitter. Flattening avoids a parent cycle when that emitter is already
-    /// an ancestor of the force site.
-    pub fn snapshot(self: *const Stack, a: A) A.Error!Stack {
-        var result: Stack = .{};
-        errdefer result.deinit(a);
-        try result.inherit(a, self);
-        return result;
-    }
-    fn inherit(self: *Stack, a: A, source: *const Stack) A.Error!void {
-        if (source.parent) |parent| try self.inherit(a, parent);
-        try self.actions.appendSlice(a, source.actions.items);
-    }
     pub fn deinit(self: *Stack, a: A) void {
         self.actions.deinit(a);
     }
@@ -94,13 +81,6 @@ fn emit(action: Action, module: *wasm.Module, function: ir.FunctionId, result: ?
             try module.emit(id, .{ .op = .local_get, .operand = @backingInt(local) });
             try module.emit(id, .{ .op = .call, .operand = module.arena.?.recycle });
             try module.emit(id, .{ .op = .end });
-        },
-        .reset_demand => |local| {
-            try module.emitSlice(id, &.{
-                .{ .op = .local_get, .operand = @backingInt(local) },                     .{ .op = .local_get, .operand = @backingInt(local) },
-                .{ .op = .i32_const, .operand = heap.offset(heap.Demand, "status") },     .{ .op = .i32_add },
-                .{ .op = .i32_const, .operand = @backingInt(heap.DemandStatus.pending) }, .{ .op = .call, .operand = module.arena.?.store_word },
-            });
         },
     }
 }

@@ -52,7 +52,7 @@ pub const Join = struct {
         for (self.lanes) |*lane| {
             // Default locals preserve the ordinary zero result on normal
             // fallthrough. Mutable locals must be captured at the edge, before
-            // owner close, a loop backedge or a demand can overwrite them.
+            // owner close or a loop backedge can overwrite them.
             if (fallthrough or mutable.contains(lane.first.id)) try materialize(lane, arena, code, context);
             if (lane.carrier == null) {
                 for (lane.holes.items) |index| try context.releaseCopy(code.function, index);
