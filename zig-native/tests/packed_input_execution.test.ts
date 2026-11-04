@@ -11,7 +11,7 @@ const fields = Array.from(
 ).join("");
 const source = template.replace("__FIELDS__", fields);
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`completed input demand promotes wide fields and preserves effects (${codegenTier})`, async () => {
+  Deno.test(`completed input demand selects transport for wide fields and preserves effects (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-packed-input-" });
     const entry = `${directory}/main.blot`;
     const compiler = await createZigProjectCompiler({

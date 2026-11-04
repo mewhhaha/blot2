@@ -1,41 +1,36 @@
 # Owned-storage rewrite: active task index
 
-The current priorities are shared-kernel runtime and Gdev Wasm size, with short
-iterations. Subsecond compilation remains the goal; the next latency gate is
-below five seconds. The
-[shared-call checkpoint](../scripts/bench/goose/results/2026-11-03-call-contexts.md)
-imports initialized source globals through checked implicit owner roles with
-cached dependency footprints. Exact immutable input equality propagates into
-nested planning, completed physical demand selects the existing 512-parameter
-ABI, and concrete callback qualifiers retain their certificates without forcing
-expansion. ABI 8/session protocol 2 and fresh-owner lifetime contracts remain.
+The current priorities are shared-kernel runtime, Gdev Wasm size and short
+iterations. Subsecond compilation, the next sub-five-second latency gate and
+1–2MB Wasm remain unmet. The
+[addressed-input checkpoint](../scripts/bench/goose/results/2026-11-04-addressed-inputs.md)
+adds immutable private bundles with separate outputs, exact range forwarding,
+complete owner/effect facts, transitive demand and bounded snapshot reuse.
+Sparse calls keep the ordinary ABI; see `zig-native/CONTRACT.md`.
 
-Current paired Main medians are **5.634 → 5.278s**, Wasm **12,113,691 →
-10,241,074B (15.5%)**, rollbacks **1,464 → 577**, discarded expressions
-**108,775 → 75,786**. Each pair improves 312/334/376ms; the median paired
-reduction is 334ms. Local/global instructions still occupy 6.69MB. A separate
-profile has backend 4.404s/5.21GB cumulative requests, peak process RSS 1.05GiB.
-The five-second, subsecond and 1–2MB targets remain unmet.
+Repeated distinct captures shrink **263,521 → 97,002B (63.2%)**; two single-use
+controls grow 7.1%. Gdev is effectively flat: paired medians **6.334 → 6.235s**,
+Main **10,241,074 → 10,253,029B (+0.12%)**. Mixed per-pair changes do not
+establish a robust latency win; the older 5.28s belongs to another shared-host
+round. Main already had zero packed helper calls. Next measure copies rejected
+solely for crossing structured branches in `wasm_copy_coalesce.zig`, using the
+short private IR replay, before changing bank storage.
 
-All 2,969 native laws compile without LLVM; affected families pass 405 unique
-native laws. Eleven focused laws pass full-fault mode. Release guests pass
-284/286; unsupported ECS summary-job export and legacy optimized iter.take(0)
-also fail on the frozen baseline. Full gate passes 49 smoke/57 harness checks,
-then stops at 180s after 100 native laws, zero failures/leaks/logged errors.
-Full qualification remains incomplete. Zig lint/format/type checks pass.
+All 2,976 native laws compile without LLVM. The affected union passes 412 laws;
+eight focused laws pass full-fault mode, including three exhaustive sweeps. The
+development family passes 245 native laws, guests and local checks. Release
+guests pass 300/302; both failures reproduce on the frozen baseline. Complete
+qualification remains pending. The full gate stops at 180s after 101 native
+passes, zero failures/leaks/logged errors; 49 smoke checks and the harness pass.
 
-World/editor and seven renderer streams match; small hand/renderer binaries
-grow. The final Main's inspected NVIDIA PNG and guest trace match the baseline
-exactly; see
-[frame evidence](storage-handoff-evidence/2026-11-03-call-contexts-frame.json).
-Broader gameplay/software-adapter coverage remains pending. Gdev `38af070`
-captures one hook environment; Ink/Pen and all assets are unchanged. The
-32-shape capture matrix shrinks shared environments up to 41.8% but its largest
-distinct-owner control nearly doubles; preserve that regression. Next measure
-immutable addressed bundles across calls, with complete semantic facts, snapshot
-behavior and invocation lifetimes. The rejected all-global context prototype and
-landed single-dispatcher source patch remain pinned in the report. Preserve
-earlier
+World/editor, hand and renderer binaries remain byte-identical. Their editor,
+hand and renderer witnesses match. The exact final Main passes original budgets
+in one inspected NVIDIA frame, with unchanged PNG and trace; see
+[frame evidence](storage-handoff-evidence/2026-11-04-addressed-inputs-frame.json).
+Broader gameplay/software-adapter checks and Pen's normal source bridge remain
+pending; that host still omits inferenceBudget. Sibling sources/assets remain
+unchanged: Gdev `38af070`, Ink `ccaf08f`, Pen `d159492`. Preserve the preceding
+[shared-call evidence](../scripts/bench/goose/results/2026-11-03-call-contexts.md),
 [fresh-owner evidence](../scripts/bench/goose/results/2026-11-03-fresh-owners.md)
 and [survey controls](../scripts/bench/goose/results/2026-11-03-expanded.md).
 
@@ -43,7 +38,7 @@ The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves
 physical Value leaves and owner/borrow metadata. Remaining local/global
 instructions occupied 8.54MB at that older checkpoint; the current census is
-6.69MB. Preserve semantic checks and explicit copies while changing that
+6.70MB. Preserve semantic checks and explicit copies while changing that
 representation. Ordinary `#run` build functions remain a separate, unimplemented
 simplification.
 

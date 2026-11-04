@@ -135,7 +135,7 @@ fn publish(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     try std.testing.expect(result.counters.scoped_input_alias_words_avoided >= 128);
     try std.testing.expect(result.counters.scoped_completed_plan_definitions >= 2);
     try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
 }
 
 test "closed concrete callback qualifiers admit wide exact alias partitions" {
@@ -150,10 +150,10 @@ test "closed concrete callback qualifiers admit wide exact alias partitions" {
         try std.testing.expect(result.diagnostic == null);
         try std.testing.expect(result.bytes.len > 8);
         try std.testing.expect(result.counters.scoped_input_alias_words_avoided >= 512);
-        try std.testing.expect(result.counters.scoped_packed_plans_promoted > 0);
+        try std.testing.expect(result.counters.scoped_addressed_definitions > 0);
         try std.testing.expect(result.counters.scoped_completed_plan_definitions >= 2);
         try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
-        try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+        try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
     }
 }
 
@@ -165,4 +165,26 @@ test "closed concrete callback qualifier publication survives allocation failure
     try checkConcreteQualifiers(&module);
     try publish(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
+}
+
+fn publishAddressed(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_addressed_definitions > 0);
+    try std.testing.expect(result.counters.scoped_addressed_calls > 0);
+    try std.testing.expect(result.counters.scoped_addressed_input_loads > 0);
+    try std.testing.expect(result.counters.scoped_addressed_snapshot_words > 0);
+    try std.testing.expect(result.counters.scoped_addressed_retained_bytes_max <= 32 * 1024);
+    try std.testing.expect(result.counters.scoped_addressed_retained_slots_max <= 8);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
+}
+
+test "addressed callback publication retains snapshot ownership and bounded storage through full OOM" {
+    const source = try callbackSource(16, 2);
+    defer a.free(source);
+    var module = try lower(source);
+    defer module.deinit(a);
+    try publishAddressed(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishAddressed, .{@as([]const core.Module, &.{module})});
 }

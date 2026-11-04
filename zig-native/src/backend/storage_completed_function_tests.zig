@@ -144,7 +144,7 @@ fn publishMutatingBorrow(allocator: std.mem.Allocator, modules: []const core.Mod
     try std.testing.expectEqual(@as(u64, 2), result.counters.scoped_owner_graph_definitions);
     try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
     try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
 }
 
 test "completed function mutating borrowed results retain prewrite refs through OOM" {
@@ -197,7 +197,7 @@ fn publishMutatingOwner(allocator: std.mem.Allocator, modules: []const core.Modu
     try std.testing.expect(result.counters.scoped_function_plan_definitions > 0);
     try std.testing.expect(result.counters.scoped_owner_graph_definitions > 0);
     try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
 }
 
 test "completed mutating owner results retain shared distinct joined and loop caller roots through OOM" {
@@ -209,7 +209,7 @@ test "completed mutating owner results retain shared distinct joined and loop ca
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishMutatingOwner, .{@as([]const core.Module, &.{module})});
 }
 
-test "completed mutating owner results retain promoted wide caller roots" {
+test "completed mutating owner results retain addressed wide caller roots" {
     const source = try mutatingOwnerSource(128, "mutating_owner_return.blot.in");
     defer a.free(source);
     var module = try lower(a, source);
@@ -219,9 +219,9 @@ test "completed mutating owner results retain promoted wide caller roots" {
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.counters.scoped_function_plan_definitions > 0);
     try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
-    try std.testing.expect(result.counters.scoped_packed_plans_promoted > 0);
-    try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expect(result.counters.scoped_addressed_definitions + result.counters.scoped_packed_plans_promoted > 0);
+    try std.testing.expect(result.counters.scoped_addressed_calls + result.counters.scoped_owned_word_calls > 0);
 }
 
 test "completed mutating owner result cache hits reject shorter stored borrows and fresh event escapes" {
@@ -255,7 +255,7 @@ fn publishNestedOwner(allocator: std.mem.Allocator, modules: []const core.Module
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
     try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
     // Only nested returns descriptors. Each unchanged Array has four words;
     // forwarding three words would leave its owner address in the result slot.
     try std.testing.expect(result.counters.scoped_result_store_words_avoided >= width * 4);
@@ -264,8 +264,8 @@ fn publishNestedOwner(allocator: std.mem.Allocator, modules: []const core.Module
         try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
         try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owned_packed_calls);
     } else {
-        try std.testing.expect(result.counters.scoped_packed_plans_promoted > 0);
-        try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
+        try std.testing.expect(result.counters.scoped_addressed_definitions + result.counters.scoped_packed_plans_promoted > 0);
+        try std.testing.expect(result.counters.scoped_addressed_calls + result.counters.scoped_owned_word_calls > 0);
     }
 }
 
@@ -287,7 +287,7 @@ fn publishFreshOwnerTransfer(allocator: std.mem.Allocator, modules: []const core
     try std.testing.expect(result.bytes.len > 8);
     try std.testing.expect(result.counters.scoped_completed_plan_definitions > 0);
     try std.testing.expect(result.counters.scoped_result_owner_transfer_definitions > 0);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
 }
 
 test "completed mutating owner results transfer fresh fixed result owners through OOM" {
@@ -307,7 +307,7 @@ test "completed function borrowed results reuse distinct caller owners and prese
     try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_completed_plan_definitions);
     try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_owner_graph_definitions);
     try std.testing.expect(result.counters.scoped_owner_graph_hits >= 1);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
     var escaped = try lower(a, escape_source);
     defer escaped.deinit(a);
     var rejected = try scoped.compile(a, &.{escaped}, 1);
@@ -365,7 +365,7 @@ fn publishPlainPlans(allocator: std.mem.Allocator, modules: []const core.Module)
     try std.testing.expectEqual(@as(u64, 2), result.counters.scoped_plain_plan_definitions);
     try std.testing.expect(result.counters.scoped_writer_cache_hits >= 2);
     try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owner_graph_inputs);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
 }
 test "completed plain plans retain functional nominal updates and local scratch results through OOM" {
     var module = try lower(a, plain_native_source);
@@ -450,7 +450,7 @@ fn publishPlainBoundaries(allocator: std.mem.Allocator, modules: []const core.Mo
     try std.testing.expectEqual(@as(u64, 6), result.counters.scoped_plain_plan_definitions);
     try std.testing.expect(result.counters.scoped_plain_plan_hits >= 3);
     try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owner_graph_inputs);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
 }
 test "completed plain word ABI retains scalar float nullary variants scratch and local references through OOM" {
     var module = try lower(a, plain_boundary_source);

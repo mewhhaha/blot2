@@ -109,6 +109,32 @@ disable sharing. Failed proofs roll back and retry independent inputs before
 recording a declined key. The alias counter counts shared logical bindings,
 including bindings that ordinary dead-input analysis could also omit.
 
+Wide private arguments may instead travel as immutable addressed bundles. The
+complete semantic Value tree, owner roles, alias partition and ordered access
+events remain checked. Pointer parameters and narrow scalar parameters precede
+reserved logical leaf locals; outputs use a separate slot. Exact contiguous
+input-local ranges may forward their address, with transitive physical demand
+recorded before publication. A structural borrowed-input preference
+distinguishes private cache alternatives without recording caller local IDs or
+addresses. Ordinary callers retain addressed transport only when completed
+input/result pointer demand exceeds 512 words or at least 16 input words forward
+to nested helpers. Other sparse calls rebuild with the ordinary ABI. A bounded
+rejection memo can skip repeated optional probes after executable rollback; it
+grants no semantic authority. Other inputs serialize snapshots. Completed bodies
+must leave bundle words and pointers unwritten and have no hidden identities or
+instruction coordinates. Failed proofs roll back to the ordinary private ABI.
+One/two actual reads load at use; frequent reads retain one entry snapshot.
+
+Reusable snapshots require complete ordered local equality and a stored demand
+superset. Local writes, all control boundaries, close/rewind and successful
+outlining invalidate the cache. The runtime packet remains owned by its
+enclosing scope; invocation cleanup still applies. Per generated function,
+retained snapshots are bounded to eight slots and 32 KiB including headers;
+later packets are reclaimed after their call. Input snapshots precede result
+scratch marks. Owner payload writes remain visible through their descriptors;
+record rebinding does not change old snapshots. Physical addresses never become
+semantic keys or guest-visible values.
+
 Packed inputs occupy logical locals `1..W` after parameter zero. Physical demand
 follows the completed body, result serialization and cleanup. A packed helper
 with at most 512 demanded words, including a needed result pointer, promotes to

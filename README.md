@@ -15,7 +15,7 @@ implementations and APIs rather than maintaining legacy compatibility.
 
 ## Benchmarks
 
-Blot versus Goose's direct Wasm backend, measured on 2026-11-03. Four
+Blot versus Goose's direct Wasm backend, measured on 2026-11-04. Four
 original-numeric pairs plus a Mandelbrot F32 control; two sorting ports are
 blocked by owned-storage recursion.
 
@@ -23,12 +23,13 @@ blocked by owned-storage recursion.
 
 ![Bounded Wasm runtime: five paired cases and two unsupported Blot sorts](scripts/bench/goose/charts/runtime.svg)
 
-Five matched pairs expose **7.4x CRC32**, **6.9x custom hash**, **3.1x Sieve**
+Five matched pairs expose **8.1x CRC32**, **7.0x custom hash**, **3.1x Sieve**
 and **1.9x F32 Mandelbrot** gaps; Fannkuch is roughly at parity. Unsupported
-cases have no bar. Byte buffers use U32 in Blot and U8 in Goose. Shared call
-contexts and one hook environment reduce Gdev Wasm **12.11 → 10.24MB**; fresh
-compile medians are **5.63 → 5.28s**. Numeric timings are controls. See
-[results, qualification and next hills](scripts/bench/goose/results/2026-11-03-call-contexts.md).
+cases have no bar. Byte buffers use U32 in Blot and U8 in Goose. Addressed
+capture bundles reduce the worst repeated-capture case **263.5 → 97.0KB**. Gdev
+remains near **10.25MB**; current paired compile medians are **6.33 → 6.23s** on
+this host. Five numeric binaries remain byte-identical. See
+[results, regressions and next hills](scripts/bench/goose/results/2026-11-04-addressed-inputs.md).
 
 ## Development
 

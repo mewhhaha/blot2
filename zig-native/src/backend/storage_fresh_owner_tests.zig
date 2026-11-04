@@ -44,7 +44,7 @@ fn publishFresh(allocator: std.mem.Allocator, modules: []const core.Module) !voi
     try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
     try std.testing.expect(result.counters.scoped_result_owner_transfer_definitions > 0);
     try std.testing.expect(result.counters.scoped_transferred_result_owners > 0);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
     try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
 }
 
@@ -93,7 +93,7 @@ fn aliasSource(width: usize) ![]u8 {
     return source;
 }
 
-test "completed fresh fixed owners preserve duplicate aliases borrowed siblings nested calls and promoted ABI" {
+test "completed fresh fixed owners preserve duplicate aliases borrowed siblings nested calls and addressed ABI" {
     for ([_]usize{ 8, 128 }) |width| {
         const source = try aliasSource(width);
         defer a.free(source);
@@ -107,13 +107,13 @@ test "completed fresh fixed owners preserve duplicate aliases borrowed siblings 
         try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
         try std.testing.expect(result.counters.scoped_result_owner_transfer_definitions > 0);
         try std.testing.expect(result.counters.scoped_transferred_result_owners > 0);
-        try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+        try std.testing.expectEqual(result.counters.scoped_addressed_retries, result.counters.scoped_completed_plan_rollbacks);
         if (width == 8) {
             try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
             try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owned_packed_calls);
         } else {
-            try std.testing.expect(result.counters.scoped_packed_plans_promoted > 0);
-            try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
+            try std.testing.expect(result.counters.scoped_addressed_definitions + result.counters.scoped_packed_plans_promoted > 0);
+            try std.testing.expect(result.counters.scoped_addressed_calls + result.counters.scoped_owned_word_calls > 0);
         }
     }
 }

@@ -174,7 +174,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
         assert(work.scoped_function_plan_hits > 0, JSON.stringify(work));
         if (name === "input_alias_partition.blot") {
           assert(work.scoped_completed_plan_definitions >= 2);
-          assert.equal(work.scoped_completed_plan_rollbacks, 0);
+          assert.equal(
+            work.scoped_completed_plan_rollbacks,
+            work.scoped_addressed_retries,
+          );
           assert(work.scoped_direct_input_words_avoided > 0);
           assert(work.scoped_direct_argument_words_avoided > 0);
         } else {
@@ -201,7 +204,14 @@ for (const codegenTier of ["development", "optimized"] as const) {
           JSON.stringify({ width, distinct, work }),
         );
         assert(work.scoped_function_plan_hits > 0);
-        if (distinct) {
+        if (work.scoped_addressed_definitions > 0) {
+          assert(work.scoped_addressed_calls > 0, JSON.stringify(work));
+          assert(work.scoped_addressed_input_loads > 0, JSON.stringify(work));
+          assert(
+            work.scoped_addressed_snapshot_words > 0,
+            JSON.stringify(work),
+          );
+        } else if (distinct) {
           assert(work.scoped_owned_packed_calls > 0);
           assert(work.scoped_packed_input_words_avoided > 0);
           assert(work.scoped_packed_argument_words_avoided > 0);
@@ -233,7 +243,14 @@ for (const codegenTier of ["development", "optimized"] as const) {
         assert(built.success, JSON.stringify(built));
         const work = built.stats.workCounters as Record<string, number>;
         assert(work.scoped_function_plan_hits > 0);
-        if (distinct) {
+        if (work.scoped_addressed_definitions > 0) {
+          assert(work.scoped_addressed_calls > 0, JSON.stringify(work));
+          assert(work.scoped_addressed_input_loads > 0, JSON.stringify(work));
+          assert(
+            work.scoped_addressed_snapshot_words > 0,
+            JSON.stringify(work),
+          );
+        } else if (distinct) {
           assert(work.scoped_owned_packed_calls > 0, JSON.stringify(work));
         } else {
           assert(work.scoped_packed_plans_promoted > 0, JSON.stringify(work));

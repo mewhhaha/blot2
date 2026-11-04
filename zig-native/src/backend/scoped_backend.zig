@@ -24,6 +24,7 @@ const type_evidence = @import("../eval/type_evidence.zig");
 const scalar_ops = @import("scalar_ops.zig");
 const source_proof = @import("../check/package_core.zig");
 const global_footprint = @import("storage_global_footprint.zig");
+const addressed_input = @import("addressed_input_demand.zig");
 const evaluation = @import("../eval/core_eval.zig");
 const Error = std.mem.Allocator.Error || error{Declined};
 /// Compiler work policy, independent of guest storage capacities and proofs.
@@ -259,17 +260,21 @@ const CheckedFunctionPlan = struct {
     abi: FunctionAbi,
     return_registers: usize,
     result_pointer_first: bool = false,
+    addressed_arguments: []const bool = &.{},
     result: Value,
     returned_owners: []const ReturnedOwner = &.{},
     events: []const WriterEvent,
     regions: []const usize,
 };
+const InputBundle = struct { parameter: u32, first: u32, words: usize, needed: []bool };
+const BundleSnapshot = struct { function: u32, root: usize, address: Local, words: []const Local, used: []const bool };
 const DescriptorCalls = struct {
     allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
     calls: call_plan.Cache,
     plans: std.AutoHashMapUnmanaged(u32, *const CheckedFunctionPlan) = .empty,
     declined: std.HashMapUnmanaged(call_plan.Key, void, call_plan.KeyContext, 80) = .empty,
+    addressed_declined: std.HashMapUnmanaged(call_plan.Key, void, call_plan.KeyContext, 80) = .empty,
     transports: std.AutoHashMapUnmanaged(u32, ?*transport_plan.Index) = .empty,
     record_metadata: RecordMetadataCache,
     global_footprint: ?global_footprint.Index = null,
@@ -294,6 +299,13 @@ const DescriptorCalls = struct {
         owned.evidence = try self.arena.allocator().dupe(u32, key.evidence);
         self.declined.putAssumeCapacityNoClobber(owned, {});
     }
+    fn declineAddressed(self: *DescriptorCalls, key: call_plan.Key) Error!void {
+        if (self.addressed_declined.count() >= 4096 or self.addressed_declined.contains(key)) return;
+        try self.addressed_declined.ensureUnusedCapacity(self.allocator, 1);
+        var owned = key;
+        owned.evidence = try self.arena.allocator().dupe(u32, key.evidence);
+        self.addressed_declined.putAssumeCapacityNoClobber(owned, {});
+    }
     fn deinit(self: *DescriptorCalls) void {
         if (self.global_footprint) |*index| index.deinit();
         self.calls.deinit();
@@ -303,6 +315,9 @@ const DescriptorCalls = struct {
         // Keys borrow flat immutable words in the compilation arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
         self.declined.deinit(self.allocator);
+        // Optional negative decisions own arena keys and survive body rollback.
+        // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
+        self.addressed_declined.deinit(self.allocator);
         // Source indexes and nested buffers belong to the compilation arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
         self.transports.deinit(self.allocator);
@@ -419,6 +434,13 @@ const Generator = struct {
     external_destination: ?usize = null,
     c: Code = undefined,
     zero_source: ZeroSource = .{},
+    input_bundles: []const InputBundle = &.{},
+    bundle_snapshots: std.ArrayList(BundleSnapshot) = .empty,
+    bundle_scan: usize = 0,
+    bundle_function: ?u32 = null,
+    bundle_retained_bytes: usize = 0,
+    bundle_retained_count: usize = 0,
+    bundle_sources: std.AutoHashMapUnmanaged(u32, void) = .empty,
     stacks: std.ArrayList(bool) = .empty,
     globals: std.ArrayList(Global) = .empty,
     globals_ready: bool = false,
@@ -472,6 +494,10 @@ const Generator = struct {
         self.type_arguments.deinit(self.allocator);
         self.invalid_literals.deinit(self.allocator);
         self.mutable_join_words.deinit(self.allocator);
+        // Snapshot word/mask vectors belong to the generator arena.
+        // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
+        self.bundle_snapshots.deinit(self.allocator);
+        self.bundle_sources.deinit(self.allocator);
         // Templates and nested fields are owned by the generator arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
         self.plain_layouts.deinit(self.allocator);
@@ -4312,7 +4338,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -4350,6 +4376,9 @@ const Generator = struct {
             g.diagnostic = self.diagnostic;
             g.context_sensitive = self.context_sensitive;
             g.zero_source = self.zero_source;
+            g.bundle_snapshots.clearRetainingCapacity();
+            g.bundle_sources.clearRetainingCapacity();
+            g.bundle_scan = 0;
             inline for (published_fields, 0..) |field, index| {
                 if (comptime std.mem.eql(u8, field, "scoped_reader_projection_calls") or std.mem.eql(u8, field, "scoped_owned_projection_calls")) {
                     g.emission_work.scoped_argument_projection_discards +|= @field(g.emission_work.*, field) -| self.publications[index];
@@ -4395,6 +4424,9 @@ const Generator = struct {
         words: usize,
         input_aliases: []const u32,
         alias_rejected: ?*bool = null,
+        addressed: bool = true,
+        addressed_rejected: ?*bool = null,
+        borrowed_inputs: bool = false,
         capture_globals: bool,
         unit_result: bool,
         result_shape: Value,
@@ -4402,23 +4434,34 @@ const Generator = struct {
         key: call_plan.Key,
     };
     fn buildFunctionPlan(self: *Generator, request: FunctionPlanInput) Error!usize {
-        const mark = FunctionMark.begin(self) orelse return error.Declined;
-        var rejected = false;
         var candidate = request;
-        candidate.alias_rejected = &rejected;
-        const expressions_before = self.emission_work.scoped_emission_expressions;
-        const discarded_before = self.emission_work.scoped_completed_plan_discarded_expressions;
-        return self.constructFunctionPlan(candidate) catch |err| {
-            if (!rejected) return err;
-            mark.rollback(self);
-            self.emission_work.scoped_input_alias_retries +|= 1;
-            self.emission_work.scoped_completed_plan_rollbacks +|= 1;
-            const nested_discarded = self.emission_work.scoped_completed_plan_discarded_expressions - discarded_before;
-            self.emission_work.scoped_completed_plan_discarded_expressions +|= self.emission_work.scoped_emission_expressions - expressions_before - nested_discarded;
-            candidate.input_aliases = &.{};
-            candidate.alias_rejected = null;
-            return self.constructFunctionPlan(candidate);
-        };
+        candidate.addressed = candidate.addressed and request.words >= 64;
+        if (candidate.addressed) candidate.addressed = !self.descriptor_calls.addressed_declined.contains(request.key);
+        while (true) {
+            const mark = FunctionMark.begin(self) orelse return error.Declined;
+            var alias_rejected = false;
+            var addressed_rejected = false;
+            candidate.alias_rejected = &alias_rejected;
+            candidate.addressed_rejected = &addressed_rejected;
+            const expressions_before = self.emission_work.scoped_emission_expressions;
+            const discarded_before = self.emission_work.scoped_completed_plan_discarded_expressions;
+            return self.constructFunctionPlan(candidate) catch |err| {
+                if (err == error.OutOfMemory or (!alias_rejected and !addressed_rejected)) return err;
+                mark.rollback(self);
+                if (addressed_rejected) {
+                    candidate.addressed = false;
+                    try self.descriptor_calls.declineAddressed(request.key);
+                    self.emission_work.scoped_addressed_retries +|= 1;
+                } else {
+                    candidate.input_aliases = &.{};
+                    self.emission_work.scoped_input_alias_retries +|= 1;
+                }
+                self.emission_work.scoped_completed_plan_rollbacks +|= 1;
+                const nested_discarded = self.emission_work.scoped_completed_plan_discarded_expressions - discarded_before;
+                self.emission_work.scoped_completed_plan_discarded_expressions +|= self.emission_work.scoped_emission_expressions - expressions_before - nested_discarded;
+                continue;
+            };
+        }
     }
     fn constructFunctionPlan(self: *Generator, request: FunctionPlanInput) Error!usize {
         const m = request.module;
@@ -4431,14 +4474,32 @@ const Generator = struct {
         const words = request.words;
         const unit_result = request.unit_result;
         const shared = request.shared;
-        var direct = ownedWordAbi(words, request.result_shape);
+        var addressed: []bool = &.{};
+        defer self.allocator.free(addressed);
+        var physical_words: usize = 0;
+        var has_bundle = false;
+        if (request.addressed and !self.scalar_admission.hasScalarReferences()) {
+            addressed = try self.allocator.alloc(bool, arguments.len);
+            for (arguments, addressed) |argument, *by_address| {
+                const count = readerWords(argument);
+                by_address.* = count >= 64;
+                has_bundle = has_bundle or by_address.*;
+                if (by_address.*) physical_words += 1 else physical_words += count;
+            }
+            if (!has_bundle or physical_words >= 512) {
+                self.allocator.free(addressed);
+                addressed = &.{};
+            }
+        }
+        const using_bundles = addressed.len != 0;
+        var direct = using_bundles or ownedWordAbi(words, request.result_shape);
         const return_registers = if (direct) try inlineReturnRegisters(request.result_shape) else 0;
         const buffered_result = request.result_shape.tag != .scalar and return_registers == 0;
         const key = request.key;
         const cache = &self.descriptor_calls.calls;
         var signature: []const wasm.ValueType = &.{.i32};
         if (direct) {
-            const count = std.math.add(usize, words, @intFromBool(buffered_result)) catch return error.Declined;
+            const count = std.math.add(usize, if (using_bundles) physical_words else words, @intFromBool(buffered_result)) catch return error.Declined;
             const parameters = try self.arena.allocator().alloc(wasm.ValueType, count);
             @memset(parameters, .i32);
             signature = parameters;
@@ -4503,7 +4564,26 @@ const Generator = struct {
         var input_aliases = request.input_aliases;
         if (self.scalar_admission.hasScalarReferences()) input_aliases = &.{};
         var offset: u32 = 0;
-        if (!direct) {
+        if (using_bundles) {
+            try self.module.functions.items[function].locals.appendNTimes(self.allocator, .i32, words);
+            offset = @intCast(signature.len);
+            const bundles = try child.arena.allocator().alloc(InputBundle, std.mem.count(bool, addressed, &.{true}));
+            var parameter: u32 = 0;
+            var first = offset;
+            var index: usize = 0;
+            for (arguments, addressed) |argument, by_address| {
+                const count = readerWords(argument);
+                if (by_address) {
+                    const needed = try child.arena.allocator().alloc(bool, count);
+                    @memset(needed, false);
+                    bundles[index] = .{ .parameter = parameter, .first = first, .words = count, .needed = needed };
+                    index += 1;
+                    parameter += 1;
+                } else parameter += @intCast(count);
+                first += @intCast(count);
+            }
+            child.input_bundles = bundles;
+        } else if (!direct) {
             // Logical words keep packet order; dummy callable words and body
             // temporaries allocate after this complete reserved input range.
             try self.module.functions.items[function].locals.appendNTimes(self.allocator, .i32, words);
@@ -4528,7 +4608,7 @@ const Generator = struct {
             input.* = try child.readerWordParameter(argument, &offset, input_aliases, input_first);
             try child.writerInput(input, owners, assigned);
         }
-        if (direct) std.debug.assert(offset == words) else std.debug.assert(offset == words + 1);
+        std.debug.assert(offset == input_first + words);
         const output = child.invokeBody(target, inputs, 0, false) catch |err| {
             if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
             return err;
@@ -4581,14 +4661,14 @@ const Generator = struct {
                     defer candidates.deinit(self.allocator);
                     try child.resultAliasCandidates(output, &candidates);
                     std.debug.assert(candidates.items.len == output_words.items.len);
-                    var first: u32 = 0;
-                    if (!direct) first = 1;
+                    const first = input_first;
                     result_aliases = try @import("storage_result_alias.zig").analyze(self.allocator, &self.module.functions.items[function], first, words, candidates.items);
                 }
                 var address: Local = .{ .id = 0 };
                 var base: usize = words * 4;
                 if (direct) {
                     address.id = @intCast(words);
+                    if (using_bundles) address.id = @intCast(physical_words);
                     base = 0;
                 }
                 for (output_words.items, 0..) |word, ordinal| {
@@ -4613,6 +4693,10 @@ const Generator = struct {
                 self.emission_work.scoped_global_plan_definitions +|= 1;
                 break;
             };
+        }
+        if (using_bundles and scope_outline.hasCoordinates(self.module, function)) {
+            if (request.addressed_rejected) |rejected| rejected.* = true;
+            return error.Declined;
         }
         if (input_aliases.len != 0) {
             if (scope_outline.hasCoordinates(self.module, function) or !try @import("storage_input_alias.zig").readOnly(self.allocator, machine, input_first, input_aliases)) {
@@ -4646,7 +4730,54 @@ const Generator = struct {
         }
         var input_demand: []bool = &.{};
         defer self.allocator.free(input_demand);
-        if (direct) {
+        if (using_bundles) {
+            input_demand = try self.allocator.alloc(bool, words);
+            @memset(input_demand, false);
+            for (machine.instructions.items) |inst| {
+                if (inst.op == .local_get and inst.operand >= input_first and inst.operand - input_first < words) input_demand[inst.operand - input_first] = true;
+            }
+            var forwarded: usize = 0;
+            for (child.input_bundles) |bundle| for (bundle.needed, 0..) |needed, ordinal| {
+                if (needed) {
+                    input_demand[bundle.first - input_first + ordinal] = true;
+                    forwarded += 1;
+                }
+            };
+            const result_pointer = buffered_result and !fullyAliasedResult(result_aliases);
+            const demanded = std.mem.count(bool, input_demand, &.{true}) + @intFromBool(result_pointer);
+            if (!request.borrowed_inputs and demanded <= 512 and forwarded < 16) {
+                if (request.addressed_rejected) |rejected| rejected.* = true;
+                return error.Declined;
+            }
+            const bundles = try self.allocator.alloc(addressed_input.Bundle, child.input_bundles.len);
+            defer self.allocator.free(bundles);
+            for (bundles, child.input_bundles) |*bundle, input| bundle.* = .{ .parameter = input.parameter, .first = input.first, .words = input.words };
+            const lowered = (try addressed_input.materialize(self.allocator, machine, bundles)) orelse {
+                if (request.addressed_rejected) |rejected| rejected.* = true;
+                return error.Declined;
+            };
+            defer self.allocator.free(lowered.used);
+            self.emission_work.scoped_addressed_input_loads +|= lowered.loads;
+            // Narrow inputs remain ordinary parameters, copied to their
+            // reserved logical positions only when actually read.
+            var prefix: std.ArrayList(wasm.Instruction) = .empty;
+            defer prefix.deinit(self.allocator);
+            var parameter: u32 = 0;
+            var ordinal: usize = 0;
+            for (arguments, addressed) |argument, by_address| {
+                const count = readerWords(argument);
+                if (by_address) parameter += 1 else for (0..count) |index| {
+                    if (input_demand[ordinal + index]) try prefix.appendSlice(self.allocator, &.{
+                        .{ .op = .local_get, .operand = parameter + @as(u32, @intCast(index)) },
+                        .{ .op = .local_set, .operand = input_first + @as(u32, @intCast(ordinal + index)) },
+                    });
+                }
+                if (!by_address) parameter += @intCast(count);
+                ordinal += count;
+            }
+            try machine.instructions.insertSlice(self.allocator, 0, prefix.items);
+            self.emission_work.scoped_addressed_definitions +|= 1;
+        } else if (direct) {
             // Only this new helper may gain an entry prefix. No published
             // semantic or table position may refer into its original body.
             if (!scope_outline.hasCoordinates(self.module, function)) {
@@ -4694,9 +4825,10 @@ const Generator = struct {
         const plan = try summary_arena.create(CheckedFunctionPlan);
         const used_input_words = try summary_arena.dupe(bool, input_demand);
         const retained_aliases = try summary_arena.dupe(u32, result_aliases);
+        const retained_addressed = try summary_arena.dupe(bool, addressed);
         try self.descriptor_calls.plans.ensureUnusedCapacity(self.allocator, 1);
         try self.completeCall(cache, inserted, child.context_sensitive, shared and graph_mode);
-        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = used_input_words, .result_aliases = retained_aliases, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result_pointer_first = result_pointer_first, .result = result_template, .returned_owners = returned_owners, .events = facts, .regions = retained_regions };
+        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = used_input_words, .result_aliases = retained_aliases, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result_pointer_first = result_pointer_first, .addressed_arguments = retained_addressed, .result = result_template, .returned_owners = returned_owners, .events = facts, .regions = retained_regions };
         self.descriptor_calls.plans.putAssumeCapacityNoClobber(function, plan);
         for (facts) |event| {
             if (event.kind == .read) self.emission_work.scoped_function_plan_read_events +|= 1 else self.emission_work.scoped_function_plan_write_events +|= 1;
@@ -4723,6 +4855,7 @@ const Generator = struct {
         arguments: []const Value,
         closed_scalar: bool,
         input_aliases: []const u32,
+        borrowed_inputs: bool,
         capture_globals: bool,
         fn deinit(self: *PreparedFunctionCall, allocator: std.mem.Allocator) void {
             self.graph.deinit();
@@ -4784,17 +4917,28 @@ const Generator = struct {
         var words: usize = 0;
         for (arguments) |argument| words = std.math.add(usize, words, readerWords(argument)) catch return null;
         var input_aliases: []const u32 = &.{};
+        var borrowed_inputs = false;
         errdefer self.allocator.free(input_aliases);
         if (!closed_scalar) {
             var locals: std.ArrayList(Local) = .empty;
             defer locals.deinit(self.allocator);
             for (arguments) |argument| try self.readerWordLocals(argument, &locals);
+            var ordinal: usize = 0;
+            for (arguments) |argument| {
+                const count = readerWords(argument);
+                if (count >= 64 and self.inputBundleRange(locals.items[ordinal..][0..count]) != null) borrowed_inputs = true;
+                ordinal += count;
+            }
             input_aliases = try @import("storage_input_alias.zig").partition(self.allocator, locals.items);
             try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 13, @intCast(input_aliases.len) });
             try evidence.appendSlice(self.allocator, input_aliases);
         }
+        // Physical ABI preference is structural provenance, never a pointer
+        // value. A borrowed-bundle alternative cannot select a costly snapshot
+        // ABI for unrelated direct callers with the same semantic signature.
+        if (borrowed_inputs) try evidence.append(self.allocator, std.math.maxInt(u32) - 15);
         keep = true;
-        return .{ .graph = graph, .evidence = evidence, .words = words, .arguments = arguments, .closed_scalar = closed_scalar, .input_aliases = input_aliases, .capture_globals = capture_globals, .key = .{ .unit = m.unit, .binding = target.binding, .context = if (closed_scalar) 0 else self.invocationContext(), .context_free = closed_scalar, .evidence = evidence.items } };
+        return .{ .borrowed_inputs = borrowed_inputs, .graph = graph, .evidence = evidence, .words = words, .arguments = arguments, .closed_scalar = closed_scalar, .input_aliases = input_aliases, .capture_globals = capture_globals, .key = .{ .unit = m.unit, .binding = target.binding, .context = if (closed_scalar) 0 else self.invocationContext(), .context_free = closed_scalar, .evidence = evidence.items } };
     }
     fn callableGlobalSlots(self: *Generator, value: Value, mask: []bool, remaining: *usize, depth: usize) Error!void {
         if (remaining.* == 0 or depth > 128) {
@@ -4856,7 +5000,7 @@ const Generator = struct {
             result_shape = try self.shape(try self.unit(result.unit), if (result.unit == m.unit) body.root else 0, result.ty, 0);
             if (!graphResultLayout(result_shape)) return null;
         }
-        const request: FunctionPlanInput = .{ .module = m, .target = target, .arguments = call.arguments, .owners = call.graph.owners.items, .graph = &call.graph, .words = call.words, .input_aliases = call.input_aliases, .capture_globals = call.capture_globals, .unit_result = unit_result, .result_shape = result_shape, .shared = true, .key = call.key };
+        const request: FunctionPlanInput = .{ .module = m, .target = target, .arguments = call.arguments, .owners = call.graph.owners.items, .graph = &call.graph, .words = call.words, .input_aliases = call.input_aliases, .capture_globals = call.capture_globals, .borrowed_inputs = call.borrowed_inputs, .unit_result = unit_result, .result_shape = result_shape, .shared = true, .key = call.key };
         const index = (try self.tryFunctionPlan(request)) orelse return null;
         return self.descriptor_calls.plans.get(self.descriptor_calls.calls.entries.items[index].function) orelse return self.unsupported(m, body.root);
     }
@@ -4959,7 +5103,201 @@ const Generator = struct {
         for (aliases) |alias| if (alias == @import("storage_result_alias.zig").absent) return false;
         return true;
     }
+    // Cache only straight-line snapshots whose exact source locals have not
+    // changed. Region rewind and runtime close are lifetime barriers even when
+    // the compile-time Root remains live along another control-flow path.
+    fn scanBundleSnapshots(self: *Generator) void {
+        const instructions = self.module.functions.items[self.c.function].instructions.items;
+        if (self.bundle_function != self.c.function) {
+            self.bundle_snapshots.clearRetainingCapacity();
+            self.bundle_sources.clearRetainingCapacity();
+            self.bundle_retained_bytes = 0;
+            self.bundle_retained_count = 0;
+            self.bundle_function = self.c.function;
+            self.bundle_scan = instructions.len;
+            return;
+        }
+        if (self.bundle_scan > instructions.len) {
+            self.bundle_snapshots.clearRetainingCapacity();
+            self.bundle_sources.clearRetainingCapacity();
+            self.bundle_scan = instructions.len;
+            return;
+        }
+        var barrier = false;
+        for (instructions[self.bundle_scan..]) |inst| {
+            switch (inst.op) {
+                .block, .loop, .if_, .else_, .end, .br, .br_if, .return_, .unreachable_ => barrier = true,
+                .local_set, .local_tee => if (self.bundle_sources.contains(inst.operand)) {
+                    barrier = true;
+                },
+                .call => if (inst.operand == self.runtime.functions.rewind or inst.operand == self.runtime.functions.close) {
+                    barrier = true;
+                },
+                else => {},
+            }
+        }
+        if (barrier) {
+            self.bundle_snapshots.clearRetainingCapacity();
+            self.bundle_sources.clearRetainingCapacity();
+        }
+        self.bundle_scan = instructions.len;
+    }
+    const BundleRange = struct { bundle: usize, offset: usize };
+    fn inputBundleRange(self: *const Generator, words: []const Local) ?BundleRange {
+        if (words.len == 0) return null;
+        for (self.input_bundles, 0..) |bundle, index| {
+            if (words[0].id < bundle.first) continue;
+            const offset = words[0].id - bundle.first;
+            if (offset >= bundle.words or words.len > bundle.words - offset) continue;
+            var exact = true;
+            for (words, 0..) |word, ordinal| if (word.id != bundle.first + offset + ordinal) {
+                exact = false;
+                break;
+            };
+            if (exact) return .{ .bundle = index, .offset = offset };
+        }
+        return null;
+    }
+    fn forwardedBundle(self: *Generator, words: []const Local, used: []const bool) Error!?Local {
+        const range = self.inputBundleRange(words) orelse return null;
+        const bundle = self.input_bundles[range.bundle];
+        for (used, 0..) |needed, index| if (needed) {
+            bundle.needed[range.offset + index] = true;
+            self.emission_work.scoped_addressed_forwarded_words +|= 1;
+        };
+        const pointer: Local = .{ .id = bundle.parameter };
+        if (range.offset == 0) return pointer;
+        const adjusted = try self.c.temp();
+        try self.c.set(adjusted, .{ .i32_add, pointer, range.offset * 4 });
+        return adjusted;
+    }
+    fn cachedBundle(self: *Generator, words: []const Local, used: []const bool) ?Local {
+        self.scanBundleSnapshots();
+        for (self.bundle_snapshots.items) |saved| {
+            if (saved.function != self.c.function or !self.roots.items[saved.root].live or words.len != saved.words.len) continue;
+            var complete = true;
+            for (words, saved.words) |word, original| if (word.id != original.id) {
+                complete = false;
+                break;
+            };
+            for (used, saved.used) |needed, stored| if (needed and !stored) {
+                complete = false;
+                break;
+            };
+            if (complete) {
+                for (used) |needed| if (needed) {
+                    self.emission_work.scoped_addressed_cached_words +|= 1;
+                };
+                return saved.address;
+            }
+        }
+        return null;
+    }
+    fn snapshotBundle(self: *Generator, m: *const core.Module, id: core.Id, words: []const Local, used: []const bool, retain: bool) Error!Local {
+        const count = std.math.cast(u32, @max(1, words.len)) orelse return self.unsupported(m, id);
+        const slot = try self.arrayWithShape(m, id, (try self.constant(count)).word, .fixed, .{ .word = .{ .id = 0 } });
+        const address = try self.c.temp();
+        try self.c.set(address, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
+        for (words, used, 0..) |word, needed, ordinal| if (needed) {
+            try self.c.store(address, @intCast(ordinal * 4), word);
+            self.emission_work.scoped_addressed_snapshot_words +|= 1;
+        };
+        if (retain) {
+            self.scanBundleSnapshots();
+            const saved = try self.arena.allocator().dupe(Local, words);
+            const mask = try self.arena.allocator().dupe(bool, used);
+            try self.bundle_snapshots.append(self.allocator, .{ .function = self.c.function, .root = slot.root.?, .address = address, .words = saved, .used = mask });
+            for (words) |word| try self.bundle_sources.put(self.allocator, word.id, {});
+            try self.bundle_sources.put(self.allocator, address.id, {});
+            try self.bundle_sources.put(self.allocator, slot.token.id, {});
+            self.bundle_retained_bytes += words.len * 4 + storage.header_bytes;
+            self.bundle_retained_count += 1;
+            self.emission_work.scoped_addressed_retained_bytes_max = @max(self.emission_work.scoped_addressed_retained_bytes_max, self.bundle_retained_bytes);
+            self.emission_work.scoped_addressed_retained_slots_max = @max(self.emission_work.scoped_addressed_retained_slots_max, self.bundle_retained_count);
+        }
+        return address;
+    }
+    fn callAddressedWords(self: *Generator, m: *const core.Module, id: core.Id, plan: *const CheckedFunctionPlan, arguments: []const Value, owners: []const usize) Error!Value {
+        self.emission_work.scoped_addressed_calls +|= 1;
+        var words: std.ArrayList(Local) = .empty;
+        defer words.deinit(self.allocator);
+        for (arguments) |argument| try self.readerWordLocals(argument, &words);
+        std.debug.assert(words.items.len == plan.input_words and plan.used_input_words.len == words.items.len);
+        const addresses = try self.arena.allocator().alloc(?Local, arguments.len);
+        @memset(addresses, null);
+        var ordinal: usize = 0;
+        var ephemeral = false;
+        for (arguments, plan.addressed_arguments, addresses) |argument, by_address, *address| {
+            const count = readerWords(argument);
+            const input = words.items[ordinal..][0..count];
+            const used = plan.used_input_words[ordinal..][0..count];
+            ordinal += count;
+            if (!by_address) continue;
+            address.* = try self.forwardedBundle(input, used);
+            if (address.* == null) address.* = self.cachedBundle(input, used);
+            if (address.* == null) {
+                const bytes = count * 4 + storage.header_bytes;
+                if (self.bundle_retained_count < 8 and bytes <= 32 * 1024 - self.bundle_retained_bytes) {
+                    address.* = try self.snapshotBundle(m, id, input, used, true);
+                } else ephemeral = true;
+            }
+        }
+        // Reusable snapshots precede all call scratch storage. Capped snapshots
+        // are one-call allocations and reclaim through the ordinary owner path.
+        const first_root = self.roots.items.len;
+        var mark: ?FrameMark = null;
+        const template = plan.result;
+        const result_slot = template.tag != .scalar and plan.return_registers == 0;
+        const forwarded_result = result_slot and fullyAliasedResult(plan.result_aliases);
+        if (ephemeral or (result_slot and !forwarded_result)) mark = try self.frameMark();
+        ordinal = 0;
+        for (arguments, plan.addressed_arguments, addresses) |argument, by_address, *address| {
+            const count = readerWords(argument);
+            if (by_address and address.* == null) address.* = try self.snapshotBundle(m, id, words.items[ordinal..][0..count], plan.used_input_words[ordinal..][0..count], false);
+            ordinal += count;
+        }
+        var output: ?Local = null;
+        if (result_slot and !forwarded_result) {
+            const count = std.math.cast(u32, @max(1, readerWords(template))) orelse return self.unsupported(m, id);
+            const slot = try self.arrayWithShape(m, id, (try self.constant(count)).word, .fixed, .{ .word = .{ .id = 0 } });
+            const pointer = try self.c.temp();
+            try self.c.set(pointer, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
+            output = pointer;
+        }
+        ordinal = 0;
+        for (arguments, plan.addressed_arguments, addresses) |argument, by_address, address| {
+            if (by_address) try self.c.value(address.?) else try self.readerValues(argument);
+            ordinal += readerWords(argument);
+        }
+        if (result_slot) try self.c.value(output orelse (try self.unitValue()).word);
+        try self.c.op(.call, plan.entry.function);
+        const word = try self.c.temp();
+        try self.c.op(.local_set, word.id);
+        var returned: Value = .{ .word = word, .floating = plan.entry.floating };
+        if (plan.return_registers != 0) {
+            var results: [4]Local = undefined;
+            results[0] = word;
+            for (1..plan.return_registers) |index| {
+                results[index] = try self.c.temp();
+                try self.c.set(results[index], .{ .global, self.runtime.inline_returns[index - 1] });
+            }
+            var next: usize = 0;
+            returned = try self.inlineReturnValue(template, results[0..plan.return_registers], &next);
+        } else if (forwarded_result) {
+            returned = try self.loadPlannedResult(.{ .id = 0 }, 0, template, plan.result_aliases, arguments);
+            self.emission_work.scoped_result_slots_avoided +|= 1;
+        } else if (output) |pointer| returned = try self.loadPlannedResult(pointer, 0, template, plan.result_aliases, arguments);
+        if (!plan.unit_result) returned = try self.importReturnedOwners(plan, returned, owners);
+        if (mark) |saved| {
+            try self.release(first_root, returned);
+            try self.rewindUnescaped(first_root, saved, returned);
+        }
+        returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.unit }, .arguments = &.{} });
+        if (!plan.unit_result) returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(id) }, .arguments = try self.captureTypes() });
+        return returned;
+    }
     fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, plan: *const CheckedFunctionPlan, arguments: []const Value, owners: []const usize) Error!Value {
+        if (plan.addressed_arguments.len != 0) return self.callAddressedWords(m, id, plan, arguments, owners);
         const entry = plan.entry;
         const template = plan.result;
         const words = plan.input_words;
@@ -5263,6 +5601,11 @@ const Generator = struct {
                 else => return self.fail(m, body.root, .storage_unsupported, "Scoped helper extraction could not preserve its checked machine state"),
             };
             if (credit) |committed| {
+                // Extraction moves barriers and local definitions into a new
+                // machine body. A regrown suffix cannot prove cache dominance.
+                self.bundle_snapshots.clearRetainingCapacity();
+                self.bundle_sources.clearRetainingCapacity();
+                self.bundle_scan = self.module.functions.items[self.c.function].instructions.items.len;
                 self.steps -= @intCast(committed.expressions);
                 self.layout_steps -= committed.layouts;
             }

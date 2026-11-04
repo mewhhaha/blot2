@@ -1,0 +1,93 @@
+{
+  "pen_sha256": "c5012f1cc13dad5e643348932ace58e5ee271430edf10ad2a1cbd5f2246b7d8d",
+  "command": [
+    "/home/jacobt/src/pen/target/release/pen",
+    "--game",
+    "/home/jacobt/src/blot2/build/bench/addressed-inputs/pen/game",
+    "--assets",
+    "/home/jacobt/src/gdev/src/assets",
+    "--headless",
+    "--mute",
+    "--frames",
+    "1",
+    "--fps",
+    "60",
+    "--size",
+    "640x480",
+    "--data",
+    "/home/jacobt/src/blot2/build/bench/addressed-inputs/pen/data",
+    "--trace",
+    "/home/jacobt/src/blot2/build/bench/addressed-inputs/pen/frames.trace",
+    "--screenshot",
+    "/home/jacobt/src/blot2/build/bench/addressed-inputs/pen/frame.png"
+  ],
+  "entry": "src/main.blot:main",
+  "project": "/home/jacobt/src/gdev",
+  "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+  "compiler_sha256": "2de96d223cced8d71bbf4a5ebf2d875ed92a2445a7ef7abb556c8ec7e81c8d19",
+  "storage": {
+    "temporaryBytes": 2097152,
+    "persistentBytes": 262144,
+    "transportBytes": 2097152,
+    "ownerCapacity": 4096
+  },
+  "compile_invoked": false,
+  "graphics_environment": {
+    "XDG_RUNTIME_DIR": "/run/user/1000"
+  },
+  "compiled_main_source": "/home/jacobt/src/blot2/build/bench/addressed-inputs/main-final-pairs/0-after/main-470c0d4f3c953dcd/main.wasm",
+  "wasm_sha256": "148bf08353aa302e2462e15488728a18a036fa71dfc7d7aedd192a235ee05833",
+  "scene_sha256": "156d9f802916ce2bbe1b5d85da494b9da8237282c4f0318bf487c2a3ab67f9af",
+  "assets": "/home/jacobt/src/gdev/src/assets",
+  "returncode": 0,
+  "checks": {
+    "exit_zero": true,
+    "one_completed_guest_trace": true,
+    "one_headless_step": true,
+    "first_guest_frame": true,
+    "complete_render": true,
+    "screenshot_640x480": true
+  },
+  "compiled_wasm_unchanged": true,
+  "success": true,
+  "frame_png_sha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+  "frames_trace_sha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+  "baseline_png_and_trace_byte_identical": true,
+  "visually_inspected": true,
+  "source_pins": {
+    "blot": {
+      "head": "b69ecfe38fc056bf5648e2dcb152f49ea2a0eeed",
+      "status": [
+        " M scripts/bench/capture_scaling.ts",
+        " M scripts/dev_check_areas.ts",
+        " M zig-native/CONTRACT.md",
+        " M zig-native/src/backend/scoped_backend.zig",
+        " M zig-native/src/backend/storage_completed_function_tests.zig",
+        " M zig-native/src/backend/storage_concrete_callback_tests.zig",
+        " M zig-native/src/backend/storage_fresh_owner_tests.zig",
+        " M zig-native/src/backend/storage_input_alias_tests.zig",
+        " M zig-native/src/work_counters.zig",
+        " M zig-native/tests/fresh_owner_return_execution.test.ts",
+        " M zig-native/tests/input_alias_execution.test.ts",
+        " M zig-native/tests/mutating_owner_return_execution.test.ts",
+        " M zig-native/tests/owned_word_execution.test.ts",
+        " M zig-native/tests/packed_input_execution.test.ts",
+        "?? zig-native/src/backend/addressed_input_demand.zig",
+        "?? zig-native/tests/addressed_input_execution.test.ts"
+      ]
+    },
+    "ink": {
+      "head": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+      "status": []
+    },
+    "gdev": {
+      "head": "38af0708efe585b10385ebf9ab7dc51ae5bb6b45",
+      "status": []
+    },
+    "pen": {
+      "head": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf",
+      "status": []
+    }
+  },
+  "scope": "One original-budget NVIDIA headless Main frame; broader gameplay, software adapter and normal Pen source bridge remain pending."
+}

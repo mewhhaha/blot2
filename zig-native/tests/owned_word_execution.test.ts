@@ -113,7 +113,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
             expected: (
               input: number,
             ) => [(input ^ 0x80000000) >>> 0, input, input, input],
-            packed: false,
+            addressed: false,
           },
           {
             name: "borrowed",
@@ -135,37 +135,37 @@ for (const codegenTier of ["development", "optimized"] as const) {
                 rows[1],
               ];
             },
-            packed: false,
+            addressed: false,
           },
           {
             name: "cycles",
             source: cycle,
             expected: (input: number) => [3, 3, 0, input],
-            packed: false,
+            addressed: false,
           },
           {
             name: "borrowed512",
             source: boundary(507, false),
             expected: (input: number) => [input, input],
-            packed: false,
+            addressed: true,
           },
           {
             name: "borrowed513",
             source: boundary(508, false),
             expected: (input: number) => [input, input],
-            packed: true,
+            addressed: true,
           },
           {
             name: "scalar512",
             source: boundary(508, true),
             expected: (input: number) => [input * 2, input * 3],
-            packed: false,
+            addressed: true,
           },
           {
             name: "scalar513",
             source: boundary(509, true),
             expected: (input: number) => [input * 2, input * 3],
-            packed: true,
+            addressed: true,
           },
         ]
       ) {
@@ -174,16 +174,23 @@ for (const codegenTier of ["development", "optimized"] as const) {
         });
         assert(built.success, fixture.name + ":" + JSON.stringify(built));
         const work = built.stats.workCounters as Record<string, number>;
-        if (fixture.packed) {
-          assert.equal(work.scoped_owned_word_calls, 0, fixture.name);
-          assert(
-            work.scoped_owned_packed_calls >= 1,
-            fixture.name + JSON.stringify(work),
-          );
-        } else {assert(
-            work.scoped_owned_word_calls >= 1,
-            fixture.name + JSON.stringify(work),
-          );}
+        if (fixture.addressed) {
+          if (work.scoped_addressed_definitions > 0) {
+            assert(work.scoped_addressed_calls > 0, fixture.name);
+            assert.equal(work.scoped_owned_packed_calls, 0, fixture.name);
+          } else if (fixture.name.endsWith("513")) {
+            assert(
+              work.scoped_packed_plans_promoted > 0,
+              fixture.name + JSON.stringify(work),
+            );
+            assert(work.scoped_owned_word_calls > 0, fixture.name);
+          } else {
+            assert(work.scoped_owned_word_calls > 0, fixture.name);
+            assert.equal(work.scoped_owned_packed_calls, 0, fixture.name);
+          }
+        } else {
+          assert(work.scoped_owned_word_calls >= 1, fixture.name);
+        }
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(built.bytes, { asynchronous });
           try {

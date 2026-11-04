@@ -50,7 +50,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
         // Returned logical lanes can have a different exact-word partition.
         assert(work.scoped_function_plan_definitions > 0);
         assert(work.scoped_function_plan_write_events > 0);
-        assert.equal(work.scoped_completed_plan_rollbacks, 0);
+        assert.equal(
+          work.scoped_completed_plan_rollbacks,
+          work.scoped_addressed_retries,
+        );
         if (width === 8) {
           assert(work.scoped_owned_word_calls > 0);
           assert.equal(work.scoped_owned_packed_calls, 0);
@@ -95,7 +98,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
         const nestedWork = nested.stats.workCounters as Record<string, number>;
         assert(nestedWork.scoped_function_plan_hits > 0);
         assert(nestedWork.scoped_function_plan_write_events > 0);
-        assert.equal(nestedWork.scoped_completed_plan_rollbacks, 0);
+        assert.equal(
+          nestedWork.scoped_completed_plan_rollbacks,
+          nestedWork.scoped_addressed_retries,
+        );
         assert(nestedWork.scoped_result_store_words_avoided >= width * 4);
         assert(nestedWork.scoped_result_load_words_avoided >= width * 4);
         if (width === 8) {
@@ -133,7 +139,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
       const work = fresh.stats.workCounters as Record<string, number>;
       assert(work.scoped_completed_plan_definitions > 0);
       assert(work.scoped_function_plan_hits > 0);
-      assert.equal(work.scoped_completed_plan_rollbacks, 0);
+      assert.equal(
+        work.scoped_completed_plan_rollbacks,
+        work.scoped_addressed_retries,
+      );
       const guest = await instantiateGuest(fresh.bytes);
       try {
         for (const input of [0, 7, 0xffff_ffff, 0]) {

@@ -258,6 +258,10 @@ for (const width of widths) {
               }
               row.wasmBytes = result.bytes.length;
               row.wasmSha256 = await sha256(result.bytes);
+              await Deno.writeFile(
+                resolve(directory, "main.wasm"),
+                result.bytes,
+              );
               row.stats = result.stats;
               const counters = result.stats.workCounters as
                 | Record<string, unknown>

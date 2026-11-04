@@ -116,7 +116,7 @@ fn callbackSource(width: usize, distinct: bool) ![]u8 {
     return source;
 }
 
-test "exact input aliases share wide bundle callback words in direct and buffered plans" {
+test "exact input aliases share wide bundle callback words in addressed plans" {
     const Case = struct { width: usize, distinct: bool };
     for ([_]Case{ .{ .width = 32, .distinct = false }, .{ .width = 128, .distinct = false }, .{ .width = 256, .distinct = true } }) |case| {
         const source = try callbackSource(case.width, case.distinct);
@@ -129,13 +129,12 @@ test "exact input aliases share wide bundle callback words in direct and buffere
         try std.testing.expect(result.bytes.len > 8);
         try std.testing.expect(result.counters.scoped_input_alias_words_avoided >= case.width);
         try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
-        if (!case.distinct) {
+        if (result.counters.scoped_addressed_definitions != 0) {
+            try std.testing.expect(result.counters.scoped_addressed_calls > 0);
+            try std.testing.expect(result.counters.scoped_addressed_snapshot_words > 0);
+        } else {
             try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
             try std.testing.expect(result.counters.scoped_direct_argument_words_avoided > 0);
-        } else {
-            try std.testing.expect(result.counters.scoped_owned_packed_calls > 0);
-            try std.testing.expect(result.counters.scoped_packed_input_words_avoided > 0);
-            try std.testing.expect(result.counters.scoped_packed_argument_words_avoided > 0);
         }
     }
 }

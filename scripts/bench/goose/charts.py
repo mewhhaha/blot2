@@ -8,7 +8,7 @@ from matplotlib import rcParams
 from matplotlib.figure import Figure
 
 HERE = Path(__file__).resolve().parent
-EVIDENCE = HERE / "results/2026-11-03-call-contexts.json"
+EVIDENCE = HERE / "results/2026-11-04-addressed-inputs.json"
 LABELS = {
     "fannkuch": "Fannkuch",
     "crc32": "CRC32",
@@ -79,7 +79,7 @@ def chart(rows, field, title, subtitle, filename, limit, ticks, series):
     figure.text(
         0.04,
         0.025,
-        "2026-11-03 · shared-host medians · Blot vs Goose direct Wasm",
+        "2026-11-04 · shared-host medians · Blot vs Goose direct Wasm",
         fontsize=9,
         color="#64748b",
     )

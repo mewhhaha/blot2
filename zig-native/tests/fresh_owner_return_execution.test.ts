@@ -62,7 +62,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
         assert(work.scoped_function_plan_hits > 0);
         assert(work.scoped_result_owner_transfer_definitions > 0);
         assert(work.scoped_transferred_result_owners > 0);
-        assert.equal(work.scoped_completed_plan_rollbacks, 0);
+        assert.equal(
+          work.scoped_completed_plan_rollbacks,
+          work.scoped_addressed_retries,
+        );
         if (width === 8) {
           assert(work.scoped_owned_word_calls > 0);
           assert.equal(work.scoped_owned_packed_calls, 0);
@@ -107,7 +110,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
       >;
       assert(compactedWork.scoped_result_owner_transfer_definitions > 0);
       assert(compactedWork.scoped_transferred_result_owners >= 4);
-      assert.equal(compactedWork.scoped_completed_plan_rollbacks, 0);
+      assert.equal(
+        compactedWork.scoped_completed_plan_rollbacks,
+        compactedWork.scoped_addressed_retries,
+      );
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(compacted.bytes, { asynchronous });
         try {
