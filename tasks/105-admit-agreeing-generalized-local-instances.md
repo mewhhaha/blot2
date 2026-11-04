@@ -24,21 +24,21 @@ Commit `23a934f` made production emission require checked whole-module
 ownership. Before it, `wasm.zig` absorbed an unproven body with a tracing
 fallback. A generalized local only received physical facts for its quantified
 holes when it had exactly one concrete checked use
-([CONTRACT.md](../zig-native/CONTRACT.md)), so `let c = b`, a second use or a
+([CONTRACT.md](../docs/compiler/CONTRACT.md)), so `let c = b`, a second use or a
 `:=` chain left a tuple word erased. `rcPlan` rejects erased `value` words,
 which broke Ink's ECS builders.
 
 ## Implementation checklist
 
 - [x] Visit body bindings last to first in `localStorageMappings`
-      (`zig-native/src/backend/backend_emission.zig`) so later locals' facts
+      (`compiler/src/backend/backend_emission.zig`) so later locals' facts
       close the uses feeding them.
 - [x] Admit application and local-alias producers, and several uses when all
       agree on one concrete layout.
 - [x] Ignore a use read only by an unused local alias, and give the holes of an
       unobserved local scalar word storage (`layout.word`).
 - [x] Add executed-Wasm laws in
-      `zig-native/tests/generalized_local_instance_execution.test.ts` and update
+      `tests/guest/generalized_local_instance_execution.test.ts` and update
       the contract paragraph.
 - [x] Uses at different layouts: a closed initializer built by a call,
       application, projection or constructor is evaluated speculatively
@@ -155,7 +155,7 @@ before the local milestone commit. Re-run the Ink ownership repro folder.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -253,5 +253,5 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   quantified holes stay open (the captured-`boxed` law); more than four distinct
   use layouts. Each of these keeps reporting `ownership_unproved` rather than
   emitting a latent signature mismatch or storing a quantified hole as a word.
-- Durable record: [CONTRACT.md](../zig-native/CONTRACT.md) generalized-local
+- Durable record: [CONTRACT.md](../docs/compiler/CONTRACT.md) generalized-local
   paragraph.

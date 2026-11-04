@@ -17,10 +17,10 @@ dependencies across processes.
 ## Starting point
 
 Existing
-[backend_checkpoint.zig](../zig-native/src/backend/backend_checkpoint.zig) and
-[dependency_bundle.zig](../zig-native/src/reuse/dependency_bundle.zig) retain
+[backend_checkpoint.zig](../compiler/src/backend/backend_checkpoint.zig) and
+[dependency_bundle.zig](../compiler/src/reuse/dependency_bundle.zig) retain
 only eligible subsets.
-[source_value_template.zig](../zig-native/src/reuse/source_value_template.zig)
+[source_value_template.zig](../compiler/src/reuse/source_value_template.zig)
 and evidence import code represent ownership-sensitive graphs; unsupported
 providers and generative domains currently decline.
 
@@ -63,7 +63,7 @@ commands for focused development and the scenarios below.
 
 - Commit: `88034529833783de881e59a0aca3e2b93fab69bb` (compiler milestone).
 - Implementation:
-  [semantic_archive.zig](../zig-native/src/reuse/semantic_archive.zig) persists
+  [semantic_archive.zig](../compiler/src/reuse/semantic_archive.zig) persists
   the previous revision's complete selected-specialization owner (exact checked
   Core per unit with type-node certificate bytes, namespace, evaluator snapshot,
   slots, field locations and completed receipts) under claim
@@ -96,7 +96,7 @@ commands for focused development and the scenarios below.
   recompute. Large-program benefit was unmeasured without private gdev and is
   left to task 084.
 - Durable record:
-  [persisted semantic artifacts](../zig-native/SEMANTIC_ARTIFACTS.md),
-  [restart distributions](../zig-native/qualification/semantic-artifacts-restart.csv),
-  [decode distributions](../zig-native/qualification/semantic-artifacts-decode.csv)
-  and [pins](../zig-native/qualification/semantic-artifacts-pins.json).
+  [persisted semantic artifacts](../docs/compiler/SEMANTIC_ARTIFACTS.md),
+  [restart distributions](../benchmarks/evidence/qualification/semantic-artifacts-restart.csv),
+  [decode distributions](../benchmarks/evidence/qualification/semantic-artifacts-decode.csv)
+  and [pins](../benchmarks/evidence/qualification/semantic-artifacts-pins.json).

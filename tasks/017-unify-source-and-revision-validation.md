@@ -16,10 +16,10 @@ dependency records.
 
 ## Starting point
 
-[dependency_certificate.zig](../zig-native/src/reuse/dependency_certificate.zig),
-[revision_inputs.zig](../zig-native/src/reuse/revision_inputs.zig),
-[frozen_core_validation.zig](../zig-native/src/check/frozen_core_validation.zig)
-and [dependency_admission.zig](../zig-native/src/reuse/dependency_admission.zig)
+[dependency_certificate.zig](../compiler/src/reuse/dependency_certificate.zig),
+[revision_inputs.zig](../compiler/src/reuse/revision_inputs.zig),
+[frozen_core_validation.zig](../compiler/src/check/frozen_core_validation.zig)
+and [dependency_admission.zig](../compiler/src/reuse/dependency_admission.zig)
 validate source images, bounds, pinned bytes and identities separately.
 
 ## Implementation checklist
@@ -83,8 +83,8 @@ commands for focused development and the scenarios below.
   remain authoritative. Native images are not wire payloads (task 019), and
   oversized optional certificates rerun validation. Private gdev/original boxed
   artifacts remain unavailable; tasks 002/084 stay open.
-- Durable record: [source validation](../zig-native/SOURCE_VALIDATION.md),
-  [fresh distributions](../zig-native/qualification/source-validation-queries-fresh.csv),
-  [retained distributions](../zig-native/qualification/source-validation-queries-retained.csv),
-  [pins](../zig-native/qualification/source-validation-queries-pins.json) and
-  [identical native probe](../zig-native/qualification/source_validation_probe.zig).
+- Durable record: [source validation](../docs/compiler/SOURCE_VALIDATION.md),
+  [fresh distributions](../benchmarks/evidence/qualification/source-validation-queries-fresh.csv),
+  [retained distributions](../benchmarks/evidence/qualification/source-validation-queries-retained.csv),
+  [pins](../benchmarks/evidence/qualification/source-validation-queries-pins.json) and
+  [identical native probe](../benchmarks/evidence/qualification/source_validation_probe.zig).

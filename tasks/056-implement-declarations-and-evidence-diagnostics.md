@@ -6,7 +6,7 @@
 - **Dependencies:** [055](055-implement-associated-type-members.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 3 / implementation
   declarations and evidence. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -18,8 +18,8 @@ incompatible and ambiguous evidence.
 ## Starting point
 
 Task 055 adds associated members and task 048 bounded explanations.
-[associated_catalog_tests.zig](../zig-native/src/eval/associated_catalog_tests.zig),
-[check.zig](../zig-native/src/check/check.zig) and client diagnostic schemas are
+[associated_catalog_tests.zig](../compiler/src/eval/associated_catalog_tests.zig),
+[check.zig](../compiler/src/check/check.zig) and client diagnostic schemas are
 the selection/publication boundaries.
 
 ## Implementation checklist
@@ -67,5 +67,5 @@ commands for focused development and the scenarios below.
 - Remaining limitations: body reuse, scoped capabilities and tracing removal
   retain their own task scopes; no task 056 semantic requirement is deferred.
 - Durable record:
-  [implementation qualification](../zig-native/IMPLEMENTATIONS_QUALIFICATION.md)
-  and [merged inputs/costs](../zig-native/CONTINUATION_QUALIFICATION.md).
+  [implementation qualification](../docs/qualification/IMPLEMENTATIONS_QUALIFICATION.md)
+  and [merged inputs/costs](../docs/qualification/CONTINUATION_QUALIFICATION.md).

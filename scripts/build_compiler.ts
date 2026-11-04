@@ -6,7 +6,7 @@ import {
   parseCompilerFixtures,
 } from "./compiler_fixtures.ts";
 
-const directory = new URL("../zig-native/", import.meta.url);
+const directory = new URL("../compiler/", import.meta.url);
 let development = false;
 let incremental = false;
 let timeReport = false;

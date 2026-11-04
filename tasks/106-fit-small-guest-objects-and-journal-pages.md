@@ -19,7 +19,7 @@ their allocation class.
 ## Starting point
 
 Bisect: `cb41a6d` grew the object header from 16 to 32 bytes by design
-([SHARED_OWNERSHIP.md](../zig-native/SHARED_OWNERSHIP.md)); power-of-two classes
+([SHARED_OWNERSHIP.md](../docs/compiler/SHARED_OWNERSHIP.md)); power-of-two classes
 then move a 12-byte inner array from a 32- to a 64-byte block. `2798ff9` added
 journal pages of 4096 payload bytes plus the header, which land in the 8192-byte
 class; `2689ad5` narrowed slots to 8 bytes.
@@ -28,11 +28,11 @@ class; `2689ad5` narrowed slots to 8 bytes.
 
 - [x] Size journal pages so payload plus header fits the 4096-byte class
       (4064-byte payload, 507 slots), and derive slots per page from it
-      (`zig-native/src/runtime/root_runtime.zig`).
+      (`compiler/src/runtime/root_runtime.zig`).
 - [x] Add 1.5x companion classes below 2 KiB (48, 96, 192, 384, 768 and 1536
       bytes) in the unused free-list heads 0–5, keeping 16-byte payload
       alignment and the static layout
-      (`zig-native/src/runtime/arena_runtime.zig`).
+      (`compiler/src/runtime/arena_runtime.zig`).
 - [x] Update runtime documentation that states the old classes.
 
 ## Validation
@@ -55,7 +55,7 @@ and after.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -77,7 +77,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
 - Validation: in the implementation worktree the native suite passed 2,355 laws
   with no leaks, guests passed 1,488 including two new class and journal laws,
   and lint reported zero findings; the combined gate is pending. Only
-  `zig-native/tests/arena.test.ts` changed expectations: 128-byte payloads plus
+  `tests/guest/arena.test.ts` changed expectations: 128-byte payloads plus
   the 32-byte header now take 192-byte blocks instead of 256.
 - Comparison: guest memory after `gen N` on a fresh guest, before → after: 1024:
   192 → 192 KiB, 2048: 256 → 256 KiB, 4096: 448 → 384 KiB, 8192: 832 → 640 KiB.
@@ -85,5 +85,5 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   48-byte blocks and nine journal pages from 8192 to 4096 bytes.
 - Remaining limitations: blocks of 2 KiB and more stay power-of-two, and list
   leaves keep doubling through power classes.
-- Durable record: [SHARED_RC.md](../zig-native/SHARED_RC.md) and
-  [PERSISTENT_ROOTS.md](../zig-native/PERSISTENT_ROOTS.md).
+- Durable record: [SHARED_RC.md](../docs/compiler/SHARED_RC.md) and
+  [PERSISTENT_ROOTS.md](../docs/compiler/PERSISTENT_ROOTS.md).

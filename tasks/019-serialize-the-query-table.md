@@ -16,10 +16,10 @@ checkpoints.
 
 ## Starting point
 
-[dependency_format.zig](../zig-native/src/reuse/dependency_format.zig),
-[backend_checkpoint.zig](../zig-native/src/backend/backend_checkpoint.zig),
-[principal_archive.zig](../zig-native/src/reuse/principal_archive.zig) and
-[optimized_archive.zig](../zig-native/src/reuse/optimized_archive.zig) already
+[dependency_format.zig](../compiler/src/reuse/dependency_format.zig),
+[backend_checkpoint.zig](../compiler/src/backend/backend_checkpoint.zig),
+[principal_archive.zig](../compiler/src/reuse/principal_archive.zig) and
+[optimized_archive.zig](../compiler/src/reuse/optimized_archive.zig) already
 encode bounded portable candidates, with compiler identity and checksums.
 
 ## Implementation checklist
@@ -60,7 +60,7 @@ commands for focused development and the scenarios below.
 
 - Commit: `ea4a7f3ef23ebf8506fe85eefa24f51ee65c3024` (compiler milestone).
 - Implementation:
-  [portable_query.zig](../zig-native/src/reuse/portable_query.zig) defines typed
+  [portable_query.zig](../compiler/src/reuse/portable_query.zig) defines typed
   sections (`version`, kind, schema, claim). Principal archives move to key v3,
   optimizer captures and backend checkpoints to v2. Only complete principal
   proofs with observations and sealed optimizer tables are encoded. Decoding
@@ -91,10 +91,10 @@ commands for focused development and the scenarios below.
   record per fresh session. At this milestone the private gdev snapshot did not
   match the local `../gdev` checkout and the cloud task-018 pins were absent, so
   large-program measurement was left to task 084.
-- Durable record: [portable query records](../zig-native/PORTABLE_QUERIES.md),
-  [restart distributions](../zig-native/qualification/portable-queries-restart.csv),
-  [decode distributions](../zig-native/qualification/portable-queries-decode.csv),
-  [pins](../zig-native/qualification/portable-queries-pins.json),
-  [restart driver](../zig-native/qualification/portable_queries_restart.ts),
-  [decode driver](../zig-native/qualification/portable_queries_decode.ts) and
-  [decode probe](../zig-native/qualification/portable_queries_decode_probe.zig).
+- Durable record: [portable query records](../docs/compiler/PORTABLE_QUERIES.md),
+  [restart distributions](../benchmarks/evidence/qualification/portable-queries-restart.csv),
+  [decode distributions](../benchmarks/evidence/qualification/portable-queries-decode.csv),
+  [pins](../benchmarks/evidence/qualification/portable-queries-pins.json),
+  [restart driver](../benchmarks/evidence/qualification/portable_queries_restart.ts),
+  [decode driver](../benchmarks/evidence/qualification/portable_queries_decode.ts) and
+  [decode probe](../benchmarks/evidence/qualification/portable_queries_decode_probe.zig).

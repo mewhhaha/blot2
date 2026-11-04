@@ -1,7 +1,7 @@
 # Standard library performance
 
-Use the [language guide](../compiler/guide.md) and
-[owned-storage profile](../zig-native/SCOPED_STORAGE.md) for current contracts.
+Use the [language guide](../docs/language/guide.md) and
+[owned-storage profile](../docs/compiler/SCOPED_STORAGE.md) for current contracts.
 The rewrite is unfinished: ordinary pure modules can still select ABI 3. Check
 the actual guest manifest before attributing measurements to owned storage.
 Earlier counted-runtime/List-layout measurements and optimizer details remain in

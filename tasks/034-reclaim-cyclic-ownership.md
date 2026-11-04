@@ -16,7 +16,7 @@ Implement the cycle-reclamation strategy specified in task 030.
 
 ## Starting point
 
-[tests/arena_gc_execution.test.ts](../zig-native/tests/arena_gc_execution.test.ts)
+[tests/arena_gc_execution.test.ts](../tests/guest/arena_gc_execution.test.ts)
 contains the executed State/closure/demand counterexample. Typed RC and
 suspended roots now expose the complete graph needed for cycle handling.
 
@@ -72,5 +72,5 @@ commands for focused development and the scenarios below.
   large live graphs. Tracing remains; task 035 owns its removal and final
   CPU/memory gate, including material host-call/cycle overhead. Safety
   completion does not claim that performance acceptance.
-- Durable records: [cycle ownership](../zig-native/CYCLIC_OWNERSHIP.md) and
-  [qualification](../zig-native/CYCLIC_OWNERSHIP_QUALIFICATION.md#integrated-qualification--12-october-2026).
+- Durable records: [cycle ownership](../docs/compiler/CYCLIC_OWNERSHIP.md) and
+  [qualification](../docs/qualification/CYCLIC_OWNERSHIP_QUALIFICATION.md#integrated-qualification--12-october-2026).

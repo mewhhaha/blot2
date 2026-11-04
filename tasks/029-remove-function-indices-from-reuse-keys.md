@@ -17,10 +17,10 @@ final indices during assembly.
 
 ## Starting point
 
-[optimized_bodies.zig](../zig-native/src/backend/optimized_bodies.zig),
-[runtime_function_key.zig](../zig-native/src/backend/runtime_function_key.zig)
+[optimized_bodies.zig](../compiler/src/backend/optimized_bodies.zig),
+[runtime_function_key.zig](../compiler/src/backend/runtime_function_key.zig)
 and
-[runtime_body_relocation.zig](../zig-native/src/backend/runtime_body_relocation.zig)
+[runtime_body_relocation.zig](../compiler/src/backend/runtime_body_relocation.zig)
 currently include incidental function positions in reuse matching, despite
 existing relocation proofs.
 
@@ -73,8 +73,8 @@ commands for focused development and the scenarios below.
   intentionally change public Wasm. Peak deltas and teardown live bytes are
   zero; CPU is mixed. Exact pins, distributions and isolated runtime costs are
   retained in the
-  [shared qualification](../zig-native/PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
+  [shared qualification](../docs/compiler/PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
 - Remaining limitations: Changed semantic targets, conflicting maps, incomplete
   captures and exhausted proofs decline. Public identities remain separate;
   physical machine-body sharing is unchanged.
-- Durable record: [SYMBOLIC_BODY_REUSE](../zig-native/SYMBOLIC_BODY_REUSE.md).
+- Durable record: [SYMBOLIC_BODY_REUSE](../docs/compiler/SYMBOLIC_BODY_REUSE.md).

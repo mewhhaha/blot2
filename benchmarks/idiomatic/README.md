@@ -80,7 +80,7 @@ boolean collection. Results should not be described as identical low-level
 algorithms or proof that one compiler is universally faster.
 
 The JSON report preserves exact commands, toolchain versions, host CPU/affinity,
-compiler/source hashes (including Rust target libraries and bundled compiler/
+compiler/source hashes (including Rust target libraries and bundled host/
 linker libraries), Wasm hashes and sizes, all samples, output witnesses, and
 committed Wasm memory. Committed memory is not live heap size or process RSS.
 Compiler hashes and all pinned sources must remain unchanged throughout a run.

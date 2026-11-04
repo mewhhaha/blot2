@@ -71,7 +71,7 @@ before the local milestone commit.
   with `inference_budget` instead of signal 11; it remains uncompiled. Task
   [097] retains that separate compilation qualification.
 - Durable record:
-  [stage-chain rejection](../zig-native/STAGE_CHAIN_REJECTION.md) and
-  [binary pins](../zig-native/qualification/stage-chain-rejection-pins.json).
+  [stage-chain rejection](../docs/compiler/STAGE_CHAIN_REJECTION.md) and
+  [binary pins](../benchmarks/evidence/qualification/stage-chain-rejection-pins.json).
 
 [097]: 097-resolve-array-cursor-representation-in-gdev-fixtures.md

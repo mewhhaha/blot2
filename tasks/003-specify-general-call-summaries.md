@@ -16,10 +16,10 @@ captures, effects and recursive component boundaries.
 
 ## Starting point
 
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) has
+[core_eval.zig](../compiler/src/eval/core_eval.zig) has
 `Session.call_summaries`, `ClosureRegion.collectCall`, `principalEvidence` and
 iterative job draining. Predicate-free global schemes and closed first-order
-jobs are already shared; [zig-native/CONTRACT.md](../zig-native/CONTRACT.md)
+jobs are already shared; [docs/compiler/CONTRACT.md](../docs/compiler/CONTRACT.md)
 documents their fallback and publication rules.
 
 ## Implementation checklist
@@ -33,7 +33,7 @@ documents their fallback and publication rules.
       failure.
 - [x] Specify fallback to ordinary checking and source-ordered authoritative
       diagnostics, including argument witness sites and deferred obligations.
-- [x] Save the design under `zig-native/` and link it from the
+- [x] Save the design under `compiler/` and link it from the
       architecture/contract. Give tasks 004–008 explicit interfaces and
       acceptance examples; implementation remains separate.
 
@@ -75,7 +75,7 @@ change.
   through [008](008-canonicalize-specialization-keys.md) still implement and
   qualify these contracts. Portable summary records await the later query and
   artifact work; the design explicitly retains source fallback.
-- Durable record: [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md), linked
-  from [ARCHITECTURE.md](../zig-native/ARCHITECTURE.md) and
-  [CONTRACT.md](../zig-native/CONTRACT.md). It includes positive, negative and
+- Durable record: [CALL_SUMMARIES.md](../docs/compiler/CALL_SUMMARIES.md), linked
+  from [ARCHITECTURE.md](../docs/compiler/ARCHITECTURE.md) and
+  [CONTRACT.md](../docs/compiler/CONTRACT.md). It includes positive, negative and
   recovery cases for each later summary task.

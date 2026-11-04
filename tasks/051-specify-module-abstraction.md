@@ -6,7 +6,7 @@
 - **Dependencies:** [020](020-persist-complete-semantic-artifacts.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 2 / module
   abstraction. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,7 +17,7 @@ and nominal identity across separate compilation.
 
 ## Starting point
 
-[compiler/guide.md](../compiler/guide.md#modules-constants-current-limits)
+[docs/language/guide.md](../docs/language/guide.md#modules-constants-current-limits)
 describes public-by-default module declarations and entry exports. Transparent
 aliases and dependency interfaces exist; opaque representation boundaries do
 not.
@@ -68,4 +68,4 @@ change.
   opaque storage; 053 qualifies cutoff behavior and wrapper erasure. Private
   executable archives remain compiler-owned and validated, outside the public
   semantic view.
-- Durable record: [MODULE_ABSTRACTION](../zig-native/MODULE_ABSTRACTION.md).
+- Durable record: [MODULE_ABSTRACTION](../docs/compiler/MODULE_ABSTRACTION.md).

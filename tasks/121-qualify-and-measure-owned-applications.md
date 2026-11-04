@@ -3,7 +3,7 @@
 - **Status:** Pending; no new execution or performance evidence claimed.
 - **Dependencies:** 120 final candidate. Preserve baseline artifacts before
   retirement; do not rebuild the baseline after deleting its implementation.
-- **Contract:** [Review](../zig-native/STORAGE_REWRITE_REVIEW.md),
+- **Contract:** [Review](../docs/compiler/STORAGE_REWRITE_REVIEW.md),
   [schedule and gates](STORAGE_REWRITE.md).
 
 ## Outcome and ownership
@@ -60,7 +60,7 @@ baseline. Worker fixture memory likewise is not Gdev world memory.
 
 - [ ] Required behavior checks pass or a specific remaining failure keeps the
   affected requirement open. A partial run never closes full qualification.
-- [ ] Durable report under `zig-native/` links candidate/source identities,
+- [ ] Durable report under `compiler/` links candidate/source identities,
   concise commands, results, raw local evidence locations and limitations.
 - [ ] Tables report before/after compile, runtime and memory results without
   inferring gains from architecture alone. If a meaningful gain is absent,

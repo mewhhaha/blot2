@@ -17,10 +17,10 @@ without changing chronological substitution semantics.
 
 ## Starting point
 
-[types.zig](../zig-native/src/check/types.zig) has node-local variable
+[types.zig](../compiler/src/check/types.zig) has node-local variable
 certificates;
-[resolution_cache.zig](../zig-native/src/reuse/resolution_cache.zig) and
-[epoch_resolution_cache.zig](../zig-native/src/reuse/epoch_resolution_cache.zig)
+[resolution_cache.zig](../compiler/src/reuse/resolution_cache.zig) and
+[epoch_resolution_cache.zig](../compiler/src/reuse/epoch_resolution_cache.zig)
 support generation checks. At task start, composite resolution still lost reuse
 across unrelated writes; occurs-DAG traversal was already complete.
 
@@ -87,6 +87,6 @@ commands for focused development and the scenarios below.
   256 visited nodes and a 128-entry traversal stack bound retained cost.
   Unsupported or larger proofs use ordinary resolution. The final compiler CPU,
   edit and cumulative-allocation targets remain open in their own tasks.
-- Durable record: [resolution caching](../zig-native/RESOLUTION_CACHING.md)
+- Durable record: [resolution caching](../docs/compiler/RESOLUTION_CACHING.md)
   preserves the contract, accepted implementation, rejected experiments, binary
   identities, commands and raw-data locations outside this task directory.

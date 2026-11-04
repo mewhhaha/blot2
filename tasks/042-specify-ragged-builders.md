@@ -17,9 +17,9 @@ storage.
 
 ## Starting point
 
-[exact_builder.zig](../zig-native/src/backend/exact_builder.zig) handles up to
+[exact_builder.zig](../compiler/src/backend/exact_builder.zig) handles up to
 four rectangular finite generators;
-[eval_indexed_builder.zig](../zig-native/src/eval/eval_indexed_builder.zig)
+[eval_indexed_builder.zig](../compiler/src/eval/eval_indexed_builder.zig)
 handles private staged updates. Ragged, filtered and effectful regions currently
 keep ordinary builders.
 
@@ -60,7 +60,7 @@ change.
 - Implementation: `a1df44d`.
 - Validation: Deno 2.9.7;
   `deno fmt --no-config --check
-  zig-native/RAGGED_BUILDERS.md zig-native/CONTRACT.md`
+  docs/compiler/RAGGED_BUILDERS.md docs/compiler/CONTRACT.md`
   passes. The shared local path/heading check validates 29
   specification/contract links before adding the final contract link to this
   file. Triangle/filter arithmetic and trapping guard/bound traces agree with
@@ -70,4 +70,4 @@ change.
 - Remaining limitations: initial admission has four finite generators and
   bounded pure/total controls and payloads. Unknown, effectful, trapping,
   allocating or observably intermediate construction remains ordinary.
-- Durable record: [RAGGED_BUILDERS](../zig-native/RAGGED_BUILDERS.md).
+- Durable record: [RAGGED_BUILDERS](../docs/compiler/RAGGED_BUILDERS.md).

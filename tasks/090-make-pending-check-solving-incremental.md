@@ -88,5 +88,5 @@ before the local milestone commit.
   obligation); other kinds and uses of callees still being inferred are retried
   each pass.
 - Durable record:
-  [frontend pending checks](../zig-native/INDEXED_SOLVER.md#frontend-pending-checks-11-october-2026)
-  and [checker step laws](../zig-native/tests/checker_steps.test.ts).
+  [frontend pending checks](../docs/compiler/INDEXED_SOLVER.md#frontend-pending-checks-11-october-2026)
+  and [checker step laws](../tests/guest/checker_steps.test.ts).

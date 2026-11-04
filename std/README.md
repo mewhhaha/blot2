@@ -8,7 +8,7 @@ bindings are public to other Blot modules. Import [text.blot](text.blot) for
 Unicode-scalar text operations, formatting, validation and a linear builder.
 Import [equality.blot](equality.blot) for structural equality contracts and
 [codec.blot](codec.blot) for explicit numeric-lane codecs; the
-[derivation guide](../compiler/derive.md) shows opt-in equality, debug and codec
+[derivation guide](../docs/host/derive.md) shows opt-in equality, debug and codec
 generation from checked data declarations. Only the root module's `entry const`
 and `entry let` declarations become Wasm exports; they must fit the guest ABI,
 and Wasm emission keeps the declarations they reach. Unused source declarations
@@ -59,7 +59,7 @@ retain their mutable aliases. Pure local bindings generalize independently at
 each use. Higher-order functions propagate the inferred effect rows of
 callbacks. Creating an effectful closure is pure; calling it requires the
 corresponding provider. Demand parameters use `~` and are evaluated explicitly
-with `@demand`. See [effects and controlled IO](../compiler/effects-and-io.md).
+with `@demand`. See [effects and controlled IO](../docs/language/effects-and-io.md).
 
 Plain `do:` blocks already return `()` when they fall through. No trailing
 `break ()` is needed, and their last expression statement is discarded. A
@@ -258,7 +258,7 @@ entry const answer = func () => return 20 `plus` 22
 
 Custom fixity declarations belong before other declarations. Application binds
 tighter than operators. See the
-[compiler syntax reference](../compiler/README.md#prelude-and-operators) for
+[compiler syntax reference](../host/README.md#prelude-and-operators) for
 precedence/associativity. `and` and `or` are reserved Boolean operators. They
 short-circuit: the right operand runs only when the left operand does not
 determine the result.
@@ -337,12 +337,12 @@ not host calls. `sin`/`cos` support `|radians| <= 8192`; nonfinite/out-of-domain
 arguments produce NaN. `tan` divides those approximations and is ill-conditioned
 near its poles. Keep accumulated game angles wrapped. The compiled numeric
 regressions in
-[native prelude execution tests](../zig-native/tests/prelude_execution.test.ts)
+[native prelude execution tests](../tests/guest/prelude_execution.test.ts)
 check native/JS parity and error over the supported domain.
 
 Host scalar exports use actual Wasm `f32` parameters/results and return normal
 JavaScript numbers. There is no compiler-specific ECS storage ABI. See
-[the ABI and lifetime boundary](../compiler/README.md#evaluation-and-wasm-representation).
+[the ABI and lifetime boundary](../host/README.md#evaluation-and-wasm-representation).
 
 ## Lists and arrays
 
@@ -387,7 +387,7 @@ such as `array.push` construct independent output; use a named `GrowArray` when
 appending into the same owner is intended. Access records and views retain
 aliases, so copy explicitly for an independent version. See
 [the list example](../examples/lists.blot) and
-[collection and ownership contracts](../compiler/guide.md#lists-arrays-and-libraries).
+[collection and ownership contracts](../docs/language/guide.md#lists-arrays-and-libraries).
 
 ### Iterators and SIMD
 
@@ -404,7 +404,7 @@ Import [iter.blot](iter.blot) for source-defined `range`, `zip`, `zip_strict`,
 is explicit. `windows` requires positive width and returns complete List
 windows. `zip` polls left before right and stops at either end; `zip_strict`
 traps if lengths differ.
-[The protocol and examples](../compiler/guide.md#lists-arrays-and-libraries)
+[The protocol and examples](../docs/language/guide.md#lists-arrays-and-libraries)
 describe pull order, aliasing and copy requirements.
 
 [rolling.blot](rolling.blot) provides complete overlapping reductions.
@@ -426,7 +426,7 @@ tree`, `query combine identity start count tree`,
 versions. Queries use half-open ranges and return the identity for an empty
 range. Reuse the same algebra and immutable captures for every operation. Build
 is linear; queries, updates and concatenation follow logarithmic paths. The
-[full contracts](../zig-native/ROLLING_SUMMARIES.md) specify ordering and
+[full contracts](../docs/compiler/ROLLING_SUMMARIES.md) specify ordering and
 bounds.
 
 [simd.blot](simd.blot) supplies explicit four-lane U32/F32 operations on
@@ -435,7 +435,7 @@ bitwise selection, literal shuffles, dot products, bit reinterpretation, an
 opt-in relaxed multiply-add, checked array load/store, and ordered or explicitly
 pairwise reductions. Lane, rounding and relaxed-multiply-add contracts follow
 the language guide; source spelling does not guarantee a particular optimizer
-representation. [SIMD semantics](../compiler/guide.md#simd) specify the exact
+representation. [SIMD semantics](../docs/language/guide.md#simd) specify the exact
 arithmetic and admission limits.
 
 Named owners and lexical lifetime checks govern the owned-storage profile.

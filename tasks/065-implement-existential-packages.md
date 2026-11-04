@@ -4,12 +4,12 @@
 
 - **Status:** Complete — closed on 17 October 2026 against the two package rows
   of
-  [language qualification](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+  [language qualification](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
   gate at `05401a9`.
 - **Dependencies:** [064](064-check-higher-rank-types-and-skolems.md),
   [020](020-persist-complete-semantic-artifacts.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 7 / existential
-  packages. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  packages. Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -21,8 +21,8 @@ package use across portable interfaces.
 ## Starting point
 
 Task 064 provides skolem checking; task 020 portable semantic graphs.
-[core.zig](../zig-native/src/check/core.zig),
-[specialization.zig](../zig-native/src/eval/specialization.zig) and runtime
+[core.zig](../compiler/src/check/core.zig),
+[specialization.zig](../compiler/src/eval/specialization.zig) and runtime
 layouts must represent the package design from task 063.
 
 ## Implementation checklist
@@ -61,7 +61,7 @@ commands for focused development and the scenarios below.
 ## Closed acceptance — owner decision, 15 October 2026
 
 The owner closed this task's scope to the rows of
-[language qualification](../zig-native/LANGUAGE_QUALIFICATION.md) listed below.
+[language qualification](../docs/qualification/LANGUAGE_QUALIFICATION.md) listed below.
 Forms outside these rows ("general" captures, stores, transports and shapes) are
 not required work: they must reject or decline conservatively with a stable
 diagnostic and are recorded as limitations. The acceptance criteria below are
@@ -84,7 +84,7 @@ original acceptance index
 (`build/bench/finish-rest-20261015/language-acceptance/qualified-baseline.json`)
 was removed with `build/`. The row-to-law mapping regenerated from that gate's
 native test names and guest JUnit report is recorded in
-[LANGUAGE_QUALIFICATION.md](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026).
+[LANGUAGE_QUALIFICATION.md](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026).
 
 ## Completion evidence
 
@@ -100,7 +100,7 @@ native test names and guest JUnit report is recorded in
   leaks, 1,486 guest, 28 harness, 21 preflight and 48 smoke tests and zero
   analyzer findings.
 - Row-to-law mapping: the
-  [index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
+  [index](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
   names 22 native laws and 19 guest tests for the eight requirements of the two
   package rows; all passed in the `05401a9` gate.
 - Comparison: performance measurement does not apply; the closed rows set no
@@ -114,6 +114,6 @@ native test names and guest JUnit report is recorded in
   dictionary artifact reuse, reject or decline conservatively. Packages expose
   no representation: direct reflection and hidden value escape reject.
 - Durable record:
-  [row-to-law index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
-  [implementation record](../zig-native/POLYMORPHIC_PACKAGE_IMPLEMENTATION.md)
-  and the [polymorphic package design](../zig-native/POLYMORPHIC_PACKAGES.md).
+  [row-to-law index](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+  [implementation record](../docs/compiler/POLYMORPHIC_PACKAGE_IMPLEMENTATION.md)
+  and the [polymorphic package design](../docs/compiler/POLYMORPHIC_PACKAGES.md).

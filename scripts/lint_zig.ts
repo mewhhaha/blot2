@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const source = "zig-native/src";
-const fixtures = "zig-native/fixtures";
+const source = "compiler/src";
+const fixtures = "compiler/fixtures";
 type Graph = Map<string, string[]>;
 type Cache = { version: 2; tool: string; passed: Record<string, string[]> };
 
@@ -344,9 +344,9 @@ export async function lint(args: string[]): Promise<number> {
   }
   const graph = importGraph(texts, resources);
   const configuration = [
-    "zig-native/.zig-version",
-    "zig-native/build.zig",
-    "zig-native/build.zig.zon",
+    "compiler/.zig-version",
+    "compiler/build.zig",
+    "compiler/build.zig.zon",
     ".zig-analyzer.json",
     "zig-analyzer.json",
     ".zig-analyzer/config.json",

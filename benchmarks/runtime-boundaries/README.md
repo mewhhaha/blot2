@@ -11,7 +11,7 @@ the missing acyclic marks found in gdev.
 Run with two LLVM release compiler executables:
 
 ```sh
-deno run -A scripts/bench/runtime_boundaries.ts \
+deno run -A benchmarks/tools/runtime_boundaries.ts \
   --baseline /path/to/before/blotc --candidate /path/to/after/blotc \
   --baseline-std /path/to/before/std \
   --output build/bench/runtime-boundaries
@@ -46,8 +46,8 @@ directory through the separate engine runners. The Python environment needs
 profile with timer rounding disabled and deletes it on exit.
 
 ```sh
-python scripts/bench/runtime_boundaries_wasmtime.py build/bench/runtime-boundaries
-deno run -A scripts/bench/runtime_boundaries_browser.ts build/bench/runtime-boundaries
+python benchmarks/tools/runtime_boundaries_wasmtime.py build/bench/runtime-boundaries
+deno run -A benchmarks/tools/runtime_boundaries_browser.ts build/bench/runtime-boundaries
 ```
 
 Both validate Wasm hashes, checksums and every production counter against the

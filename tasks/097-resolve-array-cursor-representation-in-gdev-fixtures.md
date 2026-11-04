@@ -88,8 +88,8 @@ before the local milestone commit.
   101 stages still reject under the unchanged one-million-step inference budget.
   Requested/peak allocation rises slightly from queue watches.
 - Durable records:
-  [partial collection layouts](../zig-native/PARTIAL_COLLECTIONS.md) and
-  [pending selections](../zig-native/PENDING_SELECTIONS.md), with executable
+  [partial collection layouts](../docs/compiler/PARTIAL_COLLECTIONS.md) and
+  [pending selections](../docs/compiler/PENDING_SELECTIONS.md), with executable
   pins and paired samples.
 
 [099]: 099-survive-long-stage-chains-without-crashing.md

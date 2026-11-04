@@ -1,0 +1,40 @@
+import { ok } from "node:assert/strict";
+import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
+import { instantiateGuest } from "../../host/guest.ts";
+import { equal } from "./compile_helpers.ts";
+const executable = Deno.args[0] ??
+  new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+
+Deno.test("generic receiver calls select members of a caller's type their module never imports", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`, helper = `${directory}/mix.blot`;
+  const prelude = new URL("../../std/prelude.blot", import.meta.url);
+  const compiler = await createZigProjectCompiler({ executable, entry, prelude });
+  try {
+    const built = await compiler.build({
+      sources: {
+        [entry]: `import * as mix from "./mix"
+type Gauge is data = $Gauge F32
+const Gauge.lerp = func (a: Gauge) => return func (b: Gauge) => return func (t: F32) => return do:
+  let $Gauge x = a
+  let $Gauge y = b
+  break $Gauge (x + (y - x) * t)
+entry const main = func (x: F32) : F32 => return do:
+  let $Gauge v = mix.halfway ($Gauge 0.0) ($Gauge x)
+  break v
+`,
+        [helper]: "const halfway = func a => return func b => return a.lerp b 0.5\n",
+      },
+    });
+    ok(built.success, JSON.stringify(built));
+    const guest = await instantiateGuest(built.bytes);
+    try {
+      equal(guest.call("main", 4), 2);
+    } finally {
+      guest.dispose();
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

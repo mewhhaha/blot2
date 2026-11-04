@@ -74,4 +74,4 @@ before the local milestone commit.
 - Remaining limitations: tail calls are not exempt; the limit is 4,096 nested
   calls. Hosts that cannot reserve 1 GiB run on the main thread, where very deep
   evaluation can still exhaust the native stack.
-- Durable record: [CONTRACT.md](../zig-native/CONTRACT.md).
+- Durable record: [CONTRACT.md](../docs/compiler/CONTRACT.md).

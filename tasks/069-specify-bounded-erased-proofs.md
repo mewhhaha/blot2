@@ -6,7 +6,7 @@
 - **Dependencies:**
   [056](056-implement-declarations-and-evidence-diagnostics.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 9 / erased proofs.
-  Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -18,9 +18,9 @@ checking.
 ## Starting point
 
 Current array accesses retain bounds checks, even inside guards.
-[types.zig](../zig-native/src/check/types.zig),
-[type_evidence.zig](../zig-native/src/eval/type_evidence.zig) and
-[wasm_control_flow.zig](../zig-native/src/backend/wasm_control_flow.zig) can
+[types.zig](../compiler/src/check/types.zig),
+[type_evidence.zig](../compiler/src/eval/type_evidence.zig) and
+[wasm_control_flow.zig](../compiler/src/backend/wasm_control_flow.zig) can
 carry facts, but numeric proof witnesses are a new feature.
 
 ## Implementation checklist
@@ -65,4 +65,4 @@ change.
   erasure and retained invalidation on the specified positive/negative matrix.
 - Remaining limitations: the proof syntax is a proposal until 070–071 implement
   it; no proof acceptance or runtime check elimination is claimed here.
-- Durable record: [bounded erased proofs](../zig-native/ERASED_PROOFS.md).
+- Durable record: [bounded erased proofs](../docs/compiler/ERASED_PROOFS.md).

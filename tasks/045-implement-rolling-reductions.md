@@ -67,4 +67,4 @@ commands for focused development and the scenarios below.
   collection costs; generic iterator elimination remains 047. No universal CPU
   or compiler speedup is claimed.
 - Durable record:
-  [Rolling and summary qualification](../zig-native/ROLLING_SUMMARIES_QUALIFICATION.md).
+  [Rolling and summary qualification](../docs/qualification/ROLLING_SUMMARIES_QUALIFICATION.md).

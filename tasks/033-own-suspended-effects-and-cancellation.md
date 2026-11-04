@@ -7,7 +7,7 @@
 - **Dependencies:** [032](032-own-escaping-values-and-persistent-roots.md)
 - **Originating requirements:** PLAN: Earlier programs / suspended ownership;
   DEMANDS: Completion and cancellation. Sources: [PLAN.md](../PLAN.md),
-  [Demand evaluation](../zig-native/DEMANDS.md).
+  [Demand evaluation](../docs/compiler/DEMANDS.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -18,10 +18,10 @@ resumption, cancellation, traps and host exceptions.
 
 ## Starting point
 
-[request_runtime.zig](../zig-native/src/runtime/request_runtime.zig),
-[runtime_cleanup.zig](../zig-native/src/runtime/runtime_cleanup.zig),
-[compiler/guest.ts](../compiler/guest.ts) and
-[tests/demand_completion_execution.test.ts](../zig-native/tests/demand_completion_execution.test.ts)
+[request_runtime.zig](../compiler/src/runtime/request_runtime.zig),
+[runtime_cleanup.zig](../compiler/src/runtime/runtime_cleanup.zig),
+[host/guest.ts](../host/guest.ts) and
+[tests/demand_completion_execution.test.ts](../tests/guest/demand_completion_execution.test.ts)
 preserve request and demand completion behavior. Persistent payload ownership
 remains part of the runtime program.
 
@@ -74,6 +74,6 @@ commands for focused development and the scenarios below.
 - Remaining limitations: Task 034 owns complete cycle collection; task 035 owns
   tracing removal and final CPU/memory qualification. JSPI settlement/rejection
   is supported; the guest has no abort API.
-- Durable record: [SUSPENDED_OWNERSHIP](../zig-native/SUSPENDED_OWNERSHIP.md);
+- Durable record: [SUSPENDED_OWNERSHIP](../docs/compiler/SUSPENDED_OWNERSHIP.md);
   exact combined pins, commands, rejected attempts and raw evidence are in
-  [integrated qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).
+  [integrated qualification](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).

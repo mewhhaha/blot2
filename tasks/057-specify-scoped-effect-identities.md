@@ -6,7 +6,7 @@
   separate implementations.
 - **Dependencies:** [052](052-implement-opaque-types-and-privacy.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / generic scoped
-  effects. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  effects. Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,10 +17,10 @@ capability capture and identity transport.
 
 ## Starting point
 
-[compiler/guide.md](../compiler/guide.md#effect-families-and-scoped-state)
+[docs/language/guide.md](../docs/language/guide.md#effect-families-and-scoped-state)
 supports closed family instances and rejects symbolic generic effect labels.
-[provider_chain.zig](../zig-native/src/backend/provider_chain.zig) and
-[request_runtime.zig](../zig-native/src/runtime/request_runtime.zig) route
+[provider_chain.zig](../compiler/src/backend/provider_chain.zig) and
+[request_runtime.zig](../compiler/src/runtime/request_runtime.zig) route
 current operations.
 
 ## Implementation checklist
@@ -67,4 +67,4 @@ change.
   explicit source/artifact/OOM, sync/JSPI and paired cost acceptance cases.
 - Remaining limitations: all proposed syntax, identity routing and escape
   checking await 058–059. The guide preserves current executable behavior.
-- Durable record: [Scoped effect identities](../zig-native/SCOPED_EFFECTS.md).
+- Durable record: [Scoped effect identities](../docs/compiler/SCOPED_EFFECTS.md).

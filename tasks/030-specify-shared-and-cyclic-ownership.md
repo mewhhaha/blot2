@@ -6,7 +6,7 @@
 - **Dependencies:** [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier programs / runtime ownership;
   DEMANDS: Effects and lifetime. Sources: [PLAN.md](../PLAN.md),
-  [Demand evaluation](../zig-native/DEMANDS.md).
+  [Demand evaluation](../docs/compiler/DEMANDS.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,11 +17,11 @@ cycle-reclamation strategy.
 
 ## Starting point
 
-[zig-native/CONTRACT.md](../zig-native/CONTRACT.md) describes tracing, local
+[docs/compiler/CONTRACT.md](../docs/compiler/CONTRACT.md) describes tracing, local
 lifetime groups and the State → closure → cached-demand cycle.
-[runtime_layout.zig](../zig-native/src/runtime/runtime_layout.zig),
-[arena_runtime.zig](../zig-native/src/runtime/arena_runtime.zig) and
-[tests/arena_gc_execution.test.ts](../zig-native/tests/arena_gc_execution.test.ts)
+[runtime_layout.zig](../compiler/src/runtime/runtime_layout.zig),
+[arena_runtime.zig](../compiler/src/runtime/arena_runtime.zig) and
+[tests/arena_gc_execution.test.ts](../tests/guest/arena_gc_execution.test.ts)
 are the current layout, allocator and counterexample boundaries.
 
 ## Implementation checklist
@@ -62,7 +62,7 @@ change.
 - Implementation: `d021c57`.
 - Validation: Deno 2.9.7;
   `deno fmt --no-config --check
-  zig-native/SHARED_OWNERSHIP.md zig-native/CONTRACT.md`
+  docs/compiler/SHARED_OWNERSHIP.md docs/compiler/CONTRACT.md`
   passes. Local path and heading validation passes (29 links across the
   ownership, builder and contract documents). Graph traces cover shared
   children, strong memo cycles, suspension, exceptional cleanup and iterative
@@ -72,4 +72,4 @@ change.
 - Remaining limitations: counting, root journals, suspension cleanup and trial
   deletion are specified, not completed. Tracing remains until all replacement
   behavior, memory and CPU gates pass; a restricted prototype cannot close 035.
-- Durable record: [SHARED_OWNERSHIP](../zig-native/SHARED_OWNERSHIP.md).
+- Durable record: [SHARED_OWNERSHIP](../docs/compiler/SHARED_OWNERSHIP.md).

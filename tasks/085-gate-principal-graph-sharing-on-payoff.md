@@ -24,7 +24,7 @@ owned inferred principal graphs without unfolding open diamonds". Its parent
 `f7be6e7` edits in 770–900 ms with inference 388–553k µs; `099e700` takes
 1560–1860 ms with inference 1.14–1.33M µs; fresh functions are equal. With
 `Session.reuse_principal_graphs = false`
-([core_eval.zig](../zig-native/src/eval/core_eval.zig)) `099e700` returns to
+([core_eval.zig](../compiler/src/eval/core_eval.zig)) `099e700` returns to
 790–880 ms. `ClosureRegion.collect` builds a principal graph for every admitted
 first-order global body with unresolved parameters or result (`principalGraph`,
 `describePrincipal` and `importPrincipal`), and `retainOpenPrincipal` walks
@@ -88,7 +88,7 @@ before the local milestone commit.
   retention does not pay. The summary-job inference growth since `f7be6e7` is
   task [088](088-restore-summary-job-inference-cost.md).
 - Durable record:
-  [open-principal payoff](../zig-native/CALL_SUMMARIES.md#open-principal-payoff-11-october-2026),
-  [gdev distributions](../zig-native/qualification/principal-payoff-gdev.csv),
-  [public results](../zig-native/qualification/principal-payoff-public.jsonl)
-  and [pins](../zig-native/qualification/principal-payoff-pins.json).
+  [open-principal payoff](../docs/compiler/CALL_SUMMARIES.md#open-principal-payoff-11-october-2026),
+  [gdev distributions](../benchmarks/evidence/qualification/principal-payoff-gdev.csv),
+  [public results](../benchmarks/evidence/qualification/principal-payoff-public.jsonl)
+  and [pins](../benchmarks/evidence/qualification/principal-payoff-pins.json).

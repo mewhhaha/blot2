@@ -7,7 +7,7 @@
 - **Dependencies:** [037](037-lower-loop-aware-local-memos.md),
   [032](032-own-escaping-values-and-persistent-roots.md)
 - **Originating requirements:** DEMANDS: Known callbacks and captured demand
-  elimination. Sources: [Demand evaluation](../zig-native/DEMANDS.md).
+  elimination. Sources: [Demand evaluation](../docs/compiler/DEMANDS.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -19,7 +19,7 @@ captured demands.
 ## Starting point
 
 Unknown, indirect and escaping callbacks currently retain cells.
-[known_call.zig](../zig-native/src/backend/known_call.zig), resolved call
+[known_call.zig](../compiler/src/backend/known_call.zig), resolved call
 evidence and demand-use summaries can prove complete local callback uses; task
 032 covers fallback roots.
 
@@ -74,6 +74,6 @@ commands for focused development and the scenarios below.
   provider/request, parameter-carried and escaping routes keep ordinary shared
   cells. The local proof remains bounded at 96 nodes, 64 bindings and 16
   parameters.
-- Durable record: [KNOWN_CALLBACK_MEMOS](../zig-native/KNOWN_CALLBACK_MEMOS.md);
+- Durable record: [KNOWN_CALLBACK_MEMOS](../docs/compiler/KNOWN_CALLBACK_MEMOS.md);
   exact combined pins, commands, rejected attempts and raw evidence are in
-  [integrated qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).
+  [integrated qualification](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).

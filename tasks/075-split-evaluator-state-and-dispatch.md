@@ -20,7 +20,7 @@ state, and split large dispatch functions.
 
 ## Starting point
 
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) owns the large `Session`
+[core_eval.zig](../compiler/src/eval/core_eval.zig) owns the large `Session`
 and `ClosureRegion`, including `expressionInner` and `collect`. Feature tasks
 touch these same responsibilities; any still open build on the split structure
 rather than precede it.
@@ -63,7 +63,7 @@ commands for focused development and the scenarios below.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -92,6 +92,6 @@ agree; imported fresh/edit/revert/failed-edit repair/restart bytes, diagnostics,
 source work and archive schema/payload agree. Exact pins and failed attempts:
 `build/bench/finish-rest-20261015/evaluator-owners/`.
 
-[Durable ownership](../zig-native/EVALUATOR_OWNERSHIP.md) records boundaries and
+[Durable ownership](../docs/compiler/EVALUATOR_OWNERSHIP.md) records boundaries and
 limits. Final common performance/compiler qualification and preceding feature
 qualification remain required. No commit or completion is claimed.

@@ -16,7 +16,7 @@ const suites = [
 const zig = Deno.env.get("ZIG") ?? "zig";
 const version = await new Deno.Command(zig, { args: ["version"] }).output();
 assert.equal(new TextDecoder().decode(version.stdout).trim(), "0.17.0");
-const native = fileURLToPath(new URL("../zig-native/", import.meta.url));
+const native = fileURLToPath(new URL("../compiler/", import.meta.url));
 const directory = await Deno.makeTempDir({ prefix: "blot-suite-inventory-" });
 const inventories = new Map<string, Set<string>>();
 try {

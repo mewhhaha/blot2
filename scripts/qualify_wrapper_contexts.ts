@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
-import { createZigProjectCompiler } from "../compiler/zig_project_client.ts";
-import { instantiateGuest } from "../compiler/guest.ts";
-import { observeGuestAllocations } from "./bench/guest_heap_observer.ts";
+import { createZigProjectCompiler } from "../host/zig_project_client.ts";
+import { instantiateGuest } from "../host/guest.ts";
+import { observeGuestAllocations } from "../benchmarks/tools/guest_heap_observer.ts";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 // An executable_identical=false row is evidence to investigate, not erasure proof.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const executable = resolve(
-  Deno.args[0] ?? root + "/zig-native/zig-out/bin/blotc",
+  Deno.args[0] ?? root + "/compiler/zig-out/bin/blotc",
 );
 const output = resolve(
   Deno.args[1] ?? root + "/build/bench/task053-wrapper-contexts",
@@ -23,9 +23,9 @@ const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
 const inputPaths = {
   compiler_sha256: executable,
   harness_sha256: fileURLToPath(import.meta.url),
-  observer_sha256: root + "/scripts/bench/guest_heap_observer.ts",
-  client_sha256: root + "/compiler/zig_project_client.ts",
-  guest_sha256: root + "/compiler/guest.ts",
+  observer_sha256: root + "/benchmarks/tools/guest_heap_observer.ts",
+  client_sha256: root + "/host/zig_project_client.ts",
+  guest_sha256: root + "/host/guest.ts",
 };
 const pins = Object.fromEntries(
   await Promise.all(

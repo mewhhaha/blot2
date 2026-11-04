@@ -19,11 +19,11 @@ publication.
 
 ## Starting point
 
-[semantic_parallel.zig](../zig-native/src/eval/semantic_parallel.zig) has an
+[semantic_parallel.zig](../compiler/src/eval/semantic_parallel.zig) has an
 opt-in independent-proof batch;
-[independent_call_proof.zig](../zig-native/src/reuse/independent_call_proof.zig)
+[independent_call_proof.zig](../compiler/src/reuse/independent_call_proof.zig)
 records owned judgments and
-[execution_policy.zig](../zig-native/src/execution_policy.zig) selects worker
+[execution_policy.zig](../compiler/src/execution_policy.zig) selects worker
 counts. General component jobs still need task-level isolation.
 
 ## Implementation checklist
@@ -82,6 +82,6 @@ commands for focused development and the scenarios below.
   active parent dependencies and non-positional artifact source units decline
   safely to ordinary inference. Private gdev and the original boxed compiler are
   still absent and remain external qualification gates. No push occurred.
-- Durable record: [SEMANTIC_JOBS.md](../zig-native/SEMANTIC_JOBS.md),
-  [ownership contract](../zig-native/CONTRACT.md) and
-  [public client options](../zig-native/PROJECT_CLIENT.md).
+- Durable record: [SEMANTIC_JOBS.md](../docs/compiler/SEMANTIC_JOBS.md),
+  [ownership contract](../docs/compiler/CONTRACT.md) and
+  [public client options](../docs/compiler/PROJECT_CLIENT.md).

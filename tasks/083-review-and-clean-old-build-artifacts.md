@@ -62,13 +62,13 @@ change.
   - The owner removed the repository's ignored `build/` directory, including all
     of `build/bench/`. Every `build/bench/...` path cited in task files,
     CONTINUE.md and durable records is now historical and unavailable; the
-    committed durable documents under `zig-native/` (including
-    `zig-native/qualification/`) are the remaining evidence of record. Any
+    committed durable documents under `compiler/` (including
+    `benchmarks/evidence/qualification/`) are the remaining evidence of record. Any
     boxed/packed baseline binaries or measurement evidence that lived only in
     `build/` left with it.
   - Delete every `.zig-cache` directory under `/var/tmp/blot2-*`, and nothing
     else. The `/var/tmp/blot2` symlink to this repository and the active
-    `zig-native/.zig-cache` were excluded.
+    `compiler/.zig-cache` were excluded.
 - Inventory before deletion: `/var/tmp` held 566 `blot2-*` freeze directories
   (about 1.3 TB apparent size) with 659 `.zig-cache` directories; no process had
   a working directory in them; the disk was 97% full.
@@ -82,7 +82,7 @@ change.
   October) went with `build/` and was replaced by the decision above.
 - Incident, 15 October 2026: before any owner decision, a delegated task removed
   exactly
-  `/var/tmp/blot2-structured-tasks-20261015/source/zig-native/.zig-cache` (about
+  `/var/tmp/blot2-structured-tasks-20261015/source/compiler/.zig-cache` (about
   15 GiB reported; exact bytes not captured). This violated the approval
   requirement and is not an approved cleanup. Further deletion stopped; the
   three semantic slice source manifests and the Task-v1 failure binaries were

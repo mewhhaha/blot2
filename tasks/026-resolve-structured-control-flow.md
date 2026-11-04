@@ -16,10 +16,10 @@ and request control.
 
 ## Starting point
 
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) emits structured
-flow; [wasm_control_flow.zig](../zig-native/src/backend/wasm_control_flow.zig),
-[loop_targets.zig](../zig-native/src/backend/loop_targets.zig) and
-[runtime_cleanup.zig](../zig-native/src/runtime/runtime_cleanup.zig) track edges
+[core_backend.zig](../compiler/src/backend/core_backend.zig) emits structured
+flow; [wasm_control_flow.zig](../compiler/src/backend/wasm_control_flow.zig),
+[loop_targets.zig](../compiler/src/backend/loop_targets.zig) and
+[runtime_cleanup.zig](../compiler/src/runtime/runtime_cleanup.zig) track edges
 and exits. Task 025 supplies resolved calls.
 
 ## Implementation checklist
@@ -58,7 +58,7 @@ commands for focused development and the scenarios below.
 ## Completion evidence
 
 - Commit: `ae908fa` ("Prepare structured flow before emission").
-- Change: [resolved_flow.zig](../zig-native/src/backend/resolved_flow.zig) plans
+- Change: [resolved_flow.zig](../compiler/src/backend/resolved_flow.zig) plans
   exits (`return`, `break`, a request handler's return and break) with their
   target construct and label, the target scope's cleanup mark, values in source
   order and the carries they replace; joins with their result type and per-arm
@@ -83,4 +83,4 @@ commands for focused development and the scenarios below.
   the cleanup actions an exit discharges are created during emission, so an exit
   fixes its target scope before its value and discharges what is recorded when
   it branches.
-- Durable record: [resolved structured flow](../zig-native/RESOLVED_FLOW.md).
+- Durable record: [resolved structured flow](../docs/compiler/RESOLVED_FLOW.md).

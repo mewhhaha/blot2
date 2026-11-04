@@ -4,12 +4,12 @@
 
 - **Status:** Complete — closed on 17 October 2026 against the three
   scoped-identity rows of
-  [language qualification](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+  [language qualification](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
   gate at `05401a9`.
 - **Dependencies:** [057](057-specify-scoped-effect-identities.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / effect
   identities and handlers. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -20,10 +20,10 @@ specialization and runtime handlers.
 
 ## Starting point
 
-[types.zig](../zig-native/src/check/types.zig),
-[check.zig](../zig-native/src/check/check.zig),
-[provider_chain.zig](../zig-native/src/backend/provider_chain.zig) and
-[request_runtime.zig](../zig-native/src/runtime/request_runtime.zig) currently
+[types.zig](../compiler/src/check/types.zig),
+[check.zig](../compiler/src/check/check.zig),
+[provider_chain.zig](../compiler/src/backend/provider_chain.zig) and
+[request_runtime.zig](../compiler/src/runtime/request_runtime.zig) currently
 identify closed operations. Task 057 defines symbolic arguments, generative
 instances and row subtraction.
 
@@ -62,7 +62,7 @@ commands for focused development and the scenarios below.
 ## Closed acceptance — owner decision, 15 October 2026
 
 The owner closed this task's scope to the rows of
-[language qualification](../zig-native/LANGUAGE_QUALIFICATION.md) listed below.
+[language qualification](../docs/qualification/LANGUAGE_QUALIFICATION.md) listed below.
 Forms outside these rows ("general" captures, stores, transports and shapes) are
 not required work: they must reject or decline conservatively with a stable
 diagnostic and are recorded as limitations. The acceptance criteria below are
@@ -83,7 +83,7 @@ original acceptance index
 (`build/bench/finish-rest-20261015/language-acceptance/qualified-baseline.json`)
 was removed with `build/`. The row-to-law mapping regenerated from that gate's
 native test names and guest JUnit report is recorded in
-[LANGUAGE_QUALIFICATION.md](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026).
+[LANGUAGE_QUALIFICATION.md](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026).
 
 ## Completion evidence
 
@@ -100,18 +100,18 @@ native test names and guest JUnit report is recorded in
   leaks, 1,486 guest, 28 harness, 21 preflight and 48 smoke tests and zero
   analyzer findings.
 - Row-to-law mapping: the
-  [index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
+  [index](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
   names 32 native laws and 24 guest tests for the twelve requirements of the
   three scoped-identity rows; all passed in the `05401a9` gate.
 - Comparison: the design's required measurement against closed static controls
   (seven alternating compiler pairs, 31 warmed guest pairs) is recorded in
-  [measured scope cost](../zig-native/LANGUAGE_QUALIFICATION.md#measured-scope-cost):
+  [measured scope cost](../docs/qualification/LANGUAGE_QUALIFICATION.md#measured-scope-cost):
   median fresh compiler CPU for two fresh scoped State owners is 1.0951× the
   static control, and warmed guest calls cost 1.2605× in sync and 1.0807× in
   JSPI mode. The earlier partial checkpoint `0d77afc` measured fresh/edit/revert
   CPU ratios of 1.0049/1.0074/1.0051 against the preceding product-only
   checkpoint
-  ([merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md)). This
+  ([merged qualification](../docs/qualification/CONTINUATION_QUALIFICATION.md)). This
   closure changes no code, so no new comparison applies.
 - Remaining limitations: forms outside the rows are excluded scope under the
   owner decision of 15 October 2026 (closed acceptance above;
@@ -120,12 +120,12 @@ native test names and guest JUnit report is recorded in
   anonymous invocation binder transport, and public generative selection schemes
   beyond the admitted invocation-version forms reject or decline conservatively
   with stable diagnostics
-  ([conservative limits](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md#conservative-limits)).
+  ([conservative limits](../docs/qualification/SCOPED_EFFECTS_QUALIFICATION.md#conservative-limits)).
   Live scoped authority never enters portable artifacts: scoped receipts decline
   import, and checkpoints keep validated symbolic binders that create fresh
   owners when run. Scoped routing costs about 26% more per warmed sync guest
   call than static families on the measured workload.
 - Durable record:
-  [row-to-law index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
-  [scoped effect qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md)
-  and the [scoped effects design](../zig-native/SCOPED_EFFECTS.md).
+  [row-to-law index](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+  [scoped effect qualification](../docs/qualification/SCOPED_EFFECTS_QUALIFICATION.md)
+  and the [scoped effects design](../docs/compiler/SCOPED_EFFECTS.md).

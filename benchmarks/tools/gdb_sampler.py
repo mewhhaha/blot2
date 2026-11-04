@@ -1,0 +1,339 @@
+# Poor man's sampling profiler for blotc, run inside gdb:
+#
+#   gdb -batch -q -x benchmarks/tools/gdb_sampler.py
+#
+# benchmarks/tools/profile_compile.ts drives it; run that instead. Environment:
+#   SAMPLE_CONTROL  directory for the handshake files below
+#   SAMPLE_BINARY   the blotc whose symbols gdb loads (must have DWARF)
+#   SAMPLE_OUT      JSON-lines output, one record per stop
+#   SAMPLE_MIN_MS / SAMPLE_MAX_MS  random interval between stops (default 3-10)
+#   SAMPLE_LIMIT    stop after this many samples (default unlimited)
+#   SAMPLE_FOCUS    validation: wait for closure validation, then sample at 8-12ms
+#                   emission: wait for actual owned Generator.emit
+#   SAMPLE_EMISSION_DELAY_MS  continue 0..15000 ms after emission starts
+#
+# Handshake: the driver writes `pid`; this script attaches and writes
+# `attached`; the driver writes `start` before the measured builds and `stop`
+# after them. Each stop sends SIGUSR1 after a random delay (gdb keeps it from
+# the program), then records every thread's stack including inlined frames.
+# Threads blocked in the process's main function (joining the compile thread)
+# are skipped.
+import json
+import os
+import random
+import subprocess
+import time
+
+import gdb
+
+control = os.environ["SAMPLE_CONTROL"]
+low = float(os.environ.get("SAMPLE_MIN_MS", "3")) / 1000
+high = float(os.environ.get("SAMPLE_MAX_MS", "10")) / 1000
+limit = int(os.environ.get("SAMPLE_LIMIT", "0")) or None
+
+
+def flag(name):
+    return os.path.exists(os.path.join(control, name))
+
+
+def wait_for(name):
+    while not flag(name):
+        time.sleep(0.005)
+
+
+def pointee(value):
+    if value.type.strip_typedefs().code in (gdb.TYPE_CODE_PTR, gdb.TYPE_CODE_REF):
+        return value.dereference()
+    return value
+
+
+def emission_frame(frame, name, tid, metadata):
+    # Debug information can omit/optimize any local. Attribution remains useful
+    # without it, and failed metadata probes must never truncate a stack.
+    if not name.startswith("backend.scoped_backend.Generator."):
+        return
+    if metadata["counter_probes"] < 16 and (
+            metadata["expressions"] is None or metadata["functions"] is None):
+        metadata["counter_probes"] += 1
+        try:
+            generator = pointee(frame.read_var("self"))
+            counters = pointee(generator["emission_work"])
+            metadata["expressions"] = int(counters["scoped_emission_expressions"])
+            work = {}
+            for key in ("scoped_source_completed_bodies", "scoped_type_environment_captures",
+                        "scoped_type_environment_capture_hits", "scoped_type_environment_copied_bindings",
+                        "scoped_type_environment_inherited_raw_bindings",
+                        "scoped_type_environment_inherited_bindings",
+                        "scoped_owner_graph_definitions", "scoped_owner_graph_hits",
+                        "scoped_owner_graph_inputs", "scoped_parameter_words_shared",
+                        "scoped_local_words_shared", "scoped_record_updates_shared",
+                        "scoped_indexed_update_roots_shared",
+                        "scoped_completed_plan_attempts", "scoped_completed_plan_definitions",
+                        "scoped_completed_plan_rollbacks", "scoped_completed_plan_discarded_expressions",
+                        "scoped_context_sensitive_definitions", "scoped_context_free_definitions",
+                        "scoped_plain_plan_definitions", "scoped_plain_plan_hits",
+                        "scoped_primitive_environment_entries_avoided",
+                        "scoped_owned_word_calls", "scoped_owned_packed_calls",
+                        "scoped_owned_argument_words_avoided",
+                        "scoped_transport_words_avoided", "scoped_scalar_completed_hits",
+                        "scoped_projected_parameter_fields"):
+                try:
+                    work[key] = int(counters[key])
+                except Exception:
+                    pass
+            metadata["work"] = work
+            try:
+                metadata["type_bindings"] = int(generator["type_arguments"]["items"]["len"])
+            except Exception:
+                pass
+            module = pointee(generator["module"])
+            metadata["functions"] = int(module["functions"]["items"]["len"])
+            metadata["owners"] = int(generator["roots"]["items"]["len"])
+            outlining = pointee(generator["outlining"])
+            metadata["outlines"] = int(outlining["helpers"]["items"]["len"])
+        except Exception as error:
+            if len(metadata["errors"]) < 4:
+                metadata["errors"].append("counters: " + str(error)[:160])
+    if not name.startswith("backend.scoped_backend.Generator.invokeBody"):
+        return
+    if metadata["invocation_probes"] >= 32:
+        metadata["invocations_truncated"] = True
+        return
+    metadata["invocation_probes"] += 1
+    try:
+        target = frame.read_var("target")
+        unit, binding = int(target["unit"]), int(target["binding"])
+        if any(item["unit"] == unit and item["binding"] == binding
+               for item in metadata["invocations"]):
+            return
+        if len(metadata["invocations"]) >= 8:
+            metadata["invocations_truncated"] = True
+            return
+        invocation = {"unit": unit, "binding": binding, "tid": tid,
+                      "body_root": None, "span": None}
+        metadata["invocations"].append(invocation)
+        try:
+            try:
+                body = pointee(frame.read_var("body"))
+            except Exception:
+                owner = pointee(frame.read_var("m"))
+                if binding >= int(owner["bindings"]["len"]):
+                    return
+                body_id = int(owner["bindings"]["ptr"][binding]["body_id"])
+                if body_id == 0 or body_id >= int(owner["bodies"]["len"]):
+                    return
+                body = owner["bodies"]["ptr"][body_id]
+            invocation["body_root"] = int(body["root"])
+            invocation["span"] = {"start": int(body["span"]["start"]),
+                                  "end": int(body["span"]["end"])}
+        except Exception:
+            pass
+    except Exception as error:
+        if len(metadata["errors"]) < 4:
+            metadata["errors"].append("invokeBody: " + str(error)[:160])
+
+
+def interrupt_after(delay):
+    subprocess.Popen([
+        "/bin/sh", "-c", "sleep %f; kill -USR1 %d 2>/dev/null" % (delay, pid)
+    ])
+
+
+def stack(thread, metadata=None):
+    thread.switch()
+    frame = gdb.newest_frame()
+    frames = []
+    physical = set()
+    reason = "end"
+    while frame is not None and len(frames) < 4096:
+        try:
+            # Some native DWARF tails keep yielding unknown frames at PC zero
+            # instead of ending. They are not recursive compiler work.
+            pc = frame.pc()
+            if pc == 0:
+                reason = "zero_pc"
+                break
+            if frame.type() != gdb.INLINE_FRAME:
+                key = (pc, int(frame.read_register("sp")))
+                if key in physical:
+                    reason = "physical_cycle"
+                    break
+                physical.add(key)
+            sal = frame.find_sal()
+            frames.append([
+                frame.name() or "??",
+                sal.symtab.filename if sal.symtab else "",
+                sal.line,
+                frame.type() == gdb.INLINE_FRAME,
+            ])
+            # Linux clone starts this function on a new stack. There is no
+            # caller beyond its thread trampoline, although native DWARF can
+            # invent an unbounded unknown tail there.
+            name = frames[-1][0]
+            if metadata is not None:
+                emission_frame(frame, name, thread.ptid[1], metadata)
+            if name.startswith("Thread.LinuxThreadImpl.spawn") and name.endswith(".Instance.entryFn"):
+                reason = "thread_root"
+                break
+        except gdb.error:
+            frames.append(["??", "", 0, False])
+            reason = "unwind_error"
+            break
+        try:
+            frame = frame.older()
+        except gdb.error:
+            reason = "unwind_error"
+            break
+    if len(frames) == 4096:
+        reason = "frame_limit"
+    return frames, reason
+
+
+wait_for("pid")
+pid = int(open(os.path.join(control, "pid")).read())
+for command in ("set pagination off", "set confirm off",
+                "set debuginfod enabled off"):
+    gdb.execute(command)
+gdb.execute("file " + os.environ["SAMPLE_BINARY"])
+gdb.execute("attach %d" % pid)
+# `noprint` would imply `nostop`; continue() captures the message.
+gdb.execute("handle SIGUSR1 nopass stop print")
+open(os.path.join(control, "attached"), "w").write("1")
+wait_for("start")
+focus = os.environ.get("SAMPLE_FOCUS", "")
+started = time.time()
+taken = 0
+window = {"focus": focus, "focus_reached": False, "samples": 0,
+          "status": "waiting_for_focus", "started_ns": None,
+          "finished_ns": None, "process_cpu_ms": None}
+window_path = os.path.join(control, "..", "sampling-window.json")
+
+
+def save_window():
+    with open(window_path, "w") as out:
+        json.dump(window, out, indent=2)
+        out.write("\n")
+
+
+def process_ticks():
+    try:
+        with open("/proc/%d/stat" % pid) as source:
+            fields = source.read().rsplit(") ", 1)[1].split()
+            return int(fields[11]) + int(fields[12])
+    except (FileNotFoundError, ProcessLookupError):
+        return None
+
+
+def thread_cpu(tid):
+    try:
+        with open("/proc/%d/task/%d/schedstat" % (pid, tid)) as source:
+            return int(source.read().split()[0])
+    except FileNotFoundError:
+        return None
+
+before_ticks = None
+save_window()
+try:
+    emission_delay_ms = 0
+    if focus == "emission":
+        emission_delay_ms = int(os.environ.get("SAMPLE_EMISSION_DELAY_MS", "0"))
+        if not 0 <= emission_delay_ms <= 15000:
+            raise RuntimeError("SAMPLE_EMISSION_DELAY_MS must be 0..15000")
+    if focus in ("validation", "emission"):
+        symbol = "backend.scoped_backend.Generator.emit"
+        if focus == "validation":
+            symbol = "reuse.dependency_closure.validateMode"
+        boundary = gdb.Breakpoint(symbol, internal=True)
+        if focus == "validation":
+            # Opening a source session also validates an empty seed. The completed
+            # closure uses the padded future-entry context after source checking.
+            boundary.condition = "padded_entry"
+        gdb.execute("continue", to_string=True)
+        # An exit or another signal is not evidence that the boundary was reached.
+        frame = gdb.newest_frame()
+        if frame is None or not (frame.name() or "").startswith(symbol):
+            raise RuntimeError("Compiler stopped before sampling focus: " + symbol)
+        boundary.delete()
+        if focus == "validation":
+            low, high, limit = 0.008, 0.012, 200
+    if focus == "emission":
+        window.update(focus_reached=True, focus_started_ns=time.time_ns(),
+                      emission_delay_ms=emission_delay_ms)
+        if emission_delay_ms:
+            window["status"] = "delaying"
+            save_window()
+            interrupt_after(emission_delay_ms / 1000)
+            gdb.execute("continue", to_string=True)
+            if flag("stop") or not gdb.selected_inferior().threads():
+                raise RuntimeError("Compiler stopped during emission sampling delay")
+    window.update(focus_reached=True, status="sampling", started_ns=time.time_ns(),
+                  interval_min_ms=low * 1000, interval_max_ms=high * 1000,
+                  sample_limit=limit)
+    before_ticks = process_ticks()
+    save_window()
+    started = time.time()
+    previous_cpu = {t.ptid[1]: thread_cpu(t.ptid[1])
+                    for t in gdb.selected_inferior().threads()}
+    with open(os.environ["SAMPLE_OUT"], "a") as out:
+        while not flag("stop") and (limit is None or taken < limit):
+            delay = random.uniform(low, high)
+            interrupt_after(delay)
+            try:
+                gdb.execute("continue", to_string=True)
+            except gdb.error:
+                break  # The process exited.
+            if flag("stop"):
+                break  # The measured builds finished while this stop was pending.
+            if not gdb.selected_inferior().threads():
+                break
+            try:
+                stacks, tids, cpu_ns, tails = [], [], [], []
+                metadata = None
+                if focus == "emission":
+                    metadata = {"invocations": [], "invocations_truncated": False,
+                                "invocation_limit": 8, "invocation_probes": 0,
+                                "counter_probes": 0, "expressions": None,
+                                "functions": None, "errors": []}
+                for thread in gdb.selected_inferior().threads():
+                    tid = thread.ptid[1]
+                    current = thread_cpu(tid)
+                    previous = previous_cpu.get(tid)
+                    previous_cpu[tid] = current
+                    frames, tail = stack(thread, metadata)
+                    if any(f[0] == "main.main" for f in frames):
+                        continue
+                    stacks.append(frames)
+                    tails.append(tail)
+                    tids.append(tid)
+                    cpu_ns.append(None if current is None or previous is None
+                                  else max(0, current - previous))
+            except gdb.error:
+                break
+            sample = {"t": time.time() - started, "wall_ns": time.time_ns(),
+                      "run": int(os.environ.get("SAMPLE_RUN", "0")),
+                      "frame_limit": 4096, "st": stacks, "tid": tids,
+                      "cpu_ns": cpu_ns, "tail": tails, "focus": focus}
+            if metadata is not None:
+                sample["emission"] = metadata
+            out.write(json.dumps(sample) + "\n")
+            out.flush()
+            taken += 1
+    window["status"] = "process_exited"
+    if flag("stop"):
+        window["status"] = "stopped"
+    elif limit is not None and taken >= limit:
+        window["status"] = "sample_limit"
+except (gdb.error, RuntimeError, ValueError) as error:
+    window.update(status="interrupted", error=str(error))
+finally:
+    after_ticks = process_ticks()
+    if before_ticks is not None and after_ticks is not None:
+        window["process_cpu_ms"] = (after_ticks - before_ticks) * 1000 / os.sysconf("SC_CLK_TCK")
+    window.update(samples=taken, finished_ns=time.time_ns())
+    save_window()
+    try:
+        gdb.execute("detach")
+    except gdb.error:
+        pass
+    open(os.path.join(control, "detached"), "w").write(str(taken))
+    gdb.execute("quit")

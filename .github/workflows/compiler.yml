@@ -40,8 +40,8 @@ jobs:
         with:
           path: |
             ~/.cache/zig
-            zig-native/.zig-cache
-          key: zig-${{ runner.os }}-${{ hashFiles('zig-native/**/*.zig', 'zig-native/build.zig') }}
+            compiler/.zig-cache
+          key: zig-${{ runner.os }}-${{ hashFiles('compiler/**/*.zig', 'compiler/build.zig') }}
           restore-keys: zig-${{ runner.os }}-
       - name: Cache zig-analyzer
         id: analyzer

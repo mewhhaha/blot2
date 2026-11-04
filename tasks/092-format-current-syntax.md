@@ -19,11 +19,11 @@ current program syntax, and refuses only invalid sources.
 gdev's `deno task fmt:blot` rejects every current gdev source with
 `Island 48
 rejected syntax`. On 11 October 2026 `formatSource` from
-[compiler/format.ts](../compiler/format.ts) also rejected the public
+[host/format.ts](../host/format.ts) also rejected the public
 `examples/ecs.blot` and `examples/syntax.blot` (at curried declarations such as
 `const insert_cell = func initial => return func builder => return do:`), while
 it accepted `std/prelude.blot` and a small `let … else:` block. The formatter
-predates the Zig compiler, and `compiler/format.test.ts` does not format the
+predates the Zig compiler, and `tests/host/format.test.ts` does not format the
 examples.
 
 ## Implementation checklist
@@ -51,14 +51,14 @@ before the local milestone commit.
 ## Completion evidence
 
 - Commit: `f6098a8` ("Format nominal record patterns and named operators").
-- Cause: in `grammar.baba`, a constructor pattern accepted either record fields
+- Cause: in `host/parser/grammar.baba`, a constructor pattern accepted either record fields
   or any pattern as its payload, and `pattern` includes record patterns, so
   `#Vec2 { x, y }` had two derivations and the `pattern` island (number 48)
   rejected it. Every failing declaration in the examples and gdev used a nominal
   record pattern. Separately, the formatter glued a named operator's right
   operand to its closing backtick (`` `plus`22 ``).
 - Change: `constructor_payload` excludes bare record patterns and is its own
-  root island in `baba.json`; `deno task generate:parser` regenerated the parser
+  root island in `host/parser/baba.json`; `deno task generate:parser` regenerated the parser
   (the committed output matched the old grammar exactly). Only the opening
   backtick of a named operator is tight.
 - Validation: `deno task test:compiler` passes the full native suite and 638
@@ -74,5 +74,5 @@ before the local milestone commit.
   separate from the Zig parser, so the two can diverge again; the gate now
   catches that for the public examples and std modules only. gdev picks the fix
   up when the package is published.
-- Durable record: [grammar.baba](../grammar.baba) and
-  [compiler/format.test.ts](../compiler/format.test.ts).
+- Durable record: [host/parser/grammar.baba](../host/parser/grammar.baba) and
+  [tests/host/format.test.ts](../tests/host/format.test.ts).

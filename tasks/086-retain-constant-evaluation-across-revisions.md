@@ -34,9 +34,9 @@ copy evaluated 594 constants per retained literal edit in about 700 ms;
 `sandbox` took 99.4% of that, and 98% of its time was inference nested in its
 evaluation rather than value evaluation (about 15 ms). The other 593 constants
 took under 5 ms together. The owner approved the dedicated
-[constant-receipt design](../zig-native/CONSTANT_REUSE.md) on 12 October 2026;
+[constant-receipt design](../docs/compiler/CONSTANT_REUSE.md) on 12 October 2026;
 the value-template boundary in
-[source_value_template.zig](../zig-native/src/reuse/source_value_template.zig)
+[source_value_template.zig](../compiler/src/reuse/source_value_template.zig)
 stays unchanged.
 
 **Findings on 17 October 2026: the targeted cost no longer dominates the latest
@@ -44,31 +44,31 @@ recorded measurements.**
 
 - Task 088 (`86db5b1`) made `sandbox`'s principal region replay from recorded
   inputs; a gdev literal edit fell to about 570 ms CPU with 240 ms of inference
-  ([summary-job cost](../zig-native/CALL_SUMMARIES.md#summary-job-cost-11-october-2026)
+  ([summary-job cost](../docs/compiler/CALL_SUMMARIES.md#summary-job-cost-11-october-2026)
   notes that 086's profile needs re-measuring).
 - After task 093 (`aef65e7`), constant evaluation (152 ms) plus constant
   serialization (120 ms) were still about 61% of a 440 ms gdev edit
-  ([attribution](../zig-native/RETAINED_EDIT_COST.md#attribution)). That
+  ([attribution](../docs/compiler/RETAINED_EDIT_COST.md#attribution)). That
   workload cannot be re-measured: the frozen gdev manifest was waived on 11
   October and `build/` was removed on 15 October (see
   [README](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)).
 - On the current 93-unit captured project, an LLVM release profile of a retained
   scalar edit at `2798ff9` reports 51–53 ms of constant work and 19 ms of value
   evaluation against 545–549 ms of inference
-  ([historical attribution](../zig-native/CONSTANT_REUSE.md#historical-attribution-before-the-current-continuation)).
+  ([historical attribution](../docs/compiler/CONSTANT_REUSE.md#historical-attribution-before-the-current-continuation)).
   The 14 October release screen measures a median edit of 843 ms (revert 733 ms)
   with every constant-receipt counter at zero
-  ([qualified continuation](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-14-october-2026)).
+  ([qualified continuation](../docs/qualification/CONTINUATION_QUALIFICATION.md#qualified-continuation-14-october-2026)).
   Against that median, 51–53 ms would be about 6%, though the two numbers come
   from different compilers.
 - At `6a57437` the captured project had no receipt activity and a roughly 5%
   retained regression from late ownership fallback assembly
-  ([measured costs](../zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md#measured-costs)).
+  ([measured costs](../docs/qualification/ITERATOR_CONSTANTS_QUALIFICATION.md#measured-costs)).
   The 15 October compound replay reaches eleven hits and 61,383 replayed steps
   on that project at near-parity CPU; unchanged inference and backend
   preparation dominate the rest. The largest constant (57,019 of 70,330 source
   steps) has a nominal result that is excluded before recording
-  ([qualified combined run](../zig-native/ITERATION_COST.md#qualified-combined-run-14-october-2026)).
+  ([qualified combined run](../docs/compiler/ITERATION_COST.md#qualified-combined-run-14-october-2026)).
 
 The 60% share that motivated this task was measured on the frozen gdev copy,
 which can no longer be re-measured. On the current captured project, the
@@ -82,7 +82,7 @@ portable member authority) is built only if the gate justifies it.
 ## Implementation checklist
 
 - [x] Run the measurement gate below on current main and record it in
-      [CONSTANT_REUSE.md](../zig-native/CONSTANT_REUSE.md) before any further
+      [CONSTANT_REUSE.md](../docs/compiler/CONSTANT_REUSE.md) before any further
       receipt work.
 - [x] Not required by the measured gate: record each constant's exact value
       dependencies (source bodies, reads, providers, generative identities and
@@ -103,7 +103,7 @@ before the local milestone commit.
 
 - Workload: the workload task [084](084-qualify-the-complete-program.md) pins;
   until it exists, the 93-unit captured project with its 415 recorded input pins
-  ([qualified continuation](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-15-october-2026)).
+  ([qualified continuation](../docs/qualification/CONTINUATION_QUALIFICATION.md#qualified-continuation-15-october-2026)).
   Synthetic large-constant workloads support laws, not this decision.
 - Compiler: an LLVM release build of current main, with persistence settings
   stated. A measurement taken before the latest change to retained-edit code
@@ -150,8 +150,8 @@ If the work proceeds:
   `b145c5e` sparse inspection (large-snapshot retained CPU 18.005 → 15.158 ms);
   `38e822d` primitive growth receipts (retained 1.630 → 1.172 ms at 512
   elements, 3.710 → 1.746 ms at 2,048). See
-  [constant receipts](../zig-native/CONSTANT_REUSE.md) and
-  [the merged record](../zig-native/ITERATOR_CONSTANTS_QUALIFICATION.md).
+  [constant receipts](../docs/compiler/CONSTANT_REUSE.md) and
+  [the merged record](../docs/qualification/ITERATOR_CONSTANTS_QUALIFICATION.md).
 - Compound replay (ordered dependency reads, reachable typed views, collection
   buffer frontiers, one ordinary retry after a post-demand mismatch, OOM never
   retried) landed in `23a934f`. Its delta was frozen as
@@ -169,9 +169,9 @@ If the work proceeds:
   function emission from constant evaluation and static serialization. Its
   samples do not align with qualifying edit windows, so Quantity C remains
   unmeasured. The
-  [cloud preparation](../zig-native/CONSTANT_REUSE.md#cloud-measurement-preparation-20-october-2026)
+  [cloud preparation](../docs/compiler/CONSTANT_REUSE.md#cloud-measurement-preparation-20-october-2026)
   records the observed contexts, pins and both comparisons needed for closure.
-- Durable record: [constant receipts](../zig-native/CONSTANT_REUSE.md).
+- Durable record: [constant receipts](../docs/compiler/CONSTANT_REUSE.md).
 
 ### Final gate, 23 October 2026
 
@@ -185,5 +185,5 @@ All fresh/retained/revert witnesses pass; current source has the complete
 checks, executed smoke and known attribution controls.
 
 See the
-[durable decision and raw evidence](../zig-native/CONSTANT_REUSE.md#measurement-gate-resolved-23-october-2026).
+[durable decision and raw evidence](../docs/compiler/CONSTANT_REUSE.md#measurement-gate-resolved-23-october-2026).
 The 30-ms literal-edit target remains open in task 101.

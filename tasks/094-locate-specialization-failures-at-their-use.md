@@ -6,8 +6,8 @@
 - **Dependencies:** [048](048-explain-dispatch-and-evidence.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / explainable
   inference; found while completing task 048. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md),
-  [dispatch explanations](../zig-native/DISPATCH_EXPLANATIONS.md#remaining-scope).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md),
+  [dispatch explanations](../docs/compiler/DISPATCH_EXPLANATIONS.md#remaining-scope).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -22,7 +22,7 @@ secondary context.
 `#Box 1 + #Box 2` in a program without `Box.add` reports `missing_associated` at
 `std/prelude.blot` 603–630, the `@type.call` inside `add`, because the checker
 leaves the concrete dispatch to specialization and
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) fails while validating the
+[core_eval.zig](../compiler/src/eval/core_eval.zig) fails while validating the
 specialized `add` body. Task 048's explanation names the operand types, but the
 location is still the prelude. `anchorRecursion` already moves recursion
 diagnostics to a call site.
@@ -75,7 +75,7 @@ commands for focused development and the scenarios below.
   location when no source-owned caller origin is available. Successful-dispatch
   editor explanations remain task 050.
 - Durable record:
-  [DISPATCH_EXPLANATIONS.md](../zig-native/DISPATCH_EXPLANATIONS.md) and the
+  [DISPATCH_EXPLANATIONS.md](../docs/compiler/DISPATCH_EXPLANATIONS.md) and the
   shared
-  [qualification](../zig-native/RESOLVED_BODIES.md#qualification-11-october-2026),
+  [qualification](../docs/compiler/RESOLVED_BODIES.md#qualification-11-october-2026),
   including exact compiler/input/harness hashes and median distributions.

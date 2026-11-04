@@ -19,7 +19,7 @@ options, never parsed assets.
 ## Starting point
 
 Typed asset imports run in TypeScript:
-[compiler/assets.ts](../compiler/assets.ts) `withAssetImports` wraps a build
+[host/assets.ts](../host/assets.ts) `withAssetImports` wraps a build
 with host-supplied parsers, and gdev's `asset_parsers.ts` (318 lines) defines
 the kinds: the catalog (`meshes`, `sounds` and `materials` as ID records), JSON
 records, `text.json` (words as code points, each checked against the font's
@@ -80,7 +80,7 @@ before the local milestone commit.
   disk inputs are still acquired and hashed. Loaded-host timings do not
   establish a general compiler speedup. Private source/assets stay outside
   commits.
-- Durable record: [native assets](../zig-native/NATIVE_ASSETS.md),
-  [protocol](../zig-native/PROJECT_PROTOCOL.md),
-  [distributions](../zig-native/qualification/native-assets.csv) and
-  [pins](../zig-native/qualification/native-assets-pins.json).
+- Durable record: [native assets](../docs/compiler/NATIVE_ASSETS.md),
+  [protocol](../docs/compiler/PROJECT_PROTOCOL.md),
+  [distributions](../benchmarks/evidence/qualification/native-assets.csv) and
+  [pins](../benchmarks/evidence/qualification/native-assets-pins.json).

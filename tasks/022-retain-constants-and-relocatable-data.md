@@ -17,10 +17,10 @@ dependencies.
 
 ## Starting point
 
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) owns evaluated values;
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) serializes them.
+[core_eval.zig](../compiler/src/eval/core_eval.zig) owns evaluated values;
+[core_backend.zig](../compiler/src/backend/core_backend.zig) serializes them.
 Scalar constant admission already exists, while
-[source_value_template.zig](../zig-native/src/reuse/source_value_template.zig)
+[source_value_template.zig](../compiler/src/reuse/source_value_template.zig)
 records complete captured graphs and aggregate data remains separate.
 
 ## Implementation checklist
@@ -86,6 +86,6 @@ commands for focused development and the scenarios below.
 - Remaining limitations: aggregate data is re-serialized (old bytes are not
   replayed); constants are still evaluated every revision; no public example
   replays an aggregate in these workloads, for reasons not investigated.
-- Durable record: [retained constants](../zig-native/RETAINED_CONSTANTS.md),
-  [distributions](../zig-native/qualification/aggregate-constants.csv) and
-  [pins](../zig-native/qualification/aggregate-constants-pins.json).
+- Durable record: [retained constants](../docs/compiler/RETAINED_CONSTANTS.md),
+  [distributions](../benchmarks/evidence/qualification/aggregate-constants.csv) and
+  [pins](../benchmarks/evidence/qualification/aggregate-constants-pins.json).

@@ -51,7 +51,7 @@ rules. Use formatting, link, consistency and evidence checks for
 documentation-only changes; run code gates only when code or build inputs
 change.
 
-- Confirm the lint run covers every `zig-native/src` file plus the fixture
+- Confirm the lint run covers every `compiler/src` file plus the fixture
   module, against the exact tree that task 084 qualifies.
 - A run over an older tree or with a missing backend does not qualify.
 
@@ -69,17 +69,17 @@ change.
 - Owner decision, 16 October 2026: the local `../zig-analyzer` build gates this
   task, and its known false positives are accepted for now.
 - Latest local run (17 October 2026, committed tree `4599957`, clean
-  `zig-native/`): `../zig-analyzer` at `9a78ce1` (0.17.0-2, pushed), which
+  `compiler/`): `../zig-analyzer` at `9a78ce1` (0.17.0-2, pushed), which
   merges the upstream fixes for the false positives below.
   `zig-analyzer
   doctor` reports Zig 0.17.0 and a compatible compiler backend.
   `deno task
   lint:zig` and an uncached `zig-analyzer check --no-cache` each
-  report 0 findings over all 487 `zig-native/src` files and the fixture module.
+  report 0 findings over all 487 `compiler/src` files and the fixture module.
   The CI-pinned `756bfd5` (0.17.0-1) also reports 0 findings over the same tree,
   so no finding is reported by only one revision. Outside the gated directories,
   `check .` under the default profile warns about five deprecated `std.fs.path`
-  uses (such as `zig-native/compiler_fingerprint.zig`); they are not part of
+  uses (such as `compiler/compiler_fingerprint.zig`); they are not part of
   this gate.
 - Earlier local run (16 October 2026, committed tree `2b2ffbb`):
   `../zig-analyzer` at `13b7e03` (0.17.0-2), Zig 0.17.0. `zig build backend`

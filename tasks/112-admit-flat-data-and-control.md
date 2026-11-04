@@ -11,18 +11,18 @@
 - **Dependencies:** Task 110's early layout/value/root/exit interface; coordinate
   sequence allocation with the runtime region owner. Do not wait for a build.
 - **Context:** [Task index](STORAGE_REWRITE.md) and
-  [conversion review](../zig-native/STORAGE_REWRITE_REVIEW.md).
+  [conversion review](../docs/compiler/STORAGE_REWRITE_REVIEW.md).
 - **Outcome:** Ordinary fixed data, ADTs, traversal and immutable lists use the
   owned storage plan without nested owning layouts or variable aggregate tails.
 
 ## File ownership
 
-Own new files under `zig-native/src/backend/`: `storage_layout.zig`,
+Own new files under `compiler/src/backend/`: `storage_layout.zig`,
 `storage_control.zig`, `storage_patterns.zig`, `storage_collections.zig`, and
 `storage_data_tests.zig`. Own affected flat APIs in `std/array.blot` and
 `std/list.blot`; coordinate prelude changes with the integrator instead of
 editing `std/prelude.blot` independently. Own new executed witnesses in
-`zig-native/tests/storage_flat_data_execution.test.ts`.
+`tests/guest/storage_flat_data_execution.test.ts`.
 Do not edit `scoped_backend.zig`, runtime modules or shared test registration;
 send the integration owner the small adapter changes those files need.
 

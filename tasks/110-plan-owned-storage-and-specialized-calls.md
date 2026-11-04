@@ -8,7 +8,7 @@
 - **Dependencies:** Agree the runtime region interface with its owner first;
   task 112 can proceed after the early interface handoff below.
 - **Context:** [Task index](STORAGE_REWRITE.md) and
-  [conversion review](../zig-native/STORAGE_REWRITE_REVIEW.md).
+  [conversion review](../docs/compiler/STORAGE_REWRITE_REVIEW.md).
 - **Outcome:** A checked storage plan drives reusable direct Wasm functions,
   with explicit result destinations and no counted allocation fallback.
 
@@ -19,12 +19,12 @@ pending.
 
 ## File ownership
 
-Own new `zig-native/src/backend/storage_plan.zig` and `storage_calls.zig`, plus
-`zig-native/src/backend/storage_liveness.zig`. Initially this task alone edits
-`zig-native/src/backend/scoped_backend.zig`; hand that file to the integrator
+Own new `compiler/src/backend/storage_plan.zig` and `storage_calls.zig`, plus
+`compiler/src/backend/storage_liveness.zig`. Initially this task alone edits
+`compiler/src/backend/scoped_backend.zig`; hand that file to the integrator
 after the first integration batch. Other agents propose integration changes
 through their owned modules. Own focused native witnesses in new
-`zig-native/src/backend/storage_plan_tests.zig` and `storage_calls_tests.zig`.
+`compiler/src/backend/storage_plan_tests.zig` and `storage_calls_tests.zig`.
 The integrator owns test registration, shared execution fixtures and gates.
 
 ## Early interface handoff

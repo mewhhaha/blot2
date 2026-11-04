@@ -20,7 +20,7 @@ Keep these requirements while simplifying the implementation:
   features must diagnose rather than silently select another memory model.
 - Use ordinary functions for compile-time work through `#run`. Controlled
   compile-time build effects remain open; current support is described in the
-  [language guide](compiler/guide.md).
+  [language guide](docs/language/guide.md).
 - Bound compiler allocation, semantic work and retained cache growth. Reuse must
   remain correct across edits, failed builds, restarts and changed dependencies.
   Keep the remaining numerical targets in tasks 086, 093 and 100–104.

@@ -10,8 +10,8 @@ complete that task or the owned-storage rewrite.
 ## Outcome and first boundary
 
 Compile and execute the unchanged Goose comparison ports
-[`sort_merge.blot`](../scripts/bench/goose/ports/sort_merge.blot) and
-[`sort_quick.blot`](../scripts/bench/goose/ports/sort_quick.blot), then replace
+[`sort_merge.blot`](../benchmarks/goose/ports/sort_merge.blot) and
+[`sort_quick.blot`](../benchmarks/goose/ports/sort_quick.blot), then replace
 their unsupported chart cells with checked measurements.
 
 First admit direct self-recursion in closed, fully applied named functions: U32
@@ -193,7 +193,7 @@ primitive-arity diagnostic failure also reproduced on the frozen source
 snapshot. The unchanged broader suite has not passed. Exact
 compiler/source/toolchain, work, phase, memory, sample, OOM and failure records
 are in the
-[checkpoint evidence](../scripts/bench/goose/results/2026-11-04-recursive-calls.md).
+[checkpoint evidence](../benchmarks/goose/results/2026-11-04-recursive-calls.md).
 
 ## Later extensions, with separate acceptance gates
 

@@ -17,11 +17,11 @@ emission.
 
 ## Starting point
 
-[specialization.zig](../zig-native/src/eval/specialization.zig) already
+[specialization.zig](../compiler/src/eval/specialization.zig) already
 separates some semantic selection, but
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) still resolves
-calls while emitting. [known_call.zig](../zig-native/src/backend/known_call.zig)
-and [layout_bridge.zig](../zig-native/src/backend/layout_bridge.zig) carry
+[core_backend.zig](../compiler/src/backend/core_backend.zig) still resolves
+calls while emitting. [known_call.zig](../compiler/src/backend/known_call.zig)
+and [layout_bridge.zig](../compiler/src/backend/layout_bridge.zig) carry
 current call/layout knowledge.
 
 ## Implementation checklist
@@ -63,7 +63,7 @@ commands for focused development and the scenarios below.
 - Commits: `b0c9168` ("Prepare named, operator, resolver and closure calls
   before emission") and `29aaa98` ("Prepare static closure applications and
   count prepared calls").
-- Change: [resolved_call.zig](../zig-native/src/backend/resolved_call.zig) plans
+- Change: [resolved_call.zig](../compiler/src/backend/resolved_call.zig) plans
   carry each call's specialization key or callable wrapper, consumed arguments
   and the semantic arrows of closures applied afterwards; static closure plans
   carry closure identity, captured values and specialized mappings. Every source
@@ -82,4 +82,4 @@ commands for focused development and the scenarios below.
   are tasks 026–028); named over-application is prepared but unreachable from
   current lowering; partial and recovered known calls are prepared only for
   inlining.
-- Durable record: [resolved calls](../zig-native/RESOLVED_CALLS.md).
+- Durable record: [resolved calls](../docs/compiler/RESOLVED_CALLS.md).

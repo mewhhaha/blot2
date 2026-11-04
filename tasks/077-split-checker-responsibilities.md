@@ -17,7 +17,7 @@ validation, reducing large handwritten functions.
 
 ## Starting point
 
-[check.zig](../zig-native/src/check/check.zig) combines these roles;
+[check.zig](../compiler/src/check/check.zig) combines these roles;
 `checkInternalExecution` and related large routines own order-sensitive checking
 and diagnostics.
 
@@ -57,7 +57,7 @@ commands for focused development and the scenarios below.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -87,4 +87,4 @@ that qualification or a commit was pending refer to those earlier checkpoints.
 - Remaining limitations: the lifecycle coordinator remains 407 lines; final
   common performance/compiler qualification and prerequisite closure are open.
   No completion, commit or push is claimed.
-- Durable record: [Checker ownership](../zig-native/CHECKER_OWNERSHIP.md).
+- Durable record: [Checker ownership](../docs/compiler/CHECKER_OWNERSHIP.md).

@@ -22,10 +22,10 @@
   model. Preserve ABI 8 and session protocol 2. Language tasks are retired;
   copied-packet host workers remain.
 - Use Zig 0.17.0. Check `zig version` before each build batch.
-- The compiler lives in `zig-native/`; Deno hosts its client, formatter and Wasm
+- The compiler lives in `compiler/`; Deno hosts its client, formatter and Wasm
   guest API.
-- Read `compiler/guide.md` for language behavior and `zig-native/CONTRACT.md`
-  for ownership rules.
+- Read `docs/language/guide.md` for language behavior and
+  `docs/compiler/CONTRACT.md` for ownership rules.
 - Always use Zig's native backend without LLVM (`-Dllvm=false`) for development
   builds and all native unit-test compilation, including the full gate. Use
   `deno task check:dev --area static-sharing` for a five-minute development
@@ -41,14 +41,14 @@
 - Keep semantic regression laws in Zig and executed-Wasm tests. Run
   `deno task test:compiler` before committing compiler changes.
 - For the current integration frontier, use the tracked
-  `scripts/storage_handoff/build_gdev.ts`, `report.py` and `run_pen.py` runners
-  as described in `CONTINUE.md`. Run a coherent affected batch after a fix;
-  reserve full qualification for the final candidate. Inspect the real PNG
-  before claiming the frame milestone.
+  `scripts/integration/build_gdev.ts`, `report.py` and `run_pen.py` runners as
+  described in `CONTINUE.md`. Run a coherent affected batch after a fix; reserve
+  full qualification for the final candidate. Inspect the real PNG before
+  claiming the frame milestone.
 - For a focused native test, run
   `zig build test -Doptimize=safe -Dllvm=false
   --prefix zig-out-native-dev -Dtest-filter="test name"`
-  in `zig-native/`. The full compiler gate is still required before committing
+  in `compiler/`. The full compiler gate is still required before committing
   compiler changes.
 - `check:dev` and the full gate both compile the complete native suite with
   `-Dllvm=false --prefix zig-out-native-dev`, catching generic mock/interface
@@ -63,8 +63,8 @@
   separate large executable for each filter. Keep correctness boundary cases
   when reducing a slow fixture; measure per-test time before changing scale.
 - Run `deno task lint:zig` (zig-analyzer from `$ZIG_ANALYZER` or
-  `../zig-analyzer/zig-out/bin/zig-analyzer`). `zig-native/src` must stay at
-  zero findings; CI enforces it.
+  `../zig-analyzer/zig-out/bin/zig-analyzer`). `compiler/src` must stay at zero
+  findings; CI enforces it.
 - Preserve uncommitted work. Measure fresh builds and retained edits separately.
 - Keep `CONTINUE.md` focused on the current frontier, contracts and evidence.
   Use pinned Git history for superseded checkpoint narratives. Preserve task

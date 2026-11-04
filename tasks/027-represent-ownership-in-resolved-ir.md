@@ -16,9 +16,9 @@ resolved IR.
 
 ## Starting point
 
-[runtime_layout.zig](../zig-native/src/runtime/runtime_layout.zig),
-[runtime_ir.zig](../zig-native/src/backend/runtime_ir.zig) and
-[wasm_lifetimes.zig](../zig-native/src/backend/wasm_lifetimes.zig) describe
+[runtime_layout.zig](../compiler/src/runtime/runtime_layout.zig),
+[runtime_ir.zig](../compiler/src/backend/runtime_ir.zig) and
+[wasm_lifetimes.zig](../compiler/src/backend/wasm_lifetimes.zig) describe
 layouts and machine-level lifetime facts. Ownership is not inferable from
 arbitrary i32 words; task 026 provides explicit edges.
 
@@ -59,7 +59,7 @@ commands for focused development and the scenarios below.
 
 - Commit: `c226967` ("Carry ownership roles from checked layouts into runtime
   IR").
-- Change: [runtime_ir.zig](../zig-native/src/backend/runtime_ir.zig) adds roles
+- Change: [runtime_ir.zig](../compiler/src/backend/runtime_ir.zig) adds roles
   (scalar, reference, value, unknown), per-function parameter roles and an
   `ownership` annotation op whose runs give each constant-size allocation's word
   roles. The emitter derives both from checked layouts and the runtime
@@ -91,4 +91,4 @@ commands for focused development and the scenarios below.
 - Remaining limitations: roles do not drive reference counting yet (tasks
   030–035); `value` words still need their checked type at each use; runtime
   helpers' functions and allocations carry no roles.
-- Durable record: [ownership roles](../zig-native/OWNERSHIP_ROLES.md).
+- Durable record: [ownership roles](../docs/compiler/OWNERSHIP_ROLES.md).

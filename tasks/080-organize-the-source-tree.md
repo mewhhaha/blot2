@@ -18,9 +18,9 @@ nearby tests.
 ## Starting point
 
 The baseline
-[zig-native/src/production_suite.zig](../zig-native/src/production_suite.zig)
-imports a flat source tree; [zig-native/build.zig](../zig-native/build.zig),
-[zig-native/compiler_fingerprint.zig](../zig-native/compiler_fingerprint.zig)
+[compiler/src/production_suite.zig](../compiler/src/production_suite.zig)
+imports a flat source tree; [compiler/build.zig](../compiler/build.zig),
+[compiler/compiler_fingerprint.zig](../compiler/compiler_fingerprint.zig)
 and packaging/analyzer scripts depend on paths.
 
 ## Implementation checklist
@@ -60,7 +60,7 @@ commands for focused development and the scenarios below.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -88,4 +88,4 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   attempts: `build/bench/finish-rest-20261015/source-areas/`.
 - Remaining: release and the final common full gate. No new full qualification
   is claimed.
-- Durable record: [source areas](../zig-native/SOURCE_AREAS.md).
+- Durable record: [source areas](../docs/compiler/SOURCE_AREAS.md).

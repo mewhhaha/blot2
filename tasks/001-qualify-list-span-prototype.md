@@ -55,7 +55,7 @@ commands for focused development and the scenarios below.
 - Exercise widths 1–16 around 248-word leaf boundaries, zero rows, nested
   traversal, early exits and preserved snapshots. Compare values, diagnostics,
   effects and recovery against main.
-- Run paired `scripts/bench_packed_rows.ts` and `scripts/bench_runtime_costs.ts`
+- Run paired `benchmarks/tools/bench_packed_rows.ts` and `benchmarks/tools/bench_runtime_costs.ts`
   measurements plus `bench:compile`; separate guest runtime/memory from
   fresh/retained compiler CPU and allocation. Preserve same-compiler
   fresh/retained byte equality.
@@ -94,6 +94,6 @@ commands for focused development and the scenarios below.
   older boxed baseline and the cursor investigation. Its initial all-width probe
   confirms the broader regression remains. This change affects direct packed
   List loops and does not change cursor emission.
-- Durable record: [LIST_TRAVERSAL.md](../zig-native/LIST_TRAVERSAL.md) preserves
+- Durable record: [LIST_TRAVERSAL.md](../docs/compiler/LIST_TRAVERSAL.md) preserves
   identities, commands/harnesses, semantic checks, measurements and limits. Raw
   logs and samples remain in ignored `build/bench/list-span-qualified/`.

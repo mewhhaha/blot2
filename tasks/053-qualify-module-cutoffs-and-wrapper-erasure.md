@@ -13,7 +13,7 @@
   [024](024-apply-general-body-interface-cutoff.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 2 / interface
   cutoff and zero-cost wrappers. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -25,7 +25,7 @@ wrappers add no runtime representation cost.
 ## Starting point
 
 Task 052 supplies opacity and task 024 general interface cutoff.
-[module_frontend_cutoff.zig](../zig-native/src/reuse/module_frontend_cutoff.zig),
+[module_frontend_cutoff.zig](../compiler/src/reuse/module_frontend_cutoff.zig),
 resolved layouts and optimizer captures provide the reuse/representation
 boundaries.
 
@@ -66,12 +66,12 @@ commands for focused development and the scenarios below.
 
 The owner closed this task's scope to the fixed rows below. Rows 1–9 are the
 private-edit rows of the
-[module abstraction acceptance laws](../zig-native/MODULE_ABSTRACTION.md#acceptance-laws)
+[module abstraction acceptance laws](../docs/compiler/MODULE_ABSTRACTION.md#acceptance-laws)
 that concern semantic cutoff, including the cases the
-[implementation limits](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#limits-and-next-qualification)
+[implementation limits](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md#limits-and-next-qualification)
 name as still open (unrelated private insertion, private declaration relocation
 and alpha-renamed parameters). Rows 10–13 are the
-[wrapper erasure](../zig-native/MODULE_ABSTRACTION.md#wrapper-erasure) cases,
+[wrapper erasure](../docs/compiler/MODULE_ABSTRACTION.md#wrapper-erasure) cases,
 including the operation-body and allocation-traffic comparison those limits
 leave to this task. The checklist and acceptance criteria above are read against
 these rows. "Eligible wrapper" means the single-constructor opaque scalar,
@@ -81,10 +81,10 @@ reference and generic record representations of rows 10–12.
    callers reuse, executable readers rebuild, and source, dependency and
    checkpoint output equals fresh output. Evidence: an opaque three-module law
    reuses both callers (fallback elaborations 5 → 3; values 42 → 43 → 42); see
-   [chains](../zig-native/BODY_CUTOFF.md#chains-with-no-clean-dependency-15-october-2026).
+   [chains](../docs/compiler/BODY_CUTOFF.md#chains-with-no-clean-dependency-15-october-2026).
 2. A private local is added to or removed from an opaque producer's last
    function: callers keep semantic reuse. Evidence:
-   [inert principal suffixes](../zig-native/BODY_CUTOFF.md#inert-principal-suffixes-15-october-2026).
+   [inert principal suffixes](../docs/compiler/BODY_CUTOFF.md#inert-principal-suffixes-15-october-2026).
 3. An unrelated or private declaration is inserted before an opaque type, or a
    private declaration moves: identity and public interface are preserved and
    semantic callers reuse. Evidence: owned
@@ -133,14 +133,14 @@ reference and generic record representations of rows 10–12.
 13. Shapes that are not eligible (multi-constructor data; deep, exhausted or
     unresolved ABI proofs) stay ordinary data or decline emission, never a
     guessed machine type. Evidence:
-    [052 limits](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#limits-and-next-qualification).
+    [052 limits](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md#limits-and-next-qualification).
 
 The task completes when rows 3–7 and 10–12 are demonstrated, every native law
 and guest test mapped to rows 1–13 passes in the full compiler gate
 (`deno task test:compiler` and `deno task lint:zig`) on committed source, and
 the row-to-law mapping, with fresh/retained work and requested/live allocation,
 is recorded in
-[MODULE_ABSTRACTION_QUALIFICATION.md](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md).
+[MODULE_ABSTRACTION_QUALIFICATION.md](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md).
 
 What moved where (nothing is dropped silently):
 
@@ -161,7 +161,7 @@ No new task is added: every row is finite and specified.
 ## Completion evidence
 
 - The fixed rows 1–13 are complete. The
-  [final qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#final-task-053-qualification-20-october-2026)
+  [final qualification](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md#final-task-053-qualification-20-october-2026)
   records the row-to-law map and exact source, binary, timing and report pins.
 - Private storage, binding/type/effect/contract insertion and movement,
   parameter alpha changes, public contracts, associated methods and bounded

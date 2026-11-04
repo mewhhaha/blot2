@@ -6,7 +6,7 @@
 - **Dependencies:** [048](048-explain-dispatch-and-evidence.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / editor
   completion. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,10 +17,10 @@ and integration with the existing editor setup.
 
 ## Starting point
 
-[compiler/zig_project_client.ts](../compiler/zig_project_client.ts),
-[zig_project_server.zig](../zig-native/src/reuse/zig_project_server.zig),
-[zig_project_frames.zig](../zig-native/src/reuse/zig_project_frames.zig) and
-[source_overlays.zig](../zig-native/src/reuse/source_overlays.zig) provide
+[host/zig_project_client.ts](../host/zig_project_client.ts),
+[zig_project_server.zig](../compiler/src/reuse/zig_project_server.zig),
+[zig_project_frames.zig](../compiler/src/reuse/zig_project_frames.zig) and
+[source_overlays.zig](../compiler/src/reuse/source_overlays.zig) provide
 retained protocol/overlays.
 [editor/helix/languages.toml](../editor/helix/languages.toml) and tree-sitter
 integration currently provide editor syntax support.
@@ -68,4 +68,4 @@ change.
 - Remaining limitations: task 050 implements and qualifies the query, client,
   bounded recovery/ranking and actual Helix bridge. The proposed 250 ms deadline
   is editor policy, not measured latency.
-- Durable record: [editor completion](../zig-native/EDITOR_COMPLETION.md).
+- Durable record: [editor completion](../docs/compiler/EDITOR_COMPLETION.md).

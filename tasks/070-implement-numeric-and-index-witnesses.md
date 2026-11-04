@@ -6,7 +6,7 @@
   lowering qualify in the final combined gate.
 - **Dependencies:** [069](069-specify-bounded-erased-proofs.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 9 / explicit
-  witnesses. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  witnesses. Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -18,10 +18,10 @@ evidence.
 ## Starting point
 
 Task 069 defines
-[proof forms and acceptance examples](../zig-native/ERASED_PROOFS.md);
-[types.zig](../zig-native/src/check/types.zig),
-[type_evidence.zig](../zig-native/src/eval/type_evidence.zig) and
-[dependency_format.zig](../zig-native/src/reuse/dependency_format.zig) need the
+[proof forms and acceptance examples](../docs/compiler/ERASED_PROOFS.md);
+[types.zig](../compiler/src/check/types.zig),
+[type_evidence.zig](../compiler/src/eval/type_evidence.zig) and
+[dependency_format.zig](../compiler/src/reuse/dependency_format.zig) need the
 corresponding checked evidence representation.
 
 ## Progress
@@ -35,7 +35,7 @@ imported proof aliases have unchanged semantic laws and complete
 allocation-failure coverage.
 
 The
-[finite acceptance audit](../zig-native/NUMERIC_PROOFS_QUALIFICATION.md#finite-acceptance-audit-15-october-2026)
+[finite acceptance audit](../docs/qualification/NUMERIC_PROOFS_QUALIFICATION.md#finite-acceptance-audit-15-october-2026)
 records the documented inference rules and bounded checking costs. Unknown or
 exhausted optional analysis retains checks; exhausted required evidence rejects.
 
@@ -101,4 +101,4 @@ commands for focused development and the scenarios below.
   contracts reject; no arbitrary theorem solving is promised. Broader program
   performance and remote CI remain in tasks 084/093 and 082.
 - Durable acceptance, erasure/import/retained/OOM controls and historical pins:
-  [numeric qualification](../zig-native/NUMERIC_PROOFS_QUALIFICATION.md).
+  [numeric qualification](../docs/qualification/NUMERIC_PROOFS_QUALIFICATION.md).

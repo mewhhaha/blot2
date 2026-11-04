@@ -18,13 +18,13 @@ transitive call graph at each use.
 ## Starting point
 
 Use the
-[approved summary interface](../zig-native/CALL_SUMMARIES.md#admission-and-caller-interface)
+[approved summary interface](../docs/compiler/CALL_SUMMARIES.md#admission-and-caller-interface)
 and its
-[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
+[acceptance cases](../docs/compiler/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
-[check_shared_scheme_tests.zig](../zig-native/src/check/check_shared_scheme_tests.zig)
+[check_shared_scheme_tests.zig](../compiler/src/check/check_shared_scheme_tests.zig)
 covers frontend scheme sharing;
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) covers checked written
+[core_eval.zig](../compiler/src/eval/core_eval.zig) covers checked written
 predicates, owned inferred first-order graphs and source-only normalized graphs
 alongside the original predicate-free path. `collectCall`, the summary queue and
 `validated_calls` implement the boundaries specified in task 003.
@@ -96,4 +96,4 @@ commands for focused development and the scenarios below.
   gdev artifacts keep final historical and program-wide qualification open.
 - Durable specification, implementation boundaries, earlier experiments and
   final qualification:
-  [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026).
+  [CALL_SUMMARIES.md](../docs/compiler/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026).

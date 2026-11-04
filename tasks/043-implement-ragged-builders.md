@@ -16,9 +16,9 @@ preserving ordinary builders elsewhere.
 
 ## Starting point
 
-[exact_builder.zig](../zig-native/src/backend/exact_builder.zig),
-[eval_indexed_builder.zig](../zig-native/src/eval/eval_indexed_builder.zig) and
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) contain the
+[exact_builder.zig](../compiler/src/backend/exact_builder.zig),
+[eval_indexed_builder.zig](../compiler/src/eval/eval_indexed_builder.zig) and
+[core_backend.zig](../compiler/src/backend/core_backend.zig) contain the
 current construction paths. The approved ragged design defines legal extra
 passes.
 
@@ -69,5 +69,5 @@ commands for focused development and the scenarios below.
   unknown/effectful/trapping shapes. Exhausted K=0 probing regresses 2.37x;
   compiler peak is unchanged.
 - Durable record:
-  [qualification](../zig-native/RAGGED_BUILDERS_QUALIFICATION.md); exact release
+  [qualification](../docs/qualification/RAGGED_BUILDERS_QUALIFICATION.md); exact release
   pins, distributions and ignored evidence paths are recorded there.

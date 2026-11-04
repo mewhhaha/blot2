@@ -70,4 +70,4 @@ before the local milestone commit.
   is the whole declaration. No public program reproduces the exhaustion through
   the project server, so that path is covered by the ordinary diagnostic flow
   rather than an end-to-end law.
-- Durable record: [CONTRACT.md](../zig-native/CONTRACT.md#frontend-interface).
+- Durable record: [CONTRACT.md](../docs/compiler/CONTRACT.md#frontend-interface).

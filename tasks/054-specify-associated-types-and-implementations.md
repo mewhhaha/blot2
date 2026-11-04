@@ -6,7 +6,7 @@
   below.
 - **Dependencies:** [052](052-implement-opaque-types-and-privacy.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 3 / generic
-  contracts. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  contracts. Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,10 +17,10 @@ selection and portable evidence.
 
 ## Starting point
 
-[compiler/guide.md](../compiler/guide.md#qualified-bindings) defines named
+[docs/language/guide.md](../docs/language/guide.md#qualified-bindings) defines named
 predicate bundles and current associated dispatch.
-[check_contract_tests.zig](../zig-native/src/check/check_contract_tests.zig) and
-[associated_catalog_tests.zig](../zig-native/src/eval/associated_catalog_tests.zig)
+[check_contract_tests.zig](../compiler/src/check/check_contract_tests.zig) and
+[associated_catalog_tests.zig](../compiler/src/eval/associated_catalog_tests.zig)
 cover existing contracts/catalogs; associated type members remain open.
 
 ## Implementation checklist
@@ -71,6 +71,6 @@ change.
 - Remaining limitations: Tasks 055–056 implement the specified members,
   projections, equality, implementations, coherence, methods and portable
   evidence. No such behavior is claimed by this design milestone.
-- Durable record: [ASSOCIATED_CONTRACTS](../zig-native/ASSOCIATED_CONTRACTS.md);
+- Durable record: [ASSOCIATED_CONTRACTS](../docs/compiler/ASSOCIATED_CONTRACTS.md);
   exact combined pins, commands, rejected attempts and raw evidence are in
-  [integrated qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).
+  [integrated qualification](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).

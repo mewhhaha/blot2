@@ -38,7 +38,7 @@ Two kinds of per-iteration work were statically removable:
 
 - [x] Store numeric Array elements with `ir.scalarStore`-annotated stores for
       index updates and `Array.set`, keeping bounds checks
-      (`zig-native/src/backend/backend_emission.zig`).
+      (`compiler/src/backend/backend_emission.zig`).
 - [x] Rewrite `root_borrows.zig` as a region proof with a forward must-copy
       dataflow. It removes duplicate stores into a slot that keeps one value,
       the lexical publications of that value, and other slots that only ever
@@ -50,18 +50,18 @@ Two kinds of per-iteration work were statically removable:
       for any result role, and ignore dead predecessors.
 - [x] Static laws: IR boundaries and in-place carry laws in `root_borrows.zig`,
       nesting/trap/leaf-call laws in `empty_root_scopes.zig`, and source laws in
-      `zig-native/src/backend/persistent_roots_tests.zig`. The source laws check
+      `compiler/src/backend/persistent_roots_tests.zig`. The source laws check
       for no loop journal calls through retained, checkpoint, replay and OOM
       runs, and check that shared, fresh and owning-element loops keep their
       journal calls.
 - [x] Executed-Wasm law in
-      `zig-native/tests/persistent_roots_execution.test.ts`. It covers an
+      `tests/guest/persistent_roots_execution.test.ts`. It covers an
       insertion sort with breaks, an Array-of-references carry repeated 3,000
       times with stable memory, an aliasing snapshot that must copy, and a
       throughput guard: journal retains per call must not grow with the
       iteration count.
-- [x] Document the rules in `zig-native/PERSISTENT_ROOTS.md`,
-      `zig-native/SHARED_RC.md` and `zig-native/CONTRACT.md`.
+- [x] Document the rules in `docs/compiler/PERSISTENT_ROOTS.md`,
+      `docs/compiler/SHARED_RC.md` and `docs/compiler/CONTRACT.md`.
 
 ## Validation
 
@@ -91,7 +91,7 @@ and patched release builds with the same harness.
   three required probes are at 1.082, 1.089 and 0.008. `break_writes` scales by
   1.821 when count doubles. All witnesses and warmed memory checks pass over
   60,480 calls. The
-  [durable current record](../zig-native/PERSISTENT_ROOTS.md#current-array-throughput-qualification-19-october-2026)
+  [durable current record](../docs/compiler/PERSISTENT_ROOTS.md#current-array-throughput-qualification-19-october-2026)
   pins source archives, binaries, harness, distributions and limitations.
 
 ### Historical implementation qualification, 17 October 2026
@@ -102,7 +102,7 @@ and patched release builds with the same harness.
   passed 362 of 362 tests on the gated build. On pre-fix main `48eda0a` the new
   executed law fails its throughput guard: journal retains per call are 8, 2,416
   and 133,298 at counts 2, 64 and 512. See the dated record in
-  [PERSISTENT_ROOTS.md](../zig-native/PERSISTENT_ROOTS.md#array-loop-throughput-17-october-2026).
+  [PERSISTENT_ROOTS.md](../docs/compiler/PERSISTENT_ROOTS.md#array-loop-throughput-17-october-2026).
 - Comparison: median release-guest times, in ms, after 400 warm-up rounds,
   paired on one host:
 
@@ -121,4 +121,4 @@ and patched release builds with the same harness.
   `ids[j - 1] := ids[j]` copies on both main and patched builds. That is an
   `ownsArrayUpdate` limitation outside this task.
 - Durable record:
-  [PERSISTENT_ROOTS.md](../zig-native/PERSISTENT_ROOTS.md#counted-owners).
+  [PERSISTENT_ROOTS.md](../docs/compiler/PERSISTENT_ROOTS.md#counted-owners).

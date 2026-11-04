@@ -18,8 +18,8 @@ when both CPU and wall time improve.
 ## Starting point
 
 Task 012 supplies isolated jobs;
-[execution_policy.zig](../zig-native/src/execution_policy.zig) and
-[scripts/bench_compile.ts](../scripts/bench_compile.ts) are the policy and
+[execution_policy.zig](../compiler/src/execution_policy.zig) and
+[benchmarks/tools/bench_compile.ts](../benchmarks/tools/bench_compile.ts) are the policy and
 measurement boundaries. Previous worker measurements were dominated by one
 region and do not justify a default change.
 
@@ -83,7 +83,7 @@ commands for focused development and the scenarios below.
   requested bytes, overlapping private job wall sums and unsupported-context
   serial fallbacks. Historical boxed/private gdev artifacts remain absent; no
   private application or general speedup claim is made.
-- Durable record: [policy qualification](../zig-native/SEMANTIC_WORKERS.md)
+- Durable record: [policy qualification](../docs/compiler/SEMANTIC_WORKERS.md)
   links exact compiler/driver/library/workload hashes, scheduler/cgroup
   snapshots and complete fresh/retained/profiling distributions outside
   `tasks/`.

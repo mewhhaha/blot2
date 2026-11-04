@@ -8,8 +8,8 @@
   [062](062-implement-resource-cleanup-contracts.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 10 / structured
   concurrency; DEMANDS: concurrent forcing boundary. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md),
-  [Demand evaluation](../zig-native/DEMANDS.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md),
+  [Demand evaluation](../docs/compiler/DEMANDS.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -22,7 +22,7 @@ disjoint access and host execution.
 
 The runtime supports synchronous/JSPI guest calls but not general structured
 tasks. Tasks 059/062 provide capability and cleanup contracts;
-[zig-native/DEMANDS.md](../zig-native/DEMANDS.md) explicitly leaves concurrent
+[docs/compiler/DEMANDS.md](../docs/compiler/DEMANDS.md) explicitly leaves concurrent
 forcing unspecified.
 
 ## Implementation checklist
@@ -62,10 +62,10 @@ change.
 - Source milestone: isolated design checkpoint based on `ef57ec5`; no compiler
   source or executable fixtures changed in this specification checkpoint.
 - Durable record:
-  [Structured Concurrency](../zig-native/STRUCTURED_CONCURRENCY.md).
+  [Structured Concurrency](../docs/compiler/STRUCTURED_CONCURRENCY.md).
 - Validation: `deno fmt --no-config --check` on the four specifications and task
   records, plus local path/heading validation; results recorded in
-  [design qualification](../zig-native/LANGUAGE_DESIGN_QUALIFICATION.md).
+  [design qualification](../docs/qualification/LANGUAGE_DESIGN_QUALIFICATION.md).
 - Comparison: documentation only; no runtime or compiler performance claim.
 - Remaining limitations: dependent implementation tasks remain open. The design
   fixes syntax, ownership/identity, portable evidence and rejection boundaries;

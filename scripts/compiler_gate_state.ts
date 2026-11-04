@@ -79,10 +79,10 @@ async function fixtureFiles(
 // Qualification notes and guest-only repairs do not change native evidence.
 export async function nativeInputs(root: string): Promise<string[]> {
   const paths = [
-    "zig-native/build.zig",
-    "zig-native/build.zig.zon",
-    "zig-native/compiler_fingerprint.zig",
-    "compiler/guide.md",
+    "compiler/build.zig",
+    "compiler/build.zig.zon",
+    "compiler/compiler_fingerprint.zig",
+    "docs/language/guide.md",
     "scripts/test_compiler.ts",
     "scripts/compiler_phase.ts",
     "scripts/compiler_gate_state.ts",
@@ -94,8 +94,8 @@ export async function nativeInputs(root: string): Promise<string[]> {
   ].map((path) => resolve(root, path));
   // Compilation can import ignored files. Parser corpus laws also read sibling
   // gdev source, including their alternative lookup from a native working dir.
-  paths.push(...await fixtureFiles(resolve(root, "zig-native/src")));
-  paths.push(...await fixtureFiles(resolve(root, "zig-native/fixtures")));
+  paths.push(...await fixtureFiles(resolve(root, "compiler/src")));
+  paths.push(...await fixtureFiles(resolve(root, "compiler/fixtures")));
   for (
     const directory of [
       "std",

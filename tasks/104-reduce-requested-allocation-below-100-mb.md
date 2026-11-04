@@ -24,7 +24,7 @@ compiler allocation, measured separately from live memory and RSS.
 ## Starting point
 
 The qualified starting value was 321.2 MB cumulative requested allocation on the
-earlier gdev workload ([STATUS.md](../zig-native/STATUS.md)). Task
+earlier gdev workload ([STATUS.md](../docs/compiler/STATUS.md)). Task
 [011](011-reduce-semantic-allocation-traffic.md) attributes allocation by owner.
 No current figure exists for the 084 workload.
 

@@ -289,7 +289,7 @@ if (import.meta.main) {
     options: {
       binary: {
         type: "string",
-        default: "zig-native/zig-out-native-dev/bin/blot-tests",
+        default: "compiler/zig-out-native-dev/bin/blot-tests",
       },
       "timings-dir": {
         type: "string",

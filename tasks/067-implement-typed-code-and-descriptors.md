@@ -7,7 +7,7 @@
 - **Dependencies:** [066](066-specify-typed-staging.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 8 / typed code and
   descriptors. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -18,10 +18,10 @@ compiler stages.
 
 ## Starting point
 
-[parser.zig](../zig-native/src/parse/parser.zig),
-[check.zig](../zig-native/src/check/check.zig),
-[core.zig](../zig-native/src/check/core.zig) and
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) are the sole source
+[parser.zig](../compiler/src/parse/parser.zig),
+[check.zig](../compiler/src/check/check.zig),
+[core.zig](../compiler/src/check/core.zig) and
+[core_eval.zig](../compiler/src/eval/core_eval.zig) are the sole source
 pipeline. Task 066 defines typed staging forms; external asset parsing remains
 an existing host boundary.
 
@@ -61,7 +61,7 @@ commands for focused development and the scenarios below.
 ## Closed acceptance — owner decision, 15 October 2026
 
 The owner closed this task's scope to the acceptance traces of the
-[typed staging design](../zig-native/TYPED_STAGING.md) listed below. The
+[typed staging design](../docs/compiler/TYPED_STAGING.md) listed below. The
 acceptance criteria below are read against these traces.
 
 | Acceptance trace                                      | Expected result                             |
@@ -79,15 +79,15 @@ measured and recorded; they are not a pass/fail target.
 
 The task completes when each trace maps to named passing native laws or guest
 tests in the full compiler gate on the committed source, recorded durably in
-[STAGING_QUALIFICATION.md](../zig-native/STAGING_QUALIFICATION.md). The
-[trace-to-law index](../zig-native/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+[STAGING_QUALIFICATION.md](../docs/qualification/STAGING_QUALIFICATION.md). The
+[trace-to-law index](../docs/qualification/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
 built from the gate at `05401a9` is recorded there.
 
 ## Completion evidence
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -108,7 +108,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
 - Validation: the full gate at `05401a9` (17 October 2026) passes 2,355 native
   laws with zero leaks, 1,501 guest tests and zero analyzer findings over 486
   files. The
-  [trace-to-law index](../zig-native/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+  [trace-to-law index](../docs/qualification/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
   maps the first trace completely. Before closure: (1) measure population and
   retained costs on gated source and record them in STAGING_QUALIFICATION.md
   (not a pass/fail target); (2) the splice trace has named laws for result and
@@ -118,7 +118,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   quotes or lifts a value whose type mentions a live skolem. The 19 October
   working-tree continuation supplies dedicated native/OOM and guest laws for (2)
   and (3); see the
-  [new trace laws](../zig-native/STAGING_QUALIFICATION.md#missing-trace-laws-19-october-2026-working-tree).
+  [new trace laws](../docs/qualification/STAGING_QUALIFICATION.md#missing-trace-laws-19-october-2026-working-tree).
   Their final LLVM qualification is pending.
 - Current focused frontier (15 October 2026): the combined stage-owner batch
   passes 73 native laws (60 portable staging laws plus operation, task and usage
@@ -127,7 +127,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   preserve fresh bytes and last-good execution. Pins were in
   `build/bench/finish-rest-20261015/staging-stage-owners/` (historical; `build/`
   was removed). See
-  [current continuation](../zig-native/STAGING_QUALIFICATION.md#current-continuation-15-october-2026).
+  [current continuation](../docs/qualification/STAGING_QUALIFICATION.md#current-continuation-15-october-2026).
 - Implemented: native and client syntax own `code [T, row E]`, descriptor
   targets and stage intrinsics (17 native syntax/OOM laws; 25 client
   syntax/formatting tests, one existing ignored test). Owned staging passes
@@ -142,7 +142,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   public nominal lifts (six-file patch SHA-256
   `928b4dd9a1bd80147ce1ae18dc89c7356b1ea4313a8ef52e82b0a6bbbda8595d`), immutable
   producer data and public nominal field descriptors are recorded in
-  [STAGING_QUALIFICATION.md](../zig-native/STAGING_QUALIFICATION.md). Recorded
+  [STAGING_QUALIFICATION.md](../docs/qualification/STAGING_QUALIFICATION.md). Recorded
   only here, with pins formerly under `build/bench/finish-program-20261014/`:
   straight-line helper blocks (two native laws, four guest groups, 38 steps),
   pure nominal-constructing helpers (five native laws, five guest groups), pure
@@ -161,6 +161,6 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   transport and complete generated declaration/source maps remain open and must
   reject or decline conservatively.
 - Durable record:
-  [staging qualification](../zig-native/STAGING_QUALIFICATION.md) and the
-  [design's implementation frontier](../zig-native/TYPED_STAGING.md#current-implementation-frontier);
+  [staging qualification](../docs/qualification/STAGING_QUALIFICATION.md) and the
+  [design's implementation frontier](../docs/compiler/TYPED_STAGING.md#current-implementation-frontier);
   cost qualification remains pending; the full gate passed at `05401a9`.

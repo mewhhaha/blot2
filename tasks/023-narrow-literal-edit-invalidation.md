@@ -17,8 +17,8 @@ relocations after literal edits.
 ## Starting point
 
 The baseline gdev literal edit takes 150/140 ms and can rebuild the seed.
-[retained_revision.zig](../zig-native/src/reuse/retained_revision.zig),
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) and query
+[retained_revision.zig](../compiler/src/reuse/retained_revision.zig),
+[core_backend.zig](../compiler/src/backend/core_backend.zig) and query
 dependency records now have the foundations for narrower invalidation.
 
 ## Implementation checklist
@@ -95,6 +95,6 @@ commands for focused development and the scenarios below.
   `simulation`); population publishes no certificate; constants are still
   evaluated every revision. The under-30-ms literal target is not demonstrated
   and remains open for task 084, since gdev is unavailable here.
-- Durable record: [literal edits](../zig-native/LITERAL_EDITS.md),
-  [distributions](../zig-native/qualification/literal-edits.csv) and
-  [pins](../zig-native/qualification/literal-edits-pins.json).
+- Durable record: [literal edits](../docs/compiler/LITERAL_EDITS.md),
+  [distributions](../benchmarks/evidence/qualification/literal-edits.csv) and
+  [pins](../benchmarks/evidence/qualification/literal-edits-pins.json).

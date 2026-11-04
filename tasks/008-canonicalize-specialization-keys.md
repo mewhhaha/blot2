@@ -18,17 +18,17 @@ duplicate regions only when the full proof permits sharing.
 ## Starting point
 
 Use the
-[approved summary interface](../zig-native/CALL_SUMMARIES.md#lexical-captures-and-canonical-inputs)
+[approved summary interface](../docs/compiler/CALL_SUMMARIES.md#lexical-captures-and-canonical-inputs)
 and its
-[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
+[acceptance cases](../docs/compiler/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
 `specialized_closures` and frozen capture proofs in
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) still retain
+[core_eval.zig](../compiler/src/eval/core_eval.zig) still retain
 value-specific keys.
-[specialization.zig](../zig-native/src/eval/specialization.zig),
-[specialization_receipt.zig](../zig-native/src/reuse/specialization_receipt.zig)
+[specialization.zig](../compiler/src/eval/specialization.zig),
+[specialization_receipt.zig](../compiler/src/reuse/specialization_receipt.zig)
 and
-[completed_specialization_query.zig](../zig-native/src/eval/completed_specialization_query.zig)
+[completed_specialization_query.zig](../compiler/src/eval/completed_specialization_query.zig)
 provide the current selected-evidence boundaries.
 
 ## Implementation checklist
@@ -85,4 +85,4 @@ commands for focused development and the scenarios below.
   Private gdev remains unavailable; task 011 owns allocation follow-up and task
   084 retains the application allocation/performance targets.
 - Durable record:
-  [session-local canonical specialization](../zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026).
+  [session-local canonical specialization](../docs/compiler/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026).

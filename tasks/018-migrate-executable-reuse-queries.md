@@ -17,10 +17,10 @@ confusing interface stability with executable stability.
 
 ## Starting point
 
-[artifact_capture.zig](../zig-native/src/reuse/artifact_capture.zig),
-[optimized_bodies.zig](../zig-native/src/backend/optimized_bodies.zig),
-[runtime_pipeline.zig](../zig-native/src/backend/runtime_pipeline.zig) and
-[runtime_body_relocation.zig](../zig-native/src/backend/runtime_body_relocation.zig)
+[artifact_capture.zig](../compiler/src/reuse/artifact_capture.zig),
+[optimized_bodies.zig](../compiler/src/backend/optimized_bodies.zig),
+[runtime_pipeline.zig](../compiler/src/backend/runtime_pipeline.zig) and
+[runtime_body_relocation.zig](../compiler/src/backend/runtime_body_relocation.zig)
 capture instructions, called bodies, signatures and lifetime facts. Demand
 inlining also consumes body dependencies.
 
@@ -85,10 +85,10 @@ commands for focused development and the scenarios below.
   broader persisted graphs task 020. Unsupported jobs and saturated tables
   conservatively rebuild. Private gdev/original boxed artifacts remain absent,
   so tasks 002/084 stay open. Later tasks remain pending.
-- Durable record: [executable queries](../zig-native/EXECUTABLE_QUERIES.md),
-  [fresh distributions](../zig-native/qualification/executable-queries-fresh.csv),
-  [retained distributions](../zig-native/qualification/executable-queries-retained.csv),
-  [pins](../zig-native/qualification/executable-queries-pins.json),
-  [native probe](../zig-native/qualification/executable_queries_probe.zig),
-  [prefix law](../zig-native/qualification/executable_queries_prefix.zig) and
-  [executed body-edit scenario](../zig-native/qualification/executable_queries_behavior.ts).
+- Durable record: [executable queries](../docs/compiler/EXECUTABLE_QUERIES.md),
+  [fresh distributions](../benchmarks/evidence/qualification/executable-queries-fresh.csv),
+  [retained distributions](../benchmarks/evidence/qualification/executable-queries-retained.csv),
+  [pins](../benchmarks/evidence/qualification/executable-queries-pins.json),
+  [native probe](../benchmarks/evidence/qualification/executable_queries_probe.zig),
+  [prefix law](../benchmarks/evidence/qualification/executable_queries_prefix.zig) and
+  [executed body-edit scenario](../benchmarks/evidence/qualification/executable_queries_behavior.ts).

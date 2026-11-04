@@ -4,11 +4,11 @@
 
 - **Status:** Complete — closed on 17 October 2026 against the two
   capability-lifetime rows of
-  [language qualification](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+  [language qualification](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
   gate at `05401a9`.
 - **Dependencies:** [058](058-implement-effect-instances-and-subtraction.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / capability
-  escape. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  escape. Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -20,8 +20,8 @@ their lifetime.
 ## Starting point
 
 Task 058 gives capabilities stable scoped identities.
-[check.zig](../zig-native/src/check/check.zig),
-[specialization.zig](../zig-native/src/eval/specialization.zig) and captured
+[check.zig](../compiler/src/check/check.zig),
+[specialization.zig](../compiler/src/eval/specialization.zig) and captured
 evidence now need the escape rules from task 057.
 
 ## Implementation checklist
@@ -60,7 +60,7 @@ commands for focused development and the scenarios below.
 ## Closed acceptance — owner decision, 15 October 2026
 
 The owner closed this task's scope to the rows of
-[language qualification](../zig-native/LANGUAGE_QUALIFICATION.md) listed below.
+[language qualification](../docs/qualification/LANGUAGE_QUALIFICATION.md) listed below.
 Forms outside these rows ("general" captures, stores, transports and shapes) are
 not required work: they must reject or decline conservatively with a stable
 diagnostic and are recorded as limitations. The acceptance criteria below are
@@ -82,7 +82,7 @@ original acceptance index
 (`build/bench/finish-rest-20261015/language-acceptance/qualified-baseline.json`)
 was removed with `build/`. The row-to-law mapping regenerated from that gate's
 native test names and guest JUnit report is recorded in
-[LANGUAGE_QUALIFICATION.md](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026).
+[LANGUAGE_QUALIFICATION.md](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026).
 
 ## Completion evidence
 
@@ -98,7 +98,7 @@ native test names and guest JUnit report is recorded in
   leaks, 1,486 guest, 28 harness, 21 preflight and 48 smoke tests and zero
   analyzer findings.
 - Row-to-law mapping: the
-  [index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
+  [index](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
   names 26 native laws and 9 guest tests for the seven requirements of the two
   capability-lifetime rows; all passed in the `05401a9` gate.
 - Comparison: performance measurement does not apply; the closed rows are
@@ -113,10 +113,10 @@ native test names and guest JUnit report is recorded in
   [README owner decisions](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)),
   not open work. Such forms reject conservatively with stable diagnostics, which
   also rejects some authority-free values and legal storage or callback flows
-  ([conservative limits](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md#conservative-limits);
+  ([conservative limits](../docs/qualification/SCOPED_EFFECTS_QUALIFICATION.md#conservative-limits);
   later sections of that record narrow the boundary).
 - Durable record:
-  [row-to-law index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
-  [scoped effect qualification](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md)
+  [row-to-law index](../docs/qualification/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026),
+  [scoped effect qualification](../docs/qualification/SCOPED_EFFECTS_QUALIFICATION.md)
   and the
-  [lifetime design](../zig-native/SCOPED_EFFECTS.md#lifetime-and-capture).
+  [lifetime design](../docs/compiler/SCOPED_EFFECTS.md#lifetime-and-capture).

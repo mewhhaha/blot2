@@ -4,7 +4,7 @@
   implemented; unconditional dispatch and legacy retirement remain pending.
 - **Dependencies:** Inventory can start early. Semantic cutover and deletion
   follow executable compiler/Ink/Gdev integration in 110–119.
-- **Contract:** [Review](../zig-native/STORAGE_REWRITE_REVIEW.md),
+- **Contract:** [Review](../docs/compiler/STORAGE_REWRITE_REVIEW.md),
   [schedule and gates](STORAGE_REWRITE.md).
 
 ## Outcome and ownership

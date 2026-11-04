@@ -2,8 +2,8 @@ import { strict as assert } from "node:assert";
 import {
   createZigProjectCompiler,
   type ZigProjectBuildResult,
-} from "../compiler/zig_project_client.ts";
-import { instantiateGuest } from "../compiler/guest.ts";
+} from "../host/zig_project_client.ts";
+import { instantiateGuest } from "../host/guest.ts";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -17,7 +17,7 @@ const { values } = parseArgs({
     ink: { type: "string", default: resolve(root, "../ink") },
     compiler: {
       type: "string",
-      default: resolve(root, "zig-native/zig-out/bin/blotc"),
+      default: resolve(root, "compiler/zig-out/bin/blotc"),
     },
     output: {
       type: "string",
@@ -186,7 +186,7 @@ entry const main = func (delta: F32) => return do:
     }
   }
 }
-const before = beforeRoot + "/zig-native/zig-out/bin/blotc";
+const before = beforeRoot + "/compiler/zig-out/bin/blotc";
 pins[before] = await hash(before);
 await pinTree(beforeRoot + "/std");
 const controls = [];

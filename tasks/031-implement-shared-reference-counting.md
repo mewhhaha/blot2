@@ -16,10 +16,10 @@ while keeping tracing during the transition.
 
 ## Starting point
 
-[runtime_layout.zig](../zig-native/src/runtime/runtime_layout.zig) defines heap
-fields, [arena_runtime.zig](../zig-native/src/runtime/arena_runtime.zig)
+[runtime_layout.zig](../compiler/src/runtime/runtime_layout.zig) defines heap
+fields, [arena_runtime.zig](../compiler/src/runtime/arena_runtime.zig)
 supplies storage, and
-[wasm_lifetimes.zig](../zig-native/src/backend/wasm_lifetimes.zig) proves local
+[wasm_lifetimes.zig](../compiler/src/backend/wasm_lifetimes.zig) proves local
 allocation groups. Task 030 defines the new shared ownership contract.
 
 ## Implementation checklist
@@ -66,10 +66,10 @@ commands for focused development and the scenarios below.
   exactly; compiler input fingerprint matches too.
 - Comparison: twenty alternating compiler/runtime pairs, header geometry and
   checked-operation costs are recorded in
-  [SHARED_RC](../zig-native/SHARED_RC.md). Fresh/edit CPU increases 3.9%/13.2%;
+  [SHARED_RC](../docs/compiler/SHARED_RC.md). Fresh/edit CPU increases 3.9%/13.2%;
   the covered Array/List workload costs 4.2/11.4 times tracing CPU. No
   performance improvement is claimed.
 - Remaining limitations: tracing remains for uncovered graphs. Persistent and
   suspended roots belong to 032–033; complete cycle reclamation/removal to
   034–035. The nested discarded-Array memory counterexample remains open.
-- Durable record: [SHARED_RC](../zig-native/SHARED_RC.md).
+- Durable record: [SHARED_RC](../docs/compiler/SHARED_RC.md).

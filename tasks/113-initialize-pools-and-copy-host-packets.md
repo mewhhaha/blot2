@@ -4,7 +4,7 @@ Status: in progress for independent packet-region budgeting (root integration).
 Computed global initialization and complete host qualification remain pending.
 
 Complete persistent pool construction and ordinary copied host transport from
-the [rewrite review](../zig-native/STORAGE_REWRITE_REVIEW.md) and
+the [rewrite review](../docs/compiler/STORAGE_REWRITE_REVIEW.md) and
 [task index](STORAGE_REWRITE.md). Preserve isolated host workers and Foreign
 suspension while the separate deletion task removes language tasks.
 
@@ -18,14 +18,14 @@ attempt recovery rule. Root integrates shared Wasm ABI/export changes.
 
 ## Exclusive file ownership
 
-- `zig-native/src/backend/storage_globals.zig`.
-- `zig-native/src/runtime/storage_packets.zig`.
-- `compiler/guest.ts` ordinary host/packet/invocation portions.
+- `compiler/src/backend/storage_globals.zig`.
+- `compiler/src/runtime/storage_packets.zig`.
+- `host/guest.ts` ordinary host/packet/invocation portions.
 - Pen `crates/blot-host/src/lib.rs` and `src/native.rs`, ordinary host portions
   in `/home/mewhhaha/src/pen`.
-- `zig-native/tests/storage_host_execution.test.ts`; new
-  `zig-native/tests/storage_globals_execution.test.ts` and
-  `zig-native/src/backend/storage_initialization_tests.zig` for initialization
+- `tests/guest/storage_host_execution.test.ts`; new
+  `tests/guest/storage_globals_execution.test.ts` and
+  `compiler/src/backend/storage_initialization_tests.zig` for initialization
   admission, publication and allocation-failure laws.
 
 Task 110 owns `scoped_backend.zig`; supply helper APIs and required emission

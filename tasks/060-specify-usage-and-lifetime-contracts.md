@@ -8,7 +8,7 @@
   [030](030-specify-shared-and-cyclic-ownership.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 5 / usage and
   lifetime contracts. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -19,7 +19,7 @@ source and separate compilation.
 
 ## Starting point
 
-[wasm_lifetimes.zig](../zig-native/src/backend/wasm_lifetimes.zig) infers
+[wasm_lifetimes.zig](../compiler/src/backend/wasm_lifetimes.zig) infers
 optimization facts but does not provide public usage contracts. Tasks 030 and
 059 define runtime ownership and capability lifetimes.
 
@@ -59,10 +59,10 @@ change.
 
 - Source milestone: isolated design checkpoint based on `ef57ec5`; no compiler
   source or executable fixtures changed in this specification checkpoint.
-- Durable record: [Usage Contracts](../zig-native/USAGE_CONTRACTS.md).
+- Durable record: [Usage Contracts](../docs/compiler/USAGE_CONTRACTS.md).
 - Validation: `deno fmt --no-config --check` on the four specifications and task
   records, plus local path/heading validation; results recorded in
-  [design qualification](../zig-native/LANGUAGE_DESIGN_QUALIFICATION.md).
+  [design qualification](../docs/qualification/LANGUAGE_DESIGN_QUALIFICATION.md).
 - Comparison: documentation only; no runtime or compiler performance claim.
 - Remaining limitations: dependent implementation tasks remain open. The design
   fixes syntax, ownership/identity, portable evidence and rejection boundaries;

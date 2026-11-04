@@ -6,7 +6,7 @@
 - **Dependencies:** [054](054-specify-associated-types-and-implementations.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 3 / associated
   type members. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,10 +17,10 @@ specialization.
 
 ## Starting point
 
-[types.zig](../zig-native/src/check/types.zig),
-[check.zig](../zig-native/src/check/check.zig),
-[type_evidence.zig](../zig-native/src/eval/type_evidence.zig) and
-[specialization.zig](../zig-native/src/eval/specialization.zig) carry current
+[types.zig](../compiler/src/check/types.zig),
+[check.zig](../compiler/src/check/check.zig),
+[type_evidence.zig](../compiler/src/eval/type_evidence.zig) and
+[specialization.zig](../compiler/src/eval/specialization.zig) carry current
 contract evidence. Task 054 defines associated members and projection syntax.
 
 ## Implementation checklist
@@ -74,6 +74,6 @@ commands for focused development and the scenarios below.
 - Limits: abstract projections have no guessed runtime layout. Implementation
   declarations, selection and member execution belong to dependent task 056.
 - Durable evidence:
-  [associated type qualification](../zig-native/ASSOCIATED_TYPES_QUALIFICATION.md)
+  [associated type qualification](../docs/qualification/ASSOCIATED_TYPES_QUALIFICATION.md)
   and
-  [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md).
+  [combined qualification](../docs/qualification/FRONTEND_OWNERSHIP_QUALIFICATION.md).

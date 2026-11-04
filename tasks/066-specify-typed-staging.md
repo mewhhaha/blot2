@@ -7,7 +7,7 @@
 - **Dependencies:** [053](053-qualify-module-cutoffs-and-wrapper-erasure.md),
   [065](065-implement-existential-packages.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 8 / typed staging.
-  Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -18,9 +18,9 @@ generation and exact dependencies.
 
 ## Starting point
 
-[compiler/assets.ts](../compiler/assets.ts) already accepts typed host asset
+[host/assets.ts](../host/assets.ts) already accepts typed host asset
 modules, and ordinary const evaluation builds values.
-[compiler/guide.md](../compiler/guide.md) explicitly lacks general type-valued
+[docs/language/guide.md](../docs/language/guide.md) explicitly lacks general type-valued
 computation; typed code must use the ordinary frontend.
 
 ## Implementation checklist
@@ -59,10 +59,10 @@ change.
 
 - Source milestone: isolated design checkpoint based on `ef57ec5`; no compiler
   source or executable fixtures changed in this specification checkpoint.
-- Durable record: [Typed Staging](../zig-native/TYPED_STAGING.md).
+- Durable record: [Typed Staging](../docs/compiler/TYPED_STAGING.md).
 - Validation: `deno fmt --no-config --check` on the four specifications and task
   records, plus local path/heading validation; results recorded in
-  [design qualification](../zig-native/LANGUAGE_DESIGN_QUALIFICATION.md).
+  [design qualification](../docs/qualification/LANGUAGE_DESIGN_QUALIFICATION.md).
 - Comparison: documentation only; no runtime or compiler performance claim.
 - Remaining limitations: dependent implementation tasks remain open. The design
   fixes syntax, ownership/identity, portable evidence and rejection boundaries;

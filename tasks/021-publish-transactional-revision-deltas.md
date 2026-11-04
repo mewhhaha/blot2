@@ -17,10 +17,10 @@ unchanged immutable data.
 
 ## Starting point
 
-[retained_revision.zig](../zig-native/src/reuse/retained_revision.zig),
-[project.zig](../zig-native/src/reuse/project.zig),
-[revision_inputs.zig](../zig-native/src/reuse/revision_inputs.zig) and
-[frozen_dependency.zig](../zig-native/src/reuse/frozen_dependency.zig) preserve
+[retained_revision.zig](../compiler/src/reuse/retained_revision.zig),
+[project.zig](../compiler/src/reuse/project.zig),
+[revision_inputs.zig](../compiler/src/reuse/revision_inputs.zig) and
+[frozen_dependency.zig](../compiler/src/reuse/frozen_dependency.zig) preserve
 last-good revisions but still reconstruct metadata on edits.
 
 ## Implementation checklist
@@ -58,7 +58,7 @@ commands for focused development and the scenarios below.
 ## Completion evidence
 
 - Commit: `696051e6db35a5464636131706e559092c9f37e6` (compiler milestone).
-- Implementation: [pool_leases.zig](../zig-native/src/eval/pool_leases.zig)
+- Implementation: [pool_leases.zig](../compiler/src/eval/pool_leases.zig)
   gives 41 plain artifact pool slices refcounted leases. Captures with an
   in-process previous revision compare each field with its leased predecessor
   and retain equal leases, copying only changed fields. Leases are taken during
@@ -87,6 +87,6 @@ commands for focused development and the scenarios below.
 - Remaining limitations: module pins, substitutions, bridge, operation keys,
   proofs and certificates are still rebuilt; sharing is whole-field; gdev-scale
   edits are unmeasured.
-- Durable record: [revision deltas](../zig-native/REVISION_DELTAS.md),
-  [distributions](../zig-native/qualification/revision-deltas.csv) and
-  [pins](../zig-native/qualification/revision-deltas-pins.json).
+- Durable record: [revision deltas](../docs/compiler/REVISION_DELTAS.md),
+  [distributions](../benchmarks/evidence/qualification/revision-deltas.csv) and
+  [pins](../benchmarks/evidence/qualification/revision-deltas-pins.json).

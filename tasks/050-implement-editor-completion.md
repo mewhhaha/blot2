@@ -6,7 +6,7 @@
 - **Dependencies:** [049](049-specify-editor-completion.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / editor
   completion. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -18,10 +18,10 @@ editor.
 ## Starting point
 
 Task 049 defines the API.
-[compiler/zig_project_client.ts](../compiler/zig_project_client.ts),
-[zig_project_server.zig](../zig-native/src/reuse/zig_project_server.zig),
-[source_overlays.zig](../zig-native/src/reuse/source_overlays.zig) and
-[scripts/helix_languages.ts](../scripts/helix_languages.ts) are the existing
+[host/zig_project_client.ts](../host/zig_project_client.ts),
+[zig_project_server.zig](../compiler/src/reuse/zig_project_server.zig),
+[source_overlays.zig](../compiler/src/reuse/source_overlays.zig) and
+[editor/helix/languages.ts](../editor/helix/languages.ts) are the existing
 integration boundaries.
 
 ## Implementation checklist
@@ -72,5 +72,5 @@ commands for focused development and the scenarios below.
 - Remaining limitations: No retained query cache or auto-imports. Generic
   fitting can exhaust its shared budget and return unknown/truncated. Visibility
   follows the current language; task 052 adds privacy.
-- Durable record: [qualification](../zig-native/EDITOR_COMPLETION.md); exact
+- Durable record: [qualification](../docs/compiler/EDITOR_COMPLETION.md); exact
   release pins, distributions and ignored evidence paths are recorded there.

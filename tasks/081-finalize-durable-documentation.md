@@ -7,8 +7,8 @@
 - **Dependencies:** [080](080-organize-the-source-tree.md)
 - **Originating requirements:** PLAN: Hill 19; LANGUAGE_EVOLUTION and DEMANDS
   status. Sources: [PLAN.md](../PLAN.md),
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md),
-  [Demand evaluation](../zig-native/DEMANDS.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md),
+  [Demand evaluation](../docs/compiler/DEMANDS.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -19,12 +19,12 @@ describe completed behavior accurately.
 
 ## Starting point
 
-[compiler/guide.md](../compiler/guide.md),
-[zig-native/ARCHITECTURE.md](../zig-native/ARCHITECTURE.md),
-[zig-native/CONTRACT.md](../zig-native/CONTRACT.md),
-[zig-native/STATUS.md](../zig-native/STATUS.md),
-[zig-native/LANGUAGE_EVOLUTION.md](../zig-native/LANGUAGE_EVOLUTION.md),
-[zig-native/DEMANDS.md](../zig-native/DEMANDS.md) and
+[docs/language/guide.md](../docs/language/guide.md),
+[docs/compiler/ARCHITECTURE.md](../docs/compiler/ARCHITECTURE.md),
+[docs/compiler/CONTRACT.md](../docs/compiler/CONTRACT.md),
+[docs/compiler/STATUS.md](../docs/compiler/STATUS.md),
+[docs/compiler/LANGUAGE_EVOLUTION.md](../docs/compiler/LANGUAGE_EVOLUTION.md),
+[docs/compiler/DEMANDS.md](../docs/compiler/DEMANDS.md) and
 [std/PERFORMANCE.md](../std/PERFORMANCE.md) hold durable knowledge; task files
 are temporary.
 

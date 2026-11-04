@@ -17,14 +17,14 @@ cutoff and transactional publication.
 
 ## Starting point
 
-[refinement_receipt.zig](../zig-native/src/reuse/refinement_receipt.zig),
-[specialization_receipt.zig](../zig-native/src/reuse/specialization_receipt.zig),
-[principal_inputs.zig](../zig-native/src/reuse/principal_inputs.zig),
-[dependency_certificate.zig](../zig-native/src/reuse/dependency_certificate.zig)
-and [revision_inputs.zig](../zig-native/src/reuse/revision_inputs.zig) implement
+[refinement_receipt.zig](../compiler/src/reuse/refinement_receipt.zig),
+[specialization_receipt.zig](../compiler/src/reuse/specialization_receipt.zig),
+[principal_inputs.zig](../compiler/src/reuse/principal_inputs.zig),
+[dependency_certificate.zig](../compiler/src/reuse/dependency_certificate.zig)
+and [revision_inputs.zig](../compiler/src/reuse/revision_inputs.zig) implement
 separate validity paths.
-[declaration_dependencies.zig](../zig-native/src/reuse/declaration_dependencies.zig)
-and [dependency_closure.zig](../zig-native/src/reuse/dependency_closure.zig)
+[declaration_dependencies.zig](../compiler/src/reuse/declaration_dependencies.zig)
+and [dependency_closure.zig](../compiler/src/reuse/dependency_closure.zig)
 supply dependency information.
 
 ## Implementation checklist
@@ -75,6 +75,6 @@ change.
   remain unimplemented tasks 015–020. The design preserves conservative
   unsupported domains and makes no new performance or complete-artifact coverage
   claim.
-- Durable record: [typed reuse queries](../zig-native/QUERY_TABLE.md), including
+- Durable record: [typed reuse queries](../docs/compiler/QUERY_TABLE.md), including
   APIs, owned representations, diagnostics, compatibility, migration mapping and
   acceptance examples.

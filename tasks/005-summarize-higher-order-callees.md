@@ -18,15 +18,15 @@ higher-order calls into independent inference regions.
 ## Starting point
 
 Use the
-[approved summary interface](../zig-native/CALL_SUMMARIES.md#higher-order-obligations-and-effects)
+[approved summary interface](../docs/compiler/CALL_SUMMARIES.md#higher-order-obligations-and-effects)
 and its
-[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
+[acceptance cases](../docs/compiler/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
 Predicate-free callbacks already use checked schemes. `ClosureRegion` and
-`principalEvidence` in [core_eval.zig](../zig-native/src/eval/core_eval.zig)
+`principalEvidence` in [core_eval.zig](../compiler/src/eval/core_eval.zig)
 still combine general higher-order graphs;
-[callback_row_tests.zig](../zig-native/src/backend/callback_row_tests.zig) and
-[tests/callback_row_execution.test.ts](../zig-native/tests/callback_row_execution.test.ts)
+[callback_row_tests.zig](../compiler/src/backend/callback_row_tests.zig) and
+[tests/callback_row_execution.test.ts](../tests/guest/callback_row_execution.test.ts)
 cover latent callback rows.
 
 ## Implementation checklist
@@ -82,6 +82,6 @@ commands for focused development and the scenarios below.
   Empty profiles supply no duration measurement. Private gdev and historical
   task 002 artifacts remain unavailable.
 - Durable record:
-  [parametric callback qualification](../zig-native/CALL_SUMMARIES.md#parametric-callback-obligations-10-october-2026)
+  [parametric callback qualification](../docs/compiler/CALL_SUMMARIES.md#parametric-callback-obligations-10-october-2026)
   records the exact baseline/candidate identities, commands, distributions and
   rejected capture experiment.

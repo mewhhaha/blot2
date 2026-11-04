@@ -21,12 +21,12 @@ compiled.
 ## Starting point
 
 A statement `case` is an ordinary expression statement, and each `do:` arm is a
-nested block that keeps its own scope, as [the guide](../compiler/guide.md)
+nested block that keeps its own scope, as [the guide](../docs/language/guide.md)
 states. `count := 7` in an arm therefore made a successor visible only inside
 that arm, and the enclosing local kept its old value with no diagnostic. A plain
 statement-level nested `do:` behaved the same. The constant evaluator and Wasm
 emission agree, so the fault is checker scoping
-(`zig-native/src/check/check.zig` `blockExpression` and `rebindStatement`).
+(`compiler/src/check/check.zig` `blockExpression` and `rebindStatement`).
 Already wrong on `86a527b`.
 
 ## Implementation checklist
@@ -42,13 +42,13 @@ Already wrong on `86a527b`.
       their `do:` suite (`Checked.statement_arms`, cached and replayed); a
       `return` nested in an `if` or loop of a rebinding arm is rejected with
       `case_arm_return`; loops carry names rebound in statement-case arms
-      (`zig-native/src/backend/loop_targets.zig`, which dropped them before).
+      (`compiler/src/backend/loop_targets.zig`, which dropped them before).
 - [x] Document the rules in the guide's rebinding and loop paragraphs and the
-      merge shape in `zig-native/CONTRACT.md`.
+      merge shape in `docs/compiler/CONTRACT.md`.
 - [x] Add executed-Wasm laws in
-      `zig-native/tests/nested_block_rebinding_execution.test.ts`, and a
+      `tests/guest/nested_block_rebinding_execution.test.ts`, and a
       cross-module generic receiver dispatch law in
-      `zig-native/tests/receiver_dispatch_module_execution.test.ts` (the second
+      `tests/guest/receiver_dispatch_module_execution.test.ts` (the second
       Ink finding, already fixed since `86a527b`).
 
 ## Validation
@@ -71,7 +71,7 @@ commit.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -92,7 +92,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   native laws (zero leaks), 1,506 guest, 48 smoke and 28 harness tests, and lint
   reported zero findings. Ink's ECS probes, its 66 test modules and the
   repository examples raise no `dead_rebinding`. New Zig laws:
-  `zig-native/src/check/core_case_statement_tests.zig`, plus evaluator,
+  `compiler/src/check/core_case_statement_tests.zig`, plus evaluator,
   body-cache replay and loop-target laws.
 - Comparison: not applicable; checker diagnostic only.
 - Remaining limitations: a plain nested `do:` and arms of a `case` whose value
@@ -100,4 +100,4 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   rebinding statement-case arm is rejected rather than supported. Existing
   statement-case arms that rebind an outer local now carry it out, which can
   surface `type_mismatch` when arms disagree.
-- Durable record: [compiler/guide.md](../compiler/guide.md) rebinding paragraph.
+- Durable record: [docs/language/guide.md](../docs/language/guide.md) rebinding paragraph.

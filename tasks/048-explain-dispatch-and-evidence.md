@@ -6,7 +6,7 @@
 - **Dependencies:** [004](004-summarize-predicate-bearing-callees.md),
   [005](005-summarize-higher-order-callees.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / explainable
-  inference. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  inference. Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,11 +17,11 @@ selected evidence in native diagnostics and the client schema.
 
 ## Starting point
 
-[hole_diagnostics.zig](../zig-native/src/reuse/hole_diagnostics.zig),
-[type_display.zig](../zig-native/src/reuse/type_display.zig) and
-[compiler/type_diagnostics.ts](../compiler/type_diagnostics.ts) already expose
+[hole_diagnostics.zig](../compiler/src/reuse/hole_diagnostics.zig),
+[type_display.zig](../compiler/src/reuse/type_display.zig) and
+[host/type_diagnostics.ts](../host/type_diagnostics.ts) already expose
 owned bounded type graphs and lexical requirements. Dispatch/member evidence is
-selected in [check.zig](../zig-native/src/check/check.zig) and specialization.
+selected in [check.zig](../compiler/src/check/check.zig) and specialization.
 
 ## Implementation checklist
 
@@ -60,7 +60,7 @@ commands for focused development and the scenarios below.
 
 - Commit: `67e7912` ("Explain failed dispatch candidates in diagnostics").
 - Change:
-  [dispatch_explanation.zig](../zig-native/src/reuse/dispatch_explanation.zig)
+  [dispatch_explanation.zig](../compiler/src/reuse/dispatch_explanation.zig)
   defines an owned explanation (operator, member, up to four candidates with
   side, spelled type and outcome). The checker attaches it to operator,
   associated, result-dispatch and receiver failures and to a selected member's
@@ -90,4 +90,4 @@ commands for focused development and the scenarios below.
   because the checker reports first; emit-stage spellings are module-qualified
   and omit unnamed shapes such as records.
 - Durable record:
-  [dispatch explanations](../zig-native/DISPATCH_EXPLANATIONS.md).
+  [dispatch explanations](../docs/compiler/DISPATCH_EXPLANATIONS.md).

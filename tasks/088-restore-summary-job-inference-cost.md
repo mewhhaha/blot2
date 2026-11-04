@@ -26,7 +26,7 @@ disabled on the task-085 compiler; inference roughly doubled (about 226k versus
 across `652f4d6` "Describe parametric callback obligations in independent type
 jobs", `71c0f2a` "Own lexical capture inputs for independent summary jobs" and
 successors; see
-[call summaries](../zig-native/CALL_SUMMARIES.md#open-principal-payoff-11-october-2026).
+[call summaries](../docs/compiler/CALL_SUMMARIES.md#open-principal-payoff-11-october-2026).
 Per-commit gdev binaries from that bisect are in `/var/tmp/bisect-bins/` on the
 owner's machine.
 
@@ -80,8 +80,8 @@ before the local milestone commit.
   [093](093-close-the-gdev-edit-gap.md). Non-source-complete graphs and jobs
   finished outside a recording still drop principal keys.
 - Durable record:
-  [summary-job cost](../zig-native/CALL_SUMMARIES.md#summary-job-cost-11-october-2026),
-  [CONTRACT.md](../zig-native/CONTRACT.md),
-  [pins](../zig-native/qualification/summary-job-cost-pins.json),
-  [gdev CSV](../zig-native/qualification/summary-job-cost-gdev.csv) and
-  [public results](../zig-native/qualification/summary-job-cost-public.jsonl).
+  [summary-job cost](../docs/compiler/CALL_SUMMARIES.md#summary-job-cost-11-october-2026),
+  [CONTRACT.md](../docs/compiler/CONTRACT.md),
+  [pins](../benchmarks/evidence/qualification/summary-job-cost-pins.json),
+  [gdev CSV](../benchmarks/evidence/qualification/summary-job-cost-gdev.csv) and
+  [public results](../benchmarks/evidence/qualification/summary-job-cost-public.jsonl).

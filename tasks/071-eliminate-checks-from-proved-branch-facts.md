@@ -8,7 +8,7 @@
   [026](026-resolve-structured-control-flow.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 9 / branch facts
   and erasure. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -19,10 +19,10 @@ Remove redundant checks from valid branch facts and erase proof representation.
 ## Starting point
 
 Task 070 supplies sound witnesses and task 026 resolved control flow. The
-[proof design](../zig-native/ERASED_PROOFS.md) defines dominated edges, exact
+[proof design](../docs/compiler/ERASED_PROOFS.md) defines dominated edges, exact
 value versions, joins, loop limits and arithmetic rules.
-[wasm_control_flow.zig](../zig-native/src/backend/wasm_control_flow.zig),
-[runtime_ir.zig](../zig-native/src/backend/runtime_ir.zig) and emission
+[wasm_control_flow.zig](../compiler/src/backend/wasm_control_flow.zig),
+[runtime_ir.zig](../compiler/src/backend/runtime_ir.zig) and emission
 currently preserve ordinary bounds/trap checks.
 
 ## Implementation checklist
@@ -86,4 +86,4 @@ commands for focused development and the scenarios below.
   contracts reject; no arbitrary theorem solving is promised. Broader program
   performance and remote CI remain in tasks 084/093 and 082.
 - Durable acceptance, erasure/import/retained/OOM controls and historical pins:
-  [numeric qualification](../zig-native/NUMERIC_PROOFS_QUALIFICATION.md).
+  [numeric qualification](../docs/qualification/NUMERIC_PROOFS_QUALIFICATION.md).

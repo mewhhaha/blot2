@@ -16,9 +16,9 @@ Broaden packed-row fusion through ordinary typed source producers and consumers.
 
 ## Starting point
 
-[packed_layout.zig](../zig-native/src/backend/packed_layout.zig),
-[collection_edit_call.zig](../zig-native/src/backend/collection_edit_call.zig),
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) and scalar
+[packed_layout.zig](../compiler/src/backend/packed_layout.zig),
+[collection_edit_call.zig](../compiler/src/backend/collection_edit_call.zig),
+[core_backend.zig](../compiler/src/backend/core_backend.zig) and scalar
 replacement handle admitted flat rows. Task 002 qualifies traversal and task 027
 provides explicit layout/ownership facts.
 
@@ -71,5 +71,5 @@ commands for focused development and the scenarios below.
 - Remaining limits: bounded small-body fusion; lazy/escaped/nested/reference/
   width-17/unknown uses retain owned fallback. Collection construction and
   general iterator-state elimination remain separate work.
-- Durable record: [ROW_FUSION](../zig-native/ROW_FUSION.md), including exact
+- Durable record: [ROW_FUSION](../docs/compiler/ROW_FUSION.md), including exact
   pins, rejected prototypes, raw distributions and combined costs.

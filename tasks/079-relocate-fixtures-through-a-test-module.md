@@ -17,14 +17,14 @@ and relocate embedded fixture data.
 
 ## Starting point
 
-[zig-native/build.zig](../zig-native/build.zig) roots tests at
+[compiler/build.zig](../compiler/build.zig) roots tests at
 `src/production_suite.zig`;
-[production_suite.zig](../zig-native/src/production_suite.zig) imports the full
+[production_suite.zig](../compiler/src/production_suite.zig) imports the full
 test suite. Many `@embedFile` paths still point inside production `src/`.
 
 ## Implementation checklist
 
-- [x] Create a dedicated fixture module rooted at `zig-native/fixtures/` and
+- [x] Create a dedicated fixture module rooted at `compiler/fixtures/` and
       expose needed embedded data through it.
 - [x] Move top-level `.blot` and fixture directories out of production sources,
       updating test consumers and build wiring.
@@ -59,7 +59,7 @@ commands for focused development and the scenarios below.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -93,5 +93,5 @@ that qualification or a commit was pending refer to those earlier checkpoints.
 - Remaining limitations: complete comptime test import/discovery under the
   module-root restrictions and the final combined compiler/analyzer gate.
 - Durable record: the fixture module is described in
-  [zig-native/README.md](../zig-native/README.md); a final qualification record
+  [compiler/README.md](../compiler/README.md); a final qualification record
   is pending.

@@ -22,7 +22,7 @@ persistence disabled.
 ## Starting point
 
 The only qualified cold figure is about 647 ms CPU on the earlier frozen private
-gdev workload ([STATUS.md](../zig-native/STATUS.md)). That manifest was waived
+gdev workload ([STATUS.md](../docs/compiler/STATUS.md)). That manifest was waived
 on 11 October 2026; it does not describe the current 415-input captured project.
 Task 084 measures the current cold cost and records the gap here.
 

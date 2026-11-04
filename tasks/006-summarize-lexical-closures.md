@@ -18,15 +18,15 @@ distinction between principal facts and selected evidence.
 ## Starting point
 
 Use the
-[approved summary interface](../zig-native/CALL_SUMMARIES.md#lexical-captures-and-canonical-inputs)
+[approved summary interface](../docs/compiler/CALL_SUMMARIES.md#lexical-captures-and-canonical-inputs)
 and its
-[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
+[acceptance cases](../docs/compiler/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) tracks closure values and
+[core_eval.zig](../compiler/src/eval/core_eval.zig) tracks closure values and
 frozen capture proofs;
-[completed_specialization_query.zig](../zig-native/src/eval/completed_specialization_query.zig)
+[completed_specialization_query.zig](../compiler/src/eval/completed_specialization_query.zig)
 and
-[source_value_template.zig](../zig-native/src/reuse/source_value_template.zig)
+[source_value_template.zig](../compiler/src/reuse/source_value_template.zig)
 compare captured graphs. Selected live accessor hints deliberately cannot
 certify reusable semantic results.
 
@@ -85,6 +85,6 @@ commands for focused development and the scenarios below.
   graphs, joint components and portable keys remain later work. Private gdev and
   historical task 002 evidence are unavailable.
 - Durable record:
-  [owned lexical inputs and qualification](../zig-native/CALL_SUMMARIES.md#owned-lexical-inputs-10-october-2026)
+  [owned lexical inputs and qualification](../docs/compiler/CALL_SUMMARIES.md#owned-lexical-inputs-10-october-2026)
   preserves ownership rules, exact pins, commands, distributions and
   limitations.

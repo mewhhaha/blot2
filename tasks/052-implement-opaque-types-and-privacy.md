@@ -6,7 +6,7 @@
   below.
 - **Dependencies:** [051](051-specify-module-abstraction.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 2 / opacity and
-  privacy. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  privacy. Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,10 +17,10 @@ compiled imports.
 
 ## Starting point
 
-[parser.zig](../zig-native/src/parse/parser.zig),
-[check.zig](../zig-native/src/check/check.zig),
-[project_check.zig](../zig-native/src/reuse/project_check.zig) and
-[dependency_interface_validation.zig](../zig-native/src/reuse/dependency_interface_validation.zig)
+[parser.zig](../compiler/src/parse/parser.zig),
+[check.zig](../compiler/src/check/check.zig),
+[project_check.zig](../compiler/src/reuse/project_check.zig) and
+[dependency_interface_validation.zig](../compiler/src/reuse/dependency_interface_validation.zig)
 implement current declarations/imports. Task 051 defines the new syntax and
 visibility model.
 
@@ -73,6 +73,6 @@ commands for focused development and the scenarios below.
   operation-level wrapper qualification. Deep/unresolved storage recipes decline
   bounded proofs; namespace-wide exports remain outside the specified syntax.
 - Durable record:
-  [MODULE_ABSTRACTION_QUALIFICATION](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md);
+  [MODULE_ABSTRACTION_QUALIFICATION](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md);
   exact combined pins, commands, rejected attempts and raw evidence are in
-  [integrated qualification](../zig-native/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).
+  [integrated qualification](../docs/qualification/MODULE_ABSTRACTION_QUALIFICATION.md#integrated-qualification--12-october-2026).

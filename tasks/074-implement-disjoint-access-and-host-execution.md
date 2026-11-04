@@ -8,7 +8,7 @@
   [071](071-eliminate-checks-from-proved-branch-facts.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 10 / disjoint
   access and host integration. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -20,8 +20,8 @@ integration.
 ## Starting point
 
 Task 073 supplies task lifecycle and task 071 bounded proof facts.
-[compiler/guest.ts](../compiler/guest.ts),
-[compiler/guest-abi.md](../compiler/guest-abi.md) and checked capability
+[host/guest.ts](../host/guest.ts),
+[docs/host/guest-abi.md](../docs/host/guest-abi.md) and checked capability
 contracts define host-facing boundaries.
 
 ## Implementation checklist
@@ -60,7 +60,7 @@ commands for focused development and the scenarios below.
 ## Closed acceptance — owner decision, 15 October 2026
 
 The owner closed this task's scope to the acceptance traces of the
-[structured concurrency design](../zig-native/STRUCTURED_CONCURRENCY.md) listed
+[structured concurrency design](../docs/compiler/STRUCTURED_CONCURRENCY.md) listed
 below.
 
 | Acceptance trace                                           | Expected result                          |
@@ -74,23 +74,23 @@ below.
 Forms outside these traces (detached tasks, shared mutable state across tasks,
 host worker transport, simultaneous Wasm reentry, unknown or overlapping
 partition evidence) must reject, as recorded in
-[the implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#deliberate-limits-and-remaining-qualification).
+[the implementation record](../docs/qualification/STRUCTURED_TASK_QUALIFICATION.md#deliberate-limits-and-remaining-qualification).
 
 Focused evidence: the private implementation passed 12 checker, four backend,
 one native-context, 26 task/context/resource and 35 guest/resource laws, with 34
 descriptors executed in sync and JSPI modes (see
-[the implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#focused-checks)).
+[the implementation record](../docs/qualification/STRUCTURED_TASK_QUALIFICATION.md#focused-checks)).
 The task completes when each trace maps to named passing laws in the full
 compiler gate on the committed source and task
 [035](035-remove-the-tracing-runtime.md) is complete. The
-[trace-to-law index](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+[trace-to-law index](../docs/qualification/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026)
 built from the gate at `05401a9` is recorded in the implementation record.
 
 ## Completion evidence
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -111,7 +111,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
 - Validation: the full gate at `05401a9` (17 October 2026) passes 2,355 native
   laws with zero leaks, 1,501 guest tests and zero analyzer findings over 486
   files, including every law in the
-  [trace-to-law index](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026).
+  [trace-to-law index](../docs/qualification/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026).
   Four traces are fully mapped. For "child returns scoped callback/package/task
   handle", group, task-handle, view and loan escapes have task-specific laws; a
   child returning a scoped callback or a package relies on the ordinary
@@ -122,12 +122,12 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   complete before closure. The 19 October working tree supplies a task-specific
   callback/package result law and guest rejection/recovery checks; their final
   LLVM qualification is pending. See the
-  [scoped result trace](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#scoped-result-trace-19-october-2026-working-tree).
+  [scoped result trace](../docs/qualification/STRUCTURED_TASK_QUALIFICATION.md#scoped-result-trace-19-october-2026-working-tree).
   Forms outside the traces (detached tasks, shared mutable state across tasks,
   host worker transport, simultaneous Wasm reentry, unknown or overlapping
   partition evidence) reject, as recorded in the
-  [implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#deliberate-limits-and-remaining-qualification).
+  [implementation record](../docs/qualification/STRUCTURED_TASK_QUALIFICATION.md#deliberate-limits-and-remaining-qualification).
 - Durable record:
-  [trace-to-law index](../zig-native/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026),
-  [implementation record](../zig-native/STRUCTURED_TASK_QUALIFICATION.md) and
-  the [structured concurrency design](../zig-native/STRUCTURED_CONCURRENCY.md).
+  [trace-to-law index](../docs/qualification/STRUCTURED_TASK_QUALIFICATION.md#trace-to-law-index-17-october-2026),
+  [implementation record](../docs/qualification/STRUCTURED_TASK_QUALIFICATION.md) and
+  the [structured concurrency design](../docs/compiler/STRUCTURED_CONCURRENCY.md).

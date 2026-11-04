@@ -65,5 +65,5 @@ change.
 - Remaining limits: arbitrary algebra laws and reducer agreement are explicit
   caller promises, not compiler-certified proofs or guessed function identity.
   No executable API/optimization is claimed by this design.
-- Durable record: [ROLLING_SUMMARIES](../zig-native/ROLLING_SUMMARIES.md), with
+- Durable record: [ROLLING_SUMMARIES](../docs/compiler/ROLLING_SUMMARIES.md), with
   exact purity/pull/trap/snapshot/numeric and acceptance laws.

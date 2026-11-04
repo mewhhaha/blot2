@@ -8,7 +8,7 @@
   [056](056-implement-declarations-and-evidence-diagnostics.md),
   [059](059-reject-escaping-capabilities.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 7 / polymorphic
-  packages. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  packages. Sources: [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -19,8 +19,8 @@ portable evidence.
 
 ## Starting point
 
-Current [types.zig](../zig-native/src/check/types.zig) and
-[check.zig](../zig-native/src/check/check.zig) support ordinary generic schemes;
+Current [types.zig](../compiler/src/check/types.zig) and
+[check.zig](../compiler/src/check/check.zig) support ordinary generic schemes;
 task 056 adds richer contract evidence and task 059 capability scope checking.
 Explicit higher-rank/package syntax remains open.
 
@@ -60,10 +60,10 @@ change.
 
 - Source milestone: isolated design checkpoint based on `ef57ec5`; no compiler
   source or executable fixtures changed in this specification checkpoint.
-- Durable record: [Polymorphic Packages](../zig-native/POLYMORPHIC_PACKAGES.md).
+- Durable record: [Polymorphic Packages](../docs/compiler/POLYMORPHIC_PACKAGES.md).
 - Validation: `deno fmt --no-config --check` on the four specifications and task
   records, plus local path/heading validation; results recorded in
-  [design qualification](../zig-native/LANGUAGE_DESIGN_QUALIFICATION.md).
+  [design qualification](../docs/qualification/LANGUAGE_DESIGN_QUALIFICATION.md).
 - Comparison: documentation only; no runtime or compiler performance claim.
 - Remaining limitations: dependent implementation tasks remain open. The design
   fixes syntax, ownership/identity, portable evidence and rejection boundaries;

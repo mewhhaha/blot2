@@ -23,7 +23,7 @@ and memory figures are recorded for information only.
 
 ## Starting point
 
-[arena_runtime.zig](../zig-native/src/runtime/arena_runtime.zig) and runtime
+[arena_runtime.zig](../compiler/src/runtime/arena_runtime.zig) and runtime
 layout/cleanup code still support tracing during tasks 031–034. Local allocation
 optimizations and public guest behavior must remain valid.
 
@@ -71,7 +71,7 @@ commands for focused development and the scenarios below.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -113,7 +113,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
 - Remaining work: conservative partial paths still use tracing; physical
   removal, complete layout/scope coverage, the bounded-memory stress scenarios
   and a passing full gate on current source remain. No completion is claimed.
-- Durable record: [TRACING_REPLACEMENT](../zig-native/TRACING_REPLACEMENT.md),
-  [combined qualification](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md),
-  [the integrated record](../zig-native/ITERATOR_STATE.md) and
-  [merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md).
+- Durable record: [TRACING_REPLACEMENT](../docs/compiler/TRACING_REPLACEMENT.md),
+  [combined qualification](../docs/qualification/FRONTEND_OWNERSHIP_QUALIFICATION.md),
+  [the integrated record](../docs/compiler/ITERATOR_STATE.md) and
+  [merged qualification](../docs/qualification/CONTINUATION_QUALIFICATION.md).

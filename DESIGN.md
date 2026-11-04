@@ -1,6 +1,6 @@
 # Blot design direction
 
-The [language guide](compiler/guide.md), Zig regression laws and `std/` describe
+The [language guide](docs/language/guide.md), Zig regression laws and `std/` describe
 the executable language. This document records the intent behind the current
 work; [CONTINUE.md](CONTINUE.md) records what has actually been qualified.
 

@@ -1,0 +1,77 @@
+import { strict as assert } from "node:assert";
+import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
+import { instantiateGuest } from "../../host/guest.ts";
+
+const executable = Deno.args[0] ??
+  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+const main = `entry const run = func (seed: U32) => return do:
+  let callable = make seed
+  let alias = callable
+  let published = {callback: callable}
+  let pressure = @array.fill 8192 0
+  break read (alias ()) + read (published.callback ()) + pressure[8191]
+`;
+const record = `const make = func (seed: U32) => return func () => return {saved: seed}
+const read = func value => return value.saved
+`;
+const array = `const make = func (seed: U32) => return func () => return #[seed + 1]
+const read = func value => return value[0]
+`;
+Deno.test("returned callable endpoints retain owners through graph publication and single-unit producer type edits with identical ABI", async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-callable-endpoint-",
+  });
+  const entry = `${directory}/main.blot`;
+  try {
+    for (const codegenTier of ["development", "optimized"] as const) {
+      for (const shareMachineCode of [false, true]) {
+        const options = {
+          executable,
+          entry,
+          codegenTier,
+          shareMachineCode,
+          cacheDirectory: false as const,
+          prelude: new URL("../../std/prelude.blot", import.meta.url),
+        };
+        const compiler = await createZigProjectCompiler(options);
+        try {
+          for (
+            const [text, expected] of [[record, 82], [array, 84], [
+              array.replace("seed + 1", "seed + 2"),
+              86,
+            ], [record, 82]] as const
+          ) {
+            const sources = { [entry]: text + main };
+            const built = await compiler.build({ sources });
+            assert(built.success, JSON.stringify(built));
+            const fresh = await createZigProjectCompiler(options);
+            try {
+              const rebuilt = await fresh.build({ sources });
+              assert(rebuilt.success, JSON.stringify(rebuilt));
+              assert.deepEqual(built.bytes, rebuilt.bytes);
+            } finally {
+              await fresh.dispose();
+            }
+            for (const asynchronous of [false, true]) {
+              const guest = await instantiateGuest(built.bytes, {
+                asynchronous,
+              });
+              try {
+                let value;
+                if (asynchronous) value = await guest.callAsync("run", 41);
+                else value = guest.call("run", 41);
+                assert.equal(value, expected);
+              } finally {
+                guest.dispose();
+              }
+            }
+          }
+        } finally {
+          await compiler.dispose();
+        }
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

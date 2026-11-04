@@ -22,9 +22,9 @@ qualification must pin its own inputs and reference implementation.
 
 [std/PERFORMANCE.md](../std/PERFORMANCE.md#choosing-collections) records roughly
 1.9× fold CPU and 1.5× cursor CPU.
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) contains
+[core_backend.zig](../compiler/src/backend/core_backend.zig) contains
 `Emitter.readListRow`, direct loop lowering and cursor extraction;
-[list_runtime.zig](../zig-native/src/runtime/list_runtime.zig) owns leaf
+[list_runtime.zig](../compiler/src/runtime/list_runtime.zig) owns leaf
 traversal. Task 001 determines whether its narrower span change lands.
 
 ## Implementation checklist
@@ -54,7 +54,7 @@ commands for focused development and the scenarios below.
   execution suites, plus native immutable-Core/allocation-failure laws.
 - Compare empty, single-leaf, multi-leaf and crossing-row traversal, early break
   and saved cursors after persistent updates, including F32 bit preservation.
-- Use alternating packed/boxed `scripts/bench_packed_rows.ts` runs and the
+- Use alternating packed/boxed `benchmarks/tools/bench_packed_rows.ts` runs and the
   iterator harness with matched libraries. Report fold and cursor distributions,
   compiler overhead, allocation and guest memory.
 
@@ -79,7 +79,7 @@ commands for focused development and the scenarios below.
   at every width.
 - Seven cold public and seven synthetic fresh/retained/restart pairs preserve
   declared counters, diagnostics, output parity and zero teardown ownership. The
-  [joint durable record](../zig-native/CYCLIC_OWNERSHIP_QUALIFICATION.md#integrated-qualification--12-october-2026)
+  [joint durable record](../docs/qualification/CYCLIC_OWNERSHIP_QUALIFICATION.md#integrated-qualification--12-october-2026)
   pins exact source/binary/commands/distributions.
 - Implementation: a rooted private tree walk advances through leaves without
   repeated root lookup; checked scalar-only row uses and flat tuple bindings
@@ -96,21 +96,21 @@ commands for focused development and the scenarios below.
   fixed-size crossing copy, float load grouping, a reduced traversal guard and
   the 9 October storage-word loop counter (no consistent F32 gain; U32 tuple
   width 5 median 1.096). Pins and measurements are in
-  [word positions at leaf boundaries](../zig-native/LIST_TRAVERSAL.md#word-positions-at-leaf-boundaries-9-october-2026)
+  [word positions at leaf boundaries](../docs/compiler/LIST_TRAVERSAL.md#word-positions-at-leaf-boundaries-9-october-2026)
   and the surrounding sections.
 - Owner decision, 11 October 2026: skip restoration of legacy artifacts. This
   removes that prerequisite, not the current correctness and all-width
   performance checks. See
-  [current qualification scope](../zig-native/LIST_TRAVERSAL.md#current-qualification-scope-11-october-2026).
+  [current qualification scope](../docs/compiler/LIST_TRAVERSAL.md#current-qualification-scope-11-october-2026).
 - Remaining scope: task 047 owns the measured cursor regression (the explicit
   cursor still allocates persistent progress and extracts rows through its
   cached lookup); localized shared-append tails remain explicit; task 035 owns
   the pre-existing nested-loop retention counterexample. No memory/update win
   over boxed is claimed. Nothing is pushed.
-- Durable record: [List traversal](../zig-native/LIST_TRAVERSAL.md) records the
+- Durable record: [List traversal](../docs/compiler/LIST_TRAVERSAL.md) records the
   ownership boundary, binary identities, every width's ratios, cursor and memory
   measurements, benchmark-safety checks and rejected candidates;
-  [integrated fold closure](../zig-native/LIST_TRAVERSAL.md#integrated-fold-closure-12-october-2026)
+  [integrated fold closure](../docs/compiler/LIST_TRAVERSAL.md#integrated-fold-closure-12-october-2026)
   and
-  [V13 handoff](../zig-native/LIST_TRAVERSAL.md#current-v13-release-handoff-12-october-2026)
+  [V13 handoff](../docs/compiler/LIST_TRAVERSAL.md#current-v13-release-handoff-12-october-2026)
   hold the final qualification.

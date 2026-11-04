@@ -73,6 +73,6 @@ Do not report a partial run as a pass or infer frame performance from compile ti
 
 ## References
 
-- [Rewrite review](../zig-native/STORAGE_REWRITE_REVIEW.md)
+- [Rewrite review](../docs/compiler/STORAGE_REWRITE_REVIEW.md)
 - [Storage rewrite](STORAGE_REWRITE.md)
-- Ink `docs/architecture.md`, `docs/blot.md`; compiler `zig-native/SCOPED_STORAGE.md`.
+- Ink `docs/architecture.md`, `docs/blot.md`; compiler `docs/compiler/SCOPED_STORAGE.md`.

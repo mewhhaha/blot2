@@ -6,8 +6,8 @@
 - **Dependencies:** None.
 - **Originating requirements:** found while completing task 027, when
   `demand_inline_tests.zig` first joined the native suite; demand forwarding
-  semantics in [compiler/guide.md](../compiler/guide.md#demand-parameters) and
-  [DEMANDS.md](../zig-native/DEMANDS.md).
+  semantics in [docs/language/guide.md](../docs/language/guide.md#demand-parameters) and
+  [DEMANDS.md](../docs/compiler/DEMANDS.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -23,7 +23,7 @@ reports `type_mismatch` over the whole declaration, with or without the
 annotation and with `func ~value`. Forwarding to another lazy function
 (`func ~(value: U32) => return twice (@demand value)`) checks. The law
 "recursive demand forwarding declines its bounded inline proof" in
-[demand_inline_tests.zig](../zig-native/src/backend/demand_inline_tests.zig)
+[demand_inline_tests.zig](../compiler/src/backend/demand_inline_tests.zig)
 expects the recursive program to check and is skipped until this task completes;
 it never ran before its file was registered.
 
@@ -67,6 +67,6 @@ before the local milestone commit.
 - Remaining limitations: Provisional demand modes cover direct recursive lambda
   spines only. This does not broaden recursive inline-proof eligibility or
   change recursive-force policy.
-- Durable record: [DEMANDS.md](../zig-native/DEMANDS.md) and the shared
-  [qualification](../zig-native/RESOLVED_BODIES.md#qualification-11-october-2026),
+- Durable record: [DEMANDS.md](../docs/compiler/DEMANDS.md) and the shared
+  [qualification](../docs/compiler/RESOLVED_BODIES.md#qualification-11-october-2026),
   including exact compiler/input/harness hashes and median distributions.

@@ -81,6 +81,6 @@ before the local milestone commit.
 - Remaining limitations: a layout or adjacency change is a real edit; the first
   real edit after trivia diffs against the pre-trivia sources, so declarations
   after shifted positions rebuild (about 200 ms more on gdev).
-- Durable record: [trivia-only edits](../zig-native/TRIVIA_EDITS.md),
-  [distributions](../zig-native/qualification/trivia-edits-gdev.csv) and
-  [pins](../zig-native/qualification/trivia-edits-pins.json).
+- Durable record: [trivia-only edits](../docs/compiler/TRIVIA_EDITS.md),
+  [distributions](../benchmarks/evidence/qualification/trivia-edits-gdev.csv) and
+  [pins](../benchmarks/evidence/qualification/trivia-edits-pins.json).

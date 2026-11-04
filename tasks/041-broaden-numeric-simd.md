@@ -15,10 +15,10 @@ Extend SIMD admission to additional proved numeric loops and row shapes.
 
 ## Starting point
 
-[wasm_vectorize.zig](../zig-native/src/backend/wasm_vectorize.zig),
-[wasm_simd_ops.zig](../zig-native/src/backend/wasm_simd_ops.zig) and
-[simd_intrinsics.zig](../zig-native/src/backend/simd_intrinsics.zig) implement
-current vectorization; [compiler/guide.md](../compiler/guide.md#simd) pins
+[wasm_vectorize.zig](../compiler/src/backend/wasm_vectorize.zig),
+[wasm_simd_ops.zig](../compiler/src/backend/wasm_simd_ops.zig) and
+[simd_intrinsics.zig](../compiler/src/backend/simd_intrinsics.zig) implement
+current vectorization; [docs/language/guide.md](../docs/language/guide.md#simd) pins
 wrapping and F32 behavior.
 
 ## Implementation checklist
@@ -68,5 +68,5 @@ commands for focused development and the scenarios below.
 - Remaining limitations: conditional/carrying loops, trapping/effectful kernels
   and unproved row products retain ordinary scalar lowering. Reductions are
   never automatically regrouped. Development artifacts stay scalar and exact.
-- Durable record: [NUMERIC_SIMD](../zig-native/NUMERIC_SIMD.md), with exact
+- Durable record: [NUMERIC_SIMD](../docs/compiler/NUMERIC_SIMD.md), with exact
   pins, three isolated screens and the merged release distributions.

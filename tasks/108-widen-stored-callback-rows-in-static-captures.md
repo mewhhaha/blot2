@@ -20,7 +20,7 @@ compiles when the checked type widened that callback's row.
 ## Starting point
 
 The evaluator rebuilt a captured static value's type from its fields in
-`ClosureRegion.addAggregate` (`zig-native/src/eval/core_eval.zig`, nominal arm).
+`ClosureRegion.addAggregate` (`compiler/src/eval/core_eval.zig`, nominal arm).
 A stored `func () => return ()` has an exact closed pure row, which fixed the
 invariant nominal argument before the capture was unified with the checker's
 declared type, whose row lists six State operations. `openCovariant` does not
@@ -32,7 +32,7 @@ or a global engine avoided the static-capture path.
 
 - [x] Reopen the covariant rows of a nominal payload's field values before
       unifying them with the constructor payload, as the checker does per use.
-- [x] Add `zig-native/tests/static_capture_row_execution.test.ts`, a two-module
+- [x] Add `tests/guest/static_capture_row_execution.test.ts`, a two-module
       project with a trimmed Ink ECS library, which fails with `effect_mismatch`
       before the fix.
 
@@ -45,7 +45,7 @@ commit.
 ## Acceptance criteria
 
 - [x] The owner-approved recreated Ink probes and the new law build and run;
-      nominal argument invariance laws in `zig-native/src/check/types_tests.zig`
+      nominal argument invariance laws in `compiler/src/check/types_tests.zig`
       still pass.
 - [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
@@ -79,5 +79,5 @@ commit.
   replacement inputs. Scalar guest memory visibility does not measure private
   heap usage, and this typing qualification makes no heap claim.
 - Durable record:
-  [stored callback captures](../zig-native/STATIC_CAPTURE_ROWS.md), the comment
+  [stored callback captures](../docs/compiler/STATIC_CAPTURE_ROWS.md), the comment
   at the fix site and the committed regression law.

@@ -8,7 +8,7 @@
   [024](024-apply-general-body-interface-cutoff.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 8 / hygiene and
   staged dependencies. Sources:
-  [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
+  [Language evolution](../docs/compiler/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -20,9 +20,9 @@ reuse and failed revisions.
 ## Starting point
 
 Task 067 supplies typed code and task 024 body cutoffs.
-[symbols.zig](../zig-native/src/parse/symbols.zig),
-[declaration_dependencies.zig](../zig-native/src/reuse/declaration_dependencies.zig)
-and [compiler/assets.ts](../compiler/assets.ts) provide identity and
+[symbols.zig](../compiler/src/parse/symbols.zig),
+[declaration_dependencies.zig](../compiler/src/reuse/declaration_dependencies.zig)
+and [host/assets.ts](../host/assets.ts) provide identity and
 tracked-input foundations.
 
 ## Implementation checklist
@@ -60,7 +60,7 @@ commands for focused development and the scenarios below.
 ## Closed acceptance — owner decision, 15 October 2026
 
 The owner closed this task's scope to the acceptance traces of the
-[typed staging design](../zig-native/TYPED_STAGING.md) listed below. The
+[typed staging design](../docs/compiler/TYPED_STAGING.md) listed below. The
 acceptance criteria below are read against these traces.
 
 | Acceptance trace                                                | Expected result                                          |
@@ -79,15 +79,15 @@ measured and recorded; they are not a pass/fail target.
 
 The task completes when each trace maps to named passing native laws or guest
 tests in the full compiler gate on the committed source, recorded durably in
-[STAGING_QUALIFICATION.md](../zig-native/STAGING_QUALIFICATION.md). The
-[trace-to-law index](../zig-native/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+[STAGING_QUALIFICATION.md](../docs/qualification/STAGING_QUALIFICATION.md). The
+[trace-to-law index](../docs/qualification/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
 built from the gate at `05401a9` is recorded there.
 
 ## Completion evidence
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -109,7 +109,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
 - Validation: the full gate at `05401a9` (17 October 2026) passes 2,355 native
   laws with zero leaks, 1,501 guest tests and zero analyzer findings over 486
   files. The
-  [trace-to-law index](../zig-native/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
+  [trace-to-law index](../docs/qualification/STAGING_QUALIFICATION.md#trace-to-law-index-17-october-2026)
   maps all four traces to named passing laws. Before closure: measure population
   and edit costs on gated source and record them in STAGING_QUALIFICATION.md
   (not a pass/fail target), and complete dependency
@@ -141,4 +141,4 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   fragments conservatively rebuild when an entire unchanged output cannot be
   reused.
 - Durable record:
-  [staging qualification](../zig-native/STAGING_QUALIFICATION.md).
+  [staging qualification](../docs/qualification/STAGING_QUALIFICATION.md).

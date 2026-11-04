@@ -18,7 +18,7 @@ the specified laws.
 ## Starting point
 
 Task 044 defines summary APIs and task 045 establishes reducer behavior.
-[list_runtime.zig](../zig-native/src/runtime/list_runtime.zig) supplies
+[list_runtime.zig](../compiler/src/runtime/list_runtime.zig) supplies
 persistent tree techniques, but no general summary-tree API is assumed.
 
 ## Implementation checklist
@@ -68,4 +68,4 @@ commands for focused development and the scenarios below.
 - Remaining limitations: caller algebra consistency; real retained summary
   graphs and ordinary cycle-collection cost; no universal update speedup.
 - Durable record:
-  [Rolling and summary qualification](../zig-native/ROLLING_SUMMARIES_QUALIFICATION.md).
+  [Rolling and summary qualification](../docs/qualification/ROLLING_SUMMARIES_QUALIFICATION.md).

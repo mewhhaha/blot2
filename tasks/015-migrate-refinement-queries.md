@@ -16,11 +16,11 @@ Move refinement receipts and their indexes into the common query model.
 
 ## Starting point
 
-[refinement_receipt.zig](../zig-native/src/reuse/refinement_receipt.zig),
-[completed_specialization_query.zig](../zig-native/src/eval/completed_specialization_query.zig)
-and [shared_query_gate.zig](../zig-native/src/reuse/shared_query_gate.zig) hold
+[refinement_receipt.zig](../compiler/src/reuse/refinement_receipt.zig),
+[completed_specialization_query.zig](../compiler/src/eval/completed_specialization_query.zig)
+and [shared_query_gate.zig](../compiler/src/reuse/shared_query_gate.zig) hold
 current refinement lookups;
-[source_value_template_tests.zig](../zig-native/src/reuse/source_value_template_tests.zig)
+[source_value_template_tests.zig](../compiler/src/reuse/source_value_template_tests.zig)
 exercises dynamic facts and publication.
 
 ## Implementation checklist
@@ -83,7 +83,7 @@ commands for focused development and the scenarios below.
   with the identical native binary. Private gdev/original boxed artifacts remain
   absent, keeping tasks 002/084 open.
 - Durable record:
-  [representation, limits and qualification](../zig-native/REFINEMENT_QUERIES.md),
-  [pins](../zig-native/qualification/refinement-queries-pins.json),
-  [fresh distributions](../zig-native/qualification/refinement-queries-fresh.csv),
-  [retained distributions](../zig-native/qualification/refinement-queries-retained.csv).
+  [representation, limits and qualification](../docs/compiler/REFINEMENT_QUERIES.md),
+  [pins](../benchmarks/evidence/qualification/refinement-queries-pins.json),
+  [fresh distributions](../benchmarks/evidence/qualification/refinement-queries-fresh.csv),
+  [retained distributions](../benchmarks/evidence/qualification/refinement-queries-retained.csv).

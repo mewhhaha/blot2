@@ -6,7 +6,7 @@
 - **Dependencies:** [031](031-implement-shared-reference-counting.md)
 - **Originating requirements:** PLAN: Earlier programs / escaping ownership;
   DEMANDS: Effects and lifetime. Sources: [PLAN.md](../PLAN.md),
-  [Demand evaluation](../zig-native/DEMANDS.md).
+  [Demand evaluation](../docs/compiler/DEMANDS.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -17,8 +17,8 @@ aggregates and roots surviving guest calls.
 
 ## Starting point
 
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) materializes
-closures/demands and globals; [compiler/guest.ts](../compiler/guest.ts) manages
+[core_backend.zig](../compiler/src/backend/core_backend.zig) materializes
+closures/demands and globals; [host/guest.ts](../host/guest.ts) manages
 guest invocation boundaries. Local lifetime proofs deliberately reject many
 escaping cases.
 
@@ -72,9 +72,9 @@ commands for focused development and the scenarios below.
   intentionally change public Wasm. Peak deltas and teardown live bytes are
   zero; CPU is mixed. Exact pins, distributions and isolated runtime costs are
   retained in the
-  [shared qualification](../zig-native/PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
+  [shared qualification](../docs/compiler/PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
 - Remaining limitations: Whole-module admission preserves complete tracing for
   unknown/host/import shapes. Host/JSPI ownership, cycles and tracing removal
   belong to 033–035. The isolated reference-Array batch costs +46.7%; memory
   retirement does not return Wasm pages to the OS.
-- Durable record: [PERSISTENT_ROOTS](../zig-native/PERSISTENT_ROOTS.md).
+- Durable record: [PERSISTENT_ROOTS](../docs/compiler/PERSISTENT_ROOTS.md).

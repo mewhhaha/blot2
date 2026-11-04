@@ -152,9 +152,9 @@ async function main() {
     await using lease = await compilerLease(root);
     const inputs = async () => [
       ...await nativeInputs(root),
-      ...await scriptInputs(resolve(root, "compiler")),
+      ...await scriptInputs(resolve(root, "host")),
       ...await scriptInputs(resolve(root, "scripts")),
-      ...await scriptInputs(resolve(root, "zig-native/tests")),
+      ...await scriptInputs(resolve(root, "tests/guest")),
       ...area.guests.map((path) => resolve(root, path)),
       ...[
         "scripts/check_dev.ts",
@@ -201,11 +201,11 @@ async function main() {
         "all",
       ],
       (buildDeadline - performance.now()) / 1000,
-      resolve(root, "zig-native"),
+      resolve(root, "compiler"),
     );
     const binary = resolve(
       root,
-      "zig-native/zig-out-native-dev/bin/blot-tests",
+      "compiler/zig-out-native-dev/bin/blot-tests",
     );
     const inventory = await phase("native-inventory", [binary, "--list"], 5);
     const names = (await Deno.readTextFile(inventory.stdout)).trim().split(
@@ -223,7 +223,7 @@ async function main() {
     await identify("initial-executables", async () => {
       report.native_binary_sha256 = await fileDigest(binary);
       report.compiler_sha256 = await fileDigest(
-        resolve(root, "zig-native/zig-out-dev/bin/blotc"),
+        resolve(root, "compiler/zig-out-dev/bin/blotc"),
       );
     });
     const native = await phase("native-run", [
@@ -258,7 +258,7 @@ async function main() {
         ...(filter ? ["--filter", filter] : []),
         ...files,
         "--",
-        "zig-native/zig-out-dev/bin/blotc",
+        "compiler/zig-out-dev/bin/blotc",
       ], (guestDeadline - performance.now()) / 1000);
       report.guest_tests.push(
         ...verifyGuestResults(
@@ -290,8 +290,11 @@ async function main() {
       "--check",
       "mod.ts",
       "deno.json",
-      "compiler",
+      "host",
+      "tests/host",
+      "tests/tooling",
       "scripts",
+      "editor/helix",
       ".github",
     ], remainingAnalysis());
     await phase("types", [
@@ -300,7 +303,7 @@ async function main() {
       "mod.ts",
       "scripts/check_dev.ts",
       "scripts/test_compiler.ts",
-      "compiler/zig_project_client.ts",
+      "host/zig_project_client.ts",
     ], remainingAnalysis());
     await phase(
       "zig-lint",
@@ -312,7 +315,7 @@ async function main() {
         report.input_digest !== await inputDigest(await inputs()) ||
         report.native_binary_sha256 !== await fileDigest(binary) ||
         report.compiler_sha256 !==
-          await fileDigest(resolve(root, "zig-native/zig-out-dev/bin/blotc"))
+          await fileDigest(resolve(root, "compiler/zig-out-dev/bin/blotc"))
       ) {
         throw new Error(
           "Inputs or executable changed during the check; results are stale",

@@ -19,8 +19,8 @@ implement, with an explicit version that both sides check.
 
 ## Starting point
 
-Only [zig_project_server.zig](../zig-native/src/reuse/zig_project_server.zig)
-and [compiler/zig_project_client.ts](../compiler/zig_project_client.ts) know the
+Only [zig_project_server.zig](../compiler/src/reuse/zig_project_server.zig)
+and [host/zig_project_client.ts](../host/zig_project_client.ts) know the
 length-prefixed frames (JSON metadata plus a binary payload), the request kinds
 (open, build with source overlays, dispose), the reply shapes (build success
 with Wasm, stats and assets; diagnostics with `details`) and the failure rules.
@@ -68,5 +68,5 @@ before the local milestone commit.
 - Remaining limitations: raw conformance does not force native OOM, 2^53
   revision exhaustion or a naturally oversized successful output. Existing
   integer/enum coercions are documented and pinned; hosts emit canonical types.
-- Durable record: [project protocol](../zig-native/PROJECT_PROTOCOL.md),
+- Durable record: [project protocol](../docs/compiler/PROJECT_PROTOCOL.md),
   including qualification and the final executable pin.

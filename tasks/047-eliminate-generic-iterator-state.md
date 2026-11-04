@@ -19,11 +19,11 @@ and loops.
 ## Starting point
 
 [std/iter.blot](../std/iter.blot),
-[known_call.zig](../zig-native/src/backend/known_call.zig),
-[wasm_sroa.zig](../zig-native/src/backend/wasm_sroa.zig) and
-[wasm_inline.zig](../zig-native/src/backend/wasm_inline.zig) remove some
+[known_call.zig](../compiler/src/backend/known_call.zig),
+[wasm_sroa.zig](../compiler/src/backend/wasm_sroa.zig) and
+[wasm_inline.zig](../compiler/src/backend/wasm_inline.zig) remove some
 wrappers, but generic step/cursor allocations persist.
-[tests/iterator_execution.test.ts](../zig-native/tests/iterator_execution.test.ts)
+[tests/iterator_execution.test.ts](../tests/guest/iterator_execution.test.ts)
 pins pull semantics.
 
 ## Implementation checklist
@@ -50,9 +50,9 @@ commands for focused development and the scenarios below.
   especially take 0 and a right side ending first.
 - Compare nested loops, independent cursors, saved windows, breaks/returns and
   effect traces with fallback.
-- Use `scripts/bench_iterators.ts` to measure step/cursor allocation, runtime
+- Use `benchmarks/tools/bench_iterators.ts` to measure step/cursor allocation, runtime
   and compiler overhead separately.
-- Run both record and tuple modes of `scripts/bench_list_traversal.ts` against
+- Run both record and tuple modes of `benchmarks/tools/bench_list_traversal.ts` against
   the pinned boxed compiler and the task 002 release, over every supported row
   width. Preserve cursor snapshots, cross-leaf rows and reference fallbacks.
 
@@ -87,7 +87,7 @@ commands for focused development and the scenarios below.
   guest/client checks and 37 harness checks, with zero native skips, failures,
   leaks or logged errors. Compiler cost and final combined all-width
   confirmation remain open. See the
-  [evaluated-call and seed record](../zig-native/ITERATOR_STATE.md#evaluated-fold-calls-and-static-scalar-seeds-focused-qualification).
+  [evaluated-call and seed record](../docs/compiler/ITERATOR_STATE.md#evaluated-fold-calls-and-static-scalar-seeds-focused-qualification).
 - The preselected fifteen-pair compiler CPU comparison fails at paired median
   1.059034 against the 1.05 limit; the seven-pair identity control passes. The
   failed result remains preserved. Diagnostic instruction/allocation ratios
@@ -143,27 +143,27 @@ commands for focused development and the scenarios below.
 - The 20 October shared-path experiment passes focused native/OOM and eight
   guest groups, then regresses selected U32 cursor runtime 2.80–2.94×. It is
   rejected outside main. The
-  [current iterator record](../zig-native/ITERATOR_STATE.md#shared-traversal-path-screen-rejected)
+  [current iterator record](../docs/compiler/ITERATOR_STATE.md#shared-traversal-path-screen-rejected)
   retains the exact artifacts. A scoped directory successor passes focused
   native/OOM and guest checks, reduces selected U32 cursor CPU ratios to
   0.223–0.267, and preserves stable roots/leases. All 62 supported width/type/
   shape cases pass against each rebuilt historical reference and current std
   separately, with no cursor regression across 186 pairs. Native compiler cost
   and LLVM/full qualification remain open. See the
-  [focused directory screen](../zig-native/ITERATOR_STATE.md#scoped-directory-candidate-focused-checks-passed).
+  [focused directory screen](../docs/compiler/ITERATOR_STATE.md#scoped-directory-candidate-focused-checks-passed).
 - Earlier full-gate checkpoint: `0d77afc` passes 1,701 native tests, 1,075
   guests, 1,050 complete OOM sweeps plus two expected-error harness laws, and
   375 analyzer files with zero findings. Strict zip retains zero objects;
   windows at 4,096 rows fall from 81,894 to 77,800 objects (1,277,540 to
   1,244,788 payload bytes) at release runtime ratio 0.9933; all 62 packed
   width/type outputs stay exact
-  ([checkpoint](../zig-native/CONTINUATION_QUALIFICATION.md#callback-and-record-footprints-completed-window-producers-13-october-2026)).
+  ([checkpoint](../docs/qualification/CONTINUATION_QUALIFICATION.md#callback-and-record-footprints-completed-window-producers-13-october-2026)).
 - Since then: direct collection progress and
-  [single-leaf traversal](../zig-native/ITERATOR_STATE.md#single-leaf-traversal-14-october-2026)
+  [single-leaf traversal](../docs/compiler/ITERATOR_STATE.md#single-leaf-traversal-14-october-2026)
   (window screen 53,236 → 49,142 objects, runtime ratio 0.9526) joined the
-  [qualified 14 October continuation](../zig-native/CONTINUATION_QUALIFICATION.md#qualified-continuation-14-october-2026);
+  [qualified 14 October continuation](../docs/qualification/CONTINUATION_QUALIFICATION.md#qualified-continuation-14-october-2026);
   later focused cursor, frame, snapshot and closure-capture slices are pinned in
-  [the iterator record](../zig-native/ITERATOR_STATE.md).
+  [the iterator record](../docs/compiler/ITERATOR_STATE.md).
 - Remaining (why the task is open): Window state and reducer captures, inner
   fold/step/cursor and semantic-buffer allocations, final release confirmation
   of the passing all-width screen, compiler cost and common qualification.

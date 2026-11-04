@@ -19,11 +19,11 @@ while preserving bounded durable ownership.
 
 ## Starting point
 
-[region_arena.zig](../zig-native/src/eval/region_arena.zig) already leases
+[region_arena.zig](../compiler/src/eval/region_arena.zig) already leases
 resettable scratch with a 64 MiB retained cap.
-[type_evidence.zig](../zig-native/src/eval/type_evidence.zig),
-[frozen_types.zig](../zig-native/src/check/frozen_types.zig) and
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) copy graphs at semantic
+[type_evidence.zig](../compiler/src/eval/type_evidence.zig),
+[frozen_types.zig](../compiler/src/check/frozen_types.zig) and
+[core_eval.zig](../compiler/src/eval/core_eval.zig) copy graphs at semantic
 boundaries. Baseline cumulative requested allocation is 321.2 MB.
 
 ## Implementation checklist
@@ -85,4 +85,4 @@ commands for focused development and the scenarios below.
   complete disjoint partition. Private gdev remains absent and task 084 retains
   the under-100-MB target; public revision plateaus are not a universal bound.
 - Durable record:
-  [semantic allocation ownership](../zig-native/SEMANTIC_ALLOCATION.md).
+  [semantic allocation ownership](../docs/compiler/SEMANTIC_ALLOCATION.md).

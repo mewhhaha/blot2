@@ -18,14 +18,14 @@ scheduling.
 ## Starting point
 
 Use the
-[approved summary interface](../zig-native/CALL_SUMMARIES.md#recursive-components-and-bounded-scheduling)
+[approved summary interface](../docs/compiler/CALL_SUMMARIES.md#recursive-components-and-bounded-scheduling)
 and its
-[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
+[acceptance cases](../docs/compiler/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
 At the task 006 baseline, active recursive targets fell back into their inline
-region in [core_eval.zig](../zig-native/src/eval/core_eval.zig). Its
+region in [core_eval.zig](../compiler/src/eval/core_eval.zig). Its
 call-summary queue already removes native recursion for admitted acyclic jobs;
-[tests/compile_budget.test.ts](../zig-native/tests/compile_budget.test.ts)
+[tests/compile_budget.test.ts](../tests/guest/compile_budget.test.ts)
 preserves deep-chain budgets.
 
 Task 004's source-normalization qualification found a source inquiry that did
@@ -35,7 +35,7 @@ attribution: checking and lowering finish on the baseline, while the ordinary
 Core source-interface inquiry does not. The bounded principal-publication cycle
 law passes; it does not qualify ordinary recursive inference. Preserve and bound
 this direct source case as part of component work. The
-[durable investigation](../zig-native/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026)
+[durable investigation](../docs/compiler/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026)
 records the probe and separates debug self-backend depth failures from the
 passing release LLVM gate.
 
@@ -94,6 +94,6 @@ commands for focused development and the scenarios below.
   rebuilding, duplicate scoped checks and allocation costs remain optimization
   work; no general speedup is claimed.
 - Durable record:
-  [joint recursive inference](../zig-native/CALL_SUMMARIES.md#joint-recursive-inference-10-october-2026)
+  [joint recursive inference](../docs/compiler/CALL_SUMMARIES.md#joint-recursive-inference-10-october-2026)
   records the implementation, exact pins, all gates, measurements and
   limitations.

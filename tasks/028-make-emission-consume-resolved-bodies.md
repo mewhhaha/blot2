@@ -17,7 +17,7 @@ semantic-selection paths after parity.
 ## Starting point
 
 Task 025–027 preparation covers calls, flow and ownership.
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) still combines
+[core_backend.zig](../compiler/src/backend/core_backend.zig) still combines
 generator planning, layout conversion, selection, serialization and instruction
 emission.
 
@@ -70,7 +70,7 @@ commands for focused development and the scenarios below.
 - Remaining limitations: Body plans remain Generator-local. Encoding still owns
   machine layout, static evaluation/serialization and lazy wrapper reservation;
   synthetic helper functions encode directly.
-- Durable record: [RESOLVED_BODIES.md](../zig-native/RESOLVED_BODIES.md) and the
+- Durable record: [RESOLVED_BODIES.md](../docs/compiler/RESOLVED_BODIES.md) and the
   shared
-  [qualification](../zig-native/RESOLVED_BODIES.md#qualification-11-october-2026),
+  [qualification](../docs/compiler/RESOLVED_BODIES.md#qualification-11-october-2026),
   including exact compiler/input/harness hashes and median distributions.

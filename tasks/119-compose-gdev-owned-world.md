@@ -3,7 +3,7 @@
 - **Status:** In progress — concrete access schema agreed with task 118; composition source follows the task 117 handoff, no compilation or qualification claimed.
 - **Dependencies:** 114 storage API, 117 application/session API; coordinate
   concrete pool declarations with 118 before either completes.
-- **Contract:** [Review](../zig-native/STORAGE_REWRITE_REVIEW.md),
+- **Contract:** [Review](../docs/compiler/STORAGE_REWRITE_REVIEW.md),
   [schedule and gates](STORAGE_REWRITE.md).
 
 ## Outcome and ownership

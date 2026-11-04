@@ -5,7 +5,7 @@
 - **Status:** Complete — local implementation `2798ff9`.
 - **Dependencies:** [036](036-summarize-demand-control-flow.md)
 - **Originating requirements:** DEMANDS: Local memo scope, loops and acceptance
-  checks. Sources: [Demand evaluation](../zig-native/DEMANDS.md).
+  checks. Sources: [Demand evaluation](../docs/compiler/DEMANDS.md).
 - **Execution:** Follow the
   [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
@@ -15,8 +15,8 @@ Place local demand memo state in its creation scope across branches and loops.
 
 ## Starting point
 
-[demand_inline.zig](../zig-native/src/backend/demand_inline.zig) and
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) already lower
+[demand_inline.zig](../compiler/src/backend/demand_inline.zig) and
+[core_backend.zig](../compiler/src/backend/core_backend.zig) already lower
 repeated admitted expression demands to invocation-local memo state; callee-loop
 cases still use runtime cells.
 
@@ -68,10 +68,10 @@ commands for focused development and the scenarios below.
   intentionally change public Wasm. Peak deltas and teardown live bytes are
   zero; CPU is mixed. Exact pins, distributions and isolated runtime costs are
   retained in the
-  [shared qualification](../zig-native/PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
+  [shared qualification](../docs/compiler/PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
 - Remaining limitations: Captured/returned pending demands, unknown callbacks,
   providers inside the callee, demand-valued joins/carries and exhausted or
   recursive proofs retain ordinary cells. Known callback elimination belongs
   to 038.
 - Durable record:
-  [LOCAL_MEMOS_QUALIFICATION](../zig-native/LOCAL_MEMOS_QUALIFICATION.md).
+  [LOCAL_MEMOS_QUALIFICATION](../docs/qualification/LOCAL_MEMOS_QUALIFICATION.md).

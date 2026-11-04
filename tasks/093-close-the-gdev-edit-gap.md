@@ -9,7 +9,7 @@
   - error edits 0.6–1.0 s → 12–48 ms (CT29).
 
   CT90 (post-rebase gate passes; see the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md)) reuses frozen
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md)) reuses frozen
   modules across test-entry switches: suite CPU 96 → 73 s. Open follow-ups are
   recorded under CT10, CT11 and CT22 in
   [COMPILE_HILLS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
@@ -30,7 +30,7 @@ call-summary jobs, while keeping the later reuse and summary benefits.
 
 After task 088 (`86db5b1`), a retained scalar literal edit on the frozen gdev
 copy costs about 570 ms CPU against 400 ms at `f7be6e7`, at load 2–3 (see
-[summary-job cost](../zig-native/CALL_SUMMARIES.md#summary-job-cost-11-october-2026)).
+[summary-job cost](../docs/compiler/CALL_SUMMARIES.md#summary-job-cost-11-october-2026)).
 Inference is 240 versus 199 ms with 1,034 versus 433 regions per edit; the
 residual regions were not attributed. The backend's lookup (+46 ms), capture
 (+21 ms) and prepare (+25 ms) timers grew alongside reuse that regenerates 102
@@ -67,23 +67,23 @@ before the local milestone commit.
   scratch, and giving dependency certificates their own 64 MiB budget so gdev
   keeps them. Full LLVM native suite, 638 guest/client tests and 310 analyzer
   files at zero; three alternating triples on the frozen gdev copy. See
-  [retained edit cost](../zig-native/RETAINED_EDIT_COST.md).
+  [retained edit cost](../docs/compiler/RETAINED_EDIT_COST.md).
 - Later captured-project milestones (the frozen gdev copy is no longer
   available): the collection-length path removes 220 inference regions per
   revision, and `ae001bb` (full gate) measures seven-pair edit CPU 1247.822 →
   906.212 ms and revert 1147.918 → 813.715 ms against `38e822d`, with exact Wasm
   and source fuel. See
-  [collection shape members](../zig-native/COLLECTION_SHAPE_MEMBERS.md) and
-  [retained assembly](../zig-native/RETAINED_ASSEMBLY_WORKLIST.md). These do not
+  [collection shape members](../docs/compiler/COLLECTION_SHAPE_MEMBERS.md) and
+  [retained assembly](../docs/compiler/RETAINED_ASSEMBLY_WORKLIST.md). These do not
   establish the historical `f7be6e7` comparison.
 - Remaining on gdev after `aef65e7`: about 39 ms of module-stamp integrity
   checks (a design decision), 26 ms of extra constant evaluation (task 086's
   area) and about 27 ms in fragment lookup, assembly and journal freezing. The
   30 ms literal-edit target is task [101](101-reach-the-literal-edit-target.md);
   finishing this task does not meet it.
-- Durable record: [retained edit cost](../zig-native/RETAINED_EDIT_COST.md).
+- Durable record: [retained edit cost](../docs/compiler/RETAINED_EDIT_COST.md).
 - The 20 October
-  [recreated-workload audit](../zig-native/RETAINED_EDIT_COST.md#recreated-workload-work-audit--20-october-2026)
+  [recreated-workload audit](../docs/compiler/RETAINED_EDIT_COST.md#recreated-workload-work-audit--20-october-2026)
   reproduces all recorded task-053 candidate medians and work distributions.
   Body revert optimizes only 18 functions but still costs about 4 seconds CPU;
   this identifies remaining work for profiling, not its CPU attribution or task

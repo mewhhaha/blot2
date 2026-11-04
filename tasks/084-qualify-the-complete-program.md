@@ -32,7 +32,7 @@ tooling and performance program.
 ## Starting point
 
 The task index and coverage matrix track implementation and external gates.
-[zig-native/STATUS.md](../zig-native/STATUS.md) must hold current qualified
+[docs/compiler/STATUS.md](../docs/compiler/STATUS.md) must hold current qualified
 results rather than the starting baseline.
 
 ## Implementation checklist
@@ -46,7 +46,7 @@ results rather than the starting baseline.
 - [x] Pin the owner-approved recreated gdev workload and record its manifest
       durably: 583 files and 69 test entries, with exact source and manifest
       hashes in
-      [current qualification](../zig-native/CLOUD_QUALIFICATION.md#current-workload-pin).
+      [current qualification](../docs/qualification/CLOUD_QUALIFICATION.md#current-workload-pin).
 - [ ] Measure that workload against pinned baselines in paired runs, including
       cold/population/first-edit/later-edit/no-op/restart/recovery and guest
       runtime/memory.
@@ -91,7 +91,7 @@ commands for focused development and the scenarios below.
 
 - Commit: pending; record the local milestone revision.
 - Partial qualification: the current workload pin and the executed compiler gate
-  are recorded in [current qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  are recorded in [current qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
   The other predecessor requirements, final-source analyzer gate and complete
   final measurement set remain open; this does not complete task 084.
 - Comparison: pending; record baseline/candidate hashes and benchmark

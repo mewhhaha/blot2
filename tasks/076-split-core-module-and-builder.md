@@ -17,7 +17,7 @@ reduce oversized state.
 
 ## Starting point
 
-[core.zig](../zig-native/src/check/core.zig) defines `Module` and `Builder`
+[core.zig](../compiler/src/check/core.zig) defines `Module` and `Builder`
 alongside dense node/side tables. Published Core must remain immutable while
 builders own temporary construction state.
 
@@ -56,7 +56,7 @@ commands for focused development and the scenarios below.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -83,4 +83,4 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   Scratch owns 25 temporary fields. No allocator is introduced.
 - Remaining limitations: prerequisite completion, final common full gate and
   performance qualification remain open. No commit or push is authorized.
-- Durable record: [Core ownership](../zig-native/CORE_OWNERSHIP.md).
+- Durable record: [Core ownership](../docs/compiler/CORE_OWNERSHIP.md).

@@ -18,9 +18,9 @@ worklists.
 ## Starting point
 
 `ClosureRegion.solveMode`, `solveStep` and `solveDataAliases` in
-[core_eval.zig](../zig-native/src/eval/core_eval.zig) repeatedly scan work.
-[types.zig](../zig-native/src/check/types.zig) owns chronological writes;
-[work_counters.zig](../zig-native/src/work_counters.zig) records passes and
+[core_eval.zig](../compiler/src/eval/core_eval.zig) repeatedly scan work.
+[types.zig](../compiler/src/check/types.zig) owns chronological writes;
+[work_counters.zig](../compiler/src/work_counters.zig) records passes and
 visits.
 
 ## Implementation checklist
@@ -92,7 +92,7 @@ commands for focused development and the scenarios below.
   recovery, source-witness comparisons and oversized frontiers keep broad write
   watches. No compiler-speed gain is claimed; the cold, edit and allocation
   targets remain open in their own tasks.
-- Durable record: [indexed inference work](../zig-native/INDEXED_SOLVER.md)
+- Durable record: [indexed inference work](../docs/compiler/INDEXED_SOLVER.md)
   records the contract, both candidates, the withdrawn allocation screen, binary
   identities and raw-data locations in
   `build/bench/indexed-solver-lazy-release/`.

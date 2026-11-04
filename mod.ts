@@ -1,13 +1,13 @@
 /** Blot's Zig project compiler and WebAssembly guest API. */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { captureNativeAssets } from "./compiler/native_assets.ts";
-import { captureAssetImports } from "./compiler/assets.ts";
+import { captureNativeAssets } from "./host/native_assets.ts";
+import { captureAssetImports } from "./host/assets.ts";
 import {
   createZigProjectCompiler,
   type ZigProjectCompiler,
   type ZigProjectCompilerOptions,
-} from "./compiler/zig_project_client.ts";
+} from "./host/zig_project_client.ts";
 export type {
   DiagnosticRequirement,
   DiagnosticRequirementKind,
@@ -15,15 +15,15 @@ export type {
   DiagnosticType,
   DiagnosticTypeKind,
   TypedHoleDiagnostic,
-} from "./compiler/type_diagnostics.ts";
+} from "./host/type_diagnostics.ts";
 import {
   extractNativeCompiler,
   extractStandardLibrary,
-} from "./compiler/packaged_native.ts";
+} from "./host/packaged_native.ts";
 
-export { createZigProjectCompiler } from "./compiler/zig_project_client.ts";
-export { jsonAssetParser } from "./compiler/assets.ts";
-export { decodeText, encodeText } from "./compiler/text.ts";
+export { createZigProjectCompiler } from "./host/zig_project_client.ts";
+export { jsonAssetParser } from "./host/assets.ts";
+export { decodeText, encodeText } from "./host/text.ts";
 export type {
   AssetBuildStats,
   AssetContext,
@@ -36,12 +36,12 @@ export type {
   AssetReference,
   AssetType,
   CompiledAsset,
-} from "./compiler/assets.ts";
+} from "./host/assets.ts";
 export type {
   NativeAssetImport,
   NativeAssetKind,
   NativeAssetOptions,
-} from "./compiler/native_assets.ts";
+} from "./host/native_assets.ts";
 export type {
   StorageBudgets,
   ZigProjectBuildOptions,
@@ -54,18 +54,14 @@ export type {
   ZigProjectCompletionResult,
   ZigProjectDiagnostic,
   ZigProjectSourceLocation,
-} from "./compiler/zig_project_client.ts";
-export {
-  GuestError,
-  instantiateGuest,
-  readGuestAbi,
-} from "./compiler/guest.ts";
+} from "./host/zig_project_client.ts";
+export { GuestError, instantiateGuest, readGuestAbi } from "./host/guest.ts";
 export type {
   AsyncHostCallback,
   Guest,
   GuestAbi,
   HostCallback,
-} from "./compiler/guest.ts";
+} from "./host/guest.ts";
 
 export const blotStdRoot: URL = new URL("./std/", import.meta.url);
 /** Include this payload when bundling the host into a desktop executable. */
@@ -205,4 +201,4 @@ export {
   type PackageOptions,
   type PackageProject,
   resolveProject,
-} from "./compiler/packages.ts";
+} from "./host/packages.ts";

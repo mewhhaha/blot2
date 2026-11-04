@@ -4,7 +4,7 @@ Status: runtime integrated; final whole-application qualification pending.
 Native storage laws and executed-Wasm capacity/identity witnesses pass.
 
 Complete the runtime foundation described in the
-[rewrite review](../zig-native/STORAGE_REWRITE_REVIEW.md) and
+[rewrite review](../docs/compiler/STORAGE_REWRITE_REVIEW.md) and
 [task index](STORAGE_REWRITE.md). This replaces the current storage scheme; it
 does not add an optional allocator or counted fallback.
 
@@ -19,9 +19,9 @@ consumes independent persistent and transport region budgets.
 
 ## Exclusive file ownership
 
-- `zig-native/src/runtime/data_stacks.zig`.
-- `zig-native/src/runtime/data_stacks_tests.zig` and `data_stacks_fixture.zig`.
-- New `zig-native/src/runtime/data_stack_regions_tests.zig` and
+- `compiler/src/runtime/data_stacks.zig`.
+- `compiler/src/runtime/data_stacks_tests.zig` and `data_stacks_fixture.zig`.
+- New `compiler/src/runtime/data_stack_regions_tests.zig` and
   `data_stack_regions_fixture.zig` if the existing fixture cannot express the
   packed-region boundaries. Do not create a separate fixture per case.
 

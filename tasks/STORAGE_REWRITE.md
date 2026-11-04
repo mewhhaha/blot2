@@ -3,7 +3,7 @@
 The current priorities are shared-kernel runtime, Gdev Wasm size and short
 iterations. Subsecond compilation, sub-five-second Main and 1–2MB remain unmet.
 The
-[current measured checkpoint](../scripts/bench/goose/results/2026-11-04-sort-hills.md)
+[current measured checkpoint](../benchmarks/goose/results/2026-11-04-sort-hills.md)
 adds dominated fixed-array validation reuse, known scalar strides and guarded
 bulk copy/fill loops. Unchanged merge/quick/Sieve improve **1.64 / 1.35 /
 2.43x**; custom hash regresses **4–5%**. Main saves another **47,689B** to
@@ -18,7 +18,7 @@ affected guests pass on the release compiler. Full qualification remains
 pending: the full gate reaches 180s after smoke/harness and 282 native passes
 without failures. A fresh inspected NVIDIA frame matches the preceding PNG/trace
 under original budgets; see
-[frame evidence](storage-handoff-evidence/2026-11-04-sort-hills-frame.json).
+[frame evidence](../benchmarks/evidence/integration/2026-11-04-sort-hills-frame.json).
 Broader gameplay/software-adapter checks and Pen's normal source bridge remain
 pending. Sibling source/assets remain Gdev `38af070`, Ink `ccaf08f`, Pen
 `d159492`.
@@ -27,12 +27,12 @@ Next measure representation work by record shape and operation, then compare
 creation-backed immutable FrameAccess with shared semantic shapes/transitive
 field demand. Main still spends 4.430s in the backend and requests 5.324GB
 cumulatively; copy-only changes cannot reach the output target. Preserve the
-[preceding shared hills](../scripts/bench/goose/results/2026-11-04-shared-hills.md),
-[recursion](../scripts/bench/goose/results/2026-11-04-recursive-calls.md),
-[addressed-input](../scripts/bench/goose/results/2026-11-04-addressed-inputs.md),
-[shared-call](../scripts/bench/goose/results/2026-11-03-call-contexts.md) and
-[fresh-owner](../scripts/bench/goose/results/2026-11-03-fresh-owners.md)
-evidence, including rejected rollouts and snapshot-specific qualifications.
+[preceding shared hills](../benchmarks/goose/results/2026-11-04-shared-hills.md),
+[recursion](../benchmarks/goose/results/2026-11-04-recursive-calls.md),
+[addressed-input](../benchmarks/goose/results/2026-11-04-addressed-inputs.md),
+[shared-call](../benchmarks/goose/results/2026-11-03-call-contexts.md) and
+[fresh-owner](../benchmarks/goose/results/2026-11-03-fresh-owners.md) evidence,
+including rejected rollouts and snapshot-specific qualifications.
 
 The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves
@@ -46,13 +46,13 @@ Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source
 validation and one real Gdev main frame in native Pen, with all runner checks
 and an inspected PNG. See
-[the current migrated-frame candidate](storage-handoff-evidence/2026-10-31-migrated-frame.json).
+[the current migrated-frame candidate](../benchmarks/evidence/integration/2026-10-31-migrated-frame.json).
 The final source/API inventories pass 760 valid files and six intended semantic
 rejections across Ink/Gdev. Broader compiler, original-export, library/game and
 host/browser qualification remain pending. Keep changing compile frontiers in
 CONTINUE.md and its linked evidence. The earlier full compiler gate stopped at
 its protocol smoke span assertion (three passed, one failed); see
-[the handoff evidence](storage-handoff-evidence/2026-10-30-full-gate.txt).
+[the handoff evidence](../benchmarks/evidence/integration/2026-10-30-full-gate.txt).
 
 ## First native frame — complete
 
@@ -64,15 +64,15 @@ Preserve source, assets and useful requirements across the existing siblings.
 For an optional compile-only diagnostic with the matching native compiler:
 
 ```sh
-deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts > /tmp/gdev-main.log 2>&1
-python3 scripts/storage_handoff/report.py /tmp/gdev-main.log
+deno run --no-config --no-lock -A scripts/integration/build_gdev.ts --timeout-ms 10000 > /tmp/gdev-main.log 2>&1
+python3 scripts/integration/report.py /tmp/gdev-main.log
 ```
 
 For actual integration, build matching Pen and plugin binaries, then run (the
 default recompiles; `CONTINUE.md` documents verified artifact reuse):
 
 ```sh
-python3 scripts/storage_handoff/run_pen.py --launch
+python3 scripts/integration/run_pen.py --launch
 ```
 
 The tracked runner requires successful exit, one frame trace, a completed render
@@ -97,8 +97,8 @@ machine are not prerequisites or current evidence.
 - Backend nonfunction/global exports and the output block-break inference defect
   remain pending. Do not hide the scalar-export law with `#run`.
 
-See [the ownership contract](../zig-native/SCOPED_STORAGE.md) and
-[decision review](../zig-native/STORAGE_REWRITE_REVIEW.md). The
+See [the ownership contract](../docs/compiler/SCOPED_STORAGE.md) and
+[decision review](../docs/compiler/STORAGE_REWRITE_REVIEW.md). The
 [historical integration log](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/STORAGE_REWRITE.md)
 retains earlier batches and measurements; it is not a list of checks passed now.
 
@@ -156,7 +156,7 @@ incomplete run or compiled-but-unexecuted inventory as a pass.
 
 Update each task and this index when code lands in the workspace, distinguishing
 implemented, development-checked and qualified. Keep the durable decision and
-final evidence under `zig-native/`. Task 999 cannot run while any task here is
+final evidence under `compiler/`. Task 999 cannot run while any task here is
 unfinished and does not itself authorize a cleanup now.
 
 Keep baseline source/binary identities before retirement. Measure fresh compile,

@@ -18,11 +18,11 @@ import { nativeExecutionArtifacts } from "./run_native_tests.ts";
 export { cacheStatus, runPhase } from "./compiler_phase.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const native = resolve(root, "zig-native");
+const native = resolve(root, "compiler");
 const smokeFiles = [
-  "zig-native/tests/zig_project_protocol.test.ts",
-  "zig-native/tests/zig_project_client.test.ts",
-  "zig-native/tests/stage_chain_budget.test.ts",
+  "tests/guest/zig_project_protocol.test.ts",
+  "tests/guest/zig_project_client.test.ts",
+  "tests/guest/stage_chain_budget.test.ts",
 ];
 
 // Unit-test compilation uses Zig in both development and full qualification.
@@ -498,10 +498,10 @@ async function main() {
         await guests(
           "preflight-regressions",
           preflightFiles,
-          "zig-native/zig-out-dev/bin/blotc",
+          "compiler/zig-out-dev/bin/blotc",
         );
       }
-      await guests("smoke", smokeFiles, "zig-native/zig-out-dev/bin/blotc");
+      await guests("smoke", smokeFiles, "compiler/zig-out-dev/bin/blotc");
     }
     if (values.dev) {
       if (requestedNative) {
@@ -515,20 +515,14 @@ async function main() {
         await guests(
           "focused-guests",
           developmentFiles,
-          "zig-native/zig-out-dev/bin/blotc",
+          "compiler/zig-out-dev/bin/blotc",
           values.filter,
         );
       }
     } else {
       let files = positionals;
       if (!files.length) {
-        files = ["zig-native/tests"];
-        for await (const entry of Deno.readDir(resolve(root, "compiler"))) {
-          if (entry.isFile && entry.name.endsWith(".test.ts")) {
-            files.push(`compiler/${entry.name}`);
-          }
-        }
-        files.sort();
+        files = ["tests/guest", "tests/host"];
       }
       if (!values.guest) {
         // Smoke also writes the shared development compiler. Protect it, then
@@ -543,16 +537,16 @@ async function main() {
           "--allow-run",
           "--allow-env",
           "--fail-fast",
-          "scripts/test_compiler.test.ts",
-          "scripts/bench_compile.test.ts",
-          "scripts/compiler_gate_state.test.ts",
-          "scripts/compiler_fingerprint.test.ts",
-          "scripts/compiler_fixtures.test.ts",
-          "scripts/build_compiler.test.ts",
-          "scripts/native_test_runner.test.ts",
-          "scripts/run_native_tests.test.ts",
-          "scripts/check_dev.test.ts",
-          "scripts/lint_zig.test.ts",
+          "tests/tooling/test_compiler.test.ts",
+          "tests/tooling/bench_compile.test.ts",
+          "tests/tooling/compiler_gate_state.test.ts",
+          "tests/tooling/compiler_fingerprint.test.ts",
+          "tests/tooling/compiler_fixtures.test.ts",
+          "tests/tooling/build_compiler.test.ts",
+          "tests/tooling/native_test_runner.test.ts",
+          "tests/tooling/run_native_tests.test.ts",
+          "tests/tooling/check_dev.test.ts",
+          "tests/tooling/lint_zig.test.ts",
         ]);
         lease = await compilerLease(root);
         const compile = () =>
@@ -611,7 +605,7 @@ async function main() {
       await guests(
         "guests",
         files,
-        "zig-native/zig-out/bin/blotc",
+        "compiler/zig-out/bin/blotc",
         values.filter,
       );
     }

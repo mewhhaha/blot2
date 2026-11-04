@@ -1,0 +1,230 @@
+{
+  "date": "2026-11-04",
+  "baseline_commit": "4f60f4ef1bb1af3a619b40218f10726f837544e6",
+  "scope": "Repository layout and callers; compiler production source and all Blot programs byte-identical.",
+  "layout": {
+    "zig-native/": "compiler/",
+    "compiler/": "host/ (Deno implementation); tests/host/ (Deno tests); docs/ (reference)",
+    "zig-native/tests/": "tests/guest/",
+    "scripts/*.test.ts": "tests/tooling/",
+    "scripts/bench/": "benchmarks/",
+    "zig-native/{qualification,measurements}/": "benchmarks/evidence/{qualification,measurements}/",
+    "tasks/storage-handoff-evidence/": "benchmarks/evidence/integration/",
+    "scripts/storage_handoff/": "scripts/integration/",
+    "generated/wasm/": "generated/parser/wasm/",
+    "grammar.baba and baba.json": "host/parser/",
+    "scripts/{setup_helix,helix_languages}.ts": "editor/helix/"
+  },
+  "preservation": {
+    "relocated_files": 1792,
+    "unchanged_raw_evidence_and_parser_files": 258,
+    "all_blot_files_byte_identical": true,
+    "compiler_production_identity_unchanged": true,
+    "release_compiler_sha256": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
+    "readme_benchmark_charts_retained": true,
+    "counted_and_owned_backends_remain_live": true
+  },
+  "validation": {
+    "tooling_tests": {
+      "passed": 57,
+      "failed": 0
+    },
+    "editor_tests": {
+      "passed": 6,
+      "failed": 0
+    },
+    "host_and_migration_tests": {
+      "passed": 55,
+      "failed": 0
+    },
+    "guest_path_tests": {
+      "passed": 68,
+      "failed": 0
+    },
+    "native_path_tests": {
+      "passed": 3,
+      "failed": 0,
+      "allocation_failures": "sampled"
+    },
+    "development_check": {
+      "area": "syntax",
+      "passed": true,
+      "wall_seconds": 9.636176841000001,
+      "compiled_native_laws": 3001,
+      "selected_native_laws": 12,
+      "guest_tests": 20,
+      "native_compile_seconds": 0.549648847
+    },
+    "full_gate": {
+      "budget_seconds": 180,
+      "wall_seconds": 180.343054383,
+      "status": "incomplete_budget",
+      "native_passed": 77,
+      "native_failed": 0,
+      "smoke_and_harness_passed": true,
+      "full_qualification_pending": true
+    },
+    "types": "passed",
+    "format": "passed",
+    "zig_lint": "zero findings",
+    "package_payload_and_standalone_api": "passed",
+    "publish_dry_run": "passed",
+    "missing_local_markdown_targets": 0,
+    "goose_quicksort_smoke": "both cold/edited builds and checked test-profile runtimes passed; one sample, no performance claim"
+  },
+  "gdev": {
+    "compile_ms": 5660.324815,
+    "wasm_bytes": 10049963,
+    "wasm_sha256": "8a5bc671b85bba52b8989abe4c2165e26d1e379c659e3db9666dd60ad7e5127b",
+    "byte_identical_to_baseline": true,
+    "deadline_ms": 10000
+  },
+  "frame": {
+    "pen_sha256": "c5012f1cc13dad5e643348932ace58e5ee271430edf10ad2a1cbd5f2246b7d8d",
+    "command": [
+      "/home/jacobt/src/pen/target/release/pen",
+      "--game",
+      "/home/jacobt/src/blot2/build/restructure/pen-frame/game",
+      "--assets",
+      "/home/jacobt/src/gdev/src/assets",
+      "--headless",
+      "--mute",
+      "--frames",
+      "1",
+      "--fps",
+      "60",
+      "--size",
+      "640x480",
+      "--data",
+      "/home/jacobt/src/blot2/build/restructure/pen-frame/data",
+      "--trace",
+      "/home/jacobt/src/blot2/build/restructure/pen-frame/frames.trace",
+      "--screenshot",
+      "/home/jacobt/src/blot2/build/restructure/pen-frame/frame.png"
+    ],
+    "entry": "src/main.blot:main",
+    "project": "/home/jacobt/src/gdev",
+    "compiler": "/home/jacobt/src/blot2/compiler/zig-out/bin/blotc",
+    "compiler_sha256": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
+    "storage": {
+      "temporaryBytes": 2097152,
+      "persistentBytes": 262144,
+      "transportBytes": 2097152,
+      "ownerCapacity": 4096
+    },
+    "compile_invoked": false,
+    "graphics_environment": {
+      "XDG_RUNTIME_DIR": "/run/user/1000"
+    },
+    "compiled_main_source": "/home/jacobt/src/blot2/build/restructure/gdev/main-c541f24a0d97f912/main.wasm",
+    "wasm_sha256": "8a5bc671b85bba52b8989abe4c2165e26d1e379c659e3db9666dd60ad7e5127b",
+    "scene_sha256": "156d9f802916ce2bbe1b5d85da494b9da8237282c4f0318bf487c2a3ab67f9af",
+    "assets": "/home/jacobt/src/gdev/src/assets",
+    "returncode": 0,
+    "checks": {
+      "exit_zero": true,
+      "one_completed_guest_trace": true,
+      "one_headless_step": true,
+      "first_guest_frame": true,
+      "complete_render": true,
+      "screenshot_640x480": true
+    },
+    "compiled_wasm_unchanged": true,
+    "success": true,
+    "frame_png_sha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frames_trace_sha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "visually_inspected": true,
+    "baseline_png_and_trace_byte_identical": true,
+    "runtime_scope": "One NVIDIA frame using the unchanged installed Pen executable and reviewed compiled artifact; broader gameplay/browser/software adapter pending."
+  },
+  "siblings": {
+    "pen": {
+      "baseline": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf",
+      "commit": "1fcc6792c4114f86423f50a203ad4e945953b9ee",
+      "files": [
+        "crates/blot-host/tests/owned_storage.rs",
+        "crates/blot-host/tests/worker_sessions.rs",
+        "crates/pen-web/structured-source.ts",
+        "scripts/bundle-structured.ts",
+        "scripts/check-examples.ts",
+        ".github/workflows/bench.yml",
+        ".github/workflows/ci.yml",
+        "plugins/blot/src/session.rs",
+        "plugins/blot/src/lib.rs",
+        "crates/blot-host/src/lib.rs",
+        "crates/pen-runtime/src/abi.rs",
+        "crates/pen-runtime/src/mods.rs",
+        "examples/rust-guest/src/adapt.rs",
+        "crates/pen-web/structured.js"
+      ]
+    },
+    "ink": {
+      "baseline": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+      "commit": "06156a322b43e8ea04c6f6c69b99d893b6a04807",
+      "files": [
+        "tests/pen_frame_encoding.test.ts",
+        "tests/pen_instance_projection.test.ts",
+        "pen.json",
+        ".github/workflows/check.yml"
+      ]
+    },
+    "gdev": {
+      "baseline": "38af0708efe585b10385ebf9ab7dc51ae5bb6b45",
+      "commit": "9d7f478ad403f316d38fdb7d6f3c86ea0667ee94",
+      "files": [
+        "performance/kernels/iteration.mjs",
+        "performance/kernels/measure.ts",
+        "performance/kernels/value-representations.mjs",
+        "performance/runtime/name-runtime.py",
+        "performance/runtime/profile.mjs",
+        "scripts/format-blot.ts",
+        "scripts/modernize/allocations.ts",
+        "scripts/modernize/browser-build.ts",
+        "scripts/modernize/build-entry.ts",
+        "scripts/modernize/codec-runner.ts",
+        "scripts/modernize/codec_pilot.ts",
+        "scripts/modernize/compare.ts",
+        "scripts/modernize/compile.ts",
+        "scripts/modernize/dependencies.ts",
+        "scripts/modernize/drift-witness.ts",
+        "scripts/modernize/kernels.ts",
+        "scripts/modernize/pile-workers.ts",
+        "scripts/modernize/project.ts",
+        "scripts/modernize/qualify.ts",
+        "scripts/modernize/reproduce-drift.ts",
+        "scripts/modernize/services-probe.ts",
+        "scripts/perf/common.py",
+        "tests/restoration_conversions.test.ts",
+        "pen.json",
+        "scripts/modernize/deno.json",
+        "scripts/modernize/generate.ts"
+      ]
+    }
+  },
+  "sibling_checks": {
+    "ink_tests": 4,
+    "gdev_runtime_witness_tests": 4,
+    "gdev_performance_tooling_tests": 30,
+    "pen_guest_js_ownership_teardown_trap_stack": "passed",
+    "pen_structured_bundle_freshness": "passed; refreshed previously stale generated host bundle using its generator",
+    "helix_formatter_and_lsp_initialize_shutdown": "passed",
+    "missing_coverage": [
+      "Pen services artifact lacks qualify_services",
+      "Pen examples require absent target/release/pen-codegen",
+      "No new Rust/browser qualification"
+    ]
+  },
+  "cache_recovery": {
+    "error": "Atomic file replacement returned ENOSPC on Btrfs with 79GiB reported free. Replacement succeeded after pruning older rebuildable cache objects.",
+    "pruned_directories": 151,
+    "pruned_allocated_bytes": 5395046400,
+    "preserved": "Installed outputs, hardlinked artifacts, recent cache, source/assets and measurements.",
+    "development_check_retry": "passed in 9.64 seconds"
+  },
+  "test_snapshot_cleanup": {
+    "test": "entry_interface_order_execution imported alias witness diagnostic start",
+    "old": 53,
+    "current": 57,
+    "control": "Unmodified original fixture and unchanged release compiler reproduce byte offset 57."
+  }
+}

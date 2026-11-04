@@ -17,7 +17,7 @@ remaining large compilation routines.
 
 ## Starting point
 
-[core_backend.zig](../zig-native/src/backend/core_backend.zig) contains
+[core_backend.zig](../compiler/src/backend/core_backend.zig) contains
 `Generator`, `compileWithOptions`, `serialize` and emission state. Tasks 025–028
 already establish the semantic boundary.
 
@@ -57,7 +57,7 @@ commands for focused development and the scenarios below.
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -92,4 +92,4 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   `build/bench/finish-rest-20261015/backend-owners/`.
 - Remaining limitations: the final common release/full compiler gate and matched
   CPU/performance qualification keep the task in progress.
-- Durable record: [Backend ownership](../zig-native/BACKEND_OWNERSHIP.md).
+- Durable record: [Backend ownership](../docs/compiler/BACKEND_OWNERSHIP.md).

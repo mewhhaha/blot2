@@ -23,7 +23,7 @@ interfaces remain unchanged.
 
 ## Starting point
 
-[module_frontend_cutoff.zig](../zig-native/src/reuse/module_frontend_cutoff.zig)
+[module_frontend_cutoff.zig](../compiler/src/reuse/module_frontend_cutoff.zig)
 and refinement receipts provide limited cutoffs. The unified queries distinguish
 semantic dependencies from executable and staging reads.
 
@@ -73,58 +73,58 @@ correct, and the form is a recorded limitation rather than required work here.
 
 1. Per-declaration refinement receipt roots and closure roots in edited modules;
    loop names that stay stable under size-changing edits
-   ([receipt roots](../zig-native/BODY_CUTOFF.md#receipt-roots-in-edited-modules)).
+   ([receipt roots](../docs/compiler/BODY_CUTOFF.md#receipt-roots-in-edited-modules)).
 2. Owned checked facts for scalar literals, U32/F32 intrinsics, applications,
    typed lambdas, conditionals, products and collection literals; generic
    nominal/structural and selected/residual evidence; closed-row certificates;
    earlier inserted AST/type nodes and new spellings
-   ([owned body facts](../zig-native/BODY_CUTOFF.md#owned-frontend-body-facts-task-024-first-slice)).
+   ([owned body facts](../docs/compiler/BODY_CUTOFF.md#owned-frontend-body-facts-task-024-first-slice)).
 3. Shared principal edges, source-declared and portable imported qualifications,
    seed-rebuild body offers, applied-annotation and constructor recipe reads
-   ([shared edges](../zig-native/BODY_CUTOFF.md#shared-principal-edges-task-024-follow-up)).
+   ([shared edges](../docs/compiler/BODY_CUTOFF.md#shared-principal-edges-task-024-follow-up)).
 4. Blocks, lets, returns, scalar rebinding, joins, case pattern rows,
    constructor patterns and unqualified local principals, with the access-path
    safety guard
-   ([scopes](../zig-native/BODY_CUTOFF.md#ordinary-scopes-and-constructor-patterns)).
+   ([scopes](../docs/compiler/BODY_CUTOFF.md#ordinary-scopes-and-constructor-patterns)).
 5. Explicit fields, concrete dotted paths, generic explicit fields,
    variable-root generic dotted templates, ordinary array selectors, field and
    indexed updates
-   ([fields](../zig-native/BODY_CUTOFF.md#integrated-explicit-fields-at-4013b10),
-   [updates](../zig-native/BODY_CUTOFF.md#field-and-indexed-update-receipts-15-october-2026)).
+   ([fields](../docs/compiler/BODY_CUTOFF.md#integrated-explicit-fields-at-4013b10),
+   [updates](../docs/compiler/BODY_CUTOFF.md#field-and-indexed-update-receipts-15-october-2026)).
 6. Inferred, declared and shared local requirements; producer ordinal
    relocation; imported annotation heads and recipe proofs; inert principal
    suffixes
-   ([combined replay](../zig-native/BODY_CUTOFF.md#combined-replay-qualification-13-october-2026),
-   [suffixes](../zig-native/BODY_CUTOFF.md#inert-principal-suffixes-15-october-2026)).
+   ([combined replay](../docs/compiler/BODY_CUTOFF.md#combined-replay-qualification-13-october-2026),
+   [suffixes](../docs/compiler/BODY_CUTOFF.md#inert-principal-suffixes-15-october-2026)).
 7. Written Foreign arrows; if-let, scalar negation, value patterns, product
    projection and pure Array/List operations; ordinary loops and `use`; demanded
    bodies
-   ([loops](../zig-native/BODY_CUTOFF.md#ordinary-loop-and-use-receipts-15-october-2026),
-   [demands](../zig-native/BODY_CUTOFF.md#ordinary-demanded-body-receipts-15-october-2026)).
+   ([loops](../docs/compiler/BODY_CUTOFF.md#ordinary-loop-and-use-receipts-15-october-2026),
+   [demands](../docs/compiler/BODY_CUTOFF.md#ordinary-demanded-body-receipts-15-october-2026)).
 8. Nongenerative user-effect callback rows; static calls to unparameterized
    effect families
-   ([effect rows](../zig-native/BODY_CUTOFF.md#user-effect-callback-rows-15-october-2026),
-   [operations](../zig-native/BODY_CUTOFF.md#static-operation-calls-15-october-2026)).
+   ([effect rows](../docs/compiler/BODY_CUTOFF.md#user-effect-callback-rows-15-october-2026),
+   [operations](../docs/compiler/BODY_CUTOFF.md#static-operation-calls-15-october-2026)).
 9. Mixed implementation modules, nominal/alias annotation recipes and
    selected-name callers within the 64-entry catalog and 4,096-step proof bounds
-   ([implementations](../zig-native/BODY_CUTOFF.md#mixed-implementation-modules-14-october-2026),
-   [callers](../zig-native/BODY_CUTOFF.md#current-selected-name-callers-14-october-2026)).
+   ([implementations](../docs/compiler/BODY_CUTOFF.md#mixed-implementation-modules-14-october-2026),
+   [callers](../docs/compiler/BODY_CUTOFF.md#current-selected-name-callers-14-october-2026)).
 10. Executable consumers of changed bodies, selected evidence, captures and
     staged inputs rebuild; nested callable fragment owners; all-dirty dependency
     chains; failed-revision rollback; source/compiled/archive/checkpoint parity;
     complete allocation-failure sweeps
-    ([nested fragments](../zig-native/BODY_CUTOFF.md#nested-callable-fragment-owners-15-october-2026),
-    [chains](../zig-native/BODY_CUTOFF.md#chains-with-no-clean-dependency-15-october-2026)).
+    ([nested fragments](../docs/compiler/BODY_CUTOFF.md#nested-callable-fragment-owners-15-october-2026),
+    [chains](../docs/compiler/BODY_CUTOFF.md#chains-with-no-clean-dependency-15-october-2026)).
 11. Implemented in the working tree: generic dotted paths with qualified roots,
     projected receivers and declared field requirements, with global/local and
     imported qualification origins. The extended row-5 matrix and the new native
     fault-sweep law pass; full LLVM qualification is pending. See the
-    [closed acceptance map](../zig-native/BODY_CUTOFF.md#declared-fields-and-the-closed-acceptance-map-19-october-2026).
+    [closed acceptance map](../docs/compiler/BODY_CUTOFF.md#declared-fields-and-the-closed-acceptance-map-19-october-2026).
 
 The task completes when row 11 is implemented, every native law and guest test
 mapped to rows 1–11 passes in the full compiler gate (`deno task test:compiler`
 and `deno task lint:zig`) on committed source, and the row-to-law mapping is
-recorded in [BODY_CUTOFF.md](../zig-native/BODY_CUTOFF.md).
+recorded in [BODY_CUTOFF.md](../docs/compiler/BODY_CUTOFF.md).
 
 What moved where (nothing is dropped silently):
 
@@ -135,7 +135,7 @@ What moved where (nothing is dropped silently):
   first-use symbol order, and with them edits that shift shared principal
   slots): task 102's checklist, since 15 October 2026.
 - **Body forms that still decline to ordinary checking**, as recorded in
-  [BODY_CUTOFF.md](../zig-native/BODY_CUTOFF.md): generated iterator bodies,
+  [BODY_CUTOFF.md](../docs/compiler/BODY_CUTOFF.md): generated iterator bodies,
   Request loops and resolver blocks; binary demand rewrites; scoped, generative,
   invocation and resource operation recipes; Scoped/State static calls and
   parameterized effect families; selection forms outside the bounded catalog,
@@ -152,7 +152,7 @@ What moved where (nothing is dropped silently):
 
 - Current local milestone: `e29dd0d2c6faa2ad16a39e4a06ef254cede3ff2c`; compiler
   and exact source/log hashes are recorded by the
-  [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md).
+  [cloud qualification](../docs/qualification/CLOUD_QUALIFICATION.md).
 - Validation: the forced LLVM gate executes all 2,470 native laws without skips,
   failures, leaks or logged errors; 1,556 guest/client checks and 37 harness
   checks pass. CI lint covers 507 source files plus the fixture module with zero
@@ -177,8 +177,8 @@ that qualification or a commit was pending refer to those earlier checkpoints.
   `5bfae5b` (sources of `fbe28c8`): ecs edits 0.84–0.85 × CPU with refinement
   hits 10 → 58 of 82, monads 0.85 ×, a size-changing lists edit 1.13 × slower;
   steady geomeans 0.972 (edit) and 0.969 (revert). See
-  [distributions](../zig-native/qualification/body-cutoff.csv) and
-  [pins](../zig-native/qualification/body-cutoff-pins.json).
+  [distributions](../benchmarks/evidence/qualification/body-cutoff.csv) and
+  [pins](../benchmarks/evidence/qualification/body-cutoff-pins.json).
 - Later milestones, each with a passing full gate: `46bf8b9` owned body facts
   (914 guests; admitted deep-body edit CPU about 25–30% lower); `2689ad5`
   shared, portable and annotation reads (925 guests); `850793f` scopes, local
@@ -196,7 +196,7 @@ that qualification or a commit was pending refer to those earlier checkpoints.
 - Remaining: full LLVM qualification, the paired compiler comparison and a local
   milestone commit. Row 11 and its durable law map are implemented and focused
   checks pass. Limitations and moved scope remain explicit above.
-- Durable record: [body interface cutoff](../zig-native/BODY_CUTOFF.md) (every
+- Durable record: [body interface cutoff](../docs/compiler/BODY_CUTOFF.md) (every
   slice, its laws, pins and costs),
-  [frontend ownership](../zig-native/FRONTEND_OWNERSHIP_QUALIFICATION.md) and
-  [merged qualification](../zig-native/CONTINUATION_QUALIFICATION.md).
+  [frontend ownership](../docs/qualification/FRONTEND_OWNERSHIP_QUALIFICATION.md) and
+  [merged qualification](../docs/qualification/CONTINUATION_QUALIFICATION.md).

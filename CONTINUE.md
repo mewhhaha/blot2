@@ -7,12 +7,20 @@ The next latency gate is below five seconds; subsecond compilation and 1–2MB
 Wasm remain goals. Reachable throughput targets are 50k source lines in 0.5s,
 then one million lines/second. None of these Main goals is complete.
 
-The
-[array-loop checkpoint](scripts/bench/goose/results/2026-11-04-sort-hills.md)
+The repository now separates the Zig compiler (`compiler/`), Deno host
+(`host/`), tests, benchmarks and reference documentation. See the
+[repository map](docs/README.md) and
+[layout validation](benchmarks/evidence/integration/2026-11-04-repository-layout.json).
+Production compiler identity, Blot sources and Main Wasm remain unchanged. The
+relocated syntax development check passes in 9.64s; full qualification remains
+pending after the bounded full gate. Pen, Ink, Gdev and installed Helix callers
+use the new paths.
+
+The [array-loop checkpoint](benchmarks/goose/results/2026-11-04-sort-hills.md)
 removes dominated fixed-array readiness guards, specializes scalar strides and
 adds guarded bulk copy/fill loops after ordinary source/owner checks. Unsafe
 ranges retain the exact scalar loop, including valid-prefix writes before a
-later bounds trap. See `zig-native/CONTRACT.md`.
+later bounds trap. See `docs/compiler/CONTRACT.md`.
 
 Five fresh release pairs improve unchanged merge sort **1.64x**, quicksort
 **1.35x**, and Sieve **2.43x**. Custom hash regresses **4–5%**; CRC32, Fannkuch
@@ -53,20 +61,20 @@ Release compiler SHA256:
 `8a5bc671b85bba52b8989abe4c2165e26d1e379c659e3db9666dd60ad7e5127b`. A fresh
 inspected NVIDIA frame passes original budgets and matches the preceding
 PNG/trace byte for byte; see
-[frame evidence](tasks/storage-handoff-evidence/2026-11-04-sort-hills-frame.json).
+[frame evidence](benchmarks/evidence/integration/2026-11-04-sort-hills-frame.json).
 Broader gameplay/software-adapter qualification remains pending. Pen's normal
 source bridge still omits inferenceBudget; the bounded Deno runner builds Main
 and Pen loads that reviewed artifact. Sibling source/assets remain unchanged:
 Gdev `38af070`, Ink `ccaf08f`, Pen `d159492`.
 
 The
-[preceding shared hills](scripts/bench/goose/results/2026-11-04-shared-hills.md)
+[preceding shared hills](benchmarks/goose/results/2026-11-04-shared-hills.md)
 retain CRC composition, zero-allocation fold probes, copy proofs and rejected
 scalar inlining.
-[Direct recursion](scripts/bench/goose/results/2026-11-04-recursive-calls.md)
+[Direct recursion](benchmarks/goose/results/2026-11-04-recursive-calls.md)
 retains fixed Array U32/U32/Unit headers and finite invariant owner access;
 broader recursion stays excluded.
-[Addressed inputs](scripts/bench/goose/results/2026-11-04-addressed-inputs.md)
+[Addressed inputs](benchmarks/goose/results/2026-11-04-addressed-inputs.md)
 retain the rejected per-call snapshot rollout. Current runtime changes do not
 complete the owned-storage rewrite.
 
@@ -98,14 +106,14 @@ bounds trap.
 Use the private checked-IR capture/replay for short backend iterations:
 
 ```sh
-deno run -A scripts/bench/capture_outline.ts --output build/bench/outline-capture
-(cd zig-native && zig build bench-outline -Doptimize=fast -Dllvm=false --prefix zig-out-native-dev)
-zig-native/zig-out-native-dev/bin/blot-outline-replay build/bench/outline-capture verify
+deno run -A benchmarks/tools/capture_outline.ts --output build/bench/outline-capture
+(cd compiler && zig build bench-outline -Doptimize=fast -Dllvm=false --prefix zig-out-native-dev)
+compiler/zig-out-native-dev/bin/blot-outline-replay build/bench/outline-capture verify
 ```
 
 Capture a fresh pinned artifact. Replay builds in about 0.5s and finalizes in
 about 3s; it is engine evidence, not arbitrary-IR or whole-runtime authority.
-Use `scripts/bench/capture_scaling.ts`, `aggregate_scaling.ts` and
+Use `benchmarks/tools/capture_scaling.ts`, `aggregate_scaling.ts` and
 `compiler_throughput.ts` for bounded controls. Small controls do not predict
 Main.
 

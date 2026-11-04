@@ -2,7 +2,7 @@
 import { fileURLToPath } from "node:url";
 
 const directory = new URL("../generated/compiler/", import.meta.url);
-const source = new URL("../zig-native/zig-out/bin/blotc", import.meta.url);
+const source = new URL("../compiler/zig-out/bin/blotc", import.meta.url);
 const destination = new URL("blotc.gz", directory);
 await Deno.mkdir(directory, { recursive: true });
 const temporary = await Deno.makeTempFile({

@@ -3,7 +3,7 @@
 - **Status:** In progress — two Sol lanes own groups 1–2 and 3–4; source migration underway, no compilation or qualification claimed.
 - **Dependencies:** API handoffs from 114–117 and the concrete owner schema from
   119. Implement alongside 119; compile after the batch.
-- **Contract:** [Review](../zig-native/STORAGE_REWRITE_REVIEW.md),
+- **Contract:** [Review](../docs/compiler/STORAGE_REWRITE_REVIEW.md),
   [schedule and gates](STORAGE_REWRITE.md).
 
 ## Outcome and ownership
