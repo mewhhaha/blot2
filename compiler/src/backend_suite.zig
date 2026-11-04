@@ -15,6 +15,7 @@ comptime {
     _ = @import("backend/wasm_bit_recurrence.zig");
     _ = @import("backend/storage_span_dominance.zig");
     _ = @import("backend/wasm_bulk_loop_tests.zig");
+    _ = @import("backend/wasm_merge_loop_tests.zig");
     _ = @import("backend/wasm_sroa.zig");
     _ = @import("backend/simd_abi.zig");
     _ = @import("backend/wasm_row_reduce.zig");

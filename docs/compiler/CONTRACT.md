@@ -153,6 +153,20 @@ elements retain scalar execution. Literal fill preserves exact scalar bits.
 Detached output and all local/instruction capacity are reserved before replacing
 the canonical loop suffix; pending outline or semantic coordinates reject it.
 
+An exact U32 two-cursor merge loop may use two cached comparison loads and one
+`i32_select` store. The source proof requires two ordered upper-bound exits,
+matching indexed reads/stores, distinct cursor/output carries, invariant limits
+and complete SSA branch/backedge correspondence. Other effects, self-dependent
+stores, changed increments and additional statements decline. Ordinary source,
+owner, read and escape checks still finish before replacing the bounded suffix.
+Lazy owner validation and every per-access bound remain in their original order:
+first source, second source, destination. A same-width store replaces the unused
+old destination load before any cursor advances. Both input values reload each
+iteration, preserving aliases, ties, wrapping arithmetic and trap prefixes.
+Publication reserves capacity and invalidates span/snapshot receipts. The
+private select opcode has the exact pure, nontrapping `(i32,i32,i32)->i32`
+contract.
+
 A fixed range loop with one U32 carry may compose one through eight pure bit
 rounds into an exact affine transform. Normal source checking, ownership, escape
 and backedge validation finish first. The bounded machine interpreter admits

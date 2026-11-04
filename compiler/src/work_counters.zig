@@ -221,6 +221,7 @@ pub const Counters = struct {
     scoped_fixed_span_accesses: u64 = 0,
     scoped_bulk_copies: u64 = 0,
     scoped_bulk_fills: u64 = 0,
+    scoped_merge_loops: u64 = 0,
     scoped_bit_recurrences: u64 = 0,
     scoped_bit_rounds_removed: u64 = 0,
     scoped_transport_words_avoided: u64 = 0,

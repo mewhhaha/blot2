@@ -8,10 +8,16 @@ quicksort ports. Original F64 Mandelbrot and the other 43 catalog tasks remain
 outside paired coverage. The custom eight-lane `Hash::SHA256` task is not
 cryptographic SHA-256.
 
-[Current array-loop hills, 2026-11-04](results/2026-11-04-sort-hills.md) records
-the sort/Sieve gains, custom-hash regression, newer Goose reference and Main
-control. The [preceding checkpoint](results/2026-11-04-shared-hills.md) records
-the CRC transform and allocation repairs.
+[Checked merge selection](results/2026-11-04-merge-select.md) improves unchanged
+merge sort another 1.47x and narrows the fresh Goose gap to 1.36x. The current
+runtime chart refreshes merge; six byte-identical controls retain their
+preceding observations. The cold-compilation chart remains the preceding full
+survey.
+
+[Preceding array-loop hills, 2026-11-04](results/2026-11-04-sort-hills.md)
+records the sort/Sieve gains, custom-hash regression, newer Goose reference and
+Main control. The [preceding checkpoint](results/2026-11-04-shared-hills.md)
+records the CRC transform and allocation repairs.
 [Recursive sort support](results/2026-11-04-recursive-calls.md) records the
 seven supported adapted pairs. The
 [expanded survey, 2026-11-03](results/2026-11-03-expanded.md) retains earlier
@@ -129,5 +135,5 @@ separately labelled F32 control.
 Independent checksum and precision regression tests:
 
 ```sh
-python3 -m unittest discover -s benchmarks/tools/goose -p test_reference.py
+python3 -m unittest discover -s benchmarks/goose -p test_reference.py
 ```

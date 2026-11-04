@@ -1,5 +1,25 @@
 /** Explicit regression families. A development pass never qualifies the full tree. */
 export const devCheckAreas = {
+  "merge-loops": {
+    description:
+      "Checked scalar merge selection, exact loop carries, aliases and prefix traps.",
+    native: [
+      "backend.runtime_ir.test.i32 select has an exact pure three input scalar contract",
+      "backend.wasm.test.i32 select encodes one untyped Wasm select opcode without an immediate",
+      "backend.wasm_merge_loop_tests.test.checked merge source proof requires exact exits stores increments and SSA carries",
+      "backend.wasm_merge_loop_tests.test.checked merge detached emission preserves allocation rollback",
+      "backend.storage_span_dominance.test.fixed span dominance retains incoming facts but never arm loop or block facts",
+      "backend.storage_span_dominance.test.fixed span dominance scope allocations unwind through every allocation failure",
+      "backend.wasm_bulk_loop_tests.test.bulk scalar loop source proofs admit only exact indexed copy and literal fill",
+      "backend.wasm_bulk_loop_tests.test.bulk scalar loop detached publication retains its exact fallback through allocation failure",
+    ],
+    guests: [
+      "tests/guest/storage_merge_loop_execution.test.ts",
+      "tests/guest/storage_bulk_loops_execution.test.ts",
+      "tests/guest/recursive_storage_execution.test.ts",
+    ],
+    guestFilters: {} as Record<string, string>,
+  },
   "function-syntax": {
     description:
       "Function keyword, explicit returns, curried separators and fallthrough rejection.",

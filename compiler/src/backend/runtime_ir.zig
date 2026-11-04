@@ -166,6 +166,8 @@ pub const Op = enum(u8) {
     /// Private zero-stack marker: retire the owning box in local `operand`.
     /// Final module lowering erases it unless the exact enqueue import exists.
     resource_retire,
+    /// Select the first i32 value when the final i32 condition is nonzero.
+    i32_select,
 };
 /// What a 32-bit word or parameter may hold, from its checked layout.
 pub const Role = enum(u2) {
@@ -452,6 +454,7 @@ pub fn fixed(op: Op) Contract {
         .i32_const, .wide_layouts => signature(&.{}, .i32, .pure),
         .f32_const => signature(&.{}, .f32, .pure),
         .i32_eqz, .i32_clz, .i32_ctz => signature(&.{.i32}, .i32, .pure),
+        .i32_select => signature(&.{ .i32, .i32, .i32 }, .i32, .pure),
         .i32_eq, .i32_ne, .i32_lt_u, .i32_gt_u, .i32_le_u, .i32_ge_u, .i32_add, .i32_sub, .i32_mul, .i32_and, .i32_or, .i32_xor, .i32_shl, .i32_shr_u => signature(&.{ .i32, .i32 }, .i32, .pure),
         .i32_div_u, .i32_rem_u => .{ .inputs = .{ .i32, .i32, .none }, .arity = 2, .result = .i32, .may_trap = true },
         .f32_eq, .f32_ne, .f32_lt, .f32_gt, .f32_le, .f32_ge => signature(&.{ .f32, .f32 }, .i32, .pure),
@@ -563,6 +566,15 @@ pub fn lift(op: Op) ?Op {
         .i32_trunc_sat_f32_u => .i32x4_trunc_sat_f32x4_u,
         else => null,
     };
+}
+
+test "i32 select has an exact pure three input scalar contract" {
+    const selected = fixed(.i32_select);
+    try std.testing.expectEqualSlices(ValueType, &.{ .i32, .i32, .i32 }, &selected.inputs);
+    try std.testing.expectEqual(@as(usize, 3), selected.arity);
+    try std.testing.expectEqual(ValueType.i32, selected.result);
+    try std.testing.expectEqual(Effect.pure, selected.effect);
+    try std.testing.expect(!selected.may_trap);
 }
 
 test "ownership runs describe only the allocation they precede" {

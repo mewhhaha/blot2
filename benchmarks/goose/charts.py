@@ -8,7 +8,7 @@ from matplotlib import rcParams
 from matplotlib.figure import Figure
 
 HERE = Path(__file__).resolve().parent
-EVIDENCE = HERE / "results/2026-11-04-sort-hills.json"
+EVIDENCE = HERE / "results/2026-11-04-merge-select.json"
 LABELS = {
     "fannkuch": "Fannkuch",
     "crc32": "CRC32",
@@ -106,8 +106,8 @@ def main():
     chart(
         builds,
         "wall_ms",
-        "Cold compilation",
-        "Five fresh uncached builds · seven supported adapted cases",
+        "Cold compilation · preceding survey",
+        "Five fresh uncached builds · scalar-array checkpoint; see pinned evidence",
         "compilation.svg",
         150,
         [0, 25, 50, 75, 100, 125, 150],
@@ -117,10 +117,10 @@ def main():
         runtime,
         "kernel_ms",
         "Bounded Wasm runtime",
-        "Five matched pairs · 400,000-element sorts · Mandelbrot F32 control",
+        "Five matched pairs · merge refreshed; six unchanged Wasm controls retain prior timings",
         "runtime.svg",
-        300,
-        [0, 50, 100, 150, 200, 250, 300],
+        200,
+        [0, 50, 100, 150, 200],
         [
             ("blot", "Blot", COLORS["blot"]),
             ("goose", "Goose", COLORS["goose"]),

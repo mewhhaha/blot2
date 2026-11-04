@@ -7,69 +7,62 @@ Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.
 Reachable throughput targets are 50k source lines in 0.5s, then one million
 lines/second.
 
-Memoized `~` parameters/types and `@demand`/`@force` are removed throughout the
-compiler, evaluator, runtime, std and source tools. `and`/`or` remain primitive
-short-circuit operators. Other deferred work uses ordinary Unit callbacks;
-explicit local bindings share computed values. `Maybe.unwrap_or_else` and
-`Result.unwrap_or_else` take callbacks. Typed Code retains its latent effects
-through an ordinary Unit-to-Unit function carrier. Declaration reachability,
-field-demand analysis and resource journal demand events are different concepts
-and remain. See [deferred work](docs/compiler/DEFERRED_WORK.md) and
-[the evidence](benchmarks/evidence/integration/2026-11-04-demand-retirement.json).
+The
+[checked merge checkpoint](benchmarks/goose/results/2026-11-04-merge-select.md)
+improves unchanged merge sort **230.88 → 157.72ms (1.466x)** across five release
+pairs. The fresh Goose gap narrows **1.97x → 1.36x**. A bounded Core proof emits
+two checked loads, select/store and Boolean cursor increments after ordinary
+semantic/owner/backedge checking. All per-access bounds and lazy validation
+remain. Aliases, ties, skipped accesses, wrapping and trap prefixes execute in
+both tiers and sync/async modes. Merge Wasm shrinks **6,991 → 6,810B**; the
+other six adapted benchmark Wasms are byte-identical. README runtime charts
+refresh merge only; cold-compilation and other exact-artifact observations
+retain their pinned preceding survey.
 
-Three fresh uncached LLVM-release pairs measure **5.409 → 5.474s**, with paired
-changes **-12 / +302 / +101ms**: no compile-speed gain. Gdev remains
-byte-identical at **10,049,963B**. The frozen before compiler uses its frozen
-std; the candidate uses the migrated std with the same application source,
-settings and runner. Main still contains 9,440 functions and 6.51MB of
-local/global instructions. Removing this language feature simplifies the
-implementation; it does not solve the representation hill.
+Current release compiler SHA256:
+`105f0e18734b8eeb7fa53801087f069a8d4591d325f26eea6c4f0416538cecbf`. All **2,953
+native laws compile without LLVM**. The affected development family passes **8
+native / 28 guests in 9.36s**; four new laws pass full-fault mode, and all 28
+affected release guests and four public-package API laws pass. The full gate
+passes smoke/harness, runtime fixtures and native compilation, then the native
+runner exits 130 after 83 passes/50 full allocation sweeps, without an emitted
+failing law. Cancellation occurs before the 180s cap; its cause is not
+established. **Full qualification remains pending.** Main has zero merge matches
+and is byte-identical at 10,049,963B; three fresh uncached pairs measure **5.271
+→ 5.279s**, changes -8/-73/+19ms, with no material compile-time gain. A fresh
+inspected NVIDIA frame matches the preceding PNG/trace under original budgets.
+See the checkpoint for exact pins, diagnostic controls and limits.
+
+Memoized `~` parameters/types and `@demand`/`@force` remain removed. `and`/`or`
+short-circuit as primitives; other deferred work uses ordinary Unit callbacks
+and explicit local sharing. Typed Code retains its effects through an ordinary
+Unit-to-Unit carrier. Declaration/field-demand analysis and resource journal
+demand events remain separate concepts. See
+[deferred work](docs/compiler/DEFERRED_WORK.md).
 
 `List T` and `[]` remain. The
 [packed-sequence pilot](docs/compiler/PACKED_SEQUENCES.md) keeps immutable
-construction, concatenation and sequential cursors separate from indexable
-mutable Arrays. A standalone native witness packs 100,000 mixed enum elements
-into **260,000 bytes**, against **1,200,000 modeled fixed-union bytes**; it
-reserves **900,000 bytes**. Five representation tests pass. This is not yet the
-production List emitter, nor a measured Blot runtime/Wasm/compile-time win.
-Contiguous concatenation copies O(total bytes); repeated concat needs a builder
-path or a separately qualified chunk representation.
-
-The final native inventory has **2,949 laws**, all compiled without LLVM. The
-migrated engine family has **231 passes and four failures**, each reproduced on
-the frozen preceding native binary. The 39-file migrated guest batch has **276
-passes and 19 classified baseline failures**. Five new executed laws cover
-Boolean short-circuiting, selected callbacks, repeated work and explicit
-sharing. Code archive portability and generated Unit-thunk parameter flags have
-focused regressions. A migrated native receipt fixture now expects ordinary
-callback reuse: both compilers show 0/1/0 reuse for
-initial/unrelated/captured-base edits. The final function-syntax development
-check passes **8 native / 26 guests** in **28.41s**, including complete native
-compilation. Full qualification remains pending; consult the evidence for the
-bounded full gate and baseline failures. Types, formatting, Zig lint,
-parser/editor, package API and publication dry-run checks pass. Publication was
-not performed.
-
-Release compiler SHA256:
-`4a2be13d0e1b09816c51cc6aa3ae1059fc3aaf4b8554ceeee323e345b2bdf60c`. Main SHA256:
-`8a5bc671b85bba52b8989abe4c2165e26d1e379c659e3db9666dd60ad7e5127b`. A fresh
-inspected NVIDIA frame passes the original budgets and matches the preceding
-PNG/trace byte for byte. Broader gameplay/software-adapter qualification remains
-pending. Pen's normal source bridge still omits inferenceBudget; the bounded
-Deno runner builds Main and Pen loads that reviewed artifact. Only Gdev's
-language compatibility test source changes in the siblings; Ink/Pen and
-application assets remain unchanged. Its broad collection fixture retains the
-same fixed-inline-layout admission failure on both compilers.
+construction/concat/cursors separate from indexable mutable Arrays. Its
+standalone witness encodes 260,000 bytes against 1,200,000 modeled fixed-union
+bytes, reserving 900,000 bytes; five tests pass. It is not production List
+emission or a measured Blot runtime/Wasm/compile-time gain. Contiguous concat
+copies O(total bytes); repeated concat needs linear builder construction or
+separately qualified chunks.
 
 The
-[preceding array-loop measurements](benchmarks/goose/results/2026-11-04-sort-hills.md)
-retain merge/quick/Sieve gains, the hash regression, fresh Goose controls and
-limited coverage. The
-[pinned preceding handoff](https://github.com/mewhhaha/blot2/blob/742f1cae8c76c8380716e17d78ff6ec5f11da681/CONTINUE.md)
-retains exact prior qualification and profiling identities. Earlier results do
-not qualify this candidate.
+[pinned preceding handoff](https://github.com/mewhhaha/blot2/blob/aa8a1268501b092c2ad52a68ddf6a1fbdf884128/CONTINUE.md)
+retains feature-retirement qualification, known baseline failures, earlier
+array-loop gains/regressions and exact profiling identities. They qualify their
+named candidates, not this release. Broader gameplay/software-adapter checks and
+Pen's source bridge inferenceBudget remain open. Sibling source/assets are
+unchanged by this checkpoint.
 
 ## Next representation levers
+
+For merge, measure complete-range bounds reuse and per-call owner validation.
+The checked select change narrows the gap; their exclusive CPU costs remain
+unmeasured. Keep source-source-destination order, valid-prefix effects, aliases
+and all fallback behavior while testing those separate levers.
 
 Integrate one bounded packed List element plan into the owned backend: dense tag
 plus active payload, append/freeze, byte-position/count cursors and one terminal
@@ -127,15 +120,20 @@ history; documentation cleanup is not completion.
 
 ## Iteration and delivery
 
-Use Zig 0.17.0 and `-Dllvm=false` for development/native tests. This feature
-removal rebuilt the development compiler in 17s and native inventory in 54s; the
-final test-only inventory rebuild is recorded in the development check. The
-final LLVM release build took about five minutes. Two premature LLVM builds were
-stopped; freeze production source before the final release build and keep
-ordinary iterations on the native backend.
+Use Zig 0.17.0 and `-Dllvm=false` for development/native tests. The current
+development family takes 9.36s after cache repair; one final LLVM release takes
+about five minutes. Use `deno task build:compiler:dev --fixtures= --jobs=2` for
+a compiler-only iteration, then the affected regression family. Keep source
+frozen before the final LLVM build.
 
-Use `deno task check:dev --area function-syntax` for this regression family and
-`deno task test:compiler` before compiler commits. Full qualification is
+A Btrfs metadata stall inflated one rebuild to about two minutes with about 20
+CPU seconds. Only older disposable compiler objects were pruned. Zig's stale
+empty-input manifests then needed invalidation to regenerate removed options
+normally; compiled-object manifests, installed binaries, source/assets and raw
+evidence were preserved. See the checkpoint for the exact cache inventory.
+
+Use `deno task check:dev --area merge-loops` for the current regression family
+and `deno task test:compiler` before compiler commits. Full qualification is
 separate. Recheck real integration after semantic changes with the tracked
 `build_gdev.ts` and `run_pen.py` runners, and inspect the actual PNG. Preserve
 unrelated work and existing siblings; no new worktrees. Commit/push coherent

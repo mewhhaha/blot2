@@ -3,15 +3,15 @@
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg xmlns:xlink="http://www.w3.org/1999/xlink" width="720pt" height="460.8pt"
   viewBox="0 0 720 460.8" xmlns="http://www.w3.org/2000/svg" version="1.1">
-  <title>Cold compilation</title>
+  <title>Cold compilation · preceding survey</title>
   <metadata>
     <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/"
       xmlns:cc="http://creativecommons.org/ns#"
       xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
       <cc:Work>
         <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title>Cold compilation</dc:title>
-        <dc:description>Five fresh uncached builds · seven supported adapted cases</dc:description>
+        <dc:title>Cold compilation · preceding survey</dc:title>
+        <dc:description>Five fresh uncached builds · scalar-array checkpoint; see pinned evidence</dc:description>
         <dc:format>image/svg+xml</dc:format>
         <dc:creator>
           <cc:Agent>
@@ -426,13 +426,13 @@ z
       <text
         style="font-weight: 700; font-size: 19px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
         x="28.8" y="28.261031"
-        transform="rotate(-0 28.8 28.261031)">Cold compilation</text>
+        transform="rotate(-0 28.8 28.261031)">Cold compilation · preceding survey</text>
     </g>
     <g id="text_31">
       <text
         style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569"
         x="28.8" y="55.296"
-        transform="rotate(-0 28.8 55.296)">Five fresh uncached builds · seven supported adapted cases</text>
+        transform="rotate(-0 28.8 55.296)">Five fresh uncached builds · scalar-array checkpoint; see pinned evidence</text>
     </g>
     <g id="text_32">
       <text

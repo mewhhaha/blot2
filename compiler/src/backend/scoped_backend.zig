@@ -4347,7 +4347,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_bit_recurrences", "scoped_bit_rounds_removed", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_bulk_copies", "scoped_bulk_fills", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_bit_recurrences", "scoped_bit_rounds_removed", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_bulk_copies", "scoped_bulk_fills", "scoped_merge_loops", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -7053,6 +7053,28 @@ const Generator = struct {
         if (value.word.id != owner.word.id or value.token.id != owner.token.id or value.epoch_low.id != owner.epoch_low.id or value.epoch_high.id != owner.epoch_high.id) return null;
         return .{ .word = value.word.id, .token = value.token.id, .epoch_low = value.epoch_low.id, .epoch_high = value.epoch_high.id };
     }
+    fn mergeSpan(self: *Generator, m: *const core.Module, binding: core.BindingId, carries: []const core.LoopCarry) ?@import("wasm_merge_loop.zig").Span {
+        const descriptor = self.bulkDescriptor(m, .{ .unit = m.unit, .binding = binding }, carries, T.u32_type) orelse return null;
+        for (self.roots.items) |owner| {
+            if (owner.word.id != descriptor.word or owner.token.id != descriptor.token or owner.epoch_low.id != descriptor.epoch_low or owner.epoch_high.id != descriptor.epoch_high) continue;
+            const span = owner.fixed_span orelse return null;
+            return .{ .word = descriptor.word, .token = descriptor.token, .epoch_low = descriptor.epoch_low, .epoch_high = descriptor.epoch_high, .length = span.length.id, .ready = if (span.ready) |ready| ready.id else null };
+        }
+        return null;
+    }
+    fn mergeScalar(self: *Generator, m: *const core.Module, binding: core.BindingId, carries: []const core.LoopCarry, values: []const Value) ?u32 {
+        var found: ?Value = null;
+        for (carries, values) |carry, value| if (carry.iteration == binding) {
+            found = value;
+            break;
+        };
+        if (found == null) for (self.bindings.items) |input| {
+            if (input.unit == m.unit and input.id == binding) found = input.value;
+        };
+        const value = found orelse return null;
+        if (value.tag != .scalar or value.floating or value.fields.len != 0 or value.root != null or value.host != null or value.other_roots.len != 0) return null;
+        return value.word.id;
+    }
     fn emitLoop(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!Value {
         const info = m.loopInfo(id);
         const collection_value: ?Value = if (info.kind == .array) try self.expression(m, info.first, depth + 1) else null;
@@ -7165,6 +7187,44 @@ const Generator = struct {
         try self.c.end();
         try self.c.end();
         self.nesting -= 2;
+        if (info.kind == .forever and !body.terminated and roots_before == self.roots.items.len and !self.scalar_admission.hasScalarReferences() and self.outlining.helpers.items.len == helpers_before and self.outlining.canRewriteSuffix(self.c.function, loop_code_start)) merge_block: {
+            const merge = @import("wasm_merge_loop.zig");
+            const source = merge.source(m, id) orelse break :merge_block;
+            const first_array = self.mergeSpan(m, source.first_array, carries) orelse break :merge_block;
+            const second_array = self.mergeSpan(m, source.second_array, carries) orelse break :merge_block;
+            const target = self.mergeSpan(m, source.target, carries) orelse break :merge_block;
+            const first_cursor = self.mergeScalar(m, source.first, carries, values) orelse break :merge_block;
+            const second_cursor = self.mergeScalar(m, source.second, carries, values) orelse break :merge_block;
+            const output_cursor = self.mergeScalar(m, source.output, carries, values) orelse break :merge_block;
+            if (first_cursor == second_cursor or first_cursor == output_cursor or second_cursor == output_cursor) break :merge_block;
+            const first_limit = self.mergeScalar(m, source.first_limit, carries, values) orelse break :merge_block;
+            const second_limit = self.mergeScalar(m, source.second_limit, carries, values) orelse break :merge_block;
+            const machine = &self.module.functions.items[self.c.function];
+            if (machine.instructions.items.len - loop_code_start > 4096) break :merge_block;
+            var detached = try merge.emit(self.allocator, .{
+                .first_array = first_array,
+                .second_array = second_array,
+                .target = target,
+                .first = first_cursor,
+                .second = second_cursor,
+                .output = output_cursor,
+                .first_limit = first_limit,
+                .second_limit = second_limit,
+                .length_function = self.runtime.functions.length,
+                .next_local = @intCast(machine.parameters.len + machine.locals.items.len),
+            });
+            defer detached.deinit(self.allocator);
+            try machine.locals.ensureUnusedCapacity(self.allocator, detached.locals.items.len);
+            try machine.instructions.ensureTotalCapacity(self.allocator, loop_code_start + detached.instructions.items.len);
+            machine.locals.appendSliceAssumeCapacity(detached.locals.items);
+            machine.instructions.shrinkRetainingCapacity(loop_code_start);
+            machine.instructions.appendSliceAssumeCapacity(detached.instructions.items);
+            self.span_scopes.reset();
+            self.bundle_snapshots.clearRetainingCapacity();
+            self.bundle_sources.clearRetainingCapacity();
+            self.bundle_scan = machine.instructions.items.len;
+            self.emission_work.scoped_merge_loops +|= 1;
+        }
         if (info.kind == .range and !info.can_exit and !body.terminated and !self.scalar_admission.hasScalarReferences() and self.outlining.helpers.items.len == helpers_before and self.outlining.canRewriteSuffix(self.c.function, loop_code_start)) bulk_block: {
             const bulk = @import("wasm_bulk_loop.zig");
             const source = bulk.source(m, id) orelse break :bulk_block;

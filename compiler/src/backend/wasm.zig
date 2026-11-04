@@ -1780,6 +1780,7 @@ fn encodeInstruction(bytes: *Bytes, inst: Instruction, functions: usize, table_s
         .host_ref_null => 0xd0,
         .host_ref_is_null => 0xd1,
         .drop => 0x1a,
+        .i32_select => 0x1b,
         .local_get => 0x20,
         .local_set => 0x21,
         .local_tee => 0x22,
@@ -1930,6 +1931,13 @@ fn encodeLocals(bytes: *Bytes, locals: []const ValueType, observed: u32) Allocat
         try bytes.uleb(observed);
         try bytes.byte(@backingInt(ValueType.i32));
     }
+}
+
+test "i32 select encodes one untyped Wasm select opcode without an immediate" {
+    var bytes = Bytes.init(std.testing.allocator);
+    defer bytes.deinit();
+    try encodeInstruction(&bytes, .{ .op = .i32_select }, 0, 0, 0, 0, 0);
+    try std.testing.expectEqualSlices(u8, &.{0x1b}, bytes.items());
 }
 
 test "local declaration groups preserve mixed slots and LEB run boundaries" {

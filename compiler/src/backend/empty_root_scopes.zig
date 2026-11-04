@@ -39,6 +39,7 @@ fn scalar(inst: ir.Instruction, module: *const wasm.Module) bool {
         .br,
         .br_if,
         .i32_eqz,
+        .i32_select,
         .i32_eq,
         .i32_ne,
         .i32_lt_u,

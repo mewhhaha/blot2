@@ -12,6 +12,16 @@ The independently newer Goose reference and all timing/size tradeoffs remain
 explicit.
 
 The latest
+[checked merge checkpoint](../benchmarks/goose/results/2026-11-04-merge-select.md)
+improves unchanged merge another 1.466x and narrows the fresh Goose gap to
+1.36x. All bounds remain; source/carry proofs admit checked select/store
+emission. All 2,953 native laws compile without LLVM, and the focused 8
+native/28 guest family passes in 9.36s. Main remains byte-identical at
+10,049,963B, with fresh paired compilation 5.271→5.279s. Full qualification
+remains pending after an unexplained native-run cancellation; the checkpoint
+preserves raw evidence.
+
+The preceding
 [feature retirement](../benchmarks/evidence/integration/2026-11-04-demand-retirement.json)
 removes memoized `~` demands in favor of primitive Boolean operators and
 ordinary Unit callbacks. All 2,949 native laws compile without LLVM; the
