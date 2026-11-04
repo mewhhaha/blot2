@@ -24,7 +24,7 @@ Current release compiler SHA256:
 native laws compile without LLVM**. The affected development family passes **10
 native / 32 guests in 37.56s**; four focused native laws pass full fault mode,
 all 32 affected release guests and four public-package API laws pass. The full
-gate reaches its 180s budget during native execution after 85 passes / 50
+gate reaches its 180s budget during native execution after 90 passes / 63
 complete full allocation sweeps, without an emitted failing law. **Full
 qualification remains pending.** Main has zero merge matches and 1,425 static
 old-load omissions; those counters are not exact encoded-instruction counts.
