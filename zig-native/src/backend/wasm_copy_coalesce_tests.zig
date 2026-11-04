@@ -122,7 +122,7 @@ test "scoped copy coalescing retains zero reads control crossings parameters and
         .{ .op = .nop },       .{ .op = .local_get, .operand = 1 },
     });
     defer source.deinit(a);
-    for ([_]ir.Op{ .block, .loop, .if_, .else_, .end, .br, .br_if, .return_, .unreachable_ }) |op| {
+    for ([_]ir.Op{ .block, .loop, .if_, .else_, .end }) |op| {
         source.instructions.items[2] = .{ .op = op };
         try std.testing.expect((try coalesce.run(a, &source, &single(&source))) == null);
     }
@@ -328,4 +328,206 @@ test "scoped copy coalescing standalone prunes only removed destinations and rem
     try std.testing.expectEqualSlices(ir.Instruction, &code, source.instructions.items);
     try std.testing.expectEqualSlices(ir.ValueType, &.{ .f32, .i32, .i32, .v128, .i32 }, source.locals.items);
     try std.testing.expectEqualSlices(ir.ValueType, &.{ .i32, .f32 }, source.parameters);
+}
+
+fn checkStructured(allocator: A, source: *const ir.Function) !void {
+    var result = (try coalesce.run(allocator, source, &single(source))).?;
+    defer result.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 3), result.removed_copies);
+    // Reads inside the two removed copy pairs are absent from the output.
+    try std.testing.expectEqual(@as(usize, 4), result.forwarded_reads);
+    try std.testing.expectEqualSlices(u32, &.{ 0, 1, 0, 0, 0 }, result.aliases);
+    for (result.bodies[0].instructions) |inst| if (inst.op == .local_get) {
+        try std.testing.expect(inst.operand < 2);
+    };
+}
+test "scoped copy coalescing retains dominating snapshots across nested branch scopes through OOM" {
+    var parameters = [_]ir.ValueType{ .i32, .i32 };
+    const code = [_]ir.Instruction{
+        .{ .op = .local_get },               .{ .op = .local_set, .operand = 2 },
+        .{ .op = .local_get, .operand = 1 }, .{ .op = .if_ },
+        .{ .op = .local_get, .operand = 2 }, .{ .op = .drop },
+        .{ .op = .block },                   .{ .op = .local_get, .operand = 2 },
+        .{ .op = .local_set, .operand = 3 }, .{ .op = .local_get, .operand = 3 },
+        .{ .op = .drop },                    .{ .op = .end },
+        .{ .op = .else_ },                   .{ .op = .local_get, .operand = 2 },
+        .{ .op = .local_set, .operand = 4 }, .{ .op = .local_get, .operand = 4 },
+        .{ .op = .drop },                    .{ .op = .end },
+        .{ .op = .local_get, .operand = 2 },
+    };
+    var source = try fixture(&parameters, &.{ .i32, .i32, .i32 }, &code);
+    defer source.deinit(a);
+    try checkStructured(a, &source);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkStructured, .{@as(*const ir.Function, &source)});
+    try std.testing.expectEqualSlices(ir.Instruction, &code, source.instructions.items);
+}
+test "scoped copy coalescing never restores source snapshots after writes in either branch" {
+    var parameters = [_]ir.ValueType{ .i32, .i32 };
+    const code = [_]ir.Instruction{
+        .{ .op = .local_get },               .{ .op = .local_set, .operand = 2 },
+        .{ .op = .local_get, .operand = 1 }, .{ .op = .if_ },
+        .{ .op = .i32_const, .operand = 9 }, .{ .op = .local_set },
+        .{ .op = .else_ },                   .{ .op = .nop },
+        .{ .op = .nop },                     .{ .op = .end },
+        .{ .op = .local_get, .operand = 2 },
+    };
+    var source = try fixture(&parameters, &.{.i32}, &code);
+    defer source.deinit(a);
+    try std.testing.expect((try coalesce.run(a, &source, &single(&source))) == null);
+    std.mem.swap(ir.Instruction, &source.instructions.items[4], &source.instructions.items[7]);
+    std.mem.swap(ir.Instruction, &source.instructions.items[5], &source.instructions.items[8]);
+    try std.testing.expect((try coalesce.run(a, &source, &single(&source))) == null);
+}
+test "scoped copy coalescing keeps branch born zero reads and loop jump barriers after scope exit" {
+    var parameters = [_]ir.ValueType{.i32};
+    var source = try fixture(&parameters, &.{.i32}, &.{
+        .{ .op = .i32_const },               .{ .op = .if_ },
+        .{ .op = .local_get },               .{ .op = .local_set, .operand = 1 },
+        .{ .op = .else_ },                   .{ .op = .local_get, .operand = 1 },
+        .{ .op = .drop },                    .{ .op = .end },
+        .{ .op = .local_get, .operand = 1 },
+    });
+    defer source.deinit(a);
+    try std.testing.expect((try coalesce.run(a, &source, &single(&source))) == null);
+    for ([_]ir.Op{ .br, .br_if }) |barrier| {
+        source.instructions.clearRetainingCapacity();
+        try source.instructions.appendSlice(a, &.{
+            .{ .op = .i32_const, .operand = 8 }, .{ .op = .local_set },
+            .{ .op = .i32_const, .operand = 9 }, .{ .op = .local_set },
+            .{ .op = .local_get },               .{ .op = .local_set, .operand = 1 },
+            .{ .op = .block },                   .{ .op = barrier },
+            .{ .op = .end },                     .{ .op = .local_get, .operand = 1 },
+        });
+        try std.testing.expect((try coalesce.run(a, &source, &single(&source))) == null);
+    }
+    source.instructions.clearRetainingCapacity();
+    try source.instructions.appendSlice(a, &.{
+        .{ .op = .i32_const, .operand = 8 }, .{ .op = .local_set },
+        .{ .op = .i32_const, .operand = 9 }, .{ .op = .local_set },
+        .{ .op = .local_get },               .{ .op = .local_set, .operand = 1 },
+        .{ .op = .block },                   .{ .op = .loop },
+        .{ .op = .end },                     .{ .op = .end },
+        .{ .op = .local_get, .operand = 1 },
+    });
+    try std.testing.expect((try coalesce.run(a, &source, &single(&source))) == null);
+}
+test "scoped copy coalescing shares caller dominance with helpers without exporting arm snapshots" {
+    var parameters = [_]ir.ValueType{ .i32, .i32 };
+    var source = try fixture(&parameters, &.{ .i32, .i32 }, &.{
+        .{ .op = .local_get },               .{ .op = .local_set, .operand = 2 },
+        .{ .op = .local_get, .operand = 1 }, .{ .op = .if_ },
+        .{ .op = .call, .operand = 7 },      .{ .op = .end },
+        .{ .op = .local_get, .operand = 2 }, .{ .op = .drop },
+        .{ .op = .local_get, .operand = 3 },
+    });
+    defer source.deinit(a);
+    var bodies = [_]coalesce.Body{
+        .{ .function = 4, .instructions = source.instructions.items },
+        .{ .function = 7, .instructions = &.{
+            .{ .op = .local_get, .operand = 2 }, .{ .op = .local_set, .operand = 3 },
+            .{ .op = .local_get, .operand = 3 }, .{ .op = .drop },
+        } },
+    };
+    var result = (try coalesce.run(a, &source, &bodies)).?;
+    defer result.deinit(a);
+    try std.testing.expectEqualSlices(u32, &.{ 0, 1, 0, 3 }, result.aliases);
+    try std.testing.expectEqual(@as(usize, 1), result.removed_copies);
+    // A helper may not close its caller's control, nor leave an open scope.
+    bodies[1].instructions = &.{.{ .op = .end }};
+    try std.testing.expect((try coalesce.run(a, &source, &bodies)) == null);
+    bodies[1].instructions = &.{.{ .op = .block }};
+    try std.testing.expect((try coalesce.run(a, &source, &bodies)) == null);
+}
+
+fn checkLoopSnapshots(allocator: A, source: *const ir.Function) !void {
+    var result = (try coalesce.run(allocator, source, &single(source))).?;
+    defer result.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 1), result.removed_copies);
+    try std.testing.expectEqual(@as(usize, 4), result.forwarded_reads);
+    // The conditional source retains its default-zero path. Only its later
+    // snapshot disappears, after the source can no longer change.
+    try std.testing.expectEqualSlices(u32, &.{ 0, 1, 2, 2 }, result.aliases);
+}
+test "scoped copy coalescing preserves once assigned snapshots across loops through OOM" {
+    var parameters = [_]ir.ValueType{ .i32, .i32 };
+    const code = [_]ir.Instruction{
+        .{ .op = .local_get, .operand = 1 }, .{ .op = .if_ },
+        .{ .op = .local_get },               .{ .op = .local_set, .operand = 2 },
+        .{ .op = .end },                     .{ .op = .local_get, .operand = 2 },
+        .{ .op = .local_set, .operand = 3 }, .{ .op = .block },
+        .{ .op = .loop },                    .{ .op = .local_get, .operand = 3 },
+        .{ .op = .drop },                    .{ .op = .local_get, .operand = 1 },
+        .{ .op = .if_ },                     .{ .op = .local_get, .operand = 3 },
+        .{ .op = .drop },                    .{ .op = .else_ },
+        .{ .op = .local_get, .operand = 3 }, .{ .op = .drop },
+        .{ .op = .end },                     .{ .op = .i32_const },
+        .{ .op = .br_if },                   .{ .op = .end },
+        .{ .op = .end },                     .{ .op = .local_get, .operand = 3 },
+    };
+    var source = try fixture(&parameters, &.{ .i32, .i32 }, &code);
+    defer source.deinit(a);
+    try checkLoopSnapshots(a, &source);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkLoopSnapshots, .{@as(*const ir.Function, &source)});
+    try std.testing.expectEqualSlices(ir.Instruction, &code, source.instructions.items);
+    // An unwritten scalar source remains the same zero through every loop.
+    source.instructions.clearRetainingCapacity();
+    try source.instructions.appendSlice(a, &.{
+        .{ .op = .local_get, .operand = 2 }, .{ .op = .local_set, .operand = 3 },
+        .{ .op = .loop },                    .{ .op = .local_get, .operand = 3 },
+        .{ .op = .drop },                    .{ .op = .end },
+        .{ .op = .local_get, .operand = 3 },
+    });
+    var zero = (try coalesce.run(a, &source, &single(&source))).?;
+    defer zero.deinit(a);
+    try std.testing.expectEqualSlices(u32, &.{ 0, 1, 2, 2 }, zero.aliases);
+}
+test "scoped copy coalescing keeps loop entry zeroes mutable helper sources and early helper exits" {
+    var parameters = [_]ir.ValueType{.i32};
+    var source = try fixture(&parameters, &.{ .i32, .i32 }, &.{
+        .{ .op = .loop },      .{ .op = .local_get, .operand = 1 }, .{ .op = .drop },
+        .{ .op = .local_get }, .{ .op = .local_set, .operand = 1 }, .{ .op = .local_get, .operand = 1 },
+        .{ .op = .drop },      .{ .op = .end },
+    });
+    defer source.deinit(a);
+    try std.testing.expect((try coalesce.run(a, &source, &single(&source))) == null);
+    source.instructions.clearRetainingCapacity();
+    try source.instructions.appendSlice(a, &.{
+        .{ .op = .local_get, .operand = 1 }, .{ .op = .local_set, .operand = 2 },
+        .{ .op = .loop },                    .{ .op = .local_get, .operand = 2 },
+        .{ .op = .drop },                    .{ .op = .call, .operand = 7 },
+        .{ .op = .end },                     .{ .op = .local_get, .operand = 2 },
+    });
+    var bodies = [_]coalesce.Body{
+        .{ .function = 4, .instructions = source.instructions.items },
+        .{ .function = 7, .instructions = &.{
+            .{ .op = .block }, .{ .op = .local_get }, .{ .op = .local_set, .operand = 1 }, .{ .op = .end },
+        } },
+    };
+    try std.testing.expect((try coalesce.run(a, &source, &bodies)) == null);
+    for ([_]ir.Op{ .return_, .br, .br_if }) |exit| {
+        const code = [_]ir.Instruction{
+            .{ .op = .i32_const }, .{ .op = exit },
+            .{ .op = .local_get }, .{ .op = .local_set, .operand = 1 },
+        };
+        bodies[1].instructions = &code;
+        try std.testing.expect((try coalesce.run(a, &source, &bodies)) == null);
+    }
+}
+test "scoped copy coalescing keeps dominating snapshots on continuing paths past traps and root returns" {
+    var parameters = [_]ir.ValueType{ .i32, .i32 };
+    var source = try fixture(&parameters, &.{.i32}, &.{
+        .{ .op = .local_get },               .{ .op = .local_set, .operand = 2 },
+        .{ .op = .local_get, .operand = 1 }, .{ .op = .if_ },
+        .{ .op = .unreachable_ },            .{ .op = .end },
+        .{ .op = .local_get, .operand = 2 },
+    });
+    defer source.deinit(a);
+    var trapped = (try coalesce.run(a, &source, &single(&source))).?;
+    defer trapped.deinit(a);
+    try std.testing.expectEqualSlices(u32, &.{ 0, 1, 0 }, trapped.aliases);
+    source.instructions.items[4] = .{ .op = .local_get };
+    try source.instructions.insert(a, 5, .{ .op = .return_ });
+    var returned = (try coalesce.run(a, &source, &single(&source))).?;
+    defer returned.deinit(a);
+    try std.testing.expectEqualSlices(u32, &.{ 0, 1, 0 }, returned.aliases);
 }

@@ -75,6 +75,16 @@ pub const Context = struct {
         if (self.finalized or self.rootIndex(function) == null) return null;
         return .{ .function = function, .start = self.module.functions.items[function].instructions.items.len, .work = work };
     }
+    pub fn canRewriteSuffix(self: *const Context, function: u32, start: usize) bool {
+        if (self.finalized or hasCoordinates(self.module, function)) return false;
+        if (self.rootIndex(function)) |index| {
+            const root = &self.roots.items[index];
+            if (root.scanned > start) return false;
+            var pending = root.pending.keyIterator();
+            while (pending.next()) |position| if (position.* >= start) return false;
+        }
+        return true;
+    }
     fn sync(self: *Context, index: usize) Error!void {
         const function = &self.module.functions.items[self.roots.items[index].function];
         const root = &self.roots.items[index];

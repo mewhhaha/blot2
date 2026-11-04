@@ -189,7 +189,11 @@ test "source lowering validates static declarations and scopes without inferring
         .{ .source = "const bad=do:\n  let value:Missing=missing\n  break value\n", .expected = .unsupported_type },
         .{ .source = "const bad=do:\n  use value:Missing<-missing\n  break value\n", .expected = .unsupported_type },
         .{ .source = "const bad:U32 where{nope U32}=42\n", .expected = .invalid_constraint },
-        .{ .source = "const bad=@u32.add 1\n", .expected = .call_arity },
+        // Numeric primitives are ordinary curried functions. Source validation
+        // cannot reject aliases or partial applications before loading imports.
+        .{ .source = "const increment=@u32.add 1\n", .expected = .module_loader_required },
+        .{ .source = "const add=@u32.add\n", .expected = .module_loader_required },
+        .{ .source = "const bad=@type.same 1\n", .expected = .call_arity },
         .{ .source = "const bad=@requests(func()=> return 42)\n", .expected = .requests_scope },
         .{ .source = "const bad=do:\n  yield 42\n", .expected = .yield_scope },
         .{ .source = "const bad=do:\n  break\n", .expected = .break_scope },

@@ -157,6 +157,12 @@ Mutual recursion and broader recursive layouts remain outside this slice. The
 [implementation contract](CONTRACT.md) specifies frozen headers, finite access
 replay, transactional publication and outline-bank safety.
 
+Fixed one-through-eight-round U32 loops may use an exact composed bit transform
+after normal source/owner checks. The proof rejects effects, memory, iterator use,
+additional live carries, nonlinear operations and instruction coordinates. This
+changes emitted work, not source semantics or storage budgets; see
+[the compiler contract](CONTRACT.md) for transactional replacement.
+
 The new path contains no counted allocator, retain/release hooks or collector.
 The old `runtime/scoped_storage.zig` remains a low-level reservation fixture,
 not the runtime emitted for these source programs. The existing

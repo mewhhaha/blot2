@@ -1070,6 +1070,25 @@ pub const Generator = struct {
                 defer rows.deinit(self.allocator);
                 try self.refineMappings(unit_id, .{ .body = key.target }, full, &mappings, &rows, body.span);
             }
+            // A saturated scalar primitive alias has no curried environment.
+            // Check its complete semantic arrow before using the direct ABI;
+            // partial applications and aggregate primitives keep their closures.
+            const root = source.node(body.root);
+            if (!body.runtime and root.tag == .primitive_function) {
+                const primitive = source.primitives[root.a];
+                if (primitive.kind == .scalar and primitive.arity == key.count and key.count != 0) {
+                    if (self.representations.store.scalar(key.parameters[0])) |operand_scalar| if (scalar_ops.opcode(primitive.op, operand_scalar)) |opcode| {
+                        var mappings: std.ArrayList(Mapping) = .empty;
+                        defer mappings.deinit(self.allocator);
+                        try self.mapType(unit_id, &mappings, root.ty, full, body.span);
+                        for (0..key.count) |index| try self.module.emit(function_id, .{ .op = .local_get, .operand = @intCast(index) });
+                        try self.module.emit(function_id, .{ .op = opcode });
+                        if (scope) |*actor| try actor.complete(function_id, null);
+                        self.planning.startup_facts.complete(function_id);
+                        return function_id;
+                    };
+                }
+            }
             const global = if (body.runtime) try self.planning.runtimeGlobal(self, key.target) else null;
             const constant_ = if (global == null) try self.constant(key.target, full) else null;
             const callee = try self.module.addLocal(function_id, .i32);

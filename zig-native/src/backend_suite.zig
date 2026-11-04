@@ -12,6 +12,7 @@ comptime {
     _ = @import("backend/activation_graph.zig");
     _ = @import("backend/callable_origins.zig");
     _ = @import("backend/wasm_inline.zig");
+    _ = @import("backend/wasm_bit_recurrence.zig");
     _ = @import("backend/wasm_sroa.zig");
     _ = @import("backend/simd_abi.zig");
     _ = @import("backend/wasm_row_reduce.zig");

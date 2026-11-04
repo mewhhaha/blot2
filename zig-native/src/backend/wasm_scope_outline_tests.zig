@@ -5,6 +5,27 @@ const outline = @import("wasm_scope_outline.zig");
 const A = std.mem.Allocator;
 const a = std.testing.allocator;
 
+test "scoped suffix rewrites decline pending copies committed extracts and semantic coordinates" {
+    var module = try moduleWithRoot(a, &.{.i32}, .none, &.{});
+    defer module.deinit();
+    var context = outline.Context.init(a, &module, .scoped_numeric_adapter_nonreentrant, .{ .minimum_instructions = 1 });
+    defer context.deinit();
+    try context.registerRoot(0);
+    try std.testing.expect(context.canRewriteSuffix(0, 0));
+    const copy = try context.reserveCopy(0);
+    try std.testing.expect(!context.canRewriteSuffix(0, 0));
+    try context.releaseCopy(0, copy);
+    try std.testing.expect(context.canRewriteSuffix(0, 0));
+    const ticket = context.begin(0, .{ .expressions = 0, .layouts = 0 }).?;
+    try emit(&module, 0, &.{ .{ .op = .local_get }, .{ .op = .drop } });
+    try std.testing.expect((try context.tryExtract(ticket, .{ .expressions = 1, .layouts = 0 })) != null);
+    try std.testing.expect(!context.canRewriteSuffix(0, 0));
+    const end = module.functions.items[0].instructions.items.len;
+    try std.testing.expect(context.canRewriteSuffix(0, end));
+    try module.recordSemanticSite(.{ .function = 0, .place = 0, .unit = 1, .node = 1, .root = 1, .mappings = 0, .rows = 0, .kind = .call });
+    try std.testing.expect(!context.canRewriteSuffix(0, end));
+}
+
 fn moduleWithRoot(allocator: A, parameters: []const ir.ValueType, result: ir.ValueType, locals: []const ir.ValueType) !wasm.Module {
     var module = wasm.Module.init(allocator);
     errdefer module.deinit();

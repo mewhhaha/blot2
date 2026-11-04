@@ -4349,7 +4349,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_bit_recurrences", "scoped_bit_rounds_removed", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -7099,6 +7099,8 @@ const Generator = struct {
         // can finish after the loop whose physical carriers it observed.
         for (values) |value| try self.markMutableWords(value, &self.mutable_join_words);
         try self.mutable_join_words.put(self.allocator, iterator.id, {});
+        const loop_code_start = self.module.functions.items[self.c.function].instructions.items.len;
+        const helpers_before = self.outlining.helpers.items.len;
         try self.c.op(.block, 0);
         try self.c.op(.loop, 0);
         self.nesting += 2;
@@ -7116,6 +7118,7 @@ const Generator = struct {
             const item = if (collection_value) |value| try self.readElement(m, id, value, try self.elementIndex(m, id, value, iterator)) else Value{ .word = iterator };
             if (item.terminated) unreachable_item = item else try self.pattern(m, info.pattern, item);
         }
+        const iteration_start = self.module.functions.items[self.c.function].instructions.items.len;
         const body = unreachable_item orelse try self.expression(m, info.body, depth + 1);
         if (!body.terminated) {
             try self.checkReadFrame(m, id, read_frame);
@@ -7130,6 +7133,7 @@ const Generator = struct {
                 try self.assignLoop(m, id, value, next, reuse);
             }
         }
+        const iteration_end = self.module.functions.items[self.c.function].instructions.items.len;
         // A conditional return reserves its result's static slot for the
         // caller, but the path reaching this backedge did not return it.
         // Rewind that iteration too; the next iteration reopens the same slot.
@@ -7143,6 +7147,31 @@ const Generator = struct {
         try self.c.end();
         try self.c.end();
         self.nesting -= 2;
+        if (info.kind == .range and !info.can_exit and !body.terminated and values.len == 1 and !self.scalar_admission.hasScalarReferences() and self.outlining.helpers.items.len == helpers_before and self.outlining.canRewriteSuffix(self.c.function, loop_code_start)) {
+            const start_node = m.node(info.first);
+            const end_node = m.node(info.end);
+            const value = values[0];
+            const exact_u32 = m.types.node(m.binding(carries[0].iteration).ty).tag == .u32 and value.tag == .scalar and !value.floating and value.fields.len == 0 and value.root == null and value.other_roots.len == 0 and value.host == null and value.demand == null;
+            if (exact_u32 and start_node.tag == .constant and end_node.tag == .constant and start_node.ty == T.u32_type and end_node.ty == T.u32_type and end_node.a > start_node.a and end_node.a - start_node.a <= 8) {
+                const recurrence = @import("wasm_bit_recurrence.zig");
+                const machine = &self.module.functions.items[self.c.function];
+                const shell = recurrence.canonicalLoop(machine.instructions.items[loop_code_start..], iteration_start - loop_code_start, iteration_end - loop_code_start, iterator.id, end.id);
+                if (shell) if (recurrence.analyzeLoop(self.module, machine.instructions.items[iteration_start..iteration_end], value.word.id, iterator.id, end.id, end_node.a - start_node.a)) |transform| {
+                    if (try recurrence.emit(self.allocator, transform, value.word.id)) |replacement| {
+                        var output = replacement;
+                        defer output.deinit(self.allocator);
+                        try machine.instructions.ensureTotalCapacity(self.allocator, loop_code_start + output.instructions.items.len);
+                        machine.instructions.shrinkRetainingCapacity(loop_code_start);
+                        machine.instructions.appendSliceAssumeCapacity(output.instructions.items);
+                        self.bundle_snapshots.clearRetainingCapacity();
+                        self.bundle_sources.clearRetainingCapacity();
+                        self.bundle_scan = machine.instructions.items.len;
+                        self.emission_work.scoped_bit_recurrences +|= 1;
+                        self.emission_work.scoped_bit_rounds_removed +|= end_node.a - start_node.a;
+                    }
+                };
+            }
+        }
         for (carries, values) |carry, value| try self.bind(m, carry.outgoing, value);
         return self.unitValue();
     }

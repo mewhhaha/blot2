@@ -11,6 +11,10 @@ const sum = iter.fold_left add 0
 const biased = iter.fold_left (func total => return func value => return total + value + 3) 10
 const add_float = func (total: F32) => return func (value: F32) => return @f32.add total value
 const sum_float = iter.fold_left add_float 1.25
+const negate = @f32.neg
+const convert = @u32.to_f32
+entry const negative = func (value: F32) => return negate value
+entry const converted = func (value: U32) => return convert value
 const append = func values => return func value => return [...values, value]
 const collect = iter.fold_left append [100]
 const collect_float = iter.fold_left append [1.25]
@@ -92,6 +96,7 @@ Deno.test("evaluated named calls preserve captured values scalar signatures effe
         floating = Math.fround(floating + value);
       }
       assert.equal(call("floating", count), floating);
+      assert.equal(call("converted", count), Math.fround(count));
       assert.deepEqual(
         call("effects", count),
         Uint32Array.from([count, trace, expected]),
@@ -102,6 +107,9 @@ Deno.test("evaluated named calls preserve captured values scalar signatures effe
         call("argument_order", seed),
         Uint32Array.from([2, seed * 31 + seed + 1, seed * 2 + 1]),
       );
+    }
+    for (const value of [0, -0, 1.5, -2.75, Infinity, -Infinity, NaN]) {
+      assert(Object.is(call("negative", value), -value));
     }
     const warm = guest.memoryBytes();
     for (let repeat = 0; repeat < 12; repeat++) {
@@ -141,13 +149,14 @@ entry const probe = func (seed: U32) => return #[seed]
         },
       });
       assert(built.success, JSON.stringify(built));
-      for (const count of [0, 4096]) {
+      for (const count of [0, 1, 2, 3, 31, 4096]) {
         const half = Math.floor(count / 2);
+        const evens = Math.ceil(count / 2);
         for (
           const [name, expected] of [
             ["range", count * (count - 1) / 2],
             ["mapped", count * (count + 1) / 2],
-            ["filtered", half * (half - 1)],
+            ["filtered", evens * (evens - 1)],
             ["taken", half * (half - 1) / 2],
           ] as const
         ) {

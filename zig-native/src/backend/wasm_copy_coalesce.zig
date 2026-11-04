@@ -17,7 +17,7 @@ pub const Result = struct {
         a.free(self.aliases);
     }
 };
-const Alias = struct { source: u32, version: usize, segment: usize };
+const Alias = struct { source: u32, version: usize, segment: usize, scope: usize };
 const Use = struct {
     writes: u8 = 0,
     reads: usize = 0,
@@ -26,10 +26,12 @@ const Use = struct {
     body: usize = 0,
     copy_source: u32 = 0,
     version: usize = 0,
+    stable: bool = false,
     alias: ?Alias = null,
     accepted: bool = false,
 };
-const Frame = struct { body: usize, next: usize = 0 };
+const Frame = struct { body: usize, next: usize = 0, controls: usize = 0 };
+const Control = struct { scope: usize, kind: ir.Op, otherwise: bool = false };
 fn neutral(inst: ir.Instruction) bool {
     return !inst.table_reference and inst.table_kind == .unknown;
 }
@@ -38,7 +40,7 @@ fn local(op: ir.Op) bool {
 }
 fn boundary(op: ir.Op) bool {
     return switch (op) {
-        .block, .loop, .if_, .else_, .end, .br, .br_if, .return_, .unreachable_ => true,
+        .loop, .br, .br_if => true,
         else => false,
     };
 }
@@ -46,9 +48,10 @@ fn numeric(source: *const ir.Function, id: u32) bool {
     if (id < source.parameters.len) return source.parameters[id] == .i32;
     return source.locals.items[id - source.parameters.len] == .i32;
 }
-fn canonical(uses: []const Use, id: u32, segment: usize) u32 {
+fn canonical(uses: []const Use, id: u32, segment: usize, scopes: []const bool) u32 {
     if (uses[id].alias) |alias| {
-        if (alias.segment == segment and uses[alias.source].version == alias.version) return alias.source;
+        const immutable = uses[alias.source].writes == 0 or uses[alias.source].stable;
+        if ((alias.segment == segment or immutable) and scopes[alias.scope] and uses[alias.source].version == alias.version) return alias.source;
     }
     return id;
 }
@@ -78,6 +81,7 @@ pub fn run(a: A, source: *const ir.Function, bodies: []const Body) A.Error!?Resu
     @memset(uses, .{});
     for (bodies, 0..) |body, index| for (body.instructions, 0..) |inst, at| {
         if (inst.op == .ownership or inst.op == .resource_retire or inst.op == .wide_layouts) return null;
+        if (inst.op == .return_ and index != 0) return null;
         if (inst.op == .call) if (ids.get(inst.operand)) |callee| {
             if (!neutral(inst) or callee == 0 or counts[callee] != 0) return null;
             counts[callee] = 1;
@@ -107,35 +111,76 @@ pub fn run(a: A, source: *const ir.Function, bodies: []const Body) A.Error!?Resu
     var frames: std.ArrayList(Frame) = .empty;
     defer frames.deinit(a);
     try frames.append(a, .{ .body = 0 });
+    var controls: std.ArrayList(Control) = .empty;
+    defer controls.deinit(a);
+    var scopes: std.ArrayList(bool) = .empty;
+    defer scopes.deinit(a);
+    try scopes.append(a, true);
     var visited: usize = 1;
     var segment: usize = 0;
+    var loops: usize = 0;
     while (frames.items.len != 0) {
-        const frame = &frames.items[frames.items.len - 1];
+        const frame_index = frames.items.len - 1;
+        const frame = frames.items[frame_index];
         const code = bodies[frame.body].instructions;
         if (frame.next == code.len) {
+            if (controls.items.len != frame.controls) return null;
             _ = frames.pop();
             continue;
         }
         const at = frame.next;
-        frame.next += 1;
+        frames.items[frame_index].next += 1;
         const flat = offsets[frame.body] + at;
         const inst = code[at];
+        // An outlined helper must return only through its ordinary end. An
+        // early exit could skip a definition while its caller resumes.
+        if (frame.body != 0 and (inst.op == .br or inst.op == .br_if) and inst.operand >= controls.items.len - frame.controls) return null;
         if (inst.op == .call) if (ids.get(inst.operand)) |callee| {
-            try frames.append(a, .{ .body = callee });
+            try frames.append(a, .{ .body = callee, .controls = controls.items.len });
             visited += 1;
             continue;
         };
         if (inst.op == .local_get) {
-            if (canonical(uses, inst.operand, segment) != inst.operand) uses[inst.operand].forwarded += 1;
+            if (canonical(uses, inst.operand, segment, scopes.items) != inst.operand) uses[inst.operand].forwarded += 1;
         } else if (local(inst.op)) {
             const use = &uses[inst.operand];
             // Even a rejected candidate advances its original write version.
             use.version += 1;
+            use.stable = use.writes == 1 and loops == 0;
             use.alias = null;
             if (use.writes == 1 and use.pair == flat) {
-                const src = canonical(uses, code[at - 1].operand, segment);
-                use.alias = .{ .source = src, .version = uses[src].version, .segment = segment };
+                const src = canonical(uses, code[at - 1].operand, segment, scopes.items);
+                var scope: usize = 0;
+                if (controls.items.len != 0) scope = controls.items[controls.items.len - 1].scope;
+                use.alias = .{ .source = src, .version = uses[src].version, .segment = segment, .scope = scope };
             }
+        }
+        // Scope IDs are never reused. Enclosing aliases dominate both arms;
+        // aliases born in an arm cannot escape it. Source versions and hard
+        // barriers stay monotonic, so closing a scope cannot revive a snapshot.
+        switch (inst.op) {
+            .block, .if_, .loop => {
+                const scope = scopes.items.len;
+                try scopes.append(a, true);
+                try controls.append(a, .{ .scope = scope, .kind = inst.op });
+                if (inst.op == .loop) loops += 1;
+            },
+            .else_ => {
+                if (controls.items.len <= frame.controls) return null;
+                const control = &controls.items[controls.items.len - 1];
+                if (control.kind != .if_ or control.otherwise) return null;
+                scopes.items[control.scope] = false;
+                control.scope = scopes.items.len;
+                control.otherwise = true;
+                try scopes.append(a, true);
+            },
+            .end => {
+                if (controls.items.len <= frame.controls) return null;
+                const closed = controls.pop().?;
+                scopes.items[closed.scope] = false;
+                if (closed.kind == .loop) loops -= 1;
+            },
+            else => {},
         }
         if (boundary(inst.op)) segment += 1;
     }

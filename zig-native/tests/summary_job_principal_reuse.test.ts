@@ -23,7 +23,11 @@ entry const probe_schema: U32 = ${schema}
 entry const probe: U32 where { type_rep U32 } = probe_with (func () => return probe_schema) 3
 `;
 Deno.test("principal inputs survive summary jobs drained inside the recorded region", async () => {
-  const ecs = await Deno.readTextFile(`${repo}examples/ecs.blot`);
+  // This law exercises compile-time principal recording. The example's runtime
+  // exports also reach mutable columns and request handlers, whose backend
+  // admission is independent of the summary jobs drained by the probe below.
+  const ecs = (await Deno.readTextFile(`${repo}examples/ecs.blot`))
+    .replace(/^entry const /gm, "const ");
   const directory = await Deno.makeTempDir({ prefix: "blot-summary-jobs-" });
   const entry = `${directory}/main.blot`;
   const options = {
@@ -66,6 +70,11 @@ Deno.test("principal inputs survive summary jobs drained inside the recorded reg
       assert.equal(restored.stats.restartCacheLoaded, true);
       const principals = restored.stats.principals as Record<string, number>;
       assert(principals.persisted_hits > 0, JSON.stringify(principals));
+      assert(
+        principals.persisted_nonempty_hits > 0,
+        JSON.stringify(principals),
+      );
+      assert(principals.persisted_call_proofs > 0, JSON.stringify(principals));
       const reference = await fresh(ecs + probe(7));
       assert(reference.success);
       assert.deepEqual(restored.bytes, reference.bytes);

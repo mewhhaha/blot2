@@ -6,6 +6,30 @@ const check = @import("../check/check.zig");
 const core = @import("../check/core.zig");
 const scoped = @import("scoped_backend.zig");
 const a = std.testing.allocator;
+
+fn publishBitRecurrence(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_bit_recurrences);
+    try std.testing.expectEqual(@as(u64, 8), result.counters.scoped_bit_rounds_removed);
+}
+test "owned bit loops publish exact affine carry replacement through every allocation failure" {
+    var module = try lower(a,
+        \\entry const answer = func (input: U32): U32 => return do:
+        \\  let rows: GrowArray U32 = #[input]
+        \\  let state = rows[0]
+        \\  for bit in 0 .. 8:
+        \\    if @u32.eq (@u32.bit_and state 1) 0:
+        \\      state := @u32.shr self 1
+        \\    else:
+        \\      state := @u32.bit_xor (@u32.shr self 1) 0xA24BAED4
+        \\  return state
+    );
+    defer module.deinit(a);
+    try publishBitRecurrence(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishBitRecurrence, .{@as([]const core.Module, &.{module})});
+}
 test {
     _ = @import("scoped_backend.zig");
     _ = @import("storage_calls.zig");

@@ -8,8 +8,10 @@ quicksort ports. Original F64 Mandelbrot and the other 43 catalog tasks remain
 outside paired coverage. The custom eight-lane `Hash::SHA256` task is not
 cryptographic SHA-256.
 
-[Recursive sort support, 2026-11-04](results/2026-11-04-recursive-calls.md)
-records the seven supported adapted pairs. The
+[Current compiler hills, 2026-11-04](results/2026-11-04-shared-hills.md) records
+the CRC transform, Main size/compile tradeoff and allocation repairs.
+[Recursive sort support](results/2026-11-04-recursive-calls.md) records the
+seven supported adapted pairs. The
 [expanded survey, 2026-11-03](results/2026-11-03-expanded.md) retains earlier
 failed builds and diagnostic source controls. The
 [fixed-span checkpoint](results/2026-11-03-fixed-spans.md) and

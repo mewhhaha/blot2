@@ -1,38 +1,36 @@
 # Owned-storage rewrite: active task index
 
 The current priorities are shared-kernel runtime, Gdev Wasm size and short
-iterations. Subsecond compilation, the next sub-five-second latency gate and
-1–2MB Wasm remain unmet. The
-[addressed-input checkpoint](../scripts/bench/goose/results/2026-11-04-addressed-inputs.md)
-adds immutable private bundles with separate outputs, exact range forwarding,
-complete owner/effect facts, transitive demand and bounded snapshot reuse.
-Sparse calls keep the ordinary ABI; see `zig-native/CONTRACT.md`.
+iterations. Subsecond compilation, sub-five-second Main and 1–2MB remain unmet.
+The
+[current measured checkpoint](../scripts/bench/goose/results/2026-11-04-shared-hills.md)
+adds exact U32 bit-loop composition, structured copy proofs and checked direct
+scalar alias calls. CRC32 improves 6.2x; Main shrinks 155,377B to 10,097,652B.
+Its paired compile median regresses 5.283 → 5.414s (+2.5%); retain this
+tradeoff. Evaluated fold probes now allocate zero bytes per invocation.
 
-Repeated distinct captures shrink **263,521 → 97,002B (63.2%)**; two single-use
-controls grow 7.1%. Gdev is effectively flat: paired medians **6.334 → 6.235s**,
-Main **10,241,074 → 10,253,029B (+0.12%)**. Mixed per-pair changes do not
-establish a robust latency win; the older 5.28s belongs to another shared-host
-round. Main already had zero packed helper calls. Next measure copies rejected
-solely for crossing structured branches in `wasm_copy_coalesce.zig`, using the
-short private IR replay, before changing bank storage.
-
-All 2,976 native laws compile without LLVM. The affected union passes 412 laws;
-eight focused laws pass full-fault mode, including three exhaustive sweeps. The
-development family passes 245 native laws, guests and local checks. Release
-guests pass 300/302; both failures reproduce on the frozen baseline. Complete
-qualification remains pending. The full gate stops at 180s after 101 native
-passes, zero failures/leaks/logged errors; 49 smoke checks and the harness pass.
-
-World/editor, hand and renderer binaries remain byte-identical. Their editor,
-hand and renderer witnesses match. The exact final Main passes original budgets
-in one inspected NVIDIA frame, with unchanged PNG and trace; see
-[frame evidence](storage-handoff-evidence/2026-11-04-addressed-inputs-frame.json).
+All 2,996 native laws compile without LLVM; 433 affected laws pass sampled
+faults. Twenty-six focused laws pass full-fault mode with 33 exhaustive sweeps.
+The 67.9s development family and all 328 affected release guests pass. The three
+previously reported baseline failures are repaired. Full qualification remains
+pending: the complete gate reaches 180s after 410 native passes with no
+failures. A fresh real NVIDIA frame matches the baseline PNG/trace under
+original budgets; see
+[frame evidence](storage-handoff-evidence/2026-11-04-shared-hills-frame.json).
 Broader gameplay/software-adapter checks and Pen's normal source bridge remain
-pending; that host still omits inferenceBudget. Sibling sources/assets remain
-unchanged: Gdev `38af070`, Ink `ccaf08f`, Pen `d159492`. Preserve the preceding
-[shared-call evidence](../scripts/bench/goose/results/2026-11-03-call-contexts.md),
-[fresh-owner evidence](../scripts/bench/goose/results/2026-11-03-fresh-owners.md)
-and [survey controls](../scripts/bench/goose/results/2026-11-03-expanded.md).
+pending; that host still omits inferenceBudget. Sibling source/assets remain
+Gdev `38af070`, Ink `ccaf08f`, Pen `d159492`.
+
+Next measure representation work by record shape and operation, then compare
+creation-backed immutable FrameAccess with shared semantic shapes/transitive
+field demand. The private IR replay retains short iterations. Main still spends
+4.439s in the backend and requests 5.315GB cumulatively; copy-only changes
+cannot reach the output target. Preserve the earlier
+[recursion](../scripts/bench/goose/results/2026-11-04-recursive-calls.md),
+[addressed-input](../scripts/bench/goose/results/2026-11-04-addressed-inputs.md),
+[shared-call](../scripts/bench/goose/results/2026-11-03-call-contexts.md) and
+[fresh-owner](../scripts/bench/goose/results/2026-11-03-fresh-owners.md)
+evidence, including rejected rollouts and snapshot-specific qualifications.
 
 The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves

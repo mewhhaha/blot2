@@ -8,6 +8,67 @@ const backend = @import("core_backend.zig");
 const types = @import("../check/types.zig");
 const a = std.testing.allocator;
 
+test "saturated scalar primitive aliases retain checked direct calls without curried storage" {
+    const prelude_source =
+        \\const U32.add = @u32.add
+        \\const U32.div = @u32.div
+        \\const negate = @f32.neg
+        \\const convert = @u32.to_f32
+    ;
+    const source =
+        \\entry const integer = func (value: U32): U32 => return @type.call "add" (@type.call "div" value 2) 7
+        \\entry const floating = func (value: F32): F32 => return negate value
+        \\entry const converted = func (value: U32): F32 => return convert value
+    ;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = prelude_source });
+    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = source });
+    const path = try tmp.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
+    defer a.free(path);
+    const prelude_path = try tmp.dir.realPathFileAlloc(std.testing.io, "prelude.blot", a);
+    defer a.free(prelude_path);
+    var loaded = try @import("../reuse/project.zig").load(a, std.testing.io, path, .{ .prelude_path = prelude_path });
+    defer loaded.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), loaded.diagnostics.items.len);
+    var checked = try @import("../reuse/project_check.zig").checkProject(a, &loaded);
+    defer checked.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    var frozen = try @import("../reuse/alias_project_pipeline.zig").lowerChecked(a, &loaded, &checked);
+    defer frozen.deinit(a);
+    var result = try backend.compileWithOptions(a, frozen.units, frozen.entry, .{ .inline_named = false, .retain_artifacts = true });
+    defer result.deinit(a);
+    try std.testing.expectEqual(@as(?backend.Diagnostic, null), result.diagnostic);
+    var module = try result.capture.?.emission.materialize(a);
+    defer module.deinit();
+    const ir = @import("runtime_ir.zig");
+    const Case = struct { op: ir.Op, parameters: []const ir.ValueType, result: ir.ValueType };
+    const cases = [_]Case{
+        .{ .op = .i32_add, .parameters = &.{ .i32, .i32, .i32 }, .result = .i32 },
+        .{ .op = .i32_div_u, .parameters = &.{ .i32, .i32, .i32 }, .result = .i32 },
+        .{ .op = .f32_neg, .parameters = &.{ .f32, .i32 }, .result = .f32 },
+        .{ .op = .f32_convert_i32_u, .parameters = &.{ .i32, .i32 }, .result = .f32 },
+    };
+    for (cases) |case| {
+        var found = false;
+        for (module.functions.items, 0..) |function, index| {
+            if (module.runtimeHelper(index) or function.entry or function.locals.items.len != 0) continue;
+            if (!std.mem.eql(ir.ValueType, function.parameters, case.parameters) or function.result != case.result or function.result_role != .scalar) continue;
+            const operands = case.parameters.len - 1;
+            if (function.provider_parameter != operands or function.parameterRole(operands) != .reference) continue;
+            const instructions = function.instructions.items;
+            if (instructions.len != operands + 1 or instructions[operands].op != case.op) continue;
+            var direct = true;
+            for (instructions[0..operands], 0..) |inst, operand| {
+                if (inst.op != .local_get or inst.operand != operand or function.parameterRole(operand) != .scalar) direct = false;
+            }
+            found = found or direct;
+        }
+        if (!found) std.debug.print("missing direct primitive alias {s}\n", .{@tagName(case.op)});
+        try std.testing.expect(found);
+    }
+}
+
 fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return lowerCatalog(allocator, source, false);
 }

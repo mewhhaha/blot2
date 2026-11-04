@@ -1,0 +1,413 @@
+diff --git a/zig-native/src/backend/runtime_pipeline.zig b/zig-native/src/backend/runtime_pipeline.zig
+index e9db8f7e..5bbdac71 100644
+--- a/zig-native/src/backend/runtime_pipeline.zig
++++ b/zig-native/src/backend/runtime_pipeline.zig
+@@ -46,6 +46,7 @@ pub const Session = struct {
+     module: *const wasm.Module,
+     summaries: lifetimes.Summaries,
+     inline_facts: @import("wasm_inline.zig").Facts = .{},
++    scalar_inlines: @import("wasm_scalar_inline.zig").Catalog = .{},
+     providers: @import("provider_modes.zig").Catalog = .{},
+     roots: bool = false,
+     needs_roots: bool = false,
+@@ -56,7 +57,10 @@ pub const Session = struct {
+         errdefer summaries.deinit();
+         var inline_facts = try @import("wasm_inline.zig").Facts.init(a, module);
+         errdefer inline_facts.deinit(a);
+-        var result: Session = .{ .allocator = a, .module = module, .summaries = summaries, .inline_facts = inline_facts };
++        var scalar_inlines: @import("wasm_scalar_inline.zig").Catalog = .{};
++        if (module.memory_model == .data_stacks) scalar_inlines = try .init(a, module);
++        errdefer scalar_inlines.deinit(a);
++        var result: Session = .{ .allocator = a, .module = module, .summaries = summaries, .inline_facts = inline_facts, .scalar_inlines = scalar_inlines };
+         result.roots = module.arena != null and !module.mutable_static;
+         for (module.imports.items, 0..) |_, index| if (module.hostCallbackImport(index) == null and !module.ownedCleanupBindImport(index) and !module.resourceImport(index) and !module.taskImport(index)) {
+             result.roots = false;
+@@ -102,6 +106,7 @@ pub const Session = struct {
+         return result;
+     }
+     pub fn deinit(self: *Session) void {
++        self.scalar_inlines.deinit(self.allocator);
+         self.inline_facts.deinit(self.allocator);
+         self.providers.deinit(self.allocator);
+         self.summaries.deinit();
+@@ -255,6 +260,12 @@ pub const Session = struct {
+                 view.locals = body.locals;
+                 view.instructions = body.instructions;
+             }
++            if (self.tier == .optimized) if (try self.scalar_inlines.run(self.allocator, self.module, &view)) |replacement| {
++                if (owned) |*body| body.deinit(self.allocator);
++                owned = replacement;
++                view.locals = replacement.locals;
++                view.instructions = replacement.instructions;
++            };
+             if (try @import("wasm_copy_coalesce.zig").runSingle(self.allocator, &view)) |replacement| {
+                 if (owned) |*body| body.deinit(self.allocator);
+                 owned = replacement;
+diff --git a/zig-native/src/backend_suite.zig b/zig-native/src/backend_suite.zig
+index b399748a..46aa1b74 100644
+--- a/zig-native/src/backend_suite.zig
++++ b/zig-native/src/backend_suite.zig
+@@ -12,6 +12,7 @@ comptime {
+     _ = @import("backend/activation_graph.zig");
+     _ = @import("backend/callable_origins.zig");
+     _ = @import("backend/wasm_inline.zig");
++    _ = @import("backend/wasm_scalar_inline.zig");
+     _ = @import("backend/wasm_sroa.zig");
+     _ = @import("backend/simd_abi.zig");
+     _ = @import("backend/wasm_row_reduce.zig");
+diff --git a/zig-native/src/backend/wasm_scalar_inline.zig b/zig-native/src/backend/wasm_scalar_inline.zig
+new file mode 100644
+index 00000000..2215bf65
+--- /dev/null
++++ b/zig-native/src/backend/wasm_scalar_inline.zig
+@@ -0,0 +1,287 @@
++//! Inline bounded closed scalar call trees at their original call position.
++//! Arguments are materialized once; invocation-local zeroes are reset each time.
++const std = @import("std");
++const ir = @import("runtime_ir.zig");
++const wasm = @import("wasm.zig");
++const A = std.mem.Allocator;
++const Fact = struct { state: enum { unknown, visiting, rejected, admitted } = .unknown, code: usize = 0, locals: usize = 0, exits: bool = false };
++
++pub const Catalog = struct {
++    facts: []Fact = &.{},
++
++    pub fn init(a: A, module: *const wasm.Module) A.Error!Catalog {
++        const facts = try a.alloc(Fact, module.functions.items.len);
++        @memset(facts, .{});
++        var result: Catalog = .{ .facts = facts };
++        for (0..facts.len) |id| _ = result.inspect(module, @intCast(id), 0);
++        return result;
++    }
++    pub fn deinit(self: *Catalog, a: A) void {
++        a.free(self.facts);
++        self.* = .{};
++    }
++    fn inspect(self: *Catalog, module: *const wasm.Module, id: u32, depth: usize) bool {
++        if (id >= self.facts.len or depth >= 8) return false;
++        const fact = &self.facts[id];
++        switch (fact.state) {
++            .admitted => return true,
++            .visiting, .rejected => return false,
++            .unknown => {},
++        }
++        fact.state = .rejected;
++        const body = &module.functions.items[id];
++        if (body.entry or module.runtimeHelper(id) or module.start == id or body.result_role != .scalar) return false;
++        if (body.provider_parameter != ir.no_provider and body.provider_parameter != ir.unknown_provider) return false;
++        if (body.result != .i32 and body.result != .f32) return false;
++        if (body.parameters.len + body.locals.items.len > 16 or body.instructions.items.len == 0 or body.instructions.items.len > 96) return false;
++        for (body.parameters, 0..) |machine, index| {
++            // Scoped descriptors also carry scalar metadata in ordinary i32
++            // formals. Unknown provenance grants no memory authority: the
++            // complete body whitelist below permits only scalar operations.
++            if (machine != .i32 and machine != .f32) return false;
++            if (body.parameterRole(index) == .reference) return false;
++        }
++        for (body.locals.items) |machine| if (machine != .i32 and machine != .f32) return false;
++        fact.state = .visiting;
++        var code = body.parameters.len + 2 * body.locals.items.len + 2;
++        var locals = body.parameters.len + body.locals.items.len;
++        var nesting: usize = 0;
++        var controls: [96]ir.Op = undefined;
++        var exits = false;
++        for (body.instructions.items) |inst| {
++            if (inst.table_reference or inst.table_kind != .unknown) {
++                fact.state = .rejected;
++                return false;
++            }
++            switch (inst.op) {
++                .local_get, .local_set, .local_tee => if (inst.operand >= body.parameters.len + body.locals.items.len) {
++                    fact.state = .rejected;
++                    return false;
++                },
++                .block, .if_ => {
++                    controls[nesting] = inst.op;
++                    nesting += 1;
++                },
++                .else_ => {
++                    if (nesting == 0 or controls[nesting - 1] != .if_) {
++                        fact.state = .rejected;
++                        return false;
++                    }
++                    controls[nesting - 1] = .else_;
++                },
++                .end => {
++                    if (nesting == 0) {
++                        fact.state = .rejected;
++                        return false;
++                    }
++                    nesting -= 1;
++                },
++                .br, .br_if => {
++                    if (inst.operand > nesting) {
++                        fact.state = .rejected;
++                        return false;
++                    }
++                    exits = exits or inst.operand == nesting;
++                },
++                .return_ => exits = true,
++                .call => {
++                    if (!self.inspect(module, inst.operand, depth + 1)) {
++                        fact.state = .rejected;
++                        return false;
++                    }
++                    code += self.facts[inst.operand].code;
++                    locals += self.facts[inst.operand].locals;
++                },
++                .nop, .drop, .unreachable_, .i32_const, .f32_const, .i32_eqz, .i32_eq, .i32_ne, .i32_lt_u, .i32_gt_u, .i32_le_u, .i32_ge_u, .f32_eq, .f32_ne, .f32_lt, .f32_gt, .f32_le, .f32_ge, .i32_add, .i32_sub, .i32_mul, .i32_div_u, .i32_rem_u, .i32_and, .i32_or, .i32_xor, .i32_shl, .i32_shr_u, .i32_clz, .i32_ctz, .f32_abs, .f32_neg, .f32_ceil, .f32_floor, .f32_trunc, .f32_sqrt, .f32_add, .f32_sub, .f32_mul, .f32_div, .f32_min, .f32_max, .i32_reinterpret_f32, .f32_reinterpret_i32, .i32_trunc_sat_f32_u, .f32_convert_i32_u => {},
++                else => {
++                    fact.state = .rejected;
++                    return false;
++                },
++            }
++            code += 1;
++            if (code > 192 or locals > 128) {
++                fact.state = .rejected;
++                return false;
++            }
++        }
++        if (nesting != 0) {
++            fact.state = .rejected;
++            return false;
++        }
++        fact.* = .{ .state = .admitted, .code = code, .locals = locals, .exits = exits };
++        return true;
++    }
++
++    pub fn run(self: *const Catalog, a: A, module: *const wasm.Module, source: *const ir.Function) A.Error!?ir.Body {
++        if (source.parameters.len + source.locals.items.len >= 8192) return null;
++        var selected = false;
++        for (source.instructions.items) |inst| if (inst.op == .call and !inst.table_reference and inst.table_kind == .unknown and inst.operand < self.facts.len and self.facts[inst.operand].state == .admitted) {
++            selected = true;
++            break;
++        };
++        if (!selected) return null;
++        var result: ir.Body = .{};
++        errdefer result.deinit(a);
++        try result.locals.appendSlice(a, source.locals.items);
++        try result.instructions.ensureTotalCapacity(a, source.instructions.items.len);
++        var expanded: usize = 0;
++        for (source.instructions.items) |inst| {
++            if (inst.op == .call and !inst.table_reference and inst.table_kind == .unknown and inst.operand < self.facts.len) {
++                const fact = self.facts[inst.operand];
++                if (fact.state == .admitted and expanded + fact.code <= 4096 and source.parameters.len + result.locals.items.len + fact.locals < 8192) {
++                    try self.emit(a, module, &result, source.parameters.len, inst.operand);
++                    expanded += fact.code;
++                    continue;
++                }
++            }
++            try result.instructions.append(a, inst);
++        }
++        return result;
++    }
++    fn emit(self: *const Catalog, a: A, module: *const wasm.Module, result: *ir.Body, parameters: usize, id: u32) A.Error!void {
++        const body = &module.functions.items[id];
++        const base: u32 = @intCast(parameters + result.locals.items.len);
++        try result.locals.appendSlice(a, body.parameters);
++        try result.locals.appendSlice(a, body.locals.items);
++        var argument = body.parameters.len;
++        while (argument != 0) {
++            argument -= 1;
++            try result.emit(a, .local_set, base + @as(u32, @intCast(argument)));
++        }
++        const zeroes = @import("scalar_consumer.zig").zeroes(body);
++        for (body.locals.items, 0..) |machine, index| {
++            if (zeroes & (@as(u64, 1) << @intCast(body.parameters.len + index)) == 0) continue;
++            try result.emit(a, if (machine == .f32) .f32_const else .i32_const, 0);
++            try result.emit(a, .local_set, base + @as(u32, @intCast(body.parameters.len + index)));
++        }
++        if (self.facts[id].exits) try result.emit(a, .block, @backingInt(body.result));
++        var nesting: u32 = 0;
++        for (body.instructions.items) |inst| {
++            if (inst.op == .call) {
++                try self.emit(a, module, result, parameters, inst.operand);
++                continue;
++            }
++            var copy = inst;
++            switch (copy.op) {
++                .local_get, .local_set, .local_tee => copy.operand += base,
++                .block, .if_ => nesting += 1,
++                .end => nesting -= 1,
++                .return_ => {
++                    copy.op = .br;
++                    copy.operand = nesting;
++                },
++                else => {},
++            }
++            try result.instructions.append(a, copy);
++        }
++        if (self.facts[id].exits) try result.emit(a, .end, 0);
++    }
++};
++
++fn scalarTree(a: A) !void {
++    var module = wasm.Module.init(a);
++    defer module.deinit();
++    const leaf = try module.addTypedFunction(&.{ .i32, .i32 }, .i32, .scalar);
++    try module.setParameterRoles(leaf, ir.packParameterRoles(&.{ .scalar, .scalar }));
++    try module.emitSlice(leaf, &.{ .{ .op = .local_get }, .{ .op = .local_get, .operand = 1 }, .{ .op = .i32_shr_u } });
++    const wrapper = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
++    try module.setParameterRoles(wrapper, ir.packParameterRoles(&.{.scalar}));
++    const zero = try module.addLocal(wrapper, .i32);
++    try module.emitSlice(wrapper, &.{
++        .{ .op = .local_get },             .{ .op = .if_ },
++        .{ .op = .local_get },             .{ .op = .i32_const, .operand = 33 },
++        .{ .op = .call, .operand = leaf }, .{ .op = .return_ },
++        .{ .op = .end },                   .{ .op = .local_get, .operand = zero },
++    });
++    const caller = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
++    try module.emitSlice(caller, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = wrapper } });
++    var catalog = try Catalog.init(a, &module);
++    defer catalog.deinit(a);
++    try std.testing.expectEqual(.admitted, catalog.facts[wrapper].state);
++    var result = (try catalog.run(a, &module, &module.functions.items[caller])).?;
++    defer result.deinit(a);
++    var calls: usize = 0;
++    var returns: usize = 0;
++    var shift: usize = 0;
++    var reset: usize = 0;
++    for (result.instructions.items, 0..) |inst, index| {
++        if (inst.op == .call) calls += 1;
++        if (inst.op == .return_) returns += 1;
++        if (inst.op == .i32_shr_u) shift += 1;
++        if (index > 0 and inst.op == .local_set and inst.operand == 2 and result.instructions.items[index - 1].op == .i32_const) reset += 1;
++    }
++    try std.testing.expectEqual(@as(usize, 0), calls);
++    try std.testing.expectEqual(@as(usize, 0), returns);
++    try std.testing.expectEqual(@as(usize, 1), shift);
++    try std.testing.expectEqual(@as(usize, 1), reset);
++    try std.testing.expectEqual(@as(usize, 2), module.functions.items[caller].instructions.items.len);
++    module.functions.items[caller].instructions.items[1].table_reference = true;
++    try std.testing.expect((try catalog.run(a, &module, &module.functions.items[caller])) == null);
++    module.functions.items[caller].instructions.items[1].table_reference = false;
++    module.functions.items[caller].instructions.items[1].table_kind = .callable;
++    try std.testing.expect((try catalog.run(a, &module, &module.functions.items[caller])) == null);
++}
++
++test "tiny scalar trees materialize arguments reset zero locals and relocate early returns through OOM" {
++    try scalarTree(std.testing.allocator);
++    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scalarTree, .{});
++}
++
++test "tiny scalar trees reject recursive host memory global and symbolic dependencies" {
++    const a = std.testing.allocator;
++    var module = wasm.Module.init(a);
++    defer module.deinit();
++    const id = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
++    try module.setParameterRoles(id, ir.packParameterRoles(&.{.scalar}));
++    try module.emitSlice(id, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = id } });
++    for ([_]ir.Op{ .call, .call_import, .call_indirect, .global_get, .global_set, .i32_load, .i32_store, .memory_grow, .loop, .else_, .ownership }) |op| {
++        module.functions.items[id].instructions.items[1].op = op;
++        var catalog = try Catalog.init(a, &module);
++        defer catalog.deinit(a);
++        try std.testing.expectEqual(.rejected, catalog.facts[id].state);
++    }
++    module.functions.items[id].instructions.items[1] = .{ .op = .i32_const, .table_reference = true };
++    var catalog = try Catalog.init(a, &module);
++    defer catalog.deinit(a);
++    try std.testing.expectEqual(.rejected, catalog.facts[id].state);
++}
++
++test "tiny scalar retained outputs observe transitive leaf body edits and reverts" {
++    const a = std.testing.allocator;
++    const retained = @import("optimized_bodies.zig");
++    var module = wasm.Module.init(a);
++    defer module.deinit();
++    module.memory_model = .data_stacks;
++    module.fixed_memory_bytes = 65_536;
++    const leaf = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
++    const wrapper = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
++    const caller = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
++    for ([_]u32{ leaf, wrapper, caller }) |id| try module.setParameterRoles(id, ir.packParameterRoles(&.{.scalar}));
++    try module.emitSlice(leaf, &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = 1 }, .{ .op = .i32_add } });
++    try module.emitSlice(wrapper, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = leaf } });
++    try module.emitSlice(caller, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = wrapper } });
++    var old: retained.Capture = .{ .allocator = a };
++    defer old.deinit();
++    const before = try module.assembleWithOptions(.{ .current = &old });
++    defer a.free(before);
++    for (old.entries.items[caller].output.?.instructions.items) |inst| try std.testing.expect(inst.op != .call);
++    module.functions.items[leaf].instructions.items[1].operand = 7;
++    var edited: retained.Capture = .{ .allocator = a };
++    defer edited.deinit();
++    var stats: retained.Stats = .{};
++    const after = try module.assembleWithOptions(.{ .previous = &old, .current = &edited, .stats = &stats });
++    defer a.free(after);
++    const fresh = try module.assemble();
++    defer a.free(fresh);
++    try std.testing.expectEqualSlices(u8, fresh, after);
++    try std.testing.expect(!std.mem.eql(u8, before, after));
++    try std.testing.expectEqual(@as(usize, 0), stats.reused);
++    module.functions.items[leaf].instructions.items[1].operand = 1;
++    var reverted: retained.Capture = .{ .allocator = a };
++    defer reverted.deinit();
++    stats = .{};
++    const again = try module.assembleWithOptions(.{ .previous = &old, .current = &reverted, .stats = &stats });
++    defer a.free(again);
++    try std.testing.expectEqualSlices(u8, before, again);
++    try std.testing.expectEqual(@as(usize, 3), stats.reused);
++}
+diff --git a/zig-native/tests/scalar_inline_execution.test.ts b/zig-native/tests/scalar_inline_execution.test.ts
+new file mode 100644
+index 00000000..76e4e22d
+--- /dev/null
++++ b/zig-native/tests/scalar_inline_execution.test.ts
+@@ -0,0 +1,57 @@
++import { strict as assert } from "node:assert";
++import { compileAndRun } from "./reduction_helpers.ts";
++
++Deno.test("tiny scalar call trees preserve eager arguments wrapping shifts F32 and trap recovery in both tiers", async () => {
++  await compileAndRun(
++    `const shift = func (value: U32) -> (amount: U32): U32 => return value >> amount
++const quotient = func (value: U32) -> (divisor: U32): U32 => return value / divisor
++const step = func (value: U32): U32 => return do:
++  if value & 1 != 0:
++    return shift value 33 ^ 0xEDB88320
++  return shift value 33
++const negate = func (value: F32): F32 => return @f32.neg value
++const combine = func (left: U32) -> (right: U32): U32 => return left * 31 + right
++entry const answer = func (input: U32): U32 => return do:
++  let rows: GrowArray U32 = #[input]
++  let value = rows[0]
++  for index in 0 .. 11:
++    value := step value
++  return value
++entry const floating = func (input: F32): F32 => return do:
++  let rows: GrowArray F32 = #[input]
++  return negate rows[0]
++entry const division = func (input: U32): U32 => return do:
++  let rows: GrowArray U32 = #[input]
++  return quotient 42 rows[0]
++entry const order = func (input: U32): U32 => return do:
++  let rows: GrowArray U32 = #[input]
++  let bump = func (value: U32): U32 => return do:
++    rows[0] := rows[0] * 10 + value
++    return value
++  let combined = combine (bump 1) (bump 2)
++  return combined + rows[0]
++`,
++    (guest) => {
++      assert.equal(guest.abi.version, 8);
++      for (const input of [0, 1, 2, 3, 0x80000000, 0xffffffff]) {
++        let expected = input;
++        for (let index = 0; index < 11; index++) {
++          if ((expected & 1) !== 0) {
++            expected = ((expected >>> 1) ^ 0xEDB88320) >>> 0;
++          } else expected >>>= 1;
++        }
++        assert.equal(guest.call("answer", input), expected);
++      }
++      assert(Object.is(guest.call("floating", 0), -0));
++      assert(Object.is(guest.call("floating", -0), 0));
++      assert.equal(guest.call("floating", Infinity), -Infinity);
++      assert.equal(guest.call("floating", -Infinity), Infinity);
++      assert.equal(guest.call("division", 2), 21);
++      assert.throws(() => guest.call("division", 0));
++      assert.equal(guest.call("division", 3), 14);
++      assert.equal(guest.call("order", 0), 45);
++      assert.equal(guest.call("order", 1), 145);
++    },
++    { stdRoot: new URL("../../std", import.meta.url).pathname },
++  );
++});

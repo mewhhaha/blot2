@@ -125,6 +125,34 @@ ordinary cycles are allowed only when disjoint from the bank root and all its
 extracted helpers. Any reachable indirect call or cyclic component containing a
 bank member rejects publication; recursion alone does not grant bank reentry.
 
+Machine copy coalescing retains a dominating i32 snapshot through nested
+blocks and branches. Append-only scope identities end arm-local visibility at
+`else`/`end`; source write versions never roll back. Loops and jumps remain
+barriers for mutable sources. A source with no writes, or whose unique write
+has already occurred outside every active loop, stays immutable across those
+barriers. Logical helpers inherit their caller's loop depth and scopes. Helper
+returns and branches to their implicit function label decline the proof; traps
+and root returns have no continuing path. Every original read must still be
+proved, and publication forwards only through copies actually removed, retaining
+intermediate snapshots and default-zero behavior.
+
+A fixed range loop with one U32 carry may compose one through eight pure bit
+rounds into an exact affine transform. Normal source checking, ownership,
+escape and backedge validation finish first. The bounded machine interpreter
+admits only closed scalar bit operations, exact pure helpers and affine branch
+joins; iterator use, another live carry, effects, memory, arithmetic traps,
+nonlinear operations and escaping control retain the original loop. The exact
+header/tail must contain no runtime cleanup. A suffix rewrite also rejects
+scanned instructions, pending copies, changed outline helpers or semantic/table
+coordinates. Detached output and capacity reservation precede mutation; snapshot
+caches are invalidated and committed counters participate in rollback.
+
+The non-scoped emitter may lower a statically selected, saturated scalar
+primitive alias directly to its existing scalar opcode. Its complete type/effect
+arrow, exact arity, input/result machines and hidden provider ABI remain checked.
+Partial applications and unsupported primitives retain their ordinary closure
+path; the optimization does not establish a general allocation-free closure ABI.
+
 Private named calls retain their complete semantic Value tree and owner/event
 contracts. Exact caller-local equality becomes a normalized input partition in
 the call key; runtime bits and local numbers never become specialization keys.
