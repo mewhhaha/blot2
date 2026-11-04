@@ -1,0 +1,275 @@
+// Numeric propositions own value identities, never lengths or addresses.
+namespace blot_check_numeric_proof_terms;
+import support.structural;
+import std;
+import dictionary;
+import support.error;
+import support.native;
+type Id = u32;
+enum Kind { unsigned32, array, list }
+enum Tag { literal, formal, capture, version, length, complement }
+enum Relation { eq, lt, le, add_fits, sub_fits, index }
+struct Term { tag: Tag, kind: Kind = Kind.unsigned32, a: u32, b: u32 = 0 }
+struct Proposition { relation: Relation, left: Id, right: Id }
+struct Limits { terms: i64 = 4096, visits: i64 = 65536 }
+struct Boundary { formals: const Kind[:], captures: const Kind[:] = [], local_versions: bool = false }
+fn constructor(name: const u8[:]) -> Relation, bool {
+    if name == "@proof.eq" { return Relation.eq, true; }
+    if name == "@proof.lt" { return Relation.lt, true; }
+    if name == "@proof.le" { return Relation.le, true; }
+    if name == "@proof.add_fits" { return Relation.add_fits, true; }
+    if name == "@proof.sub_fits" { return Relation.sub_fits, true; }
+    if name == "@proof.index" { return Relation.index, true; }
+    return Relation.eq, false;
+}
+fn typeName(name: const u8[:]) -> Relation, bool {
+    if name == "@proof.U32Eq" { return Relation.eq, true; }
+    if name == "@proof.U32Lt" { return Relation.lt, true; }
+    if name == "@proof.U32Le" { return Relation.le, true; }
+    if name == "@proof.U32AddFits" { return Relation.add_fits, true; }
+    if name == "@proof.U32SubFits" { return Relation.sub_fits, true; }
+    if name == "@proof.Index" { return Relation.index, true; }
+    return Relation.eq, false;
+}
+fn type_name(name: const u8[:]) -> Relation, bool { return typeName(name); }
+fn holds(relation: Relation, left: u32, right: u32) -> bool {
+    match relation {
+        eq => { return left == right; }, lt => { return left < right; }, le => { return left <= right; },
+        add_fits => { return (left as u64) + right <= 0xffffffff; },
+        sub_fits => { return right <= left; }, index => { return right < left; },
+    }
+}
+struct View { terms: const Term[:], owner_id: u64 = 0 }
+fn get(self: View, id: Id) -> Term, blot_error::Error {
+    if id == 0 || id > self.terms.len { return default<Term>(), blot_error::Error.invalid_proof_operand; }
+    return self.terms[id - 1], blot_error::Error.none;
+}
+fn proposition(self: View, value: Proposition) -> blot_error::Error {
+    let left, le = get(self, value.left); if le != blot_error::Error.none { return le; }
+    let right, re = get(self, value.right); if re != blot_error::Error.none { return re; }
+    if right.kind != Kind.unsigned32 { return blot_error::Error.invalid_proof_operand; }
+    if value.relation == Relation.index {
+        if left.kind == Kind.unsigned32 { return blot_error::Error.invalid_proof_operand; }
+    } else if left.kind != Kind.unsigned32 { return blot_error::Error.invalid_proof_operand; }
+    return blot_error::Error.none;
+}
+fn validate(self: View, boundary: Boundary, limits: Limits) -> blot_error::Error {
+    if self.terms.len > limits.terms || self.terms.len > limits.visits { return blot_error::Error.proof_analysis_limit; }
+    for term, index in self.terms {
+        match term.tag {
+            literal => { if term.kind != Kind.unsigned32 || term.b != 0 { return blot_error::Error.invalid_proof_operand; } },
+            formal => {
+                if term.b != 0 || term.a >= boundary.formals.len { return blot_error::Error.proof_scope_escape; }
+                if term.kind != boundary.formals[term.a] { return blot_error::Error.invalid_proof_operand; }
+            },
+            capture => {
+                if term.b != 0 || term.a >= boundary.captures.len { return blot_error::Error.proof_scope_escape; }
+                if term.kind != boundary.captures[term.a] { return blot_error::Error.invalid_proof_operand; }
+            },
+            version => { if !boundary.local_versions || term.a == 0 || term.b == 0 { return blot_error::Error.proof_scope_escape; } },
+            length => {
+                if term.kind != Kind.unsigned32 || term.b != 0 || term.a == 0 || term.a > index { return blot_error::Error.invalid_proof_operand; }
+                let child, error = get(self, term.a); if error != blot_error::Error.none { return error; }
+                if child.kind == Kind.unsigned32 { return blot_error::Error.invalid_proof_operand; }
+            },
+            complement => {
+                if term.kind != Kind.unsigned32 || term.b != 0 || term.a == 0 || term.a > index { return blot_error::Error.invalid_proof_operand; }
+                let child, error = get(self, term.a); if error != blot_error::Error.none { return error; }
+                if child.kind != Kind.unsigned32 || child.tag == Tag.literal || child.tag == Tag.complement { return blot_error::Error.invalid_proof_operand; }
+            },
+        }
+    }
+    return blot_error::Error.none;
+}
+struct Owned { terms: const Term[:], owner_id: u64 }
+fn view(self: Owned) -> View { return View { self.terms, self.owner_id }; }
+fn deinit(self: Owned&) { self.terms = []; self.owner_id = 0; }
+struct Substitution { formals: const Id[:] = [], captures: const Id[:] = [], versions: const Id[:] = [] }
+struct Store {
+    terms: Term[>..<]&, index: dictionary<Term, Id>&,
+    limits: Limits = Limits {}, visits: i64 = 0, account: i64? = null, owner_id: u64,
+}
+fn init(terms: Term[>..<]&, index: dictionary<Term, Id>&) -> Store {
+    return Store { terms, index, owner_id: blot_native::fresh_owner_id() };
+}
+fn deinit(self: Store&) { self.terms.clear(); self.index.clear(); self.owner_id = 0; }
+fn view(self: const Store&) -> View { return View { self.terms, self.owner_id }; }
+fn charge(self: Store&, amount: i64) -> blot_error::Error {
+    var available: i64 = 0;
+    if self.visits < self.limits.visits { available = self.limits.visits - self.visits; }
+    if amount > available { return blot_error::Error.proof_analysis_limit; }
+    self.visits += amount;
+    let account = self.account; if account { account += amount; }
+    return blot_error::Error.none;
+}
+recursive fn intern(self: Store&, term: Term) -> Id, blot_error::Error {
+    let charged = charge(self, 1); if charged != blot_error::Error.none { return 0, charged; }
+    match term.tag {
+        literal => { if term.kind != Kind.unsigned32 || term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; } },
+        formal, capture => { if term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; } },
+        version => { if term.a == 0 || term.b == 0 { return 0, blot_error::Error.invalid_proof_operand; } },
+        length => {
+            if term.kind != Kind.unsigned32 || term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; }
+            let child, error = get(view(self), term.a); if error != blot_error::Error.none { return 0, error; }
+            if child.kind == Kind.unsigned32 { return 0, blot_error::Error.invalid_proof_operand; }
+        },
+        complement => {
+            if term.kind != Kind.unsigned32 || term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; }
+            let child, error = get(view(self), term.a); if error != blot_error::Error.none { return 0, error; }
+            if child.kind != Kind.unsigned32 { return 0, blot_error::Error.invalid_proof_operand; }
+            if child.tag == Tag.literal { return intern(self, Term { Tag.literal, a: 0xffffffff - child.a }); }
+            if child.tag == Tag.complement { return child.a, blot_error::Error.none; }
+        },
+    }
+    block { let saved = self.index.get(term); if saved { return saved, blot_error::Error.none; } }
+    if self.terms.len >= min(self.limits.terms, 0xffffffff) { return 0, blot_error::Error.proof_analysis_limit; }
+    self.terms.push(term);
+    let id = self.terms.len as u32;
+    self.index.insert(term, id);
+    return id, blot_error::Error.none;
+}
+fn copyOwned(self: const Store&, destination: Term[>..]&) -> Owned, blot_error::Error {
+    let start = destination.len; destination.append(self.terms);
+    return Owned { destination[start..], blot_native::fresh_owner_id() }, blot_error::Error.none;
+}
+fn importProof(self: Store&, source: View, proof: Proposition, boundary: Boundary, substitution: Substitution) -> Proposition, blot_error::Error {
+    var result: Proposition[1] = [default<Proposition>(); 1];
+    let error = importInto(self, source, [proof], result, boundary, substitution);
+    if error != blot_error::Error.none { return default<Proposition>(), error; }
+    return result[0], blot_error::Error.none;
+}
+fn importMany(self: Store&, source: View, proofs: const Proposition[:], boundary: Boundary, substitution: Substitution) -> Proposition[>..], blot_error::Error {
+    var result: Proposition[>..] = [];
+    for proof in proofs { result.push(default<Proposition>()); }
+    let error = importInto(self, source, proofs, result, boundary, substitution);
+    if error != blot_error::Error.none { return [], error; }
+    return result, blot_error::Error.none;
+}
+fn importInto(self: Store&, source: View, proofs: const Proposition[:], results: Proposition[:], boundary: Boundary, substitution: Substitution) -> blot_error::Error {
+    if source.terms.len != 0 && self.terms.len != 0 {
+        if (source.owner_id != 0 && source.owner_id == self.owner_id) ||
+           self.terms.index_of(source.terms[0]) >= 0 || source.terms.index_of(self.terms[0]) >= 0 {
+            return blot_error::Error.invalid_proof_operand;
+        }
+    }
+    let validity = validate(source, boundary, self.limits); if validity != blot_error::Error.none { return validity; }
+    let source_charge = charge(self, source.terms.len); if source_charge != blot_error::Error.none { return source_charge; }
+    let proof_charge = charge(self, proofs.len); if proof_charge != blot_error::Error.none { return proof_charge; }
+    for proof in proofs { let validity = proposition(source, proof); if validity != blot_error::Error.none { return validity; } }
+    let initial = self.terms.len;
+    var map: Id[>..] = []; for term in source.terms { map.push(0); }
+    var context = Context { self, source, map, substitution };
+    let error = importResults(context, proofs, results);
+    if error != blot_error::Error.none {
+        while self.terms.len > initial { let removed = self.terms.pop(); assert(self.index.remove(removed)); }
+    }
+    return error;
+}
+struct Context { target: Store&, source: View, map: Id[:], substitution: Substitution }
+recursive fn importTerm(self: Context&, id: Id) -> Id, blot_error::Error {
+    let input, get_error = get(self.source, id); if get_error != blot_error::Error.none { return 0, get_error; }
+    let charged = charge(self.target, 1); if charged != blot_error::Error.none { return 0, charged; }
+    if self.map[id - 1] != 0 { return self.map[id - 1], blot_error::Error.none; }
+    var output: Id = 0;
+    match input.tag {
+        literal => { let saved, error = intern(self.target, input); if error != blot_error::Error.none { return 0, error; } output = saved; },
+        length, complement => {
+            let child, child_error = importTerm(self, input.a); if child_error != blot_error::Error.none { return 0, child_error; }
+            let saved, error = intern(self.target, Term { input.tag, a: child }); if error != blot_error::Error.none { return 0, error; }
+            output = saved;
+        },
+        formal, capture, version => {
+            var values = self.substitution.formals; var position = input.a;
+            if input.tag == Tag.capture { values = self.substitution.captures; }
+            if input.tag == Tag.version { values = self.substitution.versions; position = id - 1; }
+            if position >= values.len { return 0, blot_error::Error.proof_scope_escape; }
+            output = values[position];
+            let actual, error = get(view(self.target), output); if error != blot_error::Error.none { return 0, error; }
+            if actual.kind != input.kind { return 0, blot_error::Error.invalid_proof_operand; }
+        },
+    }
+    self.map[id - 1] = output;
+    return output, blot_error::Error.none;
+}
+fn importResults(context: Context&, proofs: const Proposition[:], results: Proposition[:]) -> blot_error::Error {
+    for proof, i in proofs {
+        let left, le = importTerm(context, proof.left); if le != blot_error::Error.none { return le; }
+        let right, re = importTerm(context, proof.right); if re != blot_error::Error.none { return re; }
+        results[i] = Proposition { proof.relation, left, right };
+    }
+    return blot_error::Error.none;
+}
+fn hash(value: Term) -> u64 {
+    var kind: u64 = 0; match value.kind { unsigned32 => {}, array => { kind = 1; }, list => { kind = 2; } }
+    var tag: u64 = 0; match value.tag { literal => {}, formal => { tag = 1; }, capture => { tag = 2; }, version => { tag = 3; }, length => { tag = 4; }, complement => { tag = 5; } }
+    return ::hash_combine(::hash_combine(::hash_combine(::hash(tag), ::hash(kind)), ::hash(value.a)), ::hash(value.b));
+}
+
+fn kindCode(value: Kind) -> u32 {
+    match value {
+        unsigned32 => { return 0; },
+        array => { return 1; },
+        list => { return 2; },
+    }
+}
+fn kindFromCode(code: u32) -> Kind, blot_error::Error {
+    match code {
+        0 => { return Kind.unsigned32, blot_error::Error.none; },
+        1 => { return Kind.array, blot_error::Error.none; },
+        2 => { return Kind.list, blot_error::Error.none; },
+        _ => { return Kind.unsigned32, blot_error::Error.invalid_artifact; },
+    }
+}
+
+fn blot_structural::equal(left: blot_check_numeric_proof_terms::Kind, right: blot_check_numeric_proof_terms::Kind) -> bool { return left == right; }
+fn blot_structural::hash<S>(sink: S&, value: blot_check_numeric_proof_terms::Kind) { blot_structural::hash(sink, blot_check_numeric_proof_terms::kindCode(value) as! u8); }
+
+fn tagCode(value: Tag) -> u32 {
+    match value {
+        literal => { return 0; },
+        formal => { return 1; },
+        capture => { return 2; },
+        version => { return 3; },
+        length => { return 4; },
+        complement => { return 5; },
+    }
+}
+fn tagFromCode(code: u32) -> Tag, blot_error::Error {
+    match code {
+        0 => { return Tag.literal, blot_error::Error.none; },
+        1 => { return Tag.formal, blot_error::Error.none; },
+        2 => { return Tag.capture, blot_error::Error.none; },
+        3 => { return Tag.version, blot_error::Error.none; },
+        4 => { return Tag.length, blot_error::Error.none; },
+        5 => { return Tag.complement, blot_error::Error.none; },
+        _ => { return Tag.literal, blot_error::Error.invalid_artifact; },
+    }
+}
+
+fn blot_structural::equal(left: blot_check_numeric_proof_terms::Tag, right: blot_check_numeric_proof_terms::Tag) -> bool { return left == right; }
+fn blot_structural::hash<S>(sink: S&, value: blot_check_numeric_proof_terms::Tag) { blot_structural::hash(sink, blot_check_numeric_proof_terms::tagCode(value) as! u8); }
+
+fn relationCode(value: Relation) -> u32 {
+    match value {
+        eq => { return 0; },
+        lt => { return 1; },
+        le => { return 2; },
+        add_fits => { return 3; },
+        sub_fits => { return 4; },
+        index => { return 5; },
+    }
+}
+fn relationFromCode(code: u32) -> Relation, blot_error::Error {
+    match code {
+        0 => { return Relation.eq, blot_error::Error.none; },
+        1 => { return Relation.lt, blot_error::Error.none; },
+        2 => { return Relation.le, blot_error::Error.none; },
+        3 => { return Relation.add_fits, blot_error::Error.none; },
+        4 => { return Relation.sub_fits, blot_error::Error.none; },
+        5 => { return Relation.index, blot_error::Error.none; },
+        _ => { return Relation.eq, blot_error::Error.invalid_artifact; },
+    }
+}
+
+fn blot_structural::equal(left: blot_check_numeric_proof_terms::Relation, right: blot_check_numeric_proof_terms::Relation) -> bool { return left == right; }
+fn blot_structural::hash<S>(sink: S&, value: blot_check_numeric_proof_terms::Relation) { blot_structural::hash(sink, blot_check_numeric_proof_terms::relationCode(value) as! u8); }

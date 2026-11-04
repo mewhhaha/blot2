@@ -1,0 +1,3659 @@
+{
+  "phase": "writing",
+  "verification_started": false,
+  "whole_production_port_written": false,
+  "oracle_commit": "156f84b4810f630dff7e5efb7014b2194e3160f7",
+  "scope": "Every pinned compiler/src Zig file; oracle tests remain in Zig. Source-module classification is an inventory aid, not an import-closure proof.",
+  "status_rule": "Only explicit writing-owner reports establish written_unverified; file presence alone is in_progress. No status proves parity.",
+  "modules": [
+    {
+      "zig": "compiler/src/allocation_failure_profile.zig",
+      "goose": "compiler-goose/src/allocation_failure_profile.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/allocation_failures.zig",
+      "goose": "compiler-goose/src/allocation_failures.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/allocation_failures_tests.zig",
+      "goose": "compiler-goose/src/allocation_failures_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/activation_graph.zig",
+      "goose": "compiler-goose/src/backend/activation_graph.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/activation_intersection.zig",
+      "goose": "compiler-goose/src/backend/activation_intersection.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/activation_model.zig",
+      "goose": "compiler-goose/src/backend/activation_model.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/acyclic_layout.zig",
+      "goose": "compiler-goose/src/backend/acyclic_layout.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/acyclic_layout_tests.zig",
+      "goose": "compiler-goose/src/backend/acyclic_layout_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/addressed_input_demand.zig",
+      "goose": "compiler-goose/src/backend/addressed_input_demand.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/aggregate_constant_tests.zig",
+      "goose": "compiler-goose/src/backend/aggregate_constant_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/allocation_emission.zig",
+      "goose": "compiler-goose/src/backend/allocation_emission.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/array_cost_explanation.zig",
+      "goose": "compiler-goose/src/backend/array_cost_explanation.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/backend_checkpoint.zig",
+      "goose": "compiler-goose/src/backend/backend_checkpoint.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/backend_emission.zig",
+      "goose": "compiler-goose/src/backend/backend_emission.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/backend_plan.zig",
+      "goose": "compiler-goose/src/backend/backend_plan.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/backend_representations.zig",
+      "goose": "compiler-goose/src/backend/backend_representations.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/backend_static_data.zig",
+      "goose": "compiler-goose/src/backend/backend_static_data.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/backend_timing.zig",
+      "goose": "compiler-goose/src/backend/backend_timing.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/bottom_binding_tests.zig",
+      "goose": "compiler-goose/src/backend/bottom_binding_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/bottom_result.zig",
+      "goose": "compiler-goose/src/backend/bottom_result.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/callable_origins.zig",
+      "goose": "compiler-goose/src/backend/callable_origins.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/callback_row_tests.zig",
+      "goose": "compiler-goose/src/backend/callback_row_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/captured_callable_tests.zig",
+      "goose": "compiler-goose/src/backend/captured_callable_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/cohort_candidate.zig",
+      "goose": "compiler-goose/src/backend/cohort_candidate.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/collection_edit_call.zig",
+      "goose": "compiler-goose/src/backend/collection_edit_call.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/collection_iteration.zig",
+      "goose": "compiler-goose/src/backend/collection_iteration.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/collection_ops.zig",
+      "goose": "compiler-goose/src/backend/collection_ops.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/collection_optimization_tests.zig",
+      "goose": "compiler-goose/src/backend/collection_optimization_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/collection_tests.zig",
+      "goose": "compiler-goose/src/backend/collection_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/collector_contract.zig",
+      "goose": "compiler-goose/src/backend/collector_contract.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/core_backend.zig",
+      "goose": "compiler-goose/src/backend/core_backend.goose",
+      "role": "source_module",
+      "write_state": "in_progress"
+    },
+    {
+      "zig": "compiler/src/backend/core_dispatch_tests.zig",
+      "goose": "compiler-goose/src/backend/core_dispatch_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/deferred_method_parity_tests.zig",
+      "goose": "compiler-goose/src/backend/deferred_method_parity_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/dictionary_layout.zig",
+      "goose": "compiler-goose/src/backend/dictionary_layout.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/direct_input_demand.zig",
+      "goose": "compiler-goose/src/backend/direct_input_demand.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/discarded_bindings.zig",
+      "goose": "compiler-goose/src/backend/discarded_bindings.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/discarded_bindings_tests.zig",
+      "goose": "compiler-goose/src/backend/discarded_bindings_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/empty_root_scopes.zig",
+      "goose": "compiler-goose/src/backend/empty_root_scopes.goose",
+      "role": "source_module",
+      "write_state": "in_progress"
+    },
+    {
+      "zig": "compiler/src/backend/exact_builder.zig",
+      "goose": "compiler-goose/src/backend/exact_builder.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/function_facts.zig",
+      "goose": "compiler-goose/src/backend/function_facts.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/host_cleanup_shapes.zig",
+      "goose": "compiler-goose/src/backend/host_cleanup_shapes.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/host_entry.zig",
+      "goose": "compiler-goose/src/backend/host_entry.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/identity_array.zig",
+      "goose": "compiler-goose/src/backend/identity_array.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/inline_body.zig",
+      "goose": "compiler-goose/src/backend/inline_body.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/known_call.zig",
+      "goose": "compiler-goose/src/backend/known_call.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/layout.zig",
+      "goose": "compiler-goose/src/backend/layout.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/layout_bridge.zig",
+      "goose": "compiler-goose/src/backend/layout_bridge.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/layout_bridge_tests.zig",
+      "goose": "compiler-goose/src/backend/layout_bridge_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/layout_memo_tests.zig",
+      "goose": "compiler-goose/src/backend/layout_memo_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/let_fallback_tests.zig",
+      "goose": "compiler-goose/src/backend/let_fallback_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/linear_cursor.zig",
+      "goose": "compiler-goose/src/backend/linear_cursor.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/list_traversal.zig",
+      "goose": "compiler-goose/src/backend/list_traversal.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/literal_edit_tests.zig",
+      "goose": "compiler-goose/src/backend/literal_edit_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/loop_targets.zig",
+      "goose": "compiler-goose/src/backend/loop_targets.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/loop_targets_tests.zig",
+      "goose": "compiler-goose/src/backend/loop_targets_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/machine_code_sharing.zig",
+      "goose": "compiler-goose/src/backend/machine_code_sharing.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/machine_code_sharing_tests.zig",
+      "goose": "compiler-goose/src/backend/machine_code_sharing_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/memory_profile.zig",
+      "goose": "compiler-goose/src/backend/memory_profile.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/named_closure_parameter_tests.zig",
+      "goose": "compiler-goose/src/backend/named_closure_parameter_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/native_asset_readers.zig",
+      "goose": "compiler-goose/src/backend/native_asset_readers.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/native_asset_wgsl.zig",
+      "goose": "compiler-goose/src/backend/native_asset_wgsl.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/native_assets.zig",
+      "goose": "compiler-goose/src/backend/native_assets.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/numeric_rows.zig",
+      "goose": "compiler-goose/src/backend/numeric_rows.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/opaque_storage.zig",
+      "goose": "compiler-goose/src/backend/opaque_storage.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/optimized_bodies.zig",
+      "goose": "compiler-goose/src/backend/optimized_bodies.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/optimized_bodies_tests.zig",
+      "goose": "compiler-goose/src/backend/optimized_bodies_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/owned_arrays.zig",
+      "goose": "compiler-goose/src/backend/owned_arrays.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/owned_arrays_tests.zig",
+      "goose": "compiler-goose/src/backend/owned_arrays_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/packed_input_demand.zig",
+      "goose": "compiler-goose/src/backend/packed_input_demand.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/packed_layout.zig",
+      "goose": "compiler-goose/src/backend/packed_layout.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/persistent_roots_tests.zig",
+      "goose": "compiler-goose/src/backend/persistent_roots_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/pipeline_builder.zig",
+      "goose": "compiler-goose/src/backend/pipeline_builder.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/pipeline_tests.zig",
+      "goose": "compiler-goose/src/backend/pipeline_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/private_append_region.zig",
+      "goose": "compiler-goose/src/backend/private_append_region.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/private_append_region_tests.zig",
+      "goose": "compiler-goose/src/backend/private_append_region_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/private_cursor.zig",
+      "goose": "compiler-goose/src/backend/private_cursor.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/provider_chain.zig",
+      "goose": "compiler-goose/src/backend/provider_chain.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/provider_flow.zig",
+      "goose": "compiler-goose/src/backend/provider_flow.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/provider_modes.zig",
+      "goose": "compiler-goose/src/backend/provider_modes.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/provider_origins.zig",
+      "goose": "compiler-goose/src/backend/provider_origins.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/qualified_evidence_tests.zig",
+      "goose": "compiler-goose/src/backend/qualified_evidence_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/qualified_row_tests.zig",
+      "goose": "compiler-goose/src/backend/qualified_row_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/ragged_builder.zig",
+      "goose": "compiler-goose/src/backend/ragged_builder.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/ragged_builder_tests.zig",
+      "goose": "compiler-goose/src/backend/ragged_builder_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/region_candidate.zig",
+      "goose": "compiler-goose/src/backend/region_candidate.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/request_backend_tests.zig",
+      "goose": "compiler-goose/src/backend/request_backend_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/resolved_body.zig",
+      "goose": "compiler-goose/src/backend/resolved_body.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/resolved_call.zig",
+      "goose": "compiler-goose/src/backend/resolved_call.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/resolved_flow.zig",
+      "goose": "compiler-goose/src/backend/resolved_flow.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/root_borrows.zig",
+      "goose": "compiler-goose/src/backend/root_borrows.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/root_lowering.zig",
+      "goose": "compiler-goose/src/backend/root_lowering.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_body_relocation.zig",
+      "goose": "compiler-goose/src/backend/runtime_body_relocation.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_code.zig",
+      "goose": "compiler-goose/src/backend/runtime_code.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_flags.zig",
+      "goose": "compiler-goose/src/backend/runtime_flags.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_flags_tests.zig",
+      "goose": "compiler-goose/src/backend/runtime_flags_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_function_key.zig",
+      "goose": "compiler-goose/src/backend/runtime_function_key.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_identity.zig",
+      "goose": "compiler-goose/src/backend/runtime_identity.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_ir.zig",
+      "goose": "compiler-goose/src/backend/runtime_ir.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_operation_backend_tests.zig",
+      "goose": "compiler-goose/src/backend/runtime_operation_backend_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_operation_tests.zig",
+      "goose": "compiler-goose/src/backend/runtime_operation_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_operations.zig",
+      "goose": "compiler-goose/src/backend/runtime_operations.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_parallel.zig",
+      "goose": "compiler-goose/src/backend/runtime_parallel.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_parallel_tests.zig",
+      "goose": "compiler-goose/src/backend/runtime_parallel_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_pipeline.zig",
+      "goose": "compiler-goose/src/backend/runtime_pipeline.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/runtime_pipeline_tests.zig",
+      "goose": "compiler-goose/src/backend/runtime_pipeline_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/safe_local_sinking.zig",
+      "goose": "compiler-goose/src/backend/safe_local_sinking.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/scalar_consumer.zig",
+      "goose": "compiler-goose/src/backend/scalar_consumer.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/scalar_ops.zig",
+      "goose": "compiler-goose/src/backend/scalar_ops.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/scoped_backend.zig",
+      "goose": "compiler-goose/src/backend/scoped_backend.goose",
+      "role": "source_module",
+      "write_state": "in_progress"
+    },
+    {
+      "zig": "compiler/src/backend/scoped_backend_tests.zig",
+      "goose": "compiler-goose/src/backend/scoped_backend_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/scoped_opaque_tests.zig",
+      "goose": "compiler-goose/src/backend/scoped_opaque_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/selected_startup_tests.zig",
+      "goose": "compiler-goose/src/backend/selected_startup_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/simd_abi.zig",
+      "goose": "compiler-goose/src/backend/simd_abi.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/simd_call.zig",
+      "goose": "compiler-goose/src/backend/simd_call.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/simd_intrinsics.zig",
+      "goose": "compiler-goose/src/backend/simd_intrinsics.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/source_origins.zig",
+      "goose": "compiler-goose/src/backend/source_origins.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/startup_emission_facts.zig",
+      "goose": "compiler-goose/src/backend/startup_emission_facts.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/startup_emission_facts_tests.zig",
+      "goose": "compiler-goose/src/backend/startup_emission_facts_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/startup_graph.zig",
+      "goose": "compiler-goose/src/backend/startup_graph.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/startup_graph_tests.zig",
+      "goose": "compiler-goose/src/backend/startup_graph_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/startup_occurrence_flow.zig",
+      "goose": "compiler-goose/src/backend/startup_occurrence_flow.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/startup_occurrence_flow_tests.zig",
+      "goose": "compiler-goose/src/backend/startup_occurrence_flow_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/startup_occurrence_plan.zig",
+      "goose": "compiler-goose/src/backend/startup_occurrence_plan.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/startup_occurrence_plan_tests.zig",
+      "goose": "compiler-goose/src/backend/startup_occurrence_plan_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/startup_runtime_reach.zig",
+      "goose": "compiler-goose/src/backend/startup_runtime_reach.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_assembly_options_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_assembly_options_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_call_graph_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_call_graph_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_calls.zig",
+      "goose": "compiler-goose/src/backend/storage_calls.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_calls_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_calls_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_collections.zig",
+      "goose": "compiler-goose/src/backend/storage_collections.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_completed_function_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_completed_function_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_concrete_callback_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_concrete_callback_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_control.zig",
+      "goose": "compiler-goose/src/backend/storage_control.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_data_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_data_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_deferred_join.zig",
+      "goose": "compiler-goose/src/backend/storage_deferred_join.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_deferred_join_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_deferred_join_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_deferred_value_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_deferred_value_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_field_plan.zig",
+      "goose": "compiler-goose/src/backend/storage_field_plan.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_fresh_owner_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_fresh_owner_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_global_call_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_global_call_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_global_footprint.zig",
+      "goose": "compiler-goose/src/backend/storage_global_footprint.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_globals.zig",
+      "goose": "compiler-goose/src/backend/storage_globals.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_immutable_survivor_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_immutable_survivor_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_initialization_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_initialization_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_input_alias.zig",
+      "goose": "compiler-goose/src/backend/storage_input_alias.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/storage_input_alias_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_input_alias_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_layout.zig",
+      "goose": "compiler-goose/src/backend/storage_layout.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_liveness.zig",
+      "goose": "compiler-goose/src/backend/storage_liveness.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_owner_graph.zig",
+      "goose": "compiler-goose/src/backend/storage_owner_graph.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_owner_graph_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_owner_graph_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_packed_input_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_packed_input_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_parameter_fields.zig",
+      "goose": "compiler-goose/src/backend/storage_parameter_fields.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_parameter_fields_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_parameter_fields_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_patterns.zig",
+      "goose": "compiler-goose/src/backend/storage_patterns.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_plan.zig",
+      "goose": "compiler-goose/src/backend/storage_plan.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_plan_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_plan_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_planner_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_planner_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_recursive_admission.zig",
+      "goose": "compiler-goose/src/backend/storage_recursive_admission.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_result_alias.zig",
+      "goose": "compiler-goose/src/backend/storage_result_alias.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_selected_fields_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_selected_fields_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_span_dominance.zig",
+      "goose": "compiler-goose/src/backend/storage_span_dominance.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/storage_transport.zig",
+      "goose": "compiler-goose/src/backend/storage_transport.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_type_arguments.zig",
+      "goose": "compiler-goose/src/backend/storage_type_arguments.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_type_arguments_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_type_arguments_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_type_key.zig",
+      "goose": "compiler-goose/src/backend/storage_type_key.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/storage_type_key_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_type_key_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/storage_typed_closure_tests.zig",
+      "goose": "compiler-goose/src/backend/storage_typed_closure_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/structural_record_tests.zig",
+      "goose": "compiler-goose/src/backend/structural_record_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/suspended_ownership_tests.zig",
+      "goose": "compiler-goose/src/backend/suspended_ownership_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/unconstrained_collection_tests.zig",
+      "goose": "compiler-goose/src/backend/unconstrained_collection_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/unit_index.zig",
+      "goose": "compiler-goose/src/backend/unit_index.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/unit_index_tests.zig",
+      "goose": "compiler-goose/src/backend/unit_index_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm.zig",
+      "goose": "compiler-goose/src/backend/wasm.goose",
+      "role": "source_module",
+      "write_state": "in_progress"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_bit_recurrence.zig",
+      "goose": "compiler-goose/src/backend/wasm_bit_recurrence.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_bulk_loop.zig",
+      "goose": "compiler-goose/src/backend/wasm_bulk_loop.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_bulk_loop_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_bulk_loop_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_control_flow.zig",
+      "goose": "compiler-goose/src/backend/wasm_control_flow.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_copy_coalesce.zig",
+      "goose": "compiler-goose/src/backend/wasm_copy_coalesce.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_copy_coalesce_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_copy_coalesce_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_inline.zig",
+      "goose": "compiler-goose/src/backend/wasm_inline.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_lane_loop.zig",
+      "goose": "compiler-goose/src/backend/wasm_lane_loop.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_lane_loop_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_lane_loop_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_lifetimes.zig",
+      "goose": "compiler-goose/src/backend/wasm_lifetimes.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_local_compact.zig",
+      "goose": "compiler-goose/src/backend/wasm_local_compact.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_local_compact_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_local_compact_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_local_order.zig",
+      "goose": "compiler-goose/src/backend/wasm_local_order.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_local_order_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_local_order_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_merge_loop.zig",
+      "goose": "compiler-goose/src/backend/wasm_merge_loop.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_merge_loop_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_merge_loop_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_row_products.zig",
+      "goose": "compiler-goose/src/backend/wasm_row_products.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_row_reduce.zig",
+      "goose": "compiler-goose/src/backend/wasm_row_reduce.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_scope_outline.zig",
+      "goose": "compiler-goose/src/backend/wasm_scope_outline.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_scope_outline_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_scope_outline_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_simd_ops.zig",
+      "goose": "compiler-goose/src/backend/wasm_simd_ops.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_sroa.zig",
+      "goose": "compiler-goose/src/backend/wasm_sroa.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_stackify.zig",
+      "goose": "compiler-goose/src/backend/wasm_stackify.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_stackify_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_stackify_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_stride_reduce.zig",
+      "goose": "compiler-goose/src/backend/wasm_stride_reduce.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_stride_reduce_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_stride_reduce_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_table_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_table_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_transport_cleanup.zig",
+      "goose": "compiler-goose/src/backend/wasm_transport_cleanup.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_transport_cleanup_tests.zig",
+      "goose": "compiler-goose/src/backend/wasm_transport_cleanup_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend/wasm_vectorize.zig",
+      "goose": "compiler-goose/src/backend/wasm_vectorize.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/backend_suite.zig",
+      "goose": "compiler-goose/src/backend_suite.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/bench_declaration_demand.zig",
+      "goose": "compiler-goose/src/bench_declaration_demand.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/bench_outline.zig",
+      "goose": "compiler-goose/src/bench_outline.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/check/associated_admission.zig",
+      "goose": "compiler-goose/src/check/associated_admission.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/bottom_flow_tests.zig",
+      "goose": "compiler-goose/src/check/bottom_flow_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/capability_contract_core.zig",
+      "goose": "compiler-goose/src/check/capability_contract_core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/capability_contract_source.zig",
+      "goose": "compiler-goose/src/check/capability_contract_source.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/capability_contracts.zig",
+      "goose": "compiler-goose/src/check/capability_contracts.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/capability_flow.zig",
+      "goose": "compiler-goose/src/check/capability_flow.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/capability_invocations.zig",
+      "goose": "compiler-goose/src/check/capability_invocations.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/capability_lifetimes.zig",
+      "goose": "compiler-goose/src/check/capability_lifetimes.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/capability_lifetimes_tests.zig",
+      "goose": "compiler-goose/src/check/capability_lifetimes_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check.zig",
+      "goose": "compiler-goose/src/check/check.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_alias_tests.zig",
+      "goose": "compiler-goose/src/check/check_alias_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_contract_tests.zig",
+      "goose": "compiler-goose/src/check/check_contract_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_effect_tests.zig",
+      "goose": "compiler-goose/src/check/check_effect_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_hole_tests.zig",
+      "goose": "compiler-goose/src/check/check_hole_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_loop_tests.zig",
+      "goose": "compiler-goose/src/check/check_loop_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_monad_tests.zig",
+      "goose": "compiler-goose/src/check/check_monad_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_nominal_tests.zig",
+      "goose": "compiler-goose/src/check/check_nominal_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_open_row_tests.zig",
+      "goose": "compiler-goose/src/check/check_open_row_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_pattern_tests.zig",
+      "goose": "compiler-goose/src/check/check_pattern_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_proof_tests.zig",
+      "goose": "compiler-goose/src/check/check_proof_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_request_tests.zig",
+      "goose": "compiler-goose/src/check/check_request_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_result_tests.zig",
+      "goose": "compiler-goose/src/check/check_result_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_scheme_import.zig",
+      "goose": "compiler-goose/src/check/check_scheme_import.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_shared_scheme_tests.zig",
+      "goose": "compiler-goose/src/check/check_shared_scheme_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_tests.zig",
+      "goose": "compiler-goose/src/check/check_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/check_where_tests.zig",
+      "goose": "compiler-goose/src/check/check_where_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/checked_core_freeze_tests.zig",
+      "goose": "compiler-goose/src/check/checked_core_freeze_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/cleanup_contracts.zig",
+      "goose": "compiler-goose/src/check/cleanup_contracts.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/closed_graph_tests.zig",
+      "goose": "compiler-goose/src/check/closed_graph_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/closed_nominal_storage.zig",
+      "goose": "compiler-goose/src/check/closed_nominal_storage.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/collection_contracts.zig",
+      "goose": "compiler-goose/src/check/collection_contracts.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core.zig",
+      "goose": "compiler-goose/src/check/core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_aggregate_tests.zig",
+      "goose": "compiler-goose/src/check/core_aggregate_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_array_tests.zig",
+      "goose": "compiler-goose/src/check/core_array_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_builder.zig",
+      "goose": "compiler-goose/src/check/core_builder.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_callable_tests.zig",
+      "goose": "compiler-goose/src/check/core_callable_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_case_statement_tests.zig",
+      "goose": "compiler-goose/src/check/core_case_statement_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_closure_tests.zig",
+      "goose": "compiler-goose/src/check/core_closure_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_loop_tests.zig",
+      "goose": "compiler-goose/src/check/core_loop_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_monad_tests.zig",
+      "goose": "compiler-goose/src/check/core_monad_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_proof_tests.zig",
+      "goose": "compiler-goose/src/check/core_proof_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_snapshot_tests.zig",
+      "goose": "compiler-goose/src/check/core_snapshot_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_tests.zig",
+      "goose": "compiler-goose/src/check/core_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/core_update_tests.zig",
+      "goose": "compiler-goose/src/check/core_update_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/diagnostic_code.zig",
+      "goose": "compiler-goose/src/check/diagnostic_code.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/diagnostic_location.zig",
+      "goose": "compiler-goose/src/check/diagnostic_location.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/dictionary_contracts.zig",
+      "goose": "compiler-goose/src/check/dictionary_contracts.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/dictionary_owner.zig",
+      "goose": "compiler-goose/src/check/dictionary_owner.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/effect_authority.zig",
+      "goose": "compiler-goose/src/check/effect_authority.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/effect_evidence.zig",
+      "goose": "compiler-goose/src/check/effect_evidence.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/effect_span_tests.zig",
+      "goose": "compiler-goose/src/check/effect_span_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/effect_unification_tests.zig",
+      "goose": "compiler-goose/src/check/effect_unification_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/effects.zig",
+      "goose": "compiler-goose/src/check/effects.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/effects_tests.zig",
+      "goose": "compiler-goose/src/check/effects_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/frozen_core_validation.zig",
+      "goose": "compiler-goose/src/check/frozen_core_validation.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/frozen_core_validation_tests.zig",
+      "goose": "compiler-goose/src/check/frozen_core_validation_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/frozen_types.zig",
+      "goose": "compiler-goose/src/check/frozen_types.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/generative_core.zig",
+      "goose": "compiler-goose/src/check/generative_core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/generative_relocation.zig",
+      "goose": "compiler-goose/src/check/generative_relocation.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/generative_schemes.zig",
+      "goose": "compiler-goose/src/check/generative_schemes.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/nominal_argument_borrow_tests.zig",
+      "goose": "compiler-goose/src/check/nominal_argument_borrow_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/numeric_phase_tests.zig",
+      "goose": "compiler-goose/src/check/numeric_phase_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/numeric_proof_bodies.zig",
+      "goose": "compiler-goose/src/check/numeric_proof_bodies.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/numeric_proof_contracts.zig",
+      "goose": "compiler-goose/src/check/numeric_proof_contracts.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/numeric_proof_contracts_tests.zig",
+      "goose": "compiler-goose/src/check/numeric_proof_contracts_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/numeric_proof_core.zig",
+      "goose": "compiler-goose/src/check/numeric_proof_core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/numeric_proof_headers.zig",
+      "goose": "compiler-goose/src/check/numeric_proof_headers.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/numeric_proof_terms.zig",
+      "goose": "compiler-goose/src/check/numeric_proof_terms.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/ordered_membership.zig",
+      "goose": "compiler-goose/src/check/ordered_membership.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/package_contracts.zig",
+      "goose": "compiler-goose/src/check/package_contracts.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/package_contracts_tests.zig",
+      "goose": "compiler-goose/src/check/package_contracts_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/package_core.zig",
+      "goose": "compiler-goose/src/check/package_core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/package_evidence.zig",
+      "goose": "compiler-goose/src/check/package_evidence.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/package_portable.zig",
+      "goose": "compiler-goose/src/check/package_portable.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/package_row_facts.zig",
+      "goose": "compiler-goose/src/check/package_row_facts.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/package_sequence_tests.zig",
+      "goose": "compiler-goose/src/check/package_sequence_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/parallel_lowering.zig",
+      "goose": "compiler-goose/src/check/parallel_lowering.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/parameter_patterns.zig",
+      "goose": "compiler-goose/src/check/parameter_patterns.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/primitive_operator.zig",
+      "goose": "compiler-goose/src/check/primitive_operator.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/quantifier_goals.zig",
+      "goose": "compiler-goose/src/check/quantifier_goals.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/rank_equal.zig",
+      "goose": "compiler-goose/src/check/rank_equal.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/rank_portable.zig",
+      "goose": "compiler-goose/src/check/rank_portable.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/rank_walk.zig",
+      "goose": "compiler-goose/src/check/rank_walk.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/record_order.zig",
+      "goose": "compiler-goose/src/check/record_order.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/resolver_core.zig",
+      "goose": "compiler-goose/src/check/resolver_core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/scheme_dependencies.zig",
+      "goose": "compiler-goose/src/check/scheme_dependencies.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/scheme_equations.zig",
+      "goose": "compiler-goose/src/check/scheme_equations.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/scheme_predicates.zig",
+      "goose": "compiler-goose/src/check/scheme_predicates.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/scheme_projection.zig",
+      "goose": "compiler-goose/src/check/scheme_projection.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/scoped_effect_backend_tests.zig",
+      "goose": "compiler-goose/src/check/scoped_effect_backend_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/shaped_parameter_tests.zig",
+      "goose": "compiler-goose/src/check/shaped_parameter_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/simd_contracts.zig",
+      "goose": "compiler-goose/src/check/simd_contracts.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/solver_scratch_tests.zig",
+      "goose": "compiler-goose/src/check/solver_scratch_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/solver_worklist.zig",
+      "goose": "compiler-goose/src/check/solver_worklist.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/source_order_tests.zig",
+      "goose": "compiler-goose/src/check/source_order_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/staging_capture_rights.zig",
+      "goose": "compiler-goose/src/check/staging_capture_rights.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/staging_core.zig",
+      "goose": "compiler-goose/src/check/staging_core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/staging_origins.zig",
+      "goose": "compiler-goose/src/check/staging_origins.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/staging_snapshot.zig",
+      "goose": "compiler-goose/src/check/staging_snapshot.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/staging_type_match.zig",
+      "goose": "compiler-goose/src/check/staging_type_match.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/storage_core.zig",
+      "goose": "compiler-goose/src/check/storage_core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/storage_ops.zig",
+      "goose": "compiler-goose/src/check/storage_ops.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/storage_types.zig",
+      "goose": "compiler-goose/src/check/storage_types.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/tag_tests.zig",
+      "goose": "compiler-goose/src/check/tag_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/task_backend_tests.zig",
+      "goose": "compiler-goose/src/check/task_backend_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/task_check_tests.zig",
+      "goose": "compiler-goose/src/check/task_check_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/task_core.zig",
+      "goose": "compiler-goose/src/check/task_core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/task_regions.zig",
+      "goose": "compiler-goose/src/check/task_regions.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/task_types.zig",
+      "goose": "compiler-goose/src/check/task_types.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/typed_staging.zig",
+      "goose": "compiler-goose/src/check/typed_staging.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/typed_staging_tests.zig",
+      "goose": "compiler-goose/src/check/typed_staging_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/types.zig",
+      "goose": "compiler-goose/src/check/types.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/types_tests.zig",
+      "goose": "compiler-goose/src/check/types_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/unit_coverage_tests.zig",
+      "goose": "compiler-goose/src/check/unit_coverage_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/universal_dictionary_tests.zig",
+      "goose": "compiler-goose/src/check/universal_dictionary_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/usage_backend_tests.zig",
+      "goose": "compiler-goose/src/check/usage_backend_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/usage_check.zig",
+      "goose": "compiler-goose/src/check/usage_check.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/usage_check_tests.zig",
+      "goose": "compiler-goose/src/check/usage_check_tests.goose",
+      "role": "oracle_test",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/check/usage_core.zig",
+      "goose": "compiler-goose/src/check/usage_core.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/checker_suite.zig",
+      "goose": "compiler-goose/src/checker_suite.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/compilation_tier.zig",
+      "goose": "compiler-goose/src/compilation_tier.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/annotation_arity_tests.zig",
+      "goose": "compiler-goose/src/eval/annotation_arity_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/array_limit_tests.zig",
+      "goose": "compiler-goose/src/eval/array_limit_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/associated_catalog_tests.zig",
+      "goose": "compiler-goose/src/eval/associated_catalog_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/body_recipe.zig",
+      "goose": "compiler-goose/src/eval/body_recipe.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/builtin_state_tests.zig",
+      "goose": "compiler-goose/src/eval/builtin_state_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/canonical_constructor_tests.zig",
+      "goose": "compiler-goose/src/eval/canonical_constructor_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/canonical_specialization.zig",
+      "goose": "compiler-goose/src/eval/canonical_specialization.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/closed_evidence_import.zig",
+      "goose": "compiler-goose/src/eval/closed_evidence_import.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/closed_local_value.zig",
+      "goose": "compiler-goose/src/eval/closed_local_value.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/closed_local_value_tests.zig",
+      "goose": "compiler-goose/src/eval/closed_local_value_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/closed_source_types.zig",
+      "goose": "compiler-goose/src/eval/closed_source_types.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/completed_specialization_query.zig",
+      "goose": "compiler-goose/src/eval/completed_specialization_query.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/core_eval.zig",
+      "goose": "compiler-goose/src/eval/core_eval.goose",
+      "role": "source_module",
+      "write_state": "in_progress"
+    },
+    {
+      "zig": "compiler/src/eval/core_eval_tests.zig",
+      "goose": "compiler-goose/src/eval/core_eval_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/core_operation_evidence_tests.zig",
+      "goose": "compiler-goose/src/eval/core_operation_evidence_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/core_request_tests.zig",
+      "goose": "compiler-goose/src/eval/core_request_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/eval_collection_growth.zig",
+      "goose": "compiler-goose/src/eval/eval_collection_growth.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/eval_indexed_builder.zig",
+      "goose": "compiler-goose/src/eval/eval_indexed_builder.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/eval_ragged_count.zig",
+      "goose": "compiler-goose/src/eval/eval_ragged_count.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/eval_values.zig",
+      "goose": "compiler-goose/src/eval/eval_values.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/evidence_import_cache.zig",
+      "goose": "compiler-goose/src/eval/evidence_import_cache.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/evidence_projection.zig",
+      "goose": "compiler-goose/src/eval/evidence_projection.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/fixity_core_tests.zig",
+      "goose": "compiler-goose/src/eval/fixity_core_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/given_equations.zig",
+      "goose": "compiler-goose/src/eval/given_equations.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/implementation_admission.zig",
+      "goose": "compiler-goose/src/eval/implementation_admission.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/implementation_evidence.zig",
+      "goose": "compiler-goose/src/eval/implementation_evidence.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/implementation_patterns.zig",
+      "goose": "compiler-goose/src/eval/implementation_patterns.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/implementation_predicates.zig",
+      "goose": "compiler-goose/src/eval/implementation_predicates.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/implementation_project_tests.zig",
+      "goose": "compiler-goose/src/eval/implementation_project_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/implementation_rows.zig",
+      "goose": "compiler-goose/src/eval/implementation_rows.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/implementation_tests.zig",
+      "goose": "compiler-goose/src/eval/implementation_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/implementation_trace.zig",
+      "goose": "compiler-goose/src/eval/implementation_trace.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/instance_arguments.zig",
+      "goose": "compiler-goose/src/eval/instance_arguments.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/lexical_capture_inputs.zig",
+      "goose": "compiler-goose/src/eval/lexical_capture_inputs.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/member_origin_index_tests.zig",
+      "goose": "compiler-goose/src/eval/member_origin_index_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/parallel_allocator.zig",
+      "goose": "compiler-goose/src/eval/parallel_allocator.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/plain_catalog.zig",
+      "goose": "compiler-goose/src/eval/plain_catalog.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/plain_catalog_tests.zig",
+      "goose": "compiler-goose/src/eval/plain_catalog_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/pool_leases.zig",
+      "goose": "compiler-goose/src/eval/pool_leases.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/product_projection_tests.zig",
+      "goose": "compiler-goose/src/eval/product_projection_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/proof_reuse_tests.zig",
+      "goose": "compiler-goose/src/eval/proof_reuse_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/purity_type_key.zig",
+      "goose": "compiler-goose/src/eval/purity_type_key.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/purity_type_key_tests.zig",
+      "goose": "compiler-goose/src/eval/purity_type_key_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/record_payload_tests.zig",
+      "goose": "compiler-goose/src/eval/record_payload_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/reflection_tests.zig",
+      "goose": "compiler-goose/src/eval/reflection_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/region_arena.zig",
+      "goose": "compiler-goose/src/eval/region_arena.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/scheme_membership.zig",
+      "goose": "compiler-goose/src/eval/scheme_membership.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/scope_components.zig",
+      "goose": "compiler-goose/src/eval/scope_components.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/selected_entry_parity_tests.zig",
+      "goose": "compiler-goose/src/eval/selected_entry_parity_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/selected_implementation_admission.zig",
+      "goose": "compiler-goose/src/eval/selected_implementation_admission.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/eval/selected_query.zig",
+      "goose": "compiler-goose/src/eval/selected_query.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/semantic_evidence_import.zig",
+      "goose": "compiler-goose/src/eval/semantic_evidence_import.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/semantic_handles.zig",
+      "goose": "compiler-goose/src/eval/semantic_handles.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/semantic_job_batch.zig",
+      "goose": "compiler-goose/src/eval/semantic_job_batch.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/semantic_parallel.zig",
+      "goose": "compiler-goose/src/eval/semantic_parallel.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/source_owners.zig",
+      "goose": "compiler-goose/src/eval/source_owners.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/specialization.zig",
+      "goose": "compiler-goose/src/eval/specialization.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/eval/type_evidence.zig",
+      "goose": "compiler-goose/src/eval/type_evidence.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/evaluator_suite.zig",
+      "goose": "compiler-goose/src/evaluator_suite.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/execution_policy.zig",
+      "goose": "compiler-goose/src/execution_policy.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/fixture_main.zig",
+      "goose": "compiler-goose/src/fixture_main.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/inference_limits.zig",
+      "goose": "compiler-goose/src/inference_limits.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/main.zig",
+      "goose": "compiler-goose/src/main.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/native_test_policy.zig",
+      "goose": "compiler-goose/src/native_test_policy.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/ast.zig",
+      "goose": "compiler-goose/src/parse/ast.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/parse/lexer.zig",
+      "goose": "compiler-goose/src/parse/lexer.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/parse/lexer_tests.zig",
+      "goose": "compiler-goose/src/parse/lexer_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/parser.zig",
+      "goose": "compiler-goose/src/parse/parser.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/parse/parser_adjacent_call_tests.zig",
+      "goose": "compiler-goose/src/parse/parser_adjacent_call_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/parser_binder_tests.zig",
+      "goose": "compiler-goose/src/parse/parser_binder_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/parser_identifier_tests.zig",
+      "goose": "compiler-goose/src/parse/parser_identifier_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/parser_tests.zig",
+      "goose": "compiler-goose/src/parse/parser_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/parser_use_tests.zig",
+      "goose": "compiler-goose/src/parse/parser_use_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/source_operators.zig",
+      "goose": "compiler-goose/src/parse/source_operators.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/parse/source_operators_tests.zig",
+      "goose": "compiler-goose/src/parse/source_operators_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/symbols.zig",
+      "goose": "compiler-goose/src/parse/symbols.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/parse/symbols_tests.zig",
+      "goose": "compiler-goose/src/parse/symbols_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/syntax_diagnostics.zig",
+      "goose": "compiler-goose/src/parse/syntax_diagnostics.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/parse/syntax_diagnostics_tests.zig",
+      "goose": "compiler-goose/src/parse/syntax_diagnostics_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/parse/token.zig",
+      "goose": "compiler-goose/src/parse/token.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/phase_profile.zig",
+      "goose": "compiler-goose/src/phase_profile.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/production_suite.zig",
+      "goose": "compiler-goose/src/production_suite.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/retained_suite.zig",
+      "goose": "compiler-goose/src/retained_suite.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/alias_project_pipeline.zig",
+      "goose": "compiler-goose/src/reuse/alias_project_pipeline.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/alias_project_tests.zig",
+      "goose": "compiler-goose/src/reuse/alias_project_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/artifact_backend_tests.zig",
+      "goose": "compiler-goose/src/reuse/artifact_backend_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/artifact_capture.zig",
+      "goose": "compiler-goose/src/reuse/artifact_capture.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/artifact_emitter.zig",
+      "goose": "compiler-goose/src/reuse/artifact_emitter.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/artifact_emitter_tests.zig",
+      "goose": "compiler-goose/src/reuse/artifact_emitter_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/artifact_fragment.zig",
+      "goose": "compiler-goose/src/reuse/artifact_fragment.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/artifact_import.zig",
+      "goose": "compiler-goose/src/reuse/artifact_import.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/artifact_import_tests.zig",
+      "goose": "compiler-goose/src/reuse/artifact_import_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/artifact_operation_admission_tests.zig",
+      "goose": "compiler-goose/src/reuse/artifact_operation_admission_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/body_auxiliary.zig",
+      "goose": "compiler-goose/src/reuse/body_auxiliary.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/body_check_cache.zig",
+      "goose": "compiler-goose/src/reuse/body_check_cache.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/body_check_cache_tests.zig",
+      "goose": "compiler-goose/src/reuse/body_check_cache_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/body_cutoff_tests.zig",
+      "goose": "compiler-goose/src/reuse/body_cutoff_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/buffered_stamp_tests.zig",
+      "goose": "compiler-goose/src/reuse/buffered_stamp_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/cached_seed_tests.zig",
+      "goose": "compiler-goose/src/reuse/cached_seed_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/code_artifacts.zig",
+      "goose": "compiler-goose/src/reuse/code_artifacts.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/code_artifacts_tests.zig",
+      "goose": "compiler-goose/src/reuse/code_artifacts_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/code_body_validity.zig",
+      "goose": "compiler-goose/src/reuse/code_body_validity.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/code_expectation.zig",
+      "goose": "compiler-goose/src/reuse/code_expectation.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/completed_core_validation.zig",
+      "goose": "compiler-goose/src/reuse/completed_core_validation.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/completion_check_tests.zig",
+      "goose": "compiler-goose/src/reuse/completion_check_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/completion_fit.zig",
+      "goose": "compiler-goose/src/reuse/completion_fit.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/completion_names.zig",
+      "goose": "compiler-goose/src/reuse/completion_names.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/completion_probe.zig",
+      "goose": "compiler-goose/src/reuse/completion_probe.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/composite_resolution_cache.zig",
+      "goose": "compiler-goose/src/reuse/composite_resolution_cache.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/constant_receipt.zig",
+      "goose": "compiler-goose/src/reuse/constant_receipt.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/constant_receipt_reuse.zig",
+      "goose": "compiler-goose/src/reuse/constant_receipt_reuse.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/constant_receipt_tests.zig",
+      "goose": "compiler-goose/src/reuse/constant_receipt_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/contextual_pattern_tests.zig",
+      "goose": "compiler-goose/src/reuse/contextual_pattern_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/declaration_demand.zig",
+      "goose": "compiler-goose/src/reuse/declaration_demand.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/declaration_dependencies.zig",
+      "goose": "compiler-goose/src/reuse/declaration_dependencies.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/declaration_origins.zig",
+      "goose": "compiler-goose/src/reuse/declaration_origins.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/declaration_projection.zig",
+      "goose": "compiler-goose/src/reuse/declaration_projection.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/demanded_mismatch_tests.zig",
+      "goose": "compiler-goose/src/reuse/demanded_mismatch_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_admission.zig",
+      "goose": "compiler-goose/src/reuse/dependency_admission.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_bundle.zig",
+      "goose": "compiler-goose/src/reuse/dependency_bundle.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_certificate.zig",
+      "goose": "compiler-goose/src/reuse/dependency_certificate.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_cli.zig",
+      "goose": "compiler-goose/src/reuse/dependency_cli.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_cli_tests.zig",
+      "goose": "compiler-goose/src/reuse/dependency_cli_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_closure.zig",
+      "goose": "compiler-goose/src/reuse/dependency_closure.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_closure_tests.zig",
+      "goose": "compiler-goose/src/reuse/dependency_closure_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_consumer.zig",
+      "goose": "compiler-goose/src/reuse/dependency_consumer.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_core_inputs.zig",
+      "goose": "compiler-goose/src/reuse/dependency_core_inputs.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_format.zig",
+      "goose": "compiler-goose/src/reuse/dependency_format.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_format_tests.zig",
+      "goose": "compiler-goose/src/reuse/dependency_format_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_import_resolution_tests.zig",
+      "goose": "compiler-goose/src/reuse/dependency_import_resolution_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_interface_tests.zig",
+      "goose": "compiler-goose/src/reuse/dependency_interface_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_interface_validation.zig",
+      "goose": "compiler-goose/src/reuse/dependency_interface_validation.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_project_consumer.zig",
+      "goose": "compiler-goose/src/reuse/dependency_project_consumer.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_project_consumer_tests.zig",
+      "goose": "compiler-goose/src/reuse/dependency_project_consumer_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_project_loader.zig",
+      "goose": "compiler-goose/src/reuse/dependency_project_loader.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_publication_tests.zig",
+      "goose": "compiler-goose/src/reuse/dependency_publication_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_relink.zig",
+      "goose": "compiler-goose/src/reuse/dependency_relink.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_snapshot.zig",
+      "goose": "compiler-goose/src/reuse/dependency_snapshot.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dependency_symbol_slots.zig",
+      "goose": "compiler-goose/src/reuse/dependency_symbol_slots.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dispatch_explanation.zig",
+      "goose": "compiler-goose/src/reuse/dispatch_explanation.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/dispatch_explanation_tests.zig",
+      "goose": "compiler-goose/src/reuse/dispatch_explanation_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/editor_completion.zig",
+      "goose": "compiler-goose/src/reuse/editor_completion.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/entry_diagnostic_tests.zig",
+      "goose": "compiler-goose/src/reuse/entry_diagnostic_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/entry_frontend_cutoff.zig",
+      "goose": "compiler-goose/src/reuse/entry_frontend_cutoff.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/entry_frontend_cutoff_tests.zig",
+      "goose": "compiler-goose/src/reuse/entry_frontend_cutoff_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/entry_interface_order_tests.zig",
+      "goose": "compiler-goose/src/reuse/entry_interface_order_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/entry_phase_parity_tests.zig",
+      "goose": "compiler-goose/src/reuse/entry_phase_parity_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/entry_switch_tests.zig",
+      "goose": "compiler-goose/src/reuse/entry_switch_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/epoch_resolution_cache.zig",
+      "goose": "compiler-goose/src/reuse/epoch_resolution_cache.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/executable_query.zig",
+      "goose": "compiler-goose/src/reuse/executable_query.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/fallback_check_sharing_tests.zig",
+      "goose": "compiler-goose/src/reuse/fallback_check_sharing_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/fallback_core_reuse_tests.zig",
+      "goose": "compiler-goose/src/reuse/fallback_core_reuse_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/frontend_binding_relocation.zig",
+      "goose": "compiler-goose/src/reuse/frontend_binding_relocation.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/frontend_graph_correspondence.zig",
+      "goose": "compiler-goose/src/reuse/frontend_graph_correspondence.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/frontend_method_sources.zig",
+      "goose": "compiler-goose/src/reuse/frontend_method_sources.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/frontend_reference_relocation.zig",
+      "goose": "compiler-goose/src/reuse/frontend_reference_relocation.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/frozen_dependency.zig",
+      "goose": "compiler-goose/src/reuse/frozen_dependency.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/global_references.zig",
+      "goose": "compiler-goose/src/reuse/global_references.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/hole_diagnostics.zig",
+      "goose": "compiler-goose/src/reuse/hole_diagnostics.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/independent_call_proof.zig",
+      "goose": "compiler-goose/src/reuse/independent_call_proof.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/initializer_purity_tests.zig",
+      "goose": "compiler-goose/src/reuse/initializer_purity_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/mismatch_display.zig",
+      "goose": "compiler-goose/src/reuse/mismatch_display.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/module_abstraction_validation.zig",
+      "goose": "compiler-goose/src/reuse/module_abstraction_validation.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/module_frontend_cutoff.zig",
+      "goose": "compiler-goose/src/reuse/module_frontend_cutoff.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/module_frontend_tests.zig",
+      "goose": "compiler-goose/src/reuse/module_frontend_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/module_relink_tests.zig",
+      "goose": "compiler-goose/src/reuse/module_relink_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/module_token_tests.zig",
+      "goose": "compiler-goose/src/reuse/module_token_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/module_visibility.zig",
+      "goose": "compiler-goose/src/reuse/module_visibility.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/optimized_archive.zig",
+      "goose": "compiler-goose/src/reuse/optimized_archive.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/optimized_archive_tests.zig",
+      "goose": "compiler-goose/src/reuse/optimized_archive_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/parallel_check_tests.zig",
+      "goose": "compiler-goose/src/reuse/parallel_check_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/parallel_lowering_tests.zig",
+      "goose": "compiler-goose/src/reuse/parallel_lowering_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/partial_dependency.zig",
+      "goose": "compiler-goose/src/reuse/partial_dependency.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/partial_dependency_tests.zig",
+      "goose": "compiler-goose/src/reuse/partial_dependency_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/partial_runtime_tests.zig",
+      "goose": "compiler-goose/src/reuse/partial_runtime_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/pool_lease_tests.zig",
+      "goose": "compiler-goose/src/reuse/pool_lease_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/population_seed_tests.zig",
+      "goose": "compiler-goose/src/reuse/population_seed_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/portable_query.zig",
+      "goose": "compiler-goose/src/reuse/portable_query.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/prepared_revision_tests.zig",
+      "goose": "compiler-goose/src/reuse/prepared_revision_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_archive.zig",
+      "goose": "compiler-goose/src/reuse/principal_archive.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_archive_tests.zig",
+      "goose": "compiler-goose/src/reuse/principal_archive_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_evidence_reuse.zig",
+      "goose": "compiler-goose/src/reuse/principal_evidence_reuse.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_evidence_reuse_tests.zig",
+      "goose": "compiler-goose/src/reuse/principal_evidence_reuse_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_import_tests.zig",
+      "goose": "compiler-goose/src/reuse/principal_import_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_input_image.zig",
+      "goose": "compiler-goose/src/reuse/principal_input_image.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_input_tests.zig",
+      "goose": "compiler-goose/src/reuse/principal_input_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_inputs.zig",
+      "goose": "compiler-goose/src/reuse/principal_inputs.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_interface.zig",
+      "goose": "compiler-goose/src/reuse/principal_interface.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_query.zig",
+      "goose": "compiler-goose/src/reuse/principal_query.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_reuse_gate.zig",
+      "goose": "compiler-goose/src/reuse/principal_reuse_gate.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_reuse_gate_tests.zig",
+      "goose": "compiler-goose/src/reuse/principal_reuse_gate_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/principal_type_graph.zig",
+      "goose": "compiler-goose/src/reuse/principal_type_graph.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/producer_capability_tests.zig",
+      "goose": "compiler-goose/src/reuse/producer_capability_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/project.zig",
+      "goose": "compiler-goose/src/reuse/project.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/project_check.zig",
+      "goose": "compiler-goose/src/reuse/project_check.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/project_check_tests.zig",
+      "goose": "compiler-goose/src/reuse/project_check_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/project_pipeline_tests.zig",
+      "goose": "compiler-goose/src/reuse/project_pipeline_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/project_prelude_tests.zig",
+      "goose": "compiler-goose/src/reuse/project_prelude_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/projection_cache.zig",
+      "goose": "compiler-goose/src/reuse/projection_cache.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/projection_cache_tests.zig",
+      "goose": "compiler-goose/src/reuse/projection_cache_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/purity_diagnostics.zig",
+      "goose": "compiler-goose/src/reuse/purity_diagnostics.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/refinement_receipt.zig",
+      "goose": "compiler-goose/src/reuse/refinement_receipt.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/rejected_revision_tests.zig",
+      "goose": "compiler-goose/src/reuse/rejected_revision_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/resolution_cache.zig",
+      "goose": "compiler-goose/src/reuse/resolution_cache.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/resolution_cache_tests.zig",
+      "goose": "compiler-goose/src/reuse/resolution_cache_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/restart_cache.zig",
+      "goose": "compiler-goose/src/reuse/restart_cache.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/restart_cache_tests.zig",
+      "goose": "compiler-goose/src/reuse/restart_cache_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/restored_output_tests.zig",
+      "goose": "compiler-goose/src/reuse/restored_output_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/retained_candidate_tests.zig",
+      "goose": "compiler-goose/src/reuse/retained_candidate_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/retained_capture_tests.zig",
+      "goose": "compiler-goose/src/reuse/retained_capture_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/retained_catalog_tests.zig",
+      "goose": "compiler-goose/src/reuse/retained_catalog_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/retained_dependency.zig",
+      "goose": "compiler-goose/src/reuse/retained_dependency.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/retained_revision.zig",
+      "goose": "compiler-goose/src/reuse/retained_revision.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/revision_input_tests.zig",
+      "goose": "compiler-goose/src/reuse/revision_input_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/revision_inputs.zig",
+      "goose": "compiler-goose/src/reuse/revision_inputs.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/rolling_tests.zig",
+      "goose": "compiler-goose/src/reuse/rolling_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/row_projection_uses.zig",
+      "goose": "compiler-goose/src/reuse/row_projection_uses.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/selection_cutoff_tests.zig",
+      "goose": "compiler-goose/src/reuse/selection_cutoff_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/semantic_archive.zig",
+      "goose": "compiler-goose/src/reuse/semantic_archive.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/semantic_archive_tests.zig",
+      "goose": "compiler-goose/src/reuse/semantic_archive_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/semantic_query_table.zig",
+      "goose": "compiler-goose/src/reuse/semantic_query_table.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/shared_query_gate.zig",
+      "goose": "compiler-goose/src/reuse/shared_query_gate.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/source_completion.zig",
+      "goose": "compiler-goose/src/reuse/source_completion.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/source_completion_tests.zig",
+      "goose": "compiler-goose/src/reuse/source_completion_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/source_input_tests.zig",
+      "goose": "compiler-goose/src/reuse/source_input_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/source_overlay_tests.zig",
+      "goose": "compiler-goose/src/reuse/source_overlay_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/source_overlays.zig",
+      "goose": "compiler-goose/src/reuse/source_overlays.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/source_value_template.zig",
+      "goose": "compiler-goose/src/reuse/source_value_template.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/source_value_template_tests.zig",
+      "goose": "compiler-goose/src/reuse/source_value_template_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/specialization_origin_tests.zig",
+      "goose": "compiler-goose/src/reuse/specialization_origin_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/specialization_receipt.zig",
+      "goose": "compiler-goose/src/reuse/specialization_receipt.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/startup_dependency_tests.zig",
+      "goose": "compiler-goose/src/reuse/startup_dependency_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/startup_query_composition_tests.zig",
+      "goose": "compiler-goose/src/reuse/startup_query_composition_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/substitution_keys.zig",
+      "goose": "compiler-goose/src/reuse/substitution_keys.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/type_display.zig",
+      "goose": "compiler-goose/src/reuse/type_display.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/validation_image.zig",
+      "goose": "compiler-goose/src/reuse/validation_image.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/value_pattern_scope_tests.zig",
+      "goose": "compiler-goose/src/reuse/value_pattern_scope_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/zig_project_frames.zig",
+      "goose": "compiler-goose/src/reuse/zig_project_frames.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/reuse/zig_project_frames_tests.zig",
+      "goose": "compiler-goose/src/reuse/zig_project_frames_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/reuse/zig_project_server.zig",
+      "goose": "compiler-goose/src/reuse/zig_project_server.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/arena_fixture.zig",
+      "goose": "compiler-goose/src/runtime/arena_fixture.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/arena_runtime.zig",
+      "goose": "compiler-goose/src/runtime/arena_runtime.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/cohort_fixture.zig",
+      "goose": "compiler-goose/src/runtime/cohort_fixture.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/cohort_runtime.zig",
+      "goose": "compiler-goose/src/runtime/cohort_runtime.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/cohort_runtime_tests.zig",
+      "goose": "compiler-goose/src/runtime/cohort_runtime_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/cycles_runtime.zig",
+      "goose": "compiler-goose/src/runtime/cycles_runtime.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/data_stacks.zig",
+      "goose": "compiler-goose/src/runtime/data_stacks.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/data_stacks_fixture.zig",
+      "goose": "compiler-goose/src/runtime/data_stacks_fixture.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/data_stacks_tests.zig",
+      "goose": "compiler-goose/src/runtime/data_stacks_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/fixture_tracing.zig",
+      "goose": "compiler-goose/src/runtime/fixture_tracing.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/list_runtime.zig",
+      "goose": "compiler-goose/src/runtime/list_runtime.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/list_runtime_fixture.zig",
+      "goose": "compiler-goose/src/runtime/list_runtime_fixture.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/memory.zig",
+      "goose": "compiler-goose/src/runtime/memory.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/packed_layout_fixture.zig",
+      "goose": "compiler-goose/src/runtime/packed_layout_fixture.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/public_owners.zig",
+      "goose": "compiler-goose/src/runtime/public_owners.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/region_fixture.zig",
+      "goose": "compiler-goose/src/runtime/region_fixture.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/region_runtime.zig",
+      "goose": "compiler-goose/src/runtime/region_runtime.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/request_runtime.zig",
+      "goose": "compiler-goose/src/runtime/request_runtime.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/runtime/resource_retire_fixture.zig",
+      "goose": "compiler-goose/src/runtime/resource_retire_fixture.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/resource_safepoints.zig",
+      "goose": "compiler-goose/src/runtime/resource_safepoints.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/runtime/root_runtime.zig",
+      "goose": "compiler-goose/src/runtime/root_runtime.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/runtime_cleanup.zig",
+      "goose": "compiler-goose/src/runtime/runtime_cleanup.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/runtime/runtime_layout.zig",
+      "goose": "compiler-goose/src/runtime/runtime_layout.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/runtime/session_heap.zig",
+      "goose": "compiler-goose/src/runtime/session_heap.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/shared_rc.zig",
+      "goose": "compiler-goose/src/runtime/shared_rc.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/shared_rc_fixture.zig",
+      "goose": "compiler-goose/src/runtime/shared_rc_fixture.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/shared_rc_tests.zig",
+      "goose": "compiler-goose/src/runtime/shared_rc_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/storage_packets.zig",
+      "goose": "compiler-goose/src/runtime/storage_packets.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/runtime/task_abi.zig",
+      "goose": "compiler-goose/src/runtime/task_abi.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/runtime/task_context.zig",
+      "goose": "compiler-goose/src/runtime/task_context.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/task_context_fixture.zig",
+      "goose": "compiler-goose/src/runtime/task_context_fixture.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/task_context_tests.zig",
+      "goose": "compiler-goose/src/runtime/task_context_tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/runtime/task_safepoints.zig",
+      "goose": "compiler-goose/src/runtime/task_safepoints.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/runtime_suite.zig",
+      "goose": "compiler-goose/src/runtime_suite.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/structural.zig",
+      "goose": "compiler-goose/src/support/structural.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    },
+    {
+      "zig": "compiler/src/syntax_suite.zig",
+      "goose": "compiler-goose/src/syntax_suite.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/test_prelude_producers.zig",
+      "goose": "compiler-goose/src/test_prelude_producers.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/test_runner.zig",
+      "goose": "compiler-goose/src/test_runner.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/tests.zig",
+      "goose": "compiler-goose/src/tests.goose",
+      "role": "oracle_test",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/types_suite.zig",
+      "goose": "compiler-goose/src/types_suite.goose",
+      "role": "source_module",
+      "write_state": "not_written"
+    },
+    {
+      "zig": "compiler/src/work_counters.zig",
+      "goose": "compiler-goose/src/work_counters.goose",
+      "role": "source_module",
+      "write_state": "written_unverified"
+    }
+  ],
+  "oracle_source_manifest": "oracle.json#oracle_source_sha256"
+}
