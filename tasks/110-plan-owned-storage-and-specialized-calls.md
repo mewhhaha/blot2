@@ -12,6 +12,11 @@
 - **Outcome:** A checked storage plan drives reusable direct Wasm functions,
   with explicit result destinations and no counted allocation fallback.
 
+The next recursive-call slice follows the
+[Astra-reviewed implementation plan](RECURSIVE_CALLS.md). Its first gate covers
+the two unchanged recursive sorting ports; broader SCC/ownership support remains
+pending.
+
 ## File ownership
 
 Own new `zig-native/src/backend/storage_plan.zig` and `storage_calls.zig`, plus

@@ -62,6 +62,14 @@ Five numeric binaries remain byte-identical. README charts rerun Goose's pinned
 cases and V8 checksums; no numeric runtime improvement is claimed. Two recursive
 Blot sorts and original F64 remain unsupported.
 
+## Recursive sort support plan
+
+The requested [Astra-reviewed recursion plan](tasks/RECURSIVE_CALLS.md) starts
+with direct self-recursion over existing U32 arrays and scalar bounds, returning
+Unit. It covers both unchanged sort ports with a fixed ABI, finite invariant
+owner access and explicit outline-bank safety. Implementation and qualification
+are pending; broader recursion remains separate.
+
 ## Next Main lever
 
 Measure copy candidates rejected solely for crossing structured control in
