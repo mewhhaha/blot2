@@ -84,7 +84,7 @@ The final Main SHA256 is
 `fcaf7e05e434d6647f1b53b56bf1c39d95fe02e92a1933b8b6fdca3bbc0faa3f`. A fresh
 NVIDIA frame passes the original budgets; its inspected PNG and guest trace
 match the baseline exactly. See
-[frame evidence](../../../tasks/storage-handoff-evidence/2026-11-04-shared-hills-frame.json).
+[frame evidence](../../../../tasks/storage-handoff-evidence/2026-11-04-shared-hills-frame.json).
 Broader gameplay/software-adapter qualification remains pending.
 
 ## Allocation and gate repairs

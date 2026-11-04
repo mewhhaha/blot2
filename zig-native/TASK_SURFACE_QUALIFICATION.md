@@ -7,7 +7,7 @@
 
 This continuation of `87ba3f6` implements ordinary scope wrappers, exact
 explicit spawn wrappers and task tuple collection. It does not complete
-[issue #25's remaining program](../FINISH_PLAN.md).
+[issue #25's remaining program](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md).
 
 ## Qualified behavior
 

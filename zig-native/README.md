@@ -1,14 +1,16 @@
 # Zig compiler
 
-Blot's only compiler lives here. Zig owns lexing, parsing, type/effect inference,
-staging, retained revisions and WebAssembly emission. Deno supplies the
-[host tools](../compiler/README.md).
+Blot's only compiler lives here. Zig owns lexing, parsing, type/effect
+inference, staging, retained revisions and WebAssembly emission. Deno supplies
+the [host tools](../compiler/README.md).
 
 The owned-storage rewrite is unfinished. Read [CONTINUE.md](../CONTINUE.md),
-[AGENTS.md](../AGENTS.md) and [the active task index](../tasks/STORAGE_REWRITE.md).
-The next milestone is a real Gdev frame in Pen; older test counts and benchmark
-reports do not qualify it. This is greenfield work: remove superseded code and
-APIs rather than adding compatibility layers.
+[AGENTS.md](../AGENTS.md) and
+[the active task index](../tasks/STORAGE_REWRITE.md). One real Gdev frame has
+passed native Pen with an inspected PNG; broader application and full compiler
+qualification remain pending. The handoff pins the candidate and evidence. This
+is greenfield work: remove superseded code and APIs rather than adding
+compatibility layers.
 
 ## Build
 
@@ -31,9 +33,9 @@ for the tracked real-Gdev compilation and one-frame runners.
 
 ## Validation
 
-Run coherent affected laws during integration. The documented development
-family is `deno task check:dev --area static-sharing`; list available families
-with `deno task check:dev --list-areas`. It is not full qualification.
+Run coherent affected laws during integration. The documented development family
+is `deno task check:dev --area static-sharing`; list available families with
+`deno task check:dev --list-areas`. It is not full qualification.
 
 Final compiler changes require `deno task test:compiler` and Zig lint as
 specified in `AGENTS.md`. Native unit-test compilation always uses the native
@@ -44,11 +46,13 @@ be reported separately.
 ## Contracts and evidence
 
 - [Compiler ownership contract](CONTRACT.md).
-- [Scoped storage](SCOPED_STORAGE.md) and [rewrite decisions](STORAGE_REWRITE_REVIEW.md).
+- [Scoped storage](SCOPED_STORAGE.md) and
+  [rewrite decisions](STORAGE_REWRITE_REVIEW.md).
 - [Source areas](SOURCE_AREAS.md) and [architecture](ARCHITECTURE.md).
 - [Project client](PROJECT_CLIENT.md), [project protocol](PROJECT_PROTOCOL.md),
   and [guest ABI](../compiler/guest-abi.md).
-- [Current status](STATUS.md) and [documentation map and historical evidence](../docs/README.md).
+- [Current status](STATUS.md) and
+  [documentation map and historical evidence](../docs/README.md).
 
 Legacy-backend retirement remains task 120; its presence in the source is
 unfinished migration work, not a backward-compatibility promise.

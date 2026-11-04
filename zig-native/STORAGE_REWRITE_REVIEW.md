@@ -149,7 +149,7 @@ automatic transaction. Initialization publishes only completed new owners.
 
 The user's greenfield replacement and chosen worker-only concurrency supersede
 the old counted-runtime and language-task implementation direction in tasks
-030–035 and 072–074 and the historical runtime sections of `FINISH_PLAN.md`.
+030–035 and 072–074 and the [historical runtime plan](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md).
 Keep those evidence records; do not execute them to reconstruct removed features.
 Unrelated compiler work remains separate.
 

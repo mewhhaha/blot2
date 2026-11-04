@@ -699,7 +699,7 @@ entry const folded = answer ()
 });
 
 Deno.test("retained State selected proof rejects unmet-qualifier", async () => {
-  await compileExpectedFailure(`type Cell value is data = $Cell value
+  const source = `type Cell value is data = $Cell value
 const witness32: a -> Cell U32 where { associated "missing" Bool Bool Bool } = func ignored => return @panic "witness called"
 const witnessf = func ignored : Cell F32 => return @panic "witness called"
 const handled = func computation => return do:
@@ -720,7 +720,12 @@ entry const answer = func () => return do:
   )
   break @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
-`, "missing_associated", undefined, { prelude: "none", span: [640, 651] });
+`;
+  const argument = source.indexOf("handled computation") + "handled ".length;
+  const start = new TextEncoder().encode(source.slice(0, argument)).length;
+  await compileExpectedFailure(source, "missing_associated", undefined, {
+    prelude: "none", span: [start, start + "computation".length],
+  });
 });
 
 Deno.test("retained State selected proof rejects invoked-missing-member", async () => {

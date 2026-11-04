@@ -177,5 +177,5 @@ runtime performance or full concurrency completion is claimed here.
 Caller-region inference and generic capture-transfer evidence, general
 higher-order spawn forwarding, stream channels, select-one, scoped nonlocal
 exits, purity certification and CPU worker transport remain open in
-[the completion plan](../FINISH_PLAN.md). Task collect-all is implemented;
+[the completion plan](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md). Task collect-all is implemented;
 comma-separated select-one syntax is not.

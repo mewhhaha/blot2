@@ -1,0 +1,339 @@
+{
+  "scope": "Ignored old Zig install prefixes; tracked refs + private benchmark text refs + active exe/cwd + source-file exclusions",
+  "kept_current": [
+    "zig-native/zig-out",
+    "zig-native/zig-out-dev",
+    "zig-native/zig-out-native-dev",
+    "zig-native/zig-out-engine-baseline"
+  ],
+  "cache_preserved": "zig-native/.zig-cache",
+  "private_benchmarks_preserved": "build/bench",
+  "protected_sha256": {
+    "zig-native/zig-out/bin/blotc": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
+    "zig-native/zig-out-dev/bin/blotc": "457bdb9b555f92bd9ff3a001811f8572f83ecc2f585e50afe8558598f17da56b",
+    "zig-native/zig-out-native-dev/bin/blot-tests": "babe48ba500ceb53899b7a4cd1a41e90b19108ed70eb141b99688d617ce032c0",
+    "build/bench/sort-hills/baseline/bin/blotc": "4f0120a091870fd45722f4d878a9699f97843e4e40dd830e6583e06af07b09dd",
+    "build/bench/shared-hills/baseline/bin/blotc": "f90931ef17ec2b143f880db68253d54392ec4f19a44e9eb58ff09b587d6d967b"
+  },
+  "native_tree_allocated_before": 305404026880,
+  "removed": [
+    {
+      "path": "zig-native/zig-out-aggregate-first",
+      "allocated_bytes": 235159552
+    },
+    {
+      "path": "zig-native/zig-out-before-owner-release",
+      "allocated_bytes": 69439488
+    },
+    {
+      "path": "zig-native/zig-out-before-sparse-release",
+      "allocated_bytes": 69382144
+    },
+    {
+      "path": "zig-native/zig-out-bounds-baseline-fast",
+      "allocated_bytes": 193245184
+    },
+    {
+      "path": "zig-native/zig-out-bounds-baseline-safe",
+      "allocated_bytes": 232263680
+    },
+    {
+      "path": "zig-native/zig-out-checker-cost-combined",
+      "allocated_bytes": 225099776
+    },
+    {
+      "path": "zig-native/zig-out-checker-cost-no-body",
+      "allocated_bytes": 225050624
+    },
+    {
+      "path": "zig-native/zig-out-closed-context-fast",
+      "allocated_bytes": 193507328
+    },
+    {
+      "path": "zig-native/zig-out-completed-cow-fast",
+      "allocated_bytes": 193470464
+    },
+    {
+      "path": "zig-native/zig-out-completed-unification",
+      "allocated_bytes": 236048384
+    },
+    {
+      "path": "zig-native/zig-out-concurrency-diagnostic",
+      "allocated_bytes": 232173568
+    },
+    {
+      "path": "zig-native/zig-out-concurrency-ready-order",
+      "allocated_bytes": 232263680
+    },
+    {
+      "path": "zig-native/zig-out-covariance-probe",
+      "allocated_bytes": 235130880
+    },
+    {
+      "path": "zig-native/zig-out-cursor-read-candidate",
+      "allocated_bytes": 225251328
+    },
+    {
+      "path": "zig-native/zig-out-direct-transport-final-fast",
+      "allocated_bytes": 193781760
+    },
+    {
+      "path": "zig-native/zig-out-fast-preserved",
+      "allocated_bytes": 194801664
+    },
+    {
+      "path": "zig-native/zig-out-field-candidate",
+      "allocated_bytes": 223244288
+    },
+    {
+      "path": "zig-native/zig-out-graph-self-fix-fast",
+      "allocated_bytes": 193396736
+    },
+    {
+      "path": "zig-native/zig-out-lazy-callback-leaves-fast",
+      "allocated_bytes": 192847872
+    },
+    {
+      "path": "zig-native/zig-out-local-groups-fast",
+      "allocated_bytes": 192790528
+    },
+    {
+      "path": "zig-native/zig-out-outline-frequency",
+      "allocated_bytes": 18014208
+    },
+    {
+      "path": "zig-native/zig-out-owner-words-boxed-fast",
+      "allocated_bytes": 193187840
+    },
+    {
+      "path": "zig-native/zig-out-owner-words-primitive-fast",
+      "allocated_bytes": 193228800
+    },
+    {
+      "path": "zig-native/zig-out-owner-words-witness-fast",
+      "allocated_bytes": 192872448
+    },
+    {
+      "path": "zig-native/zig-out-pre-demand-baseline",
+      "allocated_bytes": 196861952
+    },
+    {
+      "path": "zig-native/zig-out-pre-typed-call-release",
+      "allocated_bytes": 66584576
+    },
+    {
+      "path": "zig-native/zig-out-receipt-baseline",
+      "allocated_bytes": 653316096
+    },
+    {
+      "path": "zig-native/zig-out-recursive-experiment",
+      "allocated_bytes": 649547776
+    },
+    {
+      "path": "zig-native/zig-out-release-history",
+      "allocated_bytes": 66584576
+    },
+    {
+      "path": "zig-native/zig-out-screen",
+      "allocated_bytes": 96800768
+    },
+    {
+      "path": "zig-native/zig-out-sparse-release",
+      "allocated_bytes": 69431296
+    },
+    {
+      "path": "zig-native/zig-out-storage-baseline",
+      "allocated_bytes": 222920704
+    },
+    {
+      "path": "zig-native/zig-out-storage-graph-baseline",
+      "allocated_bytes": 223690752
+    },
+    {
+      "path": "zig-native/zig-out-type-attribution-baseline",
+      "allocated_bytes": 196820992
+    },
+    {
+      "path": "zig-native/zig-out-type-key-scratch-fast",
+      "allocated_bytes": 192835584
+    },
+    {
+      "path": "zig-native/zig-out-type-sharing-cow-rejected",
+      "allocated_bytes": 196747264
+    },
+    {
+      "path": "zig-native/zig-out-type-sharing-first",
+      "allocated_bytes": 235118592
+    },
+    {
+      "path": "zig-native/zig-out/bin/budget-fixture",
+      "allocated_bytes": 175976448,
+      "reason": "Retired fixture target rejected by current build registry",
+      "sha256": "91dc388ddd57f47cb0c3d9b718c8c0e0a92c2e108b2ae439e213cd15b88a144e"
+    },
+    {
+      "path": "zig-native/zig-out-dev/bin/budget-fixture",
+      "allocated_bytes": 186028032,
+      "reason": "Retired fixture target rejected by current build registry",
+      "sha256": "3c5cb04c38e47e06306d508298ab8bcc1a22be01ea05ee928fd48b1277e7f8e5"
+    }
+  ],
+  "native_tree_allocated_after": 297389109248,
+  "native_tree_bytes_reclaimed": 8014917632,
+  "removed_allocated_bytes": 8014917632,
+  "date": "2026-11-04",
+  "pre_cleanup_revision": "541ff890f1df53b5fe8572bd7f2bc41230f2fddb",
+  "preserved": {
+    "compiler_sha256": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
+    "packaged_binary_sha256": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
+    "compressed_bytes": 19079470,
+    "fixture_witnesses": {
+      "zig-native/fixtures/retained-state-fixtures/plain-annotation-scope.blot": {
+        "sha256": "73a119d1763218ede6ea8cb6938a22f9594f7e68cc32bdbabec1c7787a3ecaa9",
+        "exact_inline_copies": 2
+      },
+      "zig-native/fixtures/retained-state-fixtures/template-local-state-identity.blot": {
+        "sha256": "74c4b269109acf937903e1f6e59db2f9894a7f331586d0a862ffacd8de97e263",
+        "exact_inline_copies": 1
+      },
+      "zig-native/fixtures/retained-state-fixtures/template-local-state-scopes.blot": {
+        "sha256": "49835b6e2f2e35e22cc8d5b08c69aba6dcd425728cb65dad2405f7db00a17c8c",
+        "exact_inline_copies": 2
+      }
+    },
+    "parser_artifacts": {
+      "generated/wasm/cst-schema.json": "e62d826e965d70b26b2e7b977f392186f86a638a6617b42b5d69d6c596aecad4",
+      "generated/wasm/abi.json": "49573026c0b2cf92c0dcc774f47c34f59e370133053f7b41742257e2135ac882",
+      "generated/wasm/manifest.json": "44ae8e6035f2890dc20a0971dd8c5336990849eaa3ffe46c8337af0756d8087e",
+      "generated/wasm/mod.ts": "f75e283fa81c181a170e84d696f0a9f9beb57cf055a3aecac82ae6f21b868983",
+      "generated/wasm/parser.plan": "2ef5866884953336f252855494608e868a8b041334da8569f173ee6fee2dfef6",
+      "generated/wasm/parser.wasm": "d3957b8b48a27ed134edba78d4b2e23478a4a9ee814a0295f372eea9642d4cad",
+      "generated/wasm/syntax.ts": "cc8b7d82aeb01f9450f7fed62b7f482c3e49096ad214234cbdeb66cfb465514d"
+    }
+  },
+  "gdev": {
+    "success": true,
+    "wasm_sha256": "8a5bc671b85bba52b8989abe4c2165e26d1e379c659e3db9666dd60ad7e5127b",
+    "wasm_bytes": 10049963,
+    "compiler_sha256": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
+    "matches_pre_cleanup": true,
+    "source_checkpoint": {
+      "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+      "preludeSha256": "3d5c896f1a45c830f696a3e73e8d00f4b12c585c6517f7e588d1373ce786270b",
+      "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+    }
+  },
+  "validation": {
+    "affected_checks": 75,
+    "editor_checks": 6,
+    "native_inventory": 3001,
+    "native_backend": "safe, llvm=false",
+    "native_compilation": "cached unchanged artifact",
+    "zig_lint_findings": 0,
+    "generator": "Regenerated through Baba applyBundle; active parser files unchanged",
+    "full_guest_attempt": {
+      "passed": 158,
+      "failed": 1,
+      "test": "copied nominal payloads and reference arrays preserve the whole-graph proof (development)",
+      "file": "zig-native/tests/acyclic_updates_execution.test.ts",
+      "diagnostic": "storage_unsupported",
+      "preexisting_control": {
+        "preceding-release": {
+          "command": [
+            "deno",
+            "test",
+            "-A",
+            "--filter",
+            "copied nominal payloads",
+            "zig-native/tests/acyclic_updates_execution.test.ts",
+            "--",
+            "build/bench/sort-hills/baseline/bin/blotc"
+          ],
+          "returncode": 1,
+          "storage_unsupported": true
+        },
+        "current-release": {
+          "command": [
+            "deno",
+            "test",
+            "-A",
+            "--filter",
+            "copied nominal payloads",
+            "zig-native/tests/acyclic_updates_execution.test.ts",
+            "--",
+            "zig-native/zig-out/bin/blotc"
+          ],
+          "returncode": 1,
+          "storage_unsupported": true
+        }
+      }
+    },
+    "full_qualification": false,
+    "package_dry_run": "passed after adding explicit public memory-profile return types",
+    "profiling_checks": {
+      "passed": 2,
+      "failed_before_host_profile_read": 2,
+      "diagnostic": "storage_unsupported",
+      "file": "zig-native/tests/memory_profile_execution.test.ts",
+      "preexisting_control": {
+        "command": [
+          "deno",
+          "test",
+          "-A",
+          "--filter",
+          "executed memory costs",
+          "zig-native/tests/memory_profile_execution.test.ts",
+          "--",
+          "build/bench/sort-hills/baseline/bin/blotc"
+        ],
+        "returncode": 1,
+        "storage_unsupported": true,
+        "fails_before_profile_read": true
+      }
+    }
+  },
+  "retained_private_reference_paths": [
+    "zig-native/zig-out-active-captures-fast",
+    "zig-native/zig-out-aggregate-fast",
+    "zig-native/zig-out-aggregate-inheritance-fast",
+    "zig-native/zig-out-array-baseline",
+    "zig-native/zig-out-baseline-gate",
+    "zig-native/zig-out-bounds-preflight-safe",
+    "zig-native/zig-out-combined-probe",
+    "zig-native/zig-out-completed-context-fast",
+    "zig-native/zig-out-completed-functions-fast",
+    "zig-native/zig-out-current-fast",
+    "zig-native/zig-out-direct-plans-fast",
+    "zig-native/zig-out-env-stack",
+    "zig-native/zig-out-fast-baseline",
+    "zig-native/zig-out-field-baseline",
+    "zig-native/zig-out-global-type-ids-fast",
+    "zig-native/zig-out-immutable-bindings-fast",
+    "zig-native/zig-out-inactive-keys",
+    "zig-native/zig-out-indexed-access-fast",
+    "zig-native/zig-out-inline-memo-fast",
+    "zig-native/zig-out-lazy-callback-paths-fast",
+    "zig-native/zig-out-literal-batch-fast",
+    "zig-native/zig-out-nominal-frame-fast",
+    "zig-native/zig-out-nominal-hooks-fast",
+    "zig-native/zig-out-nominal-hooks-guarded-fast",
+    "zig-native/zig-out-options-baseline",
+    "zig-native/zig-out-owned-return",
+    "zig-native/zig-out-owner-graph-fast",
+    "zig-native/zig-out-parameter-graph-fast",
+    "zig-native/zig-out-perf-dev",
+    "zig-native/zig-out-plain-plans-fast",
+    "zig-native/zig-out-primitive-key-memo-fast",
+    "zig-native/zig-out-projected-fields-fast",
+    "zig-native/zig-out-projected-wordless-fast",
+    "zig-native/zig-out-projected-wordless-fixed-fast",
+    "zig-native/zig-out-proof-baseline",
+    "zig-native/zig-out-proof-dag",
+    "zig-native/zig-out-record-metadata-fast",
+    "zig-native/zig-out-selected-fields-baseline",
+    "zig-native/zig-out-shared-closures-baseline",
+    "zig-native/zig-out-source-completion",
+    "zig-native/zig-out-sparse-roots",
+    "zig-native/zig-out-transport-batch-fast"
+  ]
+}

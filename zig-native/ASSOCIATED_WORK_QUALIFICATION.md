@@ -93,5 +93,5 @@ installation backups and the two existing Git stashes are untouched.
 Release compiler SHA-256:
 `fec30aece1dccd18f4709a06a96d70f42e9cd0682f843bc53fa8e3f99fa0ab31`.
 
-The broader [completion plan](../FINISH_PLAN.md), including the remaining
+The broader [completion plan](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/FINISH_PLAN.md), including the remaining
 structured-task and performance work, stays open.

@@ -2,18 +2,6 @@
   "generator": "@mewhhaha/baba",
   "manifestVersion": 1,
   "files": {
-    "queries/generated-highlights.scm": {
-      "hash": "a0efc108a8f35e88ac9667f11125d126f50a76b9977dc9f66b3716acdca7a07d",
-      "ownership": "generated",
-      "encoding": "utf-8",
-      "kind": "query"
-    },
-    "queries/generated-rainbows.scm": {
-      "hash": "13448f31aeb1922d82dcc20e29f581d2b33c40767d7fd9273ec13472a022dea6",
-      "ownership": "generated",
-      "encoding": "utf-8",
-      "kind": "query"
-    },
     "wasm/abi.json": {
       "hash": "49573026c0b2cf92c0dcc774f47c34f59e370133053f7b41742257e2135ac882",
       "ownership": "generated",

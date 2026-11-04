@@ -1,7 +1,8 @@
 # Blot 2
 
 Blot is a functional language whose handwritten Zig compiler emits WebAssembly.
-Deno supplies its CLI, project client, formatter and guest host.
+Deno supplies its CLI, project client, formatter and guest host. See the
+[repository map](docs/README.md) for their roles and current contracts.
 
 The owned-storage rewrite is **unfinished**. One real Gdev main frame has passed
 native Pen with an inspected screenshot. Active source/generator conversion is

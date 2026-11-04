@@ -1,15 +1,15 @@
 # Blot executable language guide
 
 Read this before writing Blot. This describes the current executable language;
-`DESIGN.md` also contains proposals. Each `blot` code block below is an
-independent, compilable module.
+[DESIGN.md](../DESIGN.md) records the design direction. Each `blot` code block
+below is an independent, compilable module.
 
 The handwritten Zig compiler implements the source syntax in this guide. Current
 applications use the owned-storage profile described below: named owners, shared
 aliases, explicit copies and invocation-local borrows. Cutover is unfinished:
-ordinary pure programs can still select the legacy ABI 3 backend. Its implicit
-snapshot/collector behavior is being retired under task 120 and is not the
-contract for new application code. See
+some programs still select the counted backend (ABI 2–7, depending on emitted
+features). Its implicit snapshot/collector behavior is being retired under task
+120 and is not the contract for new application code. See
 [the current profile](../zig-native/SCOPED_STORAGE.md) for supported forms and
 [the rewrite task](../tasks/STORAGE_REWRITE.md) for remaining work.
 

@@ -88,7 +88,7 @@ counters are inclusive of nested planned calls, not unique-node cardinalities.
 
 A fresh real NVIDIA frame passes the original memory budgets. Its inspected PNG
 and guest trace match the baseline exactly; see
-[frame evidence](../../../tasks/storage-handoff-evidence/2026-11-04-recursive-calls-frame.json).
+[frame evidence](../../../../tasks/storage-handoff-evidence/2026-11-04-recursive-calls-frame.json).
 Broader gameplay/software-adapter coverage remains pending. Gdev is `38af070`,
 Ink `ccaf08f`, Pen `d159492`; their source/assets remain unchanged.
 
@@ -113,6 +113,6 @@ Ink `ccaf08f`, Pen `d159492`; their source/assets remain unchanged.
   errors.
 
 **Full compiler qualification remains pending.** This checkpoint implements the
-[first recursive slice](../../../tasks/RECURSIVE_CALLS.md), not the entire
+[first recursive slice](../../../../tasks/RECURSIVE_CALLS.md), not the entire
 owned-storage rewrite. Main's next separate hill remains structured-control copy
 coalescing; sort support does not establish its latency or size targets.

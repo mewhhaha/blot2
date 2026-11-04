@@ -170,8 +170,7 @@ scope, with the scalar stride known statically. Ownership and per-access bounds
 checks remain; see [the compiler contract](CONTRACT.md).
 
 The new path contains no counted allocator, retain/release hooks or collector.
-The old `runtime/scoped_storage.zig` remains a low-level reservation fixture,
-not the runtime emitted for these source programs. The existing
+Its runtime emitter is [data_stacks.zig](src/runtime/data_stacks.zig).
 `region_runtime.zig` is a counted-heap optimization; the evaluator's
 `region_arena.zig` is host compiler scratch. Neither proves the new source
 storage contract.

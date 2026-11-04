@@ -50,7 +50,12 @@ const bundle = generate(grammar, {
   metadata,
   targets: ["wasm"],
 });
-await applyBundle(bundle, { root: "generated" });
+const parserBundle = {
+  ...bundle,
+  // Editor queries come from editor/tree-sitter-blot2.
+  files: bundle.files.filter((file) => file.kind !== "query"),
+};
+await applyBundle(parserBundle, { root: "generated" });
 // Baba 9.0.1 uses dense, alphabetically sorted field IDs in its compact CST.
 const schema = {
   fields: [...fields].sort(),

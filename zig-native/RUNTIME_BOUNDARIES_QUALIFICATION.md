@@ -9,7 +9,7 @@ Issues #29, #30, #31 and #34 are fixed and correctness-qualified. The complete
 compiler gate, zero-finding Zig lint, public runtime benchmarks and application
 compile-cost screen pass. Broader representation, cycle-collection and
 attribution work remains tracked separately in
-[the issue triage](../ISSUE_TRIAGE.md).
+[the issue triage](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/ISSUE_TRIAGE.md).
 
 ## Changes
 

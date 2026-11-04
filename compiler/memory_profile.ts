@@ -73,10 +73,31 @@ type Metadata = {
   cycle_candidate_reason: string;
 };
 
+export interface MemoryProfileSnapshot {
+  version: 1;
+  complete: boolean;
+  status: number;
+  reconciliationErrors: string[];
+  profileIdentity: string;
+  compilerIdentity: string | null;
+  aggregation: string;
+  cycleCandidateReason: string;
+  reservedDiagnosticBytes: number;
+  committedMemoryBytes: number;
+  totals: MemoryCounts;
+  unknown: MemoryCounts;
+  sites: (Site & { id: number; counts: MemoryCounts })[];
+  categories: { name: string; counts: MemoryCounts }[];
+}
+
+export interface MemoryProfileReport extends MemoryProfileSnapshot {
+  wasmSha256: string;
+}
+
 export function readMemoryProfile(
   module: WebAssembly.Module,
   exports: WebAssembly.Exports,
-) {
+): MemoryProfileSnapshot {
   const sections = WebAssembly.Module.customSections(
     module,
     "blot:memory-profile",
@@ -244,7 +265,7 @@ export async function memoryProfileReport(
   bytes: Uint8Array<ArrayBuffer>,
   exports: WebAssembly.Exports,
   expectedWasmSha256?: string,
-) {
+): Promise<MemoryProfileReport> {
   const snapshot = readMemoryProfile(new WebAssembly.Module(bytes), exports);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const wasmSha256 = [...new Uint8Array(digest)].map((n) =>
@@ -262,8 +283,8 @@ export async function memoryProfileReport(
 }
 
 export function stringifyMemoryProfile(
-  report: Awaited<ReturnType<typeof memoryProfileReport>>,
-) {
+  report: MemoryProfileReport,
+): string {
   return JSON.stringify(
     report,
     (_, value) => typeof value === "bigint" ? value.toString() : value,

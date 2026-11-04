@@ -41,7 +41,12 @@ in 76.3s**. All **330 affected release guests** pass, including same-array reads
 after bulk loops, skipped reads, exact float bits, aliases and prefix traps.
 Formatting, types and Zig lint pass. The full gate passes smoke/harness and 282
 native laws without failures, then reaches its 180s budget. **Full qualification
-remains pending.**
+remains pending.** The later [repository cleanup](docs/repository-cleanup.md)
+also runs the broad guest-only gate: it stops on the existing
+`acyclic_updates_execution.test.ts` `storage_unsupported` gap, reproduced by the
+frozen preceding release. Nested memory-profile fixtures have the same existing
+storage-admission limitation. The 75 affected tooling/retained-State checks
+pass, and Gdev remains byte-identical.
 
 Release compiler SHA256:
 `dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7`. Main SHA256:
