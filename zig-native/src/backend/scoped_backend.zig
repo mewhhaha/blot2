@@ -25,6 +25,7 @@ const scalar_ops = @import("scalar_ops.zig");
 const source_proof = @import("../check/package_core.zig");
 const global_footprint = @import("storage_global_footprint.zig");
 const addressed_input = @import("addressed_input_demand.zig");
+const recursive_admission = @import("storage_recursive_admission.zig");
 const evaluation = @import("../eval/core_eval.zig");
 const Error = std.mem.Allocator.Error || error{Declined};
 /// Compiler work policy, independent of guest storage capacities and proofs.
@@ -245,11 +246,12 @@ const ReadFrame = struct {
     }
 };
 const WriterKind = enum { read, write };
-const WriterEvent = struct { owner: usize, kind: WriterKind, shape: Value };
+const WriterEvent = struct { owner: usize, kind: WriterKind, shape: Value, initializes_rows: bool = true };
 const WriterTrace = struct { inputs: usize, stable: bool = false, events: std.ArrayList(WriterEvent) = .empty, remaining: usize = 100_000 };
 // Physical descriptor calls own their summaries for the complete compilation.
 // Incoming owners are formal descriptor roles, never retained caller roots.
 const FunctionAbi = enum { scalar, registers, result_slot, buffered };
+const AccessContract = union(enum) { ordered: []const WriterEvent, invariant: []const recursive_admission.Access };
 const ReturnedOwner = struct { element: Value, element_initialized: bool, known_empty: bool, frozen: bool };
 const CheckedFunctionPlan = struct {
     entry: call_plan.Entry,
@@ -263,9 +265,10 @@ const CheckedFunctionPlan = struct {
     addressed_arguments: []const bool = &.{},
     result: Value,
     returned_owners: []const ReturnedOwner = &.{},
-    events: []const WriterEvent,
+    access: AccessContract,
     regions: []const usize,
 };
+const RecursiveHeader = struct { target: core.BindingRef, plan: *const CheckedFunctionPlan, parameter_owners: []const u32 };
 const InputBundle = struct { parameter: u32, first: u32, words: usize, needed: []bool };
 const BundleSnapshot = struct { function: u32, root: usize, address: Local, words: []const Local, used: []const bool };
 const DescriptorCalls = struct {
@@ -279,6 +282,7 @@ const DescriptorCalls = struct {
     record_metadata: RecordMetadataCache,
     global_footprint: ?global_footprint.Index = null,
     primitive_evidence: []const TypeEvidence = &.{},
+    recursion: recursive_admission.Cache = .{},
     fn initPrimitiveEvidence(self: *DescriptorCalls, units: []const core.Module) std.mem.Allocator.Error!void {
         const count = std.math.mul(usize, units.len, 5) catch return error.OutOfMemory;
         const cached = try self.arena.allocator().alloc(TypeEvidence, count);
@@ -307,6 +311,7 @@ const DescriptorCalls = struct {
         self.addressed_declined.putAssumeCapacityNoClobber(owned, {});
     }
     fn deinit(self: *DescriptorCalls) void {
+        self.recursion.deinit(self.allocator);
         if (self.global_footprint) |*index| index.deinit();
         self.calls.deinit();
         // Summary slices and shapes belong to the compilation arena.
@@ -434,6 +439,8 @@ const Generator = struct {
     external_destination: ?usize = null,
     c: Code = undefined,
     zero_source: ZeroSource = .{},
+    recursive_header: ?RecursiveHeader = null,
+    recursive_scope: bool = false,
     input_bundles: []const InputBundle = &.{},
     bundle_snapshots: std.ArrayList(BundleSnapshot) = .empty,
     bundle_scan: usize = 0,
@@ -1226,6 +1233,9 @@ const Generator = struct {
         if (self.capacity_prefix) |prefix| if (request < prefix) return error.Declined;
     }
     fn writerEvent(self: *Generator, m: *const core.Module, id: core.Id, value: Value, kind: WriterKind) Error!void {
+        return self.writerAccess(m, id, value, kind, true);
+    }
+    fn writerAccess(self: *Generator, m: *const core.Module, id: core.Id, value: Value, kind: WriterKind, initializes_rows: bool) Error!void {
         const trace = self.writer_trace orelse return;
         for (self.roots.items, 0..) |owner, index| {
             if (index >= trace.inputs or !hasRoot(value, index)) continue;
@@ -1233,7 +1243,8 @@ const Generator = struct {
             // facts. Repeated reads/writes are idempotent for this summary.
             if (trace.stable) {
                 var seen = false;
-                for (trace.events.items) |event| if (event.owner == index and event.kind == kind) {
+                for (trace.events.items) |*event| if (event.owner == index and event.kind == kind) {
+                    event.initializes_rows = event.initializes_rows or initializes_rows;
                     seen = true;
                     break;
                 };
@@ -1241,7 +1252,7 @@ const Generator = struct {
             }
             if (trace.remaining == 0) return self.fail(m, id, .storage_unsupported, "Writer access summary exceeded its checked event budget");
             trace.remaining -= 1;
-            try trace.events.append(self.allocator, .{ .owner = index, .kind = kind, .shape = owner.element });
+            try trace.events.append(self.allocator, .{ .owner = index, .kind = kind, .shape = owner.element, .initializes_rows = initializes_rows });
         }
     }
     fn privateAppendNode(self: *const Generator, unit_: u32, id: core.Id, comptime field: []const u8) bool {
@@ -4338,7 +4349,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -4427,6 +4438,7 @@ const Generator = struct {
         addressed: bool = true,
         addressed_rejected: ?*bool = null,
         borrowed_inputs: bool = false,
+        recursive: ?*const recursive_admission.Contract = null,
         capture_globals: bool,
         unit_result: bool,
         result_shape: Value,
@@ -4435,7 +4447,7 @@ const Generator = struct {
     };
     fn buildFunctionPlan(self: *Generator, request: FunctionPlanInput) Error!usize {
         var candidate = request;
-        candidate.addressed = candidate.addressed and request.words >= 64;
+        candidate.addressed = candidate.addressed and request.words >= 64 and request.recursive == null and !self.recursive_scope;
         if (candidate.addressed) candidate.addressed = !self.descriptor_calls.addressed_declined.contains(request.key);
         while (true) {
             const mark = FunctionMark.begin(self) orelse return error.Declined;
@@ -4509,7 +4521,7 @@ const Generator = struct {
             else => return self.unsupported(m, body.root),
         };
         const inserted = try cache.insert(key, function, request.result_shape.floating);
-        var trace: WriterTrace = .{ .inputs = owners.len, .stable = shared and !graph_mode };
+        var trace: WriterTrace = .{ .inputs = owners.len, .stable = request.recursive != null or (shared and !graph_mode) };
         defer trace.events.deinit(self.allocator);
         var child: Generator = .{
             .allocator = self.allocator,
@@ -4539,6 +4551,7 @@ const Generator = struct {
             .fixed_region = self.fixed_region,
             .max_stacks = self.max_stacks,
             .writer_trace = &trace,
+            .recursive_scope = self.recursive_scope or request.recursive != null,
             .c = .{ .module = self.module, .function = function },
         };
         defer child.deinit();
@@ -4609,6 +4622,31 @@ const Generator = struct {
             try child.writerInput(input, owners, assigned);
         }
         std.debug.assert(offset == input_first + words);
+        var invariant: []recursive_admission.Access = &.{};
+        var provisional: CheckedFunctionPlan = undefined;
+        if (request.recursive) |contract| {
+            invariant = try self.descriptor_calls.arena.allocator().alloc(recursive_admission.Access, owners.len);
+            @memset(invariant, .{});
+            const parameter_owners = try child.arena.allocator().alloc(u32, arguments.len);
+            @memset(parameter_owners, std.math.maxInt(u32));
+            for (arguments, contract.parameter_access, parameter_owners) |argument, access, *role| if (argument.root) |owner| {
+                const ordinal = try writerOrdinal(owners, owner);
+                role.* = @intCast(ordinal);
+                invariant[ordinal].read = invariant[ordinal].read or access.read;
+                invariant[ordinal].write = invariant[ordinal].write or access.write;
+            };
+            for (child.roots.items, owners, invariant) |*owner, original_id, access| {
+                const original = self.roots.items[original_id];
+                if ((access.read or access.write) and (!original.live or (!original.element_initialized and !original.known_empty))) return error.Declined;
+                if (access.write and original.frozen) return error.Declined;
+                owner.known_empty = false;
+                // A fixed empty owner has no uninitialized existing rows and
+                // this contract cannot add rows. No caller fact is upgraded.
+                owner.element_initialized = original.element_initialized or original.known_empty;
+            }
+            provisional = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = &.{}, .result_aliases = &.{}, .unit_result = true, .abi = .scalar, .return_registers = 0, .result = .{ .word = .{ .id = 0 } }, .access = .{ .invariant = invariant }, .regions = &.{} };
+            child.recursive_header = .{ .target = target, .plan = &provisional, .parameter_owners = parameter_owners };
+        }
         const output = child.invokeBody(target, inputs, 0, false) catch |err| {
             if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
             return err;
@@ -4707,6 +4745,16 @@ const Generator = struct {
                 self.emission_work.scoped_input_alias_words_avoided +|= 1;
             };
         }
+        if (request.recursive != null) {
+            if (child.roots.items.len != owners.len or child.used_regions.count() != 0 or scope_outline.hasCoordinates(self.module, function)) return error.Declined;
+            for (trace.events.items) |event| {
+                if (event.owner >= invariant.len) return error.Declined;
+                const allowed = invariant[event.owner];
+                if ((event.kind == .read and !allowed.read) or (event.kind == .write and !allowed.write)) return error.Declined;
+                if (event.shape.tag != .scalar or event.shape.floating or event.shape.fields.len != 0 or event.shape.root != null) return error.Declined;
+            }
+            self.emission_work.scoped_recursive_definitions +|= 1;
+        }
         var result_pointer_first = false;
         if (!direct and !scope_outline.hasCoordinates(self.module, function) and try @import("direct_input_demand.zig").canPromotePacked(self.allocator, machine, words, serialization_start, buffered_result)) {
             const parameters = try self.arena.allocator().alloc(wasm.ValueType, words + 1);
@@ -4777,7 +4825,7 @@ const Generator = struct {
             }
             try machine.instructions.insertSlice(self.allocator, 0, prefix.items);
             self.emission_work.scoped_addressed_definitions +|= 1;
-        } else if (direct) {
+        } else if (direct and request.recursive == null) {
             // Only this new helper may gain an entry prefix. No published
             // semantic or table position may refer into its original body.
             if (!scope_outline.hasCoordinates(self.module, function)) {
@@ -4792,7 +4840,7 @@ const Generator = struct {
                     machine.parameters = self.module.signatures.items[machine.signature].parameters;
                 }
             }
-        } else {
+        } else if (!direct) {
             const demand = try @import("packed_input_demand.zig").materialize(self.allocator, machine, words);
             input_demand = demand.used;
             self.emission_work.scoped_packed_input_words_avoided +|= demand.omitted;
@@ -4806,6 +4854,7 @@ const Generator = struct {
         self.max_stacks = @max(self.max_stacks, child.max_stacks);
         var regions: std.ArrayList(usize) = .empty;
         defer regions.deinit(self.allocator);
+        if (self.recursive_scope and (child.roots.items.len != owners.len or child.used_regions.count() != 0)) return error.Declined;
         // Closed scratch roots still describe regions used at runtime.
         for (child.roots.items[owners.len..]) |owner| if (owner.dedicated and std.mem.findScalar(usize, regions.items, owner.stack) == null) try regions.append(self.allocator, owner.stack);
 
@@ -4819,7 +4868,7 @@ const Generator = struct {
             if (graph_mode) {
                 shape_ = try self.retainGraphShape(original.shape, owners.len, &copies, 0);
             } else if (shared) shape_ = try self.retainDescriptorShape(original.shape) else shape_ = try self.retainReaderResult(original.shape, 0, &copies, true, 0);
-            fact.* = .{ .owner = original.owner, .kind = original.kind, .shape = shape_ };
+            fact.* = .{ .owner = original.owner, .kind = original.kind, .shape = shape_, .initializes_rows = original.initializes_rows };
         }
         const retained_regions = try summary_arena.dupe(usize, regions.items);
         const plan = try summary_arena.create(CheckedFunctionPlan);
@@ -4828,7 +4877,8 @@ const Generator = struct {
         const retained_addressed = try summary_arena.dupe(bool, addressed);
         try self.descriptor_calls.plans.ensureUnusedCapacity(self.allocator, 1);
         try self.completeCall(cache, inserted, child.context_sensitive, shared and graph_mode);
-        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = used_input_words, .result_aliases = retained_aliases, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result_pointer_first = result_pointer_first, .addressed_arguments = retained_addressed, .result = result_template, .returned_owners = returned_owners, .events = facts, .regions = retained_regions };
+        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = used_input_words, .result_aliases = retained_aliases, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result_pointer_first = result_pointer_first, .addressed_arguments = retained_addressed, .result = result_template, .returned_owners = returned_owners, .access = .{ .ordered = facts }, .regions = retained_regions };
+        if (request.recursive != null) plan.access = .{ .invariant = invariant };
         self.descriptor_calls.plans.putAssumeCapacityNoClobber(function, plan);
         for (facts) |event| {
             if (event.kind == .read) self.emission_work.scoped_function_plan_read_events +|= 1 else self.emission_work.scoped_function_plan_write_events +|= 1;
@@ -4937,6 +4987,7 @@ const Generator = struct {
         // value. A borrowed-bundle alternative cannot select a costly snapshot
         // ABI for unrelated direct callers with the same semantic signature.
         if (borrowed_inputs) try evidence.append(self.allocator, std.math.maxInt(u32) - 15);
+        if (self.recursive_scope) try evidence.append(self.allocator, std.math.maxInt(u32) - 17);
         keep = true;
         return .{ .borrowed_inputs = borrowed_inputs, .graph = graph, .evidence = evidence, .words = words, .arguments = arguments, .closed_scalar = closed_scalar, .input_aliases = input_aliases, .capture_globals = capture_globals, .key = .{ .unit = m.unit, .binding = target.binding, .context = if (closed_scalar) 0 else self.invocationContext(), .context_free = closed_scalar, .evidence = evidence.items } };
     }
@@ -5022,6 +5073,98 @@ const Generator = struct {
         self.emission_work.scoped_transferred_result_owners +|= plan.returned_owners.len;
         return self.graphCallerShape(result, roles);
     }
+    fn replayInvariant(self: *Generator, m: *const core.Module, id: core.Id, footprint: []const recursive_admission.Access, owners: []const usize) Error!void {
+        if (footprint.len != owners.len) return error.Declined;
+        for (footprint, owners) |access, owner_id| {
+            if (!access.read and !access.write) continue;
+            const owner = &self.roots.items[owner_id];
+            if (!owner.live or (!owner.element_initialized and !owner.known_empty)) return self.fail(m, id, .storage_escape, "Recursive access requires initialized live input owners");
+            if (owner.element.tag != .scalar or owner.element.floating or owner.element.fields.len != 0 or owner.element.root != null) return error.Declined;
+            const value: Value = .{ .tag = .array, .word = owner.word, .root = owner_id };
+            if (access.read) {
+                try self.registerShapeRead(value);
+                try self.writerEvent(m, id, value, .read);
+            }
+            if (access.write) {
+                if (owner.frozen) return self.fail(m, id, .storage_escape, "Recursive writes cannot modify a frozen input owner");
+                try self.clearWriterLiterals(&owner.element);
+                // A possible write does not establish initialization or rows.
+                try self.writerAccess(m, id, value, .write, false);
+            }
+        }
+    }
+    fn recursiveCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
+        const admission = &self.descriptor_calls.recursion;
+        const discovery_bodies = admission.discovery_bodies;
+        const discovery_nodes = admission.discovery_nodes;
+        const scans = admission.scans;
+        const nodes = admission.nodes;
+        defer {
+            self.emission_work.scoped_recursive_discovery_bodies +|= admission.discovery_bodies - discovery_bodies;
+            self.emission_work.scoped_recursive_discovery_nodes +|= admission.discovery_nodes - discovery_nodes;
+            self.emission_work.scoped_recursive_admission_scans +|= admission.scans - scans;
+            self.emission_work.scoped_recursive_admission_nodes +|= admission.nodes - nodes;
+        }
+        const contract = (try admission.analyze(self.allocator, self.units, target)) orelse return null;
+        if (!contract.self_recursive or contract.parameter_access.len != arguments.len) return null;
+        const body = m.body(target.binding) orelse return null;
+        // A provisional header belongs only to its checked direct self edge.
+        if (self.recursive_header) |header| if (std.meta.eql(header.target, target)) {
+            const frames = self.active_calls.frames.items;
+            if (frames.len == 0 or frames[frames.len - 1].target.kind != .named or frames[frames.len - 1].target.unit != target.unit or frames[frames.len - 1].target.id != target.binding or self.c.function != header.plan.entry.function) return self.fail(m, body.root, .storage_unsupported, "Only a direct checked self edge can use a recursive header");
+            for (arguments, header.parameter_owners) |argument, role| {
+                if (role == std.math.maxInt(u32)) {
+                    if (argument.tag != .scalar or argument.floating or argument.root != null or argument.fields.len != 0) return error.Declined;
+                } else if (argument.tag != .array or argument.mode != .fixed or argument.root != role or argument.other_roots.len != 0) return self.fail(m, body.root, .storage_unsupported, "Recursive calls must preserve formal input owner correspondence");
+            }
+            const footprint = header.plan.access.invariant;
+            const owners = try self.arena.allocator().alloc(usize, footprint.len);
+            for (owners, 0..) |*owner, ordinal| owner.* = ordinal;
+            self.emission_work.scoped_recursive_backedges +|= 1;
+            return try self.emitPlannedCall(m, body, header.plan, arguments, owners);
+        };
+        var graph = OwnerGraph.init(self.allocator, self.roots.items, arguments) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            return null;
+        };
+        defer graph.deinit();
+        var evidence: std.ArrayList(u32) = .empty;
+        defer evidence.deinit(self.allocator);
+        try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 18, @intCast(arguments.len), @intCast(graph.owners.items.len) });
+        var words: usize = 0;
+        for (arguments) |argument| {
+            if (argument.callable != null or argument.host != null or argument.demand != null or argument.fields.len != 0 or argument.variant_tags.len != 0 or argument.other_roots.len != 0) return null;
+            if (argument.tag == .scalar) {
+                if (argument.floating or argument.root != null) return null;
+                try evidence.append(self.allocator, std.math.maxInt(u32));
+            } else if (argument.tag == .array and argument.mode == .fixed and argument.root != null) {
+                const ordinal = try graph.ordinal(argument.root.?);
+                try evidence.append(self.allocator, @intCast(ordinal));
+            } else return null;
+            words += readerWords(argument);
+        }
+        if (words > 512) return null;
+        for (graph.owners.items) |owner_id| {
+            const owner = self.roots.items[owner_id];
+            if (!owner.live) return self.fail(m, body.root, .storage_escape, "Recursive calls require live input owners");
+            if (owner.element.tag != .scalar or owner.element.floating or owner.element.fields.len != 0 or owner.element.root != null) return null;
+            try evidence.append(self.allocator, @intFromBool(owner.frozen));
+        }
+        const key: call_plan.Key = .{ .unit = target.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
+        if (self.descriptor_calls.calls.find(key)) |index| {
+            const entry = self.descriptor_calls.calls.entries.items[index];
+            if (entry.building) return self.fail(m, body.root, .storage_unsupported, "A recursive header cannot escape its construction transaction");
+            const plan = self.descriptor_calls.plans.get(entry.function) orelse return error.Declined;
+            return try self.emitPlannedCall(m, body, plan, arguments, graph.owners.items);
+        }
+        const request: FunctionPlanInput = .{ .module = m, .target = target, .arguments = arguments, .owners = graph.owners.items, .graph = &graph, .words = words, .input_aliases = &.{}, .addressed = false, .capture_globals = false, .unit_result = true, .result_shape = .{ .word = .{ .id = 0 } }, .shared = true, .recursive = contract, .key = key };
+        const index = (try self.tryFunctionPlan(request)) orelse {
+            self.emission_work.scoped_recursive_declines +|= 1;
+            return self.fail(m, body.root, .storage_unsupported, "The recursive body does not satisfy its fixed-owner contract");
+        };
+        const plan = self.descriptor_calls.plans.get(self.descriptor_calls.calls.entries.items[index].function) orelse return error.Declined;
+        return try self.emitPlannedCall(m, body, plan, arguments, graph.owners.items);
+    }
     fn emitPlannedCall(self: *Generator, m: *const core.Module, body: *const core.Body, plan: *const CheckedFunctionPlan, arguments: []const Value, owners: []const usize) Error!Value {
         self.emission_work.scoped_function_plan_emissions +|= 1;
         const emitting_before = self.emitting_function_plan;
@@ -5033,22 +5176,31 @@ const Generator = struct {
         self.noteCalleeContext(entry);
         // Replay the actual compiler access order even on cache hits. Caller
         // loop scopes see the same row shapes as expanded selected bodies.
-        for (plan.events) |event| {
-            const owner_id = owners[event.owner];
-            var shape_ = event.shape;
-            shape_ = try self.graphCallerShape(shape_, owners);
-            if (event.kind == .write) {
-                const owner = &self.roots.items[owner_id];
-                try self.storedShape(m, body.root, &owner.element, shape_, owner.depth);
-                owner.element_initialized = true;
-                owner.known_empty = false;
-            } else {
-                const owner = self.roots.items[owner_id];
-                if (!includesReadShape(shape_, owner.element) or !includesReadShape(owner.element, shape_)) return self.fail(m, body.root, .storage_escape, "A writer call must preserve its checked read and mutation shape order");
-                try self.registerShapeRead(.{ .tag = .array, .word = owner.word, .root = owner_id });
+        if (plan.access == .invariant) {
+            try self.replayInvariant(m, body.root, plan.access.invariant, owners);
+            self.emission_work.scoped_recursive_calls +|= 1;
+        } else {
+            for (plan.access.ordered) |event| {
+                const owner_id = owners[event.owner];
+                var shape_ = event.shape;
+                shape_ = try self.graphCallerShape(shape_, owners);
+                if (event.kind == .write) {
+                    const owner = &self.roots.items[owner_id];
+                    try self.storedShape(m, body.root, &owner.element, shape_, owner.depth);
+                    if (event.initializes_rows) {
+                        owner.element_initialized = true;
+                        owner.known_empty = false;
+                    } else {
+                        try self.clearWriterLiterals(&owner.element);
+                    }
+                } else {
+                    const owner = self.roots.items[owner_id];
+                    if (!includesReadShape(shape_, owner.element) or !includesReadShape(owner.element, shape_)) return self.fail(m, body.root, .storage_escape, "A writer call must preserve its checked read and mutation shape order");
+                    try self.registerShapeRead(.{ .tag = .array, .word = owner.word, .root = owner_id });
+                }
+                const replay: Value = .{ .tag = .array, .word = self.roots.items[owner_id].word, .root = owner_id };
+                try self.writerAccess(m, body.root, replay, event.kind, event.initializes_rows);
             }
-            const replay: Value = .{ .tag = .array, .word = self.roots.items[owner_id].word, .root = owner_id };
-            try self.writerEvent(m, body.root, replay, event.kind);
         }
         for (plan.regions) |region| {
             try self.used_regions.put(self.allocator, region, {});
@@ -5549,6 +5701,7 @@ const Generator = struct {
         self.active_goals = m.obligations[body.scheme.obligations.start..][0..body.scheme.obligations.len];
         defer self.active_goals = previous_goals;
         try self.refineFields(m, self.active_goals);
+        if (reuse) if (try self.recursiveCall(m, target, arguments)) |result| return result;
         try self.selectedArguments(m, body.root, &.{}, arguments, &selected);
         const public = m.types.list(m.binding(target.binding).public_variables);
         try selected.appendSlice(self.allocator, &.{ std.math.maxInt(u32), @intCast(public.len) });
@@ -8430,7 +8583,7 @@ fn functionPlanAccessContract(allocator: std.mem.Allocator, units: []const core.
     defer call.deinit(allocator);
     const plan = (try g.getOrBuildFunctionPlan(m, target, &call)) orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(@as(usize, 1), call.graph.owners.items.len);
-    try std.testing.expectEqual(@as(usize, 0), plan.events.len);
+    try std.testing.expectEqual(@as(usize, 0), plan.access.ordered.len);
     try std.testing.expectEqual(@as(usize, 5), plan.input_words);
     try std.testing.expectEqual(FunctionAbi.scalar, plan.abi);
     const warm = (try g.getOrBuildFunctionPlan(m, target, &call)) orelse return error.TestUnexpectedResult;
@@ -8445,8 +8598,8 @@ fn functionPlanAccessContract(allocator: std.mem.Allocator, units: []const core.
         var query = (try g.prepareFunctionCall(m, selected, &arguments)) orelse return error.TestUnexpectedResult;
         defer query.deinit(allocator);
         const read_plan = (try g.getOrBuildFunctionPlan(m, selected, &query)) orelse return error.TestUnexpectedResult;
-        try std.testing.expect(read_plan.events.len > 0);
-        for (read_plan.events) |event| {
+        try std.testing.expect(read_plan.access.ordered.len > 0);
+        for (read_plan.access.ordered) |event| {
             try std.testing.expectEqual(WriterKind.read, event.kind);
             try std.testing.expectEqual(@as(usize, 0), event.owner);
         }
@@ -8478,4 +8631,191 @@ test "function plans retain empty unused-owner contracts actual reads and branch
     try std.testing.expectEqual(@as(usize, 0), lowered.diagnostics.len);
     try functionPlanAccessContract(allocator, &.{lowered});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, functionPlanAccessContract, .{@as([]const core.Module, &.{lowered})});
+}
+
+fn recursivePublishedHeaders(g: *const Generator) !void {
+    try std.testing.expect(g.recursive_header == null);
+    try std.testing.expectEqual(@as(usize, 0), g.active_calls.frames.items.len);
+    for (g.descriptor_calls.calls.entries.items) |entry| try std.testing.expect(!entry.building);
+    var plans = g.descriptor_calls.plans.iterator();
+    while (plans.next()) |entry| {
+        const plan = entry.value_ptr.*;
+        try std.testing.expect(!plan.entry.building);
+        try std.testing.expect(plan.entry.function < g.module.functions.items.len);
+    }
+}
+
+fn recursiveHeaderAccessContract(allocator: std.mem.Allocator, units: []const core.Module) !void {
+    const m = &units[0];
+    const recursive = for (m.bodies) |*candidate| {
+        if (std.mem.eql(u8, m.name(candidate.declaration_name), "recur")) break candidate;
+    } else return error.TestUnexpectedResult;
+    const target: core.BindingRef = .{ .unit = m.unit, .binding = recursive.binding };
+    const views = [_]*const core.Module{m};
+    var module = wasm.Module.init(allocator);
+    defer module.deinit();
+    const runtime = try storage.emit(&module);
+    const function = try module.addTypedFunction(&.{}, .i32, .scalar);
+    var emission_work: @import("../work_counters.zig").Counters = .{};
+    var proof_cache = try source_proof.SourceProofCache.initWithInventoryBudget(allocator, &views);
+    defer proof_cache.deinit();
+    var dispatches: Dispatches = .empty;
+    defer dispatches.deinit(allocator);
+    var capacity_requests: storage_plan.CapacityRequests = .{ .allocator = allocator };
+    defer capacity_requests.deinit();
+    var validation_budget: usize = 1_000_000;
+    var active_calls: call_plan.ActiveCalls = .{ .allocator = allocator };
+    defer active_calls.deinit();
+    var scalar_admission: call_plan.ScalarAdmission = .{ .allocator = allocator, .units = units };
+    defer scalar_admission.deinit();
+    var field_recipes: field_plan.Cache = .{ .allocator = allocator };
+    defer field_recipes.deinit();
+    var descriptor_calls: DescriptorCalls = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .record_metadata = .{ .allocator = allocator } };
+    defer descriptor_calls.deinit();
+    var shared_calls: call_plan.Cache = .{ .allocator = allocator };
+    defer shared_calls.deinit();
+    var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
+    defer outlining.deinit();
+    var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = m.unit, .bounds = .{ .allocator = allocator } };
+    defer methods.deinit();
+    var g: Generator = .{ .entry_unit = m.unit, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .shared_calls = &shared_calls, .descriptor_calls = &descriptor_calls, .field_recipes = &field_recipes, .scalar_admission = &scalar_admission, .active_calls = &active_calls, .units = units, .unit_views = &views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .emission_work = &emission_work, .outlining = &outlining, .c = .{ .module = &module, .function = function } };
+    defer g.deinit();
+    const parameters = m.bodyParameters(recursive);
+    const element: Value = .{ .word = .{ .id = 0 }, .literal = 17, .constant_bits = 17, .type_evidence = try g.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.u32_type }, .arguments = &.{} }) };
+    const rows: Value = .{ .tag = .array, .word = try g.c.temp(), .token = try g.c.temp(), .epoch_low = try g.c.temp(), .epoch_high = try g.c.temp(), .root = 0, .type_evidence = try g.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = parameters[0].ty }, .arguments = &.{} }) };
+    try g.roots.append(allocator, .{ .word = rows.word, .token = rows.token, .epoch_low = rows.epoch_low, .epoch_high = rows.epoch_high, .stack = 0, .depth = 0, .element = element });
+    const arguments = [_]Value{ rows, try g.constant(5) };
+    const first = g.recursiveCall(m, target, &arguments) catch |err| {
+        try recursivePublishedHeaders(&g);
+        return err;
+    };
+    try std.testing.expect(first != null);
+    try recursivePublishedHeaders(&g);
+    try std.testing.expectEqual(@as(u64, 1), emission_work.scoped_recursive_definitions);
+    try std.testing.expectEqual(@as(u64, 1), emission_work.scoped_recursive_backedges);
+    try std.testing.expectEqual(@as(?u32, null), g.roots.items[0].element.literal);
+    try std.testing.expectEqual(@as(?u32, null), g.roots.items[0].element.constant_bits);
+    var recursive_plan: ?*const CheckedFunctionPlan = null;
+    var plans = descriptor_calls.plans.iterator();
+    while (plans.next()) |entry| if (entry.value_ptr.*.access == .invariant) {
+        try std.testing.expect(recursive_plan == null);
+        recursive_plan = entry.value_ptr.*;
+    };
+    const plan = recursive_plan orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(usize, 5), plan.input_words);
+    try std.testing.expectEqual(@as(usize, 5), module.functions.items[plan.entry.function].parameters.len);
+    try std.testing.expectEqual(FunctionAbi.scalar, plan.abi);
+    try std.testing.expect(plan.unit_result);
+    try std.testing.expectEqual(@as(usize, 0), plan.regions.len);
+    try std.testing.expectEqual(@as(usize, 1), plan.access.invariant.len);
+    try std.testing.expect(plan.access.invariant[0].read and plan.access.invariant[0].write);
+    const completed = descriptor_calls.plans.count();
+    const changed_arguments = [_]Value{ rows, try g.constant(7) };
+    try std.testing.expect((try g.recursiveCall(m, target, &changed_arguments)) != null);
+    try std.testing.expectEqual(completed, descriptor_calls.plans.count());
+    try std.testing.expectEqual(@as(u64, 1), emission_work.scoped_recursive_definitions);
+
+    // Build both ordinary layers so their completed ordered contracts must
+    // retain the recursive write's lack of initialization authority.
+    var outer: ?*const CheckedFunctionPlan = null;
+    var outer_body: ?*const core.Body = null;
+    for ([_][]const u8{ "wrap1", "wrap2" }) |name| {
+        const body = for (m.bodies) |*candidate| {
+            if (std.mem.eql(u8, m.name(candidate.declaration_name), name)) break candidate;
+        } else return error.TestUnexpectedResult;
+        const selected: core.BindingRef = .{ .unit = m.unit, .binding = body.binding };
+        var call = (try g.prepareFunctionCall(m, selected, &arguments)) orelse return error.TestUnexpectedResult;
+        defer call.deinit(allocator);
+        const wrapper = (g.getOrBuildFunctionPlan(m, selected, &call) catch |err| {
+            try recursivePublishedHeaders(&g);
+            return err;
+        }) orelse return error.TestUnexpectedResult;
+        try std.testing.expect(wrapper.access == .ordered);
+        var reads: usize = 0;
+        var writes: usize = 0;
+        for (wrapper.access.ordered) |event| {
+            try std.testing.expectEqual(@as(usize, 0), event.owner);
+            if (event.kind == .read) reads += 1 else {
+                writes += 1;
+                try std.testing.expect(!event.initializes_rows);
+            }
+        }
+        try std.testing.expect(reads > 0 and writes > 0);
+        try std.testing.expectEqual(wrapper, (try g.getOrBuildFunctionPlan(m, selected, &call)).?);
+        outer = wrapper;
+        outer_body = body;
+    }
+    try recursivePublishedHeaders(&g);
+    const owners = [_]usize{0};
+    g.roots.items[0].element_initialized = false;
+    g.roots.items[0].known_empty = true;
+    g.roots.items[0].element.literal = 23;
+    g.roots.items[0].element.constant_bits = 23;
+    const frame = try g.beginReadFrame();
+    _ = try g.emitPlannedCall(m, outer_body.?, outer.?, &arguments, &owners);
+    try std.testing.expect(!g.roots.items[0].element_initialized);
+    try std.testing.expect(g.roots.items[0].known_empty);
+    try std.testing.expectEqual(@as(?u32, null), g.roots.items[0].element.literal);
+    try std.testing.expectEqual(@as(?u32, null), g.roots.items[0].element.constant_bits);
+    try std.testing.expectEqual(@as(usize, 1), g.read_frames.items[frame].first.items.len);
+    try std.testing.expectEqual(@as(usize, 0), g.read_frames.items[frame].first.items[0].owner);
+    try g.checkReadFrame(m, recursive.root, frame);
+    _ = try g.emitPlannedCall(m, recursive, plan, &arguments, &owners);
+    try std.testing.expect(!g.roots.items[0].element_initialized);
+    try std.testing.expect(g.roots.items[0].known_empty);
+
+    // Failure calls must propagate injected OOM rather than count it as the
+    // expected semantic rejection. Neither path may emit a machine call.
+    for ([_]bool{ false, true }) |frozen| {
+        g.roots.items[0].known_empty = false;
+        g.roots.items[0].element_initialized = frozen;
+        g.roots.items[0].frozen = frozen;
+        g.diagnostic = null;
+        const before = module.functions.items[function].instructions.items.len;
+        if (g.emitPlannedCall(m, recursive, plan, &arguments, &owners)) |_| return error.TestUnexpectedResult else |err| {
+            if (err == error.OutOfMemory) return err;
+            try std.testing.expectEqual(error.Declined, err);
+        }
+        try std.testing.expectEqual(backend.Code.storage_escape, g.diagnostic.?.code);
+        try std.testing.expectEqual(before, module.functions.items[function].instructions.items.len);
+    }
+    g.roots.items[0].frozen = false;
+    g.roots.items[0].element_initialized = true;
+    g.diagnostic = null;
+    const definitions_before_retry = emission_work.scoped_recursive_definitions;
+    const plans_before_retry = descriptor_calls.plans.count();
+    try std.testing.expect((try g.recursiveCall(m, target, &changed_arguments)) != null);
+    try std.testing.expectEqual(definitions_before_retry, emission_work.scoped_recursive_definitions);
+    try std.testing.expectEqual(plans_before_retry, descriptor_calls.plans.count());
+    try recursivePublishedHeaders(&g);
+}
+
+test "recursive headers preserve finite access replay and transactional publication through full OOM" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\const recur = func (rows: Array U32) -> (n: U32): Unit => return do:
+        \\  if @u32.lt 0 n:
+        \\    rows[0] := @u32.add rows[0] 1
+        \\    recur rows (@u32.sub n 1)
+        \\  return ()
+        \\const wrap1 = func (rows: Array U32) -> (n: U32): Unit => return recur rows n
+        \\const wrap2 = func (rows: Array U32) -> (n: U32): Unit => return wrap1 rows n
+        \\entry const answer = func (): U32 => return 0
+    ;
+    var lexed = try @import("../parse/lexer.zig").lex(allocator, source);
+    defer lexed.deinit(allocator);
+    var names: @import("../parse/symbols.zig").Pool = .{};
+    defer names.deinit(allocator);
+    var tree = try @import("../parse/parser.zig").parse(allocator, source, lexed.tokens.items, &names);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var checked = try @import("../check/check.zig").checkModuleWithOptions(allocator, &tree, &names, &.{}, &.{}, 1, .{ .builtin_catalog = true });
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    var lowered = try core.lower(allocator, &tree, &names, &checked);
+    defer lowered.deinit(allocator);
+    lowered.unit = 1;
+    try std.testing.expectEqual(@as(usize, 0), lowered.diagnostics.len);
+    try recursiveHeaderAccessContract(allocator, &.{lowered});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, recursiveHeaderAccessContract, .{@as([]const core.Module, &.{lowered})});
 }

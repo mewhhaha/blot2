@@ -310,6 +310,105 @@ test "scoped machine helper banks reject internal cycles unknown dispatch and gl
     }
 }
 
+fn recursiveCalleeBank(allocator: A, mutual: bool) !void {
+    var module = try moduleWithRoot(allocator, &.{.i32}, .i32, &.{.i32});
+    defer module.deinit();
+    const runtime_global = try module.addGlobal(.u32, 0, true);
+    const callee = try module.addTypedFunction(&.{.i32}, .none, .scalar);
+    var target = callee;
+    if (mutual) target = try module.addTypedFunction(&.{.i32}, .none, .scalar);
+    for (callee..target + 1) |function| {
+        var backedge = callee;
+        if (function == callee) backedge = target;
+        try module.functions.items[function].locals.append(allocator, .i32);
+        try emit(&module, @intCast(function), &.{
+            .{ .op = .local_get },                             .{ .op = .local_set, .operand = 1 },
+            .{ .op = .local_get },                             .{ .op = .if_ },
+            .{ .op = .local_get },                             .{ .op = .i32_const, .operand = 1 },
+            .{ .op = .i32_sub },                               .{ .op = .call, .operand = backedge },
+            .{ .op = .end },                                   .{ .op = .i32_const, .operand = 17 },
+            .{ .op = .global_set, .operand = runtime_global },
+        });
+    }
+    var context = outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{ .minimum_instructions = 1 });
+    defer context.deinit();
+    try context.registerRoot(0);
+    const ticket = context.begin(0, .{ .expressions = 0, .layouts = 0 }).?;
+    try emit(&module, 0, &.{
+        .{ .op = .local_get }, .{ .op = .call, .operand = callee },
+        .{ .op = .local_get }, .{ .op = .local_set, .operand = 1 },
+    });
+    try std.testing.expect((try context.tryExtract(ticket, .{ .expressions = 1, .layouts = 0 })) != null);
+    try emit(&module, 0, &.{.{ .op = .local_get, .operand = 1 }});
+    const helper = context.helpers.items[0].function;
+    const root_hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(module.functions.items[0].instructions.items));
+    const helper_hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(module.functions.items[helper].instructions.items));
+    const callee_hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(module.functions.items[callee].instructions.items));
+    const stats = context.finalize() catch |err| {
+        // The graph proof and all preparation precede bank/body publication.
+        try std.testing.expectEqual(@as(usize, 1), module.globals.items.len);
+        try std.testing.expectEqual(root_hash, std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(module.functions.items[0].instructions.items)));
+        try std.testing.expectEqual(helper_hash, std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(module.functions.items[helper].instructions.items)));
+        try std.testing.expectEqual(@as(usize, 1), module.functions.items[0].locals.items.len);
+        try std.testing.expect(!context.finalized);
+        try std.testing.expectEqual(@as(u64, 0), context.stats.regions);
+        return err;
+    };
+    try std.testing.expectEqual(@as(u64, 1), stats.regions);
+    try std.testing.expectEqual(@as(u64, 1), stats.globals);
+    try std.testing.expectEqual(callee_hash, std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(module.functions.items[callee].instructions.items)));
+    try std.testing.expectEqual(@as(usize, 1), module.functions.items[callee].locals.items.len);
+    const bytes = try module.assembleWithOptions(.{});
+    defer allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{ 0, 97, 115, 109, 1, 0, 0, 0 }, bytes[0..8]);
+}
+
+test "scoped bank callers admit ordinary self recursive callees transactionally through OOM" {
+    try recursiveCalleeBank(a, false);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, recursiveCalleeBank, .{false});
+}
+
+test "scoped bank machine proof admits disjoint mutual recursion without granting source admission" {
+    try recursiveCalleeBank(a, true);
+}
+
+test "scoped bank SCC proof rejects reentry through explored ordinary cycles and unknown dispatch" {
+    for (0..5) |mode| {
+        var module = try moduleWithRoot(a, &.{.i32}, .none, &.{});
+        defer module.deinit();
+        const first = try module.addTypedFunction(&.{}, .none, .scalar);
+        const second = try module.addTypedFunction(&.{}, .none, .scalar);
+        var context = outline.Context.init(a, &module, .scoped_numeric_adapter_nonreentrant, .{ .minimum_instructions = 1 });
+        defer context.deinit();
+        try context.registerRoot(0);
+        var target = first;
+        if (mode == 2) {
+            // Enter the ordinary SCC before its later path enters the helper.
+            try emit(&module, 0, &.{.{ .op = .call, .operand = first }});
+            target = second;
+        }
+        const ticket = context.begin(0, .{ .expressions = 0, .layouts = 0 }).?;
+        try emit(&module, 0, &.{ .{ .op = .local_get }, .{ .op = .drop }, .{ .op = .call, .operand = target } });
+        try std.testing.expect((try context.tryExtract(ticket, .{ .expressions = 1, .layouts = 0 })) != null);
+        const helper = context.helpers.items[0].function;
+        try emit(&module, first, &.{.{ .op = .call, .operand = second }});
+        try emit(&module, second, &.{.{ .op = .call, .operand = first }});
+        switch (mode) {
+            0 => try emit(&module, second, &.{ .{ .op = .i32_const }, .{ .op = .call } }),
+            1 => try emit(&module, second, &.{.{ .op = .call, .operand = helper }}),
+            // The ordinary backedge is visited before this helper joins its SCC.
+            2 => try emit(&module, first, &.{.{ .op = .call, .operand = helper }}),
+            3 => try emit(&module, second, &.{.{ .op = .call_indirect }}),
+            4 => try emit(&module, helper, &.{.{ .op = .call, .operand = helper }}),
+            else => unreachable,
+        }
+        try std.testing.expectError(error.InvalidOutline, context.finalize());
+        try std.testing.expectEqual(@as(usize, 0), module.globals.items.len);
+        try std.testing.expect(!context.finalized);
+        try std.testing.expectEqual(@as(u64, 0), context.stats.regions);
+    }
+}
+
 fn branchMembershipChurn(allocator: A) !void {
     const rounds = 24;
     const locals: [33 + 2 * rounds]ir.ValueType = @splat(.i32);

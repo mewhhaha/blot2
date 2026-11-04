@@ -15,21 +15,21 @@ implementations and APIs rather than maintaining legacy compatibility.
 
 ## Benchmarks
 
-Blot versus Goose's direct Wasm backend, measured on 2026-11-04. Four
-original-numeric pairs plus a Mandelbrot F32 control; two sorting ports are
-blocked by owned-storage recursion.
+Blot versus Goose's direct Wasm backend, measured on 2026-11-04. Seven adapted
+pairs now pass: six original-numeric workloads and a Mandelbrot F32 control.
+Merge sort and quicksort retain their original recursive algorithms.
 
-![Cold compilation time: Blot and Goose, milliseconds](scripts/bench/goose/charts/compilation.svg)
+![Cold compilation time: seven Blot and Goose pairs, milliseconds](scripts/bench/goose/charts/compilation.svg)
 
-![Bounded Wasm runtime: five paired cases and two unsupported Blot sorts](scripts/bench/goose/charts/runtime.svg)
+![Bounded Wasm runtime: seven checked Blot and Goose pairs](scripts/bench/goose/charts/runtime.svg)
 
-Five matched pairs expose **8.1x CRC32**, **7.0x custom hash**, **3.1x Sieve**
-and **1.9x F32 Mandelbrot** gaps; Fannkuch is roughly at parity. Unsupported
-cases have no bar. Byte buffers use U32 in Blot and U8 in Goose. Addressed
-capture bundles reduce the worst repeated-capture case **263.5 → 97.0KB**. Gdev
-remains near **10.25MB**; current paired compile medians are **6.33 → 6.23s** on
-this host. Five numeric binaries remain byte-identical. See
-[results, regressions and next hills](scripts/bench/goose/results/2026-11-04-addressed-inputs.md).
+The sorts compile in **51 / 53ms** including startup and emit **6.7 / 6.2KB**.
+Their bounded runtime gaps are **2.54x / 1.51x** against Goose. CRC32 and custom
+hash remain **8.1x / 7.0x** slower; five preceding numeric binaries are
+unchanged. Byte buffers use U32 in Blot and U8 in Goose; original F64 remains
+unsupported. Gdev stays at **10.25MB**, with fresh paired compile medians **5.62
+→ 5.73s**. See
+[results, controls and pending qualification](scripts/bench/goose/results/2026-11-04-recursive-calls.md).
 
 ## Development
 

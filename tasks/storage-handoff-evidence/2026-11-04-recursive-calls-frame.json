@@ -1,0 +1,88 @@
+{
+  "pen_sha256": "c5012f1cc13dad5e643348932ace58e5ee271430edf10ad2a1cbd5f2246b7d8d",
+  "command": [
+    "/home/jacobt/src/pen/target/release/pen",
+    "--game",
+    "/home/jacobt/src/blot2/build/bench/recursive-calls/pen/game",
+    "--assets",
+    "/home/jacobt/src/gdev/src/assets",
+    "--headless",
+    "--mute",
+    "--frames",
+    "1",
+    "--fps",
+    "60",
+    "--size",
+    "640x480",
+    "--data",
+    "/home/jacobt/src/blot2/build/bench/recursive-calls/pen/data",
+    "--trace",
+    "/home/jacobt/src/blot2/build/bench/recursive-calls/pen/frames.trace",
+    "--screenshot",
+    "/home/jacobt/src/blot2/build/bench/recursive-calls/pen/frame.png"
+  ],
+  "entry": "src/main.blot:main",
+  "project": "/home/jacobt/src/gdev",
+  "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+  "compiler_sha256": "f90931ef17ec2b143f880db68253d54392ec4f19a44e9eb58ff09b587d6d967b",
+  "storage": {
+    "temporaryBytes": 2097152,
+    "persistentBytes": 262144,
+    "transportBytes": 2097152,
+    "ownerCapacity": 4096
+  },
+  "compile_invoked": false,
+  "graphics_environment": {
+    "XDG_RUNTIME_DIR": "/run/user/1000"
+  },
+  "compiled_main_source": "/home/jacobt/src/blot2/build/bench/recursive-calls/main-pairs/0-after/main-1e34c073ca8ba0d1/main.wasm",
+  "wasm_sha256": "148bf08353aa302e2462e15488728a18a036fa71dfc7d7aedd192a235ee05833",
+  "scene_sha256": "156d9f802916ce2bbe1b5d85da494b9da8237282c4f0318bf487c2a3ab67f9af",
+  "assets": "/home/jacobt/src/gdev/src/assets",
+  "returncode": 0,
+  "checks": {
+    "exit_zero": true,
+    "one_completed_guest_trace": true,
+    "one_headless_step": true,
+    "first_guest_frame": true,
+    "complete_render": true,
+    "screenshot_640x480": true
+  },
+  "compiled_wasm_unchanged": true,
+  "success": true,
+  "frame_png_sha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+  "frames_trace_sha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+  "baseline_png_and_trace_byte_identical": true,
+  "visually_inspected": true,
+  "source_pins": {
+    "blot2": {
+      "head": "11bc6d5930c09584a79988525b87e268b4435ebf",
+      "status": [
+        " M compiler/guide.md",
+        " M scripts/bench/goose/README.md",
+        " M scripts/dev_check_areas.ts",
+        " M tasks/RECURSIVE_CALLS.md",
+        " M zig-native/CONTRACT.md",
+        " M zig-native/SCOPED_STORAGE.md",
+        " M zig-native/src/backend/scoped_backend.zig",
+        " M zig-native/src/backend/wasm_scope_outline.zig",
+        " M zig-native/src/backend/wasm_scope_outline_tests.zig",
+        " M zig-native/src/work_counters.zig",
+        "?? zig-native/src/backend/storage_recursive_admission.zig",
+        "?? zig-native/tests/recursive_storage_execution.test.ts"
+      ]
+    },
+    "ink": {
+      "head": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+      "status": []
+    },
+    "gdev": {
+      "head": "38af0708efe585b10385ebf9ab7dc51ae5bb6b45",
+      "status": []
+    },
+    "pen": {
+      "head": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf",
+      "status": []
+    }
+  }
+}

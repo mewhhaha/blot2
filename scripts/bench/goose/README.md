@@ -3,13 +3,15 @@
 Run translated LangArena kernels against the sibling Goose compiler's direct
 Wasm backend. Both artifacts execute in the same Node/V8, checking every
 checksum. All seven adapted cases are attempted: four original-numeric pairs, an
-explicit Mandelbrot F32 control, and two sorting ports blocked by owned-storage
-recursion. Original F64 Mandelbrot and the other 43 catalog tasks remain outside
-paired coverage. The custom eight-lane `Hash::SHA256` task is not cryptographic
-SHA-256.
+explicit Mandelbrot F32 control, and the unchanged recursive merge-sort and
+quicksort ports. Original F64 Mandelbrot and the other 43 catalog tasks remain
+outside paired coverage. The custom eight-lane `Hash::SHA256` task is not
+cryptographic SHA-256.
 
-[Expanded survey, 2026-11-03](results/2026-11-03-expanded.md) records current
-pairs, failed builds and diagnostic source controls. The
+[Recursive sort support, 2026-11-04](results/2026-11-04-recursive-calls.md)
+records the seven supported adapted pairs. The
+[expanded survey, 2026-11-03](results/2026-11-03-expanded.md) retains earlier
+failed builds and diagnostic source controls. The
 [fixed-span checkpoint](results/2026-11-03-fixed-spans.md) and
 [original baseline](results/2026-11-03.md) retain preceding results. With
 Matplotlib installed, `python3 scripts/bench/goose/charts.py` regenerates the
@@ -31,10 +33,9 @@ revision edit; one process warmup and five measured runtime samples; official
 `test` and explicitly bounded runtime profiles. All children have a hard
 30-second cap. A failing runtime cell is stopped after its first failure, while
 other cells finish. Failed/timed-out cells never receive a performance score.
-The default survey currently exits nonzero with partial results because both
-Blot sorting builds are unsupported. Use `--cases sieve mandelbrot_f32` (or
-other supported cases) for a fully runnable subset. Build diagnostics are
-retained as structured data, not missing or zero timings.
+Use `--cases sort_merge sort_quick` (or other selected cases) for a smaller
+survey. Build diagnostics are retained as structured data, not missing or zero
+timings.
 
 Use `--profiles run` to request unchanged official production iteration counts.
 The first production pilot hit the cap on all three Blot programs. That evidence

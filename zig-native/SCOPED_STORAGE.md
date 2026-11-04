@@ -148,6 +148,15 @@ across branches. None of these checks substitutes for immutable Core type
 validation; the source body and storage-operation evidence are independently
 validated before emission.
 
+Direct self-recursion is supported for closed named functions taking U32 and
+fixed `Array U32` inputs and returning Unit. Existing initialized owners retain
+identity through every self call. This covers the unchanged Goose merge-sort
+and quicksort helpers. Recursive bodies and reached helpers cannot allocate,
+resize, freeze, transfer owners, capture global owners, suspend or call indirectly.
+Mutual recursion and broader recursive layouts remain outside this slice. The
+[implementation contract](CONTRACT.md) specifies frozen headers, finite access
+replay, transactional publication and outline-bank safety.
+
 The new path contains no counted allocator, retain/release hooks or collector.
 The old `runtime/scoped_storage.zig` remains a low-level reservation fixture,
 not the runtime emitted for these source programs. The existing
@@ -162,7 +171,7 @@ not be advertised as complete:
 
 - Variable-sized inline elements, single resizable aggregate tails, nominal
   graph-node layouts, and sequential traversal of variable-sized elements.
-- Complete source admission for lists, sum-type patterns, recursive functions,
+- Complete source admission for lists, sum-type patterns, broader recursion,
   all generic layout instances, effects and the remaining collection APIs.
 - Complete library/game coverage beyond the inspected Gdev first frame, including
   broader aggregate initialization, loop carries and generic call layouts. Host

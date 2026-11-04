@@ -1,9 +1,11 @@
 # Recursive calls in the owned-storage backend
 
-Status: Planned; implementation and qualification pending. Reviewed with Astra
-(xhigh) against clean `8ff1e17696ee19fa54ee71e15ea5454f666971b2` on 2026-11-04.
-This advances [task 110](110-plan-owned-storage-and-specialized-calls.md); it
-does not complete that task or the owned-storage rewrite.
+Status: First slice implemented and measured; full compiler qualification
+remains pending on reproduced baseline failures. Reviewed with Astra (xhigh)
+against clean `8ff1e17696ee19fa54ee71e15ea5454f666971b2` on 2026-11-04, followed
+by two implementation reviews. This advances
+[task 110](110-plan-owned-storage-and-specialized-calls.md); it does not
+complete that task or the owned-storage rewrite.
 
 ## Outcome and first boundary
 
@@ -103,13 +105,14 @@ helpers. Reserve publication capacity first. Publish completion/context-free
 aliases only after every prerequisite succeeds; OOM or failed admission leaves
 nothing executable behind.
 
-Audit `wasm_scope_outline.finalize`: its current reachable-graph acyclicity
-check also rejects recursion below a banked caller. Initially prevent extraction
-for affected caller roots before it starts, preserving ordinary body-size limits
-and explicit rejection. Disabling extraction only inside the recursive helper is
-insufficient. Keep the final bank-safety check. A later, separate improvement
-may prove cyclic components disjoint from each outline-bank group; never remove
-the acyclicity guard wholesale. Measure the caller fallback on both sort ports.
+`wasm_scope_outline.finalize` now proves bank safety over machine-call strongly
+connected components. Ordinary recursive components may be reached below a
+banked caller when disjoint from its root and extracted helpers. A cyclic
+component containing any bank member, or any reachable indirect call, still
+rejects publication. This implements the stronger disjoint-component option from
+the review, avoiding the proposed initial caller extraction fallback. The
+forced-outline execution witness keeps live caller values across ordinary
+recursive calls; separate machine laws reject bank reentry and unknown dispatch.
 
 **Gate:** executed self-recursion works in both codegen tiers; forced outlining
 thresholds preserve caller locals or produce the intended bounded rejection. No
@@ -165,6 +168,32 @@ Run `deno task test:compiler` and `deno task lint:zig` before compiler
 checkpoints; full-suite budget exhaustion is not a pass. Commit/push checked
 batches and verify remote main. No LLVM build is needed for this planning
 checkpoint.
+
+## Implemented checkpoint — 2026-11-04
+
+The unchanged merge-sort and quicksort ports pass checksum/revision
+qualification at official 100,000/400,000 sizes. Five fresh cold compilations
+take 51.00/52.74ms including startup; output is 6,741/6,244B. Each has exactly
+one recursive definition and two runtime self-call sites. Their full direct
+headers retain ten/six inputs. Five bounded runtime pairs show 2.54x/1.51x gaps
+against Goose; these are reduced repetition counts, not official production
+scores.
+
+All 2,983 native laws compile without LLVM; 419 affected laws pass sampled
+faults. Seven new laws pass full-fault mode, including three exhaustive sweeps.
+The registered development family passes in 53.1s, with 252 native laws, 242
+guest tests, formatting, types and zero Zig lint findings. All 24 recursive
+guests pass both codegen tiers. The frame is freshly executed and inspected.
+Main remains byte-identical; paired compilation moves 5.615 → 5.732s, so this is
+no Main speed or size improvement.
+
+Full qualification remains pending: two release guest failures reproduce on the
+frozen compiler, and the full gate stops after 200 native passes on a frontend
+primitive-arity diagnostic failure also reproduced on the frozen source
+snapshot. The unchanged broader suite has not passed. Exact
+compiler/source/toolchain, work, phase, memory, sample, OOM and failure records
+are in the
+[checkpoint evidence](../scripts/bench/goose/results/2026-11-04-recursive-calls.md).
 
 ## Later extensions, with separate acceptance gates
 

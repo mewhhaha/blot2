@@ -216,7 +216,7 @@ pub const Context = struct {
             const root = &self.roots.items[root_index];
             if (root.helpers.items.len == 0) continue;
             if (hasCoordinates(self.module, root.function)) return error.InvalidOutline;
-            try acyclic(self.allocator, self.module, root.function);
+            try nonreentrant(self.allocator, self.module, root, self.helpers.items);
             const source = &self.module.functions.items[root.function];
             const logical = try self.allocator.alloc(coalesce.Body, root.helpers.items.len + 1);
             defer self.allocator.free(logical);
@@ -628,33 +628,68 @@ fn observe(body: coalesce.Body, first: []Reference, shared: []bool, writes: []u3
         if (inst.op == .local_get) reads[inst.operand] = body.function else writes[inst.operand] +|= 1;
     };
 }
-fn acyclic(a: A, module: *const wasm.Module, root: u32) Error!void {
-    // Reject cycles reachable from this banked root and all unknown indirect
-    // dispatch. Host nonreentry does not establish internal Wasm acyclicity.
-    const colors = try a.alloc(u2, module.functions.items.len);
-    defer a.free(colors);
-    @memset(colors, 0);
+fn nonreentrant(a: A, module: *const wasm.Module, root: *const Root, helpers: []const Helper) Error!void {
+    // Ordinary recursive callees own their Wasm locals. Only cycles containing
+    // this root or its bank-sharing helpers can overwrite a live bank. Discover
+    // complete SCCs: ignoring an ordinary DFS backedge alone misses bank members
+    // that later join that same component. Unknown dispatch stays conservative.
+    const Node = struct { index: u32 = absent, low: u32 = absent, active: bool = false, bank: bool = false };
+    const nodes = try a.alloc(Node, module.functions.items.len);
+    defer a.free(nodes);
+    @memset(nodes, .{});
+    nodes[root.function].bank = true;
+    for (root.helpers.items) |ordinal| nodes[helpers[ordinal].function].bank = true;
     const Visit = struct { function: u32, at: usize = 0 };
     var pending: std.ArrayList(Visit) = .empty;
     defer pending.deinit(a);
-    try pending.append(a, .{ .function = root });
-    colors[root] = 1;
+    var active: std.ArrayList(u32) = .empty;
+    defer active.deinit(a);
+    try pending.append(a, .{ .function = root.function });
+    try active.append(a, root.function);
+    nodes[root.function].index = 0;
+    nodes[root.function].low = 0;
+    nodes[root.function].active = true;
+    var next: u32 = 1;
     while (pending.items.len != 0) {
         const current = &pending.items[pending.items.len - 1];
         const instructions = module.functions.items[current.function].instructions.items;
         if (current.at == instructions.len) {
-            colors[current.function] = 2;
-            _ = pending.pop();
+            const function = pending.pop().?.function;
+            const node = nodes[function];
+            if (node.low == node.index) {
+                var members: usize = 0;
+                var bank = false;
+                while (true) {
+                    const member = active.pop().?;
+                    nodes[member].active = false;
+                    members += 1;
+                    bank = bank or nodes[member].bank;
+                    if (member == function) break;
+                }
+                if (bank and members > 1) return error.InvalidOutline;
+            }
+            if (pending.items.len != 0) {
+                const parent = pending.items[pending.items.len - 1].function;
+                nodes[parent].low = @min(nodes[parent].low, node.low);
+            }
             continue;
         }
         const inst = instructions[current.at];
         current.at += 1;
         if (inst.op == .call_indirect) return error.InvalidOutline;
         if (inst.op != .call) continue;
-        if (inst.operand >= colors.len or colors[inst.operand] == 1) return error.InvalidOutline;
-        if (colors[inst.operand] == 2) continue;
-        colors[inst.operand] = 1;
-        try pending.append(a, .{ .function = inst.operand });
+        if (inst.operand >= nodes.len) return error.InvalidOutline;
+        if (inst.operand == current.function and nodes[inst.operand].bank) return error.InvalidOutline;
+        if (nodes[inst.operand].index == absent) {
+            try active.append(a, inst.operand);
+            nodes[inst.operand].index = next;
+            nodes[inst.operand].low = next;
+            nodes[inst.operand].active = true;
+            next += 1;
+            try pending.append(a, .{ .function = inst.operand });
+        } else if (nodes[inst.operand].active) {
+            nodes[current.function].low = @min(nodes[current.function].low, nodes[inst.operand].index);
+        }
     }
 }
 fn uleb(value: usize) usize {

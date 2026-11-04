@@ -45,6 +45,13 @@ export const devCheckAreas = {
     description:
       "Type-directed arrays, data-stack reuse, inline records, captured borrows and Wasm bounds.",
     native: [
+      "backend.storage_recursive_admission.test.recursive source admission collects helper reads writes and both fixed-owner self edges through OOM",
+      "backend.storage_recursive_admission.test.recursive source admission declines changing owner correspondence hidden allocations globals and cycles",
+      "backend.storage_recursive_admission.test.recursive source admission preserves unused inputs and mutable owner loop versions",
+      "backend.scoped_backend.test.recursive headers preserve finite access replay and transactional publication through full OOM",
+      "backend.wasm_scope_outline_tests.test.scoped bank callers admit ordinary self recursive callees transactionally through OOM",
+      "backend.wasm_scope_outline_tests.test.scoped bank machine proof admits disjoint mutual recursion without granting source admission",
+      "backend.wasm_scope_outline_tests.test.scoped bank SCC proof rejects reentry through explored ordinary cycles and unknown dispatch",
       "backend.addressed_input_demand.test.addressed input demand loads each exact use without moving effects or output serialization",
       "backend.addressed_input_demand.test.addressed input demand leaves forwarding pointer calls and unread words without loads",
       "backend.addressed_input_demand.test.addressed input demand retains frequently read logical words with one entry load",
@@ -295,6 +302,7 @@ export const devCheckAreas = {
       "backend.storage_initialization_tests.test.owned computed flat pools publish a complete module",
     ],
     guests: [
+      "zig-native/tests/recursive_storage_execution.test.ts",
       "zig-native/tests/primitive_alias_execution.test.ts",
       "zig-native/tests/scoped_loop_cleanup_execution.test.ts",
       "zig-native/tests/stack_expression_execution.test.ts",
@@ -429,6 +437,13 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "backend.storage_recursive_admission.test.recursive source admission collects helper reads writes and both fixed-owner self edges through OOM",
+      "backend.storage_recursive_admission.test.recursive source admission declines changing owner correspondence hidden allocations globals and cycles",
+      "backend.storage_recursive_admission.test.recursive source admission preserves unused inputs and mutable owner loop versions",
+      "backend.scoped_backend.test.recursive headers preserve finite access replay and transactional publication through full OOM",
+      "backend.wasm_scope_outline_tests.test.scoped bank callers admit ordinary self recursive callees transactionally through OOM",
+      "backend.wasm_scope_outline_tests.test.scoped bank machine proof admits disjoint mutual recursion without granting source admission",
+      "backend.wasm_scope_outline_tests.test.scoped bank SCC proof rejects reentry through explored ordinary cycles and unknown dispatch",
       "backend.addressed_input_demand.test.addressed input demand loads each exact use without moving effects or output serialization",
       "backend.addressed_input_demand.test.addressed input demand leaves forwarding pointer calls and unread words without loads",
       "backend.addressed_input_demand.test.addressed input demand retains frequently read logical words with one entry load",
@@ -698,6 +713,7 @@ export const devCheckAreas = {
       "allocation_failures.test.sampled allocation failures reject swallowed faults and propagate scenario failures",
     ],
     guests: [
+      "zig-native/tests/recursive_storage_execution.test.ts",
       "zig-native/tests/primitive_alias_execution.test.ts",
       "zig-native/tests/scoped_loop_cleanup_execution.test.ts",
       "zig-native/tests/stack_expression_execution.test.ts",

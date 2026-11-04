@@ -235,6 +235,12 @@ built-in ECS, resources, schedules, graphics, or application lifecycle.
 
 ## Loops
 
+The owned-storage backend currently supports direct self-recursion in closed
+named functions with U32 and fixed `Array U32` parameters and a Unit result.
+Existing initialized arrays may be read and updated; allocation, resizing,
+freezing, global-owner access, indirect calls and mutual recursion inside the
+recursive component remain unsupported. Allocate work arrays in the caller.
+
 Prefer `for` for iteration; reserve recursion for recursive structures and
 algorithms. `for index in start..end:` uses U32 bounds and excludes `end`.
 Reversed/equal bounds run zero iterations. `for pattern in values:` iterates an

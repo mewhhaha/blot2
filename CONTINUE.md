@@ -8,67 +8,70 @@ Wasm remain goals. Reachable throughput targets are 50k source lines in 0.5s,
 then one million lines/second. None of these Main goals is complete.
 
 The
-[addressed-input checkpoint](scripts/bench/goose/results/2026-11-04-addressed-inputs.md)
-adds immutable private bundles with exact range forwarding, separate outputs,
-transitive demand and bounded snapshot reuse. Complete semantic Values, owner
-roles, callbacks and access replay remain checked. Structural borrowed-input
-preference separates private cache alternatives without runtime addresses/local
-IDs. Sparse calls rebuild with the ordinary ABI; a bounded optional rejection
-memo survives executable rollback. See `zig-native/CONTRACT.md` for admission,
-read-only proofs, snapshot barriers and cleanup.
+[recursive-call checkpoint](scripts/bench/goose/results/2026-11-04-recursive-calls.md)
+implements the first slice of the
+[Astra-reviewed plan](tasks/RECURSIVE_CALLS.md): closed named direct
+self-recursion over U32 bounds and fixed Array U32 inputs, returning Unit.
+Complete direct headers retain semantic owner aliases and never narrow
+parameters or use addressed/packed transport. Finite invariant access is
+separate from ordered events; possible writes never establish initialization or
+nonempty storage, including through ordinary wrappers. Publication is atomic.
+Machine SCCs allow ordinary recursion disjoint from outline-bank members while
+still rejecting bank reentry and reachable unknown indirect dispatch.
 
-The largest repeated distinct-capture control shrinks **263,521 → 97,002B
-(63.2%)**; shared captures shrink **50,307 → 36,141B**. Two single-call width32
-controls grow 7.1%; keep that regression visible. Three repetitions of 32 shapes
-execute 384 checks per compiler. The benchmark retains actual Wasm.
+Both unchanged Goose sorting ports now compile and execute at 100,000 and
+400,000 elements. Five fresh cold-build medians are **51.00 / 52.74ms**; Wasm is
+**6,741 / 6,244B**. Each has one recursive definition and two runtime self-call
+sites, with full ten/six-word inputs. Five bounded runtime pairs show **2.54x
+merge / 1.51x quicksort** gaps against Goose. Six original-numeric pairs plus
+the explicit Mandelbrot F32 control now pass; original F64 and the other 43
+catalog tasks remain outside paired coverage. Five preceding numeric binaries
+remain byte-identical. README charts show all seven pairs.
 
-Gdev is effectively flat: three uncached pairs record **6.334 → 6.235s**, Main
-**10,241,074 → 10,253,029B (+0.12%)**. Per-pair changes are -115/+8/-300ms, not
-a robust latency win. Earlier 5.28s belongs to another shared-host round. Final
-LLVM compiler SHA256:
-`2de96d223cced8d71bbf4a5ebf2d875ed92a2445a7ef7abb556c8ec7e81c8d19`. Final Main
-SHA256: `148bf08353aa302e2462e15488728a18a036fa71dfc7d7aedd192a235ee05833`. A
-separate exact-artifact profile has backend 4.645s, checking 0.516s, lowering
-0.131s and validation 0.107s. Backend requests 5.29GB cumulatively; maximum
-process RSS is 1,104,988KiB. Overlapping timing families do not add.
+Gdev Main is byte-identical at **10,253,029B**. Three fresh pairs record **5.615
+→ 5.732s (+2.1%)**, with changes +117/-21/+234ms. This is no compile-speed win;
+do not compare these shared-host times with earlier unpaired rounds. A separate
+exact-artifact profile records backend **4.769s**, checking **0.513s**, lowering
+**0.131s**, validation **0.108s**, cumulative backend allocation requests
+**5.30GB**, and process RSS **1,102,832KiB**. Overlapping timing families do not
+add. Discovery examines 4,029 source bodies / 169,617 nodes; Main admits no
+recursive component.
 
-**Main already had zero packed helper calls.** Packet serialization explained
-the capture regression, not the game's remaining 6.70MB of local/global
-instructions. The broad rollout grew Main by 134KB and is rejected. Adaptive
-admission reduces snapshot stores 13,965 → 1,079, but Main still has zero cache
-hits. Do not extrapolate capture savings to Main.
-
-All 2,976 native laws compile without LLVM. The affected union passes 412 laws
-with sampled faults; eight focused laws pass full-fault mode, including three
-exhaustive allocation sweeps. The final development family passes 245 native
-laws, its guest suite, formatting, types and zero Zig lint findings. Release
-guests pass 300/302; the summary-job ECS export and optimized iter.take(0)
-allocation failures also reproduce on the frozen compiler. Full qualification
-remains pending. The full gate passes 49 smoke checks and the harness, then
-stops at 180s after 101 native passes, zero failures/leaks/logged errors.
-
-World/editor, hand and renderer binaries remain byte-identical. Seven editor
-assertions, 160 hand assertions and seven renderer streams match. The exact Main
-passes the original memory budgets in one headless NVIDIA frame; its inspected
-PNG and guest trace match the baseline byte for byte. See
-[frame evidence](tasks/storage-handoff-evidence/2026-11-04-addressed-inputs-frame.json).
+Final LLVM compiler SHA256:
+`f90931ef17ec2b143f880db68253d54392ec4f19a44e9eb58ff09b587d6d967b`. Main SHA256:
+`148bf08353aa302e2462e15488728a18a036fa71dfc7d7aedd192a235ee05833`. A fresh
+headless NVIDIA frame passes unchanged memory budgets; its inspected PNG and
+guest trace match the baseline exactly. See
+[frame evidence](tasks/storage-handoff-evidence/2026-11-04-recursive-calls-frame.json).
 Broader gameplay/software-adapter coverage remains pending. The normal Pen
-source bridge still omits inferenceBudget; bounded Deno runners compile and
-execute affected sources, and the frame reuses the reviewed artifact. This batch
-changes no sibling source/assets. Gdev remains `38af070`, Ink `ccaf08f`, Pen
-`d159492`.
+source bridge still omits inferenceBudget; the bounded Deno runner builds Main
+and Pen executes that reviewed artifact. Sibling source/assets remain unchanged:
+Gdev `38af070`, Ink `ccaf08f`, Pen `d159492`.
 
-Five numeric binaries remain byte-identical. README charts rerun Goose's pinned
-cases and V8 checksums; no numeric runtime improvement is claimed. Two recursive
-Blot sorts and original F64 remain unsupported.
+All **2,983 native laws compile without LLVM**. The affected union passes **419
+laws** with sampled faults. Seven new laws pass full-fault mode, including three
+exhaustive allocation sweeps. The development family passes **252 native laws /
+242 guest tests in 53.1s**, plus formatting, types and zero Zig lint findings.
+All 24 recursive guests pass in both codegen tiers, including depth512, owner
+aliases, trap recovery, repeated exports and forced outlining. Actual native
+development rebuilds take about 7s for the compiler / 16s for inventory; LLVM is
+reserved for the one release measurement candidate.
 
-## Recursive sort support plan
+Full qualification remains **pending**. Release affected guests pass 324/326;
+the summary-job ECS export and optimized iter.take(0) allocation failures both
+reproduce on frozen compiler `2de96d…`. The full gate passes smoke/harness and
+200 native laws, then stops at 133.4s on the pre-existing source-input primitive
+arity diagnostic mismatch (`call_arity` versus `module_loader_required`). That
+failure reproduces on the frozen source snapshot; all 294 frontend files match.
+The remaining full suite has not passed.
 
-The requested [Astra-reviewed recursion plan](tasks/RECURSIVE_CALLS.md) starts
-with direct self-recursion over existing U32 arrays and scalar bounds, returning
-Unit. It covers both unchanged sort ports with a fixed ABI, finite invariant
-owner access and explicit outline-bank safety. Implementation and qualification
-are pending; broader recursion remains separate.
+The preceding
+[addressed-input evidence](scripts/bench/goose/results/2026-11-04-addressed-inputs.md)
+retains capture savings, rejected broad rollout and earlier qualification. Main
+already had zero packed helper calls: its remaining local/global copying needs a
+separate lever. Recursive components still exclude allocation, resize, freeze,
+owner transfer, globals, host suspension, indirect calls and mutual recursion.
+The broader owned-storage rewrite remains unfinished.
 
 ## Next Main lever
 

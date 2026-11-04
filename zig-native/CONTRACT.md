@@ -98,6 +98,33 @@ physical carriers. The rule does not use remaining-use counts as a dead-value
 proof: their current traversal is not complete for alternative rows, value
 patterns or refutable-binding fallbacks.
 
+Closed named functions may call themselves directly with U32 bounds, fixed
+`Array U32` inputs and Unit results. Checked Core and every reached helper must
+preserve owner identity and layout without allocating, changing capacity,
+freezing, transferring owners or using globals, host effects or indirect calls.
+Mutual recursion and recursive results with storage remain excluded.
+
+A recursive function reserves its complete direct i32 header before constructing
+its body. Semantic input-owner aliases remain in its identity; physical word
+aliases, caller constants, local IDs and empty-owner hints do not. Recursive
+headers never narrow parameters or use addressed/packed transport. A private
+provisional header resolves only its own direct self edge; complete body checking
+and reserved publication capacity precede cache completion. Failed construction
+rolls back dependent functions, plans and committed counters.
+
+Recursive access uses a finite invariant footprint per canonical plain owner,
+separate from ordinary ordered writer events. Existing accessed rows must be
+initialized, or vacuously empty in a fixed owner. Reads enter enclosing loop
+checks. Possible writes reject frozen owners and invalidate optional literals;
+they never establish initialization or nonempty storage, including when replayed
+through ordinary wrappers. Unused owners receive no invented access. Recursive
+components and their helpers have no guest scratch or result-bank requirement.
+
+Outline-bank safety uses machine-call strongly connected components. Reachable
+ordinary cycles are allowed only when disjoint from the bank root and all its
+extracted helpers. Any reachable indirect call or cyclic component containing a
+bank member rejects publication; recursion alone does not grant bank reentry.
+
 Private named calls retain their complete semantic Value tree and owner/event
 contracts. Exact caller-local equality becomes a normalized input partition in
 the call key; runtime bits and local numbers never become specialization keys.

@@ -8,7 +8,7 @@ from matplotlib import rcParams
 from matplotlib.figure import Figure
 
 HERE = Path(__file__).resolve().parent
-EVIDENCE = HERE / "results/2026-11-04-addressed-inputs.json"
+EVIDENCE = HERE / "results/2026-11-04-recursive-calls.json"
 LABELS = {
     "fannkuch": "Fannkuch",
     "crc32": "CRC32",
@@ -107,7 +107,7 @@ def main():
         builds,
         "wall_ms",
         "Cold compilation",
-        "Five fresh uncached builds · two recursive Blot cases unsupported",
+        "Five fresh uncached builds · seven supported adapted cases",
         "compilation.svg",
         150,
         [0, 25, 50, 75, 100, 125, 150],
@@ -117,10 +117,10 @@ def main():
         runtime,
         "kernel_ms",
         "Bounded Wasm runtime",
-        "Five matched pairs · Mandelbrot F32 control · unsupported cases have no bar",
+        "Five matched pairs · 400,000-element sorts · Mandelbrot F32 control",
         "runtime.svg",
-        200,
-        [0, 50, 100, 150, 200],
+        500,
+        [0, 100, 200, 300, 400, 500],
         [
             ("blot", "Blot", COLORS["blot"]),
             ("goose", "Goose", COLORS["goose"]),

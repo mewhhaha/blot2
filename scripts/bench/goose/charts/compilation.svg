@@ -11,7 +11,7 @@
       <cc:Work>
         <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
         <dc:title>Cold compilation</dc:title>
-        <dc:description>Five fresh uncached builds · two recursive Blot cases unsupported</dc:description>
+        <dc:description>Five fresh uncached builds · seven supported adapted cases</dc:description>
         <dc:format>image/svg+xml</dc:format>
         <dc:creator>
           <cc:Agent>
@@ -227,183 +227,199 @@ L 648 96.768
       </g>
       <g id="patch_3">
         <path d="M 165.6 106.917931
-L 343.842256 106.917931
-L 343.842256 118.679365
+L 355.21215 106.917931
+L 355.21215 118.679365
 L 165.6 118.679365
 z
 " clip-path="url(#p71973d074f)" style="fill: #c94d3f" />
       </g>
       <g id="patch_4">
         <path d="M 165.6 149.103847
-L 332.146616 149.103847
-L 332.146616 160.86528
+L 333.213951 149.103847
+L 333.213951 160.86528
 L 165.6 160.86528
 z
 " clip-path="url(#p71973d074f)" style="fill: #c94d3f" />
       </g>
       <g id="patch_5">
         <path d="M 165.6 191.289762
-L 339.916488 191.289762
-L 339.916488 203.051195
+L 342.480119 191.289762
+L 342.480119 203.051195
 L 165.6 203.051195
 z
 " clip-path="url(#p71973d074f)" style="fill: #c94d3f" />
       </g>
       <g id="patch_6">
         <path d="M 165.6 233.475678
-L 330.653539 233.475678
-L 330.653539 245.237111
+L 339.120261 233.475678
+L 339.120261 245.237111
 L 165.6 245.237111
 z
 " clip-path="url(#p71973d074f)" style="fill: #c94d3f" />
       </g>
       <g id="patch_7">
         <path d="M 165.6 275.661593
-L 370.116159 275.661593
-L 370.116159 287.423026
+L 330.750557 275.661593
+L 330.750557 287.423026
 L 165.6 287.423026
 z
 " clip-path="url(#p71973d074f)" style="fill: #c94d3f" />
       </g>
       <g id="patch_8">
+        <path d="M 165.6 317.847509
+L 329.608983 317.847509
+L 329.608983 329.608942
+L 165.6 329.608942
+z
+" clip-path="url(#p71973d074f)" style="fill: #c94d3f" />
+      </g>
+      <g id="patch_9">
+        <path d="M 165.6 360.033424
+L 335.217317 360.033424
+L 335.217317 371.794857
+L 165.6 371.794857
+z
+" clip-path="url(#p71973d074f)" style="fill: #c94d3f" />
+      </g>
+      <g id="patch_10">
         <path d="M 165.6 121.261143
-L 398.008726 121.261143
-L 398.008726 133.022576
+L 408.715646 121.261143
+L 408.715646 133.022576
 L 165.6 133.022576
 z
 " clip-path="url(#p71973d074f)" style="fill: #087f8c" />
       </g>
-      <g id="patch_9">
+      <g id="patch_11">
         <path d="M 165.6 163.447058
-L 410.505778 163.447058
-L 410.505778 175.208491
+L 416.882806 163.447058
+L 416.882806 175.208491
 L 165.6 175.208491
 z
 " clip-path="url(#p71973d074f)" style="fill: #087f8c" />
       </g>
-      <g id="patch_10">
+      <g id="patch_12">
         <path d="M 165.6 205.632974
-L 411.355036 205.632974
-L 411.355036 217.394407
+L 486.06443 205.632974
+L 486.06443 217.394407
 L 165.6 217.394407
 z
 " clip-path="url(#p71973d074f)" style="fill: #087f8c" />
       </g>
-      <g id="patch_11">
+      <g id="patch_13">
         <path d="M 165.6 247.818889
-L 421.434533 247.818889
-L 421.434533 259.580322
+L 422.812998 247.818889
+L 422.812998 259.580322
 L 165.6 259.580322
 z
 " clip-path="url(#p71973d074f)" style="fill: #087f8c" />
       </g>
-      <g id="patch_12">
+      <g id="patch_14">
         <path d="M 165.6 290.004805
-L 420.658101 290.004805
-L 420.658101 301.766238
+L 407.846831 290.004805
+L 407.846831 301.766238
 L 165.6 301.766238
 z
 " clip-path="url(#p71973d074f)" style="fill: #087f8c" />
       </g>
-      <g id="patch_13">
+      <g id="patch_15">
         <path d="M 165.6 332.19072
-L 471.5167 332.19072
-L 471.5167 343.952153
+L 418.161353 332.19072
+L 418.161353 343.952153
 L 165.6 343.952153
 z
 " clip-path="url(#p71973d074f)" style="fill: #087f8c" />
       </g>
-      <g id="patch_14">
+      <g id="patch_16">
         <path d="M 165.6 374.376635
-L 415.720136 374.376635
-L 415.720136 386.138069
+L 425.190226 374.376635
+L 425.190226 386.138069
 L 165.6 386.138069
 z
 " clip-path="url(#p71973d074f)" style="fill: #087f8c" />
       </g>
       <g id="text_16">
         <text
-          style="font-size: 9px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #c94d3f"
-          x="165.6" y="326.066468"
-          transform="rotate(-0 165.6 326.066468)">unsupported</text>
+          style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
+          x="360.21215" y="115.396304"
+          transform="rotate(-0 360.21215 115.396304)">58.96</text>
       </g>
       <g id="text_17">
         <text
-          style="font-size: 9px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #c94d3f"
-          x="165.6" y="368.252383"
-          transform="rotate(-0 165.6 368.252383)">unsupported</text>
+          style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
+          x="338.213951" y="157.58222"
+          transform="rotate(-0 338.213951 157.58222)">52.12</text>
       </g>
       <g id="text_18">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="348.842256" y="115.396304"
-          transform="rotate(-0 348.842256 115.396304)">55.42</text>
+          x="347.480119" y="199.768135"
+          transform="rotate(-0 347.480119 199.768135)">55.00</text>
       </g>
       <g id="text_19">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="337.146616" y="157.58222"
-          transform="rotate(-0 337.146616 157.58222)">51.79</text>
+          x="344.120261" y="241.954051"
+          transform="rotate(-0 344.120261 241.954051)">53.96</text>
       </g>
       <g id="text_20">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="344.916488" y="199.768135"
-          transform="rotate(-0 344.916488 199.768135)">54.20</text>
+          x="335.750557" y="284.139966"
+          transform="rotate(-0 335.750557 284.139966)">51.35</text>
       </g>
       <g id="text_21">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="335.653539" y="241.954051"
-          transform="rotate(-0 335.653539 241.954051)">51.32</text>
+          x="334.608983" y="326.325882"
+          transform="rotate(-0 334.608983 326.325882)">51.00</text>
       </g>
       <g id="text_22">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="375.116159" y="284.139966"
-          transform="rotate(-0 375.116159 284.139966)">63.59</text>
+          x="340.217317" y="368.511797"
+          transform="rotate(-0 340.217317 368.511797)">52.74</text>
       </g>
       <g id="text_23">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="403.008726" y="129.739515"
-          transform="rotate(-0 403.008726 129.739515)">72.27</text>
+          x="413.715646" y="129.739515"
+          transform="rotate(-0 413.715646 129.739515)">75.60</text>
       </g>
       <g id="text_24">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="415.505778" y="171.925431"
-          transform="rotate(-0 415.505778 171.925431)">76.15</text>
+          x="421.882806" y="171.925431"
+          transform="rotate(-0 421.882806 171.925431)">78.14</text>
       </g>
       <g id="text_25">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="416.355036" y="214.111346"
-          transform="rotate(-0 416.355036 214.111346)">76.42</text>
+          x="491.06443" y="214.111346"
+          transform="rotate(-0 491.06443 214.111346)">99.65</text>
       </g>
       <g id="text_26">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="426.434533" y="256.297262"
-          transform="rotate(-0 426.434533 256.297262)">79.55</text>
+          x="427.812998" y="256.297262"
+          transform="rotate(-0 427.812998 256.297262)">79.98</text>
       </g>
       <g id="text_27">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="425.658101" y="298.483177"
-          transform="rotate(-0 425.658101 298.483177)">79.31</text>
+          x="412.846831" y="298.483177"
+          transform="rotate(-0 412.846831 298.483177)">75.33</text>
       </g>
       <g id="text_28">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="476.5167" y="340.669093"
-          transform="rotate(-0 476.5167 340.669093)">95.12</text>
+          x="423.161353" y="340.669093"
+          transform="rotate(-0 423.161353 340.669093)">78.53</text>
       </g>
       <g id="text_29">
         <text
           style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start"
-          x="420.720136" y="382.855008"
-          transform="rotate(-0 420.720136 382.855008)">77.77</text>
+          x="430.190226" y="382.855008"
+          transform="rotate(-0 430.190226 382.855008)">80.72</text>
       </g>
     </g>
     <g id="text_30">
@@ -416,7 +432,7 @@ z
       <text
         style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #475569"
         x="28.8" y="55.296"
-        transform="rotate(-0 28.8 55.296)">Five fresh uncached builds · two recursive Blot cases unsupported</text>
+        transform="rotate(-0 28.8 55.296)">Five fresh uncached builds · seven supported adapted cases</text>
     </g>
     <g id="text_32">
       <text
@@ -425,7 +441,7 @@ z
         transform="rotate(-0 28.8 449.28)">2026-11-04 · shared-host medians · Blot vs Goose direct Wasm</text>
     </g>
     <g id="legend_1">
-      <g id="patch_15">
+      <g id="patch_17">
         <path d="M 562.373437 25.814437
 L 582.373437 25.814437
 L 582.373437 18.814437
@@ -439,7 +455,7 @@ z
           x="590.373437" y="25.814437"
           transform="rotate(-0 590.373437 25.814437)">Blot</text>
       </g>
-      <g id="patch_16">
+      <g id="patch_18">
         <path d="M 630.051562 25.814437
 L 650.051562 25.814437
 L 650.051562 18.814437
