@@ -8,7 +8,7 @@ from matplotlib import rcParams
 from matplotlib.figure import Figure
 
 HERE = Path(__file__).resolve().parent
-EVIDENCE = HERE / "results/2026-11-04-merge-select.json"
+EVIDENCE = HERE / "results/2026-11-04-merge-ranges.json"
 LABELS = {
     "fannkuch": "Fannkuch",
     "crc32": "CRC32",
@@ -106,8 +106,8 @@ def main():
     chart(
         builds,
         "wall_ms",
-        "Cold compilation · preceding survey",
-        "Five fresh uncached builds · scalar-array checkpoint; see pinned evidence",
+        "Cold compilation",
+        "Five fresh uncached builds per pair · current measured compiler binaries",
         "compilation.svg",
         150,
         [0, 25, 50, 75, 100, 125, 150],
@@ -117,7 +117,7 @@ def main():
         runtime,
         "kernel_ms",
         "Bounded Wasm runtime",
-        "Five matched pairs · merge refreshed; six unchanged Wasm controls retain prior timings",
+        "Five fresh matched pairs per workload · same inputs and checksums",
         "runtime.svg",
         200,
         [0, 50, 100, 150, 200],

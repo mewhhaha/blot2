@@ -8,29 +8,29 @@ Reachable throughput targets are 50k source lines in 0.5s, then one million
 lines/second.
 
 The
-[checked merge checkpoint](benchmarks/goose/results/2026-11-04-merge-select.md)
-improves unchanged merge sort **230.88 → 157.72ms (1.466x)** across five release
-pairs. The fresh Goose gap narrows **1.97x → 1.36x**. A bounded Core proof emits
-two checked loads, select/store and Boolean cursor increments after ordinary
-semantic/owner/backedge checking. All per-access bounds and lazy validation
-remain. Aliases, ties, skipped accesses, wrapping and trap prefixes execute in
-both tiers and sync/async modes. Merge Wasm shrinks **6,991 → 6,810B**; the
-other six adapted benchmark Wasms are byte-identical. README runtime charts
-refresh merge only; cold-compilation and other exact-artifact observations
-retain their pinned preceding survey.
+[guarded merge checkpoint](benchmarks/goose/results/2026-11-04-merge-ranges.md)
+improves unchanged merge another **156.70 → 137.19ms (1.145x)** across five
+release pairs. The fresh Goose gap is **1.19x**. Complete-range guards admit
+private pointer iteration for longer merges; declined guards retain the exact
+checked loop. Fresh loads preserve aliases/ties, and actual scalar cursor values
+are restored at exit. A bounded independent scalar replacement proof also omits
+unused destination loads, retaining address/owner/bounds checks and live
+borrows. Merge Wasm grows **6,810 → 7,196B**. All seven benchmark pairs are
+freshly measured; quicksort is effectively unchanged, custom hash improves about
+5%, and Mandelbrot is effectively unchanged with a slightly higher median.
 
 Current release compiler SHA256:
-`105f0e18734b8eeb7fa53801087f069a8d4591d325f26eea6c4f0416538cecbf`. All **2,953
-native laws compile without LLVM**. The affected development family passes **8
-native / 28 guests in 9.36s**; four new laws pass full-fault mode, and all 28
-affected release guests and four public-package API laws pass. The full gate
-passes smoke/harness, runtime fixtures and native compilation, then the native
-runner exits 130 after 83 passes/50 full allocation sweeps, without an emitted
-failing law. Cancellation occurs before the 180s cap; its cause is not
-established. **Full qualification remains pending.** Main has zero merge matches
-and is byte-identical at 10,049,963B; three fresh uncached pairs measure **5.271
-→ 5.279s**, changes -8/-73/+19ms, with no material compile-time gain. A fresh
-inspected NVIDIA frame matches the preceding PNG/trace under original budgets.
+`a18ced7646f5237d49f508ffdee850a0eed8490ee04944e3ec8c8f6e39da8745`. All **2,954
+native laws compile without LLVM**. The affected development family passes **10
+native / 32 guests in 37.56s**; four focused native laws pass full fault mode,
+all 32 affected release guests and four public-package API laws pass. The full
+gate reaches its 180s budget during native execution after 85 passes / 50
+complete full allocation sweeps, without an emitted failing law. **Full
+qualification remains pending.** Main has zero merge matches and 1,425 static
+old-load omissions; those counters are not exact encoded-instruction counts.
+Main saves **10,976B** to **10,038,987B**. Three fresh uncached pairs measure
+**5.362 → 5.306s**, changes **+14/-107/-33ms**: no material compilation gain. A
+fresh inspected NVIDIA frame matches the preceding PNG under original budgets.
 See the checkpoint for exact pins, diagnostic controls and limits.
 
 Memoized `~` parameters/types and `@demand`/`@force` remain removed. `and`/`or`
@@ -59,10 +59,12 @@ unchanged by this checkpoint.
 
 ## Next representation levers
 
-For merge, measure complete-range bounds reuse and per-call owner validation.
-The checked select change narrows the gap; their exclusive CPU costs remain
-unmeasured. Keep source-source-destination order, valid-prefix effects, aliases
-and all fallback behavior while testing those separate levers.
+For merge, measure per-call owner validation and recursive descriptor/call
+setup. The range/pointer path narrows the gap; remaining exclusive costs are
+unmeasured. Consider validated internal borrowed descriptors only where the
+existing recursive source proof establishes stable owners, no callbacks and no
+invalidating effects. Keep checks at authority boundaries, valid-prefix effects,
+aliases and exact fallback behavior.
 
 Integrate one bounded packed List element plan into the owned backend: dense tag
 plus active payload, append/freeze, byte-position/count cursors and one terminal
@@ -121,16 +123,11 @@ history; documentation cleanup is not completion.
 ## Iteration and delivery
 
 Use Zig 0.17.0 and `-Dllvm=false` for development/native tests. The current
-development family takes 9.36s after cache repair; one final LLVM release takes
-about five minutes. Use `deno task build:compiler:dev --fixtures= --jobs=2` for
-a compiler-only iteration, then the affected regression family. Keep source
-frozen before the final LLVM build.
-
-A Btrfs metadata stall inflated one rebuild to about two minutes with about 20
-CPU seconds. Only older disposable compiler objects were pruned. Zig's stale
-empty-input manifests then needed invalidation to regenerate removed options
-normally; compiled-object manifests, installed binaries, source/assets and raw
-evidence were preserved. See the checkpoint for the exact cache inventory.
+development family takes 37.56s including complete native compilation; one final
+LLVM release takes about six minutes. Compiler-only native rebuilds take 8–11s.
+Use `deno task build:compiler:dev --fixtures= --jobs=2` for a compiler-only
+iteration, then the affected regression family. Keep source frozen before the
+final LLVM build.
 
 Use `deno task check:dev --area merge-loops` for the current regression family
 and `deno task test:compiler` before compiler commits. Full qualification is

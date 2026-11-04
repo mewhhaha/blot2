@@ -1,6 +1,6 @@
 //! Exact checked two-cursor merges, after ordinary source/owner/backedge checks.
-//! Keep lazy owner validation and every bound; only the data-dependent choice
-//! becomes a select. Both compared values are read anew before each store.
+//! Validate complete ranges for longer merges; retain the exact checked loop
+//! when a guard declines. Both values are read anew before each store.
 const std = @import("std");
 const core = @import("../check/core.zig");
 const T = @import("../check/types.zig");
@@ -163,7 +163,7 @@ const Builder = struct {
         try self.value(x);
         try self.op(.local_set, local.id);
     }
-    fn address(self: *Builder, span: Span, index: Local, length_function: u32) A.Error!void {
+    fn ensureSpan(self: *Builder, span: Span, length_function: u32) A.Error!void {
         if (span.ready) |ready| {
             try self.value(.{ .i32_eqz, Local{ .id = ready } });
             try self.op(.if_, 0);
@@ -173,43 +173,154 @@ const Builder = struct {
             try self.set(.{ .id = ready }, 1);
             try self.op(.end, 0);
         }
+    }
+    fn checkedAddress(self: *Builder, span: Span, index: Local, length_function: u32) A.Error!void {
+        try self.ensureSpan(span, length_function);
         try self.value(.{ .i32_ge_u, index, Local{ .id = span.length } });
         try self.op(.if_, 0);
         try self.op(.unreachable_, 0);
         try self.op(.end, 0);
         try self.value(.{ .i32_add, .{ .i32_add, Local{ .id = span.word }, 16 }, .{ .i32_mul, index, 4 } });
     }
+    fn sourceGuard(self: *Builder, span: Span, limit: Local, length_function: u32) A.Error!void {
+        try self.ensureSpan(span, length_function);
+        const word: Local = .{ .id = span.word };
+        const room = .{ .i32_shr_u, .{ .i32_sub, std.math.maxInt(u32) - 16, word }, 2 };
+        // The fixed scalar descriptor proof supplies four-byte layout. An
+        // inclusive limit below both length and byte room cannot wrap on step.
+        try self.value(.{ .i32_and, .{ .i32_lt_u, limit, Local{ .id = span.length } }, .{ .i32_and, .{ .i32_le_u, word, std.math.maxInt(u32) - 16 }, .{ .i32_lt_u, limit, room } } });
+        try self.op(.if_, 0);
+    }
+    fn loop(self: *Builder, plan: Plan, one: Local, two: Local, choose: Local) A.Error!void {
+        const first: Local = .{ .id = plan.first };
+        const second: Local = .{ .id = plan.second };
+        const output: Local = .{ .id = plan.output };
+        try self.op(.block, 0);
+        try self.op(.loop, 0);
+        try self.value(.{ .i32_gt_u, second, Local{ .id = plan.second_limit } });
+        try self.op(.br_if, 1);
+        try self.value(.{ .i32_gt_u, first, Local{ .id = plan.first_limit } });
+        try self.op(.br_if, 1);
+        try self.checkedAddress(plan.first_array, first, plan.length_function);
+        try self.op(.i32_load, 0);
+        try self.op(.local_set, one.id);
+        try self.checkedAddress(plan.second_array, second, plan.length_function);
+        try self.op(.i32_load, 0);
+        try self.op(.local_set, two.id);
+        try self.set(choose, .{ .i32_lt_u, one, two });
+        try self.checkedAddress(plan.target, output, plan.length_function);
+        try self.value(.{ .i32_select, one, two, choose });
+        try self.op(.i32_store, 0);
+        try self.set(first, .{ .i32_add, first, choose });
+        try self.set(second, .{ .i32_add, second, .{ .i32_eqz, choose } });
+        try self.set(output, .{ .i32_add, output, 1 });
+        try self.op(.br, 0);
+        try self.op(.end, 0);
+        try self.op(.end, 0);
+    }
+    fn pointerLoop(self: *Builder, plan: Plan, one: Local, two: Local, choose: Local) A.Error!void {
+        const first = try self.temp();
+        const second = try self.temp();
+        const output = try self.temp();
+        const first_end = try self.temp();
+        const second_end = try self.temp();
+        const step = try self.temp();
+        const first_base = .{ .i32_add, Local{ .id = plan.first_array.word }, 16 };
+        const second_base = .{ .i32_add, Local{ .id = plan.second_array.word }, 16 };
+        const output_base = .{ .i32_add, Local{ .id = plan.target.word }, 16 };
+        try self.set(first, .{ .i32_add, first_base, .{ .i32_shl, Local{ .id = plan.first }, 2 } });
+        try self.set(second, .{ .i32_add, second_base, .{ .i32_shl, Local{ .id = plan.second }, 2 } });
+        try self.set(output, .{ .i32_add, output_base, .{ .i32_shl, Local{ .id = plan.output }, 2 } });
+        try self.set(first_end, .{ .i32_add, first_base, .{ .i32_shl, .{ .i32_add, Local{ .id = plan.first_limit }, 1 }, 2 } });
+        try self.set(second_end, .{ .i32_add, second_base, .{ .i32_shl, .{ .i32_add, Local{ .id = plan.second_limit }, 1 }, 2 } });
+        try self.op(.block, 0);
+        try self.op(.loop, 0);
+        try self.value(.{ .i32_ge_u, second, second_end });
+        try self.op(.br_if, 1);
+        try self.value(.{ .i32_ge_u, first, first_end });
+        try self.op(.br_if, 1);
+        try self.value(first);
+        try self.op(.i32_load, 0);
+        try self.op(.local_set, one.id);
+        try self.value(second);
+        try self.op(.i32_load, 0);
+        try self.op(.local_set, two.id);
+        try self.set(choose, .{ .i32_lt_u, one, two });
+        try self.value(output);
+        try self.value(.{ .i32_select, one, two, choose });
+        try self.op(.i32_store, 0);
+        try self.set(step, .{ .i32_shl, choose, 2 });
+        try self.set(first, .{ .i32_add, first, step });
+        try self.set(second, .{ .i32_add, second, .{ .i32_sub, 4, step } });
+        try self.set(output, .{ .i32_add, output, 4 });
+        try self.op(.br, 0);
+        try self.op(.end, 0);
+        try self.op(.end, 0);
+        // No source observer can see intermediate scalar carries. Publish the
+        // actual cursor positions, including the iteration that exhausted one
+        // source; the guarded maximum is never substituted for actual work.
+        try self.set(.{ .id = plan.first }, .{ .i32_shr_u, .{ .i32_sub, first, first_base }, 2 });
+        try self.set(.{ .id = plan.second }, .{ .i32_shr_u, .{ .i32_sub, second, second_base }, 2 });
+        try self.set(.{ .id = plan.output }, .{ .i32_shr_u, .{ .i32_sub, output, output_base }, 2 });
+    }
 };
-pub fn emit(a: A, plan: Plan) A.Error!ir.Body {
+pub fn checkedLoop(a: A, plan: Plan) A.Error!ir.Body {
     var b: Builder = .{ .a = a, .next_local = plan.next_local };
     errdefer b.body.deinit(a);
-    const first: Local = .{ .id = plan.first };
-    const second: Local = .{ .id = plan.second };
-    const output: Local = .{ .id = plan.output };
     const one = try b.temp();
     const two = try b.temp();
     const choose = try b.temp();
-    try b.op(.block, 0);
-    try b.op(.loop, 0);
-    try b.value(.{ .i32_gt_u, second, Local{ .id = plan.second_limit } });
-    try b.op(.br_if, 1);
-    try b.value(.{ .i32_gt_u, first, Local{ .id = plan.first_limit } });
-    try b.op(.br_if, 1);
-    try b.address(plan.first_array, first, plan.length_function);
-    try b.op(.i32_load, 0);
-    try b.op(.local_set, one.id);
-    try b.address(plan.second_array, second, plan.length_function);
-    try b.op(.i32_load, 0);
-    try b.op(.local_set, two.id);
-    try b.set(choose, .{ .i32_lt_u, one, two });
-    try b.address(plan.target, output, plan.length_function);
-    try b.value(.{ .i32_select, one, two, choose });
-    try b.op(.i32_store, 0);
-    try b.set(first, .{ .i32_add, first, choose });
-    try b.set(second, .{ .i32_add, second, .{ .i32_eqz, choose } });
-    try b.set(output, .{ .i32_add, output, 1 });
-    try b.op(.br, 0);
-    try b.op(.end, 0);
+    try b.loop(plan, one, two, choose);
+    return b.body;
+}
+pub fn emit(a: A, plan: Plan) A.Error!ir.Body {
+    var checked = try checkedLoop(a, plan);
+    defer checked.deinit(a);
+    var b: Builder = .{ .a = a, .next_local = plan.next_local + @as(u32, @intCast(checked.locals.items.len)) };
+    errdefer b.body.deinit(a);
+    try b.body.locals.appendSlice(a, checked.locals.items);
+    const safe = try b.temp();
+    const x = try b.temp();
+    const y = try b.temp();
+    const remaining = try b.temp();
+    const end = try b.temp();
+    const first: Local = .{ .id = plan.first };
+    const second: Local = .{ .id = plan.second };
+    const output: Local = .{ .id = plan.output };
+    const first_limit: Local = .{ .id = plan.first_limit };
+    const second_limit: Local = .{ .id = plan.second_limit };
+    try b.set(safe, 0);
+    // Pure comparisons may be eager; validation remains behind both exits.
+    try b.value(.{ .i32_and, .{ .i32_le_u, second, second_limit }, .{ .i32_le_u, first, first_limit } });
+    try b.op(.if_, 0);
+    try b.set(x, .{ .i32_sub, first_limit, first });
+    try b.set(y, .{ .i32_sub, second_limit, second });
+    // At least eight steps are guaranteed; small merges keep the checked loop.
+    try b.value(.{ .i32_and, .{ .i32_ge_u, x, 7 }, .{ .i32_ge_u, y, 7 } });
+    try b.op(.if_, 0);
+    try b.sourceGuard(plan.first_array, first_limit, plan.length_function);
+    try b.sourceGuard(plan.second_array, second_limit, plan.length_function);
+    try b.ensureSpan(plan.target, plan.length_function);
+    try b.value(.{ .i32_lt_u, output, Local{ .id = plan.target.length } });
+    try b.op(.if_, 0);
+    try b.set(remaining, .{ .i32_sub, Local{ .id = plan.target.length }, output });
+    try b.value(.{ .i32_and, .{ .i32_lt_u, x, remaining }, .{ .i32_lt_u, y, .{ .i32_sub, remaining, x } } });
+    try b.op(.if_, 0);
+    // x < R and y < R-x prove x+y+1 <= R before either addition.
+    try b.set(end, .{ .i32_add, output, .{ .i32_add, .{ .i32_add, x, y }, 1 } });
+    const word: Local = .{ .id = plan.target.word };
+    try b.set(safe, .{ .i32_and, .{ .i32_le_u, word, std.math.maxInt(u32) - 16 }, .{ .i32_le_u, end, .{ .i32_shr_u, .{ .i32_sub, std.math.maxInt(u32) - 16, word }, 2 } } });
+    try b.op(.end, 0); // Target capacity.
+    try b.op(.end, 0); // Active destination.
+    try b.op(.end, 0); // Second source range.
+    try b.op(.end, 0); // First source range.
+    try b.op(.end, 0); // Minimum merge length.
+    try b.op(.end, 0); // Both original exits permit an iteration.
+    try b.value(safe);
+    try b.op(.if_, 0);
+    try b.pointerLoop(plan, .{ .id = plan.next_local }, .{ .id = plan.next_local + 1 }, .{ .id = plan.next_local + 2 });
+    try b.op(.else_, 0);
+    try b.body.instructions.appendSlice(a, checked.instructions.items);
     try b.op(.end, 0);
     return b.body;
 }

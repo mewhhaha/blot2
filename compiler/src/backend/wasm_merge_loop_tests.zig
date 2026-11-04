@@ -68,20 +68,15 @@ test "checked merge source proof requires exact exits stores increments and SSA 
 }
 fn detached(allocator: std.mem.Allocator) !void {
     const span: merge.Span = .{ .word = 0, .token = 1, .epoch_low = 2, .epoch_high = 3, .length = 4, .ready = 5 };
-    var body = try merge.emit(allocator, .{ .first_array = span, .second_array = span, .target = span, .first = 6, .second = 7, .output = 8, .first_limit = 9, .second_limit = 10, .length_function = 11, .next_local = 12 });
+    const plan: merge.Plan = .{ .first_array = span, .second_array = span, .target = span, .first = 6, .second = 7, .output = 8, .first_limit = 9, .second_limit = 10, .length_function = 11, .next_local = 12 };
+    var body = try merge.emit(allocator, plan);
     defer body.deinit(allocator);
-    var loads: usize = 0;
-    var stores: usize = 0;
-    var selects: usize = 0;
-    for (body.instructions.items) |inst| switch (inst.op) {
-        .i32_load => loads += 1,
-        .i32_store => stores += 1,
-        .i32_select => selects += 1,
-        else => {},
-    };
-    try std.testing.expectEqual(@as(usize, 2), loads);
-    try std.testing.expectEqual(@as(usize, 1), stores);
-    try std.testing.expectEqual(@as(usize, 1), selects);
+    var checked = try merge.checkedLoop(allocator, plan);
+    defer checked.deinit(allocator);
+    const end = body.instructions.items.len - 1;
+    const start = end - checked.instructions.items.len;
+    try std.testing.expectEqual(@import("runtime_ir.zig").Op.else_, body.instructions.items[start - 1].op);
+    try std.testing.expectEqualSlices(@import("runtime_ir.zig").Instruction, checked.instructions.items, body.instructions.items[start..end]);
 }
 test "checked merge detached emission preserves allocation rollback" {
     try detached(a);

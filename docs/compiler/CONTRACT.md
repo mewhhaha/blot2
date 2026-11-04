@@ -82,6 +82,15 @@ including growth. The final store reuses that address and writes only the
 selected field, retaining sibling writes through aliases. Shrinking remains
 rejected while the selected borrow is live.
 
+A terminal plain scalar assignment in a program without scalar addresses may
+omit the discarded old value load after the ordinary address, owner and bounds
+checks. A bounded Core walk proves the replacement independent of `self`:
+constants, local/parameter references, scalar/logical operations and array
+get/length only. Calls, dispatch, captures, globals and unsupported or exhausted
+walks retain the load. This proof does not use the incomplete liveness map.
+Replacement evaluation, borrow pinning and the final store keep their order;
+exact scalar bits remain intact.
+
 A control-flow merge may retain a dominating aggregate's physical words when
 both incoming Core values canonicalize to that exact binding and the complete
 compilation has no scalar addresses. This identity proof includes unchanged
@@ -159,13 +168,18 @@ matching indexed reads/stores, distinct cursor/output carries, invariant limits
 and complete SSA branch/backedge correspondence. Other effects, self-dependent
 stores, changed increments and additional statements decline. Ordinary source,
 owner, read and escape checks still finish before replacing the bounded suffix.
-Lazy owner validation and every per-access bound remain in their original order:
-first source, second source, destination. A same-width store replaces the unused
-old destination load before any cursor advances. Both input values reload each
-iteration, preserving aliases, ties, wrapping arithmetic and trap prefixes.
-Publication reserves capacity and invalidates span/snapshot receipts. The
-private select opcode has the exact pure, nontrapping `(i32,i32,i32)->i32`
-contract.
+Short merges retain lazy owner validation and per-access bounds in their
+original order: first source, second source, destination. With at least eight
+elements in each source, nested guards may prove both complete source ranges,
+destination capacity and nonwrapping addresses. They validate in the same order;
+a declined guard enters the exact checked loop. Fixed scalar descriptor
+admission supplies the four-byte layout. Only the successful arm advances
+private byte pointers, then restores the actual scalar cursor positions on exit.
+Both input values reload before every store, retaining aliases and ties.
+Unproven ranges preserve wrapping arithmetic and valid-prefix writes before
+traps through the fallback. Publication reserves capacity and invalidates
+span/snapshot receipts. The private select opcode has the exact pure,
+nontrapping `(i32,i32,i32)->i32` contract.
 
 A fixed range loop with one U32 carry may compose one through eight pure bit
 rounds into an exact affine transform. Normal source checking, ownership, escape

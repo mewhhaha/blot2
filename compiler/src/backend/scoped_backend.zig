@@ -87,6 +87,120 @@ pub fn required(allocator: std.mem.Allocator, units: []const core.Module, entry:
     }
     return false;
 }
+// This proof only removes an unused scalar payload load. It establishes no
+// owner/read authority, and unsupported RHS forms retain their ordinary load.
+fn independentScalarReplacement(m: *const core.Module, id: core.Id, self_binding: core.BindingId, depth: usize, remaining: *usize) bool {
+    if (id == 0) return true;
+    if (depth > 32 or remaining.* == 0 or id >= m.nodes.len) return false;
+    remaining.* -= 1;
+    const node = m.node(id);
+    switch (node.tag) {
+        .constant => return true,
+        .reference => {
+            const reference = m.reference(id);
+            if (reference.unit != 0 and reference.unit != m.unit) return false;
+            if (reference.binding == self_binding or reference.binding == 0 or reference.binding >= m.bindings.len) return false;
+            const kind = m.binding(reference.binding).kind;
+            return kind == .local or kind == .parameter;
+        },
+        .scalar, .logical => {
+            if (node.tag == .scalar and node.c != 0) return false;
+            return independentScalarReplacement(m, node.a, self_binding, depth + 1, remaining) and
+                independentScalarReplacement(m, node.b, self_binding, depth + 1, remaining);
+        },
+        .array_op => {
+            const operation = m.arrayOperation(id);
+            if (operation != .get and operation != .length) return false;
+            for (m.children(id)) |child| {
+                if (!independentScalarReplacement(m, child, self_binding, depth + 1, remaining)) return false;
+            }
+            return true;
+        },
+        else => return false,
+    }
+}
+test "scalar replacement proof declines self captures dispatch and bounded exhaustion" {
+    var nodes = [_]core.Node{
+        .{ .tag = .invalid },
+        .{ .tag = .constant, .ty = T.u32_type, .a = 42 },
+        .{ .tag = .reference, .a = 0 },
+        .{ .tag = .reference, .a = 1 },
+        .{ .tag = .reference, .a = 2 },
+        .{ .tag = .reference, .a = 3 },
+        .{ .tag = .scalar, .a = 4, .b = 1 },
+        .{ .tag = .array_op, .a = 0, .b = 2, .c = @backingInt(core.ArrayOp.get) },
+        .{ .tag = .array_op, .a = 0, .b = 1, .c = @backingInt(core.ArrayOp.length) },
+        .{ .tag = .closure },
+        .{ .tag = .scalar, .a = 4, .b = 1, .c = 1 },
+        .{ .tag = .logical, .a = 7, .b = 8 },
+        .{ .tag = .array_op, .a = 0, .b = 2, .c = @backingInt(core.ArrayOp.set) },
+        .{ .tag = .scalar, .a = 1, .b = 2 },
+        .{ .tag = .array_op, .a = 2, .b = 2, .c = @backingInt(core.ArrayOp.get) },
+        .{ .tag = .reference, .a = 4 },
+        .{ .tag = .reference, .a = 5 },
+    };
+    var references = [_]core.BindingRef{
+        .{ .binding = 1 },            .{ .unit = 1, .binding = 1 }, .{ .binding = 2 },
+        .{ .unit = 1, .binding = 3 }, .{ .unit = 2, .binding = 1 }, .{ .binding = 4 },
+    };
+    var bindings: [5]core.Binding = undefined;
+    for (&bindings) |*binding| {
+        binding.* = std.mem.zeroes(core.Binding);
+        binding.kind = .local;
+    }
+    bindings[2].kind = .parameter;
+    bindings[4].kind = .global;
+    var extra = [_]core.Id{ 4, 5, 4, 2 };
+    var m: core.Module = .{
+        .unit = 1,
+        .types = .{ .nodes = &.{}, .extra = &.{} },
+        .nodes = &nodes,
+        .spans = &.{},
+        .extra = &extra,
+        .bindings = &bindings,
+        .bodies = &.{},
+        .parameters = &.{},
+        .references = &references,
+        .calls = &.{},
+        .merges = &.{},
+        .merge_ranges = &.{},
+        .names = &.{},
+        .obligations = &.{},
+        .diagnostics = &.{},
+        .body_lowerings = 0,
+    };
+    for ([_]core.Id{ 1, 4, 5, 6, 7, 8, 11 }) |id| {
+        var remaining: usize = 64;
+        try std.testing.expect(independentScalarReplacement(&m, id, 1, 0, &remaining));
+    }
+    for ([_]core.Id{ 2, 3, 9, 10, 12, 13, 14, 15, 16 }) |id| {
+        var remaining: usize = 64;
+        try std.testing.expect(!independentScalarReplacement(&m, id, 1, 0, &remaining));
+    }
+    // No capture/body tables are consulted for unsupported forms: every such
+    // node declines even if its ordinary children look independent.
+    for ([_]core.Tag{ .closure, .call, .apply, .project, .proof_guard, .match, .pattern_bind, .update, .loop }) |tag| {
+        nodes[9] = .{ .tag = tag, .a = 1, .b = 1 };
+        var remaining: usize = 64;
+        try std.testing.expect(!independentScalarReplacement(&m, 9, 1, 0, &remaining));
+    }
+    var chain: [35]core.Node = undefined;
+    chain[0] = .{ .tag = .invalid };
+    chain[1] = .{ .tag = .constant };
+    for (chain[2..], 2..) |*node, id| node.* = .{ .tag = .scalar, .a = @intCast(id - 1) };
+    m.nodes = &chain;
+    var remaining: usize = 64;
+    try std.testing.expect(independentScalarReplacement(&m, 33, 1, 0, &remaining));
+    remaining = 64;
+    try std.testing.expect(!independentScalarReplacement(&m, 34, 1, 0, &remaining));
+    for (chain[2..8], 2..) |*node, id| node.* = .{ .tag = .scalar, .a = @intCast(id - 1), .b = @intCast(id - 1) };
+    remaining = 64;
+    try std.testing.expect(independentScalarReplacement(&m, 6, 1, 0, &remaining));
+    try std.testing.expectEqual(@as(usize, 1), remaining);
+    remaining = 64;
+    try std.testing.expect(!independentScalarReplacement(&m, 7, 1, 0, &remaining));
+    try std.testing.expectEqual(@as(usize, 0), remaining);
+}
 const Value = struct {
     tag: enum { scalar, array, ref, view, link, aggregate, callable } = .scalar,
     word: Local,
@@ -4347,7 +4461,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_bit_recurrences", "scoped_bit_rounds_removed", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_bulk_copies", "scoped_bulk_fills", "scoped_merge_loops", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_bit_recurrences", "scoped_bit_rounds_removed", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_bulk_copies", "scoped_bulk_fills", "scoped_merge_loops", "scoped_scalar_old_loads_avoided", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -6966,8 +7080,20 @@ const Generator = struct {
             const place = try self.readElementPlace(m, id, value, index) orelse return self.terminated();
             const selected_only = at + 1 < @max(selectors.len, path.len) and plainInlineValue(place.element) and stableDescriptorShape(place.element);
             var selected: Value = undefined;
+            var replacement_budget: usize = 64;
+            const scalar_replacement = at + 1 == @max(selectors.len, path.len) and
+                !self.scalar_admission.hasScalarReferences() and place.element.tag == .scalar and
+                place.element.fields.len == 0 and place.element.root == null and place.element.other_roots.len == 0 and
+                place.element.host == null and place.element.callable == null and place.element.nominal == null and
+                place.element.variant_tags.len == 0 and
+                independentScalarReplacement(m, info.value, info.self_binding, 0, &replacement_budget);
             if (selected_only) {
                 selected = place.element;
+            } else if (scalar_replacement) {
+                // Self is unreachable in this RHS. Keep only its checked type
+                // shape; no old scalar bits or literal evidence are available.
+                selected = .{ .word = .{ .id = 0 }, .floating = place.element.floating, .name = place.element.name, .type_evidence = place.element.type_evidence };
+                self.emission_work.scoped_scalar_old_loads_avoided +|= 1;
             } else {
                 selected = try self.loadValue(place.address, 0, place.element);
             }

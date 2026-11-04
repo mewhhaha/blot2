@@ -12,14 +12,19 @@ The independently newer Goose reference and all timing/size tradeoffs remain
 explicit.
 
 The latest
-[checked merge checkpoint](../benchmarks/goose/results/2026-11-04-merge-select.md)
-improves unchanged merge another 1.466x and narrows the fresh Goose gap to
-1.36x. All bounds remain; source/carry proofs admit checked select/store
-emission. All 2,953 native laws compile without LLVM, and the focused 8
-native/28 guest family passes in 9.36s. Main remains byte-identical at
-10,049,963B, with fresh paired compilation 5.271→5.279s. Full qualification
-remains pending after an unexplained native-run cancellation; the checkpoint
-preserves raw evidence.
+[guarded merge checkpoint](../benchmarks/goose/results/2026-11-04-merge-ranges.md)
+improves unchanged merge another **1.145x**, narrowing the fresh Goose gap to
+**1.19x**. Complete-range guards admit pointer iteration and retain the exact
+checked fallback. Bounded scalar replacement proofs also remove unused old loads
+without changing address checks or live borrows. All 2,954 native laws compile
+without LLVM; the focused 10 native/32 guest family passes in 37.56s. Main saves
+10,976B to **10,038,987B**, with fresh paired compilation **5.362 → 5.306s**: no
+material compile-time gain. Full qualification remains pending after the full
+gate reaches its 180s cap during native execution, without an emitted failing
+law; the checkpoint preserves raw evidence. All seven benchmark pairs are
+freshly measured. The
+[preceding checked selection](../benchmarks/goose/results/2026-11-04-merge-select.md)
+retains its own candidate and qualification records.
 
 The preceding
 [feature retirement](../benchmarks/evidence/integration/2026-11-04-demand-retirement.json)
