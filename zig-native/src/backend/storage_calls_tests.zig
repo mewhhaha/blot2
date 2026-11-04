@@ -1919,6 +1919,36 @@ test "fixed scalar spans preserve fresh lifetimes nested array carries and expli
     try publishFixedScalarSpans(a, &.{module});
 }
 
+fn publishBulkScalarLoops(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_bulk_copies > 0);
+    try std.testing.expect(result.counters.scoped_bulk_fills > 0);
+}
+
+test "bulk scalar source loops publish checked descriptors and fallback transactionally through OOM" {
+    var module = try lower(a,
+        \\const copy = func (dst: Array U32) -> (src: Array U32) -> (end: U32): Unit => return do:
+        \\  for index in 0 .. end:
+        \\    dst[index] := src[index]
+        \\  return ()
+        \\const fill = func (dst: Array U32) -> (end: U32): Unit => return do:
+        \\  for index in 0 .. end:
+        \\    dst[index] := 305419896
+        \\  return ()
+        \\entry const answer = func (end: U32): U32 => return do:
+        \\  let dst: Array U32 = @array.fill 32 0
+        \\  let src: Array U32 = @array.fill 32 7
+        \\  copy dst src end
+        \\  fill dst end
+        \\  return dst[0]
+    );
+    defer module.deinit(a);
+    try publishBulkScalarLoops(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishBulkScalarLoops, .{@as([]const core.Module, &.{module})});
+}
+
 test "nested array carry fields retain exact identities across exits and reject replacements" {
     const source =
         \\entry const stable = func (input: U32): U32 => return do:

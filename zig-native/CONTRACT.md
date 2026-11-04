@@ -136,6 +136,23 @@ and root returns have no continuing path. Every original read must still be
 proved, and publication forwards only through copies actually removed, retaining
 intermediate snapshots and default-zero behavior.
 
+Private fixed scalar-array inputs validate their descriptor lazily at first
+actual use. A validation dominates later uses only while its original machine
+scope remains active. Arm, block and loop facts never escape their scope;
+function changes, rollback, outlining and suffix replacement invalidate them.
+Scalar layout fixes the element stride at four bytes. Per-access bounds checks
+remain, and skipped branches or empty loops cannot initialize a later read.
+
+An exact range-loop assignment `dst[index] := src[index]` or scalar literal may
+use bulk memory operations after all normal source, owner and backedge checks.
+The descriptors must retain their physical identity. Full-range bounds, stride,
+nonwrapping address and safe forward-copy overlap guards precede the bulk path;
+unsafe ranges retain the original scalar loop and its valid-prefix writes before
+a later trap. Empty/reversed ranges avoid validation, and fewer than sixteen
+elements retain scalar execution. Literal fill preserves exact scalar bits.
+Detached output and all local/instruction capacity are reserved before replacing
+the canonical loop suffix; pending outline or semantic coordinates reject it.
+
 A fixed range loop with one U32 carry may compose one through eight pure bit
 rounds into an exact affine transform. Normal source checking, ownership,
 escape and backedge validation finish first. The bounded machine interpreter

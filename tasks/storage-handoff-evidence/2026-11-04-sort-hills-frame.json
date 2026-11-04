@@ -1,0 +1,94 @@
+{
+  "pen_sha256": "c5012f1cc13dad5e643348932ace58e5ee271430edf10ad2a1cbd5f2246b7d8d",
+  "command": [
+    "/home/jacobt/src/pen/target/release/pen",
+    "--game",
+    "/home/jacobt/src/blot2/build/bench/sort-hills/pen/game",
+    "--assets",
+    "/home/jacobt/src/gdev/src/assets",
+    "--headless",
+    "--mute",
+    "--frames",
+    "1",
+    "--fps",
+    "60",
+    "--size",
+    "640x480",
+    "--data",
+    "/home/jacobt/src/blot2/build/bench/sort-hills/pen/data",
+    "--trace",
+    "/home/jacobt/src/blot2/build/bench/sort-hills/pen/frames.trace",
+    "--screenshot",
+    "/home/jacobt/src/blot2/build/bench/sort-hills/pen/frame.png"
+  ],
+  "entry": "src/main.blot:main",
+  "project": "/home/jacobt/src/gdev",
+  "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+  "compiler_sha256": "dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7",
+  "storage": {
+    "temporaryBytes": 2097152,
+    "persistentBytes": 262144,
+    "transportBytes": 2097152,
+    "ownerCapacity": 4096
+  },
+  "compile_invoked": false,
+  "graphics_environment": {
+    "XDG_RUNTIME_DIR": "/run/user/1000"
+  },
+  "compiled_main_source": "/home/jacobt/src/blot2/build/bench/sort-hills/main-pairs/0-after/main-2e04d1da0ed80530/main.wasm",
+  "wasm_sha256": "8a5bc671b85bba52b8989abe4c2165e26d1e379c659e3db9666dd60ad7e5127b",
+  "scene_sha256": "156d9f802916ce2bbe1b5d85da494b9da8237282c4f0318bf487c2a3ab67f9af",
+  "assets": "/home/jacobt/src/gdev/src/assets",
+  "returncode": 0,
+  "checks": {
+    "exit_zero": true,
+    "one_completed_guest_trace": true,
+    "one_headless_step": true,
+    "first_guest_frame": true,
+    "complete_render": true,
+    "screenshot_640x480": true
+  },
+  "compiled_wasm_unchanged": true,
+  "success": true,
+  "frame_png_sha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+  "frames_trace_sha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+  "baseline_png_and_trace_byte_identical": true,
+  "visually_inspected": true,
+  "source_pins": {
+    "blot2": {
+      "head": "c026efd58dac16d8c9c41f987221de4265d42921",
+      "status": [
+        " M scripts/bench/goose/README.md",
+        " M scripts/dev_check_areas.ts",
+        " M zig-native/CONTRACT.md",
+        " M zig-native/SCOPED_STORAGE.md",
+        " M zig-native/src/backend/scoped_backend.zig",
+        " M zig-native/src/backend/storage_calls_tests.zig",
+        " M zig-native/src/backend_suite.zig",
+        " M zig-native/src/work_counters.zig",
+        "?? zig-native/src/backend/storage_span_dominance.zig",
+        "?? zig-native/src/backend/wasm_bulk_loop.zig",
+        "?? zig-native/src/backend/wasm_bulk_loop_tests.zig",
+        "?? zig-native/tests/storage_bulk_loops_execution.test.ts"
+      ]
+    },
+    "gdev": {
+      "head": "38af0708efe585b10385ebf9ab7dc51ae5bb6b45",
+      "status": []
+    },
+    "ink": {
+      "head": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+      "status": []
+    },
+    "pen": {
+      "head": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf",
+      "status": []
+    }
+  },
+  "source_checkpoint": {
+    "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "preludeSha256": "3d5c896f1a45c830f696a3e73e8d00f4b12c585c6517f7e588d1373ce786270b",
+    "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+  },
+  "runtime_scope": "One inspected NVIDIA headless first frame; broader gameplay and software adapter remain pending."
+}

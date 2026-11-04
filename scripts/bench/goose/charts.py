@@ -8,7 +8,7 @@ from matplotlib import rcParams
 from matplotlib.figure import Figure
 
 HERE = Path(__file__).resolve().parent
-EVIDENCE = HERE / "results/2026-11-04-shared-hills.json"
+EVIDENCE = HERE / "results/2026-11-04-sort-hills.json"
 LABELS = {
     "fannkuch": "Fannkuch",
     "crc32": "CRC32",
@@ -119,8 +119,8 @@ def main():
         "Bounded Wasm runtime",
         "Five matched pairs · 400,000-element sorts · Mandelbrot F32 control",
         "runtime.svg",
-        500,
-        [0, 100, 200, 300, 400, 500],
+        300,
+        [0, 50, 100, 150, 200, 250, 300],
         [
             ("blot", "Blot", COLORS["blot"]),
             ("goose", "Goose", COLORS["goose"]),

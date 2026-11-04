@@ -3,29 +3,31 @@
 The current priorities are shared-kernel runtime, Gdev Wasm size and short
 iterations. Subsecond compilation, sub-five-second Main and 1–2MB remain unmet.
 The
-[current measured checkpoint](../scripts/bench/goose/results/2026-11-04-shared-hills.md)
-adds exact U32 bit-loop composition, structured copy proofs and checked direct
-scalar alias calls. CRC32 improves 6.2x; Main shrinks 155,377B to 10,097,652B.
-Its paired compile median regresses 5.283 → 5.414s (+2.5%); retain this
-tradeoff. Evaluated fold probes now allocate zero bytes per invocation.
+[current measured checkpoint](../scripts/bench/goose/results/2026-11-04-sort-hills.md)
+adds dominated fixed-array validation reuse, known scalar strides and guarded
+bulk copy/fill loops. Unchanged merge/quick/Sieve improve **1.64 / 1.35 /
+2.43x**; custom hash regresses **4–5%**. Main saves another **47,689B** to
+**10,049,963B**. Fresh paired compilation is effectively unchanged at **5.55s**.
+The independently newer Goose reference and all timing/size tradeoffs remain
+explicit.
 
-All 2,996 native laws compile without LLVM; 433 affected laws pass sampled
-faults. Twenty-six focused laws pass full-fault mode with 33 exhaustive sweeps.
-The 67.9s development family and all 328 affected release guests pass. The three
-previously reported baseline failures are repaired. Full qualification remains
-pending: the complete gate reaches 180s after 410 native passes with no
-failures. A fresh real NVIDIA frame matches the baseline PNG/trace under
-original budgets; see
-[frame evidence](storage-handoff-evidence/2026-11-04-shared-hills-frame.json).
+All **3,001 native laws compile without LLVM**. All **438 affected native laws**
+pass sampled faults; five focused full-fault laws include three exhaustive
+sweeps. The development family passes 271 native / 250 guests in 76.3s; all 330
+affected guests pass on the release compiler. Full qualification remains
+pending: the full gate reaches 180s after smoke/harness and 282 native passes
+without failures. A fresh inspected NVIDIA frame matches the preceding PNG/trace
+under original budgets; see
+[frame evidence](storage-handoff-evidence/2026-11-04-sort-hills-frame.json).
 Broader gameplay/software-adapter checks and Pen's normal source bridge remain
-pending; that host still omits inferenceBudget. Sibling source/assets remain
-Gdev `38af070`, Ink `ccaf08f`, Pen `d159492`.
+pending. Sibling source/assets remain Gdev `38af070`, Ink `ccaf08f`, Pen
+`d159492`.
 
 Next measure representation work by record shape and operation, then compare
 creation-backed immutable FrameAccess with shared semantic shapes/transitive
-field demand. The private IR replay retains short iterations. Main still spends
-4.439s in the backend and requests 5.315GB cumulatively; copy-only changes
-cannot reach the output target. Preserve the earlier
+field demand. Main still spends 4.430s in the backend and requests 5.324GB
+cumulatively; copy-only changes cannot reach the output target. Preserve the
+[preceding shared hills](../scripts/bench/goose/results/2026-11-04-shared-hills.md),
 [recursion](../scripts/bench/goose/results/2026-11-04-recursive-calls.md),
 [addressed-input](../scripts/bench/goose/results/2026-11-04-addressed-inputs.md),
 [shared-call](../scripts/bench/goose/results/2026-11-03-call-contexts.md) and
@@ -36,7 +38,7 @@ The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves
 physical Value leaves and owner/borrow metadata. Remaining local/global
 instructions occupied 8.54MB at that older checkpoint; the current census is
-6.70MB. Preserve semantic checks and explicit copies while changing that
+6.51MB. Preserve semantic checks and explicit copies while changing that
 representation. Ordinary `#run` build functions remain a separate, unimplemented
 simplification.
 

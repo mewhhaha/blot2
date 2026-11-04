@@ -163,6 +163,12 @@ additional live carries, nonlinear operations and instruction coordinates. This
 changes emitted work, not source semantics or storage budgets; see
 [the compiler contract](CONTRACT.md) for transactional replacement.
 
+Exact indexed scalar copy/fill loops may use guarded bulk memory operations.
+Unsafe ranges retain the scalar loop, including writes before a later bounds
+trap. Private fixed scalar-array validation may be reused within its dominating
+scope, with the scalar stride known statically. Ownership and per-access bounds
+checks remain; see [the compiler contract](CONTRACT.md).
+
 The new path contains no counted allocator, retain/release hooks or collector.
 The old `runtime/scoped_storage.zig` remains a low-level reservation fixture,
 not the runtime emitted for these source programs. The existing

@@ -2,14 +2,16 @@
 
 Run translated LangArena kernels against the sibling Goose compiler's direct
 Wasm backend. Both artifacts execute in the same Node/V8, checking every
-checksum. All seven adapted cases are attempted: four original-numeric pairs, an
+checksum. All seven adapted cases are attempted: six original-numeric pairs, an
 explicit Mandelbrot F32 control, and the unchanged recursive merge-sort and
 quicksort ports. Original F64 Mandelbrot and the other 43 catalog tasks remain
 outside paired coverage. The custom eight-lane `Hash::SHA256` task is not
 cryptographic SHA-256.
 
-[Current compiler hills, 2026-11-04](results/2026-11-04-shared-hills.md) records
-the CRC transform, Main size/compile tradeoff and allocation repairs.
+[Current array-loop hills, 2026-11-04](results/2026-11-04-sort-hills.md) records
+the sort/Sieve gains, custom-hash regression, newer Goose reference and Main
+control. The [preceding checkpoint](results/2026-11-04-shared-hills.md) records
+the CRC transform and allocation repairs.
 [Recursive sort support](results/2026-11-04-recursive-calls.md) records the
 seven supported adapted pairs. The
 [expanded survey, 2026-11-03](results/2026-11-03-expanded.md) retains earlier
@@ -93,11 +95,10 @@ U8. Both Mandelbrot sources explicitly use F32, with per-operation rounding
 checked by the independent oracle; the original F64 result differs. Sorting
 ports accept only the official 100,000/400,000 sizes, where their exact integer
 RNG conversion matches every Goose F64 RNG state. They preserve the recursive
-algorithms and remain runtime-unqualified until the backend supports them. No
-algorithm shortcut removes unused digest lanes: all eight lanes and the complete
-32-byte digest remain in both sources. These differences must accompany runtime
-and output-size comparisons. The tiny source fixtures do not establish Gdev
-performance or large-source compiler throughput.
+algorithms. No algorithm shortcut removes unused digest lanes: all eight lanes
+and the complete 32-byte digest remain in both sources. These differences must
+accompany runtime and output-size comparisons. The tiny source fixtures do not
+establish Gdev performance or large-source compiler throughput.
 
 Builds finish before runtime measurements. Runtime samples pair both backends
 with seeded shuffled order. Reports include individual observations, median,
@@ -122,10 +123,8 @@ Outputs:
   artifacts and per-child command/stdout/stderr evidence.
 
 The ports preserve the upstream MIT attribution in
-[ports/LICENSE](ports/LICENSE). The new recursive sorting ports expose an actual
-owned-backend restriction; their failures and lack of runtime scores remain
-visible. The original F64 workload is not replaced by the separately labelled
-F32 control.
+[ports/LICENSE](ports/LICENSE). The original F64 workload is not replaced by the
+separately labelled F32 control.
 
 Independent checksum and precision regression tests:
 

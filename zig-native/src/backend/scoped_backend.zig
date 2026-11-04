@@ -213,7 +213,7 @@ fn orderFields(fields: []Value) void {
         }
     }.less);
 }
-const FixedSpan = struct { length: Local, stride: Local, ready: ?Local = null };
+const FixedSpan = struct { length: Local, ready: ?Local = null, checked_scope: ?usize = null };
 const Root = struct { word: Local, token: Local, epoch_low: Local, epoch_high: Local, stack: u32, depth: usize, element: Value, element_initialized: bool = true, known_empty: bool = false, capacity_request: ?usize = null, live: bool = true, frozen: bool = false, persistent: bool = false, dedicated: bool = true, fixed_span: ?FixedSpan = null, global_ready: ?Local = null, imported_global: bool = false };
 const Global = struct { target: core.BindingRef, word: u32, token: u32, epoch_low: u32, epoch_high: u32, capacity_request: usize, literal_bytes: ?u32 = null, initializing: bool = false };
 const TypeRef = struct { unit: u32, ty: T.Id, environment: ?[]const TypeArgument = null };
@@ -448,6 +448,7 @@ const Generator = struct {
     bundle_retained_bytes: usize = 0,
     bundle_retained_count: usize = 0,
     bundle_sources: std.AutoHashMapUnmanaged(u32, void) = .empty,
+    span_scopes: @import("storage_span_dominance.zig").Scopes = .{},
     stacks: std.ArrayList(bool) = .empty,
     globals: std.ArrayList(Global) = .empty,
     globals_ready: bool = false,
@@ -488,6 +489,7 @@ const Generator = struct {
     unit_views: []const *const core.Module,
     invalid_literals: std.AutoHashMapUnmanaged(u32, void) = .empty,
     fn deinit(self: *Generator) void {
+        self.span_scopes.deinit(self.allocator);
         self.calls.deinit();
         // Value fields borrow this generator's arena or immutable Core; the
         // protected list owns only its backing buffer, not those shared slices.
@@ -1067,18 +1069,21 @@ const Generator = struct {
             // Locals recreated in a loop need a fresh create receipt, not a
             // function-wide lazy cache (including growers frozen later).
             if (root_id >= self.writer_trace.?.inputs) return null;
-            owner.fixed_span = .{ .length = try self.c.temp(), .stride = try self.c.temp(), .ready = try self.c.temp() };
+            owner.fixed_span = .{ .length = try self.c.temp(), .ready = try self.c.temp() };
             self.emission_work.scoped_fixed_spans +|= 1;
         }
-        const span = owner.fixed_span.?;
+        var span = owner.fixed_span.?;
         if (span.ready) |ready| {
+            try self.span_scopes.scan(self.allocator, self.c.function, self.module.functions.items[self.c.function].instructions.items);
+            if (self.span_scopes.contains(span.checked_scope)) return span;
             // Readiness starts at typed zero on each function call. Validate at
             // the first actual use, preserving zero-iteration and branch order.
             try self.c.when(.{ .i32_eqz, ready });
             try self.c.set(span.length, .{ .call, self.runtime.functions.length, value.token, value.epoch_low, value.epoch_high, value.word });
-            try self.c.set(span.stride, .{ .load, value.word, 12 });
             try self.c.set(ready, 1);
             try self.c.end();
+            span.checked_scope = self.span_scopes.current();
+            owner.fixed_span = span;
         }
         return span;
     }
@@ -1086,7 +1091,7 @@ const Generator = struct {
         const address = try self.c.temp();
         if (try self.fixedScalarSpan(value)) |span| {
             try self.c.trap(.{ .i32_ge_u, index, span.length });
-            try self.c.set(address, .{ .i32_add, .{ .i32_add, value.word, storage.header_bytes }, .{ .i32_mul, index, span.stride } });
+            try self.c.set(address, .{ .i32_add, .{ .i32_add, value.word, storage.header_bytes }, .{ .i32_mul, index, 4 } });
             self.emission_work.scoped_fixed_span_accesses +|= 1;
         } else try self.c.set(address, .{ .call, self.runtime.functions.address, value.token, value.epoch_low, value.epoch_high, value.word, index });
         return address;
@@ -1543,7 +1548,7 @@ const Generator = struct {
         if (self.writer_trace != null and mode == .fixed and element_shape.tag == .scalar and element_shape.fields.len == 0) {
             const length_ = try self.c.temp();
             try self.c.set(length_, capacity);
-            self.roots.items[value.root.?].fixed_span = .{ .length = length_, .stride = (try self.constant(try width(element_shape))).word };
+            self.roots.items[value.root.?].fixed_span = .{ .length = length_ };
             self.emission_work.scoped_fixed_spans +|= 1;
         }
         return value;
@@ -4349,7 +4354,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_bit_recurrences", "scoped_bit_rounds_removed", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_bit_recurrences", "scoped_bit_rounds_removed", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_bulk_copies", "scoped_bulk_fills", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -4390,6 +4395,7 @@ const Generator = struct {
             g.bundle_snapshots.clearRetainingCapacity();
             g.bundle_sources.clearRetainingCapacity();
             g.bundle_scan = 0;
+            g.span_scopes.reset();
             inline for (published_fields, 0..) |field, index| {
                 if (comptime std.mem.eql(u8, field, "scoped_reader_projection_calls") or std.mem.eql(u8, field, "scoped_owned_projection_calls")) {
                     g.emission_work.scoped_argument_projection_discards +|= @field(g.emission_work.*, field) -| self.publications[index];
@@ -5759,6 +5765,7 @@ const Generator = struct {
                 self.bundle_snapshots.clearRetainingCapacity();
                 self.bundle_sources.clearRetainingCapacity();
                 self.bundle_scan = self.module.functions.items[self.c.function].instructions.items.len;
+                self.span_scopes.reset();
                 self.steps -= @intCast(committed.expressions);
                 self.layout_steps -= committed.layouts;
             }
@@ -7035,6 +7042,25 @@ const Generator = struct {
         self.emission_work.scoped_indexed_update_roots_shared +|= 1;
         return original;
     }
+    fn bulkDescriptor(self: *Generator, m: *const core.Module, reference: core.BindingRef, carries: []const core.LoopCarry, scalar_type: T.Id) ?@import("wasm_bulk_loop.zig").Descriptor {
+        if (reference.unit != m.unit) return null;
+        var binding = reference.binding;
+        for (carries) |carry| if (carry.iteration == binding) {
+            binding = carry.incoming;
+            break;
+        };
+        var found: ?Value = null;
+        for (self.bindings.items) |input| if (input.unit == m.unit and input.id == binding) {
+            found = input.value;
+        };
+        const value = found orelse return null;
+        if (value.tag != .array or value.mode != .fixed or value.other_roots.len != 0 or value.host != null or value.demand != null) return null;
+        const owner = self.roots.items[value.root orelse return null];
+        if (!owner.live or owner.imported_global or owner.element.tag != .scalar or owner.element.fields.len != 0 or owner.element.root != null or owner.element.host != null or owner.element.demand != null) return null;
+        if (owner.element.floating != (scalar_type == T.f32_type)) return null;
+        if (value.word.id != owner.word.id or value.token.id != owner.token.id or value.epoch_low.id != owner.epoch_low.id or value.epoch_high.id != owner.epoch_high.id) return null;
+        return .{ .word = value.word.id, .token = value.token.id, .epoch_low = value.epoch_low.id, .epoch_high = value.epoch_high.id };
+    }
     fn emitLoop(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!Value {
         const info = m.loopInfo(id);
         const collection_value: ?Value = if (info.kind == .array) try self.expression(m, info.first, depth + 1) else null;
@@ -7147,6 +7173,41 @@ const Generator = struct {
         try self.c.end();
         try self.c.end();
         self.nesting -= 2;
+        if (info.kind == .range and !info.can_exit and !body.terminated and !self.scalar_admission.hasScalarReferences() and self.outlining.helpers.items.len == helpers_before and self.outlining.canRewriteSuffix(self.c.function, loop_code_start)) bulk_block: {
+            const bulk = @import("wasm_bulk_loop.zig");
+            const source = bulk.source(m, id) orelse break :bulk_block;
+            const target = self.bulkDescriptor(m, source.target, carries, source.scalar) orelse break :bulk_block;
+            var replacement: @FieldType(bulk.Plan, "replacement") = undefined;
+            switch (source.replacement) {
+                .copy => |input| replacement = .{ .copy = self.bulkDescriptor(m, input, carries, source.scalar) orelse break :bulk_block },
+                .fill => |bits| replacement = .{ .fill = bits },
+            }
+            const machine = &self.module.functions.items[self.c.function];
+            if (try bulk.emit(self.allocator, machine.instructions.items[loop_code_start..], iteration_start - loop_code_start, iteration_end - loop_code_start, .{
+                .target = target,
+                .replacement = replacement,
+                .iterator = iterator.id,
+                .end = end.id,
+                .length_function = self.runtime.functions.length,
+                .next_local = @intCast(machine.parameters.len + machine.locals.items.len),
+            })) |output| {
+                var detached = output;
+                defer detached.deinit(self.allocator);
+                try machine.locals.ensureUnusedCapacity(self.allocator, detached.locals.items.len);
+                try machine.instructions.ensureTotalCapacity(self.allocator, loop_code_start + detached.instructions.items.len);
+                machine.locals.appendSliceAssumeCapacity(detached.locals.items);
+                machine.instructions.shrinkRetainingCapacity(loop_code_start);
+                machine.instructions.appendSliceAssumeCapacity(detached.instructions.items);
+                self.span_scopes.reset();
+                self.bundle_snapshots.clearRetainingCapacity();
+                self.bundle_sources.clearRetainingCapacity();
+                self.bundle_scan = machine.instructions.items.len;
+                switch (source.replacement) {
+                    .copy => self.emission_work.scoped_bulk_copies +|= 1,
+                    .fill => self.emission_work.scoped_bulk_fills +|= 1,
+                }
+            }
+        }
         if (info.kind == .range and !info.can_exit and !body.terminated and values.len == 1 and !self.scalar_admission.hasScalarReferences() and self.outlining.helpers.items.len == helpers_before and self.outlining.canRewriteSuffix(self.c.function, loop_code_start)) {
             const start_node = m.node(info.first);
             const end_node = m.node(info.end);
@@ -7166,6 +7227,7 @@ const Generator = struct {
                         self.bundle_snapshots.clearRetainingCapacity();
                         self.bundle_sources.clearRetainingCapacity();
                         self.bundle_scan = machine.instructions.items.len;
+                        self.span_scopes.reset();
                         self.emission_work.scoped_bit_recurrences +|= 1;
                         self.emission_work.scoped_bit_rounds_removed +|= end_node.a - start_node.a;
                     }

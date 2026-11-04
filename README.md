@@ -23,14 +23,16 @@ Merge sort and quicksort retain their original recursive algorithms.
 
 ![Bounded Wasm runtime: seven checked Blot and Goose pairs](scripts/bench/goose/charts/runtime.svg)
 
-CRC32 is **6.2x faster** than the preceding compiler, leaving a **1.33x** gap
-against Goose. Custom hash remains about **7x** slower. Sorts compile in **46 /
-50ms** including startup and retain **6.7 / 6.2KB** output. Byte buffers use U32
-in Blot and U8 in Goose; original F64 remains unsupported.
+Merge sort is **1.64x faster**, quicksort **1.35x**, and Sieve **2.43x** than
+the preceding compiler. Against the newer Goose reference, merge remains **2x**
+slower and quicksort about **1.11x**. Custom hash regresses **4–5%** and remains
+about **7.4x** slower. Sorts compile in **51 / 56ms** including startup and emit
+**7.0 / 6.2KB**. Byte buffers use U32 in Blot and U8 in Goose; original F64
+remains unsupported.
 
-Gdev shrinks **10.25 → 10.10MB**, while paired compilation rises **5.28 → 5.41s
-(+2.5%)**. Evaluated fold probes now allocate zero bytes per call. See
-[results, rejected experiments and pending qualification](scripts/bench/goose/results/2026-11-04-shared-hills.md).
+Gdev shrinks **10.10 → 10.05MB**, with paired compilation effectively unchanged
+at **5.55s**. See
+[measurements and pending qualification](scripts/bench/goose/results/2026-11-04-sort-hills.md).
 
 ## Development
 

@@ -8,78 +8,70 @@ Wasm remain goals. Reachable throughput targets are 50k source lines in 0.5s,
 then one million lines/second. None of these Main goals is complete.
 
 The
-[shared-hill checkpoint](scripts/bench/goose/results/2026-11-04-shared-hills.md)
-composes checked fixed1..8-round U32 bit loops, preserves dominating machine
-snapshots through structured scopes, and removes curried allocations from
-selected saturated scalar primitive aliases. Normal type/owner/effect checks,
-exact loop shells, coordinate guards, original-read accounting and transactional
-publication remain. See `zig-native/CONTRACT.md`.
+[array-loop checkpoint](scripts/bench/goose/results/2026-11-04-sort-hills.md)
+removes dominated fixed-array readiness guards, specializes scalar strides and
+adds guarded bulk copy/fill loops after ordinary source/owner checks. Unsafe
+ranges retain the exact scalar loop, including valid-prefix writes before a
+later bounds trap. See `zig-native/CONTRACT.md`.
 
-CRC32 is **6.2x faster** in five fresh release-Wasm pairs: **110.33 → 17.78ms**.
-Its output grows **5,033 → 5,098B**; the fresh Goose gap is **1.33x**, down from
-8.10x. All seven unchanged adapted pairs pass. Original F64 and the other 43
-catalog tasks remain outside paired coverage. Custom hash remains roughly 7x
-slower; Goose batches its periodic eight-lane state with SIMD.
+Five fresh release pairs improve unchanged merge sort **1.64x**, quicksort
+**1.35x**, and Sieve **2.43x**. Custom hash regresses **4–5%**; CRC32, Fannkuch
+and F32 Mandelbrot have no material runtime gain. Goose advanced independently
+to `0d1715ce`; a fresh comparison leaves merge **2.00x**, quick **1.11x**, Sieve
+**2.31x**, CRC **1.32x** and custom hash **7.37x** behind it. All seven adapted
+pairs pass. Original F64 and the other 43 catalog tasks remain outside paired
+coverage. Direct Blot wins use its frozen preceding release, not old Goose gaps.
 
-Main shrinks **10,253,029 → 10,097,652B (-1.52%)**, but three fresh uncached
-pairs regress **5.283 → 5.414s (+2.49%)**, with changes +112/+144/+105ms. This
-is no Main compile-speed win. Declared locals fall 355,179 → 336,753. The
-private checked-IR replay removes 14,477 more copies and 315 bank globals, with
-the independent input audit passing. Remaining local/global instructions occupy
-6.54MB; adjacent transfers account for only 1.50MB. Copy deletion alone cannot
-reach 1–2MB.
+Main shrinks **10,097,652 → 10,049,963B (-0.47%)**, with declared locals
+**336,753 → 335,682** and 9,440 functions unchanged. Three fresh uncached pairs
+measure **5.555 → 5.545s**, with changes **+2 / -93 / -10ms**: no compile-speed
+win. Local/global instructions still occupy **6.51MB**. Main admits ten bulk
+copies and three fills; representation work remains the large hill.
 
-A separate exact-artifact profile records backend **4.439s**, checking
-**0.518s**, lowering **0.124s**, validation **0.102s**, cumulative backend
-allocation requests **5.315GB**, and process RSS **1,107,548KiB**. Requested
-bytes are not peak memory; overlapping timing families do not add. Main admits
-zero bit recurrences. Tiny scalar-wrapper inlining showed no runtime gain and
-was removed; its patch/artifacts/measurements remain pinned as a rejected
-experiment. Extra branch-free scope promotion also added no savings and was
-removed.
+A separate exact-artifact profile records backend **4.430s**, checking
+**0.500s**, lowering **0.124s**, validation **0.102s**, cumulative backend
+allocation requests **5.324GB**, and process RSS **1,110,332KiB**. Requested
+bytes are not peak memory; overlapping timing families do not add. Scoped
+backend engine subtimers remain unavailable.
 
-Evaluated range/map/filter/take probes now allocate **zero bytes per call**;
-previous 100-call traffic reached 78.6–137.6MB. The source partial-application
-expectation now matches the guide. The principal recorder fixture excludes
-unrelated ECS runtime exports and strengthens persisted replay assertions; that
-does not qualify ECS request-handler execution.
-
-All **2,996 native laws compile without LLVM**; **433 affected laws** pass
-sampled faults. Twenty-six focused laws pass full-fault mode with 33 exhaustive
-sweeps. The development family passes **266 native laws / 248 guests in 67.9s**,
-plus formatting, types and zero Zig lint findings. **All 328 affected release
-guests pass**, including the three previously reported failures. The full gate
-passes smoke/harness and 410 native laws with no failures, then reaches its 180s
-budget. **Full qualification remains pending.**
+All **3,001 native laws compile without LLVM**. All **438 affected laws** pass
+sampled faults on the final native binary; five focused full-fault laws include
+three exhaustive sweeps. The development family passes **271 native / 250 guests
+in 76.3s**. All **330 affected release guests** pass, including same-array reads
+after bulk loops, skipped reads, exact float bits, aliases and prefix traps.
+Formatting, types and Zig lint pass. The full gate passes smoke/harness and 282
+native laws without failures, then reaches its 180s budget. **Full qualification
+remains pending.**
 
 Release compiler SHA256:
-`4f0120a091870fd45722f4d878a9699f97843e4e40dd830e6583e06af07b09dd`. Main SHA256:
-`fcaf7e05e434d6647f1b53b56bf1c39d95fe02e92a1933b8b6fdca3bbc0faa3f`. A fresh
-NVIDIA frame passes the original budgets; its inspected PNG and guest trace
-match the baseline exactly. See
-[frame evidence](tasks/storage-handoff-evidence/2026-11-04-shared-hills-frame.json).
-Broader gameplay/software-adapter coverage remains pending. Pen's normal source
-bridge still omits inferenceBudget; the bounded Deno runner builds Main and Pen
-loads that reviewed artifact. Sibling source/assets remain unchanged: Gdev
-`38af070`, Ink `ccaf08f`, Pen `d159492`.
+`dbb034d016d09d6b8a634ff97fbfac705915692848694658ec340f6175b169a7`. Main SHA256:
+`8a5bc671b85bba52b8989abe4c2165e26d1e379c659e3db9666dd60ad7e5127b`. A fresh
+inspected NVIDIA frame passes original budgets and matches the preceding
+PNG/trace byte for byte; see
+[frame evidence](tasks/storage-handoff-evidence/2026-11-04-sort-hills-frame.json).
+Broader gameplay/software-adapter qualification remains pending. Pen's normal
+source bridge still omits inferenceBudget; the bounded Deno runner builds Main
+and Pen loads that reviewed artifact. Sibling source/assets remain unchanged:
+Gdev `38af070`, Ink `ccaf08f`, Pen `d159492`.
 
 The
-[recursion checkpoint](scripts/bench/goose/results/2026-11-04-recursive-calls.md)
-preserves direct self-recursion over fixed Array U32 inputs/U32 bounds returning
-Unit, with frozen full headers and finite invariant owner access. Broader
-recursion remains excluded. The
-[addressed-input evidence](scripts/bench/goose/results/2026-11-04-addressed-inputs.md)
-retains capture wins and the rejected broad per-call snapshot rollout. Main
-already had zero packed helper calls.
+[preceding shared hills](scripts/bench/goose/results/2026-11-04-shared-hills.md)
+retain CRC composition, zero-allocation fold probes, copy proofs and rejected
+scalar inlining.
+[Direct recursion](scripts/bench/goose/results/2026-11-04-recursive-calls.md)
+retains fixed Array U32/U32/Unit headers and finite invariant owner access;
+broader recursion stays excluded.
+[Addressed inputs](scripts/bench/goose/results/2026-11-04-addressed-inputs.md)
+retain the rejected per-call snapshot rollout. Current runtime changes do not
+complete the owned-storage rewrite.
 
 ## Next Main lever
 
 Attribute materialization by record shape and operation: construction, call,
 result, join, loop and row load. Measure distinct creations, repeated
 expansions, actual demanded fields and final encoded bytes before redesigning
-representation. Main prepares 116,590 argument lists and omits 4,014,808 words;
-these counts suggest repeated shape work but do not establish its exclusive CPU
-cost.
+representation. The preceding checkpoint’s argument counts suggest repeated
+shape work but do not establish its exclusive CPU cost.
 
 With Astra, compare two bounded pilots: creation-backed immutable
 `world_storage.FrameAccess` with borrowed private pointers/lazy field loads,
@@ -94,7 +86,7 @@ work.
 
 The nearer sub-five-second lever needs scoped backend allocation/CPU
 attribution; the current broad profile does not split generation, outlining and
-assembly. Hash lane batching and dominated fixed-array check elimination are
+assembly. Hash lane batching and dominated bounds/load elimination remain
 separate runtime hills. Preserve valid-iteration effects before an eventual
 bounds trap.
 
@@ -137,7 +129,7 @@ experiments and remaining requirements. Documentation cleanup is not completion.
 
 Use Zig 0.17.0 and `-Dllvm=false` for development/native tests. Recent native
 compiler/inventory rebuilds take about 7–13s / 16–20s; the final development
-family takes 68s. This batch used one five-minute LLVM release candidate. Do not
+family takes 76s. This batch used one five-minute LLVM release candidate. Do not
 repeat unchanged long diagnostics or the old 36-minute build; LLVM is reserved
 for meaningful final release measurements.
 
