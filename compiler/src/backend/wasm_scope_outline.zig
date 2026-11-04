@@ -624,6 +624,19 @@ fn prepareBody(a: A, source: *const ir.Function, code: []const ir.Instruction, i
         result.deinit(a);
         result = compacted;
     }
+    switch (globals) {
+        // Admission previews only need a conservative bound. Finalized bodies
+        // and the private engine replay use the same measured index ordering.
+        .sparse => {},
+        .dense => {
+            view.locals = result.locals;
+            view.instructions = result.instructions;
+            if (try @import("wasm_local_order.zig").run(a, &view)) |ordered| {
+                result.deinit(a);
+                result = ordered;
+            }
+        },
+    }
     return result;
 }
 fn observe(body: coalesce.Body, first: []Reference, shared: []bool, writes: []u32, reads: []u32) Error!void {

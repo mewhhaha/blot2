@@ -8,11 +8,11 @@ quicksort ports. Original F64 Mandelbrot and the other 43 catalog tasks remain
 outside paired coverage. The custom eight-lane `Hash::SHA256` task is not
 cryptographic SHA-256.
 
-[Checked merge selection](results/2026-11-04-merge-select.md) improves unchanged
-merge sort another 1.47x and narrows the fresh Goose gap to 1.36x. The current
-runtime chart refreshes merge; six byte-identical controls retain their
-preceding observations. The cold-compilation chart remains the preceding full
-survey.
+[Array engines and local encoding](results/2026-11-04-array-engines.md) records
+fresh all-seven runtime and cold-build comparisons. Creation receipts, guarded
+SIMD lanes and strided reduction improve merge/custom hash/Sieve another
+**1.19/7.00/1.16x** against the preceding compiler. Local-index ordering shrinks
+Main; the regressing wide-record prototype was removed.
 
 [Preceding array-loop hills, 2026-11-04](results/2026-11-04-sort-hills.md)
 records the sort/Sieve gains, custom-hash regression, newer Goose reference and
@@ -37,6 +37,10 @@ Requires installed release `compiler/zig-out/bin/blotc` and
 `../goose-to-wasm/build/bin/goose` with its adjacent `stdlib`. No compiler
 rebuild is performed. Use `--blotc`, `--goose-root`, `--goose`, `--node` and
 `--deno` to select installations. Each output directory must be new or empty.
+Reference scripts, catalogs and ports are frozen before measurement. Use
+`--goose-revision REV` to read them from a Git revision matching the installed
+binary while another checkout is under active development. The binary, reference
+revision and current checkout are fingerprinted separately.
 
 Defaults: five fresh builds per case/backend for each of cold source and a
 revision edit; one process warmup and five measured runtime samples; official
@@ -113,12 +117,12 @@ pairs and median kernel regions of at least 10ms in both programs. Small-input
 rows are correctness evidence only. Measurements run on a shared host; inspect
 dispersion before interpreting close results.
 
-The runner freezes both installed compiler binaries, Goose's standard library
-and its original JavaScript runtime. It records compiler SHA-256,
-source/host/std hashes, tool versions, CPU affinity and checkout state. An
-installed binary is not assumed to match a dirty checkout. Inputs are checked
-again at completion. Only private staged sources are edited. Sibling source and
-generated outputs are untouched.
+The runner freezes both installed compiler binaries, Goose's standard library,
+reference scripts/catalog/ports and original JavaScript runtime. It records
+compiler SHA-256, source/host/std hashes, tool versions, CPU affinity and
+checkout state. An installed binary is not assumed to match a dirty checkout.
+Inputs are checked again at completion. Only private staged sources are edited.
+Sibling source and generated outputs are untouched.
 
 Outputs:
 

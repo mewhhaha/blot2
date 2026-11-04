@@ -16,10 +16,13 @@ comptime {
     _ = @import("backend/storage_span_dominance.zig");
     _ = @import("backend/wasm_bulk_loop_tests.zig");
     _ = @import("backend/wasm_merge_loop_tests.zig");
+    _ = @import("backend/wasm_lane_loop_tests.zig");
+    _ = @import("backend/wasm_stride_reduce_tests.zig");
     _ = @import("backend/wasm_sroa.zig");
     _ = @import("backend/simd_abi.zig");
     _ = @import("backend/wasm_row_reduce.zig");
     _ = @import("backend/wasm_local_compact.zig");
+    _ = @import("backend/wasm_local_order.zig");
     _ = @import("backend/storage_planner_tests.zig");
     _ = @import("backend/runtime_operation_backend_tests.zig");
     _ = @import("backend/provider_origins.zig");

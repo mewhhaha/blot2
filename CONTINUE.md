@@ -8,30 +8,31 @@ Reachable throughput targets are 50k source lines in 0.5s, then one million
 lines/second.
 
 The
-[guarded merge checkpoint](benchmarks/goose/results/2026-11-04-merge-ranges.md)
-improves unchanged merge another **156.70 → 137.19ms (1.145x)** across five
-release pairs. The fresh Goose gap is **1.19x**. Complete-range guards admit
-private pointer iteration for longer merges; declined guards retain the exact
-checked loop. Fresh loads preserve aliases/ties, and actual scalar cursor values
-are restored at exit. A bounded independent scalar replacement proof also omits
-unused destination loads, retaining address/owner/bounds checks and live
-borrows. Merge Wasm grows **6,810 → 7,196B**. All seven benchmark pairs are
-freshly measured; quicksort is effectively unchanged, custom hash improves about
-5%, and Mandelbrot is effectively unchanged with a slightly higher median.
+[array engines checkpoint](benchmarks/goose/results/2026-11-04-array-engines.md)
+improves unchanged merge/custom hash/Sieve another **1.19/7.00/1.16x** across
+five release-Wasm pairs. Creation-proven descriptors retain private validation
+receipts; exact independent U32 lanes use scalar registers or SIMD; Sieve's
+strided count/index scan uses a branchless loop. Guards retain the original
+checked fallbacks and trap prefixes. All seven Goose pairs and both README
+charts are freshly measured.
 
-Current release compiler SHA256:
-`a18ced7646f5237d49f508ffdee850a0eed8490ee04944e3ec8c8f6e39da8745`. All **2,954
-native laws compile without LLVM**. The affected development family passes **10
-native / 32 guests in 37.56s**; four focused native laws pass full fault mode,
-all 32 affected release guests and four public-package API laws pass. The full
-gate reaches its 180s budget during native execution after 90 passes / 63
-complete full allocation sweeps, without an emitted failing law. **Full
-qualification remains pending.** Main has zero merge matches and 1,425 static
-old-load omissions; those counters are not exact encoded-instruction counts.
-Main saves **10,976B** to **10,038,987B**. Three fresh uncached pairs measure
-**5.362 → 5.306s**, changes **+14/-107/-33ms**: no material compilation gain. A
-fresh inspected NVIDIA frame matches the preceding PNG under original budgets.
-See the checkpoint for exact pins, diagnostic controls and limits.
+Main shrinks **10,038,987 → 9,203,613B** (8.3%). Three fresh paired compilations
+measure **5.768 → 5.523s**; paired deltas are **-1277ms, +38ms, +94ms**. There
+is **no reliable compilation gain**. Final local-index ordering preserves
+instruction order/count and local types, placing frequent operands below ULEB
+width thresholds. The creation-backed wide-record prototype grew Main 357,722B
+and was removed after a bounded rescue. The 20%-size/10%-compilation target was
+not met.
+
+Release compiler SHA256:
+`7c8027242749ccc1027c6d855a7bd91f7cba72f27a39df307e36ea29aace3ac8`. All **2,965
+native laws compile without LLVM**. The affected family passes **20 native /60
+guests in 29.86s**, including a separate full allocation-failure run of all 20
+selected native laws. Affected final release guests and four packaged/public API
+laws pass. A fresh inspected NVIDIA Pen frame passes under original budgets and
+matches the prior PNG. The full gate hit its 180s cap after 103 native passes
+and 73 completed full sweeps, without an emitted failing law. **Full
+qualification remains pending.**
 
 Memoized `~` parameters/types and `@demand`/`@force` remain removed. `and`/`or`
 short-circuit as primitives; other deferred work uses ordinary Unit callbacks
@@ -59,12 +60,10 @@ unchanged by this checkpoint.
 
 ## Next representation levers
 
-For merge, measure per-call owner validation and recursive descriptor/call
-setup. The range/pointer path narrows the gap; remaining exclusive costs are
-unmeasured. Consider validated internal borrowed descriptors only where the
-existing recursive source proof establishes stable owners, no callbacks and no
-invalidating effects. Keep checks at authority boundaries, valid-prefix effects,
-aliases and exact fallback behavior.
+Keep measuring the remaining sort costs against the unchanged Goose kernels.
+Creation receipts and guarded lanes now remove substantial repeated validation
+and loop overhead. Preserve aliases, exact primitive selection and trap-prefix
+behavior rather than weakening authority checks.
 
 Integrate one bounded packed List element plan into the owned backend: dense tag
 plus active payload, append/freeze, byte-position/count cursors and one terminal
@@ -73,20 +72,22 @@ exact scalar bits and original budgets. Measure scalar controls, live versus
 reserved bytes, bytes copied, construction/traversal time and emitted Wasm. Keep
 production status explicit until executed Blot witnesses pass.
 
-For Main, attribute materialization by record shape and operation before
-changing representation: construction, call, result, join, loop and row load.
-Compare creation-backed immutable `world_storage.FrameAccess` with borrowed
-private pointers/lazy field loads against shared semantic shapes and transitive
-field demand. Keep backing through helpers/branches/loops and small math records
-inline. Target roughly 20% fewer Main bytes or 10% less compile time while
-retaining snapshots, checked authority and budgets; reject designs that replace
-stores and loads with equivalent work.
+For Main, avoid emitting unnecessary transport while preserving canonical leaf
+identity, field demand and result-alias proofs. The rejected all-leaves-lazy
+record prototype added 41,582 loads and lost descriptor SSA reuse. Do not revive
+it as a broad heap-record default. Local ordering removes encoded index bytes;
+it does not remove the underlying operations. Final Main still has 3,795,220
+instructions, including 2,100,876 local operations occupying 4,721,802B. Even a
+one-byte opcode floor exceeds 3.79MB; reaching 1–2MB requires fewer operations.
+Static zero-only-local cleanup has about 108kB potential in the old artifact and
+remains unimplemented/unmeasured. The broader aggregate representation still
+needs operation/shape attribution.
 
-The preceding exact-artifact profile records backend 4.430s, checking 0.500s,
-lowering 0.124s, validation 0.102s, cumulative backend allocation requests
-5.324GB and process RSS 1,110,332KiB. Requested bytes are not peak memory;
-overlapping timing families do not add. Scoped backend engine subtimers remain
-unavailable.
+An older exact-artifact profile, before this candidate, records backend 4.430s,
+checking 0.500s, lowering 0.124s, validation 0.102s, cumulative backend
+allocation requests 5.324GB and process RSS 1,110,332KiB. Requested bytes are
+not peak memory; overlapping timing families do not add. Scoped backend engine
+subtimers remain unavailable.
 
 Use the private checked-IR capture/replay for short backend iterations:
 
@@ -123,13 +124,13 @@ history; documentation cleanup is not completion.
 ## Iteration and delivery
 
 Use Zig 0.17.0 and `-Dllvm=false` for development/native tests. The current
-development family takes 37.56s including complete native compilation; one final
-LLVM release takes about six minutes. Compiler-only native rebuilds take 8–11s.
+development family takes 29.86s including complete native compilation; one final
+LLVM release takes about five minutes. Compiler-only native rebuilds take 8–11s.
 Use `deno task build:compiler:dev --fixtures= --jobs=2` for a compiler-only
 iteration, then the affected regression family. Keep source frozen before the
 final LLVM build.
 
-Use `deno task check:dev --area merge-loops` for the current regression family
+Use `deno task check:dev --area array-engines` for the current regression family
 and `deno task test:compiler` before compiler commits. Full qualification is
 separate. Recheck real integration after semantic changes with the tracked
 `build_gdev.ts` and `run_pen.py` runners, and inspect the actual PNG. Preserve

@@ -21,16 +21,15 @@ Merge sort and quicksort retain their original recursive algorithms.
 
 ![Bounded Wasm runtime: seven checked Blot and Goose pairs](benchmarks/goose/charts/runtime.svg)
 
-Merge sort improves another **1.15x**, from **156.70 → 137.19ms**. The fresh
-Goose gap is **1.19x**; quicksort is **1.09x**, and custom hash **7.06x**. Both
-charts use fresh five-sample measurements for all seven pairs. Merge Wasm grows
-**6,810 → 7,196B** for the guarded fast path. Byte buffers use U32 in Blot and
-U8 in Goose; both sorts use four-byte elements. Original F64 remains
-unsupported.
+Against the preceding compiler, merge improves **1.19x**, custom hash **7.00x**
+and Sieve **1.16x**. Hash and merge now roughly match Goose. Both charts use
+fresh five-sample measurements. Blot uses U32 byte/flag buffers where Goose uses
+U8; both sorts use four-byte elements. Original F64 remains unsupported.
 
-Gdev saves **10,976B** to **10.039MB**, with fresh paired compilation **5.362 →
-5.306s**: no material compilation gain. See
-[measurements and pending qualification](benchmarks/goose/results/2026-11-04-merge-ranges.md).
+Main shrinks **10.04 → 9.20MB (8.3%)** through local-index ordering. Compilation
+has a **5.52s median**, with no reliable speed gain. Wide-record backing
+regressed Main and was removed. See the
+[measurements and pending qualification](benchmarks/goose/results/2026-11-04-array-engines.md).
 
 ## Development
 
@@ -59,6 +58,6 @@ Current syntax uses `func`, explicit `return`, curried `->`, `$Constructor`,
   [standard library](std/README.md).
 - [Zig compiler](compiler/README.md) and [Deno host](host/README.md).
 - [Goose benchmark suite](benchmarks/goose/README.md) and
-  [current results](benchmarks/goose/results/2026-11-04-merge-ranges.md).
+  [current results](benchmarks/goose/results/2026-11-04-array-engines.md).
 - [Agent instructions](AGENTS.md), [current frontier](CONTINUE.md) and
   [active plan](PLAN.md).

@@ -326,7 +326,38 @@ fn orderFields(fields: []Value) void {
     }.less);
 }
 const FixedSpan = struct { length: Local, ready: ?Local = null, checked_scope: ?usize = null };
-const Root = struct { word: Local, token: Local, epoch_low: Local, epoch_high: Local, stack: u32, depth: usize, element: Value, element_initialized: bool = true, known_empty: bool = false, capacity_request: ?usize = null, live: bool = true, frozen: bool = false, persistent: bool = false, dedicated: bool = true, fixed_span: ?FixedSpan = null, global_ready: ?Local = null, imported_global: bool = false };
+const Root = struct { word: Local, token: Local, epoch_low: Local, epoch_high: Local, stack: u32, depth: usize, element: Value, element_initialized: bool = true, known_empty: bool = false, capacity_request: ?usize = null, live: bool = true, frozen: bool = false, persistent: bool = false, dedicated: bool = true, fixed_span: ?FixedSpan = null, fixed_created: bool = false, global_ready: ?Local = null, imported_global: bool = false };
+fn createdDescriptorMatches(owner: Root, value: Value) bool {
+    return owner.fixed_created and owner.live and !owner.imported_global and
+        owner.element.tag == .scalar and owner.element.fields.len == 0 and owner.element.root == null and owner.element.host == null and
+        value.tag == .array and value.mode == .fixed and value.other_roots.len == 0 and value.host == null and
+        value.word.id == owner.word.id and value.token.id == owner.token.id and
+        value.epoch_low.id == owner.epoch_low.id and value.epoch_high.id == owner.epoch_high.id;
+}
+test "created fixed span provenance requires exact live singleton descriptor" {
+    const owner: Root = .{ .word = .{ .id = 1 }, .token = .{ .id = 2 }, .epoch_low = .{ .id = 3 }, .epoch_high = .{ .id = 4 }, .stack = 0, .depth = 0, .element = .{ .word = .{ .id = 0 } }, .fixed_created = true };
+    const value: Value = .{ .tag = .array, .word = owner.word, .token = owner.token, .epoch_low = owner.epoch_low, .epoch_high = owner.epoch_high, .root = 0, .mode = .fixed };
+    try std.testing.expect(createdDescriptorMatches(owner, value));
+    inline for (.{ "word", "token", "epoch_low", "epoch_high" }) |field| {
+        var forged = value;
+        @field(forged, field).id += 10;
+        try std.testing.expect(!createdDescriptorMatches(owner, forged));
+    }
+    var mixed = value;
+    mixed.other_roots = &.{1};
+    try std.testing.expect(!createdDescriptorMatches(owner, mixed));
+    mixed = value;
+    mixed.mode = .grow;
+    try std.testing.expect(!createdDescriptorMatches(owner, mixed));
+    inline for (.{ "fixed_created", "live" }) |field| {
+        var unproven = owner;
+        @field(unproven, field) = false;
+        try std.testing.expect(!createdDescriptorMatches(unproven, value));
+    }
+    var imported = owner;
+    imported.imported_global = true;
+    try std.testing.expect(!createdDescriptorMatches(imported, value));
+}
 const Global = struct { target: core.BindingRef, word: u32, token: u32, epoch_low: u32, epoch_high: u32, capacity_request: usize, literal_bytes: ?u32 = null, initializing: bool = false };
 const TypeRef = struct { unit: u32, ty: T.Id, environment: ?[]const TypeArgument = null };
 const TypeArgument = struct { unit: u32, parameter: T.Id, argument: T.Id, argument_unit: u32, environment: ?[]const TypeArgument = null };
@@ -1191,7 +1222,10 @@ const Generator = struct {
             // Readiness starts at typed zero on each function call. Validate at
             // the first actual use, preserving zero-iteration and branch order.
             try self.c.when(.{ .i32_eqz, ready });
-            try self.c.set(span.length, .{ .call, self.runtime.functions.length, value.token, value.epoch_low, value.epoch_high, value.word });
+            if (owner.fixed_created) {
+                try self.c.set(span.length, .{ .load, value.word, 8 });
+                self.emission_work.scoped_created_span_validations_avoided +|= 1;
+            } else try self.c.set(span.length, .{ .call, self.runtime.functions.length, value.token, value.epoch_low, value.epoch_high, value.word });
             try self.c.set(ready, 1);
             try self.c.end();
             span.checked_scope = self.span_scopes.current();
@@ -1656,7 +1690,10 @@ const Generator = struct {
             self.destination = null;
         } else value = try self.reserveOwner(m, id, mode, element_shape);
         try self.c.set(value.word, .{ .call, self.runtime.functions.create, value.token, value.epoch_low, value.epoch_high, capacity, @backingInt(mode), try width(element_shape) });
-        if (self.writer_trace != null and mode == .fixed and element_shape.tag == .scalar and element_shape.fields.len == 0) {
+        const owner = &self.roots.items[value.root.?];
+        owner.fixed_created = mode == .fixed and element_shape.tag == .scalar and element_shape.fields.len == 0 and element_shape.root == null and element_shape.host == null;
+        owner.fixed_span = null;
+        if (owner.fixed_created) {
             const length_ = try self.c.temp();
             try self.c.set(length_, capacity);
             self.roots.items[value.root.?].fixed_span = .{ .length = length_ };
@@ -4461,7 +4498,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_bit_recurrences", "scoped_bit_rounds_removed", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_bulk_copies", "scoped_bulk_fills", "scoped_merge_loops", "scoped_scalar_old_loads_avoided", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_recursive_definitions", "scoped_recursive_calls", "scoped_recursive_backedges", "scoped_addressed_definitions", "scoped_addressed_calls", "scoped_addressed_input_loads", "scoped_addressed_forwarded_words", "scoped_addressed_cached_words", "scoped_addressed_snapshot_words", "scoped_addressed_retained_bytes_max", "scoped_addressed_retained_slots_max", "scoped_global_plan_definitions", "scoped_global_plan_loads", "scoped_packed_plans_promoted", "scoped_input_alias_words_avoided", "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_bit_recurrences", "scoped_bit_rounds_removed", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_bulk_copies", "scoped_bulk_fills", "scoped_merge_loops", "scoped_lane_loops", "scoped_lane_simd_loops", "scoped_stride_reductions", "scoped_created_span_validations_avoided", "scoped_scalar_old_loads_avoided", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -4552,6 +4589,7 @@ const Generator = struct {
         addressed_rejected: ?*bool = null,
         borrowed_inputs: bool = false,
         recursive: ?*const recursive_admission.Contract = null,
+        created_receipts: []const bool = &.{},
         capture_globals: bool,
         unit_result: bool,
         result_shape: Value,
@@ -4674,12 +4712,12 @@ const Generator = struct {
             try child.globals.appendSlice(self.allocator, self.globals.items);
             child.globals_ready = true;
         }
-        for (owners) |owner_id| {
+        for (owners, 0..) |owner_id, owner_ordinal| {
             const original = self.roots.items[owner_id];
             var row = original.element;
             try child.clearWriterLiterals(&row);
             if (graph) |value| try child.graphInputShape(&row, value);
-            try child.roots.append(self.allocator, .{ .word = .{ .id = 0 }, .token = .{ .id = 0 }, .epoch_low = .{ .id = 0 }, .epoch_high = .{ .id = 0 }, .stack = self.fixed_region, .depth = 0, .element = row, .element_initialized = original.element_initialized, .known_empty = original.known_empty, .frozen = original.frozen, .live = original.live, .persistent = original.persistent, .dedicated = false });
+            try child.roots.append(self.allocator, .{ .word = .{ .id = 0 }, .token = .{ .id = 0 }, .epoch_low = .{ .id = 0 }, .epoch_high = .{ .id = 0 }, .stack = self.fixed_region, .depth = 0, .element = row, .element_initialized = original.element_initialized, .known_empty = original.known_empty, .frozen = original.frozen, .live = original.live, .persistent = original.persistent, .dedicated = false, .fixed_created = request.created_receipts.len == owners.len and request.created_receipts[owner_ordinal] });
         }
         // Input owners precede every helper cleanup boundary. Only new local
         // owners can have their token cleared; loops mark separately.
@@ -5020,12 +5058,44 @@ const Generator = struct {
         input_aliases: []const u32,
         borrowed_inputs: bool,
         capture_globals: bool,
+        created_receipts: []const bool,
         fn deinit(self: *PreparedFunctionCall, allocator: std.mem.Allocator) void {
             self.graph.deinit();
             self.evidence.deinit(allocator);
             allocator.free(self.input_aliases);
         }
     };
+    fn createdReceiptValues(self: *Generator, value: Value, graph: *const OwnerGraph, receipts: []bool, seen: []bool, remaining: *usize, depth: usize) Error!void {
+        if (remaining.* == 0 or depth > 128) return error.Declined;
+        remaining.* -= 1;
+        if (value.root) |root_id| {
+            const ordinal = try graph.ordinal(root_id);
+            seen[ordinal] = true;
+            if (!createdDescriptorMatches(self.roots.items[root_id], value)) receipts[ordinal] = false;
+        }
+        for (value.other_roots) |root_id| receipts[try graph.ordinal(root_id)] = false;
+        for (value.fields) |field| try self.createdReceiptValues(field, graph, receipts, seen, remaining, depth + 1);
+    }
+    fn createdReceipts(self: *Generator, arguments: []const Value, graph: *const OwnerGraph, evidence: *std.ArrayList(u32)) Error![]const bool {
+        const owners = graph.owners.items;
+        if (owners.len == 0) return &.{};
+        const receipts = try self.arena.allocator().alloc(bool, owners.len);
+        const seen = try self.arena.allocator().alloc(bool, owners.len);
+        @memset(seen, false);
+        for (owners, receipts) |owner, *receipt| receipt.* = self.roots.items[owner].fixed_created and !self.scalar_admission.hasScalarReferences();
+        var remaining: usize = 100_000;
+        for (arguments) |argument| self.createdReceiptValues(argument, graph, receipts, seen, &remaining, 0) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            @memset(receipts, false);
+            break;
+        };
+        try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 19, @intCast(owners.len) });
+        for (receipts, seen) |*receipt, present| {
+            receipt.* = receipt.* and present;
+            try evidence.append(self.allocator, @intFromBool(receipt.*));
+        }
+        return receipts;
+    }
     fn prepareFunctionCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?PreparedFunctionCall {
         if (self.destination != null) return null;
         const body = m.body(target.binding) orelse return null;
@@ -5072,6 +5142,7 @@ const Generator = struct {
             return null;
         };
         defer if (!keep) graph.deinit();
+        const created_receipts = try self.createdReceipts(arguments, &graph, &evidence);
         if (closed_scalar) {
             try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 12, m.typeOf(body.root), @intCast(arguments.len) });
             for (m.bodyParameters(body), arguments) |parameter, argument| try evidence.appendSlice(self.allocator, &.{ parameter.ty, @intFromBool(argument.floating) });
@@ -5102,7 +5173,7 @@ const Generator = struct {
         if (borrowed_inputs) try evidence.append(self.allocator, std.math.maxInt(u32) - 15);
         if (self.recursive_scope) try evidence.append(self.allocator, std.math.maxInt(u32) - 17);
         keep = true;
-        return .{ .borrowed_inputs = borrowed_inputs, .graph = graph, .evidence = evidence, .words = words, .arguments = arguments, .closed_scalar = closed_scalar, .input_aliases = input_aliases, .capture_globals = capture_globals, .key = .{ .unit = m.unit, .binding = target.binding, .context = if (closed_scalar) 0 else self.invocationContext(), .context_free = closed_scalar, .evidence = evidence.items } };
+        return .{ .created_receipts = created_receipts, .borrowed_inputs = borrowed_inputs, .graph = graph, .evidence = evidence, .words = words, .arguments = arguments, .closed_scalar = closed_scalar, .input_aliases = input_aliases, .capture_globals = capture_globals, .key = .{ .unit = m.unit, .binding = target.binding, .context = if (closed_scalar) 0 else self.invocationContext(), .context_free = closed_scalar, .evidence = evidence.items } };
     }
     fn callableGlobalSlots(self: *Generator, value: Value, mask: []bool, remaining: *usize, depth: usize) Error!void {
         if (remaining.* == 0 or depth > 128) {
@@ -5164,7 +5235,7 @@ const Generator = struct {
             result_shape = try self.shape(try self.unit(result.unit), if (result.unit == m.unit) body.root else 0, result.ty, 0);
             if (!graphResultLayout(result_shape)) return null;
         }
-        const request: FunctionPlanInput = .{ .module = m, .target = target, .arguments = call.arguments, .owners = call.graph.owners.items, .graph = &call.graph, .words = call.words, .input_aliases = call.input_aliases, .capture_globals = call.capture_globals, .borrowed_inputs = call.borrowed_inputs, .unit_result = unit_result, .result_shape = result_shape, .shared = true, .key = call.key };
+        const request: FunctionPlanInput = .{ .module = m, .target = target, .arguments = call.arguments, .owners = call.graph.owners.items, .graph = &call.graph, .words = call.words, .input_aliases = call.input_aliases, .created_receipts = call.created_receipts, .capture_globals = call.capture_globals, .borrowed_inputs = call.borrowed_inputs, .unit_result = unit_result, .result_shape = result_shape, .shared = true, .key = call.key };
         const index = (try self.tryFunctionPlan(request)) orelse return null;
         return self.descriptor_calls.plans.get(self.descriptor_calls.calls.entries.items[index].function) orelse return self.unsupported(m, body.root);
     }
@@ -5263,6 +5334,7 @@ const Generator = struct {
             if (owner.element.tag != .scalar or owner.element.floating or owner.element.fields.len != 0 or owner.element.root != null) return null;
             try evidence.append(self.allocator, @intFromBool(owner.frozen));
         }
+        const created_receipts = try self.createdReceipts(arguments, &graph, &evidence);
         const key: call_plan.Key = .{ .unit = target.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
         if (self.descriptor_calls.calls.find(key)) |index| {
             const entry = self.descriptor_calls.calls.entries.items[index];
@@ -5270,7 +5342,7 @@ const Generator = struct {
             const plan = self.descriptor_calls.plans.get(entry.function) orelse return error.Declined;
             return try self.emitPlannedCall(m, body, plan, arguments, graph.owners.items);
         }
-        const request: FunctionPlanInput = .{ .module = m, .target = target, .arguments = arguments, .owners = graph.owners.items, .graph = &graph, .words = words, .input_aliases = &.{}, .addressed = false, .capture_globals = false, .unit_result = true, .result_shape = .{ .word = .{ .id = 0 } }, .shared = true, .recursive = contract, .key = key };
+        const request: FunctionPlanInput = .{ .module = m, .target = target, .arguments = arguments, .owners = graph.owners.items, .graph = &graph, .words = words, .input_aliases = &.{}, .addressed = false, .capture_globals = false, .unit_result = true, .result_shape = .{ .word = .{ .id = 0 } }, .shared = true, .recursive = contract, .created_receipts = created_receipts, .key = key };
         const index = (try self.tryFunctionPlan(request)) orelse {
             self.emission_work.scoped_recursive_declines +|= 1;
             return self.fail(m, body.root, .storage_unsupported, "The recursive body does not satisfy its fixed-owner contract");
@@ -7201,6 +7273,43 @@ const Generator = struct {
         if (value.tag != .scalar or value.floating or value.fields.len != 0 or value.root != null or value.host != null or value.other_roots.len != 0) return null;
         return value.word.id;
     }
+    fn lanePrimitiveMember(context: *anyopaque, m: *const core.Module, member: u32) @import("wasm_lane_loop.zig").Error!?core.Op {
+        const self: *Generator = @ptrCast(@alignCast(context));
+        const identity = T.receiverIdentity(m.types.node(T.u32_type)) orelse return null;
+        const target = (try self.dispatchTarget(m, identity, member, .none)) orelse return null;
+        const owner = try self.unit(target.unit);
+        const body = owner.body(target.binding) orelse return null;
+        if (owner.bodyParameters(body).len != 0 or owner.node(body.root).tag != .primitive_function) return null;
+        const primitive_ = owner.primitive(body.root);
+        if (primitive_.kind != .scalar or primitive_.arity != 2) return null;
+        return primitive_.op;
+    }
+    fn lanePrimitiveOperators(self: *Generator, m: *const core.Module, operators: std.EnumSet(core.Op)) Error!bool {
+        var iterator = operators.iterator();
+        while (iterator.next()) |op| {
+            if (@backingInt(op) > @backingInt(core.Op.shift_right)) return false;
+            const identity = T.receiverIdentity(m.types.node(T.u32_type)) orelse return false;
+            const target = (try self.dispatchTarget(m, identity, 0, @fromBackingInt(@intCast(@backingInt(op))))) orelse continue;
+            const owner = try self.unit(target.unit);
+            const body = owner.body(target.binding) orelse return false;
+            if (owner.node(body.root).tag != .primitive_function or owner.bodyParameters(body).len != 0) return false;
+            const primitive_ = owner.primitive(body.root);
+            if (primitive_.kind != .scalar or primitive_.arity != 2 or primitive_.op != op) return false;
+        }
+        return true;
+    }
+    fn publishLoop(self: *Generator, start: usize, detached: *@import("runtime_ir.zig").Body) Error!void {
+        const machine = &self.module.functions.items[self.c.function];
+        try machine.locals.ensureUnusedCapacity(self.allocator, detached.locals.items.len);
+        try machine.instructions.ensureTotalCapacity(self.allocator, start + detached.instructions.items.len);
+        machine.locals.appendSliceAssumeCapacity(detached.locals.items);
+        machine.instructions.shrinkRetainingCapacity(start);
+        machine.instructions.appendSliceAssumeCapacity(detached.instructions.items);
+        self.span_scopes.reset();
+        self.bundle_snapshots.clearRetainingCapacity();
+        self.bundle_sources.clearRetainingCapacity();
+        self.bundle_scan = machine.instructions.items.len;
+    }
     fn emitLoop(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!Value {
         const info = m.loopInfo(id);
         const collection_value: ?Value = if (info.kind == .array) try self.expression(m, info.first, depth + 1) else null;
@@ -7313,6 +7422,35 @@ const Generator = struct {
         try self.c.end();
         try self.c.end();
         self.nesting -= 2;
+        if (info.kind == .forever and !body.terminated and roots_before == self.roots.items.len and !self.scalar_admission.hasScalarReferences() and self.outlining.helpers.items.len == helpers_before and self.outlining.canRewriteSuffix(self.c.function, loop_code_start)) reduce_block: {
+            const reduce = @import("wasm_stride_reduce.zig");
+            const source = reduce.source(m, id) orelse break :reduce_block;
+            const array_span = self.mergeSpan(m, source.array, carries) orelse break :reduce_block;
+            const cursor = self.mergeScalar(m, source.cursor, carries, values) orelse break :reduce_block;
+            const limit = self.mergeScalar(m, source.limit, carries, values) orelse break :reduce_block;
+            const last = self.mergeScalar(m, source.last, carries, values) orelse break :reduce_block;
+            const count = self.mergeScalar(m, source.count, carries, values) orelse break :reduce_block;
+            const coordinates = [_]u32{ cursor, limit, last, count };
+            for (coordinates, 0..) |coordinate, index| for (coordinates[index + 1 ..]) |other| {
+                if (coordinate == other) break :reduce_block;
+            };
+            const machine = &self.module.functions.items[self.c.function];
+            if (machine.instructions.items.len - loop_code_start > 4096) break :reduce_block;
+            var detached = try reduce.emit(self.allocator, machine.instructions.items[loop_code_start..], .{
+                .array = array_span,
+                .cursor = cursor,
+                .limit = limit,
+                .last = last,
+                .count = count,
+                .stride = source.stride,
+                .bits = source.bits,
+                .length_function = self.runtime.functions.length,
+                .next_local = @intCast(machine.parameters.len + machine.locals.items.len),
+            });
+            defer detached.deinit(self.allocator);
+            try self.publishLoop(loop_code_start, &detached);
+            self.emission_work.scoped_stride_reductions +|= 1;
+        }
         if (info.kind == .forever and !body.terminated and roots_before == self.roots.items.len and !self.scalar_admission.hasScalarReferences() and self.outlining.helpers.items.len == helpers_before and self.outlining.canRewriteSuffix(self.c.function, loop_code_start)) merge_block: {
             const merge = @import("wasm_merge_loop.zig");
             const source = merge.source(m, id) orelse break :merge_block;
@@ -7350,6 +7488,39 @@ const Generator = struct {
             self.bundle_sources.clearRetainingCapacity();
             self.bundle_scan = machine.instructions.items.len;
             self.emission_work.scoped_merge_loops +|= 1;
+        }
+        if (info.kind == .range and !info.can_exit and !body.terminated and roots_before == self.roots.items.len and !self.scalar_admission.hasScalarReferences() and self.outlining.helpers.items.len == helpers_before and self.outlining.canRewriteSuffix(self.c.function, loop_code_start)) lane_block: {
+            const lane = @import("wasm_lane_loop.zig");
+            const source = (lane.source(self.units, m, id, .{ .context = self, .resolve = lanePrimitiveMember }) catch |err| {
+                if (err == error.OutOfMemory) return err;
+                break :lane_block;
+            }) orelse break :lane_block;
+            const primitive_operators = self.lanePrimitiveOperators(m, source.associated_ops) catch |err| {
+                if (err == error.OutOfMemory) return err;
+                break :lane_block;
+            };
+            if (!primitive_operators) break :lane_block;
+            const state = self.bulkDescriptor(m, source.state, carries, T.u32_type) orelse break :lane_block;
+            const input = self.bulkDescriptor(m, source.input, carries, T.u32_type) orelse break :lane_block;
+            const machine = &self.module.functions.items[self.c.function];
+            const plan: lane.Plan = .{
+                .state = state,
+                .input = input,
+                .iterator = iterator.id,
+                .end = end.id,
+                .length_function = self.runtime.functions.length,
+                .next_local = @intCast(machine.parameters.len + machine.locals.items.len),
+            };
+            var replacement = try lane.emitSimd(self.allocator, machine.instructions.items[loop_code_start..], iteration_start - loop_code_start, iteration_end - loop_code_start, source, plan);
+            const simd = replacement != null;
+            if (replacement == null) replacement = try lane.emit(self.allocator, machine.instructions.items[loop_code_start..], iteration_start - loop_code_start, iteration_end - loop_code_start, source, plan);
+            if (replacement) |output| {
+                var detached = output;
+                defer detached.deinit(self.allocator);
+                try self.publishLoop(loop_code_start, &detached);
+                self.emission_work.scoped_lane_loops +|= 1;
+                if (simd) self.emission_work.scoped_lane_simd_loops +|= 1;
+            }
         }
         if (info.kind == .range and !info.can_exit and !body.terminated and !self.scalar_admission.hasScalarReferences() and self.outlining.helpers.items.len == helpers_before and self.outlining.canRewriteSuffix(self.c.function, loop_code_start)) bulk_block: {
             const bulk = @import("wasm_bulk_loop.zig");

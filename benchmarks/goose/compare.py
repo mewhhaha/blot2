@@ -52,6 +52,18 @@ def fingerprint_tree(directory):
     }
 
 
+def freeze_files(source, destination, paths):
+    fingerprints = {str(path): sha(source / path) for path in paths}
+    for path in paths:
+        target = destination / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source / path, target)
+    for path, expected in fingerprints.items():
+        if sha(source / path) != expected or sha(destination / path) != expected:
+            raise RuntimeError("reference changed while freezing")
+    return fingerprints
+
+
 def summary(values):
     if not values:
         return None
@@ -220,6 +232,10 @@ def main():
     )
     parser.add_argument("--goose", type=Path)
     parser.add_argument(
+        "--goose-revision",
+        help="Freeze reference scripts/catalog/ports from this Git revision; the binary is pinned separately.",
+    )
+    parser.add_argument(
         "--blotc", type=Path, default=ROOT / "compiler/zig-out/bin/blotc"
     )
     parser.add_argument("--node", type=Path, default=Path("node"))
@@ -265,14 +281,38 @@ def main():
     if output.exists() and any(output.iterdir()):
         parser.error("output must be new or empty")
     output.mkdir(parents=True, exist_ok=True)
+    frozen = output / "frozen"
+    reference_root = frozen / "reference"
+    reference_files = [Path(path) for path in [
+        "bench/langarena.py", "bench/process.py",
+        "bench/langarena/manifest.json", "bench/langarena/test.json",
+        "bench/langarena/run.json", "bench/langarena/ports/common.goose",
+        "scripts/goose_wasm.py", "oracle/goose_wasm.py",
+        "scripts/run_wasm.mjs", "toolchain.json",
+    ]]
+    reference_files += [Path("bench/langarena/ports") / CASES[s][1] for s in args.cases]
+    reference_revision = None
+    if args.goose_revision:
+        reference_revision = subprocess.check_output(
+            ["git", "rev-parse", "--verify", args.goose_revision + "^{commit}"],
+            cwd=goose_root, text=True,
+        ).strip()
+        for path in reference_files:
+            target = reference_root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(subprocess.check_output(
+                ["git", "show", f"{reference_revision}:{path}"], cwd=goose_root,
+            ))
+        reference_hashes = {str(path): sha(reference_root / path) for path in reference_files}
+    else:
+        reference_hashes = freeze_files(goose_root, reference_root, reference_files)
     spec = importlib.util.spec_from_file_location(
-        "goose_arena_reference", goose_root / "bench/langarena.py"
+        "goose_arena_reference", reference_root / "bench/langarena.py"
     )
     arena = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(arena)
     manifest = arena.load_manifest()
     catalog = {c["name"]: c for c in manifest["cases"]}
-    frozen = output / "frozen"
     for backend, executable in [("goose", goose), ("blot", blot)]:
         destination = frozen / backend / "bin" / executable.name
         destination.parent.mkdir(parents=True)
@@ -287,7 +327,7 @@ def main():
         blot_copy.parent.parent / "compiler-identity.bin",
     )
     goose_runner = frozen / "run_wasm.mjs"
-    shutil.copy2(goose_root / "scripts/run_wasm.mjs", goose_runner)
+    shutil.copy2(reference_root / "scripts/run_wasm.mjs", goose_runner)
     version = subprocess.check_output(
         [node, "-p", "JSON.stringify(process.versions)"], text=True
     ).strip()
@@ -338,12 +378,12 @@ def main():
             folder.mkdir(parents=True)
             if backend == "goose":
                 file = folder / goose_name
-                reference_source = goose_root / "bench/langarena/ports" / goose_name
+                reference_source = reference_root / "bench/langarena/ports" / goose_name
                 if short in CONTROLS:
                     reference_source = CONTROLS[short]
                 shutil.copy2(reference_source, file)
                 shutil.copy2(
-                    goose_root / "bench/langarena/ports/common.goose",
+                    reference_root / "bench/langarena/ports/common.goose",
                     folder / "common.goose",
                 )
             else:
@@ -356,17 +396,10 @@ def main():
         HERE / "reference.py",
         HERE / "runtime.ts",
         HERE / "build_blot.ts",
-        goose_root / "scripts/goose_wasm.py",
-        goose_root / "oracle/goose_wasm.py",
-        goose_root / "bench/langarena.py",
-        goose_root / "bench/langarena/manifest.json",
-        goose_root / "bench/langarena/test.json",
-        goose_root / "bench/langarena/run.json",
-        goose_root / "bench/langarena/ports/common.goose",
     ]
+    tracked += [reference_root / path for path in reference_files]
     tracked += list((HERE / "ports").glob("*.blot"))
     tracked += list((HERE / "ports").glob("*.goose"))
-    tracked += [goose_root / "bench/langarena/ports" / CASES[s][1] for s in cases]
     tracked += list((ROOT / "compiler").glob("*.ts"))
     tracked += list((ROOT / "std").rglob("*.blot"))
     report = {
@@ -406,7 +439,11 @@ def main():
             ).splitlines(),
             "compiler_sha256": {"blot": sha(blot_copy), "goose": sha(goose_copy)},
             "goose_stdlib": fingerprint_tree(goose_copy.parent / "stdlib"),
-            "goose_toolchain": json.loads((goose_root / "toolchain.json").read_text()),
+            "goose_toolchain": json.loads((reference_root / "toolchain.json").read_text()),
+            "goose_reference_source_root": str(goose_root),
+            "goose_reference_revision": reference_revision,
+            "goose_reference_frozen_root": str(reference_root),
+            "goose_reference_sha256": reference_hashes,
             "input_sha256": {str(f): sha(f) for f in tracked},
         },
         "coverage": {
@@ -541,7 +578,7 @@ def main():
                 else:
                     command = [
                         sys.executable,
-                        goose_root / "scripts/goose_wasm.py",
+                        reference_root / "scripts/goose_wasm.py",
                         "build",
                         source,
                         "-o",

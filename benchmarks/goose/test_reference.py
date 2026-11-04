@@ -1,8 +1,38 @@
 """Independent official checksums and precision/retained-output boundaries."""
 
 import unittest
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
+from compare import freeze_files, sha
 from reference import PROFILES, checksum, mandelbrot_image
+
+
+class FreezeTests(unittest.TestCase):
+    def test_freeze_is_independent_of_later_edits_and_rejects_copy_races(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            file = source / "harness.py"
+            file.write_text("first")
+            frozen = root / "frozen"
+            receipt = freeze_files(source, frozen, [Path("harness.py")])
+            file.write_text("second")
+            self.assertEqual((frozen / "harness.py").read_text(), "first")
+            self.assertEqual(receipt["harness.py"], sha(frozen / "harness.py"))
+
+            import shutil
+            copy = shutil.copy2
+
+            def copy_then_edit(before, after):
+                copy(before, after)
+                before.write_text("third")
+
+            with patch("compare.shutil.copy2", side_effect=copy_then_edit):
+                with self.assertRaisesRegex(RuntimeError, "changed while freezing"):
+                    freeze_files(source, root / "raced", [Path("harness.py")])
 
 
 class ReferenceTests(unittest.TestCase):

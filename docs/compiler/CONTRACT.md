@@ -145,12 +145,48 @@ and root returns have no continuing path. Every original read must still be
 proved, and publication forwards only through copies actually removed, retaining
 intermediate snapshots and default-zero behavior.
 
+Final prepared bodies may permute local indices by static encoded-use frequency.
+Parameter indices stay fixed, and each declared local retains its type and zero
+initialization. All get/set/tee operands follow the same bijection; instruction
+order and other packed metadata remain. Hidden local identities decline. The
+pass charges exact ULEB operand and local-declaration costs, publishing only a
+smaller body. Source semantic/table coordinates remain in immutable input IR.
+Outline admission previews stay conservative; finalized outlined bodies and
+ordinary assembly use the same ordering.
+
 Private fixed scalar-array inputs validate their descriptor lazily at first
 actual use. A validation dominates later uses only while its original machine
 scope remains active. Arm, block and loop facts never escape their scope;
 function changes, rollback, outlining and suffix replacement invalidate them.
 Scalar layout fixes the element stride at four bytes. Per-access bounds checks
 remain, and skipped branches or empty loops cannot initialize a later read.
+
+A successful fixed plain scalar Array creation may grant a private descriptor
+receipt. Only the exact live, singleton, nonglobal word/token/epoch tuple can
+reuse it. Every reinitialization resets the receipt. Complete argument walks and
+canonical input-owner bitmaps distinguish ordinary and recursive helper plans;
+unknown or mixed inputs and scalar-address programs decline. First actual use
+may read the created header length directly. Other descriptors keep lazy
+validation; per-access bounds and ordinary source/owner checks remain. This adds
+neither public ABI words nor a mutable runtime validation cache.
+
+A bounded source proof may batch eight independent cyclic U32 recurrences. Only
+exact selected scalar primitives and invariant carries qualify. Prelude
+forwarding wrappers require the selected primitive's authority; an overloaded
+implementation or curried application declines. Complete state/input bounds,
+address nonwrap and disjointness guards preserve access order before resident
+lanes delay their stores. Two i32x4 vectors handle supported DAGs with uniform
+literal shifts; other admitted expressions use scalar lanes. The exact original
+loop handles unsafe aliases, short or unaligned ranges, tails and trap prefixes.
+
+An exact strided read/count/last-index loop may use a branchless reduction. The
+complete exit, predicate, branch merges and backedge must match, with an
+invariant array/limit, distinct scalar coordinates and a positive literal step.
+Activity and minimum-trip guards precede descriptor validation. Full inclusive
+bounds and nonwrapping addresses/final cursor license one read, Boolean count
+add, last-index select and cursor increment per step. A declined guard retains
+the exact original loop. Both loop rewrites publish detached output only after
+source/owner/backedge checks and all capacity reservations finish.
 
 An exact range-loop assignment `dst[index] := src[index]` or scalar literal may
 use bulk memory operations after all normal source, owner and backedge checks.

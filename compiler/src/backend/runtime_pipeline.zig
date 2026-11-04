@@ -285,6 +285,14 @@ pub const Session = struct {
                 if (owned) |*body| body.deinit(self.allocator);
                 owned = replacement;
             }
+            if (owned) |body| {
+                view.locals = body.locals;
+                view.instructions = body.instructions;
+            }
+            if (try @import("wasm_local_order.zig").run(self.allocator, &view)) |replacement| {
+                if (owned) |*body| body.deinit(self.allocator);
+                owned = replacement;
+            }
         }
         return owned;
     }

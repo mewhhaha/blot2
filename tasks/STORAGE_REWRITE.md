@@ -3,28 +3,31 @@
 The current priorities are shared-kernel runtime, Gdev Wasm size and short
 iterations. Subsecond compilation, sub-five-second Main and 1–2MB remain unmet.
 The
-[current measured checkpoint](../benchmarks/goose/results/2026-11-04-sort-hills.md)
-adds dominated fixed-array validation reuse, known scalar strides and guarded
-bulk copy/fill loops. Unchanged merge/quick/Sieve improve **1.64 / 1.35 /
-2.43x**; custom hash regresses **4–5%**. Main saves another **47,689B** to
-**10,049,963B**. Fresh paired compilation is effectively unchanged at **5.55s**.
-The independently newer Goose reference and all timing/size tradeoffs remain
-explicit.
+[array engines checkpoint](../benchmarks/goose/results/2026-11-04-array-engines.md)
+improves unchanged merge/custom hash/Sieve another **1.19/7.00/1.16x** across
+five release-Wasm pairs. Creation-proven descriptors retain private validation
+receipts; exact independent U32 lanes use scalar registers or SIMD; Sieve's
+strided count/index scan uses a branchless loop. Guards retain the original
+checked fallbacks and trap prefixes. All seven Goose pairs and both README
+charts are freshly measured.
 
-The latest
-[guarded merge checkpoint](../benchmarks/goose/results/2026-11-04-merge-ranges.md)
-improves unchanged merge another **1.145x**, narrowing the fresh Goose gap to
-**1.19x**. Complete-range guards admit pointer iteration and retain the exact
-checked fallback. Bounded scalar replacement proofs also remove unused old loads
-without changing address checks or live borrows. All 2,954 native laws compile
-without LLVM; the focused 10 native/32 guest family passes in 37.56s. Main saves
-10,976B to **10,038,987B**, with fresh paired compilation **5.362 → 5.306s**: no
-material compile-time gain. Full qualification remains pending after the full
-gate reaches its 180s cap during native execution, without an emitted failing
-law; the checkpoint preserves raw evidence. All seven benchmark pairs are
-freshly measured. The
-[preceding checked selection](../benchmarks/goose/results/2026-11-04-merge-select.md)
-retains its own candidate and qualification records.
+Main shrinks **10,038,987 → 9,203,613B** (8.3%). Three fresh paired compilations
+measure **5.768 → 5.523s**; paired deltas are **-1277ms, +38ms, +94ms**. There
+is **no reliable compilation gain**. Final local-index ordering preserves
+instruction order/count and local types, placing frequent operands below ULEB
+width thresholds. The creation-backed wide-record prototype grew Main 357,722B
+and was removed after a bounded rescue. The 20%-size/10%-compilation target was
+not met.
+
+Release compiler SHA256:
+`7c8027242749ccc1027c6d855a7bd91f7cba72f27a39df307e36ea29aace3ac8`. All **2,965
+native laws compile without LLVM**. The affected family passes **20 native /60
+guests in 29.86s**, including a separate full allocation-failure run of all 20
+selected native laws. Affected final release guests and four packaged/public API
+laws pass. A fresh inspected NVIDIA Pen frame passes under original budgets and
+matches the prior PNG. The full gate hit its 180s cap after 103 native passes
+and 73 completed full sweeps, without an emitted failing law. **Full
+qualification remains pending.**
 
 The preceding
 [feature retirement](../benchmarks/evidence/integration/2026-11-04-demand-retirement.json)
@@ -46,10 +49,12 @@ explicit copies and capacity failure semantics while changing representation.
 Indexed mutation remains an Array operation. Measure actual live/reserved bytes
 and source-level execution before accepting the packed backend.
 
-Next measure representation work by record shape and operation, then compare
-creation-backed immutable FrameAccess with shared semantic shapes/transitive
-field demand. Main still spends 4.430s in the backend and requests 5.324GB
-cumulatively; copy-only changes cannot reach the output target. Preserve the
+Next measure representation work by record shape and operation, retaining
+canonical descriptor identities, shared semantic shapes and transitive field
+demand. The attempted all-leaves-lazy record backing regressed Main and was
+removed; do not treat that prototype as the next default. An earlier candidate
+spent 4.430s in the backend and requested 5.324GB cumulatively; copy-only
+changes cannot reach the output target. Preserve the
 [preceding shared hills](../benchmarks/goose/results/2026-11-04-shared-hills.md),
 [recursion](../benchmarks/goose/results/2026-11-04-recursive-calls.md),
 [addressed-input](../benchmarks/goose/results/2026-11-04-addressed-inputs.md),
@@ -61,7 +66,7 @@ The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves
 physical Value leaves and owner/borrow metadata. Remaining local/global
 instructions occupied 8.54MB at that older checkpoint; the current census is
-6.51MB. Preserve semantic checks and explicit copies while changing that
+5.67MB. Preserve semantic checks and explicit copies while changing that
 representation. Ordinary `#run` build functions remain a separate, unimplemented
 simplification.
 

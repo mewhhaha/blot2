@@ -1,5 +1,45 @@
 /** Explicit regression families. A development pass never qualifies the full tree. */
 export const devCheckAreas = {
+  "array-engines": {
+    description:
+      "Array creation receipts, scalar/vector lanes, strided reduction and local encoding.",
+    native: [
+      "backend.scoped_backend.test.created fixed span provenance requires exact live singleton descriptor",
+      "backend.wasm_lane_loop_tests.test.cyclic lane source proof requires independent exact U32 recurrences",
+      "backend.wasm_lane_loop_tests.test.cyclic lane detached emission preserves checked fallback and allocation rollback",
+      "backend.wasm_lane_loop_tests.test.cyclic lane SIMD emission requires uniform shifts and retains exact checked tails",
+      "backend.wasm_stride_reduce_tests.test.strided reduction proof requires exact read match merges invariant bounds and carries",
+      "backend.wasm_stride_reduce_tests.test.strided reduction detached emission preserves branchless loop and exact fallback under allocation failure",
+      "backend.wasm_local_order_tests.test.local ordering preserves typed bits zero reads parameters control and metadata through OOM",
+      "backend.wasm_local_order_tests.test.local ordering crosses both ULEB thresholds with deterministic equal weight ties",
+      "backend.wasm_local_order_tests.test.local ordering declines declaration growth hidden identities and uniform width without mutation",
+      "backend.wasm_local_order_tests.test.local ordering reaches both pipeline tiers and retains immutable source coordinates",
+      "backend.runtime_ir.test.i32 select has an exact pure three input scalar contract",
+      "backend.wasm.test.i32 select encodes one untyped Wasm select opcode without an immediate",
+      "backend.wasm_merge_loop_tests.test.checked merge source proof requires exact exits stores increments and SSA carries",
+      "backend.wasm_merge_loop_tests.test.checked merge detached emission preserves allocation rollback",
+      "backend.scoped_backend.test.scalar replacement proof declines self captures dispatch and bounded exhaustion",
+      "backend.scoped_backend_tests.test.scoped indexed replacements preserve pinned growth and sibling writes through OOM",
+      "backend.storage_span_dominance.test.fixed span dominance retains incoming facts but never arm loop or block facts",
+      "backend.storage_span_dominance.test.fixed span dominance scope allocations unwind through every allocation failure",
+      "backend.wasm_bulk_loop_tests.test.bulk scalar loop source proofs admit only exact indexed copy and literal fill",
+      "backend.wasm_bulk_loop_tests.test.bulk scalar loop detached publication retains its exact fallback through allocation failure",
+    ],
+    guests: [
+      "tests/guest/storage_created_span_execution.test.ts",
+      "tests/guest/storage_lane_loop_execution.test.ts",
+      "tests/guest/storage_stride_loop_execution.test.ts",
+      "tests/guest/storage_stride_reduce_execution.test.ts",
+      "tests/guest/aggregate_transport_execution.test.ts",
+      "tests/guest/addressed_input_execution.test.ts",
+      "tests/guest/storage_merge_loop_execution.test.ts",
+      "tests/guest/storage_bulk_loops_execution.test.ts",
+      "tests/guest/recursive_storage_execution.test.ts",
+      "tests/guest/storage_scalar_replacements_execution.test.ts",
+      "tests/guest/scoped_loop_cleanup_execution.test.ts",
+    ],
+    guestFilters: {} as Record<string, string>,
+  },
   "merge-loops": {
     description:
       "Checked scalar merge selection, exact loop carries, aliases and prefix traps.",
