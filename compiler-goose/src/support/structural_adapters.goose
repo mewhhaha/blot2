@@ -2892,6 +2892,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_contracts:
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_contracts::Opening) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_contracts::Principal)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_contracts::Principal) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_contracts::PrincipalState)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_contracts::PrincipalState) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_contracts::RowWitness)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_contracts::RowWitness) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_contracts::Substitution)->bool {return equalFields(left,right);}

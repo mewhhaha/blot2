@@ -54,7 +54,7 @@ fn canonicalGoal(self_: Owner, module: const blot_check_core::Module&, ordinal: 
         let charged = step(scopes.remaining); if charged != blot_error::Error.none { return 0, charged; }
         let candidate = goal(self_, module, prior);
         if candidate.kind != blot_check_types::ObligationKind.contract || candidate.identity.unit != value.identity.unit || candidate.identity.decl != value.identity.decl { continue; }
-        var proof = blot_check_package_contracts::Principal { left: module.types, right: module.types, views: scopes, remaining: scopes.remaining , ..};
+        var proof = blot_check_package_contracts::Principal { left: module.types, right: module.types, remaining: scopes.remaining, views: scopes , ..};
         let error = proof.validate(value.ty, candidate.ty);
         if error != blot_error::Error.none { if scopes.remaining == 0 { return 0, blot_error::Error.invalid_artifact; } continue; }
         return prior, blot_error::Error.none;

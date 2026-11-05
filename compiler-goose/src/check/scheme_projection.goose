@@ -52,13 +52,13 @@ fn selectProjection(self_: Resolver&, mapping: blot_check_package_contracts::Pri
                 for clause, index in required { let error = comparison.validate(clause, selected_arguments[index]); if error != blot_error::Error.none { if mapping.remaining == 0 { return blot_error::Error.invalid_artifact; } matches = false; break; } }
                 if !matches || !blot_structural::equal(comparison.witnesses, owner_mapping.witnesses) || !blot_structural::equal(comparison.scheme_row_witnesses, owner_mapping.scheme_row_witnesses) { continue; }
                 var declaration: const blot_check_core::Contract? = null;
-                for candidate in self_.module.contracts { let error = charge(mapping.remaining); if error != blot_error::Error.none { return error; } if candidate.identity == goal.identity { declaration .= candidate; break; } }
+                for candidate,index in self_.module.contracts { let error = charge(mapping.remaining); if error != blot_error::Error.none { return error; } if candidate.identity == goal.identity { declaration .= self_.module.contracts[index]; break; } }
                 { let optional_binding_32 .= declaration; if optional_binding_32 { let declaration .= optional_binding_32;
                     if declaration.members.len != proof.members.len { return blot_error::Error.invalid_artifact; }
                     let members = self_.module.contract_members[declaration.members.start..declaration.members.start + declaration.members.len]; let selected = self_.module.selected_members[proof.members.start..proof.members.start + proof.members.len];
                     for member, index in members { let error = charge(mapping.remaining); if error != blot_error::Error.none { return error; } if member.name != member_name { continue; } let selected = selected[index];
                         if member.kind == blot_reuse_principal_interface::ContractMemberKind.value || selected.kind != blot_reuse_principal_interface::ImplementationMemberKind.type_ || selected.name != member_name { return blot_error::Error.invalid_artifact; }
-                        var endpoint = blot_check_package_contracts::Principal { left: self_.module.types, right: self_.module.types, remaining: mapping.remaining, views: mapping.views , ..}; return endpoint.validate(selected.root, actual);
+                        return blot_check_package_contracts::validateEndpoint(self_.module.types,mapping.remaining,mapping.views,selected.root,actual);
                     } return blot_error::Error.invalid_artifact;
                  } } return blot_error::Error.invalid_artifact;
             }

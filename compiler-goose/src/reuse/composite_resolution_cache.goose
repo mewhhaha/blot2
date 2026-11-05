@@ -43,31 +43,35 @@ fn initPooled()->Cache,Error {
  return Cache {entries:state.entries,physical:state.physical, effects_physical:state.effects_physical,lease:(at+1) as u32,lease_generation:generation, ..},blot_error::Error.none;
 }
 fn valid(cache:const Cache&)->bool {return cache.lease!=0&&cache.lease-1<states.len&&states[cache.lease-1].live&&states[cache.lease-1].owner==cache.lease_generation;}
-fn deinit(cache:Cache&) {if cache.lease==0 {return;}assert(valid(cache));cache.entries.clear();let at=cache.lease-1;states[at].live=false;states.free(at);cache=Cache {..};}
+fn deinit(cache:Cache&) {if cache.lease==0 {return;}assert(valid(cache));let at=cache.lease-1;let state:State& =states[at];state.entries.clear();state.live=false;states.free(at);cache=Cache {..};}
 fn activate(cache: Cache&, physical: u16, effects_physical: u64) -> bool {
     assert(valid(cache));
+    let state:State& =states[cache.lease-1];
     if physical == 65535 || effects_physical == 18446744073709551615 { return false; }
-    if cache.physical != physical || cache.effects_physical != effects_physical {
-        for &entry in cache.entries.items { entry.root = 0; }
-        cache.physical = physical; cache.effects_physical = effects_physical;
+    if state.physical != physical || state.effects_physical != effects_physical {
+        for &entry in state.entries.items { entry.root = 0; }
+        state.physical = physical; state.effects_physical = effects_physical;
     }
     return true;
 }
 fn slot(root: u32, at: u32) -> i64 { ((root * 2654435769 ^ at * 2246822507) >> 28) as i64 }
 fn get(cache: const Cache&, root: u32, at: u32) -> blot_support::Option<Record> {
     assert(valid(cache));
-    if cache.entries.len == 0 { return blot_support::none<Record>(); }
-    let entry = cache.entries.items[slot(root, at)];
+    let state:const State& =states[cache.lease-1];
+    if state.entries.len == 0 { return blot_support::none<Record>(); }
+    let entry = state.entries.items[slot(root, at)];
     if entry.root == root && entry.at == at { return blot_support::some(entry.record); }
     return blot_support::none<Record>();
 }
 fn occupied(cache: const Cache&, root: u32, at: u32) -> bool {
     assert(valid(cache));
-    cache.entries.len != 0 && cache.entries.items[slot(root, at)].root != 0
+    let state:const State& =states[cache.lease-1];
+    state.entries.len != 0 && state.entries.items[slot(root, at)].root != 0
 }
 fn put(cache: Cache&, root: u32, at: u32, record: Record) -> Error {
     assert(valid(cache));
-    if cache.entries.len == 0 { cache.entries.resize(16, Entry {..}); }
-    cache.entries.items[slot(root, at)] = Entry { root, at, record , ..};
+    let state:State& =states[cache.lease-1];
+    if state.entries.len == 0 { state.entries.resize(16, Entry {..}); }
+    state.entries.items[slot(root, at)] = Entry { root, at, record , ..};
     return blot_error::Error.none;
 }

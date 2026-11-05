@@ -25,7 +25,7 @@ fn implementationGiven(module: const Module&, body: u32, goal: blot_check_core::
         if implementation.contract.unit != goal.identity.unit || implementation.contract.decl != goal.identity.decl || implementation.head.len != arguments.b { continue; } var owns = false;
         for member in module.implementation_members[implementation.members.start..implementation.members.start + implementation.members.len] { let error = step(scopes); if error != blot_error::Error.none { return false, error; } if member.kind == blot_reuse_principal_interface::ImplementationMemberKind.value && sameTarget(module, blot_check_core::BindingRef { 0, body , ..}, member.target) { owns = true; } } if !owns { continue; }
         var matches = true; let actuals = module.types.list(List { arguments.a, arguments.b , ..});
-        for expected, index in module.types.list(implementation.head) { var comparison = Principal { left: module.types, right: module.types, remaining: scopes.remaining, views: scopes , ..}; if comparison.validate(expected, actuals[index]) != blot_error::Error.none { matches = false; break; } } if matches { return true, blot_error::Error.none; }
+        for expected, index in module.types.list(implementation.head) { if blot_check_package_contracts::validateEndpoint(module.types,scopes.remaining,scopes,expected,actuals[index]) != blot_error::Error.none { matches = false; break; } } if matches { return true, blot_error::Error.none; }
     } return false, blot_error::Error.none;
 }
 fn requirements(module: const Module&, predicates: List, scopes: Context&, body: u32) -> Error {

@@ -31,7 +31,7 @@ struct SourceRows { module: Module, rows: const u32[:], lease: blot_check_scheme
 struct SourceDefinitions { module: Module, values: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
 struct AdmissionTables { bodies: BodyBuffer=BodyBuffer{..}, body_index: BodyMap=BodyMap{..}, source_rows: SourceRowsBuffer=SourceRowsBuffer{..}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{..} }
 struct Admission {
-    workspace: Workspace? = null, remaining: i64&, units: (const Module?)[128] = [null;128], count: i64 = 0, source_bodies: bool = false,
+    workspace: Workspace? = null, remaining: i64&, units: u64[128] = [0;128], count: i64 = 0, source_bodies: bool = false,
     bodies: BodyBuffer=BodyBuffer{..}, body_index: BodyMap=BodyMap{..}, source_rows: SourceRowsBuffer=SourceRowsBuffer{..}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{..},
     source_failure: blot_support::Option<SourceFailure>? = null,
 }
@@ -45,12 +45,13 @@ fn deinit(self_: Admission&) {
 struct BoundsReceipt { module: Module, symbol_count: blot_support::Option<i64>, source_length: blot_support::Option<u32>, forbidden_owner: blot_support::Option<u32> }
 struct WorkspaceTables { bounds_units: ModuleBuffer=ModuleBuffer{..}, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{..} }
 struct Workspace {
-    oom: bool = false, admission: Admission? = null, modules: (const Module?)[128] = [null;128], module_count: i64 = 0,
+    oom: bool = false, admission: Admission? = null, modules: u64[128] = [0;128], module_count: i64 = 0,
     bounds_units: ModuleBuffer=ModuleBuffer{..}, has_bounds_units: bool = false, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{..},
 }
 fn initWorkspace(tables: WorkspaceTables) -> Workspace { return Workspace { bounds_units: tables.bounds_units, bounds_receipts: tables.bounds_receipts , ..}; }
 fn deinit(self_: Workspace&) { self_.bounds_units.deinit(); self_.bounds_receipts.deinit(); self_.has_bounds_units = false; self_.module_count = 0; self_.admission .= null; }
-fn proved(self_: const Workspace&, module: const Module&) -> bool { if module.owner_id == 0 { return false; } for index in 0..self_.module_count { let entry .= self_.modules[index]; if entry && entry.owner_id == module.owner_id { return true; } } return false; }
+fn proved(self_: const Workspace&, module: const Module&) -> bool {return provedOwner(self_,module.owner_id);}
+fn provedOwner(self_:const Workspace&,owner_id:u64)->bool {if owner_id==0 {return false;}for index in 0..self_.module_count {if self_.modules[index]==owner_id {return true;}}return false;}
 fn convert(error: Error) -> Error { if error == blot_error::Error.none || error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.invalid_artifact; }
 struct SharedGoal {
     producer: Module, origin: blot_support::Option<Module>   = blot_support::none<Module>(), binding: u32, call_owner: Id, resolver_callback: Id, goal_depth: i64,
@@ -126,8 +127,16 @@ fn rememberSharedGoal(self_: Solver&, key: SharedGoal, depth: i64) -> Error {
 }
 fn deinit(self_: Solver&) { self_.shared_authority.present = false; self_.shared_goals.deinit(); self_.rigid_type_overflow.deinit(); self_.rigid_rows.deinit(); self_.store.deinit(); }
 fn refresh(self_: Solver&) {
-    self_.graph = blot_check_core::Types { owner_id: self_.store.owner_id, nodes: self_.store.nodes.items[..], extra: self_.store.extra.items[..], effects: blot_check_core::EffectRows { self_.store.effects.rows.items[..], self_.store.effects.labels.items[..], self_.store.effects.variables.len as u32 , ..}, operations: self_.store.operations.items[..], quantifier_goals: self_.store.quantifier_goals.items[..], quantifier_obligations: self_.store.quantifier_obligations.items[..] , ..};
-    { let optional_binding_76 .= self_.view; if optional_binding_76 { let view .= optional_binding_76; view = self_.graph;  } }
+    let nodes=blot_check_types::pool_Table_nodes.realloc_slice(self_.store.nodes.storage,self_.store.nodes.storage.len);
+    let extra=blot_check_types::pool_Table_extra.realloc_slice(self_.store.extra.storage,self_.store.extra.storage.len);
+    let rows=blot_check_effects::pool_Table_rows.realloc_slice(self_.store.effects.rows.storage,self_.store.effects.rows.storage.len);
+    let labels=blot_check_effects::pool_Table_labels.realloc_slice(self_.store.effects.labels.storage,self_.store.effects.labels.storage.len);
+    let operations=blot_check_types::pool_Table_operations.realloc_slice(self_.store.operations.storage,self_.store.operations.storage.len);
+    let goals=blot_check_types::pool_Table_quantifier_goals.realloc_slice(self_.store.quantifier_goals.storage,self_.store.quantifier_goals.storage.len);
+    let obligations=blot_check_types::pool_Table_quantifier_obligations.realloc_slice(self_.store.quantifier_obligations.storage,self_.store.quantifier_obligations.storage.len);
+    let refreshed = blot_check_core::Types { owner_id: self_.store.owner_id, nodes: nodes[..self_.store.nodes.len], extra: extra[..self_.store.extra.len], effects: blot_check_core::EffectRows { rows[..self_.store.effects.rows.len], labels[..self_.store.effects.labels.len], self_.store.effects.variables.len as u32 , ..}, operations: operations[..self_.store.operations.len], quantifier_goals: goals[..self_.store.quantifier_goals.len], quantifier_obligations: obligations[..self_.store.quantifier_obligations.len] , ..};
+    self_.graph=refreshed;
+    { let optional_binding_76 .= self_.view; if optional_binding_76 { let view .= optional_binding_76; view = refreshed;  } }
 }
 fn step(self_: Solver&) -> Error { if self_.remaining == 0 { return blot_error::Error.invalid_artifact; } self_.remaining -= 1; return blot_error::Error.none; }
 fn beginWork(self_: Solver&) { self_.store.projection_steps = 0; self_.store.projection_limit = self_.remaining; }

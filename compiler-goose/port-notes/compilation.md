@@ -4,8 +4,9 @@ The user explicitly requested fixing and recompiling the port. Verification is
 active; there is no remaining approval or source-writing barrier. Keep the Zig
 compiler, normal toolchain, saved oracle and siblings unchanged.
 
-Checkpoint `fff04fc8155f92e65893c609650967d85ec7a09e` is pushed to main. It preserves
-validation frames and recursive scratch repairs; it is not a full compiler build.
+Checkpoint `25a8da6b6f32d48bf2a11f096d2e5e9f334614a7` is pushed to main. It preserves
+unification scratch and mutable rank-state repairs; no successful whole compiler
+executable exists yet.
 Upstream Goose parses roughly 35,700 declarations across 435 files in about
 1.1 seconds. Whole-program type checking has not completed successfully.
 
@@ -13,31 +14,24 @@ Use `python3 compiler-goose/tools/check_source.py --phase check --log NAME`.
 The runner caps and kills the process group and saves full diagnostics under
 `build/goose-port/verification/`. Check mode uses streaming text diagnostics;
 JSON diagnostics buffer until completion and hid errors in capped runs.
-Check mode stops the process group after the first error; recent failed
-iterations take roughly thirteen to thirty-one seconds. The default cap is
-30 seconds; a bounded longer check exposed the next error at 30.825 seconds,
-so the current repair loop permits 45 seconds. A no-error timeout is not a pass.
-One coordinator runs whole-program checks at a time; checker currently owns
-the scheme-equation workspace lifetime frontier after rank traversal.
+Check mode stops the process group after the first error. The later source
+frontier now takes about 60–65 seconds to reach; current checks use a bounded
+90-second cap. A no-error timeout is not a pass. Exactly one coordinator runs
+whole-program checks. Checker currently owns package admission's owner-ID cache
+frontier after staging variable ranges and row frames (check128).
 
 The actual build entry remains `compiler-goose/build.py`, with explicit Goose
 binary, standard-library directory and 30-second stage caps. Do not claim a
 working compiler until C emission, linking and execution have succeeded.
 
-The official repair loop has advanced through capability, usage and task
-validation and substitution/unification scratch ownership into scheme-equation
-workspace lifetimes (check112). Opaque inference
-frames hold numeric ranges, while borrowed instruction/type inputs pass directly
-down helpers. Usage exit/staging frames use numeric indices; direct child
-visitors avoid storing recursive borrows. Named scope frames contain only scalar
-identity/view/parent data in a reusable pool. Astra reviewed identity, scope,
-16-view ordering, work charging, depth bounds and all cleanup paths without
-finding an introduced regression. This is static review, not runtime parity.
-Whole-program parsing continues to pass at about one second.
-Unification and resolution now use fixed pooled scratch with original lazy
-prefix snapshots, LIFO order, counters and rollback. Astra reviewed these against
-the native implementation; one missing reporter type annotation was corrected.
-Rank traversal passes the original mutable Store directly instead of copying it.
+The official repair loop has advanced through solver, projection and staging
+validation. Public Principal retains its existing layout/API; fresh recursive
+proofs use scalar state with borrowed roots passed directly. Static resolver
+policies preserve real projection behavior. Staging variables use their original
+same-module graph ranges; scalar row/scope frames preserve parent lifetimes,
+charges and cleanup. Astra's static comparisons found no introduced regression;
+these are not runtime qualification. Whole-program parsing passes in about one
+second. The new scalar admission representation remains under implementation.
 Scoped tests pass for lexer, interning, graph
 SCCs, arena ownership, byte/hash/JSON helpers, maps and buffers, wire/IR emission,
 native JSON and WGSL fixtures. A fresh exact C-host startup probe passes with
@@ -79,6 +73,19 @@ No experiment is accepted into the toolchain. Latest rejected-run evidence:
 `build/goose-port/fast-goose-positive/decision.json`; prior source/checkpoint
 history retains the other measurements. Do not rebuild these candidates without
 a new measured lever.
+
+The official C build attempts emitted the runtime but did not reach C program
+output: 60-second caps were incomplete. Build125 used a longer window and stopped
+immediately on the next source diagnostic at 61.464 seconds. The late profile
+(`official-profile-123`) identified RootCandidates/CanContain under recursive
+solver-summary application, before IR/emission. A private matched-O3 compiler
+build itself hit its 75-second cap and produced no candidate; see
+`fast-goose-o3/decision.json`. No upstream or installed binaries changed.
+
+The hot composite cache now accesses its canonical generation-checked state
+directly. Baseline/candidate focused execution laws match, including snapshots,
+aliases and reuse; both take about 0.15 seconds. This has no demonstrated whole
+compile-time win (both whole attempts hit their caps). Keep that distinction.
 
 Runtime recoverable physical OOM and retention parity remain separate known
 production requirements; null/unavailable metrics do not close them.
