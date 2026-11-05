@@ -1,18 +1,19 @@
 namespace blot_backend_runtime_flags;
 import .runtime_ir;
+import .wasm;
 import runtime.root_runtime;
 import runtime.shared_rc;
 import runtime.runtime_layout;
 
-struct Facts<M> { module: M&, root_mode: u32, rc_admitted: bool }
-fn wide<M>(facts: Facts<M>&) -> bool {
+struct Facts { module: const blot_backend_wasm::Module&, root_mode: u32, rc_admitted: bool }
+fn wide(facts: Facts&) -> bool {
     if !facts.module.arena.present { return false; }
     let arena = facts.module.arena.value;
     if (facts.module.globals[arena.rc_enabled].bits & blot_runtime_shared_rc::shaped_mode) != 0 { return true; }
     for item in facts.module.exports { if !item.global && (item.index == arena.allocate_shaped || item.index == arena.root_allocate_shaped) { return true; } }
     return false;
 }
-fn value<M>(facts: Facts<M>&, inst: blot_backend_runtime_ir::Instruction) -> u32, bool {
+fn value(facts: Facts&, inst: blot_backend_runtime_ir::Instruction) -> u32, bool {
     if inst.op == blot_backend_runtime_ir::OP_wide_layouts { if wide(facts) { return 1, true; } return 0, true; }
     if inst.op != blot_backend_runtime_ir::OP_global_get || !facts.module.arena.present || inst.operand >= facts.module.globals.len { return 0, false; }
     let arena = facts.module.arena.value; let global = facts.module.globals[inst.operand];
@@ -21,7 +22,7 @@ fn value<M>(facts: Facts<M>&, inst: blot_backend_runtime_ir::Instruction) -> u32
     if inst.operand == arena.rc_enabled { if facts.rc_admitted { return 1, true; } return 0, true; }
     return 0, false;
 }
-fn complete<M>(facts: Facts<M>&) -> bool {
+fn complete(facts: Facts&) -> bool {
     if !facts.module.arena.present || !facts.rc_admitted || facts.root_mode != (blot_runtime_root_runtime::enabled | blot_runtime_root_runtime::complete) { return false; }
     let arena = facts.module.arena.value;
     let root, root_known = value(facts, blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_get, arena.root_enabled));
@@ -29,7 +30,7 @@ fn complete<M>(facts: Facts<M>&) -> bool {
     return root_known && rc_known;
 }
 struct Condition { after: i64 = 0, value: bool = false, result: u32 = 0 }
-fn condition<M>(facts: Facts<M>&, instructions: const blot_backend_runtime_ir::Instruction[:], start: i64) -> Condition, bool {
+fn condition(facts: Facts&, instructions: const blot_backend_runtime_ir::Instruction[:], start: i64) -> Condition, bool {
     if start >= instructions.len { return Condition {..}, false; }
     let initial, known = value(facts, instructions[start]);
     if !known { return Condition {..}, false; }
@@ -58,11 +59,11 @@ fn opening(instructions: const blot_backend_runtime_ir::Instruction[:], alternat
     }
     return 0, false;
 }
-struct Iterator<M> {
-    facts: Facts<M>, instructions: const blot_backend_runtime_ir::Instruction[:], at: i64 = 0,
+struct Iterator {
+    facts: Facts, instructions: const blot_backend_runtime_ir::Instruction[:], at: i64 = 0,
     pending: blot_backend_runtime_ir::Instruction[18] = [blot_backend_runtime_ir::Instruction {..}; 18], pending_at: i64 = 18,
 }
-fn next<M>(iterator: Iterator<M>&) -> blot_backend_runtime_ir::Instruction, bool {
+fn next(iterator: Iterator&) -> blot_backend_runtime_ir::Instruction, bool {
     if iterator.pending_at < 18 { let inst = iterator.pending[iterator.pending_at]; iterator.pending_at++; return inst, true; }
     while iterator.at < iterator.instructions.len {
         let at = iterator.at; var inst = iterator.instructions[at]; iterator.at++;

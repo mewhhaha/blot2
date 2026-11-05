@@ -5,8 +5,8 @@ import .runtime_ir;
 import .wasm_simd_ops;
 import support.error;
 
-struct Bytes { buffer: u8[>..]& }
-fn init(buffer: u8[>..]&) -> Bytes { Bytes { buffer: buffer } }
+struct Bytes { buffer: u8[>..<]& }
+fn init(buffer: u8[>..<]&) -> Bytes { Bytes { buffer: buffer } }
 fn items(bytes: Bytes&) -> const u8[:] { bytes.buffer[..] }
 fn clear(bytes: Bytes&) { bytes.buffer.clear(); }
 fn byte(bytes: Bytes&, value: u8) { bytes.buffer.push(value); }

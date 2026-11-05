@@ -352,3 +352,25 @@ IR now exposes detached optimizer-owned `DetachedBody` and `DetachedFunction`
 records with exact typed local/instruction/parameter runs and clone/deinit.
 They are independent of Module range IDs. Syntax owner has optimized_bodies and
 optimized_archive; runtime_identity and loop_targets are parent-owned now.
+
+The full scoped_backend production first writing pass now reaches its public
+compile lifecycle. Source tests and test-only helper functions are deferred.
+The nonrecursive factory owns all scoped metadata, record indexes, reusable
+argument snapshots, proof caches, method sessions, call caches and outline
+context until assembly finishes, then destroys them before returning workspace
+bytes. CodeArtifacts and ArtifactEmitter source-view callers now use canonical
+buffer `.items`, and core prepare calls Recorder.reset to retain its pooled
+metadata authority. This remains source writing; several downstream leaves and
+Wasm assembly are absent, and no compiler/checker has run.
+
+Wasm now includes the full production assembly first writing pass: optimizer
+and parallel-preparation orchestration, immutable output reuse, RC/root and
+collector admission, ordinary-body retry, final machine sharing/indexing,
+standard sections, profiled names/data, source-shaped collector JSON, counted
+ownership/cycles/tasks metadata and ABI versions 2 through 8 with cleanup and
+multiplicity sections. Prepared output is an owned DetachedBody; transient
+Function views borrow its typed arrays through derived COW fields. Those fields
+remain excluded from semantic/wire data. Parent owns memory_profile,
+provider_modes and runtime_identity; syntax owns optimized_bodies/archive;
+checker owns wasm_lifetimes next. Runtime pipeline/parallel and remaining
+optimization/storage leaves still require writing. No checks have run.

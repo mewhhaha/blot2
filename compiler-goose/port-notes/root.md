@@ -394,3 +394,31 @@ allocator hook. This is an open parity gap, not zero measured allocations.
 All checker-owner production writing passes are complete, including CoreBuilder,
 PackageCore and StagingCore. No compiler, checker, formatter or test has run.
 Remaining backend/archives/session/CLI writing keeps the full port incomplete.
+
+Dependency bundle, strict project loader, fresh-entry consumer and dependency CLI
+now have full first production writing passes. Bundle and Core/interface inputs
+own typed Payload journals; entry emission pins copied Core headers and identity
+runs before backend entry. Decoder admission rereads each producer and import
+resolution before publication. CLI publication uses exclusive temporary files,
+sync and atomic rename. No rejection triggers an implicit source fallback.
+Payload byte metrics use concrete packed C.2 owned-run counts, separate from wire
+bytes; they have not been compared with the Zig allocator's padded footprints.
+
+ProviderModes now writes exact constructor catalogs, collision/saturation rules,
+protected-flow admission and complete read/write operation patterns. Detached
+optimizer input uses flat FunctionView or DetachedFunction. Its catalog sort is
+in-place heapsort. Optional guest memory profiling now includes all metric rows,
+shadow table probes/status bits, source/inline metadata and exact observer byte
+sequences. Streaming SHA-256 is written for the live instance fingerprint.
+Neither instruction/JSON equivalence nor hash output has been verified.
+
+Runtime memory's explicit request/change/free meter is written, including atomic
+shared updates, but Goose allocator event integration is incomplete. Uncovered
+counts serialize as null with unavailable coverage, never invented zero work.
+The session heap/runtime allocator and physical OOM/fault parity remain open.
+
+Replay states now use exact copied catalog storage admission: nonzero module/type
+owner IDs plus complete header scalar/nested-storage equality. Header-copy
+equality alone never substitutes for source/graph admission. Checker, archives
+and both backend first passes remain unverified. Retained sessions, process
+worker driver, CLI and remaining backend/helper writing keep the port incomplete.

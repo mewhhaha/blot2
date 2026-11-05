@@ -127,6 +127,11 @@ fn deinit(self: Recorder&) {
     releaseOwned(self.functions); releaseOwned(self.locals); releaseOwned(self.instructions);
     self.functions = []; self.locals = []; self.instructions = []; self.pending_instructions.clear();
 }
+fn reset(self:Recorder&) {
+    let lease=self.recorder_lease;let generation=self.recorder_generation;
+    let tables=Tables{records:self.records,bytes:self.bytes,parameters:self.parameters,operations:self.operations,pending_instructions:self.pending_instructions,..};
+    self.deinit();self=init(tables);self.recorder_lease=lease;self.recorder_generation=generation;
+}
 fn append(self: Recorder&, event: Event) -> Error {
     assert(!self.sealed);let reserved=self.records.ensure(self.records.len+1);if reserved!=Error.none {return reserved;} var sequence = self.local_clock;
     { let optional_source_58 .= self.clock; if optional_source_58 { let clock .= optional_source_58; sequence = clock; clock++;  } else { self.local_clock++; } }

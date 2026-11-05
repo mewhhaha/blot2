@@ -1,5 +1,6 @@
 // Private source-owned representation transport. No slot, fuel or call authority.
 namespace blot_reuse_source_value_template;
+import reuse.catalog_storage;
 import std;
 import dictionary;
 import check.core;
@@ -177,7 +178,7 @@ struct Plan {
 reusable[] var plan_order: u32[>..] = [];
 fn deinit(self: Plan&) { if self.order.len != 0 { let first: const u32& = self.order[0]; let at = plan_order.index_of(first); assert(at >= 0); plan_order.free_slice(plan_order[at..at + self.order.len]); } self = Plan {..}; }
 fn bind<G>(self: QueryScratch&, plan: const Plan&, g: G&) -> Error {
-    if !plan.gate || !plan.pools || self.allocation_owner == 0 || self.allocation_owner != g.evaluator.allocation_owner || !blot_support::same_slice_identity(g.evaluator.units, plan.gate.units) { return Error.declined; }
+    if !plan.gate || !plan.pools || self.allocation_owner == 0 || self.allocation_owner != g.evaluator.allocation_owner || !blot_reuse_catalog_storage::same(g.evaluator.units, plan.gate.units) { return Error.declined; }
     if self.owner != 0 { if self.owner != self.owner_id || self.generator != g.owner_id || self.session != g.evaluator.owner_id || self.pools .!= plan.pools || self.gate .!= plan.gate || !self.policy.present || self.policy.value != plan.row_policy { return Error.declined; } }
     else { if self.owner_id == 0 || g.owner_id == 0 || g.evaluator.owner_id == 0 { return Error.declined; } self.owner = self.owner_id; self.generator = g.owner_id; self.session = g.evaluator.owner_id; self.pools .= plan.pools; self.gate .= plan.gate; self.policy = blot_support::some(plan.row_policy); }
     return Error.none;

@@ -3,7 +3,7 @@ import .runtime_ir;
 import .wasm;
 import support.wyhash;
 
-fn equal(left_module: blot_backend_wasm::Module&, left: blot_backend_runtime_ir::Function, right_module: blot_backend_wasm::Module&, right: blot_backend_runtime_ir::Function) -> bool {
+fn equal(left_module: const blot_backend_wasm::Module&, left: blot_backend_runtime_ir::Function, right_module: const blot_backend_wasm::Module&, right: blot_backend_runtime_ir::Function) -> bool {
     if left.result != right.result || !blot_backend_wasm::equal(blot_backend_wasm::parameters(left_module, left), blot_backend_wasm::parameters(right_module, right)) || !blot_backend_wasm::equal(blot_backend_wasm::locals(left_module, left), blot_backend_wasm::locals(right_module, right)) { return false; }
     let left_code = blot_backend_wasm::instructions(left_module, left); let right_code = blot_backend_wasm::instructions(right_module, right); var i = 0; var j = 0;
     loop {
@@ -15,7 +15,7 @@ fn equal(left_module: blot_backend_wasm::Module&, left: blot_backend_runtime_ir:
         i++; j++;
     }
 }
-fn hash(module: blot_backend_wasm::Module&, function: blot_backend_runtime_ir::Function) -> u64 {
+fn hash(module: const blot_backend_wasm::Module&, function: blot_backend_runtime_ir::Function) -> u64 {
     var bytes: u8[>..] = [];
     appendWord(bytes, function.parameters.len as u64, 8); bytes.append(blot_backend_wasm::parameters(module, function)); bytes.push(function.result);
     appendWord(bytes, function.locals.len as u64, 8); bytes.append(blot_backend_wasm::locals(module, function));

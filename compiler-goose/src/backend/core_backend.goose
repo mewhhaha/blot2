@@ -1810,7 +1810,7 @@ fn prepare(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Error {
     if query_previous != null && query_previous.metadata.pools.present { workspace.module_stamps.previous .= query_previous.metadata.pools.value; }
     workspace.module_stamps.compare_contents = true; workspace.module_stamps.validate = run.options.validate_pins; workspace.module_stamps.computed = 0; workspace.module_stamps.reused = 0; workspace.module_stamps.comparisons = 0; workspace.module_stamps.copied = 0; workspace.module_stamps.hashed = 0; run.stamps_alive = true;
     if workspace.module_stamps.previous != null { run.stamps .= workspace.module_stamps; }
-    workspace.journal.deinit(); workspace.journal = blot_reuse_artifact_emitter::init(blot_reuse_artifact_emitter::Tables { records: workspace.journal.records,bytes: workspace.journal.bytes,parameters: workspace.journal.parameters,operations: workspace.journal.operations,pending_instructions: workspace.journal.pending_instructions , ..}); run.journal_alive = true;
+    workspace.journal.reset(); run.journal_alive = true;
     workspace.metadata.deinit(); workspace.metadata.allocation_owner = workspace.allocation_owner; workspace.metadata.active_job = 0; workspace.metadata.clock = 0; run.metadata_alive = true;
     if run.recording { workspace.journal.owner .= workspace.metadata.active_job; workspace.journal.clock .= workspace.metadata.clock; }
     var journal: blot_reuse_artifact_emitter::Recorder&? = null; if run.recording { journal .= workspace.journal; } run.generator_alive = true;
@@ -1961,7 +1961,7 @@ fn observe(run: CompileRun&,result: Result&) -> blot_error::Error {
     if run.options.explain_allocations { workspace.allocation_snapshot = blot_backend_allocation_emission::capture(workspace.allocation_snapshot.sites,run.units,run.options.identity,generator.module,run.entry,run.options.diagnostic_prelude_unit); result.allocation_emission .= workspace.allocation_snapshot; }
     if run.options.observe_startup { let snapshot,error = generator.planning.startup_facts.capture(generator.module); if error != blot_error::Error.none { return error; } workspace.startup_snapshot = snapshot; result.startup_observation .= workspace.startup_snapshot; }
     result.principal = principalStats(generator); if run.query_state != null { result.completed_queries = run.query_state.stats; } result.completed_queries.recorded = generator.evaluator.retained.specialization_receipts.len;
-    for record in generator.evaluator.retained.specialization_receipts { if record.complete { result.completed_queries.complete_records++; if record.member.present { result.completed_queries.member_recorded++; } } }
+    for record in generator.evaluator.retained.specialization_receipts.items { if record.complete { result.completed_queries.complete_records++; if record.member.present { result.completed_queries.member_recorded++; } } }
     result.reuse = generator.work; if run.principal_state != null && run.principal_state.graphs.present { result.reuse.graph_imports.principals = run.principal_state.graphs.value.census; }
     if run.query_state != null && run.query_state.semantic != null { result.reuse.graph_imports.queries = run.query_state.semantic.census; } if run.retained != null { result.reuse.graph_imports.fragments = run.retained.importer.census; }
     result.refinements = generator.refinement_stats; result.query_tables.canonical = generator.evaluator.specializations.canonical_specializations.table.storage(); if run.persisted_principals != null { result.query_tables.portable_principal = run.persisted_principals.storage(); }
@@ -1978,13 +1978,13 @@ struct ArtifactCounts { globals: i64,imports: i64,signatures: i64,data_bytes: i6
 fn recordArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
     if !run.recording { return blot_error::Error.none; } let workspace .= run.workspace; let generator .= workspace.generator; let metadata .= workspace.metadata; let journal .= workspace.journal;
     let graphs = metadata.principal_graphs.capture(generator.evaluator); if graphs != blot_error::Error.none { return graphs; }
-    for record in generator.evaluator.retained.specialization_receipts {
+    for record in generator.evaluator.retained.specialization_receipts.items {
         var input = record.input; if record.member.present { input = record.member.value.function; }
         let cloned,clone_error = record.clone(); if clone_error != blot_error::Error.none { return clone_error; }
         let remembered,error = blot_eval_selected_query::remember(metadata.specialization_queries,generator.evaluator.closureInfo(input),cloned); if error != blot_error::Error.none { return error; }
     }
     for record in metadata.specialization_queries.records { if record.dependencies.member.present { result.completed_queries.member_payload_bytes += blot_support_host_layout::selected_query_record + blot_reuse_specialization_receipt::ownedBytes(record.dependencies); } }
-    if run.query_state != null && run.options.policy.semantic_workers > 1 { for record in run.query_state.independent_calls { let cloned,error = record.clone(); if error != blot_error::Error.none { return error; } metadata.independent_calls.push(cloned); } }
+    if run.query_state != null && run.options.policy.semantic_workers > 1 { for record in run.query_state.independent_calls.items { let cloned,error = record.clone(); if error != blot_error::Error.none { return error; } metadata.independent_calls.push(cloned); } }
     result.query_tables.selected = metadata.specialization_queries.storage(); result.query_tables.principal = metadata.principal_queries.storage();
     var stamps: blot_reuse_code_artifacts::ModuleStamps&? = null; if run.stamps != null || run.options.validate_pins { stamps .= workspace.module_stamps; }
     let captured = metadata.capturePoolsWithStamps(generator,run.options.identity,stamps); if captured != blot_error::Error.none { return captured; } result.counters = generator.evaluator.counters; assert(metadata.pools.present);
@@ -1994,15 +1994,15 @@ fn recordArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
         let certificate,error = run.retained.importer.code_gate.semantic.freezeValidation(metadata.pools.value.modules); if error != blot_error::Error.none { return error; } metadata.pools.value.dependency_certificate = certificate;
     }
     if metadata.pools.value.dependency_certificate.present { let certificate = metadata.pools.value.dependency_certificate.value; result.source_validation.retained = certificate.storage(); result.source_validation.reused_images = certificate.reused_images; }
-    journal.seal(); let functions = journal.freezeFunctions(metadata.function_jobs); if functions != blot_error::Error.none { return functions; }
-    for function_id in generator.static_data.closures { journal.functions[function_id].role = blot_reuse_artifact_emitter::FunctionRole.static_closure; }
+    journal.seal(); let functions = journal.freezeFunctions(metadata.function_jobs.items); if functions != blot_error::Error.none { return functions; }
+    for function_id in generator.static_data.closures.items { journal.functions[function_id].role = blot_reuse_artifact_emitter::FunctionRole.static_closure; }
     for slot in metadata.pools.value.runtime_globals { journal.functions[slot.initializer].role = blot_reuse_artifact_emitter::FunctionRole.runtime_initializer; }
     generator.planning.task_movers.each() { layout,function_id => { journal.functions[function_id].role = blot_reuse_artifact_emitter::FunctionRole.task_mover; } }
     for function in journal.functions { if function.role == blot_reuse_artifact_emitter::FunctionRole.unknown { return blot_error::Error.invalid_function_reference; } }
     if journal.functions.len != generator.module.functions.len { return blot_error::Error.invalid_function_reference; }
-    for job in metadata.jobs { if job.state == blot_reuse_code_artifacts::State.failed || job.state == blot_reuse_code_artifacts::State.pending || job.state == blot_reuse_code_artifacts::State.reserved { return blot_error::Error.invalid_function_reference; } }
+    for job in metadata.jobs.items { if job.state == blot_reuse_code_artifacts::State.failed || job.state == blot_reuse_code_artifacts::State.pending || job.state == blot_reuse_code_artifacts::State.reserved { return blot_error::Error.invalid_function_reference; } }
     for function in metadata.pools.value.functions {
-        if function.function >= journal.functions.len { return blot_error::Error.invalid_function_reference; } let owner = journal.functions[function.function].owner; if owner == 0 || owner > metadata.jobs.len { return blot_error::Error.invalid_function_reference; } let job = metadata.jobs[owner - 1];
+        if function.function >= journal.functions.len { return blot_error::Error.invalid_function_reference; } let owner = journal.functions[function.function].owner; if owner == 0 || owner > metadata.jobs.len { return blot_error::Error.invalid_function_reference; } let job = metadata.jobs.items[owner - 1];
         if job.state != blot_reuse_code_artifacts::State.complete || !job.function.present || job.function.value != function.function || job.request != function.request || job.result_template != function.result_template { return blot_error::Error.invalid_function_reference; }
     }
     let counts = ArtifactCounts { generator.module.globals.len,generator.module.imports.len,generator.module.signatures.len,generator.module.data.len , ..};
@@ -2267,12 +2267,12 @@ struct WireList<T> { items: const T[:],capacity: i64 }
 struct WireJob { metadata: const blot_reuse_code_artifacts::Context&,job: blot_reuse_code_artifacts::Job }
 fn jsonStringify(value: WireJob,writer: blot_json::Writer&) -> blot_error::Error {
     let metadata .= value.metadata; let job = value.job; writer.beginObject(); writer.field("parent",job.parent); writer.field("request",WireRequest { job.request , ..}); writer.field("reusable",job.reusable);
-    writer.field("inline_bodies",WireList<blot_check_core::BindingRef> { metadata.inline_bodies[job.inline_bodies.start..job.inline_bodies.start + job.inline_bodies.len],job.inline_capacity , ..});
-    writer.field("static_reads",WireList<blot_reuse_code_artifacts::StaticRead> { metadata.static_reads[job.static_reads.start..job.static_reads.start + job.static_reads.len],job.static_capacity , ..});
-    writer.field("state",wireEnum(job.state)); writer.field("function",job.function); writer.field("target_job",job.target_job); writer.field("mappings",metadata.mappings[job.mappings.start..job.mappings.start + job.mappings.len]); writer.field("rows",metadata.rows[job.rows.start..job.rows.start + job.rows.len]); writer.field("templates",metadata.templates[job.templates.start..job.templates.start + job.templates.len]); writer.field("solved",job.solved); writer.field("result_template",job.result_template); writer.field("value",job.value); writer.field("global",job.global); return writer.endObject();
+    writer.field("inline_bodies",WireList<blot_check_core::BindingRef> { metadata.inline_bodies.items[job.inline_bodies.start..job.inline_bodies.start + job.inline_bodies.len],job.inline_capacity , ..});
+    writer.field("static_reads",WireList<blot_reuse_code_artifacts::StaticRead> { metadata.static_reads.items[job.static_reads.start..job.static_reads.start + job.static_reads.len],job.static_capacity , ..});
+    writer.field("state",wireEnum(job.state)); writer.field("function",job.function); writer.field("target_job",job.target_job); writer.field("mappings",metadata.mappings.items[job.mappings.start..job.mappings.start + job.mappings.len]); writer.field("rows",metadata.rows.items[job.rows.start..job.rows.start + job.rows.len]); writer.field("templates",metadata.templates.items[job.templates.start..job.templates.start + job.templates.len]); writer.field("solved",job.solved); writer.field("result_template",job.result_template); writer.field("value",job.value); writer.field("global",job.global); return writer.endObject();
 }
 struct WireJobs { metadata: const blot_reuse_code_artifacts::Context& }
-fn jsonStringify(value: WireJobs,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for job in value.metadata.jobs { writer.element(WireJob { value.metadata,job , ..}); } return writer.endArray(); }
+fn jsonStringify(value: WireJobs,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for job in value.metadata.jobs.items { writer.element(WireJob { value.metadata,job , ..}); } return writer.endArray(); }
 struct WireDemandEvent { value: blot_reuse_code_artifacts::Event }
 fn jsonStringify(value: WireDemandEvent,writer: blot_json::Writer&) -> blot_error::Error {
     match value.value { enter e=>{ writer.beginObject(); writer.field("enter",e.job); return writer.endObject(); },solved e=>{ writer.beginObject(); writer.field("solved",e.job); return writer.endObject(); },_=>{ return writer.unionValue(value.value); }, }
@@ -2321,7 +2321,7 @@ struct WireEmissionRecords { values: const blot_reuse_artifact_emitter::Record[:
 fn jsonStringify(value: WireEmissionRecords,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for record in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("sequence",record.sequence); writer.field("owner",record.owner); writer.field("event",WireEmissionEvent { record.event , ..}); writer.endObject(); } return writer.endArray(); }
 struct WireEmission { journal: const blot_reuse_artifact_emitter::Recorder& }
 fn jsonStringify(value: WireEmission,writer: blot_json::Writer&) -> blot_error::Error {
-    let journal .= value.journal; writer.beginObject(); writer.field("records",WireEmissionRecords { journal.records , ..}); writer.field("bytes",journal.bytes[..]); writer.field("parameters",WireValueTypes { journal.parameters , ..}); writer.field("operations",journal.operations[..]); writer.field("functions",WireFunctionArtifacts { journal.functions , ..}); writer.field("locals",WireValueTypes { journal.locals , ..}); writer.field("instructions",WireSymbolicInstructions { journal.instructions , ..}); return writer.endObject();
+    let journal .= value.journal; writer.beginObject(); writer.field("records",WireEmissionRecords { journal.records.items , ..}); writer.field("bytes",journal.bytes.items[..]); writer.field("parameters",WireValueTypes { journal.parameters.items , ..}); writer.field("operations",journal.operations.items[..]); writer.field("functions",WireFunctionArtifacts { journal.functions , ..}); writer.field("locals",WireValueTypes { journal.locals , ..}); writer.field("instructions",WireSymbolicInstructions { journal.instructions , ..}); return writer.endObject();
 }
 struct WireLayoutNodes { values: const blot_backend_layout::Node[:] }
 fn jsonStringify(value: WireLayoutNodes,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for node in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("tag",wireEnum(node.tag)); writer.field("a",node.a); writer.field("b",node.b); writer.field("c",node.c); writer.endObject(); } return writer.endArray(); }
@@ -2373,7 +2373,7 @@ struct WireModulePin { unit: u32,path: const u8[:],token: blot_reuse_code_artifa
 fn jsonStringify(value: WireModulePin,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("unit",value.unit); writer.field("path",value.path); writer.field("token",value.token); writer.field("stamp",value.stamp[..]); return writer.endObject(); }
 fn dumpArtifact(run: CompileRun&,result: Result&,counts: ArtifactCounts) -> blot_error::Error {
     let metadata .= run.workspace.metadata; let journal .= run.workspace.journal; assert(metadata.pools.present); let pools: const blot_reuse_code_artifacts::Pools& = metadata.pools.value;
-    let jobs = printArtifact("ARTIFACT_JOBS",WireJobs { metadata , ..}); if jobs != blot_error::Error.none { return jobs; } let demands = printArtifact("ARTIFACT_DEMAND_EVENTS",WireDemandEvents { metadata.events , ..}); if demands != blot_error::Error.none { return demands; }
+    let jobs = printArtifact("ARTIFACT_JOBS",WireJobs { metadata , ..}); if jobs != blot_error::Error.none { return jobs; } let demands = printArtifact("ARTIFACT_DEMAND_EVENTS",WireDemandEvents { metadata.events.items , ..}); if demands != blot_error::Error.none { return demands; }
     let emission = printArtifact("ARTIFACT_EMISSION",WireEmission { journal , ..}); if emission != blot_error::Error.none { return emission; }
     for pin in pools.modules { let error = printArtifact("ARTIFACT_MODULE_PIN",WireModulePin { pin.unit,pin.canonical_path,pin.token,pin.stamp , ..}); if error != blot_error::Error.none { return error; } }
     let owned = printArtifact("ARTIFACT_OWNED_POOLS",WireOwnedPools { pools , ..}); if owned != blot_error::Error.none { return owned; }

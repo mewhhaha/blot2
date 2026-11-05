@@ -32,6 +32,7 @@ fn write_all(writer: Writer, bytes: const u8[:]) -> Error {
     return Error.none;
 }
 fn flush(writer: Writer) -> Error { return Error.none; }
+fn writeAll(writer:Writer&,bytes:const u8[:])->Error {return write_all(writer,bytes);}
 
 fn read_file(path: const u8[:], out: u8[>..<]&, maximum: i64) -> Error {
     var terminated: u8[>..] = []; terminated.append(path); terminated.push(0);

@@ -14,7 +14,7 @@ fn helper(arena: blot_backend_wasm::Arena, id: u32) -> bool {
     for function in [arena.allocate_scalar, arena.retain, arena.release, arena.release_lease, arena.retire, arena.free, arena.store_word, arena.copy_words, arena.decrement, arena.recycle, arena.reset, arena.root_reserve, arena.root_pop, arena.root_open, arena.root_close, arena.root_enter, arena.root_leave, arena.root_store, arena.root_authority, arena.cycle_safe, arena.cycle_collect, arena.mark_acyclic] { if function == id { return true; } }
     return false;
 }
-fn analyze<P>(module: blot_backend_wasm::Module&, bodies: const P[:]) -> Certificate {
+fn analyze<P>(module: const blot_backend_wasm::Module&, bodies: const P[:]) -> Certificate {
     var result = Certificate {..};
     if module.public_arena { result.reason = Reason.public_arena; return result; }
     if module.imports.len != 0 || module.host_references.present { result.reason = Reason.host_import; return result; }
@@ -26,10 +26,10 @@ fn analyze<P>(module: blot_backend_wasm::Module&, bodies: const P[:]) -> Certifi
         if function.entry {
             for parameter in 0..function.parameters.len { if blot_backend_runtime_ir::parameterRole(function, parameter) != blot_backend_runtime_ir::ROLE_scalar { result.reason = Reason.incoming_reference; return result; } }
         }
-        result.covered_functions++; var code = function.instructions;
+        result.covered_functions++; var code = blot_backend_wasm::instructions(module,function);
         if bodies[id].body.present { code = bodies[id].body.value.instructions; }
         for at in 0..code.len {
-            let inst = module.instructions[code.start + at]; result.instruction = blot_support::some(at as u32);
+            let inst = code[at]; result.instruction = blot_support::some(at as u32);
             if remaining == 0 { result.reason = Reason.work_limit; return result; } remaining--;
             if inst.op == blot_backend_runtime_ir::OP_call_indirect || inst.op == blot_backend_runtime_ir::OP_call_import { result.reason = Reason.indirect_call; return result; }
             if inst.op != blot_backend_runtime_ir::OP_call { continue; }
@@ -38,7 +38,7 @@ fn analyze<P>(module: blot_backend_wasm::Module&, bodies: const P[:]) -> Certifi
             if module.arena.present {
                 let arena = module.arena.value;
                 if inst.operand == arena.allocate_typed || inst.operand == arena.root_allocate {
-                    if at != 0 { let before = module.instructions[code.start + at - 1]; if before.op == blot_backend_runtime_ir::OP_i32_const && before.operand == 0 { continue; } }
+                    if at != 0 { let before = code[at - 1]; if before.op == blot_backend_runtime_ir::OP_i32_const && before.operand == 0 { continue; } }
                     result.reason = Reason.owning_allocation; return result;
                 }
                 if inst.operand == arena.allocate || inst.operand == arena.allocate_shaped || inst.operand == arena.root_allocate_shaped { result.reason = Reason.owning_allocation; return result; }
