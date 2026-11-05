@@ -2517,7 +2517,7 @@
       "zig": "compiler/src/reuse/artifact_import.zig",
       "goose": "compiler-goose/src/reuse/artifact_import.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/artifact_import_tests.zig",
@@ -2805,7 +2805,7 @@
       "zig": "compiler/src/reuse/dependency_symbol_slots.zig",
       "goose": "compiler-goose/src/reuse/dependency_symbol_slots.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/dispatch_explanation.zig",
@@ -2979,7 +2979,7 @@
       "zig": "compiler/src/reuse/module_visibility.zig",
       "goose": "compiler-goose/src/reuse/module_visibility.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/optimized_archive.zig",
@@ -3381,7 +3381,7 @@
       "zig": "compiler/src/reuse/type_display.zig",
       "goose": "compiler-goose/src/reuse/type_display.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/validation_image.zig",

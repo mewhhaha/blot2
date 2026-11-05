@@ -25,9 +25,14 @@ Production writing passes completed, all unverified:
   native scalar/OS services, file IO, explicit packed host footprints and
   complete typed Core worker packet codecs.
 
-Artifact import and its knowledge walk are in progress; their public
-constructors are written, but request and recursive representation transport
-remain incomplete. All other runtime/reuse modules and the main CLI/session
+Artifact import now has full first writing passes for constructor admission,
+request and representation transport, closed semantic imports, principal maps,
+static graph correspondence and solved-job transport. Its immutable Core remap
+comparison and knowledge walk live in artifact_import_core and
+artifact_import_knowledge; dependency_symbol_slots is written too. All are
+unverified. importSolved receives the source Context explicitly because job
+substitutions are retained typed ranges. Pooled cleanup stacks use numeric
+generation-checked global frames, so recursive callers retain no local links. All other runtime/reuse modules and the main CLI/session
 driver remain required and unwritten. An implementation's presence does not establish import/API
 integration, source parity, runtime qualification or acceptable performance.
 
@@ -134,7 +139,13 @@ Independent call rechecking uses withSharedSession and layout.withStore, records
 only source/scalar premises and publishes through its enclosing query. The
 shared copied-worker adapters are being written by the evaluator owner.
 
-Importer, remaining retained/project/session modules and runtime collectors are
-still required. Constructor and callback alignment is unfinished throughout the
+The remaining retained/project/session modules and runtime collectors are
+still required. Artifact import, symbol-role classification, public visibility
+and type display have full first writing passes. Constructor and callback alignment is unfinished throughout the
 port. The normal Zig compiler is preserved under remote tag
 goose-port-oracle-156f84b; writing checkpoints do not select Goose for builds.
+
+Current cleanup linkage: pooled Stack descriptors contain only numeric global
+frame keys and generation values. Child emission reads the parent key without
+retaining a reference to a recursive caller. Lexical stacks remain available
+for nonrecursive owners. No build or runtime verification has run.
