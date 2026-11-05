@@ -1042,8 +1042,8 @@ fn blot_structural::equal(left: blot_check_core::Code, right: blot_check_core::C
 fn blot_structural::hash<S>(sink: S&, value: blot_check_core::Code) { blot_structural::hash(sink, blot_check_core::codeCode(value) as! u8); }
 fn blot_structural::equal(left: blot_check_core::DictionaryProof, right: blot_check_core::DictionaryProof) -> bool {
     match left {
-        selected l => { match right { selected r => { return l.value == r.value; }, _ => { return false; } } },
-        given l => { match right { given r => { return blot_structural::equal(l.value, r.value); }, _ => { return false; } } },
+        selected l => { match right { selected r => { return l.value == r.value; }, _ => { return false; }, } },
+        given l => { match right { given r => { return blot_structural::equal(l.value, r.value); }, _ => { return false; }, } },
     }
 }
 fn blot_structural::hash<S>(sink: S&, value: blot_check_core::DictionaryProof) {
@@ -1137,3 +1137,5 @@ type ImplementationMemberKind = blot_reuse_principal_interface::ImplementationMe
 type ContractMemberKind = blot_reuse_principal_interface::ContractMemberKind;
 
 type SelectedProofKind = blot_reuse_principal_interface::SelectedProofKind;
+// Named binding classification is shared by all immutable consumers.
+type BindingKind = blot_check_check::Kind;

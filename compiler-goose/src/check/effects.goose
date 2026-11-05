@@ -175,7 +175,7 @@ fn shortcut(self: Store&, first: u32) -> u32 {
     return current;
 }
 fn resolve(self: Store&, root: Id, at: Cursor) -> Id, Error {
-    match node(self, root).tail { variable => {}, _ => { return root, Error.none; } }
+    match node(self, root).tail { variable => {}, _ => { return root, Error.none; }, }
     if !self.use_resolution_cache || at != 0 || root == 0 ||
        self.physical_epoch >= none || self.mutation_epoch >= none {
         return resolveUncached(self, root, at);
@@ -190,7 +190,7 @@ fn resolve(self: Store&, root: Id, at: Cursor) -> Id, Error {
         if entry { previous = entry; }
     }
     if previous != root {
-        match node(self, previous).tail { variable => {}, _ => { return previous, Error.none; } }
+        match node(self, previous).tail { variable => {}, _ => { return previous, Error.none; }, }
     }
     let result, error = resolveUncached(self, previous, at);
     if error != Error.none { return 0, error; }
@@ -202,7 +202,7 @@ fn resolve(self: Store&, root: Id, at: Cursor) -> Id, Error {
 }
 fn resolveUncached(self: Store&, root: Id, at: Cursor) -> Id, Error {
     let original = node(self, root);
-    match original.tail { variable => {}, _ => { return root, Error.none; } }
+    match original.tail { variable => {}, _ => { return root, Error.none; }, }
     var position = max(at, original.cursor);
     var current = original;
     var labels: Label[>..] = [];
@@ -213,7 +213,7 @@ fn resolveUncached(self: Store&, root: Id, at: Cursor) -> Id, Error {
     var prefix = none;
     loop {
         var variable: u32 = 0;
-        match current.tail { variable v => { variable = v.value; }, _ => { break; } }
+        match current.tail { variable v => { variable = v.value; }, _ => { break; }, }
         position = max(position, current.cursor);
         let first, found = replacementIndex(self, variable, position);
         if !found { break; }
@@ -292,7 +292,7 @@ fn extract(self: Store&, root: Id, label: Label) -> Extraction, Error {
 }
 fn resolveView(self: Store&, value: Row) -> Row, Error {
     var variable: u32 = 0;
-    match value.tail { variable v => { variable = v.value; }, _ => { return value, Error.none; } }
+    match value.tail { variable v => { variable = v.value; }, _ => { return value, Error.none; }, }
     let write, found = replacement(self, variable, value.cursor);
     if !found { return value, Error.none; }
     let added, error = add(self, value);
@@ -351,13 +351,13 @@ fn unifyInner(self: Store&, left: Id, right: Id) -> Error {
             match a.tail { variable v => {
                 let added, error = add(self, b); if error != Error.none { return error; }
                 return bind(self, v.value, added);
-            }, _ => {} }
+            }, _ => {}, }
         }
         if b.labels.len == 0 {
             match b.tail { variable v => {
                 let added, error = add(self, a); if error != Error.none { return error; }
                 return bind(self, v.value, added);
-            }, _ => {} }
+            }, _ => {}, }
         }
         if a.labels.len == 0 { return Error.effect_mismatch; }
         let selected, error = extractView(self, b, list(self, a.labels)[0]);
@@ -365,7 +365,7 @@ fn unifyInner(self: Store&, left: Id, right: Id) -> Error {
         if selected.expanded.present {
             match a.tail { variable v => {
                 if v.value == selected.expanded.value { return Error.infinite_effect; }
-            }, _ => {} }
+            }, _ => {}, }
         }
         let advanced, first_advance = resolveView(self, Row { List { a.labels.start + 1, a.labels.len - 1 }, a.tail, a.cursor });
         if first_advance != Error.none { return first_advance; }
@@ -378,19 +378,19 @@ fn unifyInner(self: Store&, left: Id, right: Id) -> Error {
 fn substitute(self: Store&, root: Id, variable: u32, replacement_id: Id) -> Id, Error {
     match node(self, root).tail { variable v => {
         if v.value == variable { return replaceTail(self, root, replacement_id); }
-    }, _ => {} }
+    }, _ => {}, }
     return root, Error.none;
 }
 fn substituteParameter(self: Store&, root: Id, parameter: u32, replacement_id: Id) -> Id, Error {
     match node(self, root).tail { parameter v => {
         if v.value == parameter { return replaceTail(self, root, replacement_id); }
-    }, _ => {} }
+    }, _ => {}, }
     return root, Error.none;
 }
 fn substituteFormal(self: Store&, root: Id, formal: u32, replacement_id: Id) -> Id, Error {
     match node(self, root).tail { formal v => {
         if v.value == formal { return replaceTail(self, root, replacement_id); }
-    }, _ => {} }
+    }, _ => {}, }
     return root, Error.none;
 }
 fn replaceTail(self: Store&, root: Id, replacement_id: Id) -> Id, Error {
@@ -415,12 +415,12 @@ fn operationSet(self: const Store&, root: Id) -> Label[>..], Error {
     }
     return result, Error.none;
 }
-fn tailCode(value: Tail) -> u32 { match value { closed => { return 0; }, variable => { return 1; }, parameter => { return 2; }, formal => { return 3; } } }
+fn tailCode(value: Tail) -> u32 { match value { closed => { return 0; }, variable => { return 1; }, parameter => { return 2; }, formal => { return 3; }, } }
 fn tailFromCode(code: u32, value: u32) -> Tail, Error {
-    match code { 0 => { return Tail.closed, Error.none; }, 1 => { return Tail.variable { value }, Error.none; }, 2 => { return Tail.parameter { value }, Error.none; }, 3 => { return Tail.formal { value }, Error.none; }, _ => { return Tail.closed, Error.invalid_artifact; } }
+    match code { 0 => { return Tail.closed, Error.none; }, 1 => { return Tail.variable { value }, Error.none; }, 2 => { return Tail.parameter { value }, Error.none; }, 3 => { return Tail.formal { value }, Error.none; }, _ => { return Tail.closed, Error.invalid_artifact; }, }
 }
 fn blot_structural::equal(left: blot_check_effects::Tail, right: blot_check_effects::Tail) -> bool { return left == right; }
 fn blot_structural::hash<S>(sink: S&, value: blot_check_effects::Tail) {
     blot_structural::hash(sink, blot_check_effects::tailCode(value) as! u8);
-    match value { closed => {}, variable v => { blot_structural::hash(sink, v.value); }, parameter v => { blot_structural::hash(sink, v.value); }, formal v => { blot_structural::hash(sink, v.value); } }
+    match value { closed => {}, variable v => { blot_structural::hash(sink, v.value); }, parameter v => { blot_structural::hash(sink, v.value); }, formal v => { blot_structural::hash(sink, v.value); }, }
 }

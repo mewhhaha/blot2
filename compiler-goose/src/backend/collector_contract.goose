@@ -49,3 +49,4 @@ fn analyze<P>(module: blot_backend_wasm::Module&, bodies: const P[:]) -> Certifi
     }
     result.function = blot_support::none<u32>(); result.instruction = blot_support::none<u32>(); result.certified = true; return result;
 }
+fn reasonName(reason: Reason) -> const u8[:] { match reason { proven=>"proven",unchecked_module=>"unchecked_module",host_import=>"host_import",incoming_reference=>"incoming_reference",public_arena=>"public_arena",mutable_static=>"mutable_static",indirect_call=>"indirect_call",owning_allocation=>"owning_allocation",unknown_runtime_helper=>"unknown_runtime_helper",invalid_call=>"invalid_call",work_limit=>"work_limit" } }

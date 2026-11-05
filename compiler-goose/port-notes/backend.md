@@ -71,3 +71,81 @@ fresh-attempt rollback and both retry orders, with output byte/message owners
 borrowed from the caller. This API replaces the source allocator parameter
 without returning any references to lexical local owners. Exact workspace
 fields will be documented when that portion is written.
+
+Further production first passes written (unverified): `host_cleanup_shapes`,
+`backend_plan`, `backend_representations`, and `layout_bridge`. Planning keeps
+startup selections, transitive runtime reach, conservative callback coverage,
+occurrence fallback, initialization cycles and allocate-before-emission order.
+The representation bridge memoizes successful roots only and never infers an
+inverse through canonical record order. The concrete bridge context has
+caller-owned `Tables` (partial expectation store plus five u32 Grow buffers),
+and binds the exact layout/evidence owners lazily.
+
+Shared `support/path.goose` now supplies POSIX dirname/normalization/relative
+spelling for canonical protocol identity paths. Core now includes export
+selection, entry-interface admissibility, public entry wrappers and detailed
+entry type display. CompileWorkspace/lifecycle and body emitter remain pending.
+
+Current high-level boundary: core compilation attempts, typed evaluator
+providers, generation adapters, host entry/callback/owner wrappers, source
+interface validation/display, assembly orchestration, artifact capture and
+replay, counters, result publication, and both nested retry paths are written.
+`core_backend` remains WIP: exact artifact diagnostic dump projections and
+remaining helper/API alignment are not complete. The checked/native build has
+not run. `support/json.goose` supplies typed Writer/Options and custom
+jsonStringify dispatch; artifact dumps must use explicit source views for
+range-backed lists, numeric IR enum names and derived snapshot ownership.
+Generic serialization of new native contexts is not a wire-equivalent dump.
+
+Body-emission writing has started in `backend_emission.goose`: full native
+planning ADT/models, Owner/Config/withOwner lexical ownership, payload cleanup,
+semantic-site publication, guarded instruction emission, allocation role runs,
+wide allocation bitmaps and exact allocation helper selection are present.
+Most preparation and expression/body emission algorithms still remain.
+`resolved_body.goose` uses typed variable-mode ADT payloads (actual payload
+size), numeric body IDs, typed references indexed at construction, and semantic
+per-body cleanup. No variable-mode index_of or untyped byte heap is used.
+Payload storage is reclaimed at the end of the attempt after all holders clear.
+
+CompileWorkspace is a fixed driver-owned record in core_backend: Generator,
+SessionTables, module stamps, metadata/journal and all reuse states; source
+origins, region/SIMD/optimizer contexts; retained output capture/snapshots and
+explanation; output byte/message owners; independent replay module/contexts,
+context-copy owner and replay bytes. It must be constructed before compilation,
+and successful retained-result contexts stay live until Result.deinit. Fresh
+attempt reset reconstructs semantic owner identities and clears all mutable
+state before either retry path. Scoped generator and Wasm assembly remain WIP;
+most optimization/storage families are still unwritten.
+
+`core_backend.goose` now has the production algorithm first writing pass,
+including the remaining private captured-closure adapter, associated-target
+translation, source-shaped artifact dumps and public compile wrappers. The
+artifact projections expand Job list ranges with real reserved capacities,
+write original union payload shapes, spell numeric Scalar/ValueType/Role/Op
+aliases as their source enum names, and omit derived snapshot owner IDs. This
+is an unverified writing status: downstream/native API alignment, tests and
+compiler qualification have not begun. Supporting backend modules remain
+missing, so it does not constitute a complete backend port.
+
+`resolved_call.goose` also has its complete production first writing pass.
+Its variable arrow tails use typed reusable runs while preserving application
+order, partial-prefix errors and per-plan cleanup. `host_entry.goose` has the
+complete bounded no-escape proof and exact guard-before-handle host-stub check.
+`support/json.goose` now exposes the shared typed serializer used by artifact
+source views and root dispatch explanations; debug lines use the native locked
+stderr primitive. JSON output remains unverified until the whole writing pass.
+
+`resolved_flow.goose` and `unit_index.goose` production first writing passes are
+now written. Unit indexes preserve the two-pass ordered grouping algorithm,
+first-use group publication, packed 32/30/2 parent metadata and saturating
+counts, closure/merge/carry flags and quantifier membership. Uses objects have
+stable typed reusable owners; their tables and immutable hash-set images are
+reclaimed explicitly. Reference-valued dictionary slots use nullable reference
+value types so the native dictionary can construct empty buckets; only nonnull
+values are inserted. No build, test, formatter or verification has run.
+Recursive ownership writing update: Goose spec 7.8 prohibits resizable local owners at calls into any recursive cycle. The emitter now uses concrete fixed Owner maps and list descriptors backed by typed reusable native pools, with runtime_cleanup.initPooled and actual deinit on exit. Shared support/pooled_map and support/pooled_buffer implement native typed storage; backend/substitution_buffers holds exact typed specialization scratch. Specialization's one mapping algorithm now accepts lexical or pooled finite sinks, and refinement uses specialization_receipt.initPooled. Core Generator scratch paths still need the same fixed-owner conversion before the writing phase can be called complete.
+
+The emitter's local storage decisions, ambiguity closure, instance preparation, prepareBody/prepareMapped, cursor family and linear-cursor preparation, numeric proof preparation, staging, prepareNode/prepareChildren, packages, binding metadata, constructor sharing, patterns, callable/computation descriptions and factory preparation are now source-written. These are unverified first-pass code. Call inlining, most remaining emission methods, scoped Generator, Wasm assembly and numerous production leaf modules remain unwritten. No build, test, formatting or verification has run.
+Further writing progress: collection_edit_call and collection_iteration now contain their entire production algorithms. Emitter inlining (ordinary, numeric, opaque, evaluated captures, static and partial calls), aggregate/record/constructor emission, projection preparation and location masks/shapes, packed projections, update copy/reuse paths, collection-step preparation/emission and private-cursor family metadata are source-written. The active source frontier is around backend_emission.zig 3660: private cursor row/binding/directory routines and subsequent collection/scalar/control/task/template methods remain. This is a writing frontier, not a source inventory or compilation check.
+
+Generator.owner_id is a process-local nonzero context identity distinct from allocation_owner; resetGenerator preserves it through retries. layout.withStore is a complete lexical typed-owner factory for isolated private reuse probes, with callback completion and explicit deinit before owner release.

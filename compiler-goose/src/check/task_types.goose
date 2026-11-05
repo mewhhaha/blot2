@@ -1,5 +1,6 @@
 // Task families are compiler-owned; scopes carry exact lexical group owners.
 namespace blot_check_task_types;
+import support.structural;
 import std;
 import support.error;
 import support.option;
@@ -98,7 +99,7 @@ fn lookup(name: const u8[:]) -> blot_support::Option<Op> {
     if name == "@task.receive" { return blot_support::Option<Op> { true, Op.receive }; } return blot_support::Option<Op> { false, Op.scope };
 }
 fn present(pool) -> bool { for name in ["@task.scope", "@task.spawn", "@task.join", "@task.cancel", "@task.split", "@task.read", "@task.write", "@task.collect", "@task.receive"] { let id, found = pool.lookup(name); if found { return true; } } return false; }
-fn arity(op: Op) -> i64 { match op { scope, join, cancel, collect, receive => { return 1; }, spawn, read => { return 2; }, split, write => { return 3; } } }
+fn arity(op: Op) -> i64 { match op { scope, join, cancel, collect, receive => { return 1; }, spawn, read => { return 2; }, split, write => { return 3; }, } }
 fn concurrentHost(store, raw: blot_check_types::Id) -> bool {
     let arrow = store.node(store.head(raw, 0)); if arrow.tag != blot_check_types::Tag.function { return false; }
     let row = store.row(arrow.c); let labels = store.rowLabels(arrow.c);
@@ -158,5 +159,58 @@ recursive fn captureIssueWithRows(store, root: blot_check_types::Id, owning: boo
     return blot_support::Option<CaptureIssue> { false, CaptureIssue.transfer }, blot_error::Error.none;
 }
 fn closed(row: blot_check_effects::Row, rows: const u32[:]) -> bool {
-    match row.tail { closed => { return true; }, variable v => { for candidate in rows { if candidate == v.value { return true; } } return false; }, _ => { return false; } }
+    match row.tail { closed => { return true; }, variable v => { for candidate in rows { if candidate == v.value { return true; } } return false; }, _ => { return false; }, }
 }
+
+fn opCode(value: Op) -> u32 {
+    match value {
+        Op.scope => { return 0; },
+        Op.spawn => { return 1; },
+        Op.join => { return 2; },
+        Op.cancel => { return 3; },
+        Op.split => { return 4; },
+        Op.read => { return 5; },
+        Op.write => { return 6; },
+        Op.collect => { return 7; },
+        Op.receive => { return 8; },
+    }
+}
+fn opFromCode(code: u32) -> Op, blot_error::Error {
+    match code {
+        0 => { return Op.scope, blot_error::Error.none; },
+        1 => { return Op.spawn, blot_error::Error.none; },
+        2 => { return Op.join, blot_error::Error.none; },
+        3 => { return Op.cancel, blot_error::Error.none; },
+        4 => { return Op.split, blot_error::Error.none; },
+        5 => { return Op.read, blot_error::Error.none; },
+        6 => { return Op.write, blot_error::Error.none; },
+        7 => { return Op.collect, blot_error::Error.none; },
+        8 => { return Op.receive, blot_error::Error.none; },
+        _ => { return Op.scope, blot_error::Error.invalid_artifact; },
+    }
+}
+fn blot_structural::equal(left: blot_check_task_types::Op, right: blot_check_task_types::Op) -> bool { return left == right; }
+fn blot_structural::hash<S>(sink: S&, value: blot_check_task_types::Op) { blot_structural::hash(sink, blot_check_task_types::opCode(value) as! u32); }
+fn captureIssueCode(value: CaptureIssue) -> u32 {
+    match value {
+        CaptureIssue.transfer => { return 0; },
+        CaptureIssue.capability => { return 1; },
+        CaptureIssue.host => { return 2; },
+        CaptureIssue.budget => { return 3; },
+    }
+}
+fn captureIssueFromCode(code: u32) -> CaptureIssue, blot_error::Error {
+    match code {
+        0 => { return CaptureIssue.transfer, blot_error::Error.none; },
+        1 => { return CaptureIssue.capability, blot_error::Error.none; },
+        2 => { return CaptureIssue.host, blot_error::Error.none; },
+        3 => { return CaptureIssue.budget, blot_error::Error.none; },
+        _ => { return CaptureIssue.transfer, blot_error::Error.invalid_artifact; },
+    }
+}
+fn blot_structural::equal(left: blot_check_task_types::CaptureIssue, right: blot_check_task_types::CaptureIssue) -> bool { return left == right; }
+fn blot_structural::hash<S>(sink: S&, value: blot_check_task_types::CaptureIssue) { blot_structural::hash(sink, blot_check_task_types::captureIssueCode(value) as! u8); }
+
+
+
+

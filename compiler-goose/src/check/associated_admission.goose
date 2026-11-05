@@ -17,27 +17,27 @@ fn charge(remaining: i64&) -> Error { if remaining == 0 { return Error.invalid_a
 fn convert(error: Error) -> Error { if error == Error.none || error == Error.out_of_memory { return error; } return Error.invalid_artifact; }
 fn boundType(source: Source, ids: List, variable: u32) -> bool { for id in source.list(ids) { let node = source.node(id); if node.tag == blot_check_types::Tag.variable && node.a == variable { return true; } } return false; }
 fn boundRow<C>(source: Source, contract: C, variable: u32, member: bool) -> bool {
-    if member { for id in source.list(contract.row_parameters) { match source.row(id).tail { blot_check_effects::Tail.variable { value } { if value == variable { return true; } } else {} } } return false; }
+    if member { for id in source.list(contract.row_parameters) { match source.row(id).tail { blot_check_effects::Tail.variable match_payload_29 => { let value = match_payload_29.value;  if value == variable { return true; } }, _ => {}, } } return false; }
     for id in source.list(contract.row_variables) { if id == variable { return true; } } return false;
 }
 fn scope<C>(source: Source, contract: C, root: Id, member: bool, remaining: i64&) -> Error {
     var work: Work[>..<] = []; var seen: dictionary<ScopeKey,bool> = dictionary<ScopeKey,bool> {}; work += Work { root };
     while work.len != 0 { let item = work[work.len - 1]; work.resize(work.len - 1); let error = charge(remaining); if error != Error.none { return error; } if item.depth >= 256 { return Error.invalid_artifact; }
         let key = ScopeKey { item.id, item.row }; if seen.contains(key) { continue; } seen.insert(key, true);
-        if item.row { let row = source.row(item.id); match row.tail { blot_check_effects::Tail.variable { value } { if !boundRow(source, contract, value, member) { return Error.invalid_artifact; } } blot_check_effects::Tail.parameter { value } { return Error.invalid_artifact; } else {} }
+        if item.row { let row = source.row(item.id); match row.tail { blot_check_effects::Tail.variable match_payload_27 => { let value = match_payload_27.value;  if !boundRow(source, contract, value, member) { return Error.invalid_artifact; } }, blot_check_effects::Tail.parameter match_payload_28 => { let value = match_payload_28.value;  return Error.invalid_artifact; }, _ => {}, }
             for label in source.rowLabels(row.labels) { let error = charge(remaining); if error != Error.none { return error; } for argument in source.list(source.operation(label).arguments) { work += Work { argument, depth: item.depth + 1 }; } } continue;
         }
         let n = source.node(item.id); let depth = item.depth + 1;
         match n.tag {
-            blot_check_types::Tag.variable { if !boundType(source, contract.variables, n.a) { return Error.invalid_artifact; } }
-            blot_check_types::Tag.function { work += Work { n.a, depth }; work += Work { n.b, depth }; work += Work { n.c, true, depth }; }
-            blot_check_types::Tag.provider { work += Work { n.a, depth }; work += Work { n.c, true, depth }; }
-            blot_check_types::Tag.usage, blot_check_types::Tag.array, blot_check_types::Tag.list, blot_check_types::Tag.cursor, blot_check_types::Tag.resolver { work += Work { n.a, depth }; }
-            blot_check_types::Tag.state_provider { work += Work { n.a, depth }; work += Work { n.b, depth }; work += Work { n.c, depth }; }
-            blot_check_types::Tag.product { for id in source.list(List { n.a, n.b }) { work += Work { id, depth }; } }
-            blot_check_types::Tag.record { for index in 0..n.b { work += Work { source.recordField(n, index).ty, depth }; } }
-            blot_check_types::Tag.nominal, blot_check_types::Tag.projection { for id in source.nominalArguments(n) { work += Work { id, depth }; } }
-            else {}
+            blot_check_types::Tag.variable => { if !boundType(source, contract.variables, n.a) { return Error.invalid_artifact; } },
+            blot_check_types::Tag.function => { work += Work { n.a, depth }; work += Work { n.b, depth }; work += Work { n.c, true, depth }; },
+            blot_check_types::Tag.provider => { work += Work { n.a, depth }; work += Work { n.c, true, depth }; },
+            blot_check_types::Tag.usage, blot_check_types::Tag.array, blot_check_types::Tag.list, blot_check_types::Tag.cursor, blot_check_types::Tag.resolver => { work += Work { n.a, depth }; },
+            blot_check_types::Tag.state_provider => { work += Work { n.a, depth }; work += Work { n.b, depth }; work += Work { n.c, depth }; },
+            blot_check_types::Tag.product => { for id in source.list(List { n.a, n.b }) { work += Work { id, depth }; } },
+            blot_check_types::Tag.record => { for index in 0..n.b { work += Work { source.recordField(n, index).ty, depth }; } },
+            blot_check_types::Tag.nominal, blot_check_types::Tag.projection => { for id in source.nominalArguments(n) { work += Work { id, depth }; } },
+            _ => {},
         }
     } return Error.none;
 }
@@ -120,19 +120,19 @@ fn publicCoreWithBudget(principal: const blot_reuse_principal_interface::Interfa
         if public.generative.len != private.generative.len || public.variables.len != private.variables.len || public.row_variables.len != private.row_variables.len { return Error.invalid_artifact; }
         let source = typesView(principal.graph); var context = GenerativeComparison { source, executable.types, public, private, remaining }; let error = blot_check_types::withStore<GenerativeComparison,generativeStore>(context); if error != Error.none { return convert(error); }
     }
-    for value in principal.proof_contracts { let error = charge(remaining); if error != Error.none { return error; } if let original = blot_check_numeric_proof_headers::find(executable.proof_contracts, value.binding) { if !blot_check_numeric_proof_headers::equal(value.header, original) { return Error.invalid_artifact; } } else { return Error.invalid_artifact; } }
+    for value in principal.proof_contracts { let error = charge(remaining); if error != Error.none { return error; } { let optional_binding_63 .= blot_check_numeric_proof_headers::find(executable.proof_contracts, value.binding); if optional_binding_63 { let original .= optional_binding_63; if !blot_check_numeric_proof_headers::equal(value.header, original) { return Error.invalid_artifact; }  } else { return Error.invalid_artifact; } } }
     for binding, id in principal.bindings { if binding.ty == 0 { continue; } if blot_check_numeric_proof_headers::find(executable.proof_contracts, id as u32) != null && blot_check_numeric_proof_headers::find(principal.proof_contracts, id as u32) == null { return Error.invalid_artifact; } }
     if principal.contract_members.len == 0 && executable.contract_members.len == 0 { return Error.none; } let first = typesView(principal.graph);
-    for contract in principal.contracts { if contract.private || contract.members.len == 0 { continue; } var original: const blot_check_core::Contract? = null; for candidate in executable.contracts { if contract.identity == candidate.identity { original = candidate; break; } }
-        if let original = original { let error = equivalent(first, executable.types, contract, original, principal.contract_members[contract.members.start..contract.members.start + contract.members.len], executable.contract_members[original.members.start..original.members.start + original.members.len], principal.contract_predicates[contract.predicates.start..contract.predicates.start + contract.predicates.len], executable.obligations[original.predicates.start..original.predicates.start + original.predicates.len], remaining); if error != Error.none { return error; } } else { return Error.invalid_artifact; }
+    for contract in principal.contracts { if contract.private || contract.members.len == 0 { continue; } var original: const blot_check_core::Contract? = null; for candidate in executable.contracts { if contract.identity == candidate.identity { original .= candidate; break; } }
+        { let optional_binding_62 .= original; if optional_binding_62 { let original .= optional_binding_62; let error = equivalent(first, executable.types, contract, original, principal.contract_members[contract.members.start..contract.members.start + contract.members.len], executable.contract_members[original.members.start..original.members.start + original.members.len], principal.contract_predicates[contract.predicates.start..contract.predicates.start + contract.predicates.len], executable.obligations[original.predicates.start..original.predicates.start + original.predicates.len], remaining); if error != Error.none { return error; }  } else { return Error.invalid_artifact; } }
     } return Error.none;
 }
 fn originalProducers(owners: const blot_reuse_frozen_dependency::Module[:]) -> Error { var remaining: i64 = 1000000; return originalProducersWithBudget(owners, remaining); }
 fn originalProducersWithBudget(owners: const blot_reuse_frozen_dependency::Module[:], remaining: i64&) -> Error {
     for owner in owners { for contract in owner.interface.contracts { if contract.private || contract.members.len == 0 { continue; } if contract.identity.unit == 0 || contract.identity.unit > owners.len { return Error.invalid_artifact; } let producer = owners[contract.identity.unit - 1].interface;
-        var original: const blot_reuse_principal_interface::Contract? = null; for candidate in producer.contracts { if candidate.identity == contract.identity && !candidate.private { original = candidate; break; } }
-        if let original = original { let first = typesView(owner.interface.graph); let second = typesView(producer.graph);
+        var original: const blot_reuse_principal_interface::Contract? = null; for candidate in producer.contracts { if candidate.identity == contract.identity && !candidate.private { original .= candidate; break; } }
+        { let optional_binding_61 .= original; if optional_binding_61 { let original .= optional_binding_61; let first = typesView(owner.interface.graph); let second = typesView(producer.graph);
             let error = equivalent(first, second, contract, original, owner.interface.contract_members[contract.members.start..contract.members.start + contract.members.len], producer.contract_members[original.members.start..original.members.start + original.members.len], owner.interface.contract_predicates[contract.predicates.start..contract.predicates.start + contract.predicates.len], producer.contract_predicates[original.predicates.start..original.predicates.start + original.predicates.len], remaining); if error != Error.none { return error; }
-        } else { return Error.invalid_artifact; }
+         } else { return Error.invalid_artifact; } }
     } } return Error.none;
 }

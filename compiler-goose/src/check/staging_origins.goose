@@ -1,5 +1,6 @@
 // Sparse provenance supplies diagnostics and grants no code authority.
 namespace blot_check_staging_origins;
+import support.structural;
 import support.error;
 import support.option;
 struct Source { unit: u32, node: blot_check_core::Id }
@@ -54,3 +55,27 @@ fn code(trace: Trace&, units: const blot_check_core::Module[:], metadata, invoca
     let location = sourceLocation(units, invocation); if !location.present { return blot_error::Error.invalid_origin; }
     return add(trace, kind, location.value);
 }
+
+fn kindCode(value: Kind) -> u32 {
+    match value {
+        Kind.quote => { return 0; },
+        Kind.generator => { return 1; },
+        Kind.splice => { return 2; },
+        Kind.invocation => { return 3; },
+    }
+}
+fn kindFromCode(code: u32) -> Kind, blot_error::Error {
+    match code {
+        0 => { return Kind.quote, blot_error::Error.none; },
+        1 => { return Kind.generator, blot_error::Error.none; },
+        2 => { return Kind.splice, blot_error::Error.none; },
+        3 => { return Kind.invocation, blot_error::Error.none; },
+        _ => { return Kind.quote, blot_error::Error.invalid_artifact; },
+    }
+}
+fn blot_structural::equal(left: blot_check_staging_origins::Kind, right: blot_check_staging_origins::Kind) -> bool { return left == right; }
+fn blot_structural::hash<S>(sink: S&, value: blot_check_staging_origins::Kind) { blot_structural::hash(sink, blot_check_staging_origins::kindCode(value) as! u8); }
+
+
+
+

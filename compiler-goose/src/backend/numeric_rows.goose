@@ -43,7 +43,7 @@ recursive fn visit<G>(plan: Plan&, generator: G&, ty: blot_backend_layout::Id, p
     }
     if node.tag == blot_backend_layout::Tag.nominal {
         if node.a == 0 || node.a > generator.units.len { return false, blot_error::Error.none; }
-        let source = generator.unit(node.a); var tags: u32[4] = [0; 4]; var count = 0;
+        let source .= generator.unit(node.a); var tags: u32[4] = [0; 4]; var count = 0;
         for constructor in source.constructors {
             if remaining == 0 { return false, blot_error::Error.none; } remaining--;
             let nominal = source.nominal(constructor.nominal);

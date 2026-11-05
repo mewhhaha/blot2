@@ -32,8 +32,8 @@ fn run<T,R,C,F>(requests: const R[:],requested: u8,cancellation: Cancellation&,c
   var ids: i64[16]=[-1;16]; var ordinals: i64[16]=[-1;16]; var count=0;
   while count<width&&cursor<requests.len&&!cancelled(cancellation) {
    let index=cursor; cursor++; let payload,error=context.encode(requests[index]);
-   if error!=Error.none { batch.outcomes[index]=Outcome<T>.out_of_memory; continue; }
-   ids[count]=thread_spawn_contained(packetWorker,Packet {identity,index,copy(payload)},F); ordinals[count]=index; count++;
+   if error!=Error.none { if error==Error.out_of_memory { batch.outcomes[index]=Outcome<T>.out_of_memory; } else { batch.outcomes[index]=Outcome<T>.declined; } continue; }
+   ids[count]=thread_spawn_contained(packetWorker<F>,Packet {identity,index,copy(payload)}); ordinals[count]=index; count++;
   }
   var replies=0;
   for index in 0..count { if thread_wait(ids[index]) { replies++; } else { batch.outcomes[ordinals[index]]=Outcome<T>.out_of_memory; } }
@@ -41,9 +41,9 @@ fn run<T,R,C,F>(requests: const R[:],requested: u8,cancellation: Cancellation&,c
    let response=qget<Reply>(); if response.batch!=identity { qput(response); continue; } replies--;
    if response.index<0||response.index>=batch.outcomes.len { cancel(cancellation); continue; }
    if response.cancelled { cancel(cancellation); }
-   if response.error!=Error.none { batch.outcomes[response.index]=Outcome<T>.out_of_memory; }
+   if response.error!=Error.none { if response.error==Error.out_of_memory { batch.outcomes[response.index]=Outcome<T>.out_of_memory; } else { batch.outcomes[response.index]=Outcome<T>.declined; } }
    else if !response.present { batch.outcomes[response.index]=Outcome<T>.declined; }
-   else { let value,error=context.decode(response.payload); if error!=Error.none { batch.outcomes[response.index]=Outcome<T>.out_of_memory; } else { batch.outcomes[response.index]=Outcome<T>.complete {value:value}; } }
+   else { let value,error=context.decode(response.payload); if error!=Error.none { if error==Error.out_of_memory { batch.outcomes[response.index]=Outcome<T>.out_of_memory; } else { batch.outcomes[response.index]=Outcome<T>.declined; } } else { batch.outcomes[response.index]=Outcome<T>.complete {value:value}; } }
   }
  }
  for index in 0..batch.outcomes.len { match batch.outcomes[index] { pending=>{ batch.outcomes[index]=Outcome<T>.cancelled; },_=>{}, } }

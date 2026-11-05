@@ -200,8 +200,8 @@ fn importResults(context: Context&, proofs: const Proposition[:], results: Propo
     return blot_error::Error.none;
 }
 fn hash(value: Term) -> u64 {
-    var kind: u64 = 0; match value.kind { unsigned32 => {}, array => { kind = 1; }, list => { kind = 2; } }
-    var tag: u64 = 0; match value.tag { literal => {}, formal => { tag = 1; }, capture => { tag = 2; }, version => { tag = 3; }, length => { tag = 4; }, complement => { tag = 5; } }
+    var kind: u64 = 0; match value.kind { unsigned32 => {}, array => { kind = 1; }, list => { kind = 2; }, }
+    var tag: u64 = 0; match value.tag { literal => {}, formal => { tag = 1; }, capture => { tag = 2; }, version => { tag = 3; }, length => { tag = 4; }, complement => { tag = 5; }, }
     return ::hash_combine(::hash_combine(::hash_combine(::hash(tag), ::hash(kind)), ::hash(value.a)), ::hash(value.b));
 }
 

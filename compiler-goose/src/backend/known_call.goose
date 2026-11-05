@@ -6,7 +6,7 @@ import support.option;
 struct Call { target: blot_check_core::BindingRef, arguments: blot_check_core::Id[16] = [0; 16], count: i64 = 0, signature: blot_check_types::Id = 0 }
 struct Wrapper { target: blot_check_core::BindingRef, body: blot_check_core::Body }
 fn resolve(units: const blot_check_core::Module[:], unit: u32, id: blot_check_core::Id) -> blot_support::Option<Call> {
-    let source = units[unit - 1];
+    let source .= units[unit - 1];
     if source.node(id).tag == blot_check_core::Tag.call {
         let call = source.call(id); if call.arguments.len > 16 { return blot_support::none<Call>(); }
         var result = Call { target: call.target, count: call.arguments.len, signature: call.callee_type };
@@ -39,7 +39,7 @@ fn wrapper(units: const blot_check_core::Module[:], owner: u32, call: Call) -> b
     var target = call.target; if target.unit == 0 { target.unit = owner; }
     for index in 0..16 {
         if target.unit == 0 || target.unit > units.len { return blot_support::none<Wrapper>(); }
-        let source = units[target.unit - 1]; if target.binding == 0 || target.binding >= source.bindings.len { return blot_support::none<Wrapper>(); }
+        let source .= units[target.unit - 1]; if target.binding == 0 || target.binding >= source.bindings.len { return blot_support::none<Wrapper>(); }
         let binding = source.binding(target.binding);
         if binding.kind == blot_check_core::BindingKind.external { let previous = target.unit; target = binding.target; if target.unit == 0 { target.unit = previous; } continue; }
         let body = source.body(target.binding); if !body.present { return blot_support::none<Wrapper>(); }

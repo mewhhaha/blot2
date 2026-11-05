@@ -26,7 +26,7 @@ fn deinit(self: Builder&) { self.values.deinit(); self.debits.clear(); self.sour
 fn introduce(self: Builder&, value: Introduction) -> Error {
     let error = self.values.charge(1); if error != Error.none { return error; } let error = self.values.view().proposition(value.proposition); if error != Error.none { return error; }
     if self.introductions.len >= self.values.limits.terms { return Error.proof_analysis_limit; }
-    if let slot = self.expressions[value.source] { if !blot_structural::equal(self.introductions[slot], value) { return Error.invalid_proof_operand; } return Error.none; }
+    { let optional_binding_31 .= self.expressions[value.source]; if optional_binding_31 { let slot .= optional_binding_31; if !blot_structural::equal(self.introductions[slot], value) { return Error.invalid_proof_operand; } return Error.none;  } }
     self.expressions[value.source] = self.introductions.len as u32; self.introductions += value; return Error.none;
 }
 fn parameter(self: Builder&, value: Parameter) -> Error {

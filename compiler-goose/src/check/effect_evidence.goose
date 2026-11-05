@@ -54,8 +54,8 @@ fn clone(self: const Store&, tables: Tables) -> Store, Error {
         tables.row_next, tables.operation_buckets, tables.row_buckets, blot_native::fresh_owner_id() };
     result.operations.append(self.operations); result.arguments.append(self.arguments); result.rows.append(self.rows);
     result.labels.append(self.labels); result.operation_next.append(self.operation_next); result.row_next.append(self.row_next);
-    for slot in self.operation_buckets.slots { if slot.tag != 0 { result.operation_buckets.insert(slot.key, slot.val); } }
-    for slot in self.row_buckets.slots { if slot.tag != 0 { result.row_buckets.insert(slot.key, slot.val); } }
+    result.operation_buckets.slots.clear(); result.operation_buckets.slots.append(self.operation_buckets.slots); result.operation_buckets.count = self.operation_buckets.count;
+    result.row_buckets.slots.clear(); result.row_buckets.slots.append(self.row_buckets.slots); result.row_buckets.count = self.row_buckets.count;
     return result, Error.none;
 }
 fn internOperation(self: Store&, identity: blot_check_types::NominalIdentity, values: const u32[:]) -> Label, Error {

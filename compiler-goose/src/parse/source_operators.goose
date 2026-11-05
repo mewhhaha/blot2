@@ -19,17 +19,17 @@ struct Issue {
  implicit_type_witness: bool=false, terminator: Terminator=0,
  has_numeric_literal: bool=false, numeric_literal: blot_parse_ast::NumericFault=blot_parse_ast::NumericFault {0,0,blot_parse_ast::Span {},0}
 }
-fn origin(tree: Tree&,id: Id) -> u32 { for item in tree.operator_origins { if item.node==id { return item.span.start; } } return tree.span(id).start; }
-fn numeric_issue(tree: Tree&,id: Id,point: u32) -> Issue {
+fn origin(tree: const Tree&,id: Id) -> u32 { for item in tree.operator_origins { if item.node==id { return item.span.start; } } return tree.span(id).start; }
+fn numeric_issue(tree: const Tree&,id: Id,point: u32) -> Issue {
  let fault=tree.numeric_fault(id); var code=c_float_literal;
  if fault.code==blot_parse_ast::numericcode_integer_range { code=c_integer_range; } else if fault.code==blot_parse_ast::numericcode_float_range { code=c_float_range; }
  return Issue {code:code,node:id,point:point,has_numeric_literal:true,numeric_literal:fault};
 }
-fn named(pool: Pool&,symbol: Symbol) -> bool {
+fn named(pool: const Pool&,symbol: Symbol) -> bool {
  let text=pool.get(symbol); if text.len==0 { return false; } let c=text[0]; return (c>='a'&&c<='z')||(c>='A'&&c<='Z')||c=='_';
 }
 struct Validator<C> {
- tree: Tree&, pool: Pool&, context: C&, locals: Symbol[>..<]&, issue: Issue=Issue {}, has_issue: bool=false,
+ tree: const Tree&, pool: const Pool&, context: C&, locals: Symbol[>..<]&, issue: Issue=Issue {}, has_issue: bool=false,
  pattern_scope: i64=-1, record_constructor: Symbol=0, loops: i64=0, replies: bool=false,
  permitted_requests: Id=0, failure: Error=Error.none
 }
@@ -411,7 +411,7 @@ fn walk<C>(self: Validator<C>&,id: Id,depth: i64) {
   let guard=self.tree.extra[n.c]; let body=self.tree.extra[n.c+1]; walk(self,body,depth+1); walk(self,guard,depth+1);
  } else if n.tag==a_request_arm { walk(self,n.a,depth+1); scope(self,n.b,n.c,depth+1); }
 }
-fn validate<C>(tree: Tree&,pool: Pool&,context: C&) -> Issue,bool,Error {
+fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Error {
  let duplicate,has_duplicate=context.source_duplicate_name(); var collected=tree.roots.len;
  while collected!=0 {
   collected--; let id=tree.roots[collected];

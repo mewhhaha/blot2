@@ -9,7 +9,7 @@ struct Pool {
  bytes: u8[>..<]&, entries: Entry[>..<]&, buckets: Symbol[>..<]&
 }
 fn init(bytes: u8[>..<]&,entries: Entry[>..<]&,buckets: Symbol[>..<]&) -> Pool { return Pool {bytes:bytes,entries:entries,buckets:buckets}; }
-fn get(pool: Pool&, symbol: Symbol) -> const u8[:] {
+fn get(pool: const Pool&, symbol: Symbol) -> const u8[:] {
  if symbol == absent { return pool.bytes[..0]; }
  let e = pool.entries[symbol-1]; return pool.bytes[e.offset..e.offset+e.len];
 }
@@ -51,7 +51,7 @@ fn wyhash(text: const u8[:]) -> u64 {
  let low,high=multiply(a^s1,b^state);
  return mix(low^s0^(text.len as u64),high^s1);
 }
-fn find(pool: Pool&, text: const u8[:], hash: u64) -> Symbol,bool {
+fn find(pool: const Pool&, text: const u8[:], hash: u64) -> Symbol,bool {
  if pool.buckets.len==0 { return absent,false; }
  var slot=(hash & ((pool.buckets.len-1) as u64)) as i64;
  while pool.buckets[slot] != absent {
@@ -61,7 +61,7 @@ fn find(pool: Pool&, text: const u8[:], hash: u64) -> Symbol,bool {
  }
  return absent,false;
 }
-fn lookup(pool: Pool&, text: const u8[:]) -> Symbol,bool { return find(pool,text,wyhash(text)); }
+fn lookup(pool: const Pool&, text: const u8[:]) -> Symbol,bool { return find(pool,text,wyhash(text)); }
 fn reserve_buckets(pool: Pool&, count: i64) -> blot_error::Error {
  if count <= pool.buckets.len/2 { return blot_error::Error.none; }
  var capacity: i64=16;

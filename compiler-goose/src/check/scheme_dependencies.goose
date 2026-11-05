@@ -32,9 +32,9 @@ fn releaseSnapshot(ref: LeaseRef) -> blot_error::Error {
 }
 fn deinit(self: Entry&) {
     // Leases are internal linear owners; stale handles indicate a compiler bug.
-    assert(releaseSnapshot(self.root_lease) == blot_error::Error.none);
-    assert(releaseSnapshot(self.variable_lease) == blot_error::Error.none);
-    assert(releaseSnapshot(self.row_lease) == blot_error::Error.none);
+    let root_release = releaseSnapshot(self.root_lease); assert(root_release == blot_error::Error.none);
+    let variable_release = releaseSnapshot(self.variable_lease); assert(variable_release == blot_error::Error.none);
+    let row_release = releaseSnapshot(self.row_lease); assert(row_release == blot_error::Error.none);
     self = Entry {};
 }
 struct Cache { entries: Entry[>..<]&, watches: blot_check_solver_worklist::Queue, hits: u64 = 0, recomputations: u64 = 0 }

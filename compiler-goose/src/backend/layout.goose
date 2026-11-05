@@ -45,6 +45,16 @@ struct Store {
     nodes: Node[>..<]&, extra: u32[>..<]&, universal_dictionaries: UniversalDictionaries[>..<]&, next: Id[>..<]&, buckets: dictionary<u64, Id>&,
     solver_owners: blot_backend_runtime_ir::Range[>..<]&, solver_binders: u32[>..<]&, type_owners: blot_check_types::Id[>..<]&,
 }
+// Private probes enter with one lexical set of typed owners. Their callback
+// returns before any of this physical store's backing storage is released.
+fn withStore<C,F>(context: C&) -> blot_error::Error {
+    var closed_units: ClosedUnit[>..<] = []; var closed_kind_bytes: u8[>..<] = []; var closed_layouts: dictionary<u64,Id>; var names: dictionary<u32,const u8[:]>;
+    var operations: blot_check_effect_evidence::Operation[>..<] = []; var arguments: u32[>..<] = []; var rows: blot_check_effect_evidence::Row[>..<] = []; var labels: u32[>..<] = []; var operation_next: u32[>..<] = []; var row_next: u32[>..<] = []; var operation_buckets: dictionary<u64,u32>; var row_buckets: dictionary<u64,u32>;
+    var nodes: Node[>..<] = []; var extra: u32[>..<] = []; var universal_dictionaries: UniversalDictionaries[>..<] = []; var next: u32[>..<] = []; var buckets: dictionary<u64,u32>; var solver_owners: blot_backend_runtime_ir::Range[>..<] = []; var solver_binders: u32[>..<] = []; var type_owners: u32[>..<] = [];
+    let effects,error = blot_check_effect_evidence::init(blot_check_effect_evidence::Tables { operations,arguments,rows,labels,operation_next,row_next,operation_buckets,row_buckets }); if error != blot_error::Error.none { return error; }
+    var store = Store { closed: ClosedLayouts { units: [],kinds: closed_units,kind_bytes: closed_kind_bytes,layouts: closed_layouts },opaque_sources: [],record_names: blot_check_record_order::init(names),effects,nodes,extra,universal_dictionaries,next,buckets,solver_owners,solver_binders,type_owners };
+    let initialized = init(store); if initialized != blot_error::Error.none { store.deinit(); return initialized; } defer { store.deinit(); } return F(context,store);
+}
 fn init(store: Store&) -> blot_error::Error {
     store.nodes.clear(); store.next.clear(); store.extra.clear(); store.universal_dictionaries.clear(); store.buckets.clear(); store.solver_owners.clear(); store.solver_binders.clear(); store.type_owners.clear();
     assert(store.effects.rows.len != 0); // Caller initializes the effect-evidence context from its Tables first.
@@ -116,7 +126,7 @@ recursive fn scalarDepth(store: Store&, id: Id, depth: i64) -> blot_support::Opt
 }
 recursive fn opaqueScalar(store: Store&, id: Id, depth: i64) -> blot_support::Option<blot_backend_runtime_ir::Scalar> {
     let n = node(store, id); if n.a == 0 || n.a > store.opaque_sources.len { return blot_support::none<blot_backend_runtime_ir::Scalar>(); }
-    let source = store.opaque_sources[n.a - 1];
+    let source .= store.opaque_sources[n.a - 1];
     for nominal in source.nominals {
         if !nominal.is_opaque || nominal.identity.decl != n.b { continue; }
         if nominal.storage.kind == blot_backend_opaque_storage::Kind.unit { return blot_support::some(blot_backend_runtime_ir::SC_unit); }
@@ -698,7 +708,13 @@ recursive fn fromSolverRow(store: Store&, source: blot_check_types::Store&, row:
 }
 fn deinit(closed: ClosedLayouts&) { closed.kinds.clear(); closed.kind_bytes.clear(); closed.layouts.clear(); }
 fn deinit(store: Store&) {
+    store.effects.deinit();
     deinit(store.closed); store.record_names.map.clear();
     store.nodes.clear(); store.extra.clear(); store.universal_dictionaries.clear(); store.next.clear(); store.buckets.clear();
     store.solver_owners.clear(); store.solver_binders.clear(); store.type_owners.clear();
+}
+fn reset(store: Store&) -> blot_error::Error {
+    deinit(store);
+    let effects,error = blot_check_effect_evidence::init(blot_check_effect_evidence::Tables { operations: store.effects.operations,arguments: store.effects.arguments,rows: store.effects.rows,labels: store.effects.labels,operation_next: store.effects.operation_next,row_next: store.effects.row_next,operation_buckets: store.effects.operation_buckets,row_buckets: store.effects.row_buckets });
+    if error != blot_error::Error.none { return error; } store.effects = effects; return init(store);
 }

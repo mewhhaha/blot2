@@ -22,3 +22,4 @@ fn intern(self: Store&,arguments: const Identity[:]) -> u32,blot_error::Error {
 fn copyOwned(self: Store&,values: Identity[>..<]&,spans: Span[>..<]&) -> Owned {
  for value in self.values { values.push(value); } for span in self.spans { spans.push(span); } return Owned {values:values,spans:spans};
 }
+fn deinit(self: Store&) { self.values.clear(); self.spans.clear(); }

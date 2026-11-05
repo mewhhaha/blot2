@@ -937,3 +937,7 @@ fn deinit(module: Module&) {
 }
 // Derived immutable import spelling view for safepoint classification.
 fn importName(module: Module&, id: i64) -> const u8[:] { name(module, module.imports[id].name) }
+fn reset(module: Module&) {
+    deinit(module);
+    module = init(module.types,module.instructions,module.names,module.functions,module.signatures,module.imports,module.globals,module.exports,module.data,module.static_fields,module.table_functions,module.table_origins,module.semantic_sites);
+}

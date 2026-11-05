@@ -115,7 +115,7 @@ fn collect(self: Frontier&, store: blot_check_types::Store&, roots: const blot_c
         if node.tag == blot_check_types::Tag.variable { add(self, (node.a as u64) * 2); if node.b > store.cursor() { add(self, future_clock); } continue; }
         if node.tag == blot_check_types::Tag.function || node.tag == blot_check_types::Tag.provider {
             let row_id, error = store.resolveEffects(node.c, 0); if error != blot_error::Error.none { return error; } let row = store.row(row_id);
-            match row.tail { variable v => { add(self, (v.value as u64) * 2 + 1); }, _ => {} }
+            match row.tail { variable v => { add(self, (v.value as u64) * 2 + 1); }, _ => {}, }
             for label in store.effects.list(row.labels) {
                 let arguments = store.operationArguments(label); if arguments.len > stack.len - len { self.overflow = true; return blot_error::Error.none; }
                 for argument in arguments { stack[len] = argument; len += 1; }

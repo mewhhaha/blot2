@@ -117,7 +117,7 @@ recursive fn row(self: Walker&, root: blot_check_effects::Id, depth: i64) -> boo
     match row_.tail { formal v => {
         let found, error = visit(self, v.value, depth + 1);
         if error != blot_error::Error.none || found { return found, error; }
-    }, _ => {} }
+    }, _ => {}, }
     for index in row_.labels.len {
         let label = self.store.effects.list(row_.labels)[index];
         let operation = self.store.operation(label);

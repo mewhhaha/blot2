@@ -182,7 +182,7 @@ struct OperatorOrigin { node: Id, span: Span, member: blot_parse_symbols::Symbol
 struct TypeConversionOrigin { node: Id, point: u32 }
 struct Tree {
  has_typed_staging: bool = false, has_numeric_proofs: bool = false,
- nodes: Node[>..<]&, spans: Span[>..<]&, extra: u32[>..] = [], roots: Id[>..<]&,
+ nodes: Node[>..<]&, spans: Span[>..<]&, extra: u32[>..<]&, roots: Id[>..<]&,
  runtime_names: RuntimeName[>..<]&, constant_names: RuntimeName[>..<]&,
  declaration_traits: DeclarationTraits[>..<]&, declaration_nodes: DeclarationNodes[>..<]&,
  diagnostics: Diagnostic[>..<]&, operator_origins: OperatorOrigin[>..<]&,
@@ -192,9 +192,9 @@ fn init(nodes: Node[>..<]&, spans: Span[>..<]&, extra: u32[>..<]&, roots: Id[>..
  nodes.push(Node {}); spans.push(Span {});
  return Tree {nodes:nodes,spans:spans,extra:extra,roots:roots,runtime_names:runtime_names,constant_names:constant_names,declaration_traits:declaration_traits,declaration_nodes:declaration_nodes,diagnostics:diagnostics,operator_origins:operator_origins,type_conversion_origins:type_conversion_origins};
 }
-fn node(tree: Tree&, id: Id) -> Node { return tree.nodes[id]; }
-fn span(tree: Tree&, id: Id) -> Span { return tree.spans[id]; }
-fn declaration_nodes(tree: Tree&, root: Id) -> List, bool {
+fn node(tree: const Tree&, id: Id) -> Node { return tree.nodes[id]; }
+fn span(tree: const Tree&, id: Id) -> Span { return tree.spans[id]; }
+fn declaration_nodes(tree: const Tree&, root: Id) -> List, bool {
  for owner in tree.declaration_nodes {
   if owner.root != root { continue; }
   if owner.first == 0 || owner.first >= owner.end || owner.end > tree.nodes.len || root < owner.first || root >= owner.end { return List {}, false; }
@@ -202,63 +202,63 @@ fn declaration_nodes(tree: Tree&, root: Id) -> List, bool {
  }
  return List {}, false;
 }
-fn declaration_traits(tree: Tree&, id: Id) -> DeclarationTraits {
+fn declaration_traits(tree: const Tree&, id: Id) -> DeclarationTraits {
  var lo = 0; var hi = tree.declaration_traits.len;
  while lo < hi { let mid = lo + (hi-lo)/2; let v = tree.declaration_traits[mid]; if v.declaration < id { lo = mid+1; } else { hi = mid; } }
  if lo < tree.declaration_traits.len && tree.declaration_traits[lo].declaration == id { return tree.declaration_traits[lo]; }
  return DeclarationTraits { declaration: id };
 }
-fn find_name(items: RuntimeName[:], id: Id) -> u32, bool {
+fn find_name(items: const RuntimeName[:], id: Id) -> u32, bool {
  var lo = 0; var hi = items.len;
  while lo < hi { let mid = lo+(hi-lo)/2; if items[mid].declaration < id { lo = mid+1; } else { hi = mid; } }
  if lo < items.len && items[lo].declaration == id { return items[lo].point, true; }
  return 0, false;
 }
-fn runtime_name_point(tree: Tree&, id: Id) -> u32, bool { return find_name(tree.runtime_names, id); }
-fn value_name_point(tree: Tree&, id: Id) -> u32, bool {
+fn runtime_name_point(tree: const Tree&, id: Id) -> u32, bool { return find_name(tree.runtime_names, id); }
+fn value_name_point(tree: const Tree&, id: Id) -> u32, bool {
  let p, found = runtime_name_point(tree,id); if found { return p,true; }
  return find_name(tree.constant_names,id);
 }
-fn numeric_fault(tree: Tree&, id: Id) -> NumericFault {
+fn numeric_fault(tree: const Tree&, id: Id) -> NumericFault {
  let n = node(tree,id); var actual = blot_parse_token::float;
  if n.a == numericcode_integer_range { actual = blot_parse_token::integer; }
  return NumericFault {id, n.a, Span {n.b,n.c}, actual};
 }
-fn type_conversion_origin(tree: Tree&, id: Id) -> u32 {
+fn type_conversion_origin(tree: const Tree&, id: Id) -> u32 {
  var point = span(tree,id).start;
  for origin in tree.type_conversion_origins { if origin.node == id && origin.point < point { point = origin.point; } }
  return point;
 }
-fn list(tree: Tree&, range: List) -> const u32[:] { return tree.extra[range.start..range.start+range.len]; }
-fn children(tree: Tree&, id: Id) -> const Id[:] {
+fn list(tree: const Tree&, range: List) -> const u32[:] { return tree.extra[range.start..range.start+range.len]; }
+fn children(tree: const Tree&, id: Id) -> const Id[:] {
  let n=node(tree,id);
  if n.tag == tag_record { return list(tree,List {n.b,n.c}); }
  if n.tag == tag_product || n.tag == tag_array || n.tag == tag_block || n.tag == tag_constructors || n.tag == tag_effect_operations || n.tag == tag_pattern_product || n.tag == tag_pattern_record || n.tag == tag_pattern_row || n.tag == tag_type_product || n.tag == tag_type_array || n.tag == tag_type_record { return list(tree,List {n.a,n.b}); }
  return tree.extra[..0];
 }
-fn quantifier_predicates(tree: Tree&, id: Id) -> Id { return tree.extra[node(tree,id).c+1]; }
-fn value_decl(tree: Tree&, id: Id) -> ValueDecl {
+fn quantifier_predicates(tree: const Tree&, id: Id) -> Id { return tree.extra[node(tree,id).c+1]; }
+fn value_decl(tree: const Tree&, id: Id) -> ValueDecl {
  let n=node(tree,id); let x=tree.extra[n.c..n.c+9];
  return ValueDecl {n.a,n.b,x[0],x[1],x[2]==1,(x[7]&1)!=0,List {x[3],x[4]},x[8],List {x[5],x[6]}};
 }
-fn implementation(tree: Tree&, id: Id) -> ImplementationDecl {
+fn implementation(tree: const Tree&, id: Id) -> ImplementationDecl {
  let n=node(tree,id); let x=tree.extra[n.c..n.c+6]; let members=node(tree,n.b);
  return ImplementationDecl {n.a,List {x[0],x[1]},x[2],List {members.a,members.b},List {x[3],x[4]},x[5]};
 }
-fn parameter(tree: Tree&, id: Id) -> Parameter {
+fn parameter(tree: const Tree&, id: Id) -> Parameter {
  let n=node(tree,id); let x=tree.extra[n.c..n.c+4];
  return Parameter {n.a,n.b,(x[0]&1)!=0,(x[0]&2)!=0,(x[0]&4)!=0,List {x[1],x[2]},x[3]};
 }
-fn binding(tree: Tree&, id: Id) -> Binding {
+fn binding(tree: const Tree&, id: Id) -> Binding {
  let n=node(tree,id); let x=tree.extra[n.c..n.c+5];
  return Binding {n.a,n.b,x[0],List {x[1],x[2]},x[4],x[3]};
 }
-fn import_decl(tree: Tree&, id: Id) -> ImportDecl {
+fn import_decl(tree: const Tree&, id: Id) -> ImportDecl {
  let n=node(tree,id); let x=tree.extra[n.c..n.c+6];
  return ImportDecl {n.a,x[1],List {n.b,x[0]},Span {x[2],x[3]},Span {x[4],x[5]}};
 }
-fn import_binding(tree: Tree&, id: Id) -> ImportBinding { let n=node(tree,id); return ImportBinding {n.a,n.b}; }
-fn fixity(tree: Tree&, id: Id) -> Fixity {
+fn import_binding(tree: const Tree&, id: Id) -> ImportBinding { let n=node(tree,id); return ImportBinding {n.a,n.b}; }
+fn fixity(tree: const Tree&, id: Id) -> Fixity {
  let n=node(tree,id); let x=tree.extra[n.c..n.c+3]; var attrs=List {}; var literal: Id=0;
  if (x[2]&2)!=0 { attrs=List {tree.extra[n.c+3],tree.extra[n.c+4]}; }
  if (x[2]&4)!=0 { literal=tree.extra[n.c+5]; }

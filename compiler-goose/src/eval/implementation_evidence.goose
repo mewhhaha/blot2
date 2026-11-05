@@ -291,3 +291,24 @@ fn invocation<H>(host: H&,value: blot_check_core::Obligation,operands: u32[4]) -
  let result,error=host.evidenceStore().internWithEffects(Tag.function,operands[1],operands[2],row,[]); if error!=Error.none { return 0,error; } return host.evidenceStore().internWithEffects(Tag.function,operands[0],result,row,[]);
 }
 fn predicate<H,R>(host: H&,context: u32,value: blot_check_core::Obligation,mappings: const Mapping[:],rows: const RowMapping[:],resolver_: blot_eval_type_evidence::ProjectionResolver<R>&) -> bool,Error { let fact,present,error=closedPredicate(host,context,value,mappings,rows,resolver_); return present,error; }
+fn deinit(self: Store&) { self.proofs.clear(); self.arguments.clear(); self.members.clear(); self.edges.clear(); self.active_arguments.clear(); self.active.clear(); self.active_projections.clear(); self.provisional_equations.clear(); self.provisional_mappings.clear(); self.provisional_rows.clear(); self.buckets.clear(); self.next.clear(); self.facts.clear(); self.active_facts.clear(); self.owner_id=0; }
+fn reset(self: Store&) { deinit(self); self.owner_id=blot_native::fresh_owner_id(); self.trace=blot_eval_implementation_trace::Record {}; self.failure=blot_support::none<Code>(); self.candidates=0; self.prerequisite_edges=0; self.hits=0; self.max_depth=0; }
+
+fn withStore<C,F>(context: C&) -> Error {
+ var owned_proofs: Proof[>..<]=[];
+ var owned_arguments: u32[>..<]=[];
+ var owned_members: Member[>..<]=[];
+ var owned_edges: u32[>..<]=[];
+ var owned_active_arguments: u32[>..<]=[];
+ var owned_active: Active[>..<]=[];
+ var owned_active_projections: ActiveProjection[>..<]=[];
+ var owned_provisional_equations: Provisional[>..<]=[];
+ var owned_provisional_mappings: Mapping[>..<]=[];
+ var owned_provisional_rows: RowMapping[>..<]=[];
+ var owned_buckets: dictionary<u64,u32>=dictionary<u64,u32> {};
+ var owned_next: u32[>..<]=[];
+ var owned_facts: dictionary<FactKey,u32>=dictionary<FactKey,u32> {};
+ var owned_active_facts: FactKey[>..<]=[];
+ var store=init(Tables {proofs:owned_proofs,arguments:owned_arguments,members:owned_members,edges:owned_edges,active_arguments:owned_active_arguments,active:owned_active,active_projections:owned_active_projections,provisional_equations:owned_provisional_equations,provisional_mappings:owned_provisional_mappings,provisional_rows:owned_provisional_rows,buckets:owned_buckets,next:owned_next,facts:owned_facts,active_facts:owned_active_facts});
+ let error=F(context,store); deinit(store); return error;
+}

@@ -10,7 +10,7 @@ fn proves(units: const blot_check_core::Module[:], owner: u32, id: blot_check_co
 }
 recursive fn visit(units: const blot_check_core::Module[:], owner: u32, id: blot_check_core::Id, depth: i64, budget: i64&) -> bool {
     if id == 0 || owner == 0 || owner > units.len || depth >= 32 || budget == 0 { return false; }
-    budget--; let source = units[owner - 1]; let node = source.node(id);
+    budget--; let source .= units[owner - 1]; let node = source.node(id);
     if node.tag == blot_check_core::Tag.return_ { return visit(units, owner, node.a, depth + 1, budget); }
     if node.tag == blot_check_core::Tag.break_ || node.tag == blot_check_core::Tag.request_loop || node.tag == blot_check_core::Tag.loop_ || node.tag == blot_check_core::Tag.if_stmt || node.tag == blot_check_core::Tag.match_ { return false; }
     if node.tag == blot_check_core::Tag.block_ || node.tag == blot_check_core::Tag.suite {
@@ -50,7 +50,7 @@ recursive fn visit(units: const blot_check_core::Module[:], owner: u32, id: blot
     if node.tag == blot_check_core::Tag.call {
         var target = source.call(id).target; if target.unit == 0 { target.unit = owner; }
         if target.unit > units.len { return false; }
-        let producer = units[target.unit - 1]; let body .= producer.body(target.binding);
+        let producer .= units[target.unit - 1]; let body .= producer.body(target.binding);
         if body == null || !body.is_function || body.parameters.len != source.call(id).arguments.len { return false; }
         return visit(units, target.unit, body.root, depth + 1, budget);
     }

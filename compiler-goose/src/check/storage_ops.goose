@@ -31,7 +31,7 @@ fn arity(op: Op) -> u32 {
     }
 }
 fn writes(op: Op) -> bool {
-    match op { write, push, pop, truncate, freeze, reserve => { return true; }, _ => { return false; } }
+    match op { write, push, pop, truncate, freeze, reserve => { return true; }, _ => { return false; }, }
 }
 
 fn opCode(value: Op) -> u32 {

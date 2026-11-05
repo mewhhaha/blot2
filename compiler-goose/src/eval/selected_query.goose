@@ -7,6 +7,7 @@ import reuse.semantic_query_table;
 import support.error;
 import support.wyhash;
 import support.option;
+import support.host_layout;
 type Error=blot_error::Error;
 struct Source { unit: u32,identity: u32,origin: blot_eval_eval_values::ClosureOrigin,applied: u32,member: bool=false }
 fn source(value: blot_eval_eval_values::ClosureValue) -> Source { return Source {value.unit,value.identity,value.origin,value.applied,false}; }
@@ -31,11 +32,11 @@ fn complete(self: Adapter,record: Record) -> bool {
 fn bytes(self: Adapter,record: Record) -> i64 { return blot_reuse_specialization_receipt::ownedBytes(record.dependencies); }
 fn allocateRecords(self: Adapter,len: i64) -> Record[:],Error { return records.alloc_slice(len),Error.none; }
 fn releaseRecords(self: Adapter,values: const Record[:]) { if values.len==0 { return; } let first: const Record&=values[0]; let at=records.index_of(first); assert(at>=0); records.free_slice(records[at..at+values.len]); }
-fn recordBytes(self: Adapter) -> i64 { return bytes_of(default<Record>()).len; }
+fn recordBytes(self: Adapter) -> i64 { return blot_host_layout::selected_query_record; }
 fn init() -> Table { return blot_reuse_semantic_query_table::init<Key,blot_reuse_specialization_receipt::Record,Result,Adapter>(Adapter {}); }
 fn remember(table: Table&,closure: blot_eval_eval_values::ClosureValue,owned: blot_reuse_specialization_receipt::Record) -> u32,bool,Error {
  var origin=source(closure); if owned.member.present { origin=memberSource(owned.member.value.target); }
- var builder=table.begin(Key {origin,owned.input,owned.expected,owned.options,owned.depth}); defer { builder.abort(); } builder.read(owned); builder.stage(Result {owned.selected});
- var candidate=builder.complete(); if !candidate.present { return 0,false,Error.none; } defer { candidate.value.abort(); }
- let prepared,error=table.prepare(candidate.value); if error!=Error.none { return 0,false,error; } if !prepared.present { return 0,false,Error.none; } return table.publish(prepared.value,candidate.value).position,true,Error.none;
+ var builder=table.begin(Key {origin,owned.input,owned.expected,owned.options,owned.depth}); builder.read(owned); builder.stage(Result {owned.selected});
+ var candidate=builder.complete(); builder.abort(); if !candidate.present { return 0,false,Error.none; }
+ let prepared,error=table.prepare(candidate.value); if error!=Error.none { candidate.value.abort(); return 0,false,error; } if !prepared.present { candidate.value.abort(); return 0,false,Error.none; } let position=table.publish(prepared.value,candidate.value).position; candidate.value.abort(); return position,true,Error.none;
 }

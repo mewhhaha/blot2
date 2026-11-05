@@ -14,21 +14,21 @@ recursive fn expression(store, nominals, owner: i64, root: Id, work: Work&, dept
     let error = work.charge(1); if error != Error.none { return false, error; } if depth >= 128 || !bounded(store, root) { return false, Error.type_limit; } let id = store.head(root, 0); if !bounded(store, id) { return false, Error.type_limit; }
     let n = store.node(id); let error = blot_check_usage_check::nominalShape(store, nominals, n, work); if error != Error.none { return false, error; }
     match n.tag {
-        Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32 { return n.a == 0 && n.b == 0 && n.c == 0, Error.none; }
-        Tag.variable, Tag.bound { if !validList(store, nominals[owner].variables) { return false, Error.type_limit; }
+        Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32 => { return n.a == 0 && n.b == 0 && n.c == 0, Error.none; },
+        Tag.variable, Tag.bound => { if !validList(store, nominals[owner].variables) { return false, Error.type_limit; }
             for variable in store.list(nominals[owner].variables) { let error = work.charge(1); if error != Error.none { return false, error; } if !bounded(store, variable) { return false, Error.type_limit; } let formal = store.node(store.head(variable, 0));
                 if n.tag == Tag.variable && formal.tag == Tag.variable && n.a == formal.a { return true, Error.none; } if n.tag == Tag.bound && formal.tag == Tag.bound && id == variable && n.b == 0 { return true, Error.none; }
             } return false, Error.none;
-        }
-        Tag.array, Tag.list { if n.b != 0 || n.c != 0 { return false, Error.none; } return expression(store, nominals, owner, n.a, work, depth + 1); }
-        Tag.product { if n.c != 0 { return false, Error.none; } for child in store.list(blot_check_types::List { n.a, n.b }) { let closed, error = expression(store, nominals, owner, child, work, depth + 1); if error != Error.none || !closed { return closed, error; } } return true, Error.none; }
-        Tag.record { if n.c != 0 { return false, Error.none; } for index in 0..n.b { let closed, error = expression(store, nominals, owner, store.recordField(n, index).ty, work, depth + 1); if error != Error.none || !closed { return closed, error; } } return true, Error.none; }
-        Tag.nominal { var index = owner; for attempt in 0..nominals.len { let error = work.charge(1); if error != Error.none { return false, error; } let nominal = nominals[index]; if index == 0 { index = nominals.len; } index -= 1;
+        },
+        Tag.array, Tag.list => { if n.b != 0 || n.c != 0 { return false, Error.none; } return expression(store, nominals, owner, n.a, work, depth + 1); },
+        Tag.product => { if n.c != 0 { return false, Error.none; } for child in store.list(blot_check_types::List { n.a, n.b }) { let closed, error = expression(store, nominals, owner, child, work, depth + 1); if error != Error.none || !closed { return closed, error; } } return true, Error.none; },
+        Tag.record => { if n.c != 0 { return false, Error.none; } for index in 0..n.b { let closed, error = expression(store, nominals, owner, store.recordField(n, index).ty, work, depth + 1); if error != Error.none || !closed { return closed, error; } } return true, Error.none; },
+        Tag.nominal => { var index = owner; for attempt in 0..nominals.len { let error = work.charge(1); if error != Error.none { return false, error; } let nominal = nominals[index]; if index == 0 { index = nominals.len; } index -= 1;
                 if nominal.identity.unit != n.a || nominal.identity.decl != n.b { continue; } if !nominal.closed_storage || nominal.has_usage { return false, Error.none; } let arguments = store.nominalArguments(n); if arguments.len != nominal.parameters.len { return false, Error.none; }
                 for argument in arguments { let closed, error = expression(store, nominals, owner, argument, work, depth + 1); if error != Error.none || !closed { return closed, error; } } return true, Error.none;
             } return false, Error.none;
-        }
-        else { return false, Error.none; }
+        },
+        _ => { return false, Error.none; },
     }
 }
 fn facts(store, nominals, constructors, unit: u32, work: Work&) -> Error {
@@ -80,12 +80,12 @@ recursive fn matchTypes(self: Matcher&, expected: Id, actual: Id, replace: bool,
     }
     if left.tag != right.tag { return false, Error.none; }
     match left.tag {
-        Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32 { return left.a == 0 && left.b == 0 && left.c == 0 && right.a == 0 && right.b == 0 && right.c == 0, Error.none; }
-        Tag.array, Tag.list { return matchTypes(self, left.a, right.a, replace, depth + 1); }
-        Tag.product { if left.b != right.b { return false, Error.none; } let xs = types.list(blot_check_types::List { left.a, left.b }); let ys = types.list(blot_check_types::List { right.a, right.b }); for x, index in xs { let equal, error = matchTypes(self, x, ys[index], replace, depth + 1); if error != Error.none || !equal { return equal, error; } } }
-        Tag.record { if left.b != right.b { return false, Error.none; } for index in 0..left.b { let field = types.recordField(left, index); var found = false; for other in 0..right.b { let error = self.work.charge(1); if error != Error.none { return false, error; } let candidate = types.recordField(right, other); if candidate.name != field.name { continue; } if found { return false, Error.none; } let equal, error = matchTypes(self, field.ty, candidate.ty, replace, depth + 1); if error != Error.none || !equal { return equal, error; } found = true; } if !found { return false, Error.none; } } }
-        Tag.nominal { if left.a != right.a || left.b != right.b { return false, Error.none; } let xs = types.nominalArguments(left); let ys = types.nominalArguments(right); if xs.len != ys.len { return false, Error.none; } for x, index in xs { let equal, error = matchTypes(self, x, ys[index], replace, depth + 1); if error != Error.none || !equal { return equal, error; } } }
-        else { return false, Error.none; }
+        Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32 => { return left.a == 0 && left.b == 0 && left.c == 0 && right.a == 0 && right.b == 0 && right.c == 0, Error.none; },
+        Tag.array, Tag.list => { return matchTypes(self, left.a, right.a, replace, depth + 1); },
+        Tag.product => { if left.b != right.b { return false, Error.none; } let xs = types.list(blot_check_types::List { left.a, left.b }); let ys = types.list(blot_check_types::List { right.a, right.b }); for x, index in xs { let equal, error = matchTypes(self, x, ys[index], replace, depth + 1); if error != Error.none || !equal { return equal, error; } } },
+        Tag.record => { if left.b != right.b { return false, Error.none; } for index in 0..left.b { let field = types.recordField(left, index); var found = false; for other in 0..right.b { let error = self.work.charge(1); if error != Error.none { return false, error; } let candidate = types.recordField(right, other); if candidate.name != field.name { continue; } if found { return false, Error.none; } let equal, error = matchTypes(self, field.ty, candidate.ty, replace, depth + 1); if error != Error.none || !equal { return equal, error; } found = true; } if !found { return false, Error.none; } } },
+        Tag.nominal => { if left.a != right.a || left.b != right.b { return false, Error.none; } let xs = types.nominalArguments(left); let ys = types.nominalArguments(right); if xs.len != ys.len { return false, Error.none; } for x, index in xs { let equal, error = matchTypes(self, x, ys[index], replace, depth + 1); if error != Error.none || !equal { return equal, error; } } },
+        _ => { return false, Error.none; },
     } return true, Error.none;
 }
 fn construction(module: const blot_check_core::Module&, node: blot_check_core::Node, work: Work&) -> bool, Error {

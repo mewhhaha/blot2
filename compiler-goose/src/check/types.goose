@@ -6,6 +6,7 @@ import dictionary;
 import support.error;
 import support.option;
 import support.native;
+import .type_store_snapshot;
 type Error = blot_error::Error;
 type Id = u32;
 type Cursor = u32;
@@ -373,11 +374,11 @@ fn rowType(self: Store&, root: Id) -> blot_check_effects::Id, Error {
 }
 fn rowIdentity(self: const Store&, root: Id) -> bool {
     if root >= self.nodes.len { return false; } let leaf = node(self, head(self, root, 0));
-    match leaf.tag { variable => { return self.variables[leaf.a].row_effect != none; }, bound => { return leaf.b == 1 && leaf.c == 0; }, rigid => { return leaf.c == 1; }, _ => { return false; } }
+    match leaf.tag { variable => { return self.variables[leaf.a].row_effect != none; }, bound => { return leaf.b == 1 && leaf.c == 0; }, rigid => { return leaf.c == 1; }, _ => { return false; }, }
 }
 fn regionIdentity(self: const Store&, root: Id) -> bool {
     if root >= self.nodes.len { return false; } let leaf = node(self, head(self, root, 0));
-    match leaf.tag { variable => { return self.variables[leaf.a].region; }, bound => { return leaf.b == 2; }, rigid => { return leaf.c == 2; }, _ => { return false; } }
+    match leaf.tag { variable => { return self.variables[leaf.a].region; }, bound => { return leaf.b == 2; }, rigid => { return leaf.c == 2; }, _ => { return false; }, }
 }
 fn usage(self: Store&, payload: Id, kind: UsageKind, region: Id) -> Id, Error {
     if payload == absent || payload >= self.nodes.len || node(self, head(self, payload, 0)).tag == Tag.erased_proof { return 0, Error.type_mismatch; }
@@ -767,7 +768,7 @@ fn resolutionDependencies(self: const Store&, result: Id) -> blot_support::Optio
             }
             match row_.tail { variable v => {
                 if !certificate.add(blot_reuse_composite_resolution_cache::Dependency { v.value, self.effects.variables[v.value].last, true }) { return blot_support::Option<blot_reuse_composite_resolution_cache::Record> { false, certificate }; }
-            }, _ => {} }
+            }, _ => {}, }
         }
         var children: Id[3] = [0; 3]; var length: i64 = 0; var tail: const Id[:] = [];
         match value.tag {
@@ -1367,7 +1368,7 @@ fn unifyInner(self: Store&, left: Id, right: Id, reporter, associated: bool) -> 
     }
     return Error.none;
 }
-fn isRank(tag: Tag) -> bool { match tag { forall, existential, bound, rigid => { return true; }, _ => { return false; } } }
+fn isRank(tag: Tag) -> bool { match tag { forall, existential, bound, rigid => { return true; }, _ => { return false; }, } }
 fn usageCode(kind: UsageKind) -> u32 { return kind; }
 fn usageFromCode(code: u32) -> UsageKind, Error { if code > 7 { return 0, Error.type_mismatch; } return code, Error.none; }
 fn appendChildren(self: const Store&, pending: Id[>..<]&, id: Id, scoped_identity: bool) {
@@ -1439,11 +1440,11 @@ fn freeRowVariablesMode(self: Store&, root: Id, bounded: bool) -> u32[>..], Erro
             var row_ = self.effects.node(value.c); var row_at = max(at, row_.cursor);
             loop {
                 for label in self.effects.list(row_.labels) { for argument in operationArguments(self, label) { pending.push(RowWork { argument, at, work.depth + 1 }); } }
-                var variable = none; match row_.tail { variable v => { variable = v.value; }, _ => { break; } }
+                var variable = none; match row_.tail { variable v => { variable = v.value; }, _ => { break; }, }
                 row_at = max(row_at, row_.cursor); let write, found = self.effects.replacementAt(variable, row_at); if !found { break; }
                 row_ = self.effects.node(write.replacement); row_at = write.position + 1;
             }
-            match row_.tail { variable v => { if !has(result, v.value) { result.push(v.value); } }, _ => {} }
+            match row_.tail { variable v => { if !has(result, v.value) { result.push(v.value); } }, _ => {}, }
         }
         var children: Id[>..<] = []; appendChildren(self, children, id, false);
         for child in children { pending.push(RowWork { child, at, work.depth + 1 }); }
@@ -1521,14 +1522,14 @@ recursive fn substitutedRow(self: Store&, root: blot_check_effects::Id, substitu
         let index, found = typeIndex(substitution, v.value);
         if found { let replacement_row, re = rowType(self, substitution.fresh_ids[index]); if re != Error.none { return 0, re; }
             let next, error = self.effects.substituteFormal(root, substitution.old[index], replacement_row); if error != Error.none { return 0, effectError(error); } result = next; }
-    }, _ => {} }
+    }, _ => {}, }
     if changed {
         let replaced = row(self, result); if result != root { labels.append(self.effects.list(replaced.labels)[row_.labels.len..]); }
         let next, error = self.effects.rowAt(labels, replaced.tail, max(row_.cursor, replaced.cursor)); if error != Error.none { return 0, effectError(error); } result = next;
     }
     var from: i64 = 0;
     while from < substitution.old_rows.len {
-        var variable = none; match self.effects.node(result).tail { variable v => { variable = v.value; }, _ => { break; } }
+        var variable = none; match self.effects.node(result).tail { variable v => { variable = v.value; }, _ => { break; }, }
         let index, found = rowIndex(substitution, variable, from); if !found { break; }
         let next, error = self.effects.substitute(result, substitution.old_rows[index], substitution.fresh_rows[index]); if error != Error.none { return 0, effectError(error); } result = next; from = index + 1;
     }
@@ -1651,7 +1652,7 @@ recursive fn closeCovariantNode(self: Store&, root: Id, generalized: const u32[:
             match tail { variable v => { if has(generalized, v.value) && !has(protected, v.value) && !has(token_rows, v.value) {
                 if record_decisions && !has(decisions, v.value) { decisions.push(v.value); }
                 let next, error = self.effects.row(rowLabels(self, effect_row), blot_check_effects::Tail.closed); if error != Error.none { return 0, effectError(error); } effect_row = next;
-            } }, _ => {} }
+            } }, _ => {}, }
             if effect_row == value.c { return root, Error.none; } return provider(self, value.a, effect_row);
         },
         function => {
@@ -1661,9 +1662,9 @@ recursive fn closeCovariantNode(self: Store&, root: Id, generalized: const u32[:
             match tail { variable v => { if has(generalized, v.value) && !has(protected, v.value) && !has(parameter_free, v.value) && !has(result_free, v.value) {
                 if record_decisions && !has(decisions, v.value) { decisions.push(v.value); }
                 let next, error = self.effects.row(rowLabels(self, effect_row), blot_check_effects::Tail.closed); if error != Error.none { return 0, effectError(error); } effect_row = next;
-            } }, _ => {} }
+            } }, _ => {}, }
             var nested: u32[>..] = []; nested.append(protected); let union = unionInto(self, nested, parameter_free); if union != Error.none { return 0, union; }
-            match self.effects.node(effect_row).tail { variable v => { let error = unionInto(self, nested, [v.value]); if error != Error.none { return 0, error; } }, _ => {} }
+            match self.effects.node(effect_row).tail { variable v => { let error = unionInto(self, nested, [v.value]); if error != Error.none { return 0, error; } }, _ => {}, }
             let result, error = closeCovariantDepth(self, value.b, generalized, nested, decisions, record_decisions, memo, depth + 1); if error != Error.none { return 0, error; }
             if result == value.b && effect_row == value.c { return root, Error.none; } return functionWithEffects(self, value.a, result, effect_row);
         },
@@ -1710,7 +1711,7 @@ fn openCovariant(self: Store&, root: Id) -> Id, Error {
 }
 recursive fn openCovariantDepth(self: Store&, root: Id, memo: dictionary<CovariantInput, Id>&, depth: i64) -> Id, Error {
     increment(self.normalization.open_depth_entries);
-    if !self.has_projections { if depth >= 1024 { return 0, Error.type_limit; } match node(self, root).tag { function, provider, product, record, usage, array, list, cursor => {}, _ => { return root, Error.none; } } }
+    if !self.has_projections { if depth >= 1024 { return 0, Error.type_limit; } match node(self, root).tag { function, provider, product, record, usage, array, list, cursor => {}, _ => { return root, Error.none; }, } }
     var query = CovariantInput { root, depth }; if self.has_projections { query.depth = 0; }
     block { let known = memo.get(query); if known { return known, Error.none; } }
     let result, error = openCovariantNode(self, root, memo, depth); if error != Error.none { return 0, error; }
@@ -1816,3 +1817,11 @@ fn withStoreValue<C,F,R>(context: C&) -> R, Error {
     var store = initialized; let result, failure = F(context, store); deinit(store); return result, failure;
 }
 fn usageKindCode(kind: UsageKind) -> u32 { return usageCode(kind); }
+// Suspension transfers one live logical owner into typed reusable backing.
+type StoreSnapshot = blot_check_type_store_snapshot::Snapshot;
+fn suspendStore(store: Store&) -> StoreSnapshot, Error { return blot_check_type_store_snapshot::suspendStore(store); }
+fn restoreStore(snapshot: StoreSnapshot&, store: Store&) -> Error { return blot_check_type_store_snapshot::restoreStore(snapshot, store); }
+fn deinit(snapshot: StoreSnapshot&) -> Error { return blot_check_type_store_snapshot::deinit(snapshot); }
+fn cloneSnapshot(snapshot: const StoreSnapshot&) -> StoreSnapshot, Error { return blot_check_type_store_snapshot::cloneSnapshot(snapshot); }
+fn snapshotOwnedBytes(snapshot: const StoreSnapshot&) -> i64 { return blot_check_type_store_snapshot::snapshotOwnedBytes(snapshot); }
+fn snapshotMetadataBytes() -> i64 { return blot_check_type_store_snapshot::snapshotMetadataBytes(); }

@@ -11,7 +11,7 @@ fn forBinding(module: const blot_check_core::Module&, binding: blot_check_core::
     return blot_support::Option<Owner> { false, default<Owner>() };
 }
 fn count(self: Owner, module: const blot_check_core::Module&) -> i64 {
-    match self { quantified v => { return module.types.quantifierGoals(v.value).len; }, scheme v => { return module.bindings[v.value].scheme.obligations.len; } }
+    match self { quantified v => { return module.types.quantifierGoals(v.value).len; }, scheme v => { return module.bindings[v.value].scheme.obligations.len; }, }
 }
 fn goal(self: Owner, module: const blot_check_core::Module&, ordinal: i64) -> blot_check_core::Obligation {
     match self {
@@ -25,10 +25,10 @@ fn goal(self: Owner, module: const blot_check_core::Module&, ordinal: i64) -> bl
     }
 }
 fn formals(self: Owner, module: const blot_check_core::Module&) -> blot_check_types::List {
-    match self { quantified v => { let node = module.types.node(v.value); return blot_check_types::List { node.b, node.c }; }, scheme v => { return module.bindings[v.value].scheme.variables; } }
+    match self { quantified v => { let node = module.types.node(v.value); return blot_check_types::List { node.b, node.c }; }, scheme v => { return module.bindings[v.value].scheme.variables; }, }
 }
 fn enter(self: Owner, module: const blot_check_core::Module&, scopes: blot_check_package_contracts::Context&) -> blot_error::Error {
-    match self { quantified v => { return scopes.enter(v.value); }, scheme v => { return scopes.generic(module.bindings[v.value].scheme); } }
+    match self { quantified v => { return scopes.enter(v.value); }, scheme v => { return scopes.generic(module.bindings[v.value].scheme); }, }
 }
 fn instantiate(self: Owner, module: const blot_check_core::Module&, proof: blot_check_package_contracts::Principal&, actual: blot_check_types::Id) -> blot_error::Error {
     match self {

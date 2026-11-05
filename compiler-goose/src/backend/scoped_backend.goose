@@ -51,7 +51,7 @@ fn required(units: const blot_check_core::Module[:], entry: u32) -> bool, blot_e
     while pending.len != 0 {
         let current = pending.pop(); if current.id == 0 { continue; }
         if current.unit == 0 || current.unit > units.len || seen.count >= 100000 { return true, blot_error::Error.none; }
-        let source = units[current.unit - 1]; if current.id >= source.nodes.len { return true, blot_error::Error.none; }
+        let source .= units[current.unit - 1]; if current.id >= source.nodes.len { return true, blot_error::Error.none; }
         let key = (current.unit as u64 << 32) | current.id; if seen.contains(key) { continue; } seen.insert(key, true);
         let node = source.node(current.id); if node.tag == blot_check_core::Tag.storage { return true, blot_error::Error.none; }
         if node.tag == blot_check_core::Tag.update { for selector in source.updateSelectors(current.id) { if selectorIsIndex(selector) { return true, blot_error::Error.none; } } }
@@ -59,7 +59,7 @@ fn required(units: const blot_check_core::Module[:], entry: u32) -> bool, blot_e
         if node.tag == blot_check_core::Tag.reference || node.tag == blot_check_core::Tag.call {
             var target = blot_check_core::BindingRef {}; if node.tag == blot_check_core::Tag.call { target = source.call(current.id).target; } else { target = source.reference(current.id); }
             if target.unit == 0 { target.unit = source.unit; } if target.unit == 0 || target.unit > units.len { return true, blot_error::Error.none; }
-            let producer = units[target.unit - 1]; if target.binding >= producer.bindings.len { return true, blot_error::Error.none; }
+            let producer .= units[target.unit - 1]; if target.binding >= producer.bindings.len { return true, blot_error::Error.none; }
             let body = producer.body(target.binding); if body.present { pending.push(RequiredNode { unit: target.unit, id: body.value.root }); }
         }
         if node.tag == blot_check_core::Tag.closure { pending.push(RequiredNode { unit: source.unit, id: source.closures[node.a].body }); }

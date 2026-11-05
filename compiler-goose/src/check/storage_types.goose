@@ -19,7 +19,7 @@ fn named(spelling: const u8[:]) -> blot_support::Option<Kind> {
 fn name(kind: Kind) -> const u8[:] {
     match kind { 20 => { return "GrowArray"; }, 21 => { return "ResizeArray"; },
         22 => { return "Ref"; }, 23 => { return "View"; }, 24 => { return "Link"; },
-        _ => { assert(false); return ""; } }
+        _ => { assert(false); return ""; }, }
 }
 fn identity(unit: u32, declaration: u32) -> blot_support::Option<Kind> {
     if unit == 0xffffffff && declaration >= grow && declaration <= link { return blot_support::Option<Kind> { true, declaration }; }

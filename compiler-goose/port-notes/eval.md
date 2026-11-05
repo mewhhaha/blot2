@@ -123,3 +123,148 @@ This changes thread/scratch reuse costs; it has not been measured or qualified.
 Goose reusable pools and generic worker support may exceed the current bootstrap
 compiler's implementation. They are specified target-language features, and
 are not replaced with unsafe allocator or compiler-oracle bridges.
+
+Further source-writing after checkpoint f777675d: canonical_specialization now has
+its complete production replay and cache pass. Core Session execution now includes
+all expression dispatch, named and curried invocation, constructor and primitive
+execution, capability escape checks, provider scopes, request loops and unwind,
+resolver execution, staging, collections and SIMD, updates, patterns and loops,
+implementation template/dictionary selection, structural evidence matching,
+typed value publication and record member selection. The inference-facing Session
+entry points, retained receipt queries, CallSummaries and ClosureRegion remain
+under construction. No verification has run.
+
+Suspended inference regions will transfer all typed solver and Scratch state to
+an owned RegionSnapshot only at a real scheduler wait. Resumption preserves the
+same logical region/solver owner IDs and chronological handles; physical borrow
+caches must be invalidated when owners move. This preserves scheduling and fuel;
+the snapshot copying cost remains unmeasured.
+
+## Current source construction continuation
+
+The core evaluator production writing pass now also includes field/member
+selection and mismatch diagnostics; record updates; freezing retained capture
+graphs; entry inference; the full principal graph description, normalization,
+cycle/pay admission and replay algorithms; completed/checked/constant/public
+header traversals; typed persistent FrozenCopy map frames; mandatory scheme
+leaves; summary admission/expansion; and the serial SCC scheduler. Serial jobs
+transfer exact RegionSnapshot ownership only when the selected work changes;
+they keep the live region for consecutive solver steps. Restoring a snapshot
+adds no semantic inference credit. Snapshot physical copying cost is unmeasured.
+
+The serial scheduler and mutable graph readers retain their original ordering,
+limits, rollback boundaries, missing-versus-declined query states and observer
+publication decisions. The parallel component worker packet/codecs and several
+Session inference/receipt/ragged entrypoints are still being written. The three
+admission/query leaves listed above remain pending. No build, test, formatter,
+compiler invocation or checker has run.
+
+Source construction issues still requiring edits before this pass is complete:
+
+- Goose has no `defer`; existing first-pass cleanup clauses in eval/parse must
+  become explicit ordered cleanup along every control-flow exit.
+- Goose specification 7.8 forbids nonfixed locals in a recursive call cycle.
+  Recursive evaluator/graph/type owner wrappers need fixed typed pooled
+  descriptors rather than lexical Grow/dictionary owners. Exact suspended
+  solver snapshots are already separate ownership transfers.
+- Stable Grow backing for immutable recipe/source-owner slices needs actual
+  reusable slice leases for deinit/reset; clearing Grow-only owners is not a
+  legal reset. Resetting all cache scalars must accompany the context rebuild.
+- Worker Core images use `support/core_packet.goose`, namespace
+  `blot_core_packet`, parent-owned. `encode(module,outputGrow)->Error`;
+  `decode(bytes)->Owned,Error`; `Owned.module` borrows its own lease until
+  `Owned.deinit()`. No Session references cross worker queues.
+
+New caller-facing contexts: `CallSummaryTables` supplies all key/job/stack,
+active-owner, eligibility/header, principal-decline and principal-key maps plus
+`scope_components.Graph&`; `initCallSummaries(tables)` returns the fixed view.
+`initRegionStorage(allocation_owner,source_owners,definitions,units)` takes a
+stable nonzero compiler/session allocation identity. `SpecializationCaches`
+contains the fixed per-cache contexts and typed validated-call/plain maps;
+`RetainedRecords` borrows the two receipt Grow/shrink arrays.
+`reset(session,tables,units)->Error` is written and retains these caller contexts;
+cache backing/scalar cleanup alignment above remains outstanding.
+
+The selected_implementation_admission production module is now written in full:
+closed declaration reconstruction and snapshot reconstruction both recursively
+compare every supplied proof/member/predicate/prerequisite against newly derived
+authority, with shared budget and memo rules. `core(module,remaining)->Error`
+and `snapshot(units,evidence,supplied,remaining)->Error` preserve the original
+allocator-free source signatures. TypeEvidence.withStore and the new
+ImplementationEvidence.withStore supply typed entry lifetimes. It has not been
+verified. implementation_admission and completed_specialization_query remain
+pending.
+
+`withSession<C,F>(units,allocation_owner,context)->Error` is now source-written;
+F(context,session) runs while every concrete owner remains in scope. The free
+`evaluate` additionally receives a caller-owned diagnostic byte Grow array so
+its result can retain detail after the Session scope closes. Retained closure
+inference/specialization, receipt query/judgment, partial array members,
+principal-evidence observation/fallback, startup coverage, RaggedFacts and the
+counted ragged path are now source-written. Worker component codecs/execution
+and the ownership/cleanup adaptations recorded above are still pending.
+
+completed_specialization_query.goose now has the full production writing pass:
+owner-paired source admission, cached multi-root inspection, exact input/member
+matching, scalar/call/view/plain observations, independent proof recovery,
+transaction preparation, whole graph materialization and retained receipt
+relocation. `State` additionally takes caller `Tables` for independent records
+and joined parallel batch buffers; allocation identity is numeric and nonzero.
+Its copied-packet adapter calls the agreed parent-owned
+`independent_call_proof::runParallel<State,G>` contract. `State.semantic` is the
+fixed/defaultable pooled Importer supplied by the parent reuse port. This module
+is source-written only, with those parent APIs still being written/aligned.
+
+`withSharedSession<C,F>(parent,allocation_owner,context)->Error` now shares the
+same typed factory as withSession and chooses exact initShared. Mutable tables
+start empty; immutable offsets/field catalogs and catalog identity remain tied
+to the parent. No compiler or verification call has run.
+
+implementation_admission.goose now has the complete production writing pass:
+associated declaration equations, mandatory contract prerequisites, private member
+signature recipes, template body/reference reconstruction, head scope and
+unrestricted associated-type checks, complete member/predicate ownership,
+head-only overlap/orphan checks, exact public/Core/principal proof comparison and
+original producer equivalence. Core and principal owners use explicit typed
+overloads where their authorities differ. No evaluator production leaf is now
+wholly unwritten. The core parallel component execution/packet path and recorded
+cleanup/recursive ownership work remain unfinished; source presence is not a
+claim of a build or qualification.
+
+Shared copied-worker construction is now written in eval/worker_packet.goose:
+bounded little-endian scalar/record helpers, full Core catalog ownership and
+whole-catalog validation, runtime identity images, semantic evidence images,
+exact source-order scalar seeds and independent certificate payloads. New
+support/evidence_packet.goose owns typed generation-checked evidence snapshots.
+
+Parent-assigned reuse/independent_worker.goose now supplies the full
+`blot_reuse_independent_call_proof::runParallel<S,G>` adapter and copied worker
+execution. It carries complete old/current Core and identity/evidence images,
+old/current private certificates, options/depth/request and completed scalar
+inputs; it validates complete local catalogs and rebuilds the local Gate before
+calling acquire. Current scalar seed tables are constructed in source slot
+order. Gate flags and addresses are never serialized. All children join before
+coordinator result decoding/publication; only out_of_memory is classified as
+out_of_memory, while bounded packet declines remain declines. Backend payloads
+unused by independent semantic inquiry are absent from the reconstructed Pools;
+Importer.initIndependentQuery must retain the agreed semantic-only contract.
+Import reuse.independent_worker to register this namespace extension. This is
+still source construction, without a compiler/check invocation.
+
+The remaining core parallel SCC path is now production-written, with full
+component selection/SCC eligibility, deterministic sorting and budget split,
+joined copied worker execution, counter aggregation, independent-source checks,
+private semantic import and whole-component publication. New
+component_worker.goose carries all Core/evidence inputs, exact lexical typing
+and scalar seeds, recreates the private Session and exports every completed
+member in the original order. Semantic component IO presence is explicit
+`Session.semantic_io_enabled` (default false); native caller policy enables it.
+
+Caller-owned evidence tables use prepareCommit/commit for the original staged
+store swap: all destination capacity is touched before publication, then exact
+ordered runs and dictionary slots/counts are copied with the logical staged
+owner transferred. No stage references escape. This preserves semantic IDs and
+publication boundaries; the extra physical copy cost is unmeasured. A later
+fixed pooled Store descriptor can transfer these same runs directly. Full
+source writing is still not a build or semantic qualification; recursive-owner
+and cleanup work recorded above remains pending.

@@ -29,7 +29,7 @@ fn capture(sites: Site[>..<]&, units: const blot_check_core::Module[:], names: b
     for pass in 0..2 {
         for record in module.semantic_sites {
             if record.kind != blot_backend_wasm::SemanticKind.allocation || record.unit == 0 || record.unit > units.len || record.unit == prelude || (record.unit == entry) != (pass == 0) { continue; }
-            let source = units[record.unit - 1];
+            let source .= units[record.unit - 1];
             if record.node == 0 || record.node >= source.nodes.len || record.function >= module.functions.len { continue; }
             let span = source.span(record.node); if span.end <= span.start { continue; }
             let function = module.functions[record.function]; if record.place >= function.instructions.len { continue; }

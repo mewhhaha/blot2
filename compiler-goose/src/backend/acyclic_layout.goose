@@ -20,7 +20,7 @@ recursive fn within(store: blot_backend_layout::Store&, units: const blot_check_
         while index < count { let child = store.children(ty)[index]; let valid, error = within(store, units, child, active, depth + 1, budget); if error != blot_error::Error.none || !valid { return false, error; } index += step; } return true, blot_error::Error.none;
     }
     if node.tag == blot_backend_layout::Tag.nominal {
-        if node.a == 0 || node.a > units.len { return false, blot_error::Error.none; } let source = units[node.a - 1]; var found = false;
+        if node.a == 0 || node.a > units.len { return false, blot_error::Error.none; } let source .= units[node.a - 1]; var found = false;
         for constructor in source.constructors {
             if budget == 0 { return false, blot_error::Error.none; } budget--;
             let nominal = source.nominal(constructor.nominal); if nominal.identity.unit != node.a || nominal.identity.decl != node.b { continue; } found = true;

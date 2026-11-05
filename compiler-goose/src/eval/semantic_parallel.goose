@@ -35,7 +35,7 @@ fn take<S>(self: Batch&,index: i64,stats: S&) -> Record,bool,Error {
 fn run<C,F>(requests: const Request[:],requested: u8,context: C&,owned_requests: Request[>..<]&,owned_slots: Slot[>..<]&,outcomes: blot_eval_semantic_job_batch::Outcome<Result>[>..<]&) -> Batch,Error {
  let request_start=owned_requests.len; owned_requests.append(requests); let slot_start=owned_slots.len; for request in requests { owned_slots.push(Slot {}); }
  var batch=Batch {owned_requests[request_start..],owned_slots[slot_start..],1,null}; var cancellation=blot_eval_semantic_job_batch::Cancellation {};
- let joined,error=blot_eval_semantic_job_batch::run<Result,Request,C,F>(batch.requests,requested,cancellation,context,outcomes,F); if error!=Error.none { return batch,error; } batch.workers=joined.workers;
+ let joined,error=blot_eval_semantic_job_batch::run<Result,Request,C,F>(batch.requests,requested,cancellation,context,outcomes); if error!=Error.none { return batch,error; } batch.workers=joined.workers;
  for outcome,index in joined.outcomes { match outcome {
   complete result=>{ batch.slots[index].record=result.value.record; batch.slots[index].counts=result.value.counts; },
   out_of_memory=>{ batch.slots[index].failed=true; },

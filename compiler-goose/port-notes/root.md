@@ -25,8 +25,10 @@ Production writing passes completed, all unverified:
   native scalar/OS services, file IO, explicit packed host footprints and
   complete typed Core worker packet codecs.
 
-All other runtime/reuse modules and the main CLI/session driver remain required
-and unwritten. An implementation's presence does not establish import/API
+Artifact import and its knowledge walk are in progress; their public
+constructors are written, but request and recursive representation transport
+remain incomplete. All other runtime/reuse modules and the main CLI/session
+driver remain required and unwritten. An implementation's presence does not establish import/API
 integration, source parity, runtime qualification or acceptable performance.
 
 Representation contracts:
