@@ -27,21 +27,21 @@ struct Shapes<Units> {
     remaining: i64 = 1000000,
     formal: blot_support::Option<u32> = blot_support::none<u32>()
 }
-fn Shapes::step(self: Shapes&, depth: i64) -> Error { if depth >= 128 || self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; return Error.none; }
-fn Shapes::nominal(self: Shapes&, unit: u32, decl: u32, arguments: i64) -> Nominal, Error {
+fn step(self: Shapes&, depth: i64) -> Error { if depth >= 128 || self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; return Error.none; }
+fn nominal(self: Shapes&, unit: u32, decl: u32, arguments: i64) -> Nominal, Error {
     if unit == 0 || unit > self.units.len || decl == 0 { return default<Nominal>(), Error.invalid_artifact; } let module .= self.units[unit - 1].core; var found = blot_support::none<u32>();
     for family, index in module.nominals { let err = self.step(0); if err != Error.none { return default<Nominal>(), err; } if family.identity.decl != decl || (family.identity.unit != 0 && family.identity.unit != unit) { continue; }
         if found.present || family.parameters.len != arguments { return default<Nominal>(), Error.invalid_artifact; } found = blot_support::some(index as u32);
     } if !found.present { return default<Nominal>(), Error.invalid_artifact; } return Nominal { unit, found.value , ..}, Error.none;
 }
-fn Shapes::row(self: Shapes&, id: u32, depth: i64) -> u32, Error {
+fn row(self: Shapes&, id: u32, depth: i64) -> u32, Error {
     let err = self.step(depth); if err != Error.none { return 0, err; } var labels: u32[>..<]; let view = self.snapshot.evidence.view().effects;
     for label in view.rowLabels(id) { let operation = view.operation(label); if operation.instance.unit == 0 && operation.instance.decl != 0 { return 0, Error.invalid_artifact; } var arguments: u32[>..<];
         for argument in view.operationArguments(label) { let imported, err = self.evidence(argument, depth + 1); if err != Error.none { return 0, err; } arguments.append(imported); }
         let imported, err = self.store.effects.internOperationInstance(operation.identity, arguments, operation.instance); if err != Error.none { return 0, failure(err); } labels.append(imported);
     } let result, err = self.store.effects.internRow(labels); if err != Error.none { return 0, failure(err); } return result, Error.none;
 }
-fn Shapes::evidence(self: Shapes&, id: u32, depth: i64) -> u32, Error {
+fn evidence(self: Shapes&, id: u32, depth: i64) -> u32, Error {
     let err = self.step(depth); if err != Error.none { return 0, err; } if id == 0 || id >= self.imported.len { return 0, Error.invalid_artifact; }
     let view = self.snapshot.evidence.view(); let n = view.node(id);
     if n.tag == Tag.bound && (!self.formal.present || n.a >= self.formal.value || n.b != 0 || n.c != 0) { return 0, Error.invalid_artifact; }
@@ -59,7 +59,7 @@ fn Shapes::evidence(self: Shapes&, id: u32, depth: i64) -> u32, Error {
         _ => { return 0, Error.invalid_artifact; },
     } self.imported[id] = result; return result, Error.none;
 }
-fn Shapes::admitted(self: Shapes&, id: u32, depth: i64) -> Error {
+fn admitted(self: Shapes&, id: u32, depth: i64) -> Error {
     let err = self.step(depth); if err != Error.none { return err; } let n = self.store.node(id);
     match n.tag {
         Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32, Tag.never => {},
@@ -71,7 +71,7 @@ fn Shapes::admitted(self: Shapes&, id: u32, depth: i64) -> Error {
     }
     if n.tag == Tag.function { for label in self.store.effects.view().rowLabels(n.c) { let operation = self.store.effects.view().operation(label); if operation.instance.unit == 0 && operation.instance.decl != 0 { return Error.invalid_artifact; } for argument in self.store.effects.view().operationArguments(label) { let err = self.admitted(argument, depth + 1); if err != Error.none { return err; } } } } return Error.none;
 }
-fn Shapes::source(self: Shapes&, producer: const Module&, closure: Closure, ty: u32) -> u32, Error {
+fn source(self: Shapes&, producer: const Module&, closure: Closure, ty: u32) -> u32, Error {
     var mappings: blot_eval_type_evidence::Mapping[>..<]; var rows: blot_eval_type_evidence::RowMapping[>..<];
     for mapping in self.snapshot.type_mappings[closure.mappings.start..closure.mappings.start + closure.mappings.len] { if mapping.variable >= producer.types.nodes.len { return 0, Error.invalid_artifact; } let node = producer.types.node(mapping.variable);
         if node.tag != blot_check_types::Tag.variable && !(node.tag == blot_check_types::Tag.bound && node.b == 0 && node.c == 0) { continue; } for prior in mappings { if prior.variable == mapping.variable { return 0, Error.invalid_artifact; } }
@@ -80,7 +80,7 @@ fn Shapes::source(self: Shapes&, producer: const Module&, closure: Closure, ty: 
     for mapping in self.snapshot.row_mappings[closure.row_mappings.start..closure.row_mappings.start + closure.row_mappings.len] { for prior in rows { if prior.variable == mapping.variable { return 0, Error.invalid_artifact; } } let value, err = self.row(mapping.evidence, 0); if err != Error.none { return 0, err; } rows.append(blot_eval_type_evidence::RowMapping { mapping.variable, value , ..}); }
     let result, err = self.store.projectWithBudget(producer.types, ty, mappings, rows, self.remaining); if err != Error.none { return 0, failure(err); } let err = self.admitted(result, 0); return result, err;
 }
-fn Shapes::value(self: Shapes&, id: u32, expected: u32, depth: i64) -> Error {
+fn value(self: Shapes&, id: u32, expected: u32, depth: i64) -> Error {
     let err = self.step(depth); if err != Error.none { return err; } let value = self.snapshot.values[id]; let shape = self.store.node(expected); let children = self.snapshot.children[value.start..value.start + value.len];
     match shape.tag {
         Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32 => { if value.kind != Kind.scalar || children.len != 0 || value.nominal != 0 { return Error.invalid_artifact; } var scalar = blot_backend_runtime_ir::SC_unit; if shape.tag == Tag.boolean { scalar = blot_backend_runtime_ir::SC_bool; } if shape.tag == Tag.unsigned32 { scalar = blot_backend_runtime_ir::SC_u32; } if shape.tag == Tag.floating32 { scalar = blot_backend_runtime_ir::SC_f32; } if value.scalar != scalar || (shape.tag == Tag.unit && value.bits != 0) || (shape.tag == Tag.boolean && value.bits > 1) { return Error.invalid_artifact; } },

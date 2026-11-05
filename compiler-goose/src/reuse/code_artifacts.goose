@@ -107,25 +107,122 @@ fn freshToken() -> Token { blot_native::fresh_owner_id() }
 // Per-job slices are ranges into caller-owned journal tables. Inline/static
 // reads reserve a private run, so nested jobs do not invalidate their ranges.
 // A range moves only when its own capacity grows.
+import support.pooled_buffer;
+struct Context_Job {storage:Job[:]=[],items:Job[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Context_Job:Job[>..]=[];
+var inactive_Context_Job:Context_Job=Context_Job{..};
+fn ensure(self:Context_Job&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_Job);return self.failure;}
+fn push(self:Context_Job&,value:Job) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_Job);self.len=self.items.len;}
+fn append(self:Context_Job&,values:const Job[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_Job);self.len=self.items.len;}
+fn resize(self:Context_Job&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Context_Job&,length:i64,value:Job) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn clear(self:Context_Job&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Context_Job&) {blot_support_pooled_buffer::deinit(self,pool_Context_Job);self.len=0;self.failure=Error.none;}
+struct Context_StampedEvent {storage:StampedEvent[:]=[],items:StampedEvent[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Context_StampedEvent:StampedEvent[>..]=[];
+var inactive_Context_StampedEvent:Context_StampedEvent=Context_StampedEvent{..};
+fn ensure(self:Context_StampedEvent&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_StampedEvent);return self.failure;}
+fn push(self:Context_StampedEvent&,value:StampedEvent) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_StampedEvent);self.len=self.items.len;}
+fn append(self:Context_StampedEvent&,values:const StampedEvent[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_StampedEvent);self.len=self.items.len;}
+fn resize(self:Context_StampedEvent&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Context_StampedEvent&,length:i64,value:StampedEvent) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn clear(self:Context_StampedEvent&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Context_StampedEvent&) {blot_support_pooled_buffer::deinit(self,pool_Context_StampedEvent);self.len=0;self.failure=Error.none;}
+struct Context_u32 {storage:u32[:]=[],items:u32[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Context_u32:u32[>..]=[];
+var inactive_Context_u32:Context_u32=Context_u32{..};
+fn ensure(self:Context_u32&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_u32);return self.failure;}
+fn push(self:Context_u32&,value:u32) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_u32);self.len=self.items.len;}
+fn append(self:Context_u32&,values:const u32[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_u32);self.len=self.items.len;}
+fn resize(self:Context_u32&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Context_u32&,length:i64,value:u32) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn clear(self:Context_u32&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Context_u32&) {blot_support_pooled_buffer::deinit(self,pool_Context_u32);self.len=0;self.failure=Error.none;}
+struct Context_blot_check_core__BindingRef {storage:blot_check_core::BindingRef[:]=[],items:blot_check_core::BindingRef[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Context_blot_check_core__BindingRef:blot_check_core::BindingRef[>..]=[];
+var inactive_Context_blot_check_core__BindingRef:Context_blot_check_core__BindingRef=Context_blot_check_core__BindingRef{..};
+fn ensure(self:Context_blot_check_core__BindingRef&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_check_core__BindingRef);return self.failure;}
+fn push(self:Context_blot_check_core__BindingRef&,value:blot_check_core::BindingRef) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_check_core__BindingRef);self.len=self.items.len;}
+fn append(self:Context_blot_check_core__BindingRef&,values:const blot_check_core::BindingRef[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_check_core__BindingRef);self.len=self.items.len;}
+fn resize(self:Context_blot_check_core__BindingRef&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Context_blot_check_core__BindingRef&,length:i64,value:blot_check_core::BindingRef) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn clear(self:Context_blot_check_core__BindingRef&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Context_blot_check_core__BindingRef&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_check_core__BindingRef);self.len=0;self.failure=Error.none;}
+struct Context_StaticRead {storage:StaticRead[:]=[],items:StaticRead[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Context_StaticRead:StaticRead[>..]=[];
+var inactive_Context_StaticRead:Context_StaticRead=Context_StaticRead{..};
+fn ensure(self:Context_StaticRead&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_StaticRead);return self.failure;}
+fn push(self:Context_StaticRead&,value:StaticRead) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_StaticRead);self.len=self.items.len;}
+fn append(self:Context_StaticRead&,values:const StaticRead[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_StaticRead);self.len=self.items.len;}
+fn resize(self:Context_StaticRead&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Context_StaticRead&,length:i64,value:StaticRead) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn clear(self:Context_StaticRead&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Context_StaticRead&) {blot_support_pooled_buffer::deinit(self,pool_Context_StaticRead);self.len=0;self.failure=Error.none;}
+struct Context_blot_backend_layout__Mapping {storage:blot_backend_layout::Mapping[:]=[],items:blot_backend_layout::Mapping[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Context_blot_backend_layout__Mapping:blot_backend_layout::Mapping[>..]=[];
+var inactive_Context_blot_backend_layout__Mapping:Context_blot_backend_layout__Mapping=Context_blot_backend_layout__Mapping{..};
+fn ensure(self:Context_blot_backend_layout__Mapping&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_backend_layout__Mapping);return self.failure;}
+fn push(self:Context_blot_backend_layout__Mapping&,value:blot_backend_layout::Mapping) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_backend_layout__Mapping);self.len=self.items.len;}
+fn append(self:Context_blot_backend_layout__Mapping&,values:const blot_backend_layout::Mapping[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_backend_layout__Mapping);self.len=self.items.len;}
+fn resize(self:Context_blot_backend_layout__Mapping&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Context_blot_backend_layout__Mapping&,length:i64,value:blot_backend_layout::Mapping) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn clear(self:Context_blot_backend_layout__Mapping&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Context_blot_backend_layout__Mapping&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_backend_layout__Mapping);self.len=0;self.failure=Error.none;}
+struct Context_blot_backend_layout__RowMapping {storage:blot_backend_layout::RowMapping[:]=[],items:blot_backend_layout::RowMapping[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Context_blot_backend_layout__RowMapping:blot_backend_layout::RowMapping[>..]=[];
+var inactive_Context_blot_backend_layout__RowMapping:Context_blot_backend_layout__RowMapping=Context_blot_backend_layout__RowMapping{..};
+fn ensure(self:Context_blot_backend_layout__RowMapping&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_backend_layout__RowMapping);return self.failure;}
+fn push(self:Context_blot_backend_layout__RowMapping&,value:blot_backend_layout::RowMapping) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_backend_layout__RowMapping);self.len=self.items.len;}
+fn append(self:Context_blot_backend_layout__RowMapping&,values:const blot_backend_layout::RowMapping[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_backend_layout__RowMapping);self.len=self.items.len;}
+fn resize(self:Context_blot_backend_layout__RowMapping&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Context_blot_backend_layout__RowMapping&,length:i64,value:blot_backend_layout::RowMapping) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn clear(self:Context_blot_backend_layout__RowMapping&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Context_blot_backend_layout__RowMapping&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_backend_layout__RowMapping);self.len=0;self.failure=Error.none;}
+struct Context_blot_reuse_substitution_keys__Entry {storage:blot_reuse_substitution_keys::Entry[:]=[],items:blot_reuse_substitution_keys::Entry[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Context_blot_reuse_substitution_keys__Entry:blot_reuse_substitution_keys::Entry[>..]=[];
+var inactive_Context_blot_reuse_substitution_keys__Entry:Context_blot_reuse_substitution_keys__Entry=Context_blot_reuse_substitution_keys__Entry{..};
+fn ensure(self:Context_blot_reuse_substitution_keys__Entry&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_reuse_substitution_keys__Entry);return self.failure;}
+fn push(self:Context_blot_reuse_substitution_keys__Entry&,value:blot_reuse_substitution_keys::Entry) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_reuse_substitution_keys__Entry);self.len=self.items.len;}
+fn append(self:Context_blot_reuse_substitution_keys__Entry&,values:const blot_reuse_substitution_keys::Entry[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_reuse_substitution_keys__Entry);self.len=self.items.len;}
+fn resize(self:Context_blot_reuse_substitution_keys__Entry&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Context_blot_reuse_substitution_keys__Entry&,length:i64,value:blot_reuse_substitution_keys::Entry) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn clear(self:Context_blot_reuse_substitution_keys__Entry&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Context_blot_reuse_substitution_keys__Entry&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_reuse_substitution_keys__Entry);self.len=0;self.failure=Error.none;}
+struct Context_blot_reuse_independent_call_proof__Record {storage:blot_reuse_independent_call_proof::Record[:]=[],items:blot_reuse_independent_call_proof::Record[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Context_blot_reuse_independent_call_proof__Record:blot_reuse_independent_call_proof::Record[>..]=[];
+var inactive_Context_blot_reuse_independent_call_proof__Record:Context_blot_reuse_independent_call_proof__Record=Context_blot_reuse_independent_call_proof__Record{..};
+fn ensure(self:Context_blot_reuse_independent_call_proof__Record&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_reuse_independent_call_proof__Record);return self.failure;}
+fn push(self:Context_blot_reuse_independent_call_proof__Record&,value:blot_reuse_independent_call_proof::Record) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_reuse_independent_call_proof__Record);self.len=self.items.len;}
+fn append(self:Context_blot_reuse_independent_call_proof__Record&,values:const blot_reuse_independent_call_proof::Record[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_reuse_independent_call_proof__Record);self.len=self.items.len;}
+fn resize(self:Context_blot_reuse_independent_call_proof__Record&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Context_blot_reuse_independent_call_proof__Record&,length:i64,value:blot_reuse_independent_call_proof::Record) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn clear(self:Context_blot_reuse_independent_call_proof__Record&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Context_blot_reuse_independent_call_proof__Record&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_reuse_independent_call_proof__Record);self.len=0;self.failure=Error.none;}
+var inactive_context_principal_queries:blot_reuse_principal_query::Table=default<blot_reuse_principal_query::Table>();
+var inactive_context_principal_graphs:blot_eval_core_eval::RetainedPrincipalGraphs=default<blot_eval_core_eval::RetainedPrincipalGraphs>();
+var inactive_context_specialization_queries:blot_eval_selected_query::Table=default<blot_eval_selected_query::Table>();
+var inactive_context_refinement_queries:blot_reuse_refinement_receipt::Table=default<blot_reuse_refinement_receipt::Table>();
+
 struct Context {
+    context_lease:u32=0,context_generation:u64=0,
     allocation_owner: u64 = 0,
     active_job: u32 = 0, clock: u64 = 0,
-    jobs: Job[>..<]&, events: StampedEvent[>..<]&,
-    function_jobs: u32[>..<]&, global_jobs: u32[>..<]&,
-    inline_bodies: blot_check_core::BindingRef[>..<]&, static_reads: StaticRead[>..<]&,
-    mappings: blot_backend_layout::Mapping[>..<]&, rows: blot_backend_layout::RowMapping[>..<]&,
-    templates: blot_reuse_substitution_keys::Entry[>..<]&,
-    pools: blot_support::Option<Pools>,
-    principal_queries: blot_reuse_principal_query::Table&,
-    principal_graphs: blot_eval_core_eval::RetainedPrincipalGraphs&,
-    specialization_queries: blot_eval_selected_query::Table&,
-    independent_calls: blot_reuse_independent_call_proof::Record[>..<]&,
-    refinement_queries: blot_reuse_refinement_receipt::Table&,
+    jobs: Context_Job&=inactive_Context_Job, events: Context_StampedEvent&=inactive_Context_StampedEvent,
+    function_jobs: Context_u32&=inactive_Context_u32, global_jobs: Context_u32&=inactive_Context_u32,
+    inline_bodies: Context_blot_check_core__BindingRef&=inactive_Context_blot_check_core__BindingRef, static_reads: Context_StaticRead&=inactive_Context_StaticRead,
+    mappings: Context_blot_backend_layout__Mapping&=inactive_Context_blot_backend_layout__Mapping, rows: Context_blot_backend_layout__RowMapping&=inactive_Context_blot_backend_layout__RowMapping,
+    templates: Context_blot_reuse_substitution_keys__Entry&=inactive_Context_blot_reuse_substitution_keys__Entry,
+    pools: blot_support::Option<Pools>=blot_support::none<Pools>(),
+    principal_queries: blot_reuse_principal_query::Table&=inactive_context_principal_queries,
+    principal_graphs: blot_eval_core_eval::RetainedPrincipalGraphs&=inactive_context_principal_graphs,
+    specialization_queries: blot_eval_selected_query::Table&=inactive_context_specialization_queries,
+    independent_calls: Context_blot_reuse_independent_call_proof__Record&=inactive_Context_blot_reuse_independent_call_proof__Record,
+    refinement_queries: blot_reuse_refinement_receipt::Table&=inactive_context_refinement_queries,
 }
 struct Scope { context: Context&?, id: u32, parent: u32, live: bool = true }
 fn depth(self: const Context&) -> i64 {
     var id = self.active_job; var count: i64 = 0;
-    while id != 0 { id = self.jobs[id - 1].parent; count++; }
+    while id != 0 { id = self.jobs.items[id - 1].parent; count++; }
     return count;
 }
 fn appendEvent(self: Context&, event: Event) {
@@ -135,19 +232,19 @@ fn enter(self: Context&, request: Request) -> Scope, Error {
     if self.jobs.len == 4294967295 { return Scope { self, 0, 0, false , ..}, Error.out_of_memory; }
     let id = (self.jobs.len + 1) as u32;
     let parent = self.active_job;
-    self.jobs.push(Job { parent: parent, request: request , ..});
-    appendEvent(self, Event.enter { id , ..}); self.active_job = id;
+    self.jobs.push(Job { parent: parent, request: request , ..});if self.jobs.failure!=Error.none {return Scope{context:self,id:0,parent:parent,live:false,..},self.jobs.failure;}
+    appendEvent(self, Event.enter { id , ..});if self.events.failure!=Error.none {self.jobs.resize(self.jobs.len-1);return Scope{context:self,id:0,parent:parent,live:false,..},self.events.failure;}self.active_job = id;
     return Scope { self, id, parent , ..}, Error.none;
 }
 fn requireFreshCode(self: Context&) {
-    if self.active_job != 0 { self.jobs[self.active_job - 1].reusable = false; }
+    if self.active_job != 0 { self.jobs.items[self.active_job - 1].reusable = false; }
 }
 fn materializeStaticValue(self: Context&) {
     if self.active_job == 0 { return; }
-    let job = self.jobs[self.active_job - 1];
+    let job = self.jobs.items[self.active_job - 1];
     match job.request { Request.constant => {}, _ => { if !job.hasStaticValues() { self.requireFreshCode(); } } }
 }
-fn appendSpan<T>(items: T[>..<]&, span: Span, value: T, capacity: u32&) -> Span {
+fn appendSpan<T,B>(items: B&, span: Span, value: T, capacity: u32&) -> Span {
     var start = span.start;
     if span.len == capacity {
         // Zig 0.17 ArrayList grows from the requested minimum, with one cache
@@ -158,30 +255,30 @@ fn appendSpan<T>(items: T[>..<]&, span: Span, value: T, capacity: u32&) -> Span 
         let minimum = span.len + 1; let grown = minimum + minimum / 2 + initial;
         start = items.len as u32;
         for index in grown { items.push(default<T>()); }
-        for index in span.len { items[start + index] = items[span.start + index]; }
+        for index in span.len { items.items[start + index] = items.items[span.start + index]; }
         capacity = grown;
     }
-    items[start + span.len] = value; return Span { start, span.len + 1 , ..};
+    items.items[start + span.len] = value; return Span { start, span.len + 1 , ..};
 }
 fn readInlineBody(self: Context&, target: blot_check_core::BindingRef) -> Error {
     if self.active_job == 0 { return Error.none; }
-    let index = self.active_job - 1; let span = self.jobs[index].inline_bodies;
-    for at in span.len { if self.inline_bodies[span.start + at] == target { return Error.none; } }
-    self.jobs[index].inline_bodies = appendSpan(self.inline_bodies, span, target, self.jobs[index].inline_capacity);
+    let index = self.active_job - 1; let span = self.jobs.items[index].inline_bodies;
+    for at in span.len { if self.inline_bodies.items[span.start + at] == target { return Error.none; } }
+    self.jobs.items[index].inline_bodies = appendSpan(self.inline_bodies, span, target, self.jobs.items[index].inline_capacity);
     return Error.none;
 }
 fn readStaticValue(self: Context&, target: blot_check_core::BindingRef, value: u32) -> Error {
     if self.active_job == 0 { return Error.none; }
-    let index = self.active_job - 1; let span = self.jobs[index].static_reads;
+    let index = self.active_job - 1; let span = self.jobs.items[index].static_reads;
     for at in span.len {
-        let read = self.static_reads[span.start + at];
+        let read = self.static_reads.items[span.start + at];
         if read.target == target && read.value == value { return Error.none; }
     }
-    self.jobs[index].static_reads = appendSpan(self.static_reads, span, StaticRead { target, value , ..}, self.jobs[index].static_capacity);
+    self.jobs.items[index].static_reads = appendSpan(self.static_reads, span, StaticRead { target, value , ..}, self.jobs.items[index].static_capacity);
     return Error.none;
 }
 fn hasStaticValues(self: const Context&) -> bool {
-    return self.active_job != 0 && self.jobs[self.active_job - 1].hasStaticValues();
+    return self.active_job != 0 && self.jobs.items[self.active_job - 1].hasStaticValues();
 }
 fn functionCapacity(self: Context&, function: u32) {
     while self.function_jobs.len <= function { self.function_jobs.push(0); }
@@ -190,20 +287,20 @@ fn hit(self: Scope&, function: u32) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
     self.context.functionCapacity(function);
-    let target = self.context.function_jobs[function];
+    let target = self.context.function_jobs.items[function];
     self.context.appendEvent(Event.hit { self.id, target, function , ..});
-    self.context.jobs[self.id - 1].function = blot_support::some(function);
-    self.context.jobs[self.id - 1].target_job = target;
-    self.context.jobs[self.id - 1].state = State.hit; return Error.none;
+    self.context.jobs.items[self.id - 1].function = blot_support::some(function);
+    self.context.jobs.items[self.id - 1].target_job = target;
+    self.context.jobs.items[self.id - 1].state = State.hit; return Error.none;
 }
 fn reserve(self: Scope&, function: u32) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
-    self.context.functionCapacity(function); assert(self.context.function_jobs[function] == 0);
+    self.context.functionCapacity(function); assert(self.context.function_jobs.items[function] == 0);
     self.context.appendEvent(Event.reserve { self.id, function , ..});
-    self.context.function_jobs[function] = self.id;
-    self.context.jobs[self.id - 1].function = blot_support::some(function);
-    self.context.jobs[self.id - 1].state = State.reserved; return Error.none;
+    self.context.function_jobs.items[function] = self.id;
+    self.context.jobs.items[self.id - 1].function = blot_support::some(function);
+    self.context.jobs.items[self.id - 1].state = State.reserved; return Error.none;
 }
 fn solved(self: Scope&, mappings: const blot_backend_layout::Mapping[:],
     rows: const blot_backend_layout::RowMapping[:], templates: const blot_reuse_substitution_keys::Entry[:]) -> Error {
@@ -214,53 +311,53 @@ fn solved(self: Scope&, mappings: const blot_backend_layout::Mapping[:],
     let t = Span { self.context.templates.len as u32, templates.len as u32 , ..};
     self.context.mappings.append(mappings); self.context.rows.append(rows); self.context.templates.append(templates);
     self.context.appendEvent(Event.solved { self.id , ..});
-    self.context.jobs[self.id - 1].mappings = m; self.context.jobs[self.id - 1].rows = r;
-    self.context.jobs[self.id - 1].templates = t; self.context.jobs[self.id - 1].solved = true;
+    self.context.jobs.items[self.id - 1].mappings = m; self.context.jobs.items[self.id - 1].rows = r;
+    self.context.jobs.items[self.id - 1].templates = t; self.context.jobs.items[self.id - 1].solved = true;
     return Error.none;
 }
 fn complete(self: Scope&, function: u32, result_template: blot_support::Option<u32>) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
-    self.context.functionCapacity(function); let owner = self.context.function_jobs[function];
+    self.context.functionCapacity(function); let owner = self.context.function_jobs.items[function];
     assert(owner == 0 || owner == self.id);
     self.context.appendEvent(Event.complete { self.id, function, result_template , ..});
-    self.context.function_jobs[function] = self.id;
-    self.context.jobs[self.id - 1].function = blot_support::some(function);
-    self.context.jobs[self.id - 1].result_template = result_template;
-    self.context.jobs[self.id - 1].state = State.complete; return Error.none;
+    self.context.function_jobs.items[function] = self.id;
+    self.context.jobs.items[self.id - 1].function = blot_support::some(function);
+    self.context.jobs.items[self.id - 1].result_template = result_template;
+    self.context.jobs.items[self.id - 1].state = State.complete; return Error.none;
 }
 fn completeValue(self: Scope&, value: u32, shape: u32) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
     let result = ValueResult { value, shape , ..};
     self.context.appendEvent(Event.complete_value { self.id, result , ..});
-    self.context.jobs[self.id - 1].value = blot_support::some(result);
-    self.context.jobs[self.id - 1].state = State.complete; return Error.none;
+    self.context.jobs.items[self.id - 1].value = blot_support::some(result);
+    self.context.jobs.items[self.id - 1].state = State.complete; return Error.none;
 }
 fn completeGlobal(self: Scope&, global: u32) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
     while self.context.global_jobs.len <= global { self.context.global_jobs.push(0); }
-    assert(self.context.global_jobs[global] == 0);
+    assert(self.context.global_jobs.items[global] == 0);
     self.context.appendEvent(Event.complete_global { self.id, global , ..});
-    self.context.global_jobs[global] = self.id;
-    self.context.jobs[self.id - 1].global = blot_support::some(global);
-    self.context.jobs[self.id - 1].state = State.complete; return Error.none;
+    self.context.global_jobs.items[global] = self.id;
+    self.context.jobs.items[self.id - 1].global = blot_support::some(global);
+    self.context.jobs.items[self.id - 1].state = State.complete; return Error.none;
 }
 fn hitGlobal(self: Scope&, global: u32) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
-    var target: u32 = 0; if global < self.context.global_jobs.len { target = self.context.global_jobs[global]; }
+    var target: u32 = 0; if global < self.context.global_jobs.len { target = self.context.global_jobs.items[global]; }
     self.context.appendEvent(Event.hit_global { self.id, target, global , ..});
-    self.context.jobs[self.id - 1].global = blot_support::some(global);
-    self.context.jobs[self.id - 1].target_job = target;
-    self.context.jobs[self.id - 1].state = State.hit; return Error.none;
+    self.context.jobs.items[self.id - 1].global = blot_support::some(global);
+    self.context.jobs.items[self.id - 1].target_job = target;
+    self.context.jobs.items[self.id - 1].state = State.hit; return Error.none;
 }
 fn deinit(self: Scope&) {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
-    let state = self.context.jobs[self.id - 1].state;
-    if state == State.pending || state == State.reserved { self.context.jobs[self.id - 1].state = State.failed; }
+    let state = self.context.jobs.items[self.id - 1].state;
+    if state == State.pending || state == State.reserved { self.context.jobs.items[self.id - 1].state = State.failed; }
     self.context.appendEvent(Event.leave { self.id, self.parent , ..});
     self.context.active_job = self.parent; self.live = false;
 }
@@ -1235,6 +1332,8 @@ fn capturePools<G>(self: Context&, generator: G&, identity: blot_support::Option
     return self.capturePoolsWithStamps(generator, identity, null);
 }
 fn capturePoolsWithStamps<G>(self: Context&, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps?) -> Error {
+    let table_error=self.tableFailure();if table_error!=Error.none {return table_error;}
+
     assert(self.active_job == 0);
     var candidate, error = capture(generator, identity, memo); if error != Error.none { return error; }
     candidate.generation = 1;
@@ -1272,8 +1371,8 @@ fn recordPrincipal(self: Context&, target: blot_check_core::BindingRef, options:
 }
 fn deinit(self: Context&) {
     assert(self.active_job == 0);
-    self.principal_queries.deinit(); self.principal_graphs.deinit(); self.specialization_queries.deinit(); self.refinement_queries.deinit();
-    for &record in self.independent_calls { record.deinit(); } self.independent_calls.clear();
+    self.principal_queries.deinit(); self.principal_graphs.queries.deinit(); self.specialization_queries.deinit(); self.refinement_queries.deinit();
+    for &record in self.independent_calls.items { record.deinit(); } self.independent_calls.clear();
     self.jobs.clear(); self.events.clear(); self.function_jobs.clear(); self.global_jobs.clear();
     self.inline_bodies.clear(); self.static_reads.clear(); self.mappings.clear(); self.rows.clear(); self.templates.clear();
     if self.pools.present { self.pools.value.deinit(); self.pools.present = false; }
@@ -1285,3 +1384,54 @@ fn requestCode(request: Request) -> u8 {
         Request.primitive => 4, Request.operation => 5, Request.host => 6, Request.constant => 7, Request.runtime_global => 8,
     }
 }
+
+// Canonical metadata is owned independently of a lexical compiler invocation.
+var inactive_context:Context=Context{..};
+struct ContextOwner {live:bool=false,generation:u64=0,
+jobs:Context_Job=Context_Job{..},
+events:Context_StampedEvent=Context_StampedEvent{..},
+function_jobs:Context_u32=Context_u32{..},
+global_jobs:Context_u32=Context_u32{..},
+inline_bodies:Context_blot_check_core__BindingRef=Context_blot_check_core__BindingRef{..},
+static_reads:Context_StaticRead=Context_StaticRead{..},
+mappings:Context_blot_backend_layout__Mapping=Context_blot_backend_layout__Mapping{..},
+rows:Context_blot_backend_layout__RowMapping=Context_blot_backend_layout__RowMapping{..},
+templates:Context_blot_reuse_substitution_keys__Entry=Context_blot_reuse_substitution_keys__Entry{..},
+independent_calls:Context_blot_reuse_independent_call_proof__Record=Context_blot_reuse_independent_call_proof__Record{..},
+principal_queries:blot_reuse_principal_query::Table=default<blot_reuse_principal_query::Table>(),
+principal_graphs:blot_eval_core_eval::RetainedPrincipalGraphs=default<blot_eval_core_eval::RetainedPrincipalGraphs>(),
+specialization_queries:blot_eval_selected_query::Table=default<blot_eval_selected_query::Table>(),
+refinement_queries:blot_reuse_refinement_receipt::Table=default<blot_reuse_refinement_receipt::Table>(),
+canonical:Context=Context{..}}
+reusable var context_owners:ContextOwner[>..]=[];
+fn validContext(self:const Context&)->bool {return self.context_lease!=0 && self.context_lease-1<context_owners.len && context_owners[self.context_lease-1].live && context_owners[self.context_lease-1].generation==self.context_generation;}
+fn initPooledRef(allocation_owner:u64=0)->Context?,Error {
+ if context_owners.len>=0xffffffff {return null,Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=context_owners.alloc_index(ContextOwner{live:true,generation:generation,..});let state:ContextOwner&=context_owners[at];
+ state.principal_queries=blot_reuse_principal_query::init();state.principal_graphs=blot_eval_core_eval::initRetainedPrincipalGraphs();state.specialization_queries=blot_eval_selected_query::init();state.refinement_queries=blot_reuse_refinement_receipt::init();
+ state.canonical=Context{context_lease:(at+1) as u32,context_generation:generation,allocation_owner:allocation_owner,
+jobs:state.jobs,events:state.events,function_jobs:state.function_jobs,global_jobs:state.global_jobs,inline_bodies:state.inline_bodies,static_reads:state.static_reads,mappings:state.mappings,rows:state.rows,templates:state.templates,independent_calls:state.independent_calls,principal_queries:state.principal_queries,principal_graphs:state.principal_graphs,specialization_queries:state.specialization_queries,refinement_queries:state.refinement_queries,..};return state.canonical,Error.none;
+}
+fn tableFailure(self:const Context&)->Error {
+if self.jobs.failure!=Error.none {return self.jobs.failure;}
+if self.events.failure!=Error.none {return self.events.failure;}
+if self.function_jobs.failure!=Error.none {return self.function_jobs.failure;}
+if self.global_jobs.failure!=Error.none {return self.global_jobs.failure;}
+if self.inline_bodies.failure!=Error.none {return self.inline_bodies.failure;}
+if self.static_reads.failure!=Error.none {return self.static_reads.failure;}
+if self.mappings.failure!=Error.none {return self.mappings.failure;}
+if self.rows.failure!=Error.none {return self.rows.failure;}
+if self.templates.failure!=Error.none {return self.templates.failure;}
+if self.independent_calls.failure!=Error.none {return self.independent_calls.failure;}
+return Error.none;}
+fn releasePooled(self:Context&) {if self.context_lease==0 {return;}assert(self.validContext());let at=self.context_lease-1;self.deinit();
+self.jobs.deinit();
+self.events.deinit();
+self.function_jobs.deinit();
+self.global_jobs.deinit();
+self.inline_bodies.deinit();
+self.static_reads.deinit();
+self.mappings.deinit();
+self.rows.deinit();
+self.templates.deinit();
+self.independent_calls.deinit();
+self.principal_graphs.deinit();context_owners[at].live=false;self=Context{..};context_owners.free(at);}

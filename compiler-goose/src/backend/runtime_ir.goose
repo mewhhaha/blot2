@@ -1,6 +1,7 @@
 // Typed stack IR. Integer tags preserve source and transport identities.
 namespace blot_backend_runtime_ir;
 import std;
+import support.error;
 
 type ValueType = u8;
 let VT_i32: ValueType = 0x7f;
@@ -664,3 +665,20 @@ let op_names = [
     "i32_select",
 ];
 fn opName(op: Op) -> const u8[:] { assert(op < op_names.len); return op_names[op]; }
+
+// Detached optimizer artifacts own concrete typed runs rather than module ranges.
+struct DetachedBody { locals: ValueType[:] = [],instructions: Instruction[:] = [] }
+struct DetachedFunction {
+    parameters: ValueType[:] = [],result: ValueType = VT_none,result_role: Role = ROLE_unknown,entry: bool = false,provider_parameter: u8 = unknown_provider,
+    callable_layout: u32 = 0,signature: u32 = 0,parameter_roles: u64 = 0,annotations: u32 = 0,locals: ValueType[:] = [],instructions: Instruction[:] = [],
+}
+reusable[] var detached_type_runs: ValueType[>..] = [];
+reusable[] var detached_instruction_runs: Instruction[>..] = [];
+fn cloneBody(locals: const ValueType[:],instructions: const Instruction[:]) -> DetachedBody,blot_error::Error { let local_copy = detached_type_runs.alloc_slice(locals.len); for value,index in locals { local_copy[index] = value; } let code_copy = detached_instruction_runs.alloc_slice(instructions.len); for value,index in instructions { code_copy[index] = value; } return DetachedBody { locals: local_copy,instructions: code_copy,..},blot_error::Error.none; }
+fn cloneBody(body: DetachedBody) -> DetachedBody,blot_error::Error { cloneBody(body.locals,body.instructions) }
+fn deinit(body: DetachedBody&) { if body.locals.len != 0 { detached_type_runs.free_slice(body.locals); } if body.instructions.len != 0 { detached_instruction_runs.free_slice(body.instructions); } body = DetachedBody {..}; }
+fn cloneFunction(source: Function,parameters: const ValueType[:],locals: const ValueType[:],instructions: const Instruction[:]) -> DetachedFunction,blot_error::Error { let body,error = cloneBody(locals,instructions); if error != blot_error::Error.none { return DetachedFunction {..},error; } let owned = detached_type_runs.alloc_slice(parameters.len); for value,index in parameters { owned[index] = value; } return DetachedFunction { parameters: owned,result: source.result,result_role: source.result_role,entry: source.entry,provider_parameter: source.provider_parameter,callable_layout: source.callable_layout,signature: source.signature,parameter_roles: source.parameter_roles,annotations: source.annotations,locals: body.locals,instructions: body.instructions,..},blot_error::Error.none; }
+fn cloneFunction(source: DetachedFunction) -> DetachedFunction,blot_error::Error { let header = Function { result: source.result,result_role: source.result_role,entry: source.entry,provider_parameter: source.provider_parameter,callable_layout: source.callable_layout,signature: source.signature,parameter_roles: source.parameter_roles,annotations: source.annotations,..}; return cloneFunction(header,source.parameters,source.locals,source.instructions); }
+fn deinit(source: DetachedFunction&) { if source.parameters.len != 0 { detached_type_runs.free_slice(source.parameters); } var body = DetachedBody { locals: source.locals,instructions: source.instructions,..}; body.deinit(); source = DetachedFunction {..}; }
+fn parameterRole(source: DetachedFunction,index: i64) -> Role { if index >= 32 { return ROLE_unknown; } return ((source.parameter_roles >> (index * 2)) & 3) as Role; }
+fn codeLength(source: DetachedFunction) -> i64 { source.instructions.len - source.annotations }

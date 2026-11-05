@@ -1068,11 +1068,11 @@ fn importSolved<G>(self: Importer&, g: G&, job: const blot_reuse_code_artifacts:
         _ => { return blot_support::none<Solved>(), Error.none; },
     }
     let module, invalid = self.oldModule(owner); if invalid != Error.none { return optionalImported(Solved {..}, invalid); } assert(module);
-    let mappings, mapping_error = bounded(source.mappings[..], job.mappings.start, job.mappings.len);
+    let mappings, mapping_error = bounded(source.mappings.items, job.mappings.start, job.mappings.len);
     if mapping_error != Error.none { return optionalImported(Solved {..}, mapping_error); }
-    let rows, row_error = bounded(source.rows[..], job.rows.start, job.rows.len);
+    let rows, row_error = bounded(source.rows.items, job.rows.start, job.rows.len);
     if row_error != Error.none { return optionalImported(Solved {..}, row_error); }
-    let templates, template_error = bounded(source.templates[..], job.templates.start, job.templates.len);
+    let templates, template_error = bounded(source.templates.items, job.templates.start, job.templates.len);
     if template_error != Error.none { return optionalImported(Solved {..}, template_error); }
     var result = Solved { solved_layouts.alloc_slice(mappings.len), solved_layout_rows.alloc_slice(rows.len), solved_templates.alloc_slice(templates.len) , ..};
     let error = self.importSolvedInto(g, module, mappings, rows, templates, result);

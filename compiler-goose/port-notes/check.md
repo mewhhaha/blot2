@@ -6,13 +6,13 @@ port has been written.
 
 Completed writing passes (unverified):
 
-associated_admission, check, capability_contract_core, capability_contract_source, capability_contracts, capability_flow, capability_invocations, capability_lifetimes, check_scheme_import, cleanup_contracts, closed_nominal_storage, collection_contracts, core, core_builder, diagnostic_code, diagnostic_location, dictionary_contracts, dictionary_owner, effect_authority, effect_evidence, effects, frozen_types, generative_core, generative_relocation, generative_schemes, numeric_proof_bodies, numeric_proof_contracts, numeric_proof_core, numeric_proof_headers, numeric_proof_terms, ordered_membership, package_core, package_contracts, package_evidence, package_portable, package_row_facts, parallel_lowering, parameter_patterns, primitive_operator, quantifier_goals, rank_equal, rank_portable, rank_walk, record_order, resolver_core, scheme_dependencies, scheme_equations, scheme_predicates, scheme_projection, simd_contracts, solver_worklist, staging_capture_rights, staging_origins, staging_snapshot, staging_type_match, storage_core, storage_ops, storage_types, task_core, task_regions, task_types, typed_staging, types, usage_check, usage_core.
+associated_admission, check, capability_contract_core, capability_contract_source, capability_contracts, capability_flow, capability_invocations, capability_lifetimes, check_scheme_import, cleanup_contracts, closed_nominal_storage, collection_contracts, core, core_builder, diagnostic_code, diagnostic_location, dictionary_contracts, dictionary_owner, effect_authority, effect_evidence, effects, frozen_types, generative_core, generative_relocation, generative_schemes, numeric_proof_bodies, numeric_proof_contracts, numeric_proof_core, numeric_proof_headers, numeric_proof_terms, ordered_membership, package_core, package_contracts, package_evidence, package_portable, package_row_facts, parallel_lowering, parameter_patterns, primitive_operator, quantifier_goals, rank_equal, rank_portable, rank_walk, record_order, resolver_core, scheme_dependencies, scheme_equations, scheme_predicates, scheme_projection, simd_contracts, solver_worklist, staging_capture_rights, staging_origins, staging_snapshot, staging_core, staging_type_match, storage_core, storage_ops, storage_types, task_core, task_regions, task_types, typed_staging, types, usage_check, usage_core.
 
-Currently being written: staging Core admission. The main checker and CoreBuilder have complete first writing passes. The parent owns frozen_core_validation; this agent owns the other remaining check modules.
+All checker modules owned by this agent have complete first production writing passes. The parent owns frozen_core_validation and its supporting modules.
 
 Remaining production modules:
 
-frozen_core_validation, staging_core.
+frozen_core_validation (parent-owned).
 
 These lists describe writing coverage only. A written module has not been
 compiled, checked, executed or qualified. Root entry construction and cross-module
@@ -144,3 +144,16 @@ CoreBuilder now publishes `dependency_payload.Owned<Core.Module>` from `lower` a
 PackageCore writing currently includes the source-proof cache, exact metadata closure search, admission entry points, body/scheme/row ownership, principal mappings, rollback-aware goal matching, shared prerequisite expansion, and closed goal reconstruction through native line2302. Its remaining lexical expression/storage walkers and all StagingCore algorithms are still being written. SchemeEquations now uses concrete fixed owning buffer/map descriptors in Admission, Workspace, and Solver; caller factories use `initPooledAdmission`/`initPooledWorkspace`. Module snapshot records copy fixed headers and compare nonzero owner IDs plus exact headers. No verification has run.
 
 PackageCore now has its complete production first writing pass, including all lexical/capture/storage/control/expression checks. Cache publication remains transactional, failed matching retains exact epoch-aware rollback, and solver scratch uses fixed typed runs/maps. `write_check_constructor_defaults.py` writes explicit Goose `..` constructor defaults in this agent-owned check files only; it excludes root frozen validators and the three leaves owned by other agents. No compiler, build, test, formatter, or static verifier has run.
+
+Staging Core admission now has the full production writing pass: lexical owners,
+source/foreign calls, request-loop decisions, task callback boundaries, latent
+effect consumption and selected-row witnesses, descriptor fields, and all staged
+shape rules. Native bounds, fuel limits, handler installation boundaries and
+row-ownership checks remain explicit. This is written code, not verification.
+
+Source construction correction: type operations are ordinary overloaded free
+functions in each module namespace. Accidental `fn Type::operation` declarations
+were changed to `fn operation(self:Type&)` for Goose UFCS (§11.1); intentional
+namespace-qualified structural hooks remain. Constructor literals use explicit
+default tails when omitted fields require them. Both writing migrations retain
+pre-write copies under build/goose-port/. No compiler or verification ran.

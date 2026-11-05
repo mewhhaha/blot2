@@ -394,7 +394,7 @@
       "zig": "compiler/src/backend/optimized_bodies.zig",
       "goose": "compiler-goose/src/backend/optimized_bodies.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/optimized_bodies_tests.zig",
@@ -802,7 +802,7 @@
       "zig": "compiler/src/backend/storage_control.zig",
       "goose": "compiler-goose/src/backend/storage_control.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/storage_data_tests.zig",
@@ -892,7 +892,7 @@
       "zig": "compiler/src/backend/storage_liveness.zig",
       "goose": "compiler-goose/src/backend/storage_liveness.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/storage_owner_graph.zig",
@@ -928,7 +928,7 @@
       "zig": "compiler/src/backend/storage_patterns.zig",
       "goose": "compiler-goose/src/backend/storage_patterns.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/storage_plan.zig",
@@ -2457,7 +2457,7 @@
       "zig": "compiler/src/phase_profile.zig",
       "goose": "compiler-goose/src/phase_profile.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/production_suite.zig",
@@ -3051,7 +3051,7 @@
       "zig": "compiler/src/reuse/principal_archive.zig",
       "goose": "compiler-goose/src/reuse/principal_archive.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/reuse/principal_archive_tests.zig",
@@ -3285,7 +3285,7 @@
       "zig": "compiler/src/reuse/semantic_archive.zig",
       "goose": "compiler-goose/src/reuse/semantic_archive.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/reuse/semantic_archive_tests.zig",

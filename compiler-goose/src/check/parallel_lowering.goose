@@ -36,9 +36,9 @@ fn runAbove<Executor>(executor: Executor&, io_available: bool, requested: u8, na
     executor.executeCaller(order); let err = executor.finish(); if err != Error.none { executor.cancelAndJoin(); executor.deinit(); slots.clear(); return blot_support::none<Batch<Executor>>(), err; }
     return blot_support::some(Batch<Executor> { executor:executor, slots:slots, workers:workers, active:true , ..}), Error.none;
 }
-fn Batch::take(self: Batch&, index: i64) -> blot_reuse_dependency_payload::Owned<blot_check_core::Module>, Error {
+fn take(self: Batch&, index: i64) -> blot_reuse_dependency_payload::Owned<blot_check_core::Module>, Error {
     let executor .= self.executor; let slots .= self.slots; assert(executor && slots);
     assert(self.active && index >= 0 && index < slots.len && slots[index].requested && !slots[index].taken);
     slots[index].taken = true; return executor.take(index);
 }
-fn Batch::deinit(self: Batch&) {if !self.active {return;}let executor .= self.executor;let slots .= self.slots;assert(executor && slots);executor.cancelAndJoin();for slot,index in slots {if slot.requested && !slot.taken {executor.discard(index);}}executor.deinit();slots.clear();self.executor=null;self.slots=null;self.active=false;}
+fn deinit(self: Batch&) {if !self.active {return;}let executor .= self.executor;let slots .= self.slots;assert(executor && slots);executor.cancelAndJoin();for slot,index in slots {if slot.requested && !slot.taken {executor.discard(index);}}executor.deinit();slots.clear();self.executor=null;self.slots=null;self.active=false;}

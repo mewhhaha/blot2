@@ -31,7 +31,7 @@ fn prepareParallelNames(parent:Engine&,units:const u32[:])->bool,Error {
 // The copied-worker executor invokes this exact program in its private context;
 // its reply owns all new tables and carries no borrowed Engine or producer ref.
 fn executeProjectJob(parent:Engine&,unit:u32,job:ParallelJob&)->Error {
- let worker,error=borrowWorker(parent);if error!=Error.none {job.failure=error;return Error.none;}assert(worker);worker.source.symbols.read_only=true;worker.source.symbols.missing_name=false;let capture=blot_phase_profile::captureChecking(job.work);job.failure=worker.checkModule(unit);capture.restore();
+ let worker,error=borrowWorker(parent);if error!=Error.none {job.failure=error;return Error.none;}assert(worker);worker.source.symbols.read_only=true;worker.source.symbols.missing_name=false;let capture=blot_phase_profile::captureChecking(job.work);job.failure=worker.checkModule(unit);capture.restore(job.work);
  job.missing_name=worker.source.symbols.missing_name;job.resolution_used=parent.resolution_remaining-worker.resolution_remaining;job.associated_used=parent.associated_remaining-worker.associated_remaining;job.work.parallel_jobs+=1;
  job.module=worker.result.modules[unit-1];worker.result.modules[unit-1]=blot_support::none<Module>();if worker.result.body_caches.len!=0 {job.cache=worker.result.body_caches[unit-1];worker.result.body_caches[unit-1]=blot_reuse_body_check_cache::Cache{..};}
  job.diagnostics=copyOwned(worker.diagnostics.items);worker.diagnostics.items=worker.diagnostics.storage[..0];discardWorker(worker);return Error.none;

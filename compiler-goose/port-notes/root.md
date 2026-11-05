@@ -375,3 +375,22 @@ constructors; backups for root repairs are in ignored build/goose-port. No
 Goose compiler, checker, test, lint, formatter or execution was invoked. This is
 not syntax qualification. All source passes and output lifetime changes remain
 unverified. Archive, backend, copied-worker and main/session work remains.
+
+CodeArtifacts.Context and ArtifactEmitter.Recorder now own canonical typed pooled
+metadata buffers rather than retained references into invocation-local growers.
+Their explicit initPooledRef/releasePooled APIs delimit physical storage; readers
+index Buffer.items. ArtifactCapture.Factory owns Context/Recorder/FragmentTable
+and generation tokens for archive captures. Failure unwinds owned headers.
+The remaining full CompileWorkspace factory is not yet written.
+
+phase_profile now has exclusive phase clocks, RSS-growth sampling, inclusive
+trace regions, optimizer totals, and copied frontend counts. Installed profiles,
+traces and checking captures use numeric canonical owner slots. Allocation
+coverage is explicitly false until runtime allocator integration is complete;
+JSON allocation counts are null while unavailable. CountingAllocator.charge
+implements successful-request charging, but it is not an installed Goose
+allocator hook. This is an open parity gap, not zero measured allocations.
+
+All checker-owner production writing passes are complete, including CoreBuilder,
+PackageCore and StagingCore. No compiler, checker, formatter or test has run.
+Remaining backend/archives/session/CLI writing keeps the full port incomplete.

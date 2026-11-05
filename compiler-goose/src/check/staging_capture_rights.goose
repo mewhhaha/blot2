@@ -20,9 +20,9 @@ struct Checker {
     reports: Entry[>..<]&
 }
 fn require(value: bool) -> Error { if !value { return Error.invalid_artifact; } return Error.none; }
-fn Checker::deinit(self: Checker&) { for entry in self.reports { blot_check_capability_lifetimes::deinit(entry.report); } self.reports.clear(); }
-fn Checker::step(self: Checker&) -> Error { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; return Error.none; }
-fn Checker::report(self: Checker&, root: u32) -> const Report?, Error {
+fn deinit(self: Checker&) { for entry in self.reports { blot_check_capability_lifetimes::deinit(entry.report); } self.reports.clear(); }
+fn step(self: Checker&) -> Error { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; return Error.none; }
+fn report(self: Checker&, root: u32) -> const Report?, Error {
     for entry in self.reports { let err = self.step(); if err != Error.none { return null, err; } if entry.scope == root { return entry.report, Error.none; } }
     if !self.allocating { return null, Error.invalid_artifact; }
     var result, err = blot_check_capability_lifetimes::analyzeScope(self.module, self.units, root, self.remaining);
@@ -30,7 +30,7 @@ fn Checker::report(self: Checker&, root: u32) -> const Report?, Error {
     if !result.complete { blot_check_capability_lifetimes::deinit(result); return null, Error.invalid_artifact; }
     self.reports.append(Entry { root, result , ..}); return self.reports[self.reports.len - 1].report, Error.none;
 }
-fn Checker::confined(self: Checker&, image: const Report&, value: u32, scopes: const u32[:]) -> Error {
+fn confined(self: Checker&, image: const Report&, value: u32, scopes: const u32[:]) -> Error {
     if !self.allocating { return Error.invalid_artifact; } var work: u32[>..<]; var seen: dictionary<u32,bool>;
     work.append(value);
     while work.len != 0 {
@@ -48,7 +48,7 @@ fn Checker::confined(self: Checker&, image: const Report&, value: u32, scopes: c
         if node.contents != 0 { work.append(node.contents); }
     } return Error.none;
 }
-fn Checker::loanCapture(self: Checker&, closure: u32, binding: u32, loans: const u32[:]) -> bool, Error {
+fn loanCapture(self: Checker&, closure: u32, binding: u32, loans: const u32[:]) -> bool, Error {
     let borrowed = self.module.types.node(self.module.bindings[binding].ty);
     if borrowed.tag != blot_check_types::Tag.usage || (borrowed.b != blot_check_types::usageCode(blot_check_types::UsageKind.borrow) && borrowed.b != blot_check_types::usageCode(blot_check_types::UsageKind.borrow_mut)) || borrowed.c == 0 { return false, Error.none; }
     let region = self.module.types.node(borrowed.c); if region.tag != blot_check_types::Tag.bound || region.a != 0 || region.b != 2 || region.c != binding { return false, Error.none; }
@@ -58,14 +58,14 @@ fn Checker::loanCapture(self: Checker&, closure: u32, binding: u32, loans: const
         return blot_check_usage_core::physicallyCaptures(self.module, self.module.closures[self.module.node(closure).a].body, binding, self.remaining);
     } return false, Error.none;
 }
-fn Checker::requireLoanCaptures(self: Checker&, closure: u32, loans: const u32[:]) -> Error {
+fn requireLoanCaptures(self: Checker&, closure: u32, loans: const u32[:]) -> Error {
     let callback = self.module.closures[self.module.node(closure).a]; let captures = self.module.extra[callback.captures.start..callback.captures.start + callback.captures.len];
     for site in loans { let err = self.step(); if err != Error.none { return err; } let node = self.module.node(site); var owner_id = node.b; if node.tag == blot_check_core::Tag.resource_scope { owner_id = node.c; } let owner = self.module.closure(owner_id); let binding = owner.parameter.binding; if binding == callback.parameter.binding { continue; }
         let physically, err = blot_check_usage_core::physicallyCaptures(self.module, callback.body, binding, self.remaining); if err != Error.none { return err; }
         if physically { var found = false; for capture in captures { if capture == binding { found = true; break; } } if !found { return Error.invalid_artifact; } }
     } return Error.none;
 }
-fn Checker::capture(self: Checker&, closure: u32, binding: u32, scopes: const u32[:], loans: const u32[:]) -> Error {
+fn capture(self: Checker&, closure: u32, binding: u32, scopes: const u32[:], loans: const u32[:]) -> Error {
     let loan, err = self.loanCapture(closure, binding, loans); if err != Error.none { return err; } if loan { return Error.none; } if scopes.len == 0 { return Error.invalid_artifact; }
     let catalog = self.module.node(closure).a; var found = false;
     // report may grow its table; acquire the borrow after the operation completes.

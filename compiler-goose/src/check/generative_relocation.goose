@@ -40,7 +40,7 @@ fn init(source: const Module&, target: const Module&, scheme: blot_check_types::
     for pair in result.pairs[..result.len] { if source.types.node(pair.before).tag == Tag.variable { result.pairs[kept] = pair; kept += 1; } }
     result.len = kept; result.strict_versions = true; let err = result.tyOpened(arrow, output, 0, true); return result, err;
 }
-fn Relocation::applications(self: Relocation&, id: u32) -> Error {
+fn applications(self: Relocation&, id: u32) -> Error {
     if id == 0 || id >= self.target.nodes.len { return Error.invalid_artifact; } var chain: u32[16]; var count: i64 = 0; var callee = id;
     while self.target.node(callee).tag == blot_check_core::Tag.apply { if count == chain.len { return Error.invalid_artifact; } chain[count] = callee; count += 1; callee = self.target.node(callee).a; if callee == 0 || callee >= self.target.nodes.len { return Error.invalid_artifact; } }
     var arrow = self.scheme.root; for index in 0..count { let function = self.source.types.node(arrow); if function.tag != Tag.function { return Error.invalid_artifact; } arrow = function.b; let err = self.tyOpened(arrow, self.target.node(chain[count - index - 1]).ty, 0, true); if err != Error.none { return err; } } return Error.none;
@@ -53,7 +53,7 @@ fn generalized(module: const Module&, scheme: blot_check_types::Scheme, raw: u32
     var relation = Relocation { source: module, target: module, scheme: scheme, endpoint: 0, strict_versions: true, closing: true , ..}; let closed, err = list(module.types, scheme.closed_rows); if err != Error.none { return err; }
     for variable in closed { let safe, err = relation.safeClosing(raw, variable, 0); if err != Error.none { return err; } if !safe { return Error.invalid_artifact; } } return relation.tyOpened(raw, scheme.root, 0, true);
 }
-fn Relocation::hasRow(self: Relocation&, root: u32, variable: u32, depth: i64) -> bool, Error {
+fn hasRow(self: Relocation&, root: u32, variable: u32, depth: i64) -> bool, Error {
     if depth >= 128 || self.remaining == 0 || root >= self.source.types.nodes.len { return false, Error.invalid_artifact; } self.remaining -= 1; let node = self.source.types.node(root);
     match node.tag {
         Tag.function, Tag.provider => { if node.c >= self.source.types.effects.rows.len { return false, Error.invalid_artifact; } let row = self.source.types.row(node.c); match row.tail { Tail.variable payload => { if payload.value == variable { return true, Error.none; } }, _ => {}, }
@@ -71,7 +71,7 @@ fn Relocation::hasRow(self: Relocation&, root: u32, variable: u32, depth: i64) -
         _ => {},
     } return false, Error.none;
 }
-fn Relocation::safeClosing(self: Relocation&, root: u32, variable: u32, depth: i64) -> bool, Error {
+fn safeClosing(self: Relocation&, root: u32, variable: u32, depth: i64) -> bool, Error {
     if depth >= 128 || self.remaining == 0 || root >= self.source.types.nodes.len { return false, Error.invalid_artifact; } self.remaining -= 1; let node = self.source.types.node(root);
     match node.tag {
         Tag.function => { let found, err = self.hasRow(node.a, variable, depth + 1); if err != Error.none { return false, err; } if found { return false, Error.none; } if node.c >= self.source.types.effects.rows.len { return false, Error.invalid_artifact; } let tail = self.source.types.row(node.c).tail;
@@ -84,18 +84,18 @@ fn Relocation::safeClosing(self: Relocation&, root: u32, variable: u32, depth: i
         _ => { let found, err = self.hasRow(root, variable, depth + 1); return !found, err; },
     } return true, Error.none;
 }
-fn Relocation::get(self: const Relocation&, before: u32) -> blot_support::Option<u32> { for pair in self.pairs[..self.len] { if pair.before == before { return blot_support::some(pair.after); } } return blot_support::none<u32>(); }
-fn Relocation::ownedVariable(self: const Relocation&, id: u32) -> bool, Error { let variables, err = list(self.source.types, self.scheme.variables); if err != Error.none { return false, err; } for variable in variables { if variable == id { return true, Error.none; } } return false, Error.none; }
-fn Relocation::instance(self: Relocation&, variable: u32, actual: blot_check_types::NominalIdentity) -> Error {
+fn get(self: const Relocation&, before: u32) -> blot_support::Option<u32> { for pair in self.pairs[..self.len] { if pair.before == before { return blot_support::some(pair.after); } } return blot_support::none<u32>(); }
+fn ownedVariable(self: const Relocation&, id: u32) -> bool, Error { let variables, err = list(self.source.types, self.scheme.variables); if err != Error.none { return false, err; } for variable in variables { if variable == id { return true, Error.none; } } return false, Error.none; }
+fn instance(self: Relocation&, variable: u32, actual: blot_check_types::NominalIdentity) -> Error {
     let owned, err = self.ownedVariable(variable); if err != Error.none { return err; } if !owned { if !sameOwner(self.source, self.target) || actual.unit != 0 || actual.decl != variable { return Error.invalid_artifact; } return Error.none; }
     if actual.unit == 0 { if actual.decl >= self.target.types.nodes.len { return Error.invalid_artifact; } let node = self.target.types.node(actual.decl); if node.tag != Tag.variable && node.tag != Tag.instance_selection { return Error.invalid_artifact; } } else if actual.decl == 0 { return Error.invalid_artifact; }
     let mapped = self.get(variable); if mapped.present && (actual.unit != 0 || !equal(self.target.types, mapped.value, actual.decl)) { return Error.invalid_artifact; }
     for prior in self.instances[..self.instance_len] { if prior.variable == variable { if prior.owner.unit == 0 && actual.unit == 0 { if !equal(self.target.types, prior.owner.decl, actual.decl) { return Error.invalid_artifact; } } else if prior.owner != actual { return Error.invalid_artifact; } return Error.none; } }
     if self.instance_len == self.instances.len { return Error.invalid_artifact; } self.instances[self.instance_len] = Instance { variable, actual , ..}; self.instance_len += 1; return Error.none;
 }
-fn Relocation::freshVersion(self: Relocation&, before: u32, after: u32) -> Error { let source = self.source.types.node(before); let target = self.target.types.node(after); for pair in self.fresh_pairs[..self.fresh_pair_len] { let same_source = sameVersion(source, self.source.types.node(pair.before)); let same_target = sameVersion(target, self.target.types.node(pair.after)); if same_source { if !same_target { return Error.invalid_artifact; } return Error.none; } if same_target { return Error.invalid_artifact; } } if self.fresh_pair_len == self.fresh_pairs.len { return Error.invalid_artifact; } self.fresh_pairs[self.fresh_pair_len] = Pair { before, after , ..}; self.fresh_pair_len += 1; return Error.none; }
-fn Relocation::ty(self: Relocation&, before: u32, after: u32, depth: i64) -> Error { return self.tyOpened(before, after, depth, false); }
-fn Relocation::tyOpened(self: Relocation&, before: u32, after: u32, depth: i64, opened: bool) -> Error {
+fn freshVersion(self: Relocation&, before: u32, after: u32) -> Error { let source = self.source.types.node(before); let target = self.target.types.node(after); for pair in self.fresh_pairs[..self.fresh_pair_len] { let same_source = sameVersion(source, self.source.types.node(pair.before)); let same_target = sameVersion(target, self.target.types.node(pair.after)); if same_source { if !same_target { return Error.invalid_artifact; } return Error.none; } if same_target { return Error.invalid_artifact; } } if self.fresh_pair_len == self.fresh_pairs.len { return Error.invalid_artifact; } self.fresh_pairs[self.fresh_pair_len] = Pair { before, after , ..}; self.fresh_pair_len += 1; return Error.none; }
+fn ty(self: Relocation&, before: u32, after: u32, depth: i64) -> Error { return self.tyOpened(before, after, depth, false); }
+fn tyOpened(self: Relocation&, before: u32, after: u32, depth: i64, opened: bool) -> Error {
     if depth >= 128 || self.remaining == 0 || before >= self.source.types.nodes.len || after >= self.target.types.nodes.len { return Error.invalid_artifact; } self.remaining -= 1; let a = self.source.types.node(before); let b = self.target.types.node(after);
     for pair in self.pairs[..self.len] { if pair.before == before && (a.tag == Tag.variable || pair.opened == opened) { if !equal(self.target.types, pair.after, after) { return Error.invalid_artifact; } return Error.none; } }
     if self.len == self.pairs.len { return Error.invalid_artifact; } self.pairs[self.len] = Pair { before, after, opened , ..}; self.len += 1;
@@ -118,8 +118,8 @@ fn Relocation::tyOpened(self: Relocation&, before: u32, after: u32, depth: i64, 
         _ => { if a.a != b.a || a.b != b.b || a.c != b.c { return Error.invalid_artifact; } },
     } return Error.none;
 }
-fn Relocation::row(self: Relocation&, before: u32, after: u32, depth: i64) -> Error { return self.rowOpened(before, after, depth, false); }
-fn Relocation::rowOpened(self: Relocation&, before: u32, after: u32, depth: i64, opened: bool) -> Error {
+fn row(self: Relocation&, before: u32, after: u32, depth: i64) -> Error { return self.rowOpened(before, after, depth, false); }
+fn rowOpened(self: Relocation&, before: u32, after: u32, depth: i64, opened: bool) -> Error {
     let left, err = labels(self.source.types, before); if err != Error.none { return err; } let right, err = labels(self.target.types, after); if err != Error.none { return err; } let source = self.source.types.row(before); var variable = blot_support::none<u32>(); var source_variable = blot_support::none<u32>();
     match source.tail { Tail.variable payload => { source_variable = blot_support::some(payload.value); let variables, err = list(self.source.types, self.scheme.row_variables); if err != Error.none { return err; } for owned in variables { if owned == payload.value { variable = blot_support::some(owned); break; } } }, _ => {}, }
     let target = self.target.types.row(after);

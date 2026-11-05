@@ -181,7 +181,7 @@ reusable[] var checked_header_values:blot_check_numeric_proof_terms::Kind[>..];
 reusable[] var checked_header_operands:blot_check_numeric_proof_terms::Term[>..];
 reusable[] var checked_header_requirements:blot_check_numeric_proof_contracts::Requirement[>..];
 reusable[] var checked_header_parameters:u32[>..];
-fn CheckedOwner::valid(self:CheckedOwner)->bool {return self.lease!=0 && self.lease-1<checked_owners.len && checked_owners[self.lease-1].live && checked_owners[self.lease-1].generation==self.generation;}
+fn valid(self:CheckedOwner)->bool {return self.lease!=0 && self.lease-1<checked_owners.len && checked_owners[self.lease-1].live && checked_owners[self.lease-1].generation==self.generation;}
 fn checkedOwnerState(self:CheckedOwner)->CheckedOwnerState& {assert(self.valid());return checked_owners[self.lease-1];}
 fn newCheckedOwner()->CheckedOwner,blot_error::Error {if checked_owners.len>=0xffffffff {return CheckedOwner{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let index=checked_owners.alloc_index(CheckedOwnerState{generation:generation,live:true, ..});return CheckedOwner{(index+1) as u32,generation, ..},blot_error::Error.none;}
 fn ownChecked_function_exit_lambdas(owner:CheckedOwner,values:const blot_parse_ast::Id[:])->blot_parse_ast::Id[:] {let state .= checkedOwnerState(owner);assert(state.function_exit_lambdas.len==0);let result=checked_function_exit_lambdas.alloc_slice(values.len);for value,index in values {result[index]=value;}state.function_exit_lambdas=result;return result;}
@@ -342,7 +342,7 @@ if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.b
 if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=[];}
 for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=[];}
 }
-fn CheckedOwner::deinit(self:CheckedOwner&) {if self.lease==0 {return;}assert(self.valid());let state .= checkedOwnerState(self);
+fn deinit(self:CheckedOwner&) {if self.lease==0 {return;}assert(self.valid());let state .= checkedOwnerState(self);
 if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=[];}
 if state.usage_loans.len!=0 {checked_usage_loans.free_slice(state.usage_loans);state.usage_loans=[];}
 if state.proof_contracts.len!=0 {checked_proof_contracts.free_slice(state.proof_contracts);state.proof_contracts=[];}
@@ -423,5 +423,5 @@ if state.body_parameters.len!=0 {checked_body_parameters.free_slice(state.body_p
 if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.body_uses=[];}
 if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=[];}
 for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=[];}let index=self.lease-1;state.live=false;checked_owners.free(index);self=CheckedOwner{..};}
-fn Checked::deinit(self:Checked&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);if self.editor.present && self.editor.value.context.present {self.editor.value.context.value.deinit();}self.types.deinit();self.parameter_patterns.deinit();self.owner.deinit();self=default<Checked>();}
-fn SourceValidation::deinit(self:SourceValidation&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);self.types.deinit();self.parameter_patterns.deinit();self.owner.deinit();self=default<SourceValidation>();}
+fn deinit(self:Checked&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);if self.editor.present && self.editor.value.context.present {self.editor.value.context.value.deinit();}self.types.deinit();self.parameter_patterns.deinit();self.owner.deinit();self=default<Checked>();}
+fn deinit(self:SourceValidation&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);self.types.deinit();self.parameter_patterns.deinit();self.owner.deinit();self=default<SourceValidation>();}

@@ -144,7 +144,7 @@ text and cloned semantic context. Revision providers retain successful and
 failed outcomes, exact settings, source digests and import decisions; freezing
 moves the owner and rejects stale mutable provider descriptors. Source overlays
 own stable per-entry runs instead of slices into a growing byte buffer.
-Persisted::adopt receives a typed decoded owner with value:Wire and deinit(),
+revision_inputs.adoptPersisted receives a typed decoded owner with value:Wire and deinit(),
 consumes it only after success, and makes a private owned record. That extra
 copy, all reusable-pool costs and OS acquisition timing remain unmeasured.
 

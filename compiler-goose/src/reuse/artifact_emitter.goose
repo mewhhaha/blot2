@@ -46,16 +46,65 @@ struct FunctionArtifact {
     signature: u32 = 0, creation_sequence: u64 = 0, locals: Span = Span {..}, instructions: Span = Span {..},
 }
 struct Operation { key: Span, foreign: bool }
+import support.pooled_buffer;
+import support.native;
+struct Recorder_Record {storage:Record[:]=[],items:Record[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Recorder_Record:Record[>..]=[];
+var inactive_Recorder_Record:Recorder_Record=Recorder_Record{..};
+fn ensure(self:Recorder_Record&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Recorder_Record);return self.failure;}
+fn push(self:Recorder_Record&,value:Record) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Recorder_Record);self.len=self.items.len;}
+fn append(self:Recorder_Record&,values:const Record[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Recorder_Record);self.len=self.items.len;}
+fn resize(self:Recorder_Record&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn clear(self:Recorder_Record&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Recorder_Record&) {blot_support_pooled_buffer::deinit(self,pool_Recorder_Record);self.len=0;self.failure=Error.none;}
+struct Recorder_u8 {storage:u8[:]=[],items:u8[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Recorder_u8:u8[>..]=[];
+var inactive_Recorder_u8:Recorder_u8=Recorder_u8{..};
+fn ensure(self:Recorder_u8&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Recorder_u8);return self.failure;}
+fn push(self:Recorder_u8&,value:u8) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Recorder_u8);self.len=self.items.len;}
+fn append(self:Recorder_u8&,values:const u8[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Recorder_u8);self.len=self.items.len;}
+fn resize(self:Recorder_u8&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn clear(self:Recorder_u8&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Recorder_u8&) {blot_support_pooled_buffer::deinit(self,pool_Recorder_u8);self.len=0;self.failure=Error.none;}
+struct Recorder_ValueType {storage:ValueType[:]=[],items:ValueType[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Recorder_ValueType:ValueType[>..]=[];
+var inactive_Recorder_ValueType:Recorder_ValueType=Recorder_ValueType{..};
+fn ensure(self:Recorder_ValueType&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Recorder_ValueType);return self.failure;}
+fn push(self:Recorder_ValueType&,value:ValueType) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Recorder_ValueType);self.len=self.items.len;}
+fn append(self:Recorder_ValueType&,values:const ValueType[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Recorder_ValueType);self.len=self.items.len;}
+fn resize(self:Recorder_ValueType&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn clear(self:Recorder_ValueType&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Recorder_ValueType&) {blot_support_pooled_buffer::deinit(self,pool_Recorder_ValueType);self.len=0;self.failure=Error.none;}
+struct Recorder_Operation {storage:Operation[:]=[],items:Operation[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Recorder_Operation:Operation[>..]=[];
+var inactive_Recorder_Operation:Recorder_Operation=Recorder_Operation{..};
+fn ensure(self:Recorder_Operation&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Recorder_Operation);return self.failure;}
+fn push(self:Recorder_Operation&,value:Operation) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Recorder_Operation);self.len=self.items.len;}
+fn append(self:Recorder_Operation&,values:const Operation[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Recorder_Operation);self.len=self.items.len;}
+fn resize(self:Recorder_Operation&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn clear(self:Recorder_Operation&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Recorder_Operation&) {blot_support_pooled_buffer::deinit(self,pool_Recorder_Operation);self.len=0;self.failure=Error.none;}
+struct Recorder_SymbolicInstruction {storage:SymbolicInstruction[:]=[],items:SymbolicInstruction[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Recorder_SymbolicInstruction:SymbolicInstruction[>..]=[];
+var inactive_Recorder_SymbolicInstruction:Recorder_SymbolicInstruction=Recorder_SymbolicInstruction{..};
+fn ensure(self:Recorder_SymbolicInstruction&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Recorder_SymbolicInstruction);return self.failure;}
+fn push(self:Recorder_SymbolicInstruction&,value:SymbolicInstruction) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Recorder_SymbolicInstruction);self.len=self.items.len;}
+fn append(self:Recorder_SymbolicInstruction&,values:const SymbolicInstruction[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Recorder_SymbolicInstruction);self.len=self.items.len;}
+fn resize(self:Recorder_SymbolicInstruction&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn clear(self:Recorder_SymbolicInstruction&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
+fn deinit(self:Recorder_SymbolicInstruction&) {blot_support_pooled_buffer::deinit(self,pool_Recorder_SymbolicInstruction);self.len=0;self.failure=Error.none;}
+
 struct Tables {
-    records: Record[>..<]&, bytes: u8[>..<]&, parameters: ValueType[>..<]&,
-    operations: Operation[>..<]&, pending_instructions: SymbolicInstruction[>..<]&,
+    records: Recorder_Record&=inactive_Recorder_Record, bytes: Recorder_u8&=inactive_Recorder_u8, parameters: Recorder_ValueType&=inactive_Recorder_ValueType,
+    operations: Recorder_Operation&=inactive_Recorder_Operation, pending_instructions: Recorder_SymbolicInstruction&=inactive_Recorder_SymbolicInstruction,
 }
 struct Recorder {
+    recorder_lease:u32=0,recorder_generation:u64=0,
     owner: const u32&? = null, clock: u64&? = null, local_clock: u64 = 0,
-    records: Record[>..<]&, bytes: u8[>..<]&, parameters: ValueType[>..<]&, operations: Operation[>..<]&,
+    records: Recorder_Record&=inactive_Recorder_Record, bytes: Recorder_u8&=inactive_Recorder_u8, parameters: Recorder_ValueType&=inactive_Recorder_ValueType, operations: Recorder_Operation&=inactive_Recorder_Operation,
     functions: FunctionArtifact[:] = [], locals: ValueType[:] = [], instructions: SymbolicInstruction[:] = [],
-    pending_instructions: SymbolicInstruction[>..<]&, frozen_instructions: bool = false, sealed: bool = false,
-    arena: blot_support::Option<blot_backend_wasm::Arena>, lists: blot_support::Option<blot_runtime_list_runtime::Runtime>,
+    pending_instructions: Recorder_SymbolicInstruction&=inactive_Recorder_SymbolicInstruction, frozen_instructions: bool = false, sealed: bool = false,
+    arena: blot_support::Option<blot_backend_wasm::Arena>=blot_support::none<blot_backend_wasm::Arena>(), lists: blot_support::Option<blot_runtime_list_runtime::Runtime>=blot_support::none<blot_runtime_list_runtime::Runtime>(),
 }
 fn init(t: Tables) -> Recorder { Recorder { records: t.records, bytes: t.bytes, parameters: t.parameters, operations: t.operations, pending_instructions: t.pending_instructions } }
 reusable[] var owned_functions: FunctionArtifact[>..] = [];
@@ -79,25 +128,25 @@ fn deinit(self: Recorder&) {
     self.functions = []; self.locals = []; self.instructions = []; self.pending_instructions.clear();
 }
 fn append(self: Recorder&, event: Event) -> Error {
-    assert(!self.sealed); var sequence = self.local_clock;
+    assert(!self.sealed);let reserved=self.records.ensure(self.records.len+1);if reserved!=Error.none {return reserved;} var sequence = self.local_clock;
     { let optional_source_58 .= self.clock; if optional_source_58 { let clock .= optional_source_58; sequence = clock; clock++;  } else { self.local_clock++; } }
     var owner: u32 = 0; { let optional_source_57 .= self.owner; if optional_source_57 { let current .= optional_source_57; owner = current;  } }
     self.records.push(Record { sequence, owner, event , ..}); return Error.none;
 }
 fn appendInstruction(self: Recorder&, function: u32, op: Op, operand: Operand) -> Error {
-    assert(!self.sealed && !self.frozen_instructions);
+    assert(!self.sealed && !self.frozen_instructions);let pending_error=self.pending_instructions.ensure(self.pending_instructions.len+1);if pending_error!=Error.none {return pending_error;}let record_error=self.records.ensure(self.records.len+1);if record_error!=Error.none {return record_error;}
     if self.pending_instructions.len == 4294967295 { return Error.out_of_memory; }
     var owner: u32 = 0; { let optional_source_56 .= self.owner; if optional_source_56 { let current .= optional_source_56; owner = current;  } }
     var sequence = self.local_clock; { let optional_source_55 .= self.clock; if optional_source_55 { let clock .= optional_source_55; sequence = clock;  } }
     if self.records.len != 0 {
-        let index = self.records.len - 1; let last = self.records[index];
+        let index = self.records.len - 1; let last = self.records.items[index];
         if last.owner == owner {
             match last.event {
                 Event.instruction_run run => {
                     if run.function == function && last.sequence + run.instructions.len == sequence &&
                         run.instructions.start as i64 + run.instructions.len == self.pending_instructions.len {
                         self.pending_instructions.push(SymbolicInstruction { op, operand , ..});
-                        self.records[index].event = Event.instruction_run { function, Span { run.instructions.start, run.instructions.len + 1 , ..} , ..};
+                        self.records.items[index].event = Event.instruction_run { function, Span { run.instructions.start, run.instructions.len + 1 , ..} , ..};
                         { let optional_source_54 .= self.clock; if optional_source_54 { let clock .= optional_source_54; clock++;  } else { self.local_clock++; } } return Error.none;
                     }
                 }, _ => {},
@@ -108,7 +157,7 @@ fn appendInstruction(self: Recorder&, function: u32, op: Op, operand: Operand) -
     return self.append(Event.instruction_run { function, Span { start, 1 , ..} , ..});
 }
 fn instructionRun(self: const Recorder&, span: Span) -> blot_support::Option<const SymbolicInstruction[:]> {
-    var values: const SymbolicInstruction[:] = self.pending_instructions;
+    var values: const SymbolicInstruction[:] = self.pending_instructions.items;
     if self.frozen_instructions { values = self.instructions; }
     if span.start > values.len || span.len > values.len - span.start { return blot_support::none<const SymbolicInstruction[:]>(); }
     return blot_support::some(values[span.start..span.start + span.len]);
@@ -128,12 +177,12 @@ fn recordListsExtension(self: Recorder&, lists: blot_runtime_list_runtime::Runti
 }
 fn raw(self: Recorder&, value: const u8[:]) -> Span, Error {
     if self.bytes.len > 4294967295 || value.len > 4294967295 - self.bytes.len { return Span {..}, Error.out_of_memory; }
-    let span = Span { self.bytes.len as u32, value.len as u32 , ..}; self.bytes.append(value); return span, Error.none;
+    let span = Span { self.bytes.len as u32, value.len as u32 , ..}; self.bytes.append(value);if self.bytes.failure!=Error.none {return Span{..},self.bytes.failure;} return span, Error.none;
 }
 fn signature(self: Recorder&, id: u32, parameters: const ValueType[:], result: ValueType) -> Error {
     let mark = self.parameters.len;
     if mark > 4294967295 || parameters.len > 4294967295 - mark { return Error.out_of_memory; }
-    let span = Span { mark as u32, parameters.len as u32 , ..}; self.parameters.append(parameters);
+    let span = Span { mark as u32, parameters.len as u32 , ..}; self.parameters.append(parameters);if self.parameters.failure!=Error.none {return self.parameters.failure;}
     let error = self.append(Event.signature { id, span, result , ..}); if error != Error.none { self.parameters.resize(mark); } return error;
 }
 fn importFunction(self: Recorder&, id: u32, namespace_name: const u8[:], name: const u8[:], signature: u32) -> Error {
@@ -159,7 +208,7 @@ fn captureOperations<S>(self: Recorder&, store: S&) -> Error {
     assert(self.operations.len == 0);
     for entry in store.entries {
         let mark = self.bytes.len; let key, error = self.raw(store.key(entry));
-        if error != Error.none { self.bytes.resize(mark); return error; } self.operations.push(Operation { key, entry.foreign , ..});
+        if error != Error.none { self.bytes.resize(mark); return error; } self.operations.push(Operation { key, entry.foreign , ..});if self.operations.failure!=Error.none {self.bytes.resize(mark);return self.operations.failure;}
     }
     return Error.none;
 }
@@ -167,7 +216,7 @@ fn operationSymbol(self: Recorder&, id: u32, key: const u8[:], foreign: bool) ->
     let mark = self.bytes.len; let bytes, error = self.raw(key); if error != Error.none { return error; }
     let result = self.append(Event.operation_symbol { id, bytes, foreign , ..}); if result != Error.none { self.bytes.resize(mark); } return result;
 }
-fn slice(self: const Recorder&, span: Span) -> const u8[:] { self.bytes[span.start..span.start + span.len] }
+fn slice(self: const Recorder&, span: Span) -> const u8[:] { self.bytes.items[span.start..span.start + span.len] }
 fn seal(self: Recorder&) { self.owner = null; self.clock = null; self.sealed = true; }
 
 fn roleForName(name: const u8[:]) -> FunctionRole {
@@ -183,9 +232,9 @@ fn arenaFunctionName(name: const u8[:]) -> bool {
 fn classifyList(functions: FunctionArtifact[:], name: const u8[:], id: u32) { functions[id].role = prefixedRole("list_", name); }
 fn classifyList(functions: FunctionArtifact[:], name: const u8[:], id: blot_support::Option<u32>) {}
 fn freezeFunctions(self: Recorder&, function_owners: const u32[:]) -> Error {
-    assert(self.sealed && self.functions.len == 0);
+    assert(self.sealed && self.functions.len == 0);let pending_error=self.tableFailure();if pending_error!=Error.none {return pending_error;}
     var count: i64 = 0; var local_count: i64 = 0; var instruction_count: i64 = 0;
-    for record in self.records {
+    for record in self.records.items {
         match record.event {
             Event.function => { count++; }, Event.local => { local_count++; }, Event.instruction => { instruction_count++; },
             Event.instruction_run run => { instruction_count += run.instructions.len; }, _ => {},
@@ -194,7 +243,7 @@ fn freezeFunctions(self: Recorder&, function_owners: const u32[:]) -> Error {
     let functions = owned_functions.alloc_slice(count);
     for index in count { functions[index] = FunctionArtifact {..}; }
     let locals = owned_locals.alloc_slice(local_count); let instructions = owned_instructions.alloc_slice(instruction_count);
-    for record in self.records {
+    for record in self.records.items {
         match record.event {
             Event.function item => {
                 var owner: u32 = 0; if item.id < function_owners.len { owner = function_owners[item.id]; }
@@ -207,7 +256,7 @@ fn freezeFunctions(self: Recorder&, function_owners: const u32[:]) -> Error {
             Event.instruction_run item => { functions[item.function].instructions.len += item.instructions.len; }, _ => {},
         }
     }
-    for record in self.records {
+    for record in self.records.items {
         match record.event {
             Event.arena => {
                 assert(self.arena.present); let arena = self.arena.value;
@@ -237,7 +286,7 @@ fn freezeFunctions(self: Recorder&, function_owners: const u32[:]) -> Error {
         functions[index].locals.len = 0; functions[index].instructions.len = 0;
     }
     for index in self.records.len {
-        let record = self.records[index];
+        let record = self.records.items[index];
         match record.event {
             Event.local item => {
                 let span = functions[item.function].locals; locals[span.start + span.len] = item.ty; functions[item.function].locals.len++;
@@ -251,7 +300,7 @@ fn freezeFunctions(self: Recorder&, function_owners: const u32[:]) -> Error {
                 let start = span.start + span.len;
                 for instruction, at in source.value { instructions[start + at] = instruction; }
                 functions[item.function].instructions.len += item.instructions.len;
-                self.records[index].event = Event.instruction_run { item.function, Span { start, item.instructions.len , ..} , ..};
+                self.records.items[index].event = Event.instruction_run { item.function, Span { start, item.instructions.len , ..} , ..};
             }, _ => {},
         }
     }
@@ -285,14 +334,14 @@ fn prepareOperations(self: Replay&) -> Error {
     var ordered: u32[>..<] = []; for index in self.journal.operations.len { ordered.push(index as u32); }
     for index in 1..ordered.len {
         let value = ordered[index]; var at = index;
-        while at != 0 && lessBytes(self.journal.slice(self.journal.operations[value].key), self.journal.slice(self.journal.operations[ordered[at - 1]].key)) {
+        while at != 0 && lessBytes(self.journal.slice(self.journal.operations.items[value].key), self.journal.slice(self.journal.operations.items[ordered[at - 1]].key)) {
             ordered[at] = ordered[at - 1]; at--;
         }
         ordered[at] = value;
     }
     self.operations.clear(); for index in 0..ordered.len + 1 { self.operations.push(0); }
     var next: u32 = 2;
-    for id in ordered { if self.journal.operations[id].foreign { self.operations[id + 1] = 1; } else { self.operations[id + 1] = next; next++; } }
+    for id in ordered { if self.journal.operations.items[id].foreign { self.operations[id + 1] = 1; } else { self.operations[id + 1] = next; next++; } }
     return Error.none;
 }
 fn resolve(self: const Replay&, operand: Operand) -> u32, Error {
@@ -317,13 +366,14 @@ fn replayInstruction(self: const Replay&, module: blot_backend_wasm::Module&, fu
 }
 fn materialize(self: const Recorder&, destination: blot_backend_wasm::Module&) -> Error { self.replayInto(destination) }
 fn replayInto(self: const Recorder&, module: blot_backend_wasm::Module&) -> Error {
+    let table_error=self.tableFailure();if table_error!=Error.none {return table_error;}
     if !self.sealed || module.artifacts != null { return Error.invalid_artifact; }
     if module.data.len != 0 || module.arena.present || module.host_references.present { return Error.unsupported_arena_composition; }
     var functions: u32[>..<] = []; var signatures: u32[>..<] = []; var imports: u32[>..<] = [];
     var globals: u32[>..<] = []; var operations: u32[>..<] = []; var data: DataRange[>..<] = [];
     var replay = Replay { self, functions, signatures, imports, globals, operations, data , ..};
     let prepared = replay.prepareOperations(); if prepared != Error.none { return prepared; }
-    for record in self.records {
+    for record in self.records.items {
         let error = replayEvent(replay, module, record.event); if error != Error.none { return error; }
     }
     return Error.none;
@@ -468,3 +518,34 @@ fn roleCode(role: Role) -> u8 {
     match role { Role.literal => 0, Role.function => 1, Role.import_ => 2, Role.signature => 3, Role.global => 4,
         Role.table_function => 5, Role.callable_function => 6, Role.callable_layout => 7, Role.static_address => 8, Role.operation => 9, Role.host_table => 10 }
 }
+
+// A recorder can outlive its invocation without pointing into local growers.
+var inactive_recorder:Recorder=Recorder{..};
+struct RecorderOwner {live:bool=false,generation:u64=0,
+records:Recorder_Record=Recorder_Record{..},
+bytes:Recorder_u8=Recorder_u8{..},
+parameters:Recorder_ValueType=Recorder_ValueType{..},
+operations:Recorder_Operation=Recorder_Operation{..},
+pending_instructions:Recorder_SymbolicInstruction=Recorder_SymbolicInstruction{..},
+canonical:Recorder=Recorder{..}}
+reusable var recorder_owners:RecorderOwner[>..]=[];
+fn initPooledRef()->Recorder?,Error {
+ if recorder_owners.len>=0xffffffff {return null,Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=recorder_owners.alloc_index(RecorderOwner{live:true,generation:generation,..});let state:RecorderOwner&=recorder_owners[at];
+ state.canonical=Recorder{recorder_lease:(at+1) as u32,recorder_generation:generation,
+records:state.records,bytes:state.bytes,parameters:state.parameters,operations:state.operations,pending_instructions:state.pending_instructions,..};return state.canonical,Error.none;
+}
+fn validRecorder(self:const Recorder&)->bool {return self.recorder_lease!=0 && self.recorder_lease-1<recorder_owners.len && recorder_owners[self.recorder_lease-1].live && recorder_owners[self.recorder_lease-1].generation==self.recorder_generation;}
+fn tableFailure(self:const Recorder&)->Error {
+if self.records.failure!=Error.none {return self.records.failure;}
+if self.bytes.failure!=Error.none {return self.bytes.failure;}
+if self.parameters.failure!=Error.none {return self.parameters.failure;}
+if self.operations.failure!=Error.none {return self.operations.failure;}
+if self.pending_instructions.failure!=Error.none {return self.pending_instructions.failure;}
+return Error.none;}
+fn releasePooled(self:Recorder&) {if self.recorder_lease==0 {return;}assert(self.validRecorder());let at=self.recorder_lease-1;self.deinit();
+self.records.deinit();
+self.bytes.deinit();
+self.parameters.deinit();
+self.operations.deinit();
+self.pending_instructions.deinit();
+recorder_owners[at].live=false;self=Recorder{..};recorder_owners.free(at);}

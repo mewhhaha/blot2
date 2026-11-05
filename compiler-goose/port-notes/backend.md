@@ -318,3 +318,37 @@ parameter promotion and alias retry, recursive access contracts, fresh result
 owner summaries, retained event/region/schema runs and exact publication order.
 Later prepared/reusable-call emission, bundle snapshots, scalar/source lowering
 and scoped compile construction remain. No verification has run.
+
+Current continuation: scoped_backend now has the native algorithms through loop
+emission, with the loop rewrite dispatcher and general expression/public compile
+tail still in progress. This includes created-descriptor receipts, captured
+Global footprints, checked function-plan lookup, recursive invariant replay,
+packed/direct/addressed/register call ABIs, snapshot dominance invalidation,
+selected type DAG keys, named/closure invocation, associated dispatch, SIMD
+primitives, pattern/match joins, projection and indexed functional updates.
+`storage_liveness`, `storage_patterns`, and `storage_control` now have complete
+production first writing passes. All of this remains unverified; the supporting
+optimizer/storage leaves and Wasm assembly are still incomplete.
+
+Public result ownership now stages inputs before compile. The driver binds a
+fresh publication owner to a workspace initialized with empty units, then calls
+`pinWorkspaceInputs(workspace,units,catalogOwner,unitOwners,seedOwners)`. That
+retains every journal and copies Core headers before evaluators/generators can
+borrow them. `compileWithOptions` selects the copied headers and permits one
+public compile epoch; `pinResult` later adds capture-header copies without
+retaining inputs twice. On every error, journal pins stay with the canonical
+workspace until its contexts are destroyed. Result.deinit retires the result
+lease; driver teardown destroys contexts before result_publication.destroy
+releases pins. Borrowed internal workspaces keep owner zero. This records the
+source ownership design, not tested lifetime or allocation-failure equivalence.
+
+The current constructor-default authoring pass uses explicit `..` for omitted
+defaultable record fields. Its initial shared token writer also recognized enum
+comparisons before control braces, so those control-block insertions were
+removed in the owned files and reported to the other owners. No Goose tooling
+has run. Further construction/API alignment remains part of writing.
+
+IR now exposes detached optimizer-owned `DetachedBody` and `DetachedFunction`
+records with exact typed local/instruction/parameter runs and clone/deinit.
+They are independent of Module range IDs. Syntax owner has optimized_bodies and
+optimized_archive; runtime_identity and loop_targets are parent-owned now.

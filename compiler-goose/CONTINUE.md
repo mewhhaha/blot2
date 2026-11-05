@@ -18,15 +18,16 @@ package-root imports (`import check.types;`) and file-relative peer imports
 
 Current writing ownership:
 
-- `goose_syntax_port`: all seven parse modules written; now all 38 eval modules.
-- `goose_language_mapping`: all 67 check modules.
+- `goose_syntax_port`: parse/eval first passes; now archive codecs and optimized bodies.
+- `goose_language_mapping`: check first passes complete; now artifact fragment and constant replay.
 - `goose_backend_port`: all 125 backend modules.
 - Root: all reuse/runtime modules, support primitives, driver and packaging.
 
 Progress and exact constructor/API decisions belong in the agents' port notes.
 The writing phase is unfinished; no verification has run.
 
-Fixed contexts borrow typed caller-owned grow/shrink arrays. Arrays cannot
+Retained contexts now use canonical typed metadata and fixed pooled buffers.
+Lexical contexts may borrow caller-owned tables. Arrays cannot
 become multiple owning fields in one Goose record. Backend Function/Signature
 records use ranges into Module tables. Owner identities are fresh process-local
 u64 values, not pointer casts; zero declines optional cache authority. Marks,

@@ -74,3 +74,4 @@ fn finish<D>(builder: Builder&,output: D&) -> Error {
     let header = appendOutput(output,[0x53444b31,1,builder.nodes.items.len as u32,builder.words.items.len as u32]); if header != Error.none { return fail(builder,header); }
     for node in builder.nodes.items { let size = appendOutput(output,node.len as u32); if size != Error.none { return fail(builder,size); } let words = appendOutput(output,builder.words.items[node.start..node.start + node.len]); if words != Error.none { return fail(builder,words); } } builder.finished = true; return Error.none;
 }
+fn clear(words: Words&) { words.resize(0); }

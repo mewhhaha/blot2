@@ -1,0 +1,6 @@
+// Backedges preserve each named owner and the complete possible borrow roots.
+namespace blot_backend_storage_control;
+recursive fn fixedCarry<C,V>(context: C&,value: V) -> bool { match value.tag { callable=>{ return false; },array=>{ if !value.root.present { return false; } },_=>{}, } for field in context.children(value) { if !fixedCarry(context,field) { return false; } } return true; }
+fn contains<C,V>(context: C&,value: V,root: i64) -> bool { if value.root.present && value.root.value == root { return true; } for other in context.otherRoots(value) { if other == root { return true; } } return false; }
+fn includes<C,V>(context: C&,left: V,right: V) -> bool { if right.root.present && !contains(context,left,right.root.value) { return false; } for root in context.otherRoots(right) { if !contains(context,left,root) { return false; } } return true; }
+recursive fn stableCarry<C,V>(context: C&,before: V,after: V) -> bool { if before.tag != after.tag || before.fields.len != after.fields.len || !includes(context,before,after) || !includes(context,after,before) { return false; } let old = context.children(before); let next = context.children(after); for value,index in old { if !stableCarry(context,value,next[index]) { return false; } } return true; }
