@@ -42,3 +42,5 @@ fn extend(self: Store&,children: blot_eval_eval_values::Words&,before: Span,valu
  var shift: u32=0; if front { shift=1; } for i in 0..before.len { children.items[after.start+shift+i]=children.items[before.start+i]; }
  var slot=after.start+before.len; if front { slot=after.start; } children.items[slot]=value; self.buffers.insert(after,buffer); mutation(self); return after,blot_error::Error.none;
 }
+
+fn remove(self: BufferMap&,key: Span) -> bool { var view=blot_support_pooled_map::Map<Span,Span> {count:self.count,slots:self.slots}; let result=blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; return result; }

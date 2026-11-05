@@ -48,71 +48,67 @@ struct OperationLink { next: blot_check_effects::Label = none, previous: blot_ch
 struct RowCertificate { generation: u16 = 0, argument_height: u8 = 0, has_arguments: bool = false }
 struct ClosedRow { row: blot_check_effects::Id = 0, generation: u16 = 0, argument_height: u8 = 0, has_arguments: bool = false }
 struct OperationRow { row: blot_check_effects::Id = 0, result: blot_check_effects::Id = 0, at: Cursor = 0, depth: i64 = 0, limit: i64 = 0, mutation: u64 = 0xffffffffffffffff, effects: u64 = 0xffffffffffffffff }
-struct Tables {
-    nodes: Node[>..<]&, extra: Id[>..<]&, variables: Variable[>..<]&, versions: Version[>..<]&,
-    operations: Operation[>..<]&, operation_links: OperationLink[>..<]&,
-    quantifier_goals: QuantifierGoals[>..<]&, quantifier_obligations: Obligation[>..<]&,
-    occurs_seen: u32[>..<]&, closed_row_index: RowCertificate[>..<]&, closed_operation_index: RowCertificate[>..<]&,
-    variable_views: dictionary<u64, Id>&, associated_equations: dictionary<Id, Id>&,
-    projection_resolutions: dictionary<ProjectionResolution, Id>&,
-    operation_chains: dictionary<OperationKey, OperationChain>&,
-}
-struct Store {
-    nodes: Node[>..<]&, extra: Id[>..<]&, variables: Variable[>..<]&, versions: Version[>..<]&,
-    operations: Operation[>..<]&, operation_links: OperationLink[>..<]&,
-    quantifier_goals: QuantifierGoals[>..<]&, quantifier_obligations: Obligation[>..<]&,
-    occurs_seen: u32[>..<]&, closed_row_index: RowCertificate[>..<]&, closed_operation_index: RowCertificate[>..<]&,
-    variable_views: dictionary<u64, Id>&, associated_equations: dictionary<Id, Id>&,
-    projection_resolutions: dictionary<ProjectionResolution, Id>&,
-    operation_chains: dictionary<OperationKey, OperationChain>&,
-    effects: blot_check_effects::Store,
-    resolved: blot_reuse_epoch_resolution_cache::Cache,
-    composites: blot_reuse_composite_resolution_cache::Cache,
-    owner_id: u64,
-    use_closed_rows: bool = true, closed_rows: ClosedRow[4] = [ClosedRow {}; 4],
-    use_operation_rows: bool = true, operation_rows: OperationRow[64] = [OperationRow {}; 64],
-    has_usage_types: bool = false, has_rank_types: bool = false, next_rigid_scope: u32 = 1,
-    use_closed_graphs: bool = false, has_proof_kinds: bool = false, has_projections: bool = false,
-    projection_limit: i64 = 1000000, projection_steps: i64 = 0, resolution_depth_limit: i64 = 1024,
-    projection_exhausted: bool = false, projection_resolution_types: u64 = 0,
-    projection_resolution_rows: u64 = 0, projection_resolution_limit: i64 = 0,
-    closed_generation: u16 = 1, closed_effect_physical_epoch: u64 = 0,
-    mutation_epoch: u64 = 0, occurs_steps: u64 = 0,
-    normalization: blot_work_counters::Normalization = blot_work_counters::Normalization {},
-    resolution_steps: u64 = 0, occurs_generation: u32 = 0, use_resolution_cache: bool = true,
-    use_composite_cache: bool = true, composite_min_growth: i64 = 4,
-    use_operation_shapes: bool = true, operation_shape_generation: u16 = 0, operation_shape_enabled: bool = false,
+
+struct Store {lease:u32=0,owner_generation:u64=0,
+nodes:Table_nodes&=inactive_nodes,
+extra:Table_extra&=inactive_extra,
+variables:Table_variables&=inactive_variables,
+versions:Table_versions&=inactive_versions,
+operations:Table_operations&=inactive_operations,
+operation_links:Table_operation_links&=inactive_operation_links,
+quantifier_goals:Table_quantifier_goals&=inactive_quantifier_goals,
+quantifier_obligations:Table_quantifier_obligations&=inactive_quantifier_obligations,
+occurs_seen:Table_occurs_seen&=inactive_occurs_seen,
+closed_row_index:Table_closed_row_index&=inactive_closed_row_index,
+closed_operation_index:Table_closed_operation_index&=inactive_closed_operation_index,
+variable_views:Map_variable_views&=inactive_variable_views,
+associated_equations:Map_associated_equations&=inactive_associated_equations,
+projection_resolutions:Map_projection_resolutions&=inactive_projection_resolutions,
+operation_chains:Map_operation_chains&=inactive_operation_chains,
+effects:blot_check_effects::Store&=inactive_effects,
+resolved:blot_reuse_epoch_resolution_cache::Cache&=inactive_resolved,
+composites:blot_reuse_composite_resolution_cache::Cache&=inactive_composites,
+owner_id:(u64)&=inactive_scalars.owner_id,
+use_closed_rows:(bool)&=inactive_scalars.use_closed_rows,
+closed_rows:(ClosedRow[4])&=inactive_scalars.closed_rows,
+use_operation_rows:(bool)&=inactive_scalars.use_operation_rows,
+operation_rows:(OperationRow[64])&=inactive_scalars.operation_rows,
+has_usage_types:(bool)&=inactive_scalars.has_usage_types,
+has_rank_types:(bool)&=inactive_scalars.has_rank_types,
+next_rigid_scope:(u32)&=inactive_scalars.next_rigid_scope,
+use_closed_graphs:(bool)&=inactive_scalars.use_closed_graphs,
+has_proof_kinds:(bool)&=inactive_scalars.has_proof_kinds,
+has_projections:(bool)&=inactive_scalars.has_projections,
+projection_limit:(i64)&=inactive_scalars.projection_limit,
+projection_steps:(i64)&=inactive_scalars.projection_steps,
+resolution_depth_limit:(i64)&=inactive_scalars.resolution_depth_limit,
+projection_exhausted:(bool)&=inactive_scalars.projection_exhausted,
+projection_resolution_types:(u64)&=inactive_scalars.projection_resolution_types,
+projection_resolution_rows:(u64)&=inactive_scalars.projection_resolution_rows,
+projection_resolution_limit:(i64)&=inactive_scalars.projection_resolution_limit,
+closed_generation:(u16)&=inactive_scalars.closed_generation,
+closed_effect_physical_epoch:(u64)&=inactive_scalars.closed_effect_physical_epoch,
+mutation_epoch:(u64)&=inactive_scalars.mutation_epoch,
+occurs_steps:(u64)&=inactive_scalars.occurs_steps,
+normalization:(blot_work_counters::Normalization)&=inactive_scalars.normalization,
+resolution_steps:(u64)&=inactive_scalars.resolution_steps,
+occurs_generation:(u32)&=inactive_scalars.occurs_generation,
+use_resolution_cache:(bool)&=inactive_scalars.use_resolution_cache,
+use_composite_cache:(bool)&=inactive_scalars.use_composite_cache,
+composite_min_growth:(i64)&=inactive_scalars.composite_min_growth,
+use_operation_shapes:(bool)&=inactive_scalars.use_operation_shapes,
+operation_shape_generation:(u16)&=inactive_scalars.operation_shape_generation,
+operation_shape_enabled:(bool)&=inactive_scalars.operation_shape_enabled,
 }
 struct Options { resolution_cache: bool = true, closed_graphs: bool = false, composite_cache: bool = true, composite_min_growth: i64 = 4 }
-fn init(tables: Tables, effects: blot_check_effects::Store, resolved: blot_reuse_epoch_resolution_cache::Cache,
-        composites: blot_reuse_composite_resolution_cache::Cache) -> Store, Error {
-    return initWithOptions(tables, effects, resolved, composites, Options {});
-}
-fn initWithOptions(t: Tables, effects: blot_check_effects::Store, resolved: blot_reuse_epoch_resolution_cache::Cache,
-                   composites: blot_reuse_composite_resolution_cache::Cache, options: Options) -> Store, Error {
-    var result = Store { t.nodes, t.extra, t.variables, t.versions, t.operations, t.operation_links,
-        t.quantifier_goals, t.quantifier_obligations, t.occurs_seen, t.closed_row_index, t.closed_operation_index,
-        t.variable_views, t.associated_equations, t.projection_resolutions, t.operation_chains,
-        effects, resolved, composites, blot_native::fresh_owner_id(),
-        use_closed_graphs: options.closed_graphs, use_resolution_cache: options.resolution_cache,
-        use_composite_cache: options.composite_cache && options.closed_graphs, composite_min_growth: options.composite_min_growth };
-    result.effects.use_resolution_cache = options.resolution_cache;
-    result.nodes.append([Node { Tag.absent }, Node { Tag.unit }, Node { Tag.boolean }, Node { Tag.unsigned32 }, Node { Tag.floating32 }, Node { Tag.never }]);
-    result.operations.append([Operation { NominalIdentity { 0, 0 } }, Operation { NominalIdentity { 0, 1 } }]);
-    return result, Error.none;
-}
-fn deinit(self: Store&) {
-    self.nodes.clear(); self.extra.clear(); self.variables.clear(); self.versions.clear(); self.variable_views.clear();
-    self.resolved.deinit(); self.projection_resolutions.clear(); self.associated_equations.clear(); self.composites.deinit();
-    self.occurs_seen.clear(); self.closed_row_index.clear(); self.closed_operation_index.clear(); self.effects.deinit();
-    self.operations.clear(); self.operation_chains.clear(); self.operation_links.clear(); self.quantifier_goals.clear();
-    self.quantifier_obligations.clear(); self.owner_id = 0;
-}
-fn node(self: const Store&, id: Id) -> Node { return self.nodes[id]; }
-fn list(self: const Store&, span: List) -> const Id[:] { return self.extra[span.start..span.start + span.len]; }
+
+
+
+fn node(self: const Store&, id: Id) -> Node { return self.nodes.items[id]; }
+fn list(self: const Store&, span: List) -> const Id[:] { return self.extra.items[span.start..span.start + span.len]; }
 fn saveList(self: Store&, values: const Id[:]) -> List, Error {
     if values.len > none - self.extra.len { return List {}, Error.type_limit; }
-    let start = self.extra.len as u32; self.extra.append(values);
+    let start = self.extra.len as u32; self.extra.append(values);if self.extra.failure!=Error.none {return default<List>(),self.extra.failure;}
     return List { start, values.len as u32 }, Error.none;
 }
 fn tick(self: Store&) { if self.mutation_epoch != 0xffffffffffffffff { self.mutation_epoch += 1; } }
@@ -123,14 +119,14 @@ fn synchronizeClosedGraphs(self: Store&) {
 }
 fn replaceListItem(self: Store&, span: List, index: i64, value: Id) {
     assert(index < span.len && value < self.nodes.len); let slot = span.start + index;
-    if self.extra[slot] == value { return; } self.extra[slot] = value;
+    if self.extra.items[slot] == value { return; } self.extra.items[slot] = value;
     invalidateClosedGraphs(self); tick(self);
 }
 fn add(self: Store&, value: Node) -> Id, Error {
     if self.nodes.len == none { return 0, Error.type_limit; }
     let id = self.nodes.len as u32; var owned = value;
     if self.use_closed_graphs { synchronizeClosedGraphs(self); owned.closed_height = closedNodeHeight(self, value); owned.closed_generation = self.closed_generation; }
-    self.nodes.push(owned); return id, Error.none;
+    self.nodes.push(owned);if self.nodes.failure!=Error.none {return 0,self.nodes.failure;} return id, Error.none;
 }
 fn formalRowKey(binder: Id) -> u32, Error {
     if binder == 0 || binder >= blot_check_effects::formal_key_bit { return 0, Error.type_limit; }
@@ -182,7 +178,7 @@ fn closedRow(self: const Store&, id: blot_check_effects::Id) -> blot_support::Op
     if !self.use_closed_rows || !self.use_closed_graphs || self.closed_generation == 0xffff || self.effects.physical_epoch == 0xffffffffffffffff || self.closed_effect_physical_epoch != self.effects.physical_epoch { return blot_support::Option<ClosedRow> { false, ClosedRow {} }; }
     var value = self.closed_rows[id % self.closed_rows.len];
     if id < self.closed_row_index.len {
-        let proof = self.closed_row_index[id];
+        let proof = self.closed_row_index.items[id];
         value = ClosedRow { id, proof.generation, proof.argument_height, proof.has_arguments };
     }
     if value.row == id && value.generation == self.closed_generation { return blot_support::Option<ClosedRow> { true, value }; }
@@ -194,19 +190,19 @@ fn closedRow(self: const Store&, id: blot_check_effects::Id) -> blot_support::Op
 }
 fn saveClosedRow(self: Store&, id: blot_check_effects::Id, height: u8, has_arguments: bool) {
     if !self.use_closed_rows || !self.use_closed_graphs || self.closed_generation == 0xffff || self.effects.physical_epoch == 0xffffffffffffffff || self.closed_effect_physical_epoch != self.effects.physical_epoch { return; }
-    if id < self.closed_row_index.len { self.closed_row_index[id] = RowCertificate { self.closed_generation, height, has_arguments }; }
+    if id < self.closed_row_index.len { self.closed_row_index.items[id] = RowCertificate { self.closed_generation, height, has_arguments }; }
     let slot = spanSlot(row(self, id).labels);
     if self.closed_rows[slot].generation == self.closed_generation && self.closed_rows[slot].row != id { self.normalization.closed_row_evictions += 1; }
     self.closed_rows[slot] = ClosedRow { id, self.closed_generation, height, has_arguments };
 }
 fn closedOperation(self: const Store&, label: blot_check_effects::Label) -> blot_support::Option<RowCertificate> {
     if !self.use_closed_rows || !self.use_closed_graphs || self.closed_generation == 0xffff || self.effects.physical_epoch == 0xffffffffffffffff || self.closed_effect_physical_epoch != self.effects.physical_epoch || label >= self.closed_operation_index.len { return blot_support::Option<RowCertificate> { false, RowCertificate {} }; }
-    let proof = self.closed_operation_index[label];
+    let proof = self.closed_operation_index.items[label];
     return blot_support::Option<RowCertificate> { proof.generation == self.closed_generation, proof };
 }
 fn saveClosedOperation(self: Store&, label: blot_check_effects::Label, height: u8, has_arguments: bool) {
     if !self.use_closed_rows || !self.use_closed_graphs || self.closed_generation == 0xffff || self.effects.physical_epoch == 0xffffffffffffffff || self.closed_effect_physical_epoch != self.effects.physical_epoch || label >= self.closed_operation_index.len { return; }
-    self.closed_operation_index[label] = RowCertificate { self.closed_generation, height, has_arguments };
+    self.closed_operation_index.items[label] = RowCertificate { self.closed_generation, height, has_arguments };
 }
 fn closedRowHeight(self: Store&, id: blot_check_effects::Id) -> u8 {
     let value = self.effects.node(id);
@@ -219,15 +215,15 @@ fn closedRowHeight(self: Store&, id: blot_check_effects::Id) -> u8 {
         if label >= self.operations.len { return 0; }
         let proof = closedOperation(self, label);
         if proof.present { height = max(height, proof.value.argument_height); has_arguments = has_arguments || proof.value.has_arguments; continue; }
-        let instance = self.operations[label].instance;
+        let instance = self.operations.items[label].instance;
         if instance.unit == 0 && instance.decl != 0 { return 0; }
         var operation_height: u8 = 0;
-        for arg in list(self, self.operations[label].arguments) {
+        for arg in list(self, self.operations.items[label].arguments) {
             has_arguments = true; let argument_height = closedHeight(self, arg);
             if argument_height == 0 { return 0; }
             height = max(height, argument_height); operation_height = max(operation_height, argument_height);
         }
-        saveClosedOperation(self, label, operation_height, self.operations[label].arguments.len != 0);
+        saveClosedOperation(self, label, operation_height, self.operations.items[label].arguments.len != 0);
     }
     saveClosedRow(self, id, height, has_arguments);
     if height == 255 { return 0; } return height + 1;
@@ -268,7 +264,7 @@ fn rigidScope(self: Store&) -> u32, Error {
     let scope = self.next_rigid_scope; self.next_rigid_scope += 1; return scope, Error.none;
 }
 fn rigid(self: Store&, scope: u32, ordinal: u32, sort: u32) -> Id, Error { self.has_rank_types = true; return add(self, Node { Tag.rigid, a: scope, b: ordinal, c: sort }); }
-fn quantifierGoals(self: const Store&, owner: Id) -> const Obligation[:] { return blot_check_quantifier_goals::get(self.quantifier_goals, self.quantifier_obligations, owner); }
+fn quantifierGoals(self: const Store&, owner: Id) -> const Obligation[:] { return blot_check_quantifier_goals::get(self.quantifier_goals.items, self.quantifier_obligations.items, owner); }
 fn quantified(self: Store&, tag: Tag, body: Id, binders: const Id[:]) -> Id, Error { return quantifiedWithGoals(self, tag, body, binders, []); }
 fn quantifiedWithGoals(self: Store&, tag: Tag, body: Id, binders: const Id[:], goals: const Obligation[:]) -> Id, Error {
     assert(tag == Tag.forall || tag == Tag.existential);
@@ -286,7 +282,7 @@ fn quantifiedWithGoals(self: Store&, tag: Tag, body: Id, binders: const Id[:], g
     let owner, oe = add(self, Node { tag, a: body, b: span.start, c: span.len }); if oe != Error.none { rollback(self, point); return 0, oe; }
     if owned_goals.len != 0 {
         let stored, error = saveQuantifierGoals(self, owned_goals); if error != Error.none { rollback(self, point); return 0, error; }
-        self.quantifier_goals.push(QuantifierGoals { owner, stored });
+        self.quantifier_goals.push(QuantifierGoals { owner, stored });if self.quantifier_goals.failure!=Error.none {return 0,self.quantifier_goals.failure;}
     }
     return owner, Error.none;
 }
@@ -309,7 +305,7 @@ fn reownQuantified(self: Store&, tag: Tag, body: Id, binders: const Id[:], goals
 }
 fn saveQuantifierGoals(self: Store&, goals: const Obligation[:]) -> List, Error {
     if goals.len > 4096 || goals.len > none - self.quantifier_obligations.len { return List {}, Error.type_limit; }
-    let start = self.quantifier_obligations.len as u32; self.quantifier_obligations.append(goals); return List { start, goals.len as u32 }, Error.none;
+    let start = self.quantifier_obligations.len as u32; self.quantifier_obligations.append(goals);if self.quantifier_obligations.failure!=Error.none {return default<List>(),self.quantifier_obligations.failure;} return List { start, goals.len as u32 }, Error.none;
 }
 fn substituteGoal(self: Store&, goal: Obligation, old: const Id[:], fresh_ids: const Id[:]) -> Obligation, Error {
     var result = goal;
@@ -350,23 +346,23 @@ fn freeBound(self: Store&, root: Id) -> bool, Error { if !self.has_rank_types { 
 fn increment(value: u64&) { if value != 0xffffffffffffffff { value += 1; } }
 fn fresh(self: Store&) -> Id, Error {
     if self.variables.len >= none { return 0, Error.type_limit; } let index = self.variables.len as u32;
-    self.variables.push(Variable {}); increment(self.normalization.type_binders_created);
+    self.variables.push(Variable {});if self.variables.failure!=Error.none {return 0,self.variables.failure;} increment(self.normalization.type_binders_created);
     let id, error = variableView(self, index, 0); if error != Error.none { self.variables.pop(); } return id, error;
 }
 fn freshRegion(self: Store&) -> Id, Error {
     if self.variables.len >= none { return 0, Error.type_limit; } let index = self.variables.len as u32;
-    self.variables.push(Variable { region: true }); increment(self.normalization.type_binders_created); self.has_rank_types = true;
+    self.variables.push(Variable { region: true });if self.variables.failure!=Error.none {return 0,self.variables.failure;} increment(self.normalization.type_binders_created); self.has_rank_types = true;
     let id, error = variableView(self, index, 0); if error != Error.none { self.variables.pop(); } return id, error;
 }
 fn freshRowType(self: Store&) -> Id, Error {
     let point = mark(self); let row_, re = freshEffects(self); if re != Error.none { rollback(self, point); return 0, re; }
     if self.variables.len >= none { rollback(self, point); return 0, Error.type_limit; }
-    let index = self.variables.len as u32; self.variables.push(Variable { row_effect: row_ }); increment(self.normalization.type_binders_created); self.has_rank_types = true;
+    let index = self.variables.len as u32; self.variables.push(Variable { row_effect: row_ });if self.variables.failure!=Error.none {return 0,self.variables.failure;} increment(self.normalization.type_binders_created); self.has_rank_types = true;
     let id, error = variableView(self, index, 0); if error != Error.none { rollback(self, point); } return id, error;
 }
 fn rowType(self: Store&, root: Id) -> blot_check_effects::Id, Error {
     let resolved, error = resolve(self, root, 0); if error != Error.none { return 0, error; } let leaf = node(self, resolved);
-    if leaf.tag == Tag.variable && self.variables[leaf.a].row_effect != none { return self.variables[leaf.a].row_effect, Error.none; }
+    if leaf.tag == Tag.variable && self.variables.items[leaf.a].row_effect != none { return self.variables.items[leaf.a].row_effect, Error.none; }
     if (leaf.tag == Tag.bound && leaf.b == 1 && leaf.c == 0) || (leaf.tag == Tag.rigid && leaf.c == 1) {
         let id, error = self.effects.row([], blot_check_effects::Tail.formal { resolved }); return id, effectError(error);
     }
@@ -374,11 +370,11 @@ fn rowType(self: Store&, root: Id) -> blot_check_effects::Id, Error {
 }
 fn rowIdentity(self: const Store&, root: Id) -> bool {
     if root >= self.nodes.len { return false; } let leaf = node(self, head(self, root, 0));
-    match leaf.tag { variable => { return self.variables[leaf.a].row_effect != none; }, bound => { return leaf.b == 1 && leaf.c == 0; }, rigid => { return leaf.c == 1; }, _ => { return false; }, }
+    match leaf.tag { variable => { return self.variables.items[leaf.a].row_effect != none; }, bound => { return leaf.b == 1 && leaf.c == 0; }, rigid => { return leaf.c == 1; }, _ => { return false; }, }
 }
 fn regionIdentity(self: const Store&, root: Id) -> bool {
     if root >= self.nodes.len { return false; } let leaf = node(self, head(self, root, 0));
-    match leaf.tag { variable => { return self.variables[leaf.a].region; }, bound => { return leaf.b == 2; }, rigid => { return leaf.c == 2; }, _ => { return false; }, }
+    match leaf.tag { variable => { return self.variables.items[leaf.a].region; }, bound => { return leaf.b == 2; }, rigid => { return leaf.c == 2; }, _ => { return false; }, }
 }
 fn usage(self: Store&, payload: Id, kind: UsageKind, region: Id) -> Id, Error {
     if payload == absent || payload >= self.nodes.len || node(self, head(self, payload, 0)).tag == Tag.erased_proof { return 0, Error.type_mismatch; }
@@ -394,11 +390,11 @@ fn dataKind(self: const Store&, root: Id) -> Error {
     return Error.none;
 }
 fn variableView(self: Store&, index: u32, at: Cursor) -> Id, Error {
-    var position = at; if self.variables[index].first == none && at <= cursor(self) { position = 0; }
+    var position = at; if self.variables.items[index].first == none && at <= cursor(self) { position = 0; }
     let key = ((index as u64) << 32) | position;
     block { let saved = self.variable_views.get(key); if saved { return saved, Error.none; } }
     let id, error = add(self, Node { Tag.variable, a: index, b: position }); if error != Error.none { return 0, error; }
-    self.variable_views.insert(key, id); increment(self.normalization.variable_views_created); return id, Error.none;
+    self.variable_views.insert(key, id);if self.variable_views.failure!=Error.none {return 0,self.variable_views.failure;} increment(self.normalization.variable_views_created); return id, Error.none;
 }
 fn function(self: Store&, parameter: Id, result: Id) -> Id, Error { return functionWithEffects(self, parameter, result, 0); }
 fn functionWithEffects(self: Store&, parameter: Id, result: Id, effect_row: blot_check_effects::Id) -> Id, Error {
@@ -441,7 +437,7 @@ fn instanceSelection(self: Store&, identity: NominalIdentity, arguments: const I
     for argument in arguments[..2] { if argument >= self.nodes.len || node(self, argument).tag != Tag.scoped { return 0, Error.type_mismatch; } }
     if arguments.len == 3 && (arguments[2] >= self.nodes.len || node(self, arguments[2]).tag != Tag.instance_version) { return 0, Error.type_mismatch; }
     if self.nodes.len > 65536 { return 0, Error.type_limit; }
-    for value, index in self.nodes {
+    for value, index in self.nodes.items {
         if value.tag != Tag.instance_selection || value.a != identity.unit || value.b != identity.decl { continue; }
         let choices = nominalArguments(self, value); if choices.len != arguments.len { continue; }
         if choices.len == 3 && node(self, choices[2]) != node(self, arguments[2]) { continue; }
@@ -456,18 +452,18 @@ fn nominalLike(self: Store&, tag: Tag, identity: NominalIdentity, arguments: con
     for argument in arguments { let error = dataKind(self, argument); if error != Error.none { return 0, error; } }
     if arguments.len >= none || self.extra.len > none - arguments.len - 1 { return 0, Error.type_limit; }
     var owned: Id[>..] = []; owned.append(arguments); let start = self.extra.len as u32;
-    self.extra.push(owned.len as u32); self.extra.append(owned);
+    self.extra.push(owned.len as u32);if self.extra.failure!=Error.none {return 0,self.extra.failure;} self.extra.append(owned);if self.extra.failure!=Error.none {return 0,self.extra.failure;}
     return add(self, Node { tag, a: identity.unit, b: identity.decl, c: start });
 }
 fn chargeProjection(self: Store&) -> Error { if self.projection_steps >= self.projection_limit { self.projection_exhausted = true; return Error.type_limit; } self.projection_steps += 1; return Error.none; }
 fn projection(self: Store&, identity: NominalIdentity, member: u32, arguments: const Id[:]) -> Id, Error {
     for argument in arguments { let error = dataKind(self, argument); if error != Error.none { return 0, error; } }
     self.has_projections = true; let id, error = nominal(self, identity, arguments); if error != Error.none { return 0, error; }
-    self.extra.push(member); self.nodes[id].tag = Tag.projection; self.nodes[id].closed_height = 0; return id, Error.none;
+    self.extra.push(member);if self.extra.failure!=Error.none {return 0,self.extra.failure;} self.nodes.items[id].tag = Tag.projection; self.nodes.items[id].closed_height = 0; return id, Error.none;
 }
-fn projectionMember(self: const Store&, value: Node) -> u32 { assert(value.tag == Tag.projection); return self.extra[value.c + 1 + self.extra[value.c]]; }
-fn nominalArguments(self: const Store&, value: Node) -> const Id[:] { assert(value.tag == Tag.nominal || value.tag == Tag.projection || value.tag == Tag.instance_selection); return self.extra[value.c + 1..value.c + 1 + self.extra[value.c]]; }
-fn recordField(self: const Store&, value: Node, index: i64) -> Field { assert(value.tag == Tag.record && index < value.b); return Field { self.extra[value.a + index * 2], self.extra[value.a + index * 2 + 1] }; }
+fn projectionMember(self: const Store&, value: Node) -> u32 { assert(value.tag == Tag.projection); return self.extra.items[value.c + 1 + self.extra.items[value.c]]; }
+fn nominalArguments(self: const Store&, value: Node) -> const Id[:] { assert(value.tag == Tag.nominal || value.tag == Tag.projection || value.tag == Tag.instance_selection); return self.extra.items[value.c + 1..value.c + 1 + self.extra.items[value.c]]; }
+fn recordField(self: const Store&, value: Node, index: i64) -> Field { assert(value.tag == Tag.record && index < value.b); return Field { self.extra.items[value.a + index * 2], self.extra.items[value.a + index * 2 + 1] }; }
 fn mergeRecords(self: Store&, left: Id, right: Id) -> blot_support::Option<Id>, Error {
     let a = node(self, head(self, left, 0)); let b = node(self, head(self, right, 0));
     if a.tag == Tag.never || b.tag == Tag.never { return blot_support::Option<Id> { true, never }, Error.none; }
@@ -490,38 +486,38 @@ fn rollback(self: Store&, point: Mark) {
     for key in discarded { self.associated_equations.remove(key); }
     invalidateClosedGraphs(self); tick(self);
     while self.versions.len > point.versions {
-        let write = self.versions.pop(); self.variables[write.variable].last = write.previous;
-        if write.previous == none { self.variables[write.variable].first = none; } else { self.versions[write.previous].next = none; }
+        let write = self.versions.pop(); self.variables.items[write.variable].last = write.previous;
+        if write.previous == none { self.variables.items[write.variable].first = none; } else { self.versions.items[write.previous].next = none; }
     }
-    for value in self.nodes[point.nodes..] { if value.tag == Tag.variable { self.variable_views.remove(((value.a as u64) << 32) | value.b); } }
+    for value in self.nodes.items[point.nodes..] { if value.tag == Tag.variable { self.variable_views.remove(((value.a as u64) << 32) | value.b); } }
     self.nodes.pop_n(self.nodes.len - point.nodes); self.extra.pop_n(self.extra.len - point.extra); self.variables.pop_n(self.variables.len - point.variables);
     unlinkOperations(self, point.operations); self.operations.pop_n(self.operations.len - point.operations);
     self.quantifier_goals.pop_n(self.quantifier_goals.len - point.quantifier_goals); self.quantifier_obligations.pop_n(self.quantifier_obligations.len - point.quantifier_obligations);
     self.effects.rollback(point.effects); self.closed_effect_physical_epoch = self.effects.physical_epoch;
 }
 fn appendVersion(self: Store&, variable: Id, replacement_id: Id) -> Error {
-    let value = node(self, variable); assert(value.tag == Tag.variable); let old = self.variables[value.a];
+    let value = node(self, variable); assert(value.tag == Tag.variable); let old = self.variables.items[value.a];
     if old.row_effect != none { if !rowIdentity(self, replacement_id) { return Error.type_mismatch; } }
     else if old.region { if !regionIdentity(self, replacement_id) { return Error.type_mismatch; } }
     else { let error = dataKind(self, replacement_id); if error != Error.none { return error; } }
     if self.versions.len == none || cursor(self) == none { return Error.type_limit; }
-    let index = self.versions.len as u32; self.versions.push(Version { value.a, replacement_id, cursor(self), old.last });
-    if old.last == none { self.variables[value.a].first = index; } else { self.versions[old.last].next = index; }
-    self.variables[value.a].last = index; self.effects.next_position += 1; tick(self); return Error.none;
+    let index = self.versions.len as u32; self.versions.push(Version { value.a, replacement_id, cursor(self), old.last });if self.versions.failure!=Error.none {return self.versions.failure;}
+    if old.last == none { self.variables.items[value.a].first = index; } else { self.versions.items[old.last].next = index; }
+    self.variables.items[value.a].last = index; self.effects.next_position += 1; tick(self); return Error.none;
 }
 fn replacement(self: const Store&, index: u32, at: Cursor) -> blot_support::Option<Version> {
-    var version = self.variables[index].first;
+    var version = self.variables.items[index].first;
     if version == none { return blot_support::Option<Version> { false, default<Version>() }; }
-    let first = self.versions[version]; if first.position >= at { return blot_support::Option<Version> { true, first }; }
-    if self.versions[self.variables[index].last].position < at { return blot_support::Option<Version> { false, default<Version>() }; }
+    let first = self.versions.items[version]; if first.position >= at { return blot_support::Option<Version> { true, first }; }
+    if self.versions.items[self.variables.items[index].last].position < at { return blot_support::Option<Version> { false, default<Version>() }; }
     version = first.next;
-    while version != none { let value = self.versions[version]; if value.position >= at { return blot_support::Option<Version> { true, value }; } version = value.next; }
+    while version != none { let value = self.versions.items[version]; if value.position >= at { return blot_support::Option<Version> { true, value }; } version = value.next; }
     return blot_support::Option<Version> { false, default<Version>() };
 }
 fn bindAssociated(self: Store&, projection_: Id, result: Id) -> Error {
     let kind = dataKind(self, result); if kind != Error.none { return kind; } let charged = chargeProjection(self); if charged != Error.none { return charged; }
     if node(self, projection_).tag != Tag.projection { return Error.type_mismatch; }
-    self.associated_equations.insert(projection_, result); tick(self); return Error.none;
+    self.associated_equations.insert(projection_, result);if self.associated_equations.failure!=Error.none {return self.associated_equations.failure;} tick(self); return Error.none;
 }
 fn head(self: const Store&, root: Id, at: Cursor) -> Id {
     var id = root; var position = at;
@@ -739,7 +735,7 @@ fn saveComposite(self: Store&, root: Id, at: Cursor, result: Id) -> Error {
 fn validResolution(self: Store&, certificate: blot_reuse_composite_resolution_cache::Record) -> bool {
     if certificate.future_clock.present && certificate.future_clock.value != cursor(self) { self.normalization.composite_future_clock_misses += 1; return false; }
     for dependency in certificate.dependencies[..certificate.count] {
-        var last: u32 = 0; if dependency.effect { last = self.effects.variables[dependency.variable].last; } else { last = self.variables[dependency.variable].last; }
+        var last: u32 = 0; if dependency.effect { last = self.effects.variables[dependency.variable].last; } else { last = self.variables.items[dependency.variable].last; }
         if last != dependency.last { self.normalization.composite_stale_dependencies += 1; return false; }
     }
     return true;
@@ -752,7 +748,7 @@ fn resolutionDependencies(self: const Store&, result: Id) -> blot_support::Optio
         if budget == 0 { return blot_support::Option<blot_reuse_composite_resolution_cache::Record> { false, certificate }; } budget -= 1;
         let value = node(self, id);
         if value.tag == Tag.variable {
-            let variable = self.variables[value.a];
+            let variable = self.variables.items[value.a];
             if !certificate.add(blot_reuse_composite_resolution_cache::Dependency { value.a, variable.last }) { return blot_support::Option<blot_reuse_composite_resolution_cache::Record> { false, certificate }; }
             if variable.first == none && value.b > cursor(self) { certificate.future_clock = blot_support::Option<u32> { true, cursor(self) }; }
             continue;
@@ -803,9 +799,9 @@ fn resolveRoot(self: Store&, root: Id, at: Cursor) -> Id, Error {
         if self.use_resolution_cache && at == 0 && raw.tag == Tag.variable && raw.b == 0 && raw.c != 0 && raw.closed_generation == self.closed_generation && self.closed_generation != 0xffff && self.effects.physical_epoch != 0xffffffffffffffff {
             let remaining = node(self, raw.c); if closedHeight(self, raw.c) != 0 { return raw.c, Error.none; }
             if remaining.tag == Tag.variable {
-                let last = self.variables[remaining.a].last;
+                let last = self.variables.items[remaining.a].last;
                 if last == none { if remaining.b == 0 || remaining.b > cursor(self) { return raw.c, Error.none; } }
-                else if self.versions[last].position < remaining.b { return raw.c, Error.none; }
+                else if self.versions.items[last].position < remaining.b { return raw.c, Error.none; }
             }
         }
     }
@@ -821,7 +817,7 @@ fn resolveRoot(self: Store&, root: Id, at: Cursor) -> Id, Error {
     } }
     let before_nodes = self.nodes.len; let result, error = resolveDepth(self, root, at, 0); if error != Error.none { return 0, error; }
     if self.use_closed_graphs && self.closed_generation != 0xffff && self.effects.physical_epoch != 0xffffffffffffffff && (closedHeight(self, result) != 0 || node(self, result).tag == Tag.variable) && node(self, root).tag == Tag.variable && node(self, root).b == 0 {
-        self.nodes[root].c = result; self.nodes[root].closed_generation = self.closed_generation; return result, Error.none;
+        self.nodes.items[root].c = result; self.nodes.items[root].closed_generation = self.closed_generation; return result, Error.none;
     }
     if result == root && root >= self.resolved.high_water { return result, Error.none; }
     let publication = self.resolved.put(root, result); if publication != Error.none { return 0, publication; }
@@ -841,7 +837,7 @@ recursive fn resolveDepth(self: Store&, root: Id, at: Cursor, depth: i64) -> Id,
         let key = ProjectionResolution { root, at, depth as u32 };
         block { let cached = self.projection_resolutions.get(key); if cached { return cached, Error.none; } }
         let result, error = resolveNode(self, root, at, depth); if error != Error.none { return 0, error; }
-        if self.projection_resolutions.count < 65536 { self.projection_resolutions.insert(key, result); }
+        if self.projection_resolutions.count < 65536 { self.projection_resolutions.insert(key, result);if self.projection_resolutions.failure!=Error.none {return 0,self.projection_resolutions.failure;} }
         return result, Error.none;
     }
     return resolveNode(self, root, at, depth);
@@ -860,7 +856,7 @@ recursive fn resolveNode(self: Store&, root: Id, at: Cursor, depth: i64) -> Id, 
     if id != root { let height = closedHeight(self, id); if height != 0 { if depth + height > self.resolution_depth_limit { return 0, Error.type_limit; } return id, Error.none; } }
     let value = node(self, id); let result, error = resolveSelected(self, id, value, position, depth);
     if self.use_closed_graphs && value.tag != Tag.variable && self.closed_generation != 0xffff {
-        let refreshed = closedNodeHeight(self, value); if refreshed != 0 { self.nodes[id].closed_height = refreshed; self.nodes[id].closed_generation = self.closed_generation; }
+        let refreshed = closedNodeHeight(self, value); if refreshed != 0 { self.nodes.items[id].closed_height = refreshed; self.nodes.items[id].closed_generation = self.closed_generation; }
     }
     return result, error;
 }
@@ -899,8 +895,8 @@ recursive fn resolveSelected(self: Store&, id: Id, value: Node, position: Cursor
         product => {
             var fields: Id[>..] = []; var changed = false;
             for i in value.b {
-                let old = self.extra[value.a + i]; let child, error = resolveDepth(self, old, position, depth + 1); if error != Error.none { return 0, error; }
-                if !changed && child != old { fields.append(self.extra[value.a..value.a + i]); changed = true; }
+                let old = self.extra.items[value.a + i]; let child, error = resolveDepth(self, old, position, depth + 1); if error != Error.none { return 0, error; }
+                if !changed && child != old { fields.append(self.extra.items[value.a..value.a + i]); changed = true; }
                 if changed { fields.push(child); }
             }
             if changed { return product(self, fields); } return id, Error.none;
@@ -930,10 +926,10 @@ recursive fn resolveSelected(self: Store&, id: Id, value: Node, position: Cursor
             if changed { return record(self, fields); } return id, Error.none;
         },
         nominal, projection, instance_selection => {
-            var args: Id[>..] = []; var changed = false; let count = self.extra[value.c];
+            var args: Id[>..] = []; var changed = false; let count = self.extra.items[value.c];
             for i in count {
-                let child = self.extra[value.c + 1 + i]; let next, error = resolveDepth(self, child, position, depth + 1); if error != Error.none { return 0, error; }
-                if !changed && child != next { args.append(self.extra[value.c + 1..value.c + 1 + i]); changed = true; } if changed { args.push(next); }
+                let child = self.extra.items[value.c + 1 + i]; let next, error = resolveDepth(self, child, position, depth + 1); if error != Error.none { return 0, error; }
+                if !changed && child != next { args.append(self.extra.items[value.c + 1..value.c + 1 + i]); changed = true; } if changed { args.push(next); }
             }
             if !changed { return id, Error.none; }
             if value.tag == Tag.projection { return projection(self, NominalIdentity { value.a, value.b }, projectionMember(self, value), args); }
@@ -946,12 +942,12 @@ recursive fn resolveSelected(self: Store&, id: Id, value: Node, position: Cursor
 fn occurs(self: Store&, variable: u32, root: Id) -> bool, Error {
     let resolved_root, error = resolve(self, root, 0); if error != Error.none { return false, error; }
     if closedHeight(self, resolved_root) != 0 || resolved_root <= never { self.occurs_steps += 1; return false, Error.none; }
-    if self.occurs_seen.len < self.nodes.len { self.occurs_seen.resize(self.nodes.len, 0); }
+    if self.occurs_seen.len < self.nodes.len { self.occurs_seen.resize(self.nodes.len, 0);if self.occurs_seen.failure!=Error.none {return false,self.occurs_seen.failure;} }
     self.occurs_generation += 1;
-    if self.occurs_generation == 0 { for &value in self.occurs_seen { value = 0; } self.occurs_generation = 1; }
+    if self.occurs_generation == 0 { for &value in self.occurs_seen.items { value = 0; } self.occurs_generation = 1; }
     var pending: Id[>..<] = []; pending.push(resolved_root); var budget: i64 = 1000000;
     while pending.len > 0 {
-        let id = pending.pop(); if self.occurs_seen[id] == self.occurs_generation { continue; } self.occurs_seen[id] = self.occurs_generation;
+        let id = pending.pop(); if self.occurs_seen.items[id] == self.occurs_generation { continue; } self.occurs_seen.items[id] = self.occurs_generation;
         if budget == 0 { return false, Error.type_limit; } budget -= 1; self.occurs_steps += 1; if closedHeight(self, id) != 0 { continue; }
         let value = node(self, id);
         if value.tag == Tag.function || value.tag == Tag.provider { for label in rowLabels(self, value.c) {
@@ -1022,8 +1018,8 @@ recursive fn resolveOperationRow(self: Store&, root: blot_check_effects::Id, at:
     let id, error = self.effects.resolve(root, at); if error != Error.none { return 0, effectError(error); }
     let row_ = row(self, id); if row_.labels.len == 0 { return id, Error.none; }
     if self.use_closed_rows && self.use_closed_graphs && id >= self.closed_row_index.len {
-        let previous = self.closed_row_index.len; self.closed_row_index.resize(self.effects.rows.len, RowCertificate {});
-        for value in self.closed_rows { if value.row >= previous && value.row < self.closed_row_index.len { self.closed_row_index[value.row] = RowCertificate { value.generation, value.argument_height, value.has_arguments }; } }
+        let previous = self.closed_row_index.len; self.closed_row_index.resize(self.effects.rows.len, RowCertificate {});if self.closed_row_index.failure!=Error.none {return default<blot_check_effects::Id>(),self.closed_row_index.failure;}
+        for value in self.closed_rows { if value.row >= previous && value.row < self.closed_row_index.len { self.closed_row_index.items[value.row] = RowCertificate { value.generation, value.argument_height, value.has_arguments }; } }
     }
     let cached = closedRow(self, id);
     if cached.present { self.normalization.closed_row_hits += 1; if cached.value.has_arguments && depth + 1 + cached.value.argument_height > self.resolution_depth_limit { return 0, Error.type_limit; } return id, Error.none; }
@@ -1045,7 +1041,7 @@ recursive fn resolveOperationRow(self: Store&, root: blot_check_effects::Id, at:
 }
 recursive fn resolveOperationArguments(self: Store&, id: blot_check_effects::Id, at: Cursor, depth: i64) -> blot_check_effects::Id, Error {
     self.normalization.argument_rows += 1;
-    if self.use_closed_rows && self.use_closed_graphs && self.closed_operation_index.len < self.operations.len { self.closed_operation_index.resize(self.operations.len, RowCertificate {}); }
+    if self.use_closed_rows && self.use_closed_graphs && self.closed_operation_index.len < self.operations.len { self.closed_operation_index.resize(self.operations.len, RowCertificate {});if self.closed_operation_index.failure!=Error.none {return default<blot_check_effects::Id>(),self.closed_operation_index.failure;} }
     let row_ = row(self, id); var all_closed = true; var argument_height: u8 = 0; var has_arguments = false;
     var labels: blot_check_effects::Label[>..] = []; var changed = false;
     for index in row_.labels.len {
@@ -1085,7 +1081,7 @@ recursive fn resolveOperationArguments(self: Store&, id: blot_check_effects::Id,
 }
 fn row(self: const Store&, id: blot_check_effects::Id) -> blot_check_effects::Row { return self.effects.node(id); }
 fn rowLabels(self: const Store&, id: blot_check_effects::Id) -> const blot_check_effects::Label[:] { return self.effects.list(row(self, id).labels); }
-fn operation(self: const Store&, label: blot_check_effects::Label) -> Operation { return self.operations[label]; }
+fn operation(self: const Store&, label: blot_check_effects::Label) -> Operation { return self.operations.items[label]; }
 fn operationArguments(self: const Store&, label: blot_check_effects::Label) -> const Id[:] { return list(self, operation(self, label).arguments); }
 fn internOperation(self: Store&, identity: NominalIdentity, arguments: const Id[:]) -> blot_check_effects::Label, Error { return internOperationMode(self, identity, NominalIdentity { 0, 0 }, arguments, false); }
 fn internSymbolicOperation(self: Store&, identity: NominalIdentity, arguments: const Id[:]) -> blot_check_effects::Label, Error { return internOperationMode(self, identity, NominalIdentity { 0, 0 }, arguments, true); }
@@ -1111,14 +1107,14 @@ fn internResolvedOperation(self: Store&, identity: NominalIdentity, instance: No
         var first = none; block { let chain = self.operation_chains.get(key); if chain { first = chain.first; } }
         var index = first;
         while index != none {
-            self.normalization.interner_candidates += 1; let old = list(self, self.operations[index].arguments); var same = true;
+            self.normalization.interner_candidates += 1; let old = list(self, self.operations.items[index].arguments); var same = true;
             for a, i in old { if !same { break; } self.normalization.interner_arguments += 1; let result, error = equalGraph(self, a, resolved[i], symbolic); if error != Error.none { rollback(self, point); return 0, error; } same = result; }
-            if same { return index, Error.none; } index = self.operation_links[index].next;
+            if same { return index, Error.none; } index = self.operation_links.items[index].next;
         }
     }
     if self.operations.len == none { rollback(self, point); return 0, Error.type_limit; }
     let span, error = saveList(self, resolved); if error != Error.none { rollback(self, point); return 0, error; }
-    let id = self.operations.len as u32; self.operations.push(Operation { identity, span, instance }); return id, Error.none;
+    let id = self.operations.len as u32; self.operations.push(Operation { identity, span, instance });if self.operations.failure!=Error.none {return default<blot_check_effects::Label>(),self.operations.failure;} return id, Error.none;
 }
 fn operationShape(self: const Store&, arguments: const Id[:]) -> u64 {
     if !self.operation_shape_enabled { return 0; } var value = arguments.len as u64;
@@ -1150,25 +1146,25 @@ fn linkOperations(self: Store&) -> Error {
         self.normalization.interner_rebuilds += 1; self.operation_chains.clear(); self.operation_links.clear();
     }
     self.operation_shape_generation = self.closed_generation; self.operation_shape_enabled = enabled;
-    if self.operation_links.len == 0 { self.operation_links.push(OperationLink {}); }
+    if self.operation_links.len == 0 { self.operation_links.push(OperationLink {});if self.operation_links.failure!=Error.none {return self.operation_links.failure;} }
     while self.operation_links.len < self.operations.len {
-        self.normalization.interner_linked += 1; let index = self.operation_links.len as u32; let operation_ = self.operations[index];
+        self.normalization.interner_linked += 1; let index = self.operation_links.len as u32; let operation_ = self.operations.items[index];
         let shape = operationShape(self, list(self, operation_.arguments)); let key = OperationKey { operation_.identity, operation_.instance, operation_.arguments.len, shape };
         var found = false; var last = none;
         block { let entry = self.operation_chains.get(key); if entry { found = true; last = entry.last; entry.last = index; } }
-        if found { self.operation_links[last].next = index; self.operation_links.push(OperationLink { previous: last, shape: shape }); }
-        else { self.operation_links.push(OperationLink { shape: shape }); self.operation_chains.insert(key, OperationChain { index, index }); }
+        if found { self.operation_links.items[last].next = index; self.operation_links.push(OperationLink { previous: last, shape: shape });if self.operation_links.failure!=Error.none {return self.operation_links.failure;} }
+        else { self.operation_links.push(OperationLink { shape: shape });if self.operation_links.failure!=Error.none {return self.operation_links.failure;} self.operation_chains.insert(key, OperationChain { index, index });if self.operation_chains.failure!=Error.none {return self.operation_chains.failure;} }
     }
     return Error.none;
 }
 fn unlinkOperations(self: Store&, length: i64) {
     if self.operation_links.len > self.operations.len { self.operation_chains.clear(); self.operation_links.clear(); }
     while self.operation_links.len > max(length, 1) {
-        let index = self.operation_links.len - 1; let operation_ = self.operations[index];
-        let key = OperationKey { operation_.identity, operation_.instance, operation_.arguments.len, self.operation_links[index].shape };
+        let index = self.operation_links.len - 1; let operation_ = self.operations.items[index];
+        let key = OperationKey { operation_.identity, operation_.instance, operation_.arguments.len, self.operation_links.items[index].shape };
         let previous = self.operation_links.pop().previous;
         if previous == none { self.operation_chains.remove(key); }
-        else { self.operation_links[previous].next = none; let chain = self.operation_chains.get(key); assert(chain); chain.last = previous; }
+        else { self.operation_links.items[previous].next = none; let chain = self.operation_chains.get(key); assert(chain); chain.last = previous; }
     }
 }
 struct Pair { a: Id, b: Id, effect_row: bool = false }
@@ -1296,21 +1292,21 @@ fn unifyInner(self: Store&, left: Id, right: Id, reporter, associated: bool) -> 
             let ar, are = rowType(self, a); if are != Error.none { return are; } let br, bre = rowType(self, b); if bre != Error.none { return bre; }
             let error = unifyEffects(self, ar, br); if error != Error.none { return error; } continue;
         }
-        if an.tag == Tag.variable && self.variables[an.a].region && !regionIdentity(self, b) { return mismatch(self, reporter, a, b); }
-        if bn.tag == Tag.variable && self.variables[bn.a].region && !regionIdentity(self, a) { return mismatch(self, reporter, a, b); }
+        if an.tag == Tag.variable && self.variables.items[an.a].region && !regionIdentity(self, b) { return mismatch(self, reporter, a, b); }
+        if bn.tag == Tag.variable && self.variables.items[bn.a].region && !regionIdentity(self, a) { return mismatch(self, reporter, a, b); }
         if a == b || a == never || b == never { continue; }
         if self.has_rank_types && (isRank(an.tag) || isRank(bn.tag)) { rank_active = true; }
         if bounded || rank_active { let key = Pair { a, b }; if seen.contains(key) { continue; } seen.insert(key, true); }
         if an.tag == Tag.variable && bn.tag == Tag.variable && an.a == bn.a { continue; }
         if an.tag == Tag.variable {
             if bn.tag == Tag.forall { return mismatch(self, reporter, a, b); }
-            if !self.variables[an.a].region { let free, error = freeBound(self, b); if error != Error.none { return error; } if free { return mismatch(self, reporter, a, b); } }
+            if !self.variables.items[an.a].region { let free, error = freeBound(self, b); if error != Error.none { return error; } if free { return mismatch(self, reporter, a, b); } }
             let infinite, error = occurs(self, an.a, b); if error != Error.none { return error; } if infinite { return Error.infinite_type; }
             let error = appendVersion(self, a, b); if error != Error.none { return error; } continue;
         }
         if bn.tag == Tag.variable {
             if an.tag == Tag.forall { return mismatch(self, reporter, a, b); }
-            if !self.variables[bn.a].region { let free, error = freeBound(self, a); if error != Error.none { return error; } if free { return mismatch(self, reporter, a, b); } }
+            if !self.variables.items[bn.a].region { let free, error = freeBound(self, a); if error != Error.none { return error; } if free { return mismatch(self, reporter, a, b); } }
             let infinite, error = occurs(self, bn.a, a); if error != Error.none { return error; } if infinite { return Error.infinite_type; }
             let error = appendVersion(self, b, a); if error != Error.none { return error; } continue;
         }
@@ -1334,7 +1330,7 @@ fn unifyInner(self: Store&, left: Id, right: Id, reporter, associated: bool) -> 
                 let body, error = substitute(self, bn.a, old, fresh_ids); if error != Error.none { return error; } pending.push(Pair { an.a, body });
             },
             function => { pending.append([Pair { an.c, bn.c, true }, Pair { an.b, bn.b }, Pair { an.a, bn.a }]); },
-            product => { if an.b != bn.b { return mismatch(self, reporter, a, b); } var i = an.b; while i != 0 { i -= 1; pending.push(Pair { self.extra[an.a + i], self.extra[bn.a + i] }); } },
+            product => { if an.b != bn.b { return mismatch(self, reporter, a, b); } var i = an.b; while i != 0 { i -= 1; pending.push(Pair { self.extra.items[an.a + i], self.extra.items[bn.a + i] }); } },
             array, list, cursor, resolver => { pending.push(Pair { an.a, bn.a }); },
             provider => { pending.append([Pair { an.c, bn.c, true }, Pair { an.a, bn.a }]); },
             state_provider => { pending.append([Pair { an.c, bn.c }, Pair { an.b, bn.b }, Pair { an.a, bn.a }]); },
@@ -1577,7 +1573,7 @@ recursive fn substituteNode(self: Store&, root: Id, substitution: const Substitu
             return functionWithEffects(self, parameter, result, row_);
         },
         product => {
-            var fields: Id[>..] = []; for i in value.b { let next, error = substituteDepth(self, self.extra[value.a + i], substitution, copied, depth + 1); if error != Error.none { return 0, error; } fields.push(next); } return product(self, fields);
+            var fields: Id[>..] = []; for i in value.b { let next, error = substituteDepth(self, self.extra.items[value.a + i], substitution, copied, depth + 1); if error != Error.none { return 0, error; } fields.push(next); } return product(self, fields);
         },
         array, list, cursor, resolver => {
             let next, error = substituteDepth(self, value.a, substitution, copied, depth + 1); if error != Error.none { return 0, error; }
@@ -1670,10 +1666,10 @@ recursive fn closeCovariantNode(self: Store&, root: Id, generalized: const u32[:
         },
         product, record => {
             var protected_siblings: u32[>..] = []; protected_siblings.append(protected);
-            for i in value.b { var child = self.extra[value.a + i]; if value.tag == Tag.record { child = recordField(self, value, i).ty; } let error = covariantInputs(self, child, protected_siblings, depth + 1); if error != Error.none { return 0, error; } }
+            for i in value.b { var child = self.extra.items[value.a + i]; if value.tag == Tag.record { child = recordField(self, value, i).ty; } let error = covariantInputs(self, child, protected_siblings, depth + 1); if error != Error.none { return 0, error; } }
             var children: Id[>..] = []; var fields: Field[>..] = []; var changed = false;
             for i in value.b {
-                var field = Field { 0, self.extra[value.a + i] }; if value.tag == Tag.record { field = recordField(self, value, i); }
+                var field = Field { 0, self.extra.items[value.a + i] }; if value.tag == Tag.record { field = recordField(self, value, i); }
                 let child, error = closeCovariantDepth(self, field.ty, generalized, protected_siblings, decisions, record_decisions, memo, depth + 1); if error != Error.none { return 0, error; }
                 changed = changed || child != field.ty; if value.tag == Tag.record { fields.push(Field { field.name, child }); } else { children.push(child); }
             }
@@ -1700,7 +1696,7 @@ recursive fn covariantInputsSeen(self: Store&, root: Id, out: u32[>..]&, depth: 
         function => { let free, error = freeRowVariables(self, value.a); if error != Error.none { return error; } let added = unionInto(self, out, free); if added != Error.none { return added; } return covariantInputsSeen(self, value.b, out, depth + 1, seen); },
         nominal, state_provider => { let free, error = freeRowVariables(self, root); if error != Error.none { return error; } return unionInto(self, out, free); },
         provider => { let free, error = freeRowVariables(self, value.a); if error != Error.none { return error; } return unionInto(self, out, free); },
-        product, record => { for i in value.b { var child = self.extra[value.a + i]; if value.tag == Tag.record { child = recordField(self, value, i).ty; } let error = covariantInputsSeen(self, child, out, depth + 1, seen); if error != Error.none { return error; } } },
+        product, record => { for i in value.b { var child = self.extra.items[value.a + i]; if value.tag == Tag.record { child = recordField(self, value, i).ty; } let error = covariantInputsSeen(self, child, out, depth + 1, seen); if error != Error.none { return error; } } },
         usage, array, list, cursor => { return covariantInputsSeen(self, value.a, out, depth + 1, seen); }, _ => {},
     }
     return Error.none;
@@ -1738,7 +1734,7 @@ recursive fn openCovariantNode(self: Store&, root: Id, memo: dictionary<Covarian
         },
         product, record => {
             var children: Id[>..] = []; var fields: Field[>..] = []; var changed = false;
-            for i in value.b { var field = Field { 0, self.extra[value.a + i] }; if value.tag == Tag.record { field = recordField(self, value, i); }
+            for i in value.b { var field = Field { 0, self.extra.items[value.a + i] }; if value.tag == Tag.record { field = recordField(self, value, i); }
                 let child, error = openCovariantDepth(self, field.ty, memo, depth + 1); if error != Error.none { return 0, error; }
                 changed = changed || child != field.ty; if value.tag == Tag.record { fields.push(Field { field.name, child }); } else { children.push(child); }
             }
@@ -1767,55 +1763,9 @@ fn blot_structural::equal(left: blot_check_types::ObligationKind, right: blot_ch
 fn blot_structural::hash<S>(sink: S&, value: blot_check_types::ObligationKind) { blot_structural::hash(sink, blot_check_types::obligationKindCode(value) as! u8); }
 fn usageKindFromCode(code: u32) -> UsageKind, bool { if code > 7 { return 0, false; } return code, true; }
 
-fn withStore<C,F>(context: C&) -> Error {
-    var nodes: Node[>..<] = [];
-    var extra: Id[>..<] = [];
-    var variables: Variable[>..<] = [];
-    var versions: Version[>..<] = [];
-    var operations: Operation[>..<] = [];
-    var operation_links: OperationLink[>..<] = [];
-    var quantifier_goals: QuantifierGoals[>..<] = [];
-    var quantifier_obligations: Obligation[>..<] = [];
-    var occurs_seen: u32[>..<] = [];
-    var closed_row_index: RowCertificate[>..<] = [];
-    var closed_operation_index: RowCertificate[>..<] = [];
-    var variable_views = dictionary<u64, Id> {}; var associated_equations = dictionary<Id, Id> {};
-    var projection_resolutions = dictionary<ProjectionResolution, Id> {}; var operation_chains = dictionary<OperationKey, OperationChain> {};
-    var effect_rows: blot_check_effects::Row[>..<] = []; var effect_labels: blot_check_effects::Label[>..<] = [];
-    var effect_variables: blot_check_effects::Variable[>..<] = []; var effect_versions: blot_check_effects::Version[>..<] = []; var effect_resolved = dictionary<Id, Id> {};
-    let effects, effect_error = blot_check_effects::init(effect_rows, effect_labels, effect_variables, effect_versions, effect_resolved);
-    var resolved_entries: blot_reuse_epoch_resolution_cache::Entry[>..<] = []; var composite_entries: blot_reuse_composite_resolution_cache::Entry[>..<] = [];
-    let resolved = blot_reuse_epoch_resolution_cache::init(resolved_entries); let composites = blot_reuse_composite_resolution_cache::init(composite_entries);
-    let tables = Tables { nodes, extra, variables, versions, operations, operation_links, quantifier_goals, quantifier_obligations, occurs_seen, closed_row_index, closed_operation_index, variable_views, associated_equations, projection_resolutions, operation_chains };
-    if effect_error != Error.none { return effectError(effect_error); }
-    let initialized, error = init(tables, effects, resolved, composites); if error != Error.none { return error; }
-    var store = initialized; let result = F(context, store); deinit(store); return result;
-}
 
-fn withStoreValue<C,F,R>(context: C&) -> R, Error {
-    var nodes: Node[>..<] = [];
-    var extra: Id[>..<] = [];
-    var variables: Variable[>..<] = [];
-    var versions: Version[>..<] = [];
-    var operations: Operation[>..<] = [];
-    var operation_links: OperationLink[>..<] = [];
-    var quantifier_goals: QuantifierGoals[>..<] = [];
-    var quantifier_obligations: Obligation[>..<] = [];
-    var occurs_seen: u32[>..<] = [];
-    var closed_row_index: RowCertificate[>..<] = [];
-    var closed_operation_index: RowCertificate[>..<] = [];
-    var variable_views = dictionary<u64, Id> {}; var associated_equations = dictionary<Id, Id> {};
-    var projection_resolutions = dictionary<ProjectionResolution, Id> {}; var operation_chains = dictionary<OperationKey, OperationChain> {};
-    var effect_rows: blot_check_effects::Row[>..<] = []; var effect_labels: blot_check_effects::Label[>..<] = [];
-    var effect_variables: blot_check_effects::Variable[>..<] = []; var effect_versions: blot_check_effects::Version[>..<] = []; var effect_resolved = dictionary<Id, Id> {};
-    let effects, effect_error = blot_check_effects::init(effect_rows, effect_labels, effect_variables, effect_versions, effect_resolved);
-    var resolved_entries: blot_reuse_epoch_resolution_cache::Entry[>..<] = []; var composite_entries: blot_reuse_composite_resolution_cache::Entry[>..<] = [];
-    let resolved = blot_reuse_epoch_resolution_cache::init(resolved_entries); let composites = blot_reuse_composite_resolution_cache::init(composite_entries);
-    let tables = Tables { nodes, extra, variables, versions, operations, operation_links, quantifier_goals, quantifier_obligations, occurs_seen, closed_row_index, closed_operation_index, variable_views, associated_equations, projection_resolutions, operation_chains };
-    if effect_error != Error.none { return default<R>(), effectError(effect_error); }
-    let initialized, error = init(tables, effects, resolved, composites); if error != Error.none { return default<R>(), error; }
-    var store = initialized; let result, failure = F(context, store); deinit(store); return result, failure;
-}
+
+
 fn usageKindCode(kind: UsageKind) -> u32 { return usageCode(kind); }
 // Suspension transfers one live logical owner into typed reusable backing.
 type StoreSnapshot = blot_check_type_store_snapshot::Snapshot;
@@ -1825,3 +1775,422 @@ fn deinit(snapshot: StoreSnapshot&) -> Error { return blot_check_type_store_snap
 fn cloneSnapshot(snapshot: const StoreSnapshot&) -> StoreSnapshot, Error { return blot_check_type_store_snapshot::cloneSnapshot(snapshot); }
 fn snapshotOwnedBytes(snapshot: const StoreSnapshot&) -> i64 { return blot_check_type_store_snapshot::snapshotOwnedBytes(snapshot); }
 fn snapshotMetadataBytes() -> i64 { return blot_check_type_store_snapshot::snapshotMetadataBytes(); }
+
+import support.pooled_buffer;
+struct ScalarDefaults {
+owner_id:u64=default<u64>(),
+use_closed_rows:bool=true,
+closed_rows:ClosedRow[4]=[ClosedRow {}; 4],
+use_operation_rows:bool=true,
+operation_rows:OperationRow[64]=[OperationRow {}; 64],
+has_usage_types:bool=false,
+has_rank_types:bool=false,
+next_rigid_scope:u32=1,
+use_closed_graphs:bool=false,
+has_proof_kinds:bool=false,
+has_projections:bool=false,
+projection_limit:i64=1000000,
+projection_steps:i64=0,
+resolution_depth_limit:i64=1024,
+projection_exhausted:bool=false,
+projection_resolution_types:u64=0,
+projection_resolution_rows:u64=0,
+projection_resolution_limit:i64=0,
+closed_generation:u16=1,
+closed_effect_physical_epoch:u64=0,
+mutation_epoch:u64=0,
+occurs_steps:u64=0,
+normalization:blot_work_counters::Normalization=blot_work_counters::Normalization {},
+resolution_steps:u64=0,
+occurs_generation:u32=0,
+use_resolution_cache:bool=true,
+use_composite_cache:bool=true,
+composite_min_growth:i64=4,
+use_operation_shapes:bool=true,
+operation_shape_generation:u16=0,
+operation_shape_enabled:bool=false,
+}
+var inactive_scalars=ScalarDefaults{};
+struct OwnerState {generation:u64=0,live:bool=false,
+nodes:Table_nodes=Table_nodes{},
+extra:Table_extra=Table_extra{},
+variables:Table_variables=Table_variables{},
+versions:Table_versions=Table_versions{},
+operations:Table_operations=Table_operations{},
+operation_links:Table_operation_links=Table_operation_links{},
+quantifier_goals:Table_quantifier_goals=Table_quantifier_goals{},
+quantifier_obligations:Table_quantifier_obligations=Table_quantifier_obligations{},
+occurs_seen:Table_occurs_seen=Table_occurs_seen{},
+closed_row_index:Table_closed_row_index=Table_closed_row_index{},
+closed_operation_index:Table_closed_operation_index=Table_closed_operation_index{},
+variable_views:Map_variable_views=Map_variable_views{},
+associated_equations:Map_associated_equations=Map_associated_equations{},
+projection_resolutions:Map_projection_resolutions=Map_projection_resolutions{},
+operation_chains:Map_operation_chains=Map_operation_chains{},
+effects:blot_check_effects::Store=blot_check_effects::Store{},
+resolved:blot_reuse_epoch_resolution_cache::Cache=blot_reuse_epoch_resolution_cache::Cache{},
+composites:blot_reuse_composite_resolution_cache::Cache=blot_reuse_composite_resolution_cache::Cache{},
+owner_id:u64=default<u64>(),
+use_closed_rows:bool=true,
+closed_rows:ClosedRow[4]=[ClosedRow {}; 4],
+use_operation_rows:bool=true,
+operation_rows:OperationRow[64]=[OperationRow {}; 64],
+has_usage_types:bool=false,
+has_rank_types:bool=false,
+next_rigid_scope:u32=1,
+use_closed_graphs:bool=false,
+has_proof_kinds:bool=false,
+has_projections:bool=false,
+projection_limit:i64=1000000,
+projection_steps:i64=0,
+resolution_depth_limit:i64=1024,
+projection_exhausted:bool=false,
+projection_resolution_types:u64=0,
+projection_resolution_rows:u64=0,
+projection_resolution_limit:i64=0,
+closed_generation:u16=1,
+closed_effect_physical_epoch:u64=0,
+mutation_epoch:u64=0,
+occurs_steps:u64=0,
+normalization:blot_work_counters::Normalization=blot_work_counters::Normalization {},
+resolution_steps:u64=0,
+occurs_generation:u32=0,
+use_resolution_cache:bool=true,
+use_composite_cache:bool=true,
+composite_min_growth:i64=4,
+use_operation_shapes:bool=true,
+operation_shape_generation:u16=0,
+operation_shape_enabled:bool=false,
+}
+var inactive_nodes=Table_nodes{};
+var inactive_extra=Table_extra{};
+var inactive_variables=Table_variables{};
+var inactive_versions=Table_versions{};
+var inactive_operations=Table_operations{};
+var inactive_operation_links=Table_operation_links{};
+var inactive_quantifier_goals=Table_quantifier_goals{};
+var inactive_quantifier_obligations=Table_quantifier_obligations{};
+var inactive_occurs_seen=Table_occurs_seen{};
+var inactive_closed_row_index=Table_closed_row_index{};
+var inactive_closed_operation_index=Table_closed_operation_index{};
+var inactive_variable_views=Map_variable_views{};
+var inactive_associated_equations=Map_associated_equations{};
+var inactive_projection_resolutions=Map_projection_resolutions{};
+var inactive_operation_chains=Map_operation_chains{};
+var inactive_effects=blot_check_effects::Store{};
+var inactive_resolved=blot_reuse_epoch_resolution_cache::Cache{};
+var inactive_composites=blot_reuse_composite_resolution_cache::Cache{};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+reusable[] var owner_states:OwnerState[>..];
+var next_owner_generation:u64=1;
+
+struct Table_nodes {storage:Node[:]=[],items:Node[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_nodes:Node[>..];
+fn ensure(self:Table_nodes&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_nodes);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_nodes&,value:Node) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_nodes);self.len=self.items.len;}
+fn append(self:Table_nodes&,values:const Node[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_nodes);self.len=self.items.len;}
+fn resize(self:Table_nodes&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_nodes&,length:i64,value:Node) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_nodes&)->Node {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_nodes&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_nodes&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_nodes&) {blot_support_pooled_buffer::deinit(self,pool_Table_nodes);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_nodes&,value:const Node&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_nodes&,values:const Node[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_extra {storage:Id[:]=[],items:Id[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_extra:Id[>..];
+fn ensure(self:Table_extra&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_extra);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_extra&,value:Id) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_extra);self.len=self.items.len;}
+fn append(self:Table_extra&,values:const Id[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_extra);self.len=self.items.len;}
+fn resize(self:Table_extra&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_extra&,length:i64,value:Id) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_extra&)->Id {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_extra&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_extra&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_extra&) {blot_support_pooled_buffer::deinit(self,pool_Table_extra);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_extra&,value:const Id&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_extra&,values:const Id[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_variables {storage:Variable[:]=[],items:Variable[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_variables:Variable[>..];
+fn ensure(self:Table_variables&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_variables);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_variables&,value:Variable) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_variables);self.len=self.items.len;}
+fn append(self:Table_variables&,values:const Variable[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_variables);self.len=self.items.len;}
+fn resize(self:Table_variables&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_variables&,length:i64,value:Variable) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_variables&)->Variable {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_variables&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_variables&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_variables&) {blot_support_pooled_buffer::deinit(self,pool_Table_variables);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_variables&,value:const Variable&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_variables&,values:const Variable[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_versions {storage:Version[:]=[],items:Version[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_versions:Version[>..];
+fn ensure(self:Table_versions&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_versions);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_versions&,value:Version) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_versions);self.len=self.items.len;}
+fn append(self:Table_versions&,values:const Version[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_versions);self.len=self.items.len;}
+fn resize(self:Table_versions&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_versions&,length:i64,value:Version) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_versions&)->Version {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_versions&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_versions&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_versions&) {blot_support_pooled_buffer::deinit(self,pool_Table_versions);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_versions&,value:const Version&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_versions&,values:const Version[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_operations {storage:Operation[:]=[],items:Operation[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_operations:Operation[>..];
+fn ensure(self:Table_operations&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_operations);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_operations&,value:Operation) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_operations);self.len=self.items.len;}
+fn append(self:Table_operations&,values:const Operation[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_operations);self.len=self.items.len;}
+fn resize(self:Table_operations&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_operations&,length:i64,value:Operation) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_operations&)->Operation {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_operations&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_operations&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_operations&) {blot_support_pooled_buffer::deinit(self,pool_Table_operations);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_operations&,value:const Operation&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_operations&,values:const Operation[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_operation_links {storage:OperationLink[:]=[],items:OperationLink[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_operation_links:OperationLink[>..];
+fn ensure(self:Table_operation_links&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_operation_links);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_operation_links&,value:OperationLink) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_operation_links);self.len=self.items.len;}
+fn append(self:Table_operation_links&,values:const OperationLink[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_operation_links);self.len=self.items.len;}
+fn resize(self:Table_operation_links&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_operation_links&,length:i64,value:OperationLink) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_operation_links&)->OperationLink {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_operation_links&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_operation_links&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_operation_links&) {blot_support_pooled_buffer::deinit(self,pool_Table_operation_links);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_operation_links&,value:const OperationLink&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_operation_links&,values:const OperationLink[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_quantifier_goals {storage:QuantifierGoals[:]=[],items:QuantifierGoals[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_quantifier_goals:QuantifierGoals[>..];
+fn ensure(self:Table_quantifier_goals&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_quantifier_goals);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_quantifier_goals&,value:QuantifierGoals) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_quantifier_goals);self.len=self.items.len;}
+fn append(self:Table_quantifier_goals&,values:const QuantifierGoals[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_quantifier_goals);self.len=self.items.len;}
+fn resize(self:Table_quantifier_goals&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_quantifier_goals&,length:i64,value:QuantifierGoals) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_quantifier_goals&)->QuantifierGoals {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_quantifier_goals&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_quantifier_goals&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_quantifier_goals&) {blot_support_pooled_buffer::deinit(self,pool_Table_quantifier_goals);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_quantifier_goals&,value:const QuantifierGoals&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_quantifier_goals&,values:const QuantifierGoals[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_quantifier_obligations {storage:Obligation[:]=[],items:Obligation[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_quantifier_obligations:Obligation[>..];
+fn ensure(self:Table_quantifier_obligations&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_quantifier_obligations);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_quantifier_obligations&,value:Obligation) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_quantifier_obligations);self.len=self.items.len;}
+fn append(self:Table_quantifier_obligations&,values:const Obligation[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_quantifier_obligations);self.len=self.items.len;}
+fn resize(self:Table_quantifier_obligations&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_quantifier_obligations&,length:i64,value:Obligation) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_quantifier_obligations&)->Obligation {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_quantifier_obligations&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_quantifier_obligations&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_quantifier_obligations&) {blot_support_pooled_buffer::deinit(self,pool_Table_quantifier_obligations);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_quantifier_obligations&,value:const Obligation&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_quantifier_obligations&,values:const Obligation[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_occurs_seen {storage:u32[:]=[],items:u32[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_occurs_seen:u32[>..];
+fn ensure(self:Table_occurs_seen&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_occurs_seen);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_occurs_seen&,value:u32) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_occurs_seen);self.len=self.items.len;}
+fn append(self:Table_occurs_seen&,values:const u32[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_occurs_seen);self.len=self.items.len;}
+fn resize(self:Table_occurs_seen&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_occurs_seen&,length:i64,value:u32) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_occurs_seen&)->u32 {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_occurs_seen&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_occurs_seen&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_occurs_seen&) {blot_support_pooled_buffer::deinit(self,pool_Table_occurs_seen);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_occurs_seen&,value:const u32&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_occurs_seen&,values:const u32[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_closed_row_index {storage:RowCertificate[:]=[],items:RowCertificate[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_closed_row_index:RowCertificate[>..];
+fn ensure(self:Table_closed_row_index&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_closed_row_index);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_closed_row_index&,value:RowCertificate) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_closed_row_index);self.len=self.items.len;}
+fn append(self:Table_closed_row_index&,values:const RowCertificate[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_closed_row_index);self.len=self.items.len;}
+fn resize(self:Table_closed_row_index&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_closed_row_index&,length:i64,value:RowCertificate) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_closed_row_index&)->RowCertificate {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_closed_row_index&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_closed_row_index&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_closed_row_index&) {blot_support_pooled_buffer::deinit(self,pool_Table_closed_row_index);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_closed_row_index&,value:const RowCertificate&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_closed_row_index&,values:const RowCertificate[:])->Error {self.clear();self.append(values);return self.failure;}
+
+struct Table_closed_operation_index {storage:RowCertificate[:]=[],items:RowCertificate[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var pool_Table_closed_operation_index:RowCertificate[>..];
+fn ensure(self:Table_closed_operation_index&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Table_closed_operation_index);if error!=Error.none {self.failure=error;}return error;}
+fn push(self:Table_closed_operation_index&,value:RowCertificate) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Table_closed_operation_index);self.len=self.items.len;}
+fn append(self:Table_closed_operation_index&,values:const RowCertificate[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Table_closed_operation_index);self.len=self.items.len;}
+fn resize(self:Table_closed_operation_index&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
+fn resize(self:Table_closed_operation_index&,length:i64,value:RowCertificate) {if length<=self.len {self.resize(length);return;}let error=self.ensure(length);if error!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
+fn pop(self:Table_closed_operation_index&)->RowCertificate {assert(self.len!=0);let value=self.items[self.len-1];self.resize(self.len-1);return value;}
+fn pop_n(self:Table_closed_operation_index&,count:i64) {assert(count>=0 && count<=self.len);self.resize(self.len-count);}
+fn clear(self:Table_closed_operation_index&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:Table_closed_operation_index&) {blot_support_pooled_buffer::deinit(self,pool_Table_closed_operation_index);self.len=0;self.failure=Error.none;}
+fn index_of(self:const Table_closed_operation_index&,value:const RowCertificate&)->i64 {return self.items.index_of(value);}
+fn restore(self:Table_closed_operation_index&,values:const RowCertificate[:])->Error {self.clear();self.append(values);return self.failure;}
+struct Map_variable_views { count: i64 = 0, failure:Error=Error.none, slots: dictionary_slot<u64,Id>[:] = [] }
+fn probe(map: const Map_variable_views&,key: u64) -> i64 {
+    if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key == key { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
+}
+fn get(map: const Map_variable_views&,key: u64) -> Id? { let index = probe(map,key); if index < 0 { return null; } return map.slots[index].val; }
+fn contains(map: const Map_variable_views&,key: u64) -> bool { return probe(map,key) >= 0; }
+fn release(slots: dictionary_slot<u64,Id>[:]) { if slots.len != 0 { pool_Map_variable_views.free_slice(slots); } }
+fn grow(map: Map_variable_views&,capacity: i64) {
+    let replacement = pool_Map_variable_views.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<u64,Id> { default<u64>(),default<Id>(),0 }; }
+    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
+    release(map.slots); map.slots = replacement;
+}
+fn insert(map: Map_variable_views&,key: u64,value: Id) -> bool {
+    if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
+    let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<u64,Id> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<u64,Id> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+}
+fn remove(map: Map_variable_views&,key: u64) -> bool {
+    var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
+    loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
+    map.slots[hole] = dictionary_slot<u64,Id> { default<u64>(),default<Id>(),0 }; map.count--; return true;
+}
+fn clear(map: Map_variable_views&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
+fn deinit(map: Map_variable_views&) { release(map.slots); map.slots = []; map.count = 0;map.failure=Error.none; }
+fn clone(map: const Map_variable_views&) -> Map_variable_views { var copy = Map_variable_views {}; if map.slots.len != 0 { let slots = pool_Map_variable_views.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn each<F>(map: Map_variable_views&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
+
+reusable[] var pool_Map_variable_views:dictionary_slot<u64,Id>[>..];
+fn restore(map:Map_variable_views&,slots:const dictionary_slot<u64,Id>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return Error.invalid_artifact;}return Error.none;}let run=pool_Map_variable_views.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return Error.none;}
+struct Map_associated_equations { count: i64 = 0, failure:Error=Error.none, slots: dictionary_slot<Id,Id>[:] = [] }
+fn probe(map: const Map_associated_equations&,key: Id) -> i64 {
+    if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key == key { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
+}
+fn get(map: const Map_associated_equations&,key: Id) -> Id? { let index = probe(map,key); if index < 0 { return null; } return map.slots[index].val; }
+fn contains(map: const Map_associated_equations&,key: Id) -> bool { return probe(map,key) >= 0; }
+fn release(slots: dictionary_slot<Id,Id>[:]) { if slots.len != 0 { pool_Map_associated_equations.free_slice(slots); } }
+fn grow(map: Map_associated_equations&,capacity: i64) {
+    let replacement = pool_Map_associated_equations.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<Id,Id> { default<Id>(),default<Id>(),0 }; }
+    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
+    release(map.slots); map.slots = replacement;
+}
+fn insert(map: Map_associated_equations&,key: Id,value: Id) -> bool {
+    if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
+    let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<Id,Id> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<Id,Id> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+}
+fn remove(map: Map_associated_equations&,key: Id) -> bool {
+    var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
+    loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
+    map.slots[hole] = dictionary_slot<Id,Id> { default<Id>(),default<Id>(),0 }; map.count--; return true;
+}
+fn clear(map: Map_associated_equations&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
+fn deinit(map: Map_associated_equations&) { release(map.slots); map.slots = []; map.count = 0;map.failure=Error.none; }
+fn clone(map: const Map_associated_equations&) -> Map_associated_equations { var copy = Map_associated_equations {}; if map.slots.len != 0 { let slots = pool_Map_associated_equations.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn each<F>(map: Map_associated_equations&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
+
+reusable[] var pool_Map_associated_equations:dictionary_slot<Id,Id>[>..];
+fn restore(map:Map_associated_equations&,slots:const dictionary_slot<Id,Id>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return Error.invalid_artifact;}return Error.none;}let run=pool_Map_associated_equations.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return Error.none;}
+struct Map_projection_resolutions { count: i64 = 0, failure:Error=Error.none, slots: dictionary_slot<ProjectionResolution,Id>[:] = [] }
+fn probe(map: const Map_projection_resolutions&,key: ProjectionResolution) -> i64 {
+    if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key == key { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
+}
+fn get(map: const Map_projection_resolutions&,key: ProjectionResolution) -> Id? { let index = probe(map,key); if index < 0 { return null; } return map.slots[index].val; }
+fn contains(map: const Map_projection_resolutions&,key: ProjectionResolution) -> bool { return probe(map,key) >= 0; }
+fn release(slots: dictionary_slot<ProjectionResolution,Id>[:]) { if slots.len != 0 { pool_Map_projection_resolutions.free_slice(slots); } }
+fn grow(map: Map_projection_resolutions&,capacity: i64) {
+    let replacement = pool_Map_projection_resolutions.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<ProjectionResolution,Id> { default<ProjectionResolution>(),default<Id>(),0 }; }
+    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
+    release(map.slots); map.slots = replacement;
+}
+fn insert(map: Map_projection_resolutions&,key: ProjectionResolution,value: Id) -> bool {
+    if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
+    let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<ProjectionResolution,Id> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<ProjectionResolution,Id> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+}
+fn remove(map: Map_projection_resolutions&,key: ProjectionResolution) -> bool {
+    var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
+    loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
+    map.slots[hole] = dictionary_slot<ProjectionResolution,Id> { default<ProjectionResolution>(),default<Id>(),0 }; map.count--; return true;
+}
+fn clear(map: Map_projection_resolutions&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
+fn deinit(map: Map_projection_resolutions&) { release(map.slots); map.slots = []; map.count = 0;map.failure=Error.none; }
+fn clone(map: const Map_projection_resolutions&) -> Map_projection_resolutions { var copy = Map_projection_resolutions {}; if map.slots.len != 0 { let slots = pool_Map_projection_resolutions.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn each<F>(map: Map_projection_resolutions&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
+
+reusable[] var pool_Map_projection_resolutions:dictionary_slot<ProjectionResolution,Id>[>..];
+fn restore(map:Map_projection_resolutions&,slots:const dictionary_slot<ProjectionResolution,Id>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return Error.invalid_artifact;}return Error.none;}let run=pool_Map_projection_resolutions.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return Error.none;}
+struct Map_operation_chains { count: i64 = 0, failure:Error=Error.none, slots: dictionary_slot<OperationKey,OperationChain>[:] = [] }
+fn probe(map: const Map_operation_chains&,key: OperationKey) -> i64 {
+    if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key == key { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
+}
+fn get(map: const Map_operation_chains&,key: OperationKey) -> OperationChain? { let index = probe(map,key); if index < 0 { return null; } return map.slots[index].val; }
+fn contains(map: const Map_operation_chains&,key: OperationKey) -> bool { return probe(map,key) >= 0; }
+fn release(slots: dictionary_slot<OperationKey,OperationChain>[:]) { if slots.len != 0 { pool_Map_operation_chains.free_slice(slots); } }
+fn grow(map: Map_operation_chains&,capacity: i64) {
+    let replacement = pool_Map_operation_chains.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<OperationKey,OperationChain> { default<OperationKey>(),default<OperationChain>(),0 }; }
+    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
+    release(map.slots); map.slots = replacement;
+}
+fn insert(map: Map_operation_chains&,key: OperationKey,value: OperationChain) -> bool {
+    if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
+    let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<OperationKey,OperationChain> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<OperationKey,OperationChain> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+}
+fn remove(map: Map_operation_chains&,key: OperationKey) -> bool {
+    var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
+    loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
+    map.slots[hole] = dictionary_slot<OperationKey,OperationChain> { default<OperationKey>(),default<OperationChain>(),0 }; map.count--; return true;
+}
+fn clear(map: Map_operation_chains&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
+fn deinit(map: Map_operation_chains&) { release(map.slots); map.slots = []; map.count = 0;map.failure=Error.none; }
+fn clone(map: const Map_operation_chains&) -> Map_operation_chains { var copy = Map_operation_chains {}; if map.slots.len != 0 { let slots = pool_Map_operation_chains.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn each<F>(map: Map_operation_chains&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
+
+reusable[] var pool_Map_operation_chains:dictionary_slot<OperationKey,OperationChain>[>..];
+fn restore(map:Map_operation_chains&,slots:const dictionary_slot<OperationKey,OperationChain>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return Error.invalid_artifact;}return Error.none;}let run=pool_Map_operation_chains.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return Error.none;}
+fn valid(self:const Store&)->bool {return self.lease!=0 && self.lease-1<owner_states.len && owner_states[self.lease-1].live && owner_states[self.lease-1].generation==self.owner_generation;}
+fn initPooled(options:Options=Options{})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{},Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true});let state:OwnerState&=owner_states[index];var self=Store{lease:(index+1) as u32,owner_generation:generation,nodes:state.nodes,extra:state.extra,variables:state.variables,versions:state.versions,operations:state.operations,operation_links:state.operation_links,quantifier_goals:state.quantifier_goals,quantifier_obligations:state.quantifier_obligations,occurs_seen:state.occurs_seen,closed_row_index:state.closed_row_index,closed_operation_index:state.closed_operation_index,variable_views:state.variable_views,associated_equations:state.associated_equations,projection_resolutions:state.projection_resolutions,operation_chains:state.operation_chains,effects:state.effects,resolved:state.resolved,composites:state.composites,owner_id:state.owner_id,use_closed_rows:state.use_closed_rows,closed_rows:state.closed_rows,use_operation_rows:state.use_operation_rows,operation_rows:state.operation_rows,has_usage_types:state.has_usage_types,has_rank_types:state.has_rank_types,next_rigid_scope:state.next_rigid_scope,use_closed_graphs:state.use_closed_graphs,has_proof_kinds:state.has_proof_kinds,has_projections:state.has_projections,projection_limit:state.projection_limit,projection_steps:state.projection_steps,resolution_depth_limit:state.resolution_depth_limit,projection_exhausted:state.projection_exhausted,projection_resolution_types:state.projection_resolution_types,projection_resolution_rows:state.projection_resolution_rows,projection_resolution_limit:state.projection_resolution_limit,closed_generation:state.closed_generation,closed_effect_physical_epoch:state.closed_effect_physical_epoch,mutation_epoch:state.mutation_epoch,occurs_steps:state.occurs_steps,normalization:state.normalization,resolution_steps:state.resolution_steps,occurs_generation:state.occurs_generation,use_resolution_cache:state.use_resolution_cache,use_composite_cache:state.use_composite_cache,composite_min_growth:state.composite_min_growth,use_operation_shapes:state.use_operation_shapes,operation_shape_generation:state.operation_shape_generation,operation_shape_enabled:state.operation_shape_enabled,};self.owner_id=blot_native::fresh_owner_id();self.use_closed_graphs=options.closed_graphs;self.use_resolution_cache=options.resolution_cache;self.use_composite_cache=options.composite_cache && options.closed_graphs;self.composite_min_growth=options.composite_min_growth;let effects,error=blot_check_effects::initPooled(blot_check_effects::Options{resolution_cache:options.resolution_cache});if error!=Error.none {self.deinit();return Store{},effectError(error);}self.effects=effects;let resolved,error=blot_reuse_epoch_resolution_cache::initPooled();if error!=Error.none {self.deinit();return Store{},error;}self.resolved=resolved;let composites,error=blot_reuse_composite_resolution_cache::initPooled();if error!=Error.none {self.deinit();return Store{},error;}self.composites=composites;self.nodes.append([Node{Tag.absent},Node{Tag.unit},Node{Tag.boolean},Node{Tag.unsigned32},Node{Tag.floating32},Node{Tag.never}]);if self.nodes.failure!=Error.none {return default<Store>(),self.nodes.failure;}self.operations.append([Operation{NominalIdentity{0,0}},Operation{NominalIdentity{0,1}}]);if self.operations.failure!=Error.none {return default<Store>(),self.operations.failure;}if self.nodes.failure!=Error.none || self.operations.failure!=Error.none {var error=self.nodes.failure;if error==Error.none {error=self.operations.failure;}self.deinit();return Store{},error;}return self,Error.none;}
+fn init()->Store,Error {return initPooled();}
+fn initWithOptions(options:Options)->Store,Error {return initPooled(options);}
+fn deinit(self:Store&) {if self.lease==0 {return;}assert(valid(self));self.nodes.deinit();self.extra.deinit();self.variables.deinit();self.versions.deinit();self.operations.deinit();self.operation_links.deinit();self.quantifier_goals.deinit();self.quantifier_obligations.deinit();self.occurs_seen.deinit();self.closed_row_index.deinit();self.closed_operation_index.deinit();self.variable_views.deinit();self.associated_equations.deinit();self.projection_resolutions.deinit();self.operation_chains.deinit();self.effects.deinit();self.resolved.deinit();self.composites.deinit();let index=self.lease-1;owner_states[index].live=false;owner_states.free(index);self=Store{};}
+fn withStore<C,F>(context:C&)->Error {let initialized,error=initPooled();if error!=Error.none {return error;}var store=initialized;let result=F(context,store);store.deinit();return result;}
+fn withStoreValue<C,F,R>(context:C&)->R,Error {let initialized,error=initPooled();if error!=Error.none {return default<R>(),error;}var store=initialized;let result,failure=F(context,store);store.deinit();return result,failure;}

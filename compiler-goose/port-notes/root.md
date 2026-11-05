@@ -196,3 +196,19 @@ provider address. Lowering/checking io fields record IO presence as a bool.
 Phase profiling and dependency relink remain forward dependencies not yet
 written, and OS error/stream behavior and source/API parity remain unverified.
 The whole port is still incomplete, and normal builds still select Zig.
+
+Solver epoch/composite caches now have generation-checked pooled owner slots,
+fixed EntryBuffer descriptors and shared scalar metadata. Their initPooled
+returns Cache,Error; entries use .items/.len and restore preserves exact slots.
+Epoch growth directly rehashes live entries into the new typed run without a
+recursive lexical Grow owner. Checker Types/Effects owners are being aligned.
+
+Principal interface bounds and graph validation have full first production
+writing passes, including numeric/capability headers, selected proofs, source
+record uniqueness, associated/implementation admission and iterative tri-color
+cycle detection. Declaration demand and its shared global-reference walker are
+also written: lexical shadowing, operator origins, reexports, namespaces,
+conservative whole-unit fallback and source evaluation order remain explicit.
+The manifest owns typed declaration runs; it never authorizes checked schemes.
+No port compilation, execution, test, checker, lint or format verification has
+run. All passes remain unverified and the production port is incomplete.

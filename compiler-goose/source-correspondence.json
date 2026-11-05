@@ -208,7 +208,7 @@
       "zig": "compiler/src/backend/dictionary_layout.zig",
       "goose": "compiler-goose/src/backend/dictionary_layout.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/direct_input_demand.zig",
@@ -262,7 +262,7 @@
       "zig": "compiler/src/backend/identity_array.zig",
       "goose": "compiler-goose/src/backend/identity_array.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/inline_body.zig",
@@ -310,7 +310,7 @@
       "zig": "compiler/src/backend/linear_cursor.zig",
       "goose": "compiler-goose/src/backend/linear_cursor.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/list_traversal.zig",
@@ -436,7 +436,7 @@
       "zig": "compiler/src/backend/pipeline_builder.zig",
       "goose": "compiler-goose/src/backend/pipeline_builder.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/pipeline_tests.zig",
@@ -484,7 +484,7 @@
       "zig": "compiler/src/backend/provider_origins.zig",
       "goose": "compiler-goose/src/backend/provider_origins.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/qualified_evidence_tests.zig",
@@ -706,7 +706,7 @@
       "zig": "compiler/src/backend/startup_emission_facts.zig",
       "goose": "compiler-goose/src/backend/startup_emission_facts.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/startup_emission_facts_tests.zig",
@@ -982,7 +982,7 @@
       "zig": "compiler/src/backend/storage_type_arguments.zig",
       "goose": "compiler-goose/src/backend/storage_type_arguments.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/storage_type_arguments_tests.zig",
@@ -2655,7 +2655,7 @@
       "zig": "compiler/src/reuse/declaration_demand.zig",
       "goose": "compiler-goose/src/reuse/declaration_demand.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/declaration_dependencies.zig",
@@ -2763,7 +2763,7 @@
       "zig": "compiler/src/reuse/dependency_interface_validation.zig",
       "goose": "compiler-goose/src/reuse/dependency_interface_validation.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/dependency_project_consumer.zig",
@@ -2919,7 +2919,7 @@
       "zig": "compiler/src/reuse/global_references.zig",
       "goose": "compiler-goose/src/reuse/global_references.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/hole_diagnostics.zig",

@@ -136,11 +136,11 @@ fn init(types: ValueType[>..<]&, instructions: Instruction[>..<]&, names: u8[>..
     return Module { types: types, instructions: instructions, names: names, functions: functions, signatures: signatures, imports: imports, globals: globals, exports: exports, data: data,
         static_fields: static_fields, table_functions: table_functions, table_origins: table_origins, semantic_sites: semantic_sites };
 }
-fn name(module: Module&, range: Range) -> const u8[:] { module.names[range.start..range.start + range.len] }
-fn parameters(module: Module&, function: Function) -> const ValueType[:] { module.types[function.parameters.start..function.parameters.start + function.parameters.len] }
-fn locals(module: Module&, function: Function) -> const ValueType[:] { module.types[function.locals.start..function.locals.start + function.locals.len] }
-fn instructions(module: Module&, function: Function) -> const Instruction[:] { module.instructions[function.instructions.start..function.instructions.start + function.instructions.len] }
-fn signatureParameters(module: Module&, signature: Signature) -> const ValueType[:] { module.types[signature.parameters.start..signature.parameters.start + signature.parameters.len] }
+fn name(module: const Module&, range: Range) -> const u8[:] { module.names[range.start..range.start + range.len] }
+fn parameters(module: const Module&, function: Function) -> const ValueType[:] { module.types[function.parameters.start..function.parameters.start + function.parameters.len] }
+fn locals(module: const Module&, function: Function) -> const ValueType[:] { module.types[function.locals.start..function.locals.start + function.locals.len] }
+fn instructions(module: const Module&, function: Function) -> const Instruction[:] { module.instructions[function.instructions.start..function.instructions.start + function.instructions.len] }
+fn signatureParameters(module: const Module&, signature: Signature) -> const ValueType[:] { module.types[signature.parameters.start..signature.parameters.start + signature.parameters.len] }
 fn ownName(module: Module&, value: const u8[:]) -> Range {
     let result = Range { start: module.names.len, len: value.len }; module.names.append(value); return result;
 }
@@ -739,14 +739,14 @@ fn resourceTransferImports(module: Module&) -> ResourceTransfers, blot_error::Er
     let drain, drain_error = importFunction(module, "blot:resource/2", "drain", [], blot_backend_runtime_ir::VT_none); if drain_error != blot_error::Error.none { return result, drain_error; } result.drain = drain;
     return result, blot_error::Error.none;
 }
-fn resourceDrainImport(module: Module&) -> u32, bool {
+fn resourceDrainImport(module: const Module&) -> u32, bool {
     for item, index in module.imports {
         if !equal(name(module, item.module), "blot:resource/2") || !equal(name(module, item.name), "drain") { continue; }
         let signature = module.signatures[item.signature]; if signature.parameters.len == 0 && signature.result == blot_backend_runtime_ir::VT_none { return index as u32, true; }
     }
     return 0, false;
 }
-fn resourceRetireImport(module: Module&) -> u32, bool {
+fn resourceRetireImport(module: const Module&) -> u32, bool {
     for item, index in module.imports {
         if !equal(name(module, item.module), "blot:resource/2") || !equal(name(module, item.name), "retire") { continue; }
         let signature = module.signatures[item.signature]; if equal(signatureParameters(module, signature), [blot_backend_runtime_ir::VT_i32]) && signature.result == blot_backend_runtime_ir::VT_none { return index as u32, true; }
@@ -781,25 +781,25 @@ fn exportTaskAdapter(module: Module&, id: u32, exported_name: const u8[:], runti
 }
 fn taskAdapterFunction(module: Module&, id: i64) -> bool { for item in module.exports { if !item.global && item.index == id && item.task_adapter { return true; } } return false; }
 fn taskCount(module: Module&) -> u32 { var count: u32 = 0; for item in module.exports { if item.task_adapter && startsWith(name(module, item.name), "blot:task_start/") { count++; } } return count; }
-fn taskImport(module: Module&, id: i64) -> bool {
+fn taskImport(module: const Module&, id: i64) -> bool {
     if id >= module.imports.len { return false; }
     let item = module.imports[id]; if !equal(name(module, item.module), "blot:task/1") { return false; }
     let signature = module.signatures[item.signature];
     for entry in blot_runtime_task_abi::imports { if equal(name(module, item.name), entry.name) { return signature.result == entry.result && equal(signatureParameters(module, signature), entry.parameters); } }
     return false;
 }
-fn taskImportNamed(module: Module&, imported_name: const u8[:]) -> u32, bool {
+fn taskImportNamed(module: const Module&, imported_name: const u8[:]) -> u32, bool {
     for item, index in module.imports { if equal(name(module, item.module), "blot:task/1") && equal(name(module, item.name), imported_name) && taskImport(module, index) { return index as u32, true; } } return 0, false;
 }
-fn resourceAdapter(module: Module&, item: Export) -> bool { let text = name(module, item.name); return startsWith(text, "blot:resource_cleanup/") || startsWith(text, "blot:resource_drop/"); }
-fn resourceAdapterFunction(module: Module&, id: i64) -> bool {
+fn resourceAdapter(module: const Module&, item: Export) -> bool { let text = name(module, item.name); return startsWith(text, "blot:resource_cleanup/") || startsWith(text, "blot:resource_drop/"); }
+fn resourceAdapterFunction(module: const Module&, id: i64) -> bool {
     for item in module.exports { if !item.global && item.index == id && resourceAdapter(module, item) && !module.functions[id].entry { return true; } } return false;
 }
-fn fixtureHelper(module: Module&, id: i64) -> bool {
+fn fixtureHelper(module: const Module&, id: i64) -> bool {
     if module.fixture_helpers_present { for helper in module.fixture_helpers { if id == helper { return true; } } } return false;
 }
 fn arenaFunctions(arena: Arena) -> u32[32] { return [arena.allocate, arena.allocate_scalar, arena.recycle, arena.reset, arena.allocate_typed, arena.retain, arena.release, arena.release_lease, arena.retire, arena.free, arena.store_word, arena.copy_words, arena.decrement, arena.root_allocate, arena.root_reserve, arena.root_pop, arena.root_open, arena.root_close, arena.root_enter, arena.root_leave, arena.root_store, arena.root_public_allocate, arena.root_public_reset, arena.root_authority, arena.cycle_enqueue, arena.cycle_unlink, arena.cycle_visit, arena.cycle_collect, arena.cycle_safe, arena.mark_acyclic, arena.allocate_shaped, arena.root_allocate_shaped]; }
-fn runtimeHelper(module: Module&, id: i64) -> bool {
+fn runtimeHelper(module: const Module&, id: i64) -> bool {
     for item in module.exports { if !item.global && item.index == id && item.task_runtime { return true; } }
     if fixtureHelper(module, id) { return true; }
     if module.regions.present && blot_runtime_region_runtime::contains(module.regions.value.runtime, id) { return true; }
@@ -814,7 +814,7 @@ fn callbackSpelling(parameter: Scalar, result: Scalar) -> u8[>..] {
     let parameter_name, parameter_valid = callbackName(parameter); let result_name, result_valid = callbackName(result);
     assert(parameter_valid && result_valid); var output: u8[>..] = []; output.append("call_"); output.append(parameter_name); output.push('_'); output.append(result_name); return output;
 }
-fn hostCallbackImport(module: Module&, id: i64) -> blot_support::Option<Callback> {
+fn hostCallbackImport(module: const Module&, id: i64) -> blot_support::Option<Callback> {
     if id >= module.imports.len { return blot_support::none<Callback>(); }
     let item = module.imports[id]; let namespace_name = name(module, item.module);
     let data = equal(namespace_name, "blot:cleanup_data/1") || equal(namespace_name, "blot:cleanup_data/2");
@@ -936,7 +936,7 @@ fn deinit(module: Module&) {
     module.host_references = blot_support::none<HostReferences>(); module.public_arena = false; module.cleanup_data = Range {}; module.defer_cycles = false; module.mutable_static = false; module.indirect = false; module.start = blot_support::none<u32>();
 }
 // Derived immutable import spelling view for safepoint classification.
-fn importName(module: Module&, id: i64) -> const u8[:] { name(module, module.imports[id].name) }
+fn importName(module: const Module&, id: i64) -> const u8[:] { name(module, module.imports[id].name) }
 fn reset(module: Module&) {
     deinit(module);
     module = init(module.types,module.instructions,module.names,module.functions,module.signatures,module.imports,module.globals,module.exports,module.data,module.static_fields,module.table_functions,module.table_origins,module.semantic_sites);

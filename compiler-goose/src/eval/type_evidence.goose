@@ -211,7 +211,7 @@ fn view(self: const Store&) -> View { assert(valid(self)); return View {self.own
 fn node(self: const Store&,id: Id) -> Node { return view(self).node(id); }
 fn children(self: const Store&,id: Id) -> const Id[:] { return view(self).children(id); }
 fn goalEqual(left: const Goal[:],right: const Goal[:]) -> bool { if left.len!=right.len { return false; } for a,index in left { if a!=right[index] { return false; } } return true; }
-fn put32(bytes: ByteBuffer&,value: u32) { for shift in 0..4 { bytes.push((value>>((shift*8) as u32)) as u8); } }
+fn put32<B>(bytes: B&,value: u32) { for shift in 0..4 { bytes.push((value>>((shift*8) as u32)) as u8); } }
 fn fingerprint(tag: Tag,a: u32,b: u32,row: u32,values: const Id[:],goals: const Goal[:]) -> u64 {
  var bytes=ByteBuffer {};  bytes.push(tagCode(tag)); put32(bytes,a); put32(bytes,b);
  if goals.len==0 { put32(bytes,row); }
