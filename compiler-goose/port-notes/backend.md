@@ -275,3 +275,17 @@ while making native allocation timing a pending qualification item. FunctionMark
 restores the exact source publication field set and counts discarded projection
 calls before resetting the module tail. tryFunctionPlan and following emission
 sections are still pending. No verification has run.
+Scoped completed-plan retry/rollback and construction input stages are now
+written: fixed FunctionPlanInput ranges, canonical rejection flag slots,
+addressed/direct/buffered signature choice, helper/cache insertion, child owner
+contexts, global catalog rebinding, addressed bundles, parameter aliases and
+provisional recursive contracts (source through roughly 4825). Construction is
+still WIP: output serialization, demand rewrites, summary publication and later
+call/expression/compile methods remain. No compiler or checks have run.
+Scoped construction now includes helper body invocation, fresh-result owner
+roles, retained graph result schemas, inline register publication, buffered
+result serialization and unchanged-input result aliases (source around 4880).
+Added full storage_result_alias production pass with exact write/annotation
+rejection and typed run cleanup. Wasm also has u32 function-ID overloads for its
+immutable parameters/locals/instructions views. Demand rewriting and final plan
+publication still await writing before constructFunctionPlan can be completed.

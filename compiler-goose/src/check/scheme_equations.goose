@@ -7,6 +7,8 @@ import support.option;
 import support.structural;
 import .types;
 import .check_scheme_import;
+import support.pooled_buffer;
+import support.pooled_map;
 type Error = blot_error::Error;
 type Id = blot_check_types::Id;
 type List = blot_check_types::List;
@@ -15,34 +17,34 @@ type Facts = blot_check_package_row_facts::Facts;
 type Views = blot_check_package_contracts::Context;
 type Import = blot_check_check_scheme_import::Copier;
 struct SourceFailure { unit: u32, span: blot_check_core::Span }
-struct Body { module: const Module&, binding: u32 }
-struct SourceRows { module: const Module&, rows: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
-struct SourceDefinitions { module: const Module&, values: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
-struct AdmissionTables { bodies: Body[>..<]&, body_index: dictionary<Body,bool>&, source_rows: SourceRows[>..<]&, source_definitions: SourceDefinitions[>..<]& }
+struct Body { module: Module, binding: u32 }
+struct SourceRows { module: Module, rows: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
+struct SourceDefinitions { module: Module, values: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
+struct AdmissionTables { bodies: BodyBuffer=BodyBuffer{}, body_index: BodyMap=BodyMap{}, source_rows: SourceRowsBuffer=SourceRowsBuffer{}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{} }
 struct Admission {
     workspace: Workspace? = null, remaining: i64&, units: (const Module?)[128] = [null;128], count: i64 = 0, source_bodies: bool = false,
-    bodies: Body[>..<]&, body_index: dictionary<Body,bool>&, source_rows: SourceRows[>..<]&, source_definitions: SourceDefinitions[>..<]&,
+    bodies: BodyBuffer=BodyBuffer{}, body_index: BodyMap=BodyMap{}, source_rows: SourceRowsBuffer=SourceRowsBuffer{}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{},
     source_failure: blot_support::Option<SourceFailure>? = null,
 }
 fn initAdmission(remaining: i64&, tables: AdmissionTables) -> Admission { return Admission { remaining, bodies: tables.bodies, body_index: tables.body_index, source_rows: tables.source_rows, source_definitions: tables.source_definitions }; }
 fn deinitBodies(self: Admission&) { self.body_index.clear(); self.bodies.clear(); }
-fn rollbackBodies(self: Admission&, before: i64) { for body in self.bodies[before..] { let removed = self.body_index.remove(body); assert(removed); } self.bodies.resize(before); }
+fn rollbackBodies(self: Admission&, before: i64) { for body in self.bodies.items[before..] { let removed = self.body_index.remove(body); assert(removed); } self.bodies.resize(before); }
 fn deinit(self: Admission&) {
-    deinitBodies(self); for entry in self.source_rows { let error = blot_check_scheme_dependencies::releaseSnapshot(entry.lease); assert(error == Error.none); } self.source_rows.clear();
-    for entry in self.source_definitions { let error = blot_check_scheme_dependencies::releaseSnapshot(entry.lease); assert(error == Error.none); } self.source_definitions.clear();
+    deinitBodies(self); for entry in self.source_rows.items { let error = blot_check_scheme_dependencies::releaseSnapshot(entry.lease); assert(error == Error.none); } self.source_rows.deinit();
+    for entry in self.source_definitions.items { let error = blot_check_scheme_dependencies::releaseSnapshot(entry.lease); assert(error == Error.none); } self.source_definitions.deinit();self.bodies.deinit();self.body_index.deinit();
 }
-struct BoundsReceipt { module: const Module&, symbol_count: blot_support::Option<i64>, source_length: blot_support::Option<u32>, forbidden_owner: blot_support::Option<u32> }
-struct WorkspaceTables { bounds_units: ModuleRef[>..<]&, bounds_receipts: BoundsReceipt[>..<]& }
+struct BoundsReceipt { module: Module, symbol_count: blot_support::Option<i64>, source_length: blot_support::Option<u32>, forbidden_owner: blot_support::Option<u32> }
+struct WorkspaceTables { bounds_units: ModuleBuffer=ModuleBuffer{}, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{} }
 struct Workspace {
     oom: bool = false, admission: Admission? = null, modules: (const Module?)[128] = [null;128], module_count: i64 = 0,
-    bounds_units: ModuleRef[>..<]&, has_bounds_units: bool = false, bounds_receipts: BoundsReceipt[>..<]&,
+    bounds_units: ModuleBuffer=ModuleBuffer{}, has_bounds_units: bool = false, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{},
 }
 fn initWorkspace(tables: WorkspaceTables) -> Workspace { return Workspace { bounds_units: tables.bounds_units, bounds_receipts: tables.bounds_receipts }; }
-fn deinit(self: Workspace&) { self.bounds_units.clear(); self.bounds_receipts.clear(); self.has_bounds_units = false; self.module_count = 0; self.admission .= null; }
+fn deinit(self: Workspace&) { self.bounds_units.deinit(); self.bounds_receipts.deinit(); self.has_bounds_units = false; self.module_count = 0; self.admission .= null; }
 fn proved(self: const Workspace&, module: const Module&) -> bool { if module.owner_id == 0 { return false; } for index in 0..self.module_count { let entry .= self.modules[index]; if entry && entry.owner_id == module.owner_id { return true; } } return false; }
 fn convert(error: Error) -> Error { if error == Error.none || error == Error.out_of_memory { return error; } return Error.invalid_artifact; }
 struct SharedGoal {
-    producer: const Module&, origin: const Module? = null, binding: u32, call_owner: Id, resolver_callback: Id, goal_depth: i64,
+    producer: Module, origin: blot_support::Option<Module> = blot_support::none<Module>(), binding: u32, call_owner: Id, resolver_callback: Id, goal_depth: i64,
     ambient: u32, foreign_allowed: bool, type_count: u8, row_count: u8, arguments: Id[128] = [0; 128],
 }
 struct SharedAuthority {
@@ -63,12 +65,12 @@ fn matches(self: const SharedAuthority&, views: const Views&) -> bool {
     for index in 0..self.scheme_count { if self.schemes[index] != views.schemes[index] { return false; } }
     return self.pure_rows.eql(views.pure_rows) && self.closed_rows.eql(views.closed_rows) && self.instance_variables.eql(views.instance_variables) && self.instance_rows.eql(views.instance_rows);
 }
-struct SolverTables { rigid_type_overflow: dictionary<Id,bool>&, rigid_rows: dictionary<u32,bool>&, shared_goals: dictionary<SharedGoal,i64>& }
+struct SolverTables { rigid_type_overflow: IdMap=IdMap{}, rigid_rows: IdMap=IdMap{}, shared_goals: GoalMap=GoalMap{} }
 struct Solver {
     store: blot_check_types::Store, graph: blot_check_core::Types, view: blot_check_core::Types? = null, scope: u32 = 0, oom: bool = false,
-    rigid_types: blot_check_package_contracts::Bits4096 = blot_check_package_contracts::Bits4096 {}, rigid_type_overflow: dictionary<Id,bool>&, rigid_rows: dictionary<u32,bool>&,
+    rigid_types: blot_check_package_contracts::Bits4096 = blot_check_package_contracts::Bits4096 {}, rigid_type_overflow: IdMap=IdMap{}, rigid_rows: IdMap=IdMap{},
     remaining: i64&, prefix_nodes: i64 = 0, prefix_rows: i64 = 0, prefix_operations: i64 = 0, prefix_extra: i64 = 0, prefix_row_variables: i64 = 0,
-    shared_authority: blot_support::Option<SharedAuthority> = blot_support::none<SharedAuthority>(), shared_goals: dictionary<SharedGoal,i64>&, shared_goal_hits: i64 = 0,
+    shared_authority: blot_support::Option<SharedAuthority> = blot_support::none<SharedAuthority>(), shared_goals: GoalMap=GoalMap{}, shared_goal_hits: i64 = 0,
 }
 fn init(store: blot_check_types::Store, module: const Module&, views: Views&, remaining: i64&, tables: SolverTables) -> Solver, Error {
     var result = Solver { store, graph: blot_check_core::Types { nodes: [], extra: [] }, rigid_type_overflow: tables.rigid_type_overflow, rigid_rows: tables.rigid_rows, remaining, shared_goals: tables.shared_goals };
@@ -76,9 +78,9 @@ fn init(store: blot_check_types::Store, module: const Module&, views: Views&, re
 }
 fn initialize(self: Solver&, module: const Module&, views: Views&) -> Error {
     let store: blot_check_types::Store& = self.store;
-    store.use_resolution_cache = true; store.use_composite_cache = false; store.nodes.clear(); store.nodes.items += module.types.nodes; store.extra.clear(); store.extra.items += module.types.extra;
-    store.operations.clear(); store.operations.items += module.types.operations; store.quantifier_goals.items += module.types.quantifier_goals; store.quantifier_obligations.items += module.types.quantifier_obligations;
-    store.effects.rows.clear(); store.effects.rows.items += module.types.effects.rows; store.effects.labels.clear(); store.effects.labels.items += module.types.effects.labels;
+    store.use_resolution_cache = true; store.use_composite_cache = false; store.nodes.clear(); store.nodes.append(module.types.nodes); store.extra.clear(); store.extra.append(module.types.extra);
+    store.operations.clear(); store.operations.append(module.types.operations); store.quantifier_goals.append(module.types.quantifier_goals); store.quantifier_obligations.append(module.types.quantifier_obligations);
+    store.effects.rows.clear(); store.effects.rows.append(module.types.effects.rows); store.effects.labels.clear(); store.effects.labels.append(module.types.effects.labels);
     let scope, error = store.rigidScope(); if error != Error.none { return convert(error); } self.scope = scope;
     for index in 0..views.scheme_count { let scheme = views.schemes[index];
         if module.types.node(scheme.root).tag != blot_check_types::Tag.forall { for formal in module.types.list(scheme.variables) { if self.remaining == 0 || formal >= module.types.nodes.len { return Error.invalid_artifact; } self.remaining -= 1; if formal < 4096 { self.rigid_types.set(formal); } else { self.rigid_type_overflow.insert(formal, true); } } }
@@ -113,7 +115,7 @@ fn rememberSharedGoal(self: Solver&, key: SharedGoal, depth: i64) -> Error {
     if key.producer.owner_id == 0 { return Error.none; } { let optional_binding_77 .= self.shared_goals.get(key); if optional_binding_77 { let proved_depth .= optional_binding_77; self.shared_goals.insert(key, max(proved_depth, depth)); return Error.none;  } }
     if self.shared_goals.count >= 65536 { return Error.none; } self.shared_goals.insert(key, depth); return Error.none;
 }
-fn deinit(self: Solver&) { self.shared_authority.present = false; self.shared_goals.clear(); self.rigid_type_overflow.clear(); self.rigid_rows.clear(); self.store.deinit(); }
+fn deinit(self: Solver&) { self.shared_authority.present = false; self.shared_goals.deinit(); self.rigid_type_overflow.deinit(); self.rigid_rows.deinit(); self.store.deinit(); }
 fn refresh(self: Solver&) {
     self.graph = blot_check_core::Types { owner_id: self.store.owner_id, nodes: self.store.nodes.items[:], extra: self.store.extra.items[:], effects: blot_check_core::EffectRows { self.store.effects.rows.items[:], self.store.effects.labels.items[:], self.store.effects.variables.len as u32 }, operations: self.store.operations.items[:], quantifier_goals: self.store.quantifier_goals.items[:], quantifier_obligations: self.store.quantifier_obligations.items[:] };
     { let optional_binding_76 .= self.view; if optional_binding_76 { let view .= optional_binding_76; view = self.graph;  } }
@@ -135,26 +137,80 @@ fn importer(self: Solver&, module: const Module&, frozen: blot_check_frozen_type
 fn copy(self: Solver&, copier: Import&, root: Id) -> Id, Error { let error = step(self); if error != Error.none { return 0, error; } beginWork(self); let value, error = copier.copy(root, 0); endWork(self); return value, convert(error); }
 fn bounds(workspace: Workspace?, module: const Module&, context: blot_check_frozen_core_validation::Context) -> Error {
     { let optional_binding_75 .= workspace; if optional_binding_75 { let owner .= optional_binding_75;
-        var same_context = true; if owner.has_bounds_units { same_context = sameUnits(owner.bounds_units, context.units); }
-        if same_context { for receipt in owner.bounds_receipts { if receipt.module.owner_id != 0 && receipt.module.owner_id == module.owner_id && receipt.symbol_count == context.symbol_count && receipt.source_length == context.source_length && receipt.forbidden_owner == context.forbidden_owner { return Error.none; } } }
+        var same_context = true; if owner.has_bounds_units { same_context = sameUnits(owner.bounds_units.items, context.units); }
+        if same_context { for receipt in owner.bounds_receipts.items { if receipt.module.owner_id != 0 && receipt.module.owner_id == module.owner_id && receipt.symbol_count == context.symbol_count && receipt.source_length == context.source_length && receipt.forbidden_owner == context.forbidden_owner { return Error.none; } } }
         let error = blot_check_frozen_core_validation::validateBounds(module, context); if error != Error.none { return error; } if !same_context { return Error.none; }
-        if !owner.has_bounds_units { owner.bounds_units += context.units; owner.has_bounds_units = true; }
-        owner.bounds_receipts += BoundsReceipt { module, context.symbol_count, context.source_length, context.forbidden_owner }; return Error.none;
+        if !owner.has_bounds_units { for reference in context.units { owner.bounds_units.push(reference.value); } owner.has_bounds_units = true; }
+        owner.bounds_receipts.push(BoundsReceipt { module, context.symbol_count, context.source_length, context.forbidden_owner }); return Error.none;
      } } return blot_check_frozen_core_validation::validateBounds(module, context);
 }
-fn sameUnits(left: const ModuleRef[:], right: const ModuleRef[:]) -> bool { if left.len != right.len { return false; } for unit, index in left { if unit.owner_id == 0 || unit.owner_id != right[index].owner_id { return false; } } return true; }
-struct SolverScope<C,F> { module: const Module&, views: Views&, remaining: i64&, context: C& }
-fn withSolver<C,F>(module: const Module&, views: Views&, remaining: i64&, context: C&) -> Error {
-    var scope = SolverScope<C,F> { module, views, remaining, context }; return blot_check_types::withStore<SolverScope<C,F>,solverScope>(scope);
-}
-fn solverScope<C,F>(scope: SolverScope<C,F>&, store: blot_check_types::Store&) -> Error {
-    var overflow: dictionary<Id,bool> = dictionary<Id,bool> {}; var rows: dictionary<u32,bool> = dictionary<u32,bool> {}; var goals: dictionary<SharedGoal,i64> = dictionary<SharedGoal,i64> {};
-    var solver, error = init(store, scope.module, scope.views, scope.remaining, SolverTables { overflow, rows, goals }); if error != Error.none { return error; }
-    let error = F(scope.context, solver); deinit(solver); return error;
-}
+fn sameUnits(left:const Module[:],right:const ModuleRef[:])->bool {if left.len!=right.len {return false;}for unit,index in left {let other=right[index].value;if unit.owner_id==0 || unit.owner_id!=other.owner_id || unit!=other {return false;}}return true;}
+fn withSolver<C,F>(module:const Module&,views:Views&,remaining:i64&,context:C&)->Error {let initialized,error=blot_check_types::initPooled();if error!=Error.none {return error;}var solver,error=init(initialized,module,views,remaining,SolverTables{});if error!=Error.none {return error;}let failure=F(context,solver);deinit(solver);return failure;}
 fn saveSourceRows(self: Admission&, module: const Module&, rows: const u32[:]) -> Error {
-    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != Error.none { return error; } self.source_rows += SourceRows { module, copied, lease }; return Error.none;
+    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != Error.none { return error; } self.source_rows.push(SourceRows { module, copied, lease }); return Error.none;
 }
 fn saveSourceDefinitions(self: Admission&, module: const Module&, values: const u32[:]) -> Error {
-    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(values); if error != Error.none { return error; } self.source_definitions += SourceDefinitions { module, copied, lease }; return Error.none;
+    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(values); if error != Error.none { return error; } self.source_definitions.push(SourceDefinitions { module, copied, lease }); return Error.none;
 }
+
+struct BodyBuffer {storage:Body[:]=[],items:Body[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var bodybuffer_runs:Body[>..];
+fn push(self:BodyBuffer&,value:Body) {let error=blot_support_pooled_buffer::push(self,value,bodybuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn append(self:BodyBuffer&,values:const Body[:]) {let error=blot_support_pooled_buffer::append(self,values,bodybuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn resize(self:BodyBuffer&,length:i64) {assert(length<=self.items.len);self.items=self.storage[..length];self.len=length;}
+fn clear(self:BodyBuffer&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:BodyBuffer&) {blot_support_pooled_buffer::deinit(self,bodybuffer_runs);self.len=0;self.failure=Error.none;}
+struct SourceRowsBuffer {storage:SourceRows[:]=[],items:SourceRows[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var sourcerowsbuffer_runs:SourceRows[>..];
+fn push(self:SourceRowsBuffer&,value:SourceRows) {let error=blot_support_pooled_buffer::push(self,value,sourcerowsbuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn append(self:SourceRowsBuffer&,values:const SourceRows[:]) {let error=blot_support_pooled_buffer::append(self,values,sourcerowsbuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn resize(self:SourceRowsBuffer&,length:i64) {assert(length<=self.items.len);self.items=self.storage[..length];self.len=length;}
+fn clear(self:SourceRowsBuffer&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:SourceRowsBuffer&) {blot_support_pooled_buffer::deinit(self,sourcerowsbuffer_runs);self.len=0;self.failure=Error.none;}
+struct SourceDefinitionsBuffer {storage:SourceDefinitions[:]=[],items:SourceDefinitions[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var sourcedefinitionsbuffer_runs:SourceDefinitions[>..];
+fn push(self:SourceDefinitionsBuffer&,value:SourceDefinitions) {let error=blot_support_pooled_buffer::push(self,value,sourcedefinitionsbuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn append(self:SourceDefinitionsBuffer&,values:const SourceDefinitions[:]) {let error=blot_support_pooled_buffer::append(self,values,sourcedefinitionsbuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn resize(self:SourceDefinitionsBuffer&,length:i64) {assert(length<=self.items.len);self.items=self.storage[..length];self.len=length;}
+fn clear(self:SourceDefinitionsBuffer&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:SourceDefinitionsBuffer&) {blot_support_pooled_buffer::deinit(self,sourcedefinitionsbuffer_runs);self.len=0;self.failure=Error.none;}
+struct ModuleBuffer {storage:Module[:]=[],items:Module[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var modulebuffer_runs:Module[>..];
+fn push(self:ModuleBuffer&,value:Module) {let error=blot_support_pooled_buffer::push(self,value,modulebuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn append(self:ModuleBuffer&,values:const Module[:]) {let error=blot_support_pooled_buffer::append(self,values,modulebuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn resize(self:ModuleBuffer&,length:i64) {assert(length<=self.items.len);self.items=self.storage[..length];self.len=length;}
+fn clear(self:ModuleBuffer&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:ModuleBuffer&) {blot_support_pooled_buffer::deinit(self,modulebuffer_runs);self.len=0;self.failure=Error.none;}
+struct BoundsReceiptBuffer {storage:BoundsReceipt[:]=[],items:BoundsReceipt[:]=[],len:i64=0,failure:Error=Error.none}
+reusable[] var boundsreceiptbuffer_runs:BoundsReceipt[>..];
+fn push(self:BoundsReceiptBuffer&,value:BoundsReceipt) {let error=blot_support_pooled_buffer::push(self,value,boundsreceiptbuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn append(self:BoundsReceiptBuffer&,values:const BoundsReceipt[:]) {let error=blot_support_pooled_buffer::append(self,values,boundsreceiptbuffer_runs);if error!=Error.none {self.failure=error;}self.len=self.items.len;}
+fn resize(self:BoundsReceiptBuffer&,length:i64) {assert(length<=self.items.len);self.items=self.storage[..length];self.len=length;}
+fn clear(self:BoundsReceiptBuffer&) {self.items=self.storage[..0];self.len=0;self.failure=Error.none;}
+fn deinit(self:BoundsReceiptBuffer&) {blot_support_pooled_buffer::deinit(self,boundsreceiptbuffer_runs);self.len=0;self.failure=Error.none;}
+struct BodyMap {count:i64=0,slots:dictionary_slot<Body,bool>[:]=[],failure:Error=Error.none}
+reusable[] var bodymap_slots:dictionary_slot<Body,bool>[>..];
+fn contains(self:const BodyMap&,key:Body)->bool {return blot_support_pooled_map::contains(self,key);}
+fn get(self:const BodyMap&,key:Body)->bool? {return blot_support_pooled_map::get(self,key);}
+fn insert(self:BodyMap&,key:Body,value:bool)->bool {if self.count>=0x1555555555555555 {self.failure=Error.out_of_memory;return false;}return blot_support_pooled_map::insert(self,key,value,bodymap_slots);}
+fn remove(self:BodyMap&,key:Body)->bool {return blot_support_pooled_map::remove(self,key);}
+fn clear(self:BodyMap&) {blot_support_pooled_map::clear(self);self.failure=Error.none;}
+fn deinit(self:BodyMap&) {blot_support_pooled_map::deinit(self,bodymap_slots);self.failure=Error.none;}
+struct IdMap {count:i64=0,slots:dictionary_slot<u32,bool>[:]=[],failure:Error=Error.none}
+reusable[] var idmap_slots:dictionary_slot<u32,bool>[>..];
+fn contains(self:const IdMap&,key:u32)->bool {return blot_support_pooled_map::contains(self,key);}
+fn get(self:const IdMap&,key:u32)->bool? {return blot_support_pooled_map::get(self,key);}
+fn insert(self:IdMap&,key:u32,value:bool)->bool {if self.count>=0x1555555555555555 {self.failure=Error.out_of_memory;return false;}return blot_support_pooled_map::insert(self,key,value,idmap_slots);}
+fn remove(self:IdMap&,key:u32)->bool {return blot_support_pooled_map::remove(self,key);}
+fn clear(self:IdMap&) {blot_support_pooled_map::clear(self);self.failure=Error.none;}
+fn deinit(self:IdMap&) {blot_support_pooled_map::deinit(self,idmap_slots);self.failure=Error.none;}
+struct GoalMap {count:i64=0,slots:dictionary_slot<SharedGoal,i64>[:]=[],failure:Error=Error.none}
+reusable[] var goalmap_slots:dictionary_slot<SharedGoal,i64>[>..];
+fn contains(self:const GoalMap&,key:SharedGoal)->bool {return blot_support_pooled_map::contains(self,key);}
+fn get(self:const GoalMap&,key:SharedGoal)->i64? {return blot_support_pooled_map::get(self,key);}
+fn insert(self:GoalMap&,key:SharedGoal,value:i64)->bool {if self.count>=0x1555555555555555 {self.failure=Error.out_of_memory;return false;}return blot_support_pooled_map::insert(self,key,value,goalmap_slots);}
+fn remove(self:GoalMap&,key:SharedGoal)->bool {return blot_support_pooled_map::remove(self,key);}
+fn clear(self:GoalMap&) {blot_support_pooled_map::clear(self);self.failure=Error.none;}
+fn deinit(self:GoalMap&) {blot_support_pooled_map::deinit(self,goalmap_slots);self.failure=Error.none;}
+fn initPooledAdmission(remaining:i64&)->Admission,Error {return Admission{remaining:remaining},Error.none;}
+fn initPooledWorkspace()->Workspace,Error {return Workspace{},Error.none;}

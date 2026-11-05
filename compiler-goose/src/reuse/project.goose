@@ -19,6 +19,7 @@ import support.io;
 import support.path;
 import support.pooled_buffer;
 import backend.runtime_identity;
+import reuse.project_check;
 type Error = blot_error::Error;
 type UnitId = u32;
 type Symbol = blot_parse_symbols::Symbol;
@@ -102,7 +103,7 @@ fn append(self:DiagnosticBuffer&,values:const Diagnostic[:])->Error {if self.fai
 fn resize(self:DiagnosticBuffer&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
 fn clear(self:DiagnosticBuffer&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
 fn deinit(self:DiagnosticBuffer&) {blot_support_pooled_buffer::deinit(self,project_DiagnosticBuffer_runs);self.len=0;self.failure=Error.none;}
-struct ProjectState {owner:u64=0,units:UnitBuffer=UnitBuffer {},order:WordBuffer=WordBuffer {},imports:ImportBuffer=ImportBuffer {},diagnostics:DiagnosticBuffer=DiagnosticBuffer {}}
+struct ProjectState {owner:u64=0,origin_lease:u32=0,units:UnitBuffer=UnitBuffer {},order:WordBuffer=WordBuffer {},imports:ImportBuffer=ImportBuffer {},diagnostics:DiagnosticBuffer=DiagnosticBuffer {}}
 reusable var projects:ProjectState[>..]=[];
 struct Lowering { io: bool=false, workers:u8=1 }
 struct Project {
@@ -120,7 +121,7 @@ fn deinit(self:Project&) {
     if self.lease==0 {return;}assert(projects[self.lease-1].owner==self.owner_id);
     for &unit in self.units.items {unit.deinit();}self.units.deinit();self.order.deinit();self.imports.deinit();
     for item in self.diagnostics.items {releaseLexical(item.lexical_details);}self.diagnostics.deinit();self.symbols.deinit();
-    let index=self.lease-1;projects[index].owner=0;projects.free(index);self=Project {};
+    let index=self.lease-1;blot_reuse_project_check::releaseModuleOrigins(projects[index].origin_lease);projects[index].owner=0;projects.free(index);self=Project {};
 }
 fn compiledModule(self:const Project&,id:i64)->const blot_reuse_frozen_dependency::Module? {if id==0||id>self.compiled_modules.len {return null;}if self.compiled_reuse.len!=0&&!self.compiled_reuse[id-1] {return null;}return self.compiled_modules[id-1];}
 fn compiledCount(self:const Project&)->i64 {if self.compiled_reuse.len==0 {return self.compiled_modules.len;}var count:i64=0;for reused in self.compiled_reuse {if reused {count++;}}return count;}

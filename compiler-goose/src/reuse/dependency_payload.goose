@@ -101,7 +101,7 @@ run_blot_reuse_frozen_dependency__Module {values:blot_reuse_frozen_dependency::M
 
 struct Link {value:Run,next:u32=0}
 
-struct Lease {head:u32=0,generation:u64=0,live:bool=false}
+struct Lease {head:u32=0,generation:u64=0,live:bool=false,references:u64=1}
 
 reusable var links:Link[>..]=[];
 
@@ -253,8 +253,8 @@ reusable[] var pool_blot_reuse_frozen_dependency__Module:blot_reuse_frozen_depen
 
 fn valid(self:const Owner&)->bool {return self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation;}
 fn init()->Owner,Error {if leases.len>=0xffffffff {return Owner {},Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=leases.alloc_index(Lease {generation:generation,live:true});return Owner {(at+1) as u32,generation},Error.none;}
-fn remember(self:Owner&,value:Run)->Error {assert(valid(self));if links.len>=0xffffffff {return Error.out_of_memory;}let head=leases[self.lease-1].head;let at=links.alloc_index(Link {value,head});leases[self.lease-1].head=(at+1) as u32;return Error.none;}
-fn deinit(self:Owner&) {if self.lease==0 {return;}assert(valid(self));let owner=self.lease-1;var next=leases[owner].head;while next!=0 {let at=next-1;let link=links[at];next=link.next;match link.value {
+fn remember(self:Owner&,value:Run)->Error {assert(unique(self));if links.len>=0xffffffff {return Error.out_of_memory;}let head=leases[self.lease-1].head;let at=links.alloc_index(Link {value,head});leases[self.lease-1].head=(at+1) as u32;return Error.none;}
+fn deinit(self:Owner&) {if self.lease==0 {return;}assert(valid(self));let owner=self.lease-1;assert(leases[owner].references!=0);leases[owner].references-=1;if leases[owner].references!=0 {self=Owner {};return;}var next=leases[owner].head;while next!=0 {let at=next-1;let link=links[at];next=link.next;match link.value {
 
 Run.run_u32 run=>{pool_u32.free_slice(run.values);},
 
@@ -403,7 +403,7 @@ Run.run_blot_reuse_frozen_dependency__Module run=>{pool_blot_reuse_frozen_depend
 }links.free(at);}leases[owner].live=false;self=Owner {};leases.free(owner);}
 fn deinit<T>(self:Owned<T>&) {self.owner.deinit();self.value=default<T>();}
 fn adopt(self:Owner&,source:Owner&)->Error {
- assert(valid(self)&&valid(source));if self.lease==source.lease {return Error.invalid_artifact;}
+ assert(valid(self)&&valid(source));if !unique(self)||!unique(source) {return Error.invalid_artifact;}if self.lease==source.lease {return Error.invalid_artifact;}
  let at=source.lease-1;let head=leases[at].head;if head!=0 {var tail=head;while links[tail-1].next!=0 {tail=links[tail-1].next;}links[tail-1].next=leases[self.lease-1].head;leases[self.lease-1].head=head;}
  leases[at].live=false;source=Owner {};leases.free(at);return Error.none;
 }
@@ -411,11 +411,11 @@ fn alloc<T>(self:Owner&,length:i64)->T[:],Error {return allocate(self,default<T>
 fn copy<T>(self:Owner&,values:const T[:])->T[:],Error {let result,error=self.alloc<T>(values.len);if error!=Error.none {return [],error;}for value,index in values {result[index]=value;}return result,Error.none;}
 
 fn allocate(self:Owner&,sample:u32,length:i64)->u32[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_u32.alloc_slice(length);let error=remember(self,Run.run_u32 {run});if error!=Error.none {pool_u32.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const u32[:])->u32[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u32 run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -425,11 +425,11 @@ fn cloneValue(self:Owner&,values:const u32[:])->u32[:],Error {
 }
 
 fn allocate(self:Owner&,sample:blot_check_numeric_proof_terms::Kind,length:i64)->blot_check_numeric_proof_terms::Kind[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_numeric_proof_terms__Kind.alloc_slice(length);let error=remember(self,Run.run_blot_check_numeric_proof_terms__Kind {run});if error!=Error.none {pool_blot_check_numeric_proof_terms__Kind.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_numeric_proof_terms::Kind[:])->blot_check_numeric_proof_terms::Kind[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Kind run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -439,11 +439,11 @@ fn cloneValue(self:Owner&,values:const blot_check_numeric_proof_terms::Kind[:])-
 }
 
 fn allocate(self:Owner&,sample:blot_check_numeric_proof_terms::Term,length:i64)->blot_check_numeric_proof_terms::Term[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_numeric_proof_terms__Term.alloc_slice(length);let error=remember(self,Run.run_blot_check_numeric_proof_terms__Term {run});if error!=Error.none {pool_blot_check_numeric_proof_terms__Term.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_numeric_proof_terms::Term[:])->blot_check_numeric_proof_terms::Term[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Term run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -453,11 +453,11 @@ fn cloneValue(self:Owner&,values:const blot_check_numeric_proof_terms::Term[:])-
 }
 
 fn allocate(self:Owner&,sample:blot_check_numeric_proof_contracts::Requirement,length:i64)->blot_check_numeric_proof_contracts::Requirement[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_numeric_proof_contracts__Requirement.alloc_slice(length);let error=remember(self,Run.run_blot_check_numeric_proof_contracts__Requirement {run});if error!=Error.none {pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:])->blot_check_numeric_proof_contracts::Requirement[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_contracts__Requirement run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -467,11 +467,11 @@ fn cloneValue(self:Owner&,values:const blot_check_numeric_proof_contracts::Requi
 }
 
 fn allocate(self:Owner&,sample:blot_check_numeric_proof_headers::Named,length:i64)->blot_check_numeric_proof_headers::Named[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_numeric_proof_headers__Named.alloc_slice(length);let error=remember(self,Run.run_blot_check_numeric_proof_headers__Named {run});if error!=Error.none {pool_blot_check_numeric_proof_headers__Named.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_numeric_proof_headers::Named[:])->blot_check_numeric_proof_headers::Named[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_headers__Named run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -481,11 +481,11 @@ fn cloneValue(self:Owner&,values:const blot_check_numeric_proof_headers::Named[:
 }
 
 fn allocate(self:Owner&,sample:blot_check_capability_contracts::Term,length:i64)->blot_check_capability_contracts::Term[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_capability_contracts__Term.alloc_slice(length);let error=remember(self,Run.run_blot_check_capability_contracts__Term {run});if error!=Error.none {pool_blot_check_capability_contracts__Term.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Term run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -495,11 +495,11 @@ fn cloneValue(self:Owner&,values:const blot_check_capability_contracts::Term[:])
 }
 
 fn allocate(self:Owner&,sample:blot_check_capability_contracts::Binding,length:i64)->blot_check_capability_contracts::Binding[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_capability_contracts__Binding.alloc_slice(length);let error=remember(self,Run.run_blot_check_capability_contracts__Binding {run});if error!=Error.none {pool_blot_check_capability_contracts__Binding.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Binding run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -509,11 +509,11 @@ fn cloneValue(self:Owner&,values:const blot_check_capability_contracts::Binding[
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::FieldName,length:i64)->blot_check_core::FieldName[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__FieldName.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__FieldName {run});if error!=Error.none {pool_blot_check_core__FieldName.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::FieldName[:])->blot_check_core::FieldName[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__FieldName run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -523,11 +523,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::FieldName[:])->blot_chec
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::RuntimeName,length:i64)->blot_check_core::RuntimeName[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__RuntimeName.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__RuntimeName {run});if error!=Error.none {pool_blot_check_core__RuntimeName.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::RuntimeName[:])->blot_check_core::RuntimeName[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RuntimeName run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -537,11 +537,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::RuntimeName[:])->blot_ch
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::DeclarationDependencies,length:i64)->blot_check_core::DeclarationDependencies[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__DeclarationDependencies.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__DeclarationDependencies {run});if error!=Error.none {pool_blot_check_core__DeclarationDependencies.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::DeclarationDependencies[:])->blot_check_core::DeclarationDependencies[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DeclarationDependencies run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -551,11 +551,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::DeclarationDependencies[
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::BindingRef,length:i64)->blot_check_core::BindingRef[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__BindingRef.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__BindingRef {run});if error!=Error.none {pool_blot_check_core__BindingRef.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::BindingRef[:])->blot_check_core::BindingRef[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__BindingRef run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -565,11 +565,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::BindingRef[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::DependencyMember,length:i64)->blot_check_core::DependencyMember[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__DependencyMember.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__DependencyMember {run});if error!=Error.none {pool_blot_check_core__DependencyMember.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::DependencyMember[:])->blot_check_core::DependencyMember[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DependencyMember run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -579,11 +579,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::DependencyMember[:])->bl
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::ErasedDeclarationReference,length:i64)->blot_check_core::ErasedDeclarationReference[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__ErasedDeclarationReference.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__ErasedDeclarationReference {run});if error!=Error.none {pool_blot_check_core__ErasedDeclarationReference.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::ErasedDeclarationReference[:])->blot_check_core::ErasedDeclarationReference[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ErasedDeclarationReference run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -593,11 +593,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::ErasedDeclarationReferen
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::RequestLoopInfo,length:i64)->blot_check_core::RequestLoopInfo[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__RequestLoopInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__RequestLoopInfo {run});if error!=Error.none {pool_blot_check_core__RequestLoopInfo.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::RequestLoopInfo[:])->blot_check_core::RequestLoopInfo[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestLoopInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -607,11 +607,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::RequestLoopInfo[:])->blo
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::RequestArm,length:i64)->blot_check_core::RequestArm[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__RequestArm.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__RequestArm {run});if error!=Error.none {pool_blot_check_core__RequestArm.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::RequestArm[:])->blot_check_core::RequestArm[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestArm run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -621,11 +621,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::RequestArm[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_types::Node,length:i64)->blot_check_types::Node[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_types__Node.alloc_slice(length);let error=remember(self,Run.run_blot_check_types__Node {run});if error!=Error.none {pool_blot_check_types__Node.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_types::Node[:])->blot_check_types::Node[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Node run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -635,11 +635,11 @@ fn cloneValue(self:Owner&,values:const blot_check_types::Node[:])->blot_check_ty
 }
 
 fn allocate(self:Owner&,sample:blot_check_effects::Row,length:i64)->blot_check_effects::Row[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_effects__Row.alloc_slice(length);let error=remember(self,Run.run_blot_check_effects__Row {run});if error!=Error.none {pool_blot_check_effects__Row.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_effects::Row[:])->blot_check_effects::Row[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_effects__Row run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -649,11 +649,11 @@ fn cloneValue(self:Owner&,values:const blot_check_effects::Row[:])->blot_check_e
 }
 
 fn allocate(self:Owner&,sample:blot_check_types::Operation,length:i64)->blot_check_types::Operation[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_types__Operation.alloc_slice(length);let error=remember(self,Run.run_blot_check_types__Operation {run});if error!=Error.none {pool_blot_check_types__Operation.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_types::Operation[:])->blot_check_types::Operation[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Operation run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -663,11 +663,11 @@ fn cloneValue(self:Owner&,values:const blot_check_types::Operation[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_types::QuantifierGoals,length:i64)->blot_check_types::QuantifierGoals[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_types__QuantifierGoals.alloc_slice(length);let error=remember(self,Run.run_blot_check_types__QuantifierGoals {run});if error!=Error.none {pool_blot_check_types__QuantifierGoals.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_types::QuantifierGoals[:])->blot_check_types::QuantifierGoals[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__QuantifierGoals run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -677,11 +677,11 @@ fn cloneValue(self:Owner&,values:const blot_check_types::QuantifierGoals[:])->bl
 }
 
 fn allocate(self:Owner&,sample:blot_check_types::Obligation,length:i64)->blot_check_types::Obligation[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_types__Obligation.alloc_slice(length);let error=remember(self,Run.run_blot_check_types__Obligation {run});if error!=Error.none {pool_blot_check_types__Obligation.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_types::Obligation[:])->blot_check_types::Obligation[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Obligation run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -691,11 +691,11 @@ fn cloneValue(self:Owner&,values:const blot_check_types::Obligation[:])->blot_ch
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Node,length:i64)->blot_check_core::Node[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Node.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Node {run});if error!=Error.none {pool_blot_check_core__Node.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Node[:])->blot_check_core::Node[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Node run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -705,11 +705,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Node[:])->blot_check_cor
 }
 
 fn allocate(self:Owner&,sample:blot_parse_ast::Span,length:i64)->blot_parse_ast::Span[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_parse_ast__Span.alloc_slice(length);let error=remember(self,Run.run_blot_parse_ast__Span {run});if error!=Error.none {pool_blot_parse_ast__Span.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_parse_ast::Span[:])->blot_parse_ast::Span[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_parse_ast__Span run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -719,11 +719,11 @@ fn cloneValue(self:Owner&,values:const blot_parse_ast::Span[:])->blot_parse_ast:
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Binding,length:i64)->blot_check_core::Binding[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Binding.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Binding {run});if error!=Error.none {pool_blot_check_core__Binding.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Binding[:])->blot_check_core::Binding[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Binding run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -733,11 +733,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Binding[:])->blot_check_
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Body,length:i64)->blot_check_core::Body[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Body.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Body {run});if error!=Error.none {pool_blot_check_core__Body.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Body[:])->blot_check_core::Body[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Body run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -747,11 +747,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Body[:])->blot_check_cor
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Parameter,length:i64)->blot_check_core::Parameter[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Parameter.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Parameter {run});if error!=Error.none {pool_blot_check_core__Parameter.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Parameter[:])->blot_check_core::Parameter[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Parameter run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -761,11 +761,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Parameter[:])->blot_chec
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::CallInfo,length:i64)->blot_check_core::CallInfo[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__CallInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__CallInfo {run});if error!=Error.none {pool_blot_check_core__CallInfo.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::CallInfo[:])->blot_check_core::CallInfo[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__CallInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -775,11 +775,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::CallInfo[:])->blot_check
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Merge,length:i64)->blot_check_core::Merge[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Merge.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Merge {run});if error!=Error.none {pool_blot_check_core__Merge.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Merge[:])->blot_check_core::Merge[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Merge run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -789,11 +789,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Merge[:])->blot_check_co
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::List,length:i64)->blot_check_core::List[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__List.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__List {run});if error!=Error.none {pool_blot_check_core__List.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::List[:])->blot_check_core::List[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__List run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -803,11 +803,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::List[:])->blot_check_cor
 }
 
 fn allocate(self:Owner&,sample:u8,length:i64)->u8[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_u8.alloc_slice(length);let error=remember(self,Run.run_u8 {run});if error!=Error.none {pool_u8.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const u8[:])->u8[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u8 run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -817,11 +817,11 @@ fn cloneValue(self:Owner&,values:const u8[:])->u8[:],Error {
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Obligation,length:i64)->blot_check_core::Obligation[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Obligation.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Obligation {run});if error!=Error.none {pool_blot_check_core__Obligation.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Obligation[:])->blot_check_core::Obligation[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Obligation run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -831,11 +831,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Obligation[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Nominal,length:i64)->blot_check_core::Nominal[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Nominal.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Nominal {run});if error!=Error.none {pool_blot_check_core__Nominal.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Nominal[:])->blot_check_core::Nominal[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Nominal run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -845,11 +845,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Nominal[:])->blot_check_
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::OperationName,length:i64)->blot_check_core::OperationName[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__OperationName.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__OperationName {run});if error!=Error.none {pool_blot_check_core__OperationName.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::OperationName[:])->blot_check_core::OperationName[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationName run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -859,11 +859,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::OperationName[:])->blot_
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Constructor,length:i64)->blot_check_core::Constructor[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Constructor.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Constructor {run});if error!=Error.none {pool_blot_check_core__Constructor.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Constructor[:])->blot_check_core::Constructor[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Constructor run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -873,11 +873,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Constructor[:])->blot_ch
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Projection,length:i64)->blot_check_core::Projection[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Projection.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Projection {run});if error!=Error.none {pool_blot_check_core__Projection.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Projection[:])->blot_check_core::Projection[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Projection run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -887,11 +887,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Projection[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::ProjectionVariant,length:i64)->blot_check_core::ProjectionVariant[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__ProjectionVariant.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__ProjectionVariant {run});if error!=Error.none {pool_blot_check_core__ProjectionVariant.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::ProjectionVariant[:])->blot_check_core::ProjectionVariant[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ProjectionVariant run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -901,11 +901,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::ProjectionVariant[:])->b
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Pattern,length:i64)->blot_check_core::Pattern[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Pattern.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Pattern {run});if error!=Error.none {pool_blot_check_core__Pattern.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Pattern[:])->blot_check_core::Pattern[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Pattern run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -915,11 +915,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Pattern[:])->blot_check_
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::PatternRow,length:i64)->blot_check_core::PatternRow[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__PatternRow.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__PatternRow {run});if error!=Error.none {pool_blot_check_core__PatternRow.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::PatternRow[:])->blot_check_core::PatternRow[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__PatternRow run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -929,11 +929,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::PatternRow[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::MatchArm,length:i64)->blot_check_core::MatchArm[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__MatchArm.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__MatchArm {run});if error!=Error.none {pool_blot_check_core__MatchArm.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::MatchArm[:])->blot_check_core::MatchArm[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchArm run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -943,11 +943,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::MatchArm[:])->blot_check
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::MatchInfo,length:i64)->blot_check_core::MatchInfo[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__MatchInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__MatchInfo {run});if error!=Error.none {pool_blot_check_core__MatchInfo.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::MatchInfo[:])->blot_check_core::MatchInfo[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -957,11 +957,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::MatchInfo[:])->blot_chec
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::UpdateInfo,length:i64)->blot_check_core::UpdateInfo[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__UpdateInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__UpdateInfo {run});if error!=Error.none {pool_blot_check_core__UpdateInfo.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::UpdateInfo[:])->blot_check_core::UpdateInfo[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -971,11 +971,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::UpdateInfo[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::UpdateStep,length:i64)->blot_check_core::UpdateStep[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__UpdateStep.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__UpdateStep {run});if error!=Error.none {pool_blot_check_core__UpdateStep.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::UpdateStep[:])->blot_check_core::UpdateStep[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateStep run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -985,11 +985,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::UpdateStep[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::ClosureInfo,length:i64)->blot_check_core::ClosureInfo[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__ClosureInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__ClosureInfo {run});if error!=Error.none {pool_blot_check_core__ClosureInfo.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::ClosureInfo[:])->blot_check_core::ClosureInfo[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ClosureInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -999,11 +999,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::ClosureInfo[:])->blot_ch
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Associated,length:i64)->blot_check_core::Associated[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Associated.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Associated {run});if error!=Error.none {pool_blot_check_core__Associated.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Associated[:])->blot_check_core::Associated[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Associated run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1013,11 +1013,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Associated[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Contract,length:i64)->blot_check_core::Contract[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Contract.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Contract {run});if error!=Error.none {pool_blot_check_core__Contract.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Contract[:])->blot_check_core::Contract[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Contract run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1027,11 +1027,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Contract[:])->blot_check
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::ContractMember,length:i64)->blot_reuse_principal_interface::ContractMember[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__ContractMember.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__ContractMember {run});if error!=Error.none {pool_blot_reuse_principal_interface__ContractMember.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::ContractMember[:])->blot_reuse_principal_interface::ContractMember[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ContractMember run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1041,11 +1041,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::ContractM
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Implementation,length:i64)->blot_reuse_principal_interface::Implementation[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__Implementation.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Implementation {run});if error!=Error.none {pool_blot_reuse_principal_interface__Implementation.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Implementation[:])->blot_reuse_principal_interface::Implementation[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Implementation run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1055,11 +1055,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Implement
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::ImplementationMember,length:i64)->blot_reuse_principal_interface::ImplementationMember[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__ImplementationMember.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__ImplementationMember {run});if error!=Error.none {pool_blot_reuse_principal_interface__ImplementationMember.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:])->blot_reuse_principal_interface::ImplementationMember[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ImplementationMember run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1069,11 +1069,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Implement
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::MemberTemplate,length:i64)->blot_reuse_principal_interface::MemberTemplate[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__MemberTemplate.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__MemberTemplate {run});if error!=Error.none {pool_blot_reuse_principal_interface__MemberTemplate.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:])->blot_reuse_principal_interface::MemberTemplate[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__MemberTemplate run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1083,11 +1083,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::MemberTem
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::SelectedProof,length:i64)->blot_reuse_principal_interface::SelectedProof[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__SelectedProof.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__SelectedProof {run});if error!=Error.none {pool_blot_reuse_principal_interface__SelectedProof.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::SelectedProof[:])->blot_reuse_principal_interface::SelectedProof[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__SelectedProof run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1097,11 +1097,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::SelectedP
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::SelectedUse,length:i64)->blot_check_core::SelectedUse[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__SelectedUse.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__SelectedUse {run});if error!=Error.none {pool_blot_check_core__SelectedUse.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::SelectedUse[:])->blot_check_core::SelectedUse[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__SelectedUse run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1111,11 +1111,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::SelectedUse[:])->blot_ch
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::DictionarySelection,length:i64)->blot_check_core::DictionarySelection[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__DictionarySelection.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__DictionarySelection {run});if error!=Error.none {pool_blot_check_core__DictionarySelection.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::DictionarySelection[:])->blot_check_core::DictionarySelection[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionarySelection run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1125,11 +1125,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::DictionarySelection[:])-
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::DictionaryUse,length:i64)->blot_check_core::DictionaryUse[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__DictionaryUse.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__DictionaryUse {run});if error!=Error.none {pool_blot_check_core__DictionaryUse.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::DictionaryUse[:])->blot_check_core::DictionaryUse[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionaryUse run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1139,11 +1139,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::DictionaryUse[:])->blot_
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Primitive,length:i64)->blot_check_core::Primitive[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Primitive.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Primitive {run});if error!=Error.none {pool_blot_check_core__Primitive.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Primitive[:])->blot_check_core::Primitive[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Primitive run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1153,11 +1153,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Primitive[:])->blot_chec
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::LoopInfo,length:i64)->blot_check_core::LoopInfo[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__LoopInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__LoopInfo {run});if error!=Error.none {pool_blot_check_core__LoopInfo.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::LoopInfo[:])->blot_check_core::LoopInfo[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1167,11 +1167,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::LoopInfo[:])->blot_check
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::LoopCarry,length:i64)->blot_check_core::LoopCarry[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__LoopCarry.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__LoopCarry {run});if error!=Error.none {pool_blot_check_core__LoopCarry.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::LoopCarry[:])->blot_check_core::LoopCarry[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopCarry run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1181,11 +1181,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::LoopCarry[:])->blot_chec
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::ResolverInfo,length:i64)->blot_check_core::ResolverInfo[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__ResolverInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__ResolverInfo {run});if error!=Error.none {pool_blot_check_core__ResolverInfo.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::ResolverInfo[:])->blot_check_core::ResolverInfo[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ResolverInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1195,11 +1195,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::ResolverInfo[:])->blot_c
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::OperationValue,length:i64)->blot_check_core::OperationValue[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__OperationValue.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__OperationValue {run});if error!=Error.none {pool_blot_check_core__OperationValue.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::OperationValue[:])->blot_check_core::OperationValue[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationValue run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1209,11 +1209,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::OperationValue[:])->blot
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::HandleEffects,length:i64)->blot_check_core::HandleEffects[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__HandleEffects.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__HandleEffects {run});if error!=Error.none {pool_blot_check_core__HandleEffects.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::HandleEffects[:])->blot_check_core::HandleEffects[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__HandleEffects run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1223,11 +1223,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::HandleEffects[:])->blot_
 }
 
 fn allocate(self:Owner&,sample:blot_check_core::Diagnostic,length:i64)->blot_check_core::Diagnostic[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_core__Diagnostic.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Diagnostic {run});if error!=Error.none {pool_blot_check_core__Diagnostic.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_core::Diagnostic[:])->blot_check_core::Diagnostic[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Diagnostic run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1237,11 +1237,11 @@ fn cloneValue(self:Owner&,values:const blot_check_core::Diagnostic[:])->blot_che
 }
 
 fn allocate(self:Owner&,sample:blot_check_parameter_patterns::Node,length:i64)->blot_check_parameter_patterns::Node[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_check_parameter_patterns__Node.alloc_slice(length);let error=remember(self,Run.run_blot_check_parameter_patterns__Node {run});if error!=Error.none {pool_blot_check_parameter_patterns__Node.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_check_parameter_patterns::Node[:])->blot_check_parameter_patterns::Node[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_parameter_patterns__Node run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1251,11 +1251,11 @@ fn cloneValue(self:Owner&,values:const blot_check_parameter_patterns::Node[:])->
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Binding,length:i64)->blot_reuse_principal_interface::Binding[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__Binding.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Binding {run});if error!=Error.none {pool_blot_reuse_principal_interface__Binding.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Binding[:])->blot_reuse_principal_interface::Binding[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Binding run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1265,11 +1265,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Binding[:
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Nominal,length:i64)->blot_reuse_principal_interface::Nominal[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__Nominal.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Nominal {run});if error!=Error.none {pool_blot_reuse_principal_interface__Nominal.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Nominal[:])->blot_reuse_principal_interface::Nominal[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Nominal run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1279,11 +1279,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Nominal[:
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Constructor,length:i64)->blot_reuse_principal_interface::Constructor[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__Constructor.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Constructor {run});if error!=Error.none {pool_blot_reuse_principal_interface__Constructor.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Constructor[:])->blot_reuse_principal_interface::Constructor[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Constructor run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1293,11 +1293,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Construct
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::EffectFamily,length:i64)->blot_reuse_principal_interface::EffectFamily[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__EffectFamily.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__EffectFamily {run});if error!=Error.none {pool_blot_reuse_principal_interface__EffectFamily.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::EffectFamily[:])->blot_reuse_principal_interface::EffectFamily[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectFamily run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1307,11 +1307,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::EffectFam
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::EffectTemplate,length:i64)->blot_reuse_principal_interface::EffectTemplate[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__EffectTemplate.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__EffectTemplate {run});if error!=Error.none {pool_blot_reuse_principal_interface__EffectTemplate.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:])->blot_reuse_principal_interface::EffectTemplate[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectTemplate run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1321,11 +1321,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::EffectTem
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Associated,length:i64)->blot_reuse_principal_interface::Associated[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__Associated.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Associated {run});if error!=Error.none {pool_blot_reuse_principal_interface__Associated.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Associated[:])->blot_reuse_principal_interface::Associated[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Associated run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1335,11 +1335,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Associate
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Contract,length:i64)->blot_reuse_principal_interface::Contract[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_principal_interface__Contract.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Contract {run});if error!=Error.none {pool_blot_reuse_principal_interface__Contract.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Contract[:])->blot_reuse_principal_interface::Contract[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Contract run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1349,11 +1349,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Contract[
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::ImportResolution,length:i64)->blot_reuse_frozen_dependency::ImportResolution[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_frozen_dependency__ImportResolution.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__ImportResolution {run});if error!=Error.none {pool_blot_reuse_frozen_dependency__ImportResolution.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:])->blot_reuse_frozen_dependency::ImportResolution[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1363,11 +1363,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_frozen_dependency::ImportResol
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::Export,length:i64)->blot_reuse_frozen_dependency::Export[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_frozen_dependency__Export.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__Export {run});if error!=Error.none {pool_blot_reuse_frozen_dependency__Export.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::Export[:])->blot_reuse_frozen_dependency::Export[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Export run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1377,11 +1377,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_frozen_dependency::Export[:])-
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::Fixity,length:i64)->blot_reuse_frozen_dependency::Fixity[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_frozen_dependency__Fixity.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__Fixity {run});if error!=Error.none {pool_blot_reuse_frozen_dependency__Fixity.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::Fixity[:])->blot_reuse_frozen_dependency::Fixity[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Fixity run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1391,11 +1391,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:])-
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::Symbol,length:i64)->blot_reuse_frozen_dependency::Symbol[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_frozen_dependency__Symbol.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__Symbol {run});if error!=Error.none {pool_blot_reuse_frozen_dependency__Symbol.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::Symbol[:])->blot_reuse_frozen_dependency::Symbol[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Symbol run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -1405,11 +1405,11 @@ fn cloneValue(self:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:])-
 }
 
 fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::Module,length:i64)->blot_reuse_frozen_dependency::Module[:],Error {
- assert(valid(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
+ assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
  let run=pool_blot_reuse_frozen_dependency__Module.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__Module {run});if error!=Error.none {pool_blot_reuse_frozen_dependency__Module.free_slice(run);return [],error;}return run,Error.none;
 }
 fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::Module[:])->blot_reuse_frozen_dependency::Module[:] {
- assert(valid(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
+ assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
  while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Module run=>{if run.values .== values {return run.values;}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
@@ -4349,9 +4349,9 @@ fn clone(value:const blot_reuse_frozen_dependency::FrozenDependency&)->Owned<blo
 
 // Split existing registered runs without copying a retained module.
 struct Mark {owner:u32,generation:u64,head:u32}
-fn mark(self:const Owner&)->Mark {assert(valid(self));return Mark {self.lease,self.generation,leases[self.lease-1].head};}
+fn mark(self:const Owner&)->Mark {assert(unique(self));return Mark {self.lease,self.generation,leases[self.lease-1].head};}
 fn rollback(self:Owner&,mark:Mark) {
- assert(valid(self)&&self.lease==mark.owner&&self.generation==mark.generation);
+ assert(unique(self)&&self.lease==mark.owner&&self.generation==mark.generation);
  var check=leases[self.lease-1].head;while check!=mark.head {assert(check!=0);check=links[check-1].next;}
  while leases[self.lease-1].head!=mark.head {let head=leases[self.lease-1].head;let link=links[head-1];leases[self.lease-1].head=link.next;match link.value {
 
@@ -4503,7 +4503,7 @@ Run.run_blot_reuse_frozen_dependency__Module run=>{pool_blot_reuse_frozen_depend
 }
 
 fn detach(self:Owner&,destination:Owner&,values:const u32[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u32 run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4514,7 +4514,7 @@ fn detach(self:Owner&,destination:Owner&,values:const u32[:]) {
 fn partitionInto(self:Owner&,destination:Owner&,values:const u32[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Kind run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4525,7 +4525,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_t
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Term run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4536,7 +4536,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_t
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_contracts__Requirement run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4547,7 +4547,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_c
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_headers__Named run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4558,7 +4558,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_h
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Term run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4569,7 +4569,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_capability_cont
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Binding run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4580,7 +4580,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_capability_cont
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__FieldName run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4591,7 +4591,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::FieldName
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RuntimeName[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RuntimeName run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4602,7 +4602,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RuntimeNa
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::RuntimeName[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DeclarationDependencies[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DeclarationDependencies run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4613,7 +4613,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Declarati
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DeclarationDependencies[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::BindingRef[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__BindingRef run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4624,7 +4624,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::BindingRe
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::BindingRef[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DependencyMember[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DependencyMember run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4635,7 +4635,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Dependenc
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DependencyMember[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ErasedDeclarationReference[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ErasedDeclarationReference run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4646,7 +4646,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ErasedDec
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ErasedDeclarationReference[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RequestLoopInfo[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestLoopInfo run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4657,7 +4657,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RequestLo
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::RequestLoopInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RequestArm[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestArm run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4668,7 +4668,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RequestAr
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::RequestArm[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Node[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Node run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4679,7 +4679,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Node[:])
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::Node[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_effects::Row[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_effects__Row run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4690,7 +4690,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_effects::Row[:]
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_effects::Row[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Operation[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Operation run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4701,7 +4701,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Operatio
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::Operation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__QuantifierGoals run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4712,7 +4712,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Quantifi
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Obligation[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Obligation run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4723,7 +4723,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Obligati
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::Obligation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Node[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Node run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4734,7 +4734,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Node[:]) 
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Node[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_parse_ast__Span run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4745,7 +4745,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) {
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Binding[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Binding run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4756,7 +4756,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Binding[:
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Binding[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Body[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Body run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4767,7 +4767,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Body[:]) 
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Body[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Parameter[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Parameter run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4778,7 +4778,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Parameter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Parameter[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::CallInfo[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__CallInfo run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4789,7 +4789,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::CallInfo[
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::CallInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Merge[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Merge run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4800,7 +4800,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Merge[:])
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Merge[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::List[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__List run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4811,7 +4811,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::List[:]) 
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::List[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const u8[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u8 run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4822,7 +4822,7 @@ fn detach(self:Owner&,destination:Owner&,values:const u8[:]) {
 fn partitionInto(self:Owner&,destination:Owner&,values:const u8[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Obligation[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Obligation run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4833,7 +4833,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Obligatio
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Obligation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Nominal[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Nominal run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4844,7 +4844,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Nominal[:
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Nominal[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::OperationName[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationName run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4855,7 +4855,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Operation
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::OperationName[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Constructor[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Constructor run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4866,7 +4866,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Construct
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Constructor[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Projection[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Projection run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4877,7 +4877,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Projectio
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Projection[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ProjectionVariant[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ProjectionVariant run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4888,7 +4888,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Projectio
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ProjectionVariant[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Pattern[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Pattern run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4899,7 +4899,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Pattern[:
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Pattern[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::PatternRow[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__PatternRow run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4910,7 +4910,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::PatternRo
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::PatternRow[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::MatchArm[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchArm run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4921,7 +4921,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::MatchArm[
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::MatchArm[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::MatchInfo[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchInfo run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4932,7 +4932,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::MatchInfo
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::MatchInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateInfo[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateInfo run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4943,7 +4943,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateInf
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateStep[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateStep run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4954,7 +4954,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateSte
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateStep[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ClosureInfo[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ClosureInfo run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4965,7 +4965,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ClosureIn
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ClosureInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Associated[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Associated run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4976,7 +4976,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Associate
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Associated[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Contract[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Contract run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4987,7 +4987,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Contract[
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Contract[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ContractMember[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ContractMember run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -4998,7 +4998,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ContractMember[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Implementation[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Implementation run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5009,7 +5009,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Implementation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ImplementationMember run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5020,7 +5020,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__MemberTemplate run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5031,7 +5031,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__SelectedProof run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5042,7 +5042,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::SelectedUse[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__SelectedUse run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5053,7 +5053,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::SelectedU
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::SelectedUse[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionarySelection run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5064,7 +5064,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Dictionar
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionaryUse run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5075,7 +5075,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Dictionar
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Primitive[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Primitive run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5086,7 +5086,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Primitive
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Primitive[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopInfo run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5097,7 +5097,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo[
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::LoopCarry[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopCarry run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5108,7 +5108,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::LoopCarry
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::LoopCarry[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ResolverInfo[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ResolverInfo run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5119,7 +5119,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ResolverI
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ResolverInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::OperationValue[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationValue run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5130,7 +5130,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Operation
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::OperationValue[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::HandleEffects[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__HandleEffects run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5141,7 +5141,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::HandleEff
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::HandleEffects[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Diagnostic[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Diagnostic run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5152,7 +5152,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Diagnosti
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Diagnostic[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_check_parameter_patterns::Node[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_parameter_patterns__Node run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5163,7 +5163,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_check_parameter_patte
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_parameter_patterns::Node[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Binding[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Binding run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5174,7 +5174,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Binding[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Nominal[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Nominal run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5185,7 +5185,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Nominal[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Constructor[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Constructor run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5196,7 +5196,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Constructor[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectFamily run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5207,7 +5207,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectTemplate run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5218,7 +5218,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Associated[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Associated run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5229,7 +5229,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Associated[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Contract[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Contract run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5240,7 +5240,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_inter
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Contract[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5251,7 +5251,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependen
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Export[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Export run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5262,7 +5262,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependen
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Export[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Fixity run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5273,7 +5273,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependen
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Symbol run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -5284,7 +5284,7 @@ fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependen
 fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
 
 fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Module[:]) {
- assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Module run=>{if run.values .== values {return;}},_=>{}}}
  var previous:u32=0;next=leases[self.lease-1].head;
@@ -7842,3 +7842,8 @@ fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependen
 partitionInto(self,destination,value.text);
 
 }
+
+// Retained readers share immutable runs; every mutation requires the sole lease.
+fn unique(self:const Owner&)->bool {return valid(self)&&leases[self.lease-1].references==1;}
+fn retain(self:Owner)->Owner,Error {if !valid(self) {return Owner{},Error.invalid_artifact;}let at=self.lease-1;if leases[at].references==0xffffffffffffffff {return Owner{},Error.dependency_limit;}leases[at].references+=1;return self,Error.none;}
+fn release(self:Owner&) {self.deinit();}

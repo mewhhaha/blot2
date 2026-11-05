@@ -132,9 +132,10 @@ fn initPooled()->Cache,Error {
 }
 fn init()->Cache,Error {return initPooled();}
 fn initPooledRef()->Cache?,Error {let result,error=initPooled();if error!=Error.none {return null,error;}return cache_states[result.lease-1].canonical,Error.none;}
-fn find(self:const Cache&,name:const u8[:])->const Body? {assert(valid(self));let index .= blot_support_pooled_map::get(self.index,name);if !index {return null;}return self.bodies.items[index].body();}
+fn find(self:const Cache&,name:const u8[:])->const Body? {if self.lease==0 {return null;}assert(valid(self));let index .= blot_support_pooled_map::get(self.index,name);if !index {return null;}return self.bodies.items[index].body();}
+fn activate(self:Cache&)->Error {if self.lease!=0 {assert(valid(self));return Error.none;}let value,error=initPooled();if error!=Error.none {return error;}self=value;return Error.none;}
 fn retain(self:Cache&,body:const Body&)->Error {
- assert(valid(self) && body.owner.live);var index:i64=-1;for &candidate,at in body.owner.bodies {if candidate .== body {index=at;break;}}
+ let opened=self.activate();if opened!=Error.none {return opened;}assert(body.owner.live);var index:i64=-1;for &candidate,at in body.owner.bodies {if candidate .== body {index=at;break;}}
  if index<0 {return Error.dependency_limit;}let error=blot_support_pooled_buffer::ensure(self.bodies,self.bodies.len+1,lease_runs);if error!=Error.none {return error;}
  reserveNames(self.index,self.index.count+1);let at=self.bodies.len;self.bodies.storage[at]=Lease{body.owner,index};self.bodies.items=self.bodies.storage[..at+1];self.bodies.len=at+1;blot_support_pooled_map::insert(self.index,body.name,at,name_slots);let owner_at=chunks.index_of(body.owner);assert(owner_at>=0);chunks[owner_at].references+=1;return Error.none;
 }
@@ -144,13 +145,13 @@ fn deinit(self:Cache&) {
 }
 struct LiveBytes {bytes:i64=0,types:i64=0}
 fn compact(self:Cache&)->Error {
- assert(valid(self));var live=dictionary<u64,LiveBytes>{};for lease in self.bodies.items {let body=lease.body();let slot=chunks.index_of(body.owner) as u64;let current .= live.get(slot);var entry=LiveBytes{};if current {entry=current;}entry.bytes+=body.bytes();entry.types+=body.type_work;live.insert(slot,entry);}
+ let opened=self.activate();if opened!=Error.none {return opened;}var live=dictionary<u64,LiveBytes>{};for lease in self.bodies.items {let body=lease.body();let slot=chunks.index_of(body.owner) as u64;let current .= live.get(slot);var entry=LiveBytes{};if current {entry=current;}entry.bytes+=body.bytes();entry.types+=body.type_work;live.insert(slot,entry);}
  var index:i64=0;while index<self.bodies.len {let body=self.bodies.items[index].body();let slot=chunks.index_of(body.owner) as u64;let active .= live.get(slot);assert(active!=null);if active.bytes>=(body.owner.body_bytes+1)/2 && active.types>=(body.owner.type_work+1)/2 {index+=1;continue;}
  blot_support_pooled_map::remove(self.index,body.name);let length=self.bodies.len-1;self.bodies.storage[index]=self.bodies.storage[length];self.bodies.items=self.bodies.storage[..length];self.bodies.len=length;if index<length {blot_support_pooled_map::insert(self.index,self.bodies.items[index].body().name,index,name_slots);}body.owner.release();}return Error.none;
 }
 struct Payload {bytes:i64=0,graph_nodes:i64=0,chunks:i64=0}
 fn payload(self:const Cache&)->Payload,Error {
- assert(valid(self));var seen=dictionary<u64,bool>{};var result=Payload{bytes:self.bodies.len*16};for lease in self.bodies.items {let owner .= lease.owner;let at=chunks.index_of(owner) as u64;if seen.contains(at) {continue;}seen.insert(at,true);let graph=owner.graph;
+ if self.lease==0 {return Payload{},Error.none;}assert(valid(self));var seen=dictionary<u64,bool>{};var result=Payload{bytes:self.bodies.len*16};for lease in self.bodies.items {let owner .= lease.owner;let at=chunks.index_of(owner) as u64;if seen.contains(at) {continue;}seen.insert(at,true);let graph=owner.graph;
  result.bytes+=chunk_footprint+owner.qualifications.len*qualification_footprint+owner.body_bytes+graph.nodes.len*type_node_footprint+graph.extra.len*4+graph.rows.len*effect_row_footprint+graph.labels.len*4+graph.operations.len*operation_footprint+graph.quantifier_goals.len*12+graph.quantifier_obligations.len*obligation_footprint;
  result.bytes+=owner.nominals.len*identity_read_footprint;for nominal in owner.nominals {result.bytes+=nominal.name.len;}result.bytes+=owner.field_names.len*16;for name in owner.field_names {result.bytes+=name.len;}result.graph_nodes+=graph.nodes.len;}
  result.chunks=seen.count;return result,Error.none;

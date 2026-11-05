@@ -25,6 +25,16 @@ struct Snapshot {
 }
 reusable var snapshots:Snapshot[>..]=[];
 reusable[] var handles:ModuleHandle[>..]=[];
+struct InputPin {owners:Owner[:]=[]}
+reusable[] var input_owner_runs:Owner[>..]=[];
+fn pinInputs(self:const Snapshot&)->InputPin,Error {
+ if !self.valid() || self.initialized!=self.modules.len {return InputPin{},Error.invalid_artifact;}
+ let owners=input_owner_runs.alloc_slice(self.modules.len+1);for &owner in owners {owner=Owner{};}
+ let root,error=self.owner.retain();if error!=Error.none {input_owner_runs.free_slice(owners);return InputPin{},error;}owners[0]=root;
+ for handle,index in self.modules {assert(handle.valid());let owner,error=module_owners[handle.slot-1].owner.retain();if error!=Error.none {for &prior in owners[..index+1] {prior.release();}input_owner_runs.free_slice(owners);return InputPin{},error;}owners[index+1]=owner;}
+ return InputPin{owners},Error.none;
+}
+fn deinit(self:InputPin&) {for &owner in self.owners {owner.release();}if self.owners.len!=0 {input_owner_runs.free_slice(self.owners);}self=InputPin{};}
 fn valid(self:const Snapshot&)->bool {return self.live&&self.slot!=0&&self.slot-1<snapshots.len&&snapshots[self.slot-1].live&&snapshots[self.slot-1].generation==self.generation;}
 fn allocateSnapshot(count:i64)->Snapshot?,Error {
  if count<0||count>0xffffffff||snapshots.len>=0xffffffff {return null,Error.out_of_memory;}

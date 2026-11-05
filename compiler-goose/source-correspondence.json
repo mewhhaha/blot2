@@ -58,7 +58,7 @@
       "zig": "compiler/src/backend/addressed_input_demand.zig",
       "goose": "compiler-goose/src/backend/addressed_input_demand.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/aggregate_constant_tests.zig",
@@ -214,7 +214,7 @@
       "zig": "compiler/src/backend/direct_input_demand.zig",
       "goose": "compiler-goose/src/backend/direct_input_demand.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/discarded_bindings.zig",
@@ -418,7 +418,7 @@
       "zig": "compiler/src/backend/packed_input_demand.zig",
       "goose": "compiler-goose/src/backend/packed_input_demand.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/packed_layout.zig",
@@ -898,7 +898,7 @@
       "zig": "compiler/src/backend/storage_owner_graph.zig",
       "goose": "compiler-goose/src/backend/storage_owner_graph.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/storage_owner_graph_tests.zig",
@@ -958,7 +958,7 @@
       "zig": "compiler/src/backend/storage_result_alias.zig",
       "goose": "compiler-goose/src/backend/storage_result_alias.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/storage_selected_fields_tests.zig",
@@ -2799,7 +2799,7 @@
       "zig": "compiler/src/reuse/dependency_snapshot.zig",
       "goose": "compiler-goose/src/reuse/dependency_snapshot.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/dependency_symbol_slots.zig",
@@ -3141,7 +3141,7 @@
       "zig": "compiler/src/reuse/project_check.zig",
       "goose": "compiler-goose/src/reuse/project_check.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/reuse/project_check_tests.zig",
@@ -3309,7 +3309,7 @@
       "zig": "compiler/src/reuse/source_completion.zig",
       "goose": "compiler-goose/src/reuse/source_completion.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/source_completion_tests.zig",

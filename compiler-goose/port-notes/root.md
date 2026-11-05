@@ -311,3 +311,34 @@ root/row/scheme/effect arrays and dispatches physical/rigid/version requests to
 a statically typed private context. BodyCache source completeness does not
 establish that import closure or worker/CLI/compiler qualification. No port
 compiler, test, checker, lint, formatter or execution has run.
+
+
+Dependency snapshot graph/principal/interface projection now has a complete
+first source writing pass, as does CoreBuilder owned Core publication. These
+remain unverified. Source completion Prefix/Entry/Borrow and closed fresh-source
+factories are written with generation-checked private metadata, exact live graph
+and Core descriptor checks, owned identity copies and explicit seed journal pins.
+Their project/partial factories are still being written; no authority is minted
+from a decoded graph or validation-only receipt.
+
+Project checker is in progress: public diagnostics/results/catalogs, result run
+ownership, live Engine metadata, compiled catalog recovery/relocation, body
+offers, ordered cutoff admission and canonical module-origin catalogs are
+written. Imports/module checks, callbacks, parallel scheduling and public check
+factories remain. Origins are lazy immutable typed names owned by each loaded
+Project; source failure is retained explicitly in ModuleOrigins.failure.
+
+Payload Owner journals now have generation-checked immutable retain/release.
+The last lease frees runs. alloc/mutable/mark/rollback/partition require the sole
+lease; adopt declines shared journals. Retained Snapshot.pinInputs retains its
+root journal plus every child module journal, independent of snapshot metadata.
+Backend result publication/workspace leases are being written; the public driver
+must pin every actual Core owner and the full output workspace until Result
+teardown. Raw Frozen slices cannot fabricate journal pins. Cloning unowned Core
+is a possible fallback, not a measured performance result.
+
+Do not rerun /tmp payload authoring generators over the final source without
+preserving reference-counted journal guards and partition/rollback additions.
+All migration edits remain isolated in compiler-goose. The Zig oracle source,
+installed release and default build remain intact. No Goose build, execution,
+checker, test, lint or formatter has run; the full source port remains incomplete.

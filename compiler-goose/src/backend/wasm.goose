@@ -954,3 +954,9 @@ fn reset(module: Module&) {
     deinit(module);
     module = init(module.types,module.instructions,module.names,module.functions,module.signatures,module.imports,module.globals,module.exports,module.data,module.static_fields,module.table_functions,module.table_origins,module.semantic_sites);
 }
+// Numeric function IDs use the same immutable body view as function records.
+fn parameters(module: const Module&,id: u32) -> const ValueType[:] { parameters(module,module.functions[id]) }
+fn locals(module: const Module&,id: u32) -> const ValueType[:] { locals(module,module.functions[id]) }
+fn instructions(module: const Module&,id: u32) -> const Instruction[:] { instructions(module,module.functions[id]) }
+// Unpublished helper rewrites may replace the parameter view before reinterning.
+fn setFunctionParameters(module: Module&,id: u32,parameters: const ValueType[:]) -> blot_error::Error { if id >= module.functions.len { return blot_error::Error.invalid_function_reference; } let range = Range { start: module.types.len,len: parameters.len }; module.types.append(parameters); module.functions[id].parameters = range; return blot_error::Error.none; }

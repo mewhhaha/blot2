@@ -920,8 +920,8 @@ fn blot_structural::equal(left: blot_check_check::ReflectionKind,right: blot_che
 fn blot_structural::hash<S>(sink:S&,value:blot_check_check::ReflectionKind) {blot_structural::hash(sink,blot_check_check::reflectionKindCode(value));}
 // Source identity and producer lookups are explicit immutable catalogs.
 struct ModuleOrigin {unit:u32,name:const u8[:],source_available:bool=true}
-struct ModuleOrigins {entries:const ModuleOrigin[:]=[],has_source_available:bool=false,has_lookup:bool=false}
-fn ModuleOrigins::name(self:ModuleOrigins,unit:u32,current_unit:u32)->const u8[:],blot_error::Error {for entry in self.entries {if entry.unit==unit {return entry.name,blot_error::Error.none;}}if self.has_lookup || self.entries.len!=0 || unit!=current_unit {return [],blot_error::Error.source_identity_unavailable;}return "main",blot_error::Error.none;}
+struct ModuleOrigins {entries:const ModuleOrigin[:]=[],has_source_available:bool=false,has_lookup:bool=false,failure:blot_error::Error=blot_error::Error.none}
+fn ModuleOrigins::name(self:ModuleOrigins,unit:u32,current_unit:u32)->const u8[:],blot_error::Error {if self.failure!=blot_error::Error.none {return [],self.failure;}for entry in self.entries {if entry.unit==unit {return entry.name,blot_error::Error.none;}}if self.has_lookup || self.entries.len!=0 || unit!=current_unit {return [],blot_error::Error.source_identity_unavailable;}return "main",blot_error::Error.none;}
 fn ModuleOrigins::sourceAvailable(self:ModuleOrigins,unit:u32)->bool {for entry in self.entries {if entry.unit==unit {return entry.source_available;}}return false;}
 struct TraceSink {events:GlobalTrace[>..<]&}
 fn TraceSink::observe(self:TraceSink&,value:GlobalTrace) {self.events.append(value);}

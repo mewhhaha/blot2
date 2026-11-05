@@ -236,16 +236,9 @@ struct Binding { binding: u32, root: Id }
 struct Collection { nodes: const Term[:] = [], words: const u32[:] = [], bindings: const Binding[:] = [] }
 fn header(self: Collection, binding: u32, arity: u32) -> blot_support::Option<Recipe> { for entry in self.bindings { if entry.binding == binding { return blot_support::some(Recipe { arity, entry.root, self.nodes, self.words }); } } return blot_support::none<Recipe>(); }
 struct CollectionTables { nodes: Term[>..]&, words: u32[>..]&, bindings: Binding[>..]& }
-fn select(self: Collection, bindings, keep: const bool[:], has_keep: bool, destination: CollectionTables) -> Collection, Error {
-    var nodes: Term[>..<] = []; var words: u32[>..<] = []; var store = init(nodes, words); var roots: Binding[>..] = [];
-    for entry in self.bindings { if entry.binding >= bindings.len { return Collection {}, Error.invalid_capability_contract; } let binding = bindings[entry.binding];
-        if binding.kind != blot_check_check::Kind.global || !binding.capability_parameters.present() { continue; } if has_keep && !keep[entry.binding] { continue; }
-        let found = header(self, entry.binding, binding.capability_parameters.arity()); if !found.present { return Collection {}, Error.invalid_capability_contract; } let recipe = found.value; var arguments: u32[16];
-        for index in 0..recipe.arity { let id, error = append(store, Term { Tag.parameter, index as u32 }); if error != Error.none { return Collection {}, error; } arguments[index] = id; }
-        let root, error = instantiateCanonical(store, recipe, arguments[..recipe.arity]); if error != Error.none { return Collection {}, error; } roots += Binding { entry.binding, root };
-    }
-    if roots.len == 0 { return Collection {}, Error.none; } return clone(Collection { store.nodes[:], store.words[:], roots[:] }, destination);
-}
+fn select(self: Collection, bindings, keep: const bool[:], has_keep: bool, destination: CollectionTables) -> Collection, Error {let initialized,error=initPooled();if error!=Error.none {return Collection{},error;}var store=initialized;var roots:Binding[>..<]=[];let result,failure=selectValues(self,bindings,keep,has_keep,destination,store,roots);store.deinit();return result,failure;}
+fn selectValues(self:Collection,bindings,keep:const bool[:],has_keep:bool,destination:CollectionTables,store:Store&,roots:Binding[>..<]&)->Collection,Error {for entry in self.bindings {if entry.binding>=bindings.len {return Collection{},Error.invalid_capability_contract;}let binding=bindings[entry.binding];if binding.kind!=blot_check_check::Kind.global || !binding.capability_parameters.present() {continue;}if has_keep && !keep[entry.binding] {continue;}let found=header(self,entry.binding,binding.capability_parameters.arity());if !found.present {return Collection{},Error.invalid_capability_contract;}let recipe=found.value;var arguments:u32[16]=[0;16];for index in 0..recipe.arity {let id,error=append(store,Term{Tag.parameter,index as u32});if error!=Error.none {return Collection{},error;}arguments[index]=id;}let root,error=instantiateCanonical(store,recipe,arguments[..recipe.arity]);if error!=Error.none {return Collection{},error;}roots.push(Binding{entry.binding,root});}if roots.len==0 {return Collection{},Error.none;}return clone(Collection{store.nodes.items[:],store.words.items[:],roots[:]},destination);}
+
 fn validate(self: Collection, binding_count: i64, symbol_count: i64) -> Error {
     if self.bindings.len == 0 { if self.nodes.len != 0 || self.words.len != 0 { return Error.invalid_capability_contract; } return Error.none; }
     let error = validate(View { self.nodes, self.words }, 0, 16, true); if error != Error.none { return error; } var previous: u32 = 0; var has_previous = false;

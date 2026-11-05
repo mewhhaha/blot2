@@ -6,13 +6,13 @@ port has been written.
 
 Completed writing passes (unverified):
 
-associated_admission, check, capability_contract_core, capability_contract_source, capability_contracts, capability_flow, capability_invocations, capability_lifetimes, check_scheme_import, cleanup_contracts, closed_nominal_storage, collection_contracts, core, diagnostic_code, diagnostic_location, dictionary_contracts, dictionary_owner, effect_authority, effect_evidence, effects, frozen_types, generative_core, generative_relocation, generative_schemes, numeric_proof_bodies, numeric_proof_contracts, numeric_proof_core, numeric_proof_headers, numeric_proof_terms, ordered_membership, package_contracts, package_evidence, package_portable, package_row_facts, parallel_lowering, parameter_patterns, primitive_operator, quantifier_goals, rank_equal, rank_portable, rank_walk, record_order, resolver_core, scheme_dependencies, scheme_equations, scheme_predicates, scheme_projection, simd_contracts, solver_worklist, staging_capture_rights, staging_origins, staging_snapshot, staging_type_match, storage_core, storage_ops, storage_types, task_core, task_regions, task_types, typed_staging, types, usage_check, usage_core.
+associated_admission, check, capability_contract_core, capability_contract_source, capability_contracts, capability_flow, capability_invocations, capability_lifetimes, check_scheme_import, cleanup_contracts, closed_nominal_storage, collection_contracts, core, core_builder, diagnostic_code, diagnostic_location, dictionary_contracts, dictionary_owner, effect_authority, effect_evidence, effects, frozen_types, generative_core, generative_relocation, generative_schemes, numeric_proof_bodies, numeric_proof_contracts, numeric_proof_core, numeric_proof_headers, numeric_proof_terms, ordered_membership, package_contracts, package_evidence, package_portable, package_row_facts, parallel_lowering, parameter_patterns, primitive_operator, quantifier_goals, rank_equal, rank_portable, rank_walk, record_order, resolver_core, scheme_dependencies, scheme_equations, scheme_predicates, scheme_projection, simd_contracts, solver_worklist, staging_capture_rights, staging_origins, staging_snapshot, staging_type_match, storage_core, storage_ops, storage_types, task_core, task_regions, task_types, typed_staging, types, usage_check, usage_core.
 
-Currently being written: the remaining admission/lowering passes and main checker. The parent owns frozen_core_validation; this agent owns the other remaining check modules.
+Currently being written: package and staging Core admission. The main checker and CoreBuilder have complete first writing passes. The parent owns frozen_core_validation; this agent owns the other remaining check modules.
 
 Remaining production modules:
 
-core_builder, frozen_core_validation, package_core, staging_core.
+frozen_core_validation, package_core, staging_core.
 
 These lists describe writing coverage only. A written module has not been
 compiled, checked, executed or qualified. Root entry construction and cross-module
@@ -138,3 +138,5 @@ Pooled Types/Effects ownership is now written. Store copies share generation-tag
 - ParameterPatterns.Store now has concrete pooled node/word owners; FrozenTypes.Patterns.store carries that fixed descriptor by value.
 - Checked and SourceValidation own generation-tagged typed output runs, including nested proof headers and proof-body/capability catalogs. SourceValidation transfer releases all unretained body tables. Factory scratch remains lexical and outside inference recursion; numeric rejection takes a separate unchecked source-validation entry to avoid an owner-factory recursion cycle.
 - SchemeCopier memo maps are concrete fixed typed pooled maps, and associated admission now initializes/deinitializes the parent-owned pooled principal graph copiers. Remaining recursive scratch conversions and logical allocator-fault hooks are source integration work, not completed verification.
+
+CoreBuilder now publishes `dependency_payload.Owned<Core.Module>` from `lower` and `lowerWithOrigins`. Every table, nested proof-header slice, selected capability catalog, and declaration-dependency table is retained by that owner; recursive scratch uses fixed pooled buffers. Its full production lowering algorithms are written, still unverified.
