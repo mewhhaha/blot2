@@ -1,11 +1,14 @@
 // Decoded immutable checked fields retain their concrete typed packet journal.
 namespace blot_check_check;
+import support.error;
+import support.pooled_map;
+import support.project_packet_contexts;
+
 import .check;
 import support.project_packet;
-import support.pooled_map;
 import dictionary;
 struct CheckedPacketKey {lease:u32,generation:u64}
-var checked_packets:blot_support_pooled_map::Map<CheckedPacketKey,blot_project_packet::Owner>=blot_support_pooled_map::Map<CheckedPacketKey,blot_project_packet::Owner>{..};
+var checked_packets:blot_support_pooled_map::Map<CheckedPacketKey,blot_project_packet::Owner> =blot_support_pooled_map::Map<CheckedPacketKey,blot_project_packet::Owner>{..};
 reusable[] var checked_packet_slots:dictionary_slot<CheckedPacketKey,blot_project_packet::Owner>[>..]=[];
 fn attachCheckedPacket(owner:CheckedOwner,packet:blot_project_packet::Owner)->blot_error::Error {
  if !owner.valid() {return blot_error::Error.invalid_artifact;}let key=CheckedPacketKey{owner.lease,owner.generation};if blot_support_pooled_map::contains(checked_packets,key) {return blot_error::Error.invalid_artifact;}

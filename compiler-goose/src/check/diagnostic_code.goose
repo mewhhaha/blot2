@@ -1,9 +1,12 @@
 // Shared public diagnostic vocabulary and exact message text.
 namespace blot_check_diagnostic_code;
+import support.error;
+import support.structural_adapters;
+
 import support.structural;
 enum Code { cycle, constant_fuel, constant_recursion, integer_divide_by_zero, array_bounds, backend_limit, const_panic, const_effect, const_runtime_dependency, invalid_annotation, ambiguous_state, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, missing_implementation, incompatible_implementation, recursive_evidence, recursive_associated_type, associated_limit, missing_field, ambiguous_qualified, type_mismatch, effect_mismatch, infinite_effect, type_constructor_required, invalid_provider, initialization_cycle, backend_const_only, unsupported, no_entry, entry_type, entry_let_type, unresolved_type, constant_expression, complexity, invalid_numeric_proof, ownership_unproved, collector_free_unproved, simd_lane_literal, stage_unavailable, code_shape_mismatch, cross_stage_authority, staging_budget, storage_unsupported, storage_borrow_conflict, storage_escape }
-fn message(self: Code, detail: const u8[:]) -> const u8[:] {
-    match self {
+fn message(self_: Code, detail: const u8[:]) -> const u8[:] {
+    match self_ {
         storage_unsupported => { if detail.len != 0 { return detail; } return "This program exceeds the current scoped-storage profile"; },
         storage_borrow_conflict => { if detail.len != 0 { return detail; } return "This storage operation could invalidate a borrow"; },
         storage_escape => { if detail.len != 0 { return detail; } return "Borrowed storage cannot escape its owner"; },

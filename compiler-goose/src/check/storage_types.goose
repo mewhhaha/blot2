@@ -1,8 +1,10 @@
 // Storage identities belong to the compiler and never coerce ordinary arrays.
 namespace blot_check_storage_types;
-import std;
+import check.types;
 import support.error;
 import support.option;
+
+import std;
 type Kind = u32;
 let grow: Kind = 20; let resize: Kind = 21; let ref: Kind = 22; let view: Kind = 23; let link: Kind = 24;
 struct Info { kind: Kind, element: blot_check_types::Id }

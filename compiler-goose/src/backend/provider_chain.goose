@@ -25,9 +25,9 @@ fn same(left: Key, right: Key) -> bool { left.operation == right.operation && le
 struct Installation { head: Head = 0, cell: CellId = 0 }
 struct Match { frame: Frame }
 struct Mark { frames: i64, cells: i64 }
-struct Frames { storage: Frame[:] = [],items: Frame[:] = [],len: i64 = 0 }
-struct Cells { storage: Cell[:] = [],items: Cell[:] = [],len: i64 = 0 }
-struct Scopes { storage: Authority[:] = [],items: Authority[:] = [],len: i64 = 0 }
+struct Frames { storage: Frame[:] = default<Frame[:]>(),items: Frame[:] = default<Frame[:]>(),len: i64 = 0 }
+struct Cells { storage: Cell[:] = default<Cell[:]>(),items: Cell[:] = default<Cell[:]>(),len: i64 = 0 }
+struct Scopes { storage: Authority[:] = default<Authority[:]>(),items: Authority[:] = default<Authority[:]>(),len: i64 = 0 }
 reusable[] var frame_runs: Frame[>..] = [];
 reusable[] var cell_runs: Cell[>..] = [];
 reusable[] var scope_runs: Authority[>..] = [];
@@ -46,7 +46,7 @@ fn clear(buffer: Scopes&) { blot_support_pooled_buffer::clear(buffer); buffer.le
 fn deinit(buffer: Frames&) { blot_support_pooled_buffer::deinit(buffer,frame_runs); buffer.len = 0; }
 fn deinit(buffer: Cells&) { blot_support_pooled_buffer::deinit(buffer,cell_runs); buffer.len = 0; }
 fn deinit(buffer: Scopes&) { blot_support_pooled_buffer::deinit(buffer,scope_runs); buffer.len = 0; }
-struct FrameOwners { count: i64 = 0,slots: dictionary_slot<Head,Authority>[:] = [] }
+struct FrameOwners { count: i64 = 0,slots: dictionary_slot<Head,Authority>[:] = default<dictionary_slot<Head,Authority>[:]>() }
 reusable[] var frame_owner_slots: dictionary_slot<Head,Authority>[>..] = [];
 fn get(map: const FrameOwners&,key: Head) -> Authority? { let view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; return blot_support_pooled_map::get(view,key); }
 fn reserve(map: FrameOwners&,extra: i64) -> blot_error::Error { if extra < 0 || map.count > 1537228672809129301 - extra { return blot_error::Error.out_of_memory; } var capacity = max(8,map.slots.len); while (map.count + extra) * 3 > capacity * 2 { capacity *= 2; } if capacity != map.slots.len { var view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; blot_support_pooled_map::grow(view,capacity,frame_owner_slots); map.count = view.count; map.slots = view.slots; } return blot_error::Error.none; }
@@ -67,9 +67,9 @@ struct Reference { value: Store }
 reusable var references: Reference[>..] = [];
 fn valid(store: const Store&) -> bool { return store.lease != 0 && store.lease - 1 < states.len && store.owner_id != 0 && states[store.lease - 1].owner_id == store.owner_id && states[store.lease - 1].generation == store.generation; }
 fn initPooled() -> Store,blot_error::Error {
-    if next_generation == 18446744073709551615 || states.len >= 4294967295 { return Store {..},blot_error::Error.out_of_memory; } let authorities,error = blot_check_effect_authority::initPooled(); if error != blot_error::Error.none { return Store {..},error; } let generation = next_generation; next_generation++; let owner_id = blot_native::fresh_owner_id(); let index = states.alloc_index(State { owner_id,generation,frames: Frames {..},cells: Cells {..},authorities,frame_owners: FrameOwners {..} , ..}); let state: State& = states[index]; return Store { owner_id,lease: (index + 1) as u32,generation,frames: state.frames,cells: state.cells,authorities: state.authorities,frame_owners: state.frame_owners , ..},blot_error::Error.none;
+    if next_generation == 18446744073709551615 || states.len >= 4294967295 { return Store {..},blot_error::Error.out_of_memory; } let authorities,error = blot_check_effect_authority::initPooled(); if error != blot_error::Error.none { return Store {..},error; } let generation = next_generation; next_generation++; let owner_id = blot_native::fresh_owner_id(); let index = states.alloc_index(State { owner_id: owner_id,generation: generation,frames: Frames {..},cells: Cells {..},authorities: authorities,frame_owners: FrameOwners {..} , ..}); let state: State& = states[index]; return Store { owner_id: owner_id,lease: (index + 1) as u32,generation: generation,frames: state.frames,cells: state.cells,authorities: state.authorities,frame_owners: state.frame_owners , ..},blot_error::Error.none;
 }
-fn init() -> Store,blot_error::Error { initPooled() }
+fn init() -> Store,blot_error::Error { return initPooled(); }
 fn initPooledRef() -> Store?,blot_error::Error { let initialized,error = initPooled(); if error != blot_error::Error.none { return null,error; } if references.len >= 4294967295 { var unused = initialized; unused.deinit(); return null,blot_error::Error.out_of_memory; } let index = references.alloc_index(Reference { initialized , ..}); references[index].value.reference_lease = (index + 1) as u32; return references[index].value,blot_error::Error.none; }
 fn end(activation: Activation&, store: Store&) {
     while activation.scopes.len != 0 { let owner = activation.scopes.pop(); let error = store.authorities.end(owner); assert(error == blot_error::Error.none); }
@@ -110,12 +110,12 @@ fn retainFrame(store: Store&, head: Head, owner: Authority) -> blot_error::Error
     let error = store.authorities.retain(owner); if error != blot_error::Error.none { return error; }
     store.frame_owners.insert(head, owner); return blot_error::Error.none;
 }
-fn installProvider(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, provider: Provider) -> Head, blot_error::Error { installProviderKey(store, catalog, outer, Key { operation: provider.operation , ..}, provider.implementation) }
+fn installProvider(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, provider: Provider) -> Head, blot_error::Error { return installProviderKey(store, catalog, outer, Key { operation: provider.operation , ..}, provider.implementation); }
 fn installProviderKey(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, key: Key, implementation: Value) -> Head, blot_error::Error {
     let head, error = installFrame(store, catalog, outer, key, implementation, blot_runtime_runtime_layout::ProviderKind_callback); return head, error;
 }
-fn installRequest(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, operation: Operation, handler: u32) -> Head, blot_error::Error { installRequestKey(store, catalog, outer, Key { operation: operation , ..}, handler) }
-fn installRequestKey(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, key: Key, handler: u32) -> Head, blot_error::Error { installFrame(store, catalog, outer, key, handler, blot_runtime_runtime_layout::ProviderKind_request) }
+fn installRequest(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, operation: Operation, handler: u32) -> Head, blot_error::Error { return installRequestKey(store, catalog, outer, Key { operation: operation , ..}, handler); }
+fn installRequestKey(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, key: Key, handler: u32) -> Head, blot_error::Error { return installFrame(store, catalog, outer, key, handler, blot_runtime_runtime_layout::ProviderKind_request); }
 fn installFrame(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, key: Key, target: Value, kind: Kind) -> Head, blot_error::Error {
     var error = validateHead(store, outer); if error != blot_error::Error.none { return 0, error; }
     error = validateOperation(catalog, key.operation); if error != blot_error::Error.none { return 0, error; }
@@ -125,7 +125,7 @@ fn installFrame(store: Store&, catalog: blot_check_effect_evidence::View, outer:
     let head = (store.frames.len + 1) as u32; error = retainFrame(store, head, key.owner); if error != blot_error::Error.none { return 0, error; }
     store.frames.appendAssumeCapacity(Frame { operation: key.operation, target: target, outer: outer, kind: kind , ..}); return head, blot_error::Error.none;
 }
-fn installState(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, provider: StateProvider) -> Installation, blot_error::Error { installStateKeys(store, catalog, outer, Key { operation: provider.read , ..}, Key { operation: provider.write , ..}, provider.initial) }
+fn installState(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, provider: StateProvider) -> Installation, blot_error::Error { return installStateKeys(store, catalog, outer, Key { operation: provider.read , ..}, Key { operation: provider.write , ..}, provider.initial); }
 fn installStateKeys(store: Store&, catalog: blot_check_effect_evidence::View, outer: Head, read_key: Key, write_key: Key, initial: Value) -> Installation, blot_error::Error {
     var error = validateHead(store, outer); if error != blot_error::Error.none { return Installation {..}, error; }
     error = validateOperation(catalog, read_key.operation); if error != blot_error::Error.none { return Installation {..}, error; }
@@ -144,7 +144,7 @@ fn installStateKeys(store: Store&, catalog: blot_check_effect_evidence::View, ou
     store.frames.appendAssumeCapacity(Frame { operation: read_key.operation, target: cell, outer: write_head, kind: blot_runtime_runtime_layout::ProviderKind_state_read , ..});
     return Installation { head: store.frames.len as u32, cell: cell , ..}, blot_error::Error.none;
 }
-fn lookup(store: Store&, head: Head, operation: Operation) -> blot_support::Option<Match>, blot_error::Error { lookupKey(store, head, Key { operation: operation , ..}) }
+fn lookup(store: Store&, head: Head, operation: Operation) -> blot_support::Option<Match>, blot_error::Error { return lookupKey(store, head, Key { operation: operation , ..}); }
 fn lookupKey(store: Store&, head: Head, key: Key) -> blot_support::Option<Match>, blot_error::Error {
     var error = store.authorities.requireActive(key.owner); if error != blot_error::Error.none { return blot_support::none<Match>(), error; }
     error = validateHead(store, head); if error != blot_error::Error.none { return blot_support::none<Match>(), error; }

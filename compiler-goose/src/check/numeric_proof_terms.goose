@@ -1,10 +1,12 @@
 // Numeric propositions own value identities, never lengths or addresses.
 namespace blot_check_numeric_proof_terms;
+import support.error;
+import support.native;
+import support.structural_adapters;
+
 import support.structural;
 import std;
 import dictionary;
-import support.error;
-import support.native;
 type Id = u32;
 enum Kind { unsigned32, array, list }
 enum Tag { literal, formal, capture, version, length, complement }
@@ -12,7 +14,7 @@ enum Relation { eq, lt, le, add_fits, sub_fits, index }
 struct Term { tag: Tag, kind: Kind = Kind.unsigned32, a: u32, b: u32 = 0 }
 struct Proposition { relation: Relation, left: Id, right: Id }
 struct Limits { terms: i64 = 4096, visits: i64 = 65536 }
-struct Boundary { formals: const Kind[:], captures: const Kind[:] = [], local_versions: bool = false }
+struct Boundary { formals: const Kind[:], captures: const Kind[:] = default<const Kind[:]>(), local_versions: bool = false }
 fn constructor(name: const u8[:]) -> Relation, bool {
     if name == "@proof.eq" { return Relation.eq, true; }
     if name == "@proof.lt" { return Relation.lt, true; }
@@ -40,22 +42,22 @@ fn holds(relation: Relation, left: u32, right: u32) -> bool {
     }
 }
 struct View { terms: const Term[:], owner_id: u64 = 0 }
-fn get(self: View, id: Id) -> Term, blot_error::Error {
-    if id == 0 || id > self.terms.len { return default<Term>(), blot_error::Error.invalid_proof_operand; }
-    return self.terms[id - 1], blot_error::Error.none;
+fn get(self_: View, id: Id) -> Term, blot_error::Error {
+    if id == 0 || id > self_.terms.len { return default<Term>(), blot_error::Error.invalid_proof_operand; }
+    return self_.terms[id - 1], blot_error::Error.none;
 }
-fn proposition(self: View, value: Proposition) -> blot_error::Error {
-    let left, le = get(self, value.left); if le != blot_error::Error.none { return le; }
-    let right, re = get(self, value.right); if re != blot_error::Error.none { return re; }
+fn proposition(self_: View, value: Proposition) -> blot_error::Error {
+    let left, le = get(self_, value.left); if le != blot_error::Error.none { return le; }
+    let right, re = get(self_, value.right); if re != blot_error::Error.none { return re; }
     if right.kind != Kind.unsigned32 { return blot_error::Error.invalid_proof_operand; }
     if value.relation == Relation.index {
         if left.kind == Kind.unsigned32 { return blot_error::Error.invalid_proof_operand; }
     } else if left.kind != Kind.unsigned32 { return blot_error::Error.invalid_proof_operand; }
     return blot_error::Error.none;
 }
-fn validate(self: View, boundary: Boundary, limits: Limits) -> blot_error::Error {
-    if self.terms.len > limits.terms || self.terms.len > limits.visits { return blot_error::Error.proof_analysis_limit; }
-    for term, index in self.terms {
+fn validate(self_: View, boundary: Boundary, limits: Limits) -> blot_error::Error {
+    if self_.terms.len > limits.terms || self_.terms.len > limits.visits { return blot_error::Error.proof_analysis_limit; }
+    for term, index in self_.terms {
         match term.tag {
             literal => { if term.kind != Kind.unsigned32 || term.b != 0 { return blot_error::Error.invalid_proof_operand; } },
             formal => {
@@ -69,12 +71,12 @@ fn validate(self: View, boundary: Boundary, limits: Limits) -> blot_error::Error
             version => { if !boundary.local_versions || term.a == 0 || term.b == 0 { return blot_error::Error.proof_scope_escape; } },
             length => {
                 if term.kind != Kind.unsigned32 || term.b != 0 || term.a == 0 || term.a > index { return blot_error::Error.invalid_proof_operand; }
-                let child, error = get(self, term.a); if error != blot_error::Error.none { return error; }
+                let child, error = get(self_, term.a); if error != blot_error::Error.none { return error; }
                 if child.kind == Kind.unsigned32 { return blot_error::Error.invalid_proof_operand; }
             },
             complement => {
                 if term.kind != Kind.unsigned32 || term.b != 0 || term.a == 0 || term.a > index { return blot_error::Error.invalid_proof_operand; }
-                let child, error = get(self, term.a); if error != blot_error::Error.none { return error; }
+                let child, error = get(self_, term.a); if error != blot_error::Error.none { return error; }
                 if child.kind != Kind.unsigned32 || child.tag == Tag.literal || child.tag == Tag.complement { return blot_error::Error.invalid_proof_operand; }
             },
         }
@@ -82,113 +84,113 @@ fn validate(self: View, boundary: Boundary, limits: Limits) -> blot_error::Error
     return blot_error::Error.none;
 }
 struct Owned { terms: const Term[:], owner_id: u64 }
-fn view(self: Owned) -> View { return View { self.terms, self.owner_id , ..}; }
-fn deinit(self: Owned&) { self.terms = []; self.owner_id = 0; }
-struct Substitution { formals: const Id[:] = [], captures: const Id[:] = [], versions: const Id[:] = [] }
+fn view(self_: Owned) -> View { return View { self_.terms, self_.owner_id , ..}; }
+fn deinit(self_: Owned&) { self_.terms = []; self_.owner_id = 0; }
+struct Substitution { formals: const Id[:] = default<const Id[:]>(), captures: const Id[:] = default<const Id[:]>(), versions: const Id[:] = default<const Id[:]>() }
 struct Store {
-    terms: Term[>..<]&, index: dictionary<Term, Id>&,
+    terms: Term[>..]&, index: dictionary<Term, Id>&,
     limits: Limits = Limits {..}, visits: i64 = 0, account: i64? = null, owner_id: u64,
 }
-fn init(terms: Term[>..<]&, index: dictionary<Term, Id>&) -> Store {
-    return Store { terms, index, owner_id: blot_native::fresh_owner_id() , ..};
+fn init(terms: Term[>..]&, index: dictionary<Term, Id>&) -> Store {
+    return Store { terms: terms, index: index, owner_id: blot_native::fresh_owner_id() , ..};
 }
-fn deinit(self: Store&) { self.terms.clear(); self.index.clear(); self.owner_id = 0; }
-fn view(self: const Store&) -> View { return View { self.terms, self.owner_id , ..}; }
-fn charge(self: Store&, amount: i64) -> blot_error::Error {
+fn deinit(self_: Store&) { self_.terms.clear(); self_.index.clear(); self_.owner_id = 0; }
+fn view(self_: const Store&) -> View { return View { self_.terms, self_.owner_id , ..}; }
+fn charge(self_: Store&, amount: i64) -> blot_error::Error {
     var available: i64 = 0;
-    if self.visits < self.limits.visits { available = self.limits.visits - self.visits; }
+    if self_.visits < self_.limits.visits { available = self_.limits.visits - self_.visits; }
     if amount > available { return blot_error::Error.proof_analysis_limit; }
-    self.visits += amount;
-    let account = self.account; if account { account += amount; }
+    self_.visits += amount;
+    let account = self_.account; if account { account += amount; }
     return blot_error::Error.none;
 }
-recursive fn intern(self: Store&, term: Term) -> Id, blot_error::Error {
-    let charged = charge(self, 1); if charged != blot_error::Error.none { return 0, charged; }
+recursive fn intern(self_: Store&, term: Term) -> Id, blot_error::Error {
+    let charged = charge(self_, 1); if charged != blot_error::Error.none { return 0, charged; }
     match term.tag {
         literal => { if term.kind != Kind.unsigned32 || term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; } },
         formal, capture => { if term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; } },
         version => { if term.a == 0 || term.b == 0 { return 0, blot_error::Error.invalid_proof_operand; } },
         length => {
             if term.kind != Kind.unsigned32 || term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; }
-            let child, error = get(view(self), term.a); if error != blot_error::Error.none { return 0, error; }
+            let child, error = get(view(self_), term.a); if error != blot_error::Error.none { return 0, error; }
             if child.kind == Kind.unsigned32 { return 0, blot_error::Error.invalid_proof_operand; }
         },
         complement => {
             if term.kind != Kind.unsigned32 || term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; }
-            let child, error = get(view(self), term.a); if error != blot_error::Error.none { return 0, error; }
+            let child, error = get(view(self_), term.a); if error != blot_error::Error.none { return 0, error; }
             if child.kind != Kind.unsigned32 { return 0, blot_error::Error.invalid_proof_operand; }
-            if child.tag == Tag.literal { return intern(self, Term { Tag.literal, a: 0xffffffff - child.a , ..}); }
+            if child.tag == Tag.literal { return intern(self_, Term { tag: Tag.literal, a: 0xffffffff - child.a , ..}); }
             if child.tag == Tag.complement { return child.a, blot_error::Error.none; }
         },
     }
-    block { let saved = self.index.get(term); if saved { return saved, blot_error::Error.none; } }
-    if self.terms.len >= min(self.limits.terms, 0xffffffff) { return 0, blot_error::Error.proof_analysis_limit; }
-    self.terms.push(term);
-    let id = self.terms.len as u32;
-    self.index.insert(term, id);
+    block { let saved = self_.index.get(term); if saved { return saved, blot_error::Error.none; } }
+    if self_.terms.len >= min(self_.limits.terms, 0xffffffff) { return 0, blot_error::Error.proof_analysis_limit; }
+    self_.terms.push(term);
+    let id = self_.terms.len as u32;
+    self_.index.insert(term, id);
     return id, blot_error::Error.none;
 }
-fn copyOwned(self: const Store&, destination: Term[>..]&) -> Owned, blot_error::Error {
-    let start = destination.len; destination.append(self.terms);
+fn copyOwned(self_: const Store&, destination: Term[>..]&) -> Owned, blot_error::Error {
+    let start = destination.len; destination.append(self_.terms);
     return Owned { destination[start..], blot_native::fresh_owner_id() , ..}, blot_error::Error.none;
 }
-fn importProof(self: Store&, source: View, proof: Proposition, boundary: Boundary, substitution: Substitution) -> Proposition, blot_error::Error {
+fn importProof(self_: Store&, source: View, proof: Proposition, boundary: Boundary, substitution: Substitution) -> Proposition, blot_error::Error {
     var result: Proposition[1] = [default<Proposition>(); 1];
-    let error = importInto(self, source, [proof], result, boundary, substitution);
+    let error = importInto(self_, source, [proof], result, boundary, substitution);
     if error != blot_error::Error.none { return default<Proposition>(), error; }
     return result[0], blot_error::Error.none;
 }
-fn importMany(self: Store&, source: View, proofs: const Proposition[:], boundary: Boundary, substitution: Substitution) -> Proposition[>..], blot_error::Error {
+fn importMany(self_: Store&, source: View, proofs: const Proposition[:], boundary: Boundary, substitution: Substitution) -> Proposition[>..], blot_error::Error {
     var result: Proposition[>..] = [];
     for proof in proofs { result.push(default<Proposition>()); }
-    let error = importInto(self, source, proofs, result, boundary, substitution);
+    let error = importInto(self_, source, proofs, result, boundary, substitution);
     if error != blot_error::Error.none { return [], error; }
     return result, blot_error::Error.none;
 }
-fn importInto(self: Store&, source: View, proofs: const Proposition[:], results: Proposition[:], boundary: Boundary, substitution: Substitution) -> blot_error::Error {
-    if source.terms.len != 0 && self.terms.len != 0 {
-        if (source.owner_id != 0 && source.owner_id == self.owner_id) ||
-           self.terms.index_of(source.terms[0]) >= 0 || source.terms.index_of(self.terms[0]) >= 0 {
+fn importInto(self_: Store&, source: View, proofs: const Proposition[:], results: Proposition[:], boundary: Boundary, substitution: Substitution) -> blot_error::Error {
+    if source.terms.len != 0 && self_.terms.len != 0 {
+        if (source.owner_id != 0 && source.owner_id == self_.owner_id) ||
+           self_.terms.index_of(source.terms[0]) >= 0 || source.terms.index_of(self_.terms[0]) >= 0 {
             return blot_error::Error.invalid_proof_operand;
         }
     }
-    let validity = validate(source, boundary, self.limits); if validity != blot_error::Error.none { return validity; }
-    let source_charge = charge(self, source.terms.len); if source_charge != blot_error::Error.none { return source_charge; }
-    let proof_charge = charge(self, proofs.len); if proof_charge != blot_error::Error.none { return proof_charge; }
+    let validity = validate(source, boundary, self_.limits); if validity != blot_error::Error.none { return validity; }
+    let source_charge = charge(self_, source.terms.len); if source_charge != blot_error::Error.none { return source_charge; }
+    let proof_charge = charge(self_, proofs.len); if proof_charge != blot_error::Error.none { return proof_charge; }
     for proof in proofs { let validity = proposition(source, proof); if validity != blot_error::Error.none { return validity; } }
-    let initial = self.terms.len;
+    let initial = self_.terms.len;
     var map: Id[>..] = []; for term in source.terms { map.push(0); }
-    var context = Context { self, source, map, substitution , ..};
+    var context = Context { self_, source, map, substitution , ..};
     let error = importResults(context, proofs, results);
     if error != blot_error::Error.none {
-        while self.terms.len > initial { let removed = self.terms.pop(); assert(self.index.remove(removed)); }
+        while self_.terms.len > initial { let removed = self_.terms.pop(); assert(self_.index.remove(removed)); }
     }
     return error;
 }
 struct Context { target: Store&, source: View, map: Id[:], substitution: Substitution }
-recursive fn importTerm(self: Context&, id: Id) -> Id, blot_error::Error {
-    let input, get_error = get(self.source, id); if get_error != blot_error::Error.none { return 0, get_error; }
-    let charged = charge(self.target, 1); if charged != blot_error::Error.none { return 0, charged; }
-    if self.map[id - 1] != 0 { return self.map[id - 1], blot_error::Error.none; }
+recursive fn importTerm(self_: Context&, id: Id) -> Id, blot_error::Error {
+    let input, get_error = get(self_.source, id); if get_error != blot_error::Error.none { return 0, get_error; }
+    let charged = charge(self_.target, 1); if charged != blot_error::Error.none { return 0, charged; }
+    if self_.map[id - 1] != 0 { return self_.map[id - 1], blot_error::Error.none; }
     var output: Id = 0;
     match input.tag {
-        literal => { let saved, error = intern(self.target, input); if error != blot_error::Error.none { return 0, error; } output = saved; },
+        literal => { let saved, error = intern(self_.target, input); if error != blot_error::Error.none { return 0, error; } output = saved; },
         length, complement => {
-            let child, child_error = importTerm(self, input.a); if child_error != blot_error::Error.none { return 0, child_error; }
-            let saved, error = intern(self.target, Term { input.tag, a: child , ..}); if error != blot_error::Error.none { return 0, error; }
+            let child, child_error = importTerm(self_, input.a); if child_error != blot_error::Error.none { return 0, child_error; }
+            let saved, error = intern(self_.target, Term { tag: input.tag, a: child , ..}); if error != blot_error::Error.none { return 0, error; }
             output = saved;
         },
         formal, capture, version => {
-            var values = self.substitution.formals; var position = input.a;
-            if input.tag == Tag.capture { values = self.substitution.captures; }
-            if input.tag == Tag.version { values = self.substitution.versions; position = id - 1; }
+            var values = self_.substitution.formals; var position = input.a;
+            if input.tag == Tag.capture { values = self_.substitution.captures; }
+            if input.tag == Tag.version { values = self_.substitution.versions; position = id - 1; }
             if position >= values.len { return 0, blot_error::Error.proof_scope_escape; }
             output = values[position];
-            let actual, error = get(view(self.target), output); if error != blot_error::Error.none { return 0, error; }
+            let actual, error = get(view(self_.target), output); if error != blot_error::Error.none { return 0, error; }
             if actual.kind != input.kind { return 0, blot_error::Error.invalid_proof_operand; }
         },
     }
-    self.map[id - 1] = output;
+    self_.map[id - 1] = output;
     return output, blot_error::Error.none;
 }
 fn importResults(context: Context&, proofs: const Proposition[:], results: Proposition[:]) -> blot_error::Error {

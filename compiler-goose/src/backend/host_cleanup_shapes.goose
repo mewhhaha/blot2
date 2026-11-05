@@ -12,7 +12,7 @@ struct Field { name: const u8[:], child: u32 }
 struct Variant { tag: u32, child: u32 }
 struct Node {
     id: u32, tag: Tag, floating: bool = false, reference: bool = false, child: u32 = 0, row_words: u32 = 0, leaf_words: u32 = 0,
-    children: const u32[:] = [], fields: const Field[:] = [], variants: const Variant[:] = [], name: const u8[:] = "",
+    children: const u32[:] = default<const u32[:]>(), fields: const Field[:] = default<const Field[:]>(), variants: const Variant[:] = default<const Variant[:]>(), name: const u8[:] = "",
 }
 struct Facts { name: const u8[:], hidden: bool, variants: const Variant[:] }
 reusable[] var owned_children: u32[>..] = [];
@@ -27,49 +27,49 @@ fn deinit(node: Node) {
     if node.variants.len != 0 { let first: const Variant& = node.variants[0]; let start = owned_variants.index_of(first); owned_variants.free_slice(owned_variants[start..start + node.variants.len]); }
 }
 struct Builder<C> { context: C, nodes: Node[>..<]&, seen: dictionary<u32,bool>&, remaining: i64 = 65536 }
-fn charge<C>(builder: Builder<C>&) -> Error { if builder.remaining == 0 { return Error.layout_limit; } builder.remaining--; return Error.none; }
+fn charge<C>(builder: Builder<C>&) -> Error { if builder.remaining == 0 { return blot_error::Error.layout_limit; } builder.remaining--; return blot_error::Error.none; }
 fn deinit<C>(builder: Builder<C>&) { for node in builder.nodes { deinit(node); } builder.nodes.clear(); builder.seen.clear(); }
 recursive fn add<C>(builder: Builder<C>&, id: u32, depth: i64) -> Error {
-    let charged = charge(builder); if charged != Error.none { return charged; }
-    if depth >= 128 || id == 0 || id >= builder.context.layouts.nodes.len { return Error.layout_limit; }
-    if builder.seen.contains(id) { return Error.none; } if builder.nodes.len == 4096 { return Error.layout_limit; } builder.seen.insert(id,true);
-    let layout = builder.context.layouts.node(id); var node = Node { id, Tag.unit , ..}; var published = false; 
+    let charged = charge(builder); if charged != blot_error::Error.none { return charged; }
+    if depth >= 128 || id == 0 || id >= builder.context.layouts.nodes.len { return blot_error::Error.layout_limit; }
+    if builder.seen.contains(id) { return blot_error::Error.none; } if builder.nodes.len == 4096 { return blot_error::Error.layout_limit; } builder.seen.insert(id,true);
+    let layout = builder.context.layouts.node(id); var node = Node { id, Tag.unit , ..}; var published = false;
     recursive fn cleanup_continuation_2() -> Error {
 
     match layout.tag {
         unit => { node.tag = Tag.unit; }, boolean => { node.tag = Tag.boolean; }, unsigned32 => { node.tag = Tag.unsigned32; }, floating32 => { node.tag = Tag.floating32; },
         array,list => {
             node.tag = Tag.array; if layout.tag == blot_backend_layout::Tag.list { node.tag = Tag.list; } node.child = layout.a;
-            let words,error = builder.context.rowWords(layout.a,builder.remaining,depth); if error != Error.none { return error; } node.row_words = words;
+            let words,error = builder.context.rowWords(layout.a,builder.remaining,depth); if error != blot_error::Error.none { return error; } node.row_words = words;
             if layout.tag == blot_backend_layout::Tag.list { node.leaf_words = blot_runtime_list_runtime::capacity; }
         },
         product => { node.tag = Tag.product; node.children = copyChildren(builder.context.layouts.children(id)); },
         record => {
             node.tag = Tag.record; var fields: Field[>..<] = []; let children = builder.context.layouts.children(id);
             for index in 0..layout.b {
-                let error = charge(builder); if error != Error.none { return error; }
-                let name = builder.context.layouts.record_names.map.get(children[index * 2]); if name == null { return Error.layout_limit; }
+                let error = charge(builder); if error != blot_error::Error.none { return error; }
+                let name = builder.context.layouts.record_names.map.get(children[index * 2]); if name == null { return blot_error::Error.layout_limit; }
                 fields.push(Field { name, children[index * 2 + 1] , ..});
             }
             node.fields = copyFields(fields);
         },
         nominal => {
-            let facts,error = builder.context.nominal(id,builder.remaining); if error != Error.none { return error; }
+            let facts,error = builder.context.nominal(id,builder.remaining); if error != blot_error::Error.none { return error; }
             node.name = facts.name; node.tag = Tag.nominal; if facts.hidden { node.tag = Tag.opaque_; } node.variants = facts.variants; node.children = copyChildren(builder.context.layouts.children(id));
         },
-        _ => { return Error.layout_limit; },
+        _ => { return blot_error::Error.layout_limit; },
     }
-    let physical,error = builder.context.physical(id,builder.remaining,depth); if error != Error.none { return error; }
+    let physical,error = builder.context.physical(id,builder.remaining,depth); if error != blot_error::Error.none { return error; }
     node.floating = physical.floating; node.reference = physical.reference; builder.nodes.push(node); published = true;
-    if node.child != 0 { let child = add(builder,node.child,depth + 1); if child != Error.none { return child; } }
-    for child in node.children { let error = add(builder,child,depth + 1); if error != Error.none { return error; } }
-    for field in node.fields { let error = add(builder,field.child,depth + 1); if error != Error.none { return error; } }
-    for variant in node.variants { let error = add(builder,variant.child,depth + 1); if error != Error.none { return error; } }
-    return Error.none;
+    if node.child != 0 { let child = add(builder,node.child,depth + 1); if child != blot_error::Error.none { return child; } }
+    for child in node.children { let error = add(builder,child,depth + 1); if error != blot_error::Error.none { return error; } }
+    for field in node.fields { let error = add(builder,field.child,depth + 1); if error != blot_error::Error.none { return error; } }
+    for variant in node.variants { let error = add(builder,variant.child,depth + 1); if error != blot_error::Error.none { return error; } }
+    return blot_error::Error.none;
 
     }
     let cleanup_result_2_0 = cleanup_continuation_2();
-     if !published { deinit(node); } 
+     if !published { deinit(node); }
     return cleanup_result_2_0;
 }
 fn jsonNumber(out: u8[>..<]&,value: u32) { var digits: u8[10]; var count: i64 = 0; var remaining = value; while true { digits[count] = '0' + (remaining % 10) as u8; count++; remaining /= 10; if remaining == 0 { break; } } while count > 0 { count--; out.push(digits[count]); } }
@@ -82,10 +82,10 @@ fn jsonNode(node: Node,out: u8[>..<]&) {
     out.append("],\"name\":"); blot_backend_backend_timing::jsonString(out,node.name); out.push('}');
 }
 fn build<C>(context: C,roots: const u32[:],out: u8[>..<]&) -> Error {
-    var nodes: Node[>..<] = []; var seen: dictionary<u32,bool>; var builder = Builder<C> { context,nodes,seen , ..}; 
+    var nodes: Node[>..<] = []; var seen: dictionary<u32,bool>; var builder = Builder<C> { context,nodes,seen , ..};
     recursive fn cleanup_continuation_1() -> Error {
 
-    for root in roots { let error = add(builder,root,0); if error != Error.none { return error; } }
+    for root in roots { let error = add(builder,root,0); if error != blot_error::Error.none { return error; } }
     // IDs are unique; bounded merge sorting gives the source O(n log n) work.
     var scratch: Node[>..<] = []; for node in nodes { scratch.push(node); } var width: i64 = 1;
     while width < nodes.len {
@@ -98,10 +98,10 @@ fn build<C>(context: C,roots: const u32[:],out: u8[>..<]&) -> Error {
         }
         for node,index in scratch { nodes[index] = node; } width *= 2;
     }
-    out.append("{\"version\":1,\"nodes\":["); for node,index in nodes { if index != 0 { out.push(','); } jsonNode(node,out); } out.append("]}"); return Error.none;
+    out.append("{\"version\":1,\"nodes\":["); for node,index in nodes { if index != 0 { out.push(','); } jsonNode(node,out); } out.append("]}"); return blot_error::Error.none;
 
     }
     let cleanup_result_1_0 = cleanup_continuation_1();
-     deinit(builder); 
+     deinit(builder);
     return cleanup_result_1_0;
 }

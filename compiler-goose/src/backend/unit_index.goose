@@ -9,7 +9,7 @@ import support.error;
 import support.option;
 type Error = blot_error::Error;
 type SetSlot = dictionary_slot<u32,bool>;
-struct Set { slots: const SetSlot[:] = [] }
+struct Set { slots: const SetSlot[:] = default<const SetSlot[:]>() }
 struct Quantified { types: Set,rows: Set }
 reusable[] var owned_sets: SetSlot[>..] = [];
 fn freezeSet(values: const dictionary<u32,bool>&) -> Set { if values.slots.len == 0 { return Set {..}; } let out = owned_sets.alloc_slice(values.slots.len); for slot,index in values.slots { out[index] = slot; } return Set { out , ..}; }
@@ -30,10 +30,10 @@ fn initQuantified(source: const blot_check_core::Module&) -> Quantified,Error {
     for closure in source.closures { addVariables(rows,source.types,[closure.closed_rows]); }
     for contract in source.contracts { addVariables(types,source.types,[contract.parameters,contract.variables]); addVariables(rows,source.types,[contract.row_variables,contract.row_parameters]); }
     for implementation in source.implementations { addVariables(types,source.types,[implementation.variables,implementation.head]); addVariables(rows,source.types,[implementation.row_variables,implementation.row_parameters]); }
-    return Quantified { freezeSet(types),freezeSet(rows) , ..},Error.none;
+    return Quantified { freezeSet(types),freezeSet(rows) , ..},blot_error::Error.none;
 }
-struct Table<T> { offsets: u32[:] = [],items: T[:] = [] }
-struct Builder<T> { offsets: u32[:],items: T[:] = [],filling: bool = false }
+struct Table<T> { offsets: u32[:] = default<u32[:]>(),items: T[:] = default<T[:]>() }
+struct Builder<T> { offsets: u32[:],items: T[:] = default<T[:]>(),filling: bool = false }
 fn add<T>(builder: Builder<T>&,key: u32,value: T) { if !builder.filling { builder.offsets[key + 1]++; return; } builder.items[builder.offsets[key]] = value; builder.offsets[key]++; }
 reusable[] var owned_words: u32[>..] = [];
 struct Exit { exit: u32,position: u32 }
@@ -41,7 +41,7 @@ reusable[] var owned_exits: Exit[>..] = [];
 fn build<T,C,F>(keys: i64,context: C,item_pool: T[>..]&) -> Table<T>,Error {
     let offsets = owned_words.alloc_slice(keys + 1); var builder = Builder<T> { offsets , ..}; F(context,builder); for index in 1..offsets.len { offsets[index] += offsets[index - 1]; }
     let items = item_pool.alloc_slice(offsets[keys]); builder.items = items; builder.filling = true; F(context,builder); var index = keys;
-    while index > 0 { offsets[index] = offsets[index - 1]; index--; } offsets[0] = 0; return Table<T> { offsets,items , ..},Error.none;
+    while index > 0 { offsets[index] = offsets[index - 1]; index--; } offsets[0] = 0; return Table<T> { offsets,items , ..},blot_error::Error.none;
 }
 fn deinit<T>(table: Table<T>&,item_pool: T[>..]&) {
     if table.offsets.len != 0 { let first: const u32& = table.offsets[0]; let at = owned_words.index_of(first); owned_words.free_slice(owned_words[at..at + table.offsets.len]); }
@@ -55,7 +55,7 @@ fn ownReference(source: const blot_check_core::Module&,unit: u32,id: u32) -> blo
 }
 struct Scope { source: const blot_check_core::Module&,unit: u32 }
 fn visitReferences(scope: Scope,builder: Builder<u32>&) { for node,index in scope.source.nodes { if node.tag != blot_check_core::Tag.reference { continue; } let binding = ownReference(scope.source,scope.unit,index as u32); if binding.present { builder.add(binding.value,index as u32); } } }
-fn references(source: const blot_check_core::Module&,unit: u32) -> Table<u32>,Error { build(source.bindings.len,Scope { source,unit , ..},owned_words,visitReferences) }
+fn references(source: const blot_check_core::Module&,unit: u32) -> Table<u32>,Error { return build(source.bindings.len,Scope { source,unit , ..},owned_words,visitReferences); }
 fn visitDefinitions(scope: Scope,builder: Builder<u32>&) { for node,index in scope.source.nodes { if node.tag == blot_check_core::Tag.bind && node.a < scope.source.bindings.len { builder.add(node.a,index as u32); } } }
 fn visitInputs(scope: Scope,builder: Builder<u32>&) {
     let source .= scope.source; for node,index in source.nodes {
@@ -71,25 +71,25 @@ fn visitCarries(scope: Scope,builder: Builder<u32>&) {
 }
 struct Flags { captured: bool = false,merge_branch: bool = false,merge_result: bool = false,carried: bool = false }
 struct Parent { node: u32 = 0,position: u32 = 0,count: u8 = 0 }
-struct Carry { loop: u32 = 0,position: u32 = 0 }
+struct Carry { loop_: u32 = 0,position: u32 = 0 }
 struct Need { parents: bool = false,flow: bool = false }
-struct Uses { references: Table<u32>,flags: Flags[:] = [],parents: u64[:] = [],has_parents: bool = false,definitions: Table<u32>,inputs: Table<u32>,carries: Table<u32>,exits: Table<u32>,values: Table<Exit>,carry_loops: Carry[:] = [],has_flow: bool = false }
+struct Uses { references: Table<u32>,flags: Flags[:] = default<Flags[:]>(),parents: u64[:] = default<u64[:]>(),has_parents: bool = false,definitions: Table<u32>,inputs: Table<u32>,carries: Table<u32>,exits: Table<u32>,values: Table<Exit>,carry_loops: Carry[:] = default<Carry[:]>(),has_flow: bool = false }
 reusable[] var owned_flags: Flags[>..] = [];
 reusable[] var owned_parents: u64[>..] = [];
 reusable[] var owned_carries: Carry[>..] = [];
 reusable var owned_uses: Uses[>..] = [];
 fn createUses(source: const blot_check_core::Module&,unit: u32) -> Uses&,Error {
-    let owner .= owned_uses.alloc_ref(Uses {..}); let initialized,error = initBase(source,unit); if error != Error.none { owned_uses.free(owned_uses.index_of(owner)); return owner,error; } owner = initialized; return owner,Error.none;
+    let owner .= owned_uses.alloc_ref(Uses {..}); let initialized,error = initBase(source,unit); if error != blot_error::Error.none { owned_uses.free(owned_uses.index_of(owner)); return owner,error; } owner = initialized; return owner,blot_error::Error.none;
 }
 fn release(owner: Uses&) { owned_uses.free(owned_uses.index_of(owner)); }
 fn init(source: const blot_check_core::Module&,unit: u32) -> Uses,Error {
-    let base,error = initBase(source,unit); if error != Error.none { return base,error; } var result = base; let completed = result.ensure(source,unit,Need { true,true , ..}); if completed != Error.none { result.deinit(); return Uses {..},completed; } return result,Error.none;
+    let base,error = initBase(source,unit); if error != blot_error::Error.none { return base,error; } var result = base; let completed = result.ensure(source,unit,Need { true,true , ..}); if completed != blot_error::Error.none { result.deinit(); return Uses {..},completed; } return result,blot_error::Error.none;
 }
 fn initBase(source: const blot_check_core::Module&,unit: u32) -> Uses,Error {
-    var result = Uses {..}; let grouped,error = references(source,unit); if error != Error.none { return result,error; } result.references = grouped; result.flags = owned_flags.alloc_slice(source.bindings.len);
+    var result = Uses {..}; let grouped,error = references(source,unit); if error != blot_error::Error.none { return result,error; } result.references = grouped; result.flags = owned_flags.alloc_slice(source.bindings.len);
     for closure in source.closures { for held in source.extra[closure.captures.start..closure.captures.start + closure.captures.len] { if held < result.flags.len { result.flags[held].captured = true; } } }
     for merge in source.merges { for held in [merge.then_binding,merge.else_binding] { if held < result.flags.len { result.flags[held].merge_branch = true; } } if merge.result < result.flags.len { result.flags[merge.result].merge_result = true; } }
-    for carry in source.loop_carries { for held in [carry.incoming,carry.iteration,carry.backedge,carry.outgoing] { if held < result.flags.len { result.flags[held].carried = true; } } } return result,Error.none;
+    for carry in source.loop_carries { for held in [carry.incoming,carry.iteration,carry.backedge,carry.outgoing] { if held < result.flags.len { result.flags[held].carried = true; } } } return result,blot_error::Error.none;
 }
 fn packParent(parent: Parent) -> u64 { assert(parent.position < 1073741824 && parent.count <= 3); return parent.node as u64 | ((parent.position as u64) << 32) | ((parent.count as u64) << 62); }
 fn unpackParent(parent: u64) -> Parent { Parent { parent as! u32,((parent >> 32) & 1073741823) as u32,(parent >> 62) as u8 } }
@@ -107,21 +107,31 @@ fn ensure(uses: Uses&,source: const blot_check_core::Module&,unit: u32,need: Nee
         if uses.parents.len != 0 { let first: const u64& = uses.parents[0]; let at = owned_parents.index_of(first); owned_parents.free_slice(owned_parents[at..at + uses.parents.len]); } uses.parents = parents; uses.has_parents = true;
     }
     if need.flow && !uses.has_flow {
-        var definitions = Table<u32> {..}; var inputs = Table<u32> {..}; var carries = Table<u32> {..}; var exits = Table<u32> {..}; var values = Table<Exit> {..}; var carry_loops: Carry[:] = []; var published = false;
-        defer {
+        var definitions = Table<u32> {..}; var inputs = Table<u32> {..}; var carries = Table<u32> {..}; var exits = Table<u32> {..}; var values = Table<Exit> {..}; var carry_loops: Carry[:] = default<Carry[:]>(); var published = false;
+
+        let definition_table,definition_error = build(source.bindings.len,scope,owned_words,visitDefinitions); if definition_error != blot_error::Error.none { let __cleanup_result_112_0: Error = definition_error; {
             if !published { definitions.deinit(); inputs.deinit(); carries.deinit(); exits.deinit(); values.deinit(); if carry_loops.len != 0 { owned_carries.free_slice(carry_loops); } }
-        }
-        let definition_table,definition_error = build(source.bindings.len,scope,owned_words,visitDefinitions); if definition_error != Error.none { return definition_error; } definitions = definition_table;
-        let input_table,input_error = build(source.bindings.len,scope,owned_words,visitInputs); if input_error != Error.none { return input_error; } inputs = input_table;
-        let carry_table,carry_error = build(source.bindings.len,scope,owned_words,visitCarries); if carry_error != Error.none { return carry_error; } carries = carry_table;
-        let exit_table,exit_error = build(source.nodes.len,scope,owned_words,visitExits); if exit_error != Error.none { return exit_error; } exits = exit_table;
-        let value_table,value_error = build(source.nodes.len,scope,owned_exits,visitValues); if value_error != Error.none { return value_error; } values = value_table;
+        } return __cleanup_result_112_0; } definitions = definition_table;
+        let input_table,input_error = build(source.bindings.len,scope,owned_words,visitInputs); if input_error != blot_error::Error.none { let __cleanup_result_113_0: Error = input_error; {
+            if !published { definitions.deinit(); inputs.deinit(); carries.deinit(); exits.deinit(); values.deinit(); if carry_loops.len != 0 { owned_carries.free_slice(carry_loops); } }
+        } return __cleanup_result_113_0; } inputs = input_table;
+        let carry_table,carry_error = build(source.bindings.len,scope,owned_words,visitCarries); if carry_error != blot_error::Error.none { let __cleanup_result_114_0: Error = carry_error; {
+            if !published { definitions.deinit(); inputs.deinit(); carries.deinit(); exits.deinit(); values.deinit(); if carry_loops.len != 0 { owned_carries.free_slice(carry_loops); } }
+        } return __cleanup_result_114_0; } carries = carry_table;
+        let exit_table,exit_error = build(source.nodes.len,scope,owned_words,visitExits); if exit_error != blot_error::Error.none { let __cleanup_result_115_0: Error = exit_error; {
+            if !published { definitions.deinit(); inputs.deinit(); carries.deinit(); exits.deinit(); values.deinit(); if carry_loops.len != 0 { owned_carries.free_slice(carry_loops); } }
+        } return __cleanup_result_115_0; } exits = exit_table;
+        let value_table,value_error = build(source.nodes.len,scope,owned_exits,visitValues); if value_error != blot_error::Error.none { let __cleanup_result_116_0: Error = value_error; {
+            if !published { definitions.deinit(); inputs.deinit(); carries.deinit(); exits.deinit(); values.deinit(); if carry_loops.len != 0 { owned_carries.free_slice(carry_loops); } }
+        } return __cleanup_result_116_0; } values = value_table;
         carry_loops = owned_carries.alloc_slice(source.loop_carries.len);
         for node,index in source.nodes { if node.tag != blot_check_core::Tag.loop_ { continue; } let range = source.loopInfo(index as u32).carries; for position in 0..range.len { carry_loops[range.start + position] = Carry { index as u32,position as u32 , ..}; } }
         uses.definitions.deinit(); uses.inputs.deinit(); uses.carries.deinit(); uses.exits.deinit(); uses.values.deinit(); if uses.carry_loops.len != 0 { let first: const Carry& = uses.carry_loops[0]; let at = owned_carries.index_of(first); owned_carries.free_slice(owned_carries[at..at + uses.carry_loops.len]); }
         uses.definitions = definitions; uses.inputs = inputs; uses.carries = carries; uses.exits = exits; uses.values = values; uses.carry_loops = carry_loops; uses.has_flow = true; published = true;
-    }
-    return Error.none;
+     {
+            if !published { definitions.deinit(); inputs.deinit(); carries.deinit(); exits.deinit(); values.deinit(); if carry_loops.len != 0 { owned_carries.free_slice(carry_loops); } }
+        } }
+    return blot_error::Error.none;
 }
 fn deinit(uses: Uses&) {
     uses.references.deinit(); if uses.flags.len != 0 { let first: const Flags& = uses.flags[0]; let at = owned_flags.index_of(first); owned_flags.free_slice(owned_flags[at..at + uses.flags.len]); }

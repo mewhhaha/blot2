@@ -4,6 +4,7 @@ import dictionary;
 import .runtime_ir;
 import .runtime_identity;
 import .wasm;
+import .optimizer_buffers;
 import eval.type_evidence;
 import check.effect_evidence;
 import reuse.artifact_emitter;
@@ -113,12 +114,12 @@ recursive fn ty(encoder: Encoder&, id: u32, depth: i64) -> blot_error::Error {
     return blot_error::Error.none;
 }
 struct Store {
-    identity: blot_support::Option<blot_backend_runtime_identity::View>, entries: Entry[>..<]&, key_bytes: u8[>..<]&, keys: dictionary<u64, Id>&,
+    identity: blot_support::Option<blot_backend_runtime_identity::View>, entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&,
     relocations: Relocation[>..<]&, finalized: bool = false, artifacts: blot_reuse_artifact_emitter::Recorder&? = null,
 }
-fn init(entries: Entry[>..<]&, key_bytes: u8[>..<]&, keys: dictionary<u64, Id>&, relocations: Relocation[>..<]&) -> Store { Store { entries: entries, key_bytes: key_bytes, keys: keys, relocations: relocations } }
-fn initProject(entries: Entry[>..<]&, key_bytes: u8[>..<]&, keys: dictionary<u64, Id>&, relocations: Relocation[>..<]&, names: blot_backend_runtime_identity::View) -> Store { var store = init(entries, key_bytes, keys, relocations); store.identity = blot_support::some(names); return store; }
-fn key(store: Store&, entry: Entry) -> const u8[:] { store.key_bytes[entry.key.start..entry.key.start + entry.key.len] }
+fn init(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&, relocations: Relocation[>..<]&) -> Store { Store { entries: entries, key_bytes: key_bytes, keys: keys, relocations: relocations } }
+fn initProject(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&, relocations: Relocation[>..<]&, names: blot_backend_runtime_identity::View) -> Store { var store = init(entries, key_bytes, keys, relocations); store.identity = blot_support::some(names); return store; }
+fn key(store: Store&, entry: Entry) -> const u8[:] { store.key_bytes.items[entry.key.start..entry.key.start + entry.key.len] }
 fn intern(store: Store&, view: blot_eval_type_evidence::View, label: blot_check_effect_evidence::Label) -> Id, blot_error::Error {
     if store.finalized { return 0, blot_error::Error.invalid_operation; }
     var bytes: u8[>..<] = []; let encoder = Encoder { view: view, identity: store.identity, bytes: bytes , ..};
@@ -146,7 +147,7 @@ fn internSymbol(store: Store&, bytes: const u8[:], foreign: bool) -> Id, blot_er
         var error = blot_reuse_artifact_emitter::operationSymbol(store.artifacts, id, bytes, foreign); if error != blot_error::Error.none { return 0, error; }
         error = blot_reuse_artifact_emitter::recordDemand(store.artifacts, blot_reuse_artifact_emitter::ResourceKind.operation, id, false); if error != blot_error::Error.none { return 0, error; }
     }
-    let range = blot_backend_runtime_ir::Range { start: store.key_bytes.len, len: bytes.len , ..}; store.key_bytes.append(bytes);
+    let range = blot_backend_runtime_ir::Range { start: store.key_bytes.len, len: bytes.len , ..}; let appended=store.key_bytes.append(bytes);if appended!=blot_error::Error.none {return 0,appended;}
     var previous: Id = 0; block { let found = store.keys.get(fingerprint); if found { previous = found; } }
     store.entries.push(Entry { key: range, foreign: foreign, next: previous , ..}); store.keys.insert(fingerprint, id); return id, blot_error::Error.none;
 }

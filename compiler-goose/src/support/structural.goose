@@ -88,11 +88,11 @@ fn hash<S,T>(sink: S&, value: blot_support::Option<T>) {
     hash(sink, value.present); if value.present { hash(sink, value.value); }
 }
 
-fn equal<T>(left: T, right: T) -> bool {
+fn equalFields<T>(left: T, right: T) -> bool {
     const for <N, A> in fields<T> { if !equal(left.A, right.A) { return false; } }
     return true;
 }
-fn hash<S,T>(sink: S&, value: T) {
+fn hashFields<S,T>(sink: S&, value: T) {
     const for <N, A> in fields<T> { hash(sink, value.A); }
 }
 

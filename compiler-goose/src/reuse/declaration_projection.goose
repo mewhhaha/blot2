@@ -13,169 +13,169 @@ type List = blot_check_core::List;
 enum Work { node { id: u32 }, binding { id: u32 }, pattern { id: u32 }, projection { id: u32 } }
 reusable[] var owned_words: u32[>..] = [];
 reusable[] var owned_work: Work[>..] = [];
-fn release(run: const u32[:]) { if run.len != 0 { let first: const u32& = run[0]; let at = owned_words.index_of(first); assert(at >= 0); owned_words.free_slice(owned_words[at..at + run.len]); } }
-fn release(run: const Work[:]) { if run.len != 0 { let first: const Work& = run[0]; let at = owned_work.index_of(first); assert(at >= 0); owned_work.free_slice(owned_work[at..at + run.len]); } }
+fn release(run: const u32[:]) { if run.len != 0 { owned_words.free_slice(run); } }
+fn release(run: const Work[:]) { if run.len != 0 { owned_work.free_slice(run); } }
 struct Workspace {
-    nodes: u32[:] = [], bindings: u32[:] = [], patterns: u32[:] = [], projections: u32[:] = [],
-    generation: u32 = 0, scans: i64 = 0, visits: i64 = 0, work: Work[:] = [], count: i64 = 0,
+    nodes: u32[:] = default<u32[:]>(), bindings: u32[:] = default<u32[:]>(), patterns: u32[:] = default<u32[:]>(), projections: u32[:] = default<u32[:]>(),
+    generation: u32 = 0, scans: i64 = 0, visits: i64 = 0, work: Work[:] = default<Work[:]>(), count: i64 = 0,
 }
 fn init(old: const Module&) -> Workspace {
     var result = Workspace { nodes: owned_words.alloc_slice(old.nodes.len), bindings: owned_words.alloc_slice(old.bindings.len), patterns: owned_words.alloc_slice(old.patterns.len), projections: owned_words.alloc_slice(old.projections.len) , ..};
     result.clear(); return result;
 }
-fn clear(self: Workspace&) { for &v in self.nodes { v = 0; } for &v in self.bindings { v = 0; } for &v in self.patterns { v = 0; } for &v in self.projections { v = 0; } self.generation = 0; }
-fn capacityBytes(self: const Workspace&) -> i64 { return (self.nodes.len + self.bindings.len + self.patterns.len + self.projections.len) * 4 + self.work.len * 5; }
-fn deinit(self: Workspace&) { release(self.nodes); release(self.bindings); release(self.patterns); release(self.projections); release(self.work); self = Workspace {..}; }
+fn clear(self_: Workspace&) { for &v in self_.nodes { v = 0; } for &v in self_.bindings { v = 0; } for &v in self_.patterns { v = 0; } for &v in self_.projections { v = 0; } self_.generation = 0; }
+fn capacityBytes(self_: const Workspace&) -> i64 { return (self_.nodes.len + self_.bindings.len + self_.patterns.len + self_.projections.len) * 4 + self_.work.len * 5; }
+fn deinit(self_: Workspace&) { release(self_.nodes); release(self_.bindings); release(self_.patterns); release(self_.projections); release(self_.work); self_ = Workspace {..}; }
 fn withWorkspace<C,F>(old: const Module&, context: C) { var workspace = init(old); let result = F(context, workspace); workspace.deinit(); return result; }
-fn definitionEqual(self: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]? = null, constant_types: bool = false) -> bool, Error { return self.run(old, current, binding, closures, constant_types, 0, null, []); }
-fn definitionEqualWithOrigins(self: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool, origins: const bool[:]) -> bool, Error {
-    var admitted: const bool[:] = []; if binding < origins.len && origins[binding] { admitted = origins; } return self.run(old, current, binding, closures, constant_types, 0, null, admitted);
+fn definitionEqual(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]? = null, constant_types: bool = false) -> bool, Error { return self_.run(old, current, binding, closures, constant_types, 0, null, []); }
+fn definitionEqualWithOrigins(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool, origins: const bool[:]) -> bool, Error {
+    var admitted: const bool[:] = default<const bool[:]>(); if binding < origins.len && origins[binding] { admitted = origins; } return self_.run(old, current, binding, closures, constant_types, 0, null, admitted);
 }
-fn run(self: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool, expression: u32, reached: u32[>..<]?, origins: const bool[:]) -> bool, Error {
-    if binding == 0 && expression == 0 { return false, Error.none; }
-    assert(self.nodes.len == old.nodes.len && self.bindings.len == old.bindings.len && self.patterns.len == old.patterns.len && self.projections.len == old.projections.len);
-    if self.generation == 0xffffffff { self.clear(); } self.generation++; self.scans++; self.count = 0;
-    var scan = Scan { workspace: self, old: old, current: current, closures: closures, constant_types: constant_types, origins: origins , ..};
+fn run(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool, expression: u32, reached: u32[>..<]?, origins: const bool[:]) -> bool, Error {
+    if binding == 0 && expression == 0 { return false, blot_error::Error.none; }
+    assert(self_.nodes.len == old.nodes.len && self_.bindings.len == old.bindings.len && self_.patterns.len == old.patterns.len && self_.projections.len == old.projections.len);
+    if self_.generation == 0xffffffff { self_.clear(); } self_.generation++; self_.scans++; self_.count = 0;
+    var scan = Scan { workspace: self_, old: old, current: current, closures: closures, constant_types: constant_types, origins: origins , ..};
     if origins.len != 0 { scan.source_shift = current.sourceNamePoint(binding) as i64 - old.sourceNamePoint(binding) as i64; }
     if expression != 0 { scan.node(expression); scan.drain(); } else { scan.run(binding); }
-    self.visits += scan.visits;
-    if scan.failure != Error.none { if scan.failure == Error.out_of_memory { return false, scan.failure; } return false, Error.none; }
-    if reached { for seen, id in self.nodes { if seen == self.generation { reached.push(id as u32); } } }
-    return true, Error.none;
+    self_.visits += scan.visits;
+    if scan.failure != blot_error::Error.none { if scan.failure == blot_error::Error.out_of_memory { return false, scan.failure; } return false, blot_error::Error.none; }
+    if reached { for seen, id in self_.nodes { if seen == self_.generation { reached.push(id as u32); } } }
+    return true, blot_error::Error.none;
 }
 struct Scan {
     workspace: Workspace&, old: const Module&, current: const Module&,
     visits: i64 = 0, closures: u32[>..<]? = null, constant_types: bool = false,
-    origins: const bool[:] = [], source_shift: i64 = 0, failure: Error = Error.none,
+    origins: const bool[:] = default<const bool[:]>(), source_shift: i64 = 0, failure: Error = blot_error::Error.none,
 }
-fn bindingShift(self: const Scan&, id: i64) -> i64 { if self.old.bindings[id].kind != blot_check_check::Kind.global { return self.source_shift; } if id >= self.origins.len || !self.origins[id] { return 0; } return self.current.sourceNamePoint(id as u32) as i64 - self.old.sourceNamePoint(id as u32) as i64; }
+fn bindingShift(self_: const Scan&, id: i64) -> i64 { if self_.old.bindings[id].kind != blot_reuse_principal_interface::Kind.global { return self_.source_shift; } if id >= self_.origins.len || !self_.origins[id] { return 0; } return self_.current.sourceNamePoint(id as u32) as i64 - self_.old.sourceNamePoint(id as u32) as i64; }
 fn shiftedPoint(old: u32, current: u32, shift: i64) -> bool { return (old == 0 && current == 0) || current as i64 - old as i64 == shift; }
-fn normalizePositions<T>(old: T&, current: T, shift: i64) -> Error { return Error.none; }
+fn normalizePositions<T>(old: T&, current: T, shift: i64) -> Error { return blot_error::Error.none; }
 fn normalizePositions(old: blot_check_core::Span&, current: blot_check_core::Span, shift: i64) -> Error {
-    if old.start == 0 && old.end == 0 && current.start == 0 && current.end == 0 { return Error.none; }
-    if current.start as i64 - old.start as i64 != shift || current.end as i64 - old.end as i64 != shift { return Error.changed; } old = current; return Error.none;
+    if old.start == 0 && old.end == 0 && current.start == 0 && current.end == 0 { return blot_error::Error.none; }
+    if current.start as i64 - old.start as i64 != shift || current.end as i64 - old.end as i64 != shift { return blot_error::Error.changed; } old = current; return blot_error::Error.none;
 }
-fn normalizePositions(old: blot_check_core::Projection&, current: blot_check_core::Projection, shift: i64) -> Error { if !shiftedPoint(old.diagnostic_point, current.diagnostic_point, shift) { return Error.changed; } old.diagnostic_point = current.diagnostic_point; return Error.none; }
+fn normalizePositions(old: blot_check_core::Projection&, current: blot_check_core::Projection, shift: i64) -> Error { if !shiftedPoint(old.diagnostic_point, current.diagnostic_point, shift) { return blot_error::Error.changed; } old.diagnostic_point = current.diagnostic_point; return blot_error::Error.none; }
 fn normalizePositions(old: blot_check_core::ClosureInfo&, current: blot_check_core::ClosureInfo, shift: i64) -> Error { return normalizePositions(old.parameter, current.parameter, shift); }
-fn aliases<T>(self: const Scan&, normalized: T&, after: T) -> bool { return true; }
-fn alias(self: const Scan&, before: u32&, after: u32) -> bool { if !self.constant_types && before != after { return false; } if !equalConstantType(self.old.types, before, self.current.types, after) { return false; } before = after; return true; }
-fn projectedItem<T>(self: Scan&, left: const T[:], right: const T[:], id: i64) -> T {
-    if self.failure != Error.none { return default<T>(); }
-    if id < 0 || id >= left.len || id >= right.len { self.failure = Error.changed; return default<T>(); }
+fn aliases<T>(self_: const Scan&, normalized: T&, after: T) -> bool { return true; }
+fn alias(self_: const Scan&, before: u32&, after: u32) -> bool { if !self_.constant_types && before != after { return false; } if !equalConstantType(self_.old.types, before, self_.current.types, after) { return false; } before = after; return true; }
+fn projectedItem<T>(self_: Scan&, left: const T[:], right: const T[:], id: i64) -> T {
+    if self_.failure != blot_error::Error.none { return default<T>(); }
+    if id < 0 || id >= left.len || id >= right.len { self_.failure = blot_error::Error.changed; return default<T>(); }
     var normalized = left[id];
-    if !self.constant_types && self.origins.len == 0 { if !blot_structural::equal(normalized, right[id]) { self.failure = Error.changed; return default<T>(); } return normalized; }
-    if self.origins.len != 0 { let error = normalizeItemPositions(self, normalized, right[id], id); if error != Error.none { self.failure = error; return default<T>(); } }
-    if !self.aliases(normalized, right[id]) || !blot_structural::equal(normalized, right[id]) { self.failure = Error.changed; return default<T>(); } return left[id];
+    if !self_.constant_types && self_.origins.len == 0 { if !blot_structural::equal(normalized, right[id]) { self_.failure = blot_error::Error.changed; return default<T>(); } return normalized; }
+    if self_.origins.len != 0 { let error = normalizeItemPositions(self_, normalized, right[id], id); if error != blot_error::Error.none { self_.failure = error; return default<T>(); } }
+    if !self_.aliases(normalized, right[id]) || !blot_structural::equal(normalized, right[id]) { self_.failure = blot_error::Error.changed; return default<T>(); } return left[id];
 }
-fn normalizeItemPositions<T>(self: const Scan&, before: T&, after: T, id: i64) -> Error { return normalizePositions(before, after, self.source_shift); }
-fn normalizeItemPositions(self: const Scan&, before: blot_check_core::Binding&, after: blot_check_core::Binding, id: i64) -> Error { return normalizePositions(before, after, self.bindingShift(id)); }
-fn projectedSlice<T>(self: Scan&, left: const T[:], right: const T[:], list: List) -> const T[:] {
-    if self.failure != Error.none { return []; }
-    if list.start > left.len || list.len > left.len - list.start || list.start > right.len || list.len > right.len - list.start { self.failure = Error.changed; return []; }
+fn normalizeItemPositions<T>(self_: const Scan&, before: T&, after: T, id: i64) -> Error { return normalizePositions(before, after, self_.source_shift); }
+fn normalizeItemPositions(self_: const Scan&, before: blot_check_core::Binding&, after: blot_check_core::Binding, id: i64) -> Error { return normalizePositions(before, after, self_.bindingShift(id)); }
+fn projectedSlice<T>(self_: Scan&, left: const T[:], right: const T[:], list: List) -> const T[:] {
+    if self_.failure != blot_error::Error.none { return default<const T[:]>(); }
+    if list.start > left.len || list.len > left.len - list.start || list.start > right.len || list.len > right.len - list.start { self_.failure = blot_error::Error.changed; return default<const T[:]>(); }
     let result = left[list.start..list.start + list.len];
-    for before, index in result { var normalized = before; let after = right[list.start + index]; if self.origins.len != 0 { let error = normalizePositions(normalized, after, self.source_shift); if error != Error.none { self.failure = error; return []; } } if !blot_structural::equal(normalized, after) { self.failure = Error.changed; return []; } }
+    for before, index in result { var normalized = before; let after = right[list.start + index]; if self_.origins.len != 0 { let error = normalizePositions(normalized, after, self_.source_shift); if error != blot_error::Error.none { self_.failure = error; return default<const T[:]>(); } } if !blot_structural::equal(normalized, after) { self_.failure = blot_error::Error.changed; return default<const T[:]>(); } }
     return result;
 }
-fn enqueue(self: Scan&, item: Work) {
-    if self.failure != Error.none { return; } var seen: u32[:] = []; var id: u32 = 0; var projection = false;
-    match item { Work.node entry => { seen = self.workspace.nodes; id = entry.id; }, Work.binding entry => { seen = self.workspace.bindings; id = entry.id; }, Work.pattern entry => { seen = self.workspace.patterns; id = entry.id; }, Work.projection entry => { seen = self.workspace.projections; id = entry.id; projection = true; } }
-    if id == 0 && !projection { return; } if id >= seen.len { self.failure = Error.changed; return; } if seen[id] == self.workspace.generation { return; }
-    let w .= self.workspace;
+fn enqueue(self_: Scan&, item: Work) {
+    if self_.failure != blot_error::Error.none { return; } var seen: u32[:] = default<u32[:]>(); var id: u32 = 0; var projection = false;
+    match item { node entry => { seen = self_.workspace.nodes; id = entry.id; }, binding entry => { seen = self_.workspace.bindings; id = entry.id; }, pattern entry => { seen = self_.workspace.patterns; id = entry.id; }, projection entry => { seen = self_.workspace.projections; id = entry.id; projection = true; } }
+    if id == 0 && !projection { return; } if id >= seen.len { self_.failure = blot_error::Error.changed; return; } if seen[id] == self_.workspace.generation { return; }
+    let w .= self_.workspace;
     if w.count == w.work.len {
-        let minimum = w.count + 1; if minimum > 0x5555555555555540 { self.failure = Error.out_of_memory; return; }
+        let minimum = w.count + 1; if minimum > 0x5555555555555540 { self_.failure = blot_error::Error.out_of_memory; return; }
         let next = minimum + minimum / 2 + 12; let run = owned_work.alloc_slice(next);
         for index in w.count { run[index] = w.work[index]; } release(w.work); w.work = run;
     }
-    w.work[w.count] = item; w.count++; seen[id] = w.generation; self.visits++;
+    w.work[w.count] = item; w.count++; seen[id] = w.generation; self_.visits++;
 }
-fn node(self: Scan&, id: u32) { self.enqueue(Work.node { id , ..}); }
-fn binding(self: Scan&, id: u32) { self.enqueue(Work.binding { id , ..}); }
-fn pattern(self: Scan&, id: u32) { self.enqueue(Work.pattern { id , ..}); }
-fn projection(self: Scan&, id: u32) { self.enqueue(Work.projection { id , ..}); }
-fn words(self: Scan&, list: List) -> const u32[:] { return self.projectedSlice(self.old.extra, self.current.extra, list); }
-fn children(self: Scan&, list: List) { for id in self.words(list) { self.node(id); } }
-fn bindingList(self: Scan&, list: List) { for id in self.words(list) { self.binding(id); } }
-fn reference(self: Scan&, ref: blot_check_core::BindingRef) { if ref.unit == 0 || ref.unit == self.old.unit { self.binding(ref.binding); } }
-fn carries(self: Scan&, list: List) { for carry in self.projectedSlice(self.old.loop_carries, self.current.loop_carries, list) { self.binding(carry.incoming); self.binding(carry.iteration); self.binding(carry.backedge); self.binding(carry.outgoing); } }
-fn erased(self: Scan&, id: u32) {
-    var old_count: i64 = 0; var new_count: i64 = 0; for ref in self.old.erased_declaration_references { if ref.node == id { old_count++; } } for ref in self.current.erased_declaration_references { if ref.node == id { new_count++; } }
-    if old_count != new_count { self.failure = Error.changed; return; } var at: i64 = 0;
-    for old in self.old.erased_declaration_references { if old.node != id { continue; } while self.current.erased_declaration_references[at].node != id { at++; } if !blot_structural::equal(old, self.current.erased_declaration_references[at]) { self.failure = Error.changed; return; } self.reference(old.target); at++; }
+fn node(self_: Scan&, id: u32) { self_.enqueue(Work.node { id , ..}); }
+fn binding(self_: Scan&, id: u32) { self_.enqueue(Work.binding { id , ..}); }
+fn pattern(self_: Scan&, id: u32) { self_.enqueue(Work.pattern { id , ..}); }
+fn projection(self_: Scan&, id: u32) { self_.enqueue(Work.projection { id , ..}); }
+fn words(self_: Scan&, list: List) -> const u32[:] { return self_.projectedSlice(self_.old.extra, self_.current.extra, list); }
+fn children(self_: Scan&, list: List) { for id in self_.words(list) { self_.node(id); } }
+fn bindingList(self_: Scan&, list: List) { for id in self_.words(list) { self_.binding(id); } }
+fn reference(self_: Scan&, ref: blot_check_core::BindingRef) { if ref.unit == 0 || ref.unit == self_.old.unit { self_.binding(ref.binding); } }
+fn carries(self_: Scan&, list: List) { for carry in self_.projectedSlice(self_.old.loop_carries, self_.current.loop_carries, list) { self_.binding(carry.incoming); self_.binding(carry.iteration); self_.binding(carry.backedge); self_.binding(carry.outgoing); } }
+fn erased(self_: Scan&, id: u32) {
+    var old_count: i64 = 0; var new_count: i64 = 0; for ref in self_.old.erased_declaration_references { if ref.node == id { old_count++; } } for ref in self_.current.erased_declaration_references { if ref.node == id { new_count++; } }
+    if old_count != new_count { self_.failure = blot_error::Error.changed; return; } var at: i64 = 0;
+    for old in self_.old.erased_declaration_references { if old.node != id { continue; } while self_.current.erased_declaration_references[at].node != id { at++; } if !blot_structural::equal(old, self_.current.erased_declaration_references[at]) { self_.failure = blot_error::Error.changed; return; } self_.reference(old.target); at++; }
 }
-fn scanNode(self: Scan&, id: u32) {
-    let n = self.projectedItem(self.old.nodes, self.current.nodes, id); self.projectedItem(self.old.spans, self.current.spans, id); if self.failure != Error.none { return; }
-    if self.old.isTagCall(id) != self.current.isTagCall(id) { self.failure = Error.changed; return; }
-    if self.old.dispatch_signatures.len != 0 || self.current.dispatch_signatures.len != 0 { self.projectedItem(self.old.dispatch_signatures, self.current.dispatch_signatures, id); }
-    if self.old.merge_ranges.len != 0 || self.current.merge_ranges.len != 0 { let list = self.projectedItem(self.old.merge_ranges, self.current.merge_ranges, id); for merge in self.projectedSlice(self.old.merges, self.current.merges, list) { self.node(merge.node); self.binding(merge.result); self.binding(merge.then_binding); self.binding(merge.else_binding); } }
-    self.erased(id); if self.failure != Error.none { return; }
+fn scanNode(self_: Scan&, id: u32) {
+    let n = self_.projectedItem(self_.old.nodes, self_.current.nodes, id); self_.projectedItem(self_.old.spans, self_.current.spans, id); if self_.failure != blot_error::Error.none { return; }
+    if self_.old.isTagCall(id) != self_.current.isTagCall(id) { self_.failure = blot_error::Error.changed; return; }
+    if self_.old.dispatch_signatures.len != 0 || self_.current.dispatch_signatures.len != 0 { self_.projectedItem(self_.old.dispatch_signatures, self_.current.dispatch_signatures, id); }
+    if self_.old.merge_ranges.len != 0 || self_.current.merge_ranges.len != 0 { let list = self_.projectedItem(self_.old.merge_ranges, self_.current.merge_ranges, id); for merge in self_.projectedSlice(self_.old.merges, self_.current.merges, list) { self_.node(merge.node); self_.binding(merge.result); self_.binding(merge.then_binding); self_.binding(merge.else_binding); } }
+    self_.erased(id); if self_.failure != blot_error::Error.none { return; }
     match n.tag {
-        blot_check_core::Tag.contract_method => { self.projectedItem(self.old.member_templates, self.current.member_templates, n.a); self.children(List { n.b, n.c , ..}); },
-        blot_check_core::Tag.task, blot_check_core::Tag.resource_acquire, blot_check_core::Tag.resource_release, blot_check_core::Tag.usage_share, blot_check_core::Tag.resource_scope,
-        blot_check_core::Tag.usage_read, blot_check_core::Tag.usage_borrow, blot_check_core::Tag.package_pack, blot_check_core::Tag.package_unpack, blot_check_core::Tag.invalid => { self.failure = Error.changed; },
-        blot_check_core::Tag.constant, blot_check_core::Tag.panic, blot_check_core::Tag.constructor_function, blot_check_core::Tag.type_constructor => {},
-        blot_check_core::Tag.primitive_function => { self.projectedItem(self.old.primitives, self.current.primitives, n.a); },
-        blot_check_core::Tag.reference => { self.reference(self.projectedItem(self.old.references, self.current.references, n.a)); },
-        blot_check_core::Tag.staging, blot_check_core::Tag.scalar, blot_check_core::Tag.logical, blot_check_core::Tag.associated, blot_check_core::Tag.record_merge,
-        blot_check_core::Tag.type_same, blot_check_core::Tag.effect_provider, blot_check_core::Tag.proof_guard => { self.node(n.a); self.node(n.b); },
-        blot_check_core::Tag.handle => { self.node(n.a); self.node(n.b); if n.c != 0 { let effects = self.projectedItem(self.old.handle_effects, self.current.handle_effects, n.c - 1); self.node(effects.node); } },
-        blot_check_core::Tag.call => { let call = self.projectedItem(self.old.calls, self.current.calls, n.a); self.reference(call.target); self.children(List { n.b, n.c , ..}); },
-        blot_check_core::Tag.block_, blot_check_core::Tag.suite, blot_check_core::Tag.product, blot_check_core::Tag.array, blot_check_core::Tag.array_op, blot_check_core::Tag.storage => { self.children(List { n.a, n.b , ..}); },
-        blot_check_core::Tag.record => { self.children(List { n.a, n.b , ..}); self.words(List { n.c, n.b , ..}); },
-        blot_check_core::Tag.if_value, blot_check_core::Tag.if_stmt, blot_check_core::Tag.state_provider => { self.node(n.a); self.node(n.b); self.node(n.c); },
-        blot_check_core::Tag.bind => { self.binding(n.a); self.node(n.b); },
-        blot_check_core::Tag.return_ => { self.node(n.a); self.node(n.b); },
-        blot_check_core::Tag.computation, blot_check_core::Tag.effect_scope, blot_check_core::Tag.result_associated => { self.node(n.a); },
-        blot_check_core::Tag.project => { self.node(n.a); self.projection(n.b); },
-        blot_check_core::Tag.construct => { self.node(n.b); },
-        blot_check_core::Tag.closure => { let value = self.projectedItem(self.old.closures, self.current.closures, n.a); if self.failure != Error.none { return; } if self.closures { self.closures.push(n.a); } self.binding(value.qualifier); self.binding(value.parameter.binding); self.bindingList(value.captures); self.node(value.body); },
-        blot_check_core::Tag.apply => { self.node(n.a); self.node(n.b); },
-        blot_check_core::Tag.effect_reflection => { if n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.count) || n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.has) || n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.same) { self.node(n.b); self.node(n.c); } },
-        blot_check_core::Tag.operation_value => { let value = self.projectedItem(self.old.operation_values, self.current.operation_values, n.a); self.node(value.witness); },
-        blot_check_core::Tag.request_decision => { self.node(n.b); self.node(n.c); },
-        blot_check_core::Tag.request_loop => { let value = self.projectedItem(self.old.request_loops, self.current.request_loops, n.a); if self.failure != Error.none { return; } self.node(value.computation); self.pattern(value.completion_pattern); self.node(value.completion_body); self.node(value.return_target); self.bindingList(value.completion_state_bindings); self.carries(value.carries); for arm in self.projectedSlice(self.old.request_arms, self.current.request_arms, value.arms) { self.node(arm.callback); self.node(arm.selector); } },
-        blot_check_core::Tag.resolver_op => { let value = self.projectedItem(self.old.resolver_ops, self.current.resolver_ops, n.a); if self.failure != Error.none { return; } self.node(value.resolver); if value.method.binding != 0 { self.reference(value.method); } self.children(value.arguments); },
-        blot_check_core::Tag.pattern_bind => { self.pattern(n.a); self.node(n.b); self.node(n.c); },
-        blot_check_core::Tag.match_ => { let value = self.projectedItem(self.old.matches, self.current.matches, n.a); if self.failure != Error.none { return; } self.children(value.inputs); for arm in self.projectedSlice(self.old.match_arms, self.current.match_arms, value.arms) { self.node(arm.body); self.node(arm.guard); for row in self.projectedSlice(self.old.pattern_rows, self.current.pattern_rows, arm.rows) { for pattern in self.words(row.patterns) { self.pattern(pattern); } } } },
-        blot_check_core::Tag.update => { let value = self.projectedItem(self.old.updates, self.current.updates, n.a); if self.failure != Error.none { return; } self.node(value.root); self.node(value.value); self.binding(value.self_binding); for projection in self.words(value.path) { self.projection(projection); } for step in self.projectedSlice(self.old.update_steps, self.current.update_steps, value.selectors) { match step.kind { blot_check_core::UpdateKind.field => { self.projection(step.projection); }, blot_check_core::UpdateKind.index => { self.node(step.index); } } } },
-        blot_check_core::Tag.loop_ => { let value = self.projectedItem(self.old.loops, self.current.loops, n.a); if self.failure != Error.none { return; } self.node(value.first); self.node(value.end); self.node(value.body); self.pattern(value.pattern); self.carries(value.carries); },
-        blot_check_core::Tag.break_ => { self.node(n.a); self.children(List { n.b, n.c , ..}); },
+        contract_method => { self_.projectedItem(self_.old.member_templates, self_.current.member_templates, n.a); self_.children(List { n.b, n.c , ..}); },
+        task, resource_acquire, resource_release, usage_share, resource_scope,
+        usage_read, usage_borrow, package_pack, package_unpack, invalid => { self_.failure = blot_error::Error.changed; },
+        constant, panic, constructor_function, type_constructor => {},
+        primitive_function => { self_.projectedItem(self_.old.primitives, self_.current.primitives, n.a); },
+        reference => { self_.reference(self_.projectedItem(self_.old.references, self_.current.references, n.a)); },
+        staging, scalar, logical, associated, record_merge,
+        type_same, effect_provider, proof_guard => { self_.node(n.a); self_.node(n.b); },
+        handle => { self_.node(n.a); self_.node(n.b); if n.c != 0 { let effects = self_.projectedItem(self_.old.handle_effects, self_.current.handle_effects, n.c - 1); self_.node(effects.node); } },
+        call => { let call = self_.projectedItem(self_.old.calls, self_.current.calls, n.a); self_.reference(call.target); self_.children(List { n.b, n.c , ..}); },
+        block_, suite, product, array, array_op, storage => { self_.children(List { n.a, n.b , ..}); },
+        record => { self_.children(List { n.a, n.b , ..}); self_.words(List { n.c, n.b , ..}); },
+        if_value, if_stmt, state_provider => { self_.node(n.a); self_.node(n.b); self_.node(n.c); },
+        bind => { self_.binding(n.a); self_.node(n.b); },
+        return_ => { self_.node(n.a); self_.node(n.b); },
+        computation, effect_scope, result_associated => { self_.node(n.a); },
+        project => { self_.node(n.a); self_.projection(n.b); },
+        construct => { self_.node(n.b); },
+        closure => { let value = self_.projectedItem(self_.old.closures, self_.current.closures, n.a); if self_.failure != blot_error::Error.none { return; } if self_.closures { self_.closures.push(n.a); } self_.binding(value.qualifier); self_.binding(value.parameter.binding); self_.bindingList(value.captures); self_.node(value.body); },
+        apply => { self_.node(n.a); self_.node(n.b); },
+        effect_reflection => { if n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.count) || n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.has) || n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.same) { self_.node(n.b); self_.node(n.c); } },
+        operation_value => { let value = self_.projectedItem(self_.old.operation_values, self_.current.operation_values, n.a); self_.node(value.witness); },
+        request_decision => { self_.node(n.b); self_.node(n.c); },
+        request_loop => { let value = self_.projectedItem(self_.old.request_loops, self_.current.request_loops, n.a); if self_.failure != blot_error::Error.none { return; } self_.node(value.computation); self_.pattern(value.completion_pattern); self_.node(value.completion_body); self_.node(value.return_target); self_.bindingList(value.completion_state_bindings); self_.carries(value.carries); for arm in self_.projectedSlice(self_.old.request_arms, self_.current.request_arms, value.arms) { self_.node(arm.callback); self_.node(arm.selector); } },
+        resolver_op => { let value = self_.projectedItem(self_.old.resolver_ops, self_.current.resolver_ops, n.a); if self_.failure != blot_error::Error.none { return; } self_.node(value.resolver); if value.method.binding != 0 { self_.reference(value.method); } self_.children(value.arguments); },
+        pattern_bind => { self_.pattern(n.a); self_.node(n.b); self_.node(n.c); },
+        match_ => { let value = self_.projectedItem(self_.old.matches, self_.current.matches, n.a); if self_.failure != blot_error::Error.none { return; } self_.children(value.inputs); for arm in self_.projectedSlice(self_.old.match_arms, self_.current.match_arms, value.arms) { self_.node(arm.body); self_.node(arm.guard_); for row in self_.projectedSlice(self_.old.pattern_rows, self_.current.pattern_rows, arm.rows) { for pattern in self_.words(row.patterns) { self_.pattern(pattern); } } } },
+        update => { let value = self_.projectedItem(self_.old.updates, self_.current.updates, n.a); if self_.failure != blot_error::Error.none { return; } self_.node(value.root); self_.node(value.value); self_.binding(value.self_binding); for projection in self_.words(value.path) { self_.projection(projection); } for step in self_.projectedSlice(self_.old.update_steps, self_.current.update_steps, value.selectors) { match step.kind { field => { self_.projection(step.projection); }, index => { self_.node(step.index); } } } },
+        loop_ => { let value = self_.projectedItem(self_.old.loops, self_.current.loops, n.a); if self_.failure != blot_error::Error.none { return; } self_.node(value.first); self_.node(value.end); self_.node(value.body); self_.pattern(value.pattern); self_.carries(value.carries); },
+        break_ => { self_.node(n.a); self_.children(List { n.b, n.c , ..}); },
     }
 }
-fn run(self: Scan&, binding_id: u32) {
-    let binding = self.projectedItem(self.old.bindings, self.current.bindings, binding_id); if self.failure != Error.none { return; }
-    if binding.kind != blot_check_check::Kind.global || binding.body_id == 0 { self.failure = Error.changed; return; }
-    let body = self.projectedItem(self.old.bodies, self.current.bodies, binding.body_id); let recipe = self.projectedItem(self.old.declaration_dependencies, self.current.declaration_dependencies, binding.body_id); if self.failure != Error.none { return; }
-    for ref in self.projectedSlice(self.old.dependency_references, self.current.dependency_references, recipe.references) { self.reference(ref); }
-    self.projectedSlice(self.old.dependency_members, self.current.dependency_members, recipe.members); self.node(recipe.runtime_metadata); self.binding(binding_id); self.node(binding.initializer); self.node(body.root);
-    for parameter in self.projectedSlice(self.old.parameters, self.current.parameters, body.parameters) { self.binding(parameter.binding); } self.drain();
+fn run(self_: Scan&, binding_id: u32) {
+    let binding = self_.projectedItem(self_.old.bindings, self_.current.bindings, binding_id); if self_.failure != blot_error::Error.none { return; }
+    if binding.kind != blot_reuse_principal_interface::Kind.global || binding.body_id == 0 { self_.failure = blot_error::Error.changed; return; }
+    let body = self_.projectedItem(self_.old.bodies, self_.current.bodies, binding.body_id); let recipe = self_.projectedItem(self_.old.declaration_dependencies, self_.current.declaration_dependencies, binding.body_id); if self_.failure != blot_error::Error.none { return; }
+    for ref in self_.projectedSlice(self_.old.dependency_references, self_.current.dependency_references, recipe.references) { self_.reference(ref); }
+    self_.projectedSlice(self_.old.dependency_members, self_.current.dependency_members, recipe.members); self_.node(recipe.runtime_metadata); self_.binding(binding_id); self_.node(binding.initializer); self_.node(body.root);
+    for parameter in self_.projectedSlice(self_.old.parameters, self_.current.parameters, body.parameters) { self_.binding(parameter.binding); } self_.drain();
 }
-fn drain(self: Scan&) {
-    while self.workspace.count != 0 && self.failure == Error.none {
-        self.workspace.count--; let work = self.workspace.work[self.workspace.count];
+fn drain(self_: Scan&) {
+    while self_.workspace.count != 0 && self_.failure == blot_error::Error.none {
+        self_.workspace.count--; let work = self_.workspace.work[self_.workspace.count];
         match work {
-            Work.node entry => { self.scanNode(entry.id); },
-            Work.binding entry => {
-                let id = entry.id; let value = self.referencedBinding(id); if self.failure != Error.none { return; } var shift: i64 = 0; if self.origins.len != 0 { shift = self.bindingShift(id); }
-                if !shiftedPoint(self.old.sourceNamePoint(id), self.current.sourceNamePoint(id), shift) || !shiftedPoint(self.old.runtimeNamePoint(id), self.current.runtimeNamePoint(id), shift) { self.failure = Error.changed; return; }
-                if value.kind == blot_check_check::Kind.local || value.kind == blot_check_check::Kind.parameter { self.node(value.initializer); }
+            node entry => { self_.scanNode(entry.id); },
+            binding entry => {
+                let id = entry.id; let value = self_.referencedBinding(id); if self_.failure != blot_error::Error.none { return; } var shift: i64 = 0; if self_.origins.len != 0 { shift = self_.bindingShift(id); }
+                if !shiftedPoint(self_.old.sourceNamePoint(id), self_.current.sourceNamePoint(id), shift) || !shiftedPoint(self_.old.runtimeNamePoint(id), self_.current.runtimeNamePoint(id), shift) { self_.failure = blot_error::Error.changed; return; }
+                if value.kind == blot_reuse_principal_interface::Kind.local || value.kind == blot_reuse_principal_interface::Kind.parameter { self_.node(value.initializer); }
             },
-            Work.pattern entry => { let p = self.projectedItem(self.old.patterns, self.current.patterns, entry.id); if self.failure != Error.none { return; } match p.tag {
-                blot_check_core::PatternTag.invalid => { self.failure = Error.changed; }, blot_check_core::PatternTag.wildcard, blot_check_core::PatternTag.constant => {},
-                blot_check_core::PatternTag.bind => { self.binding(p.a); }, blot_check_core::PatternTag.value => { self.node(p.a); },
-                blot_check_core::PatternTag.constructor, blot_check_core::PatternTag.record_payload => { self.pattern(p.b); }, blot_check_core::PatternTag.product => { for child in self.words(List { p.a, p.b , ..}) { self.pattern(child); } },
+            pattern entry => { let p = self_.projectedItem(self_.old.patterns, self_.current.patterns, entry.id); if self_.failure != blot_error::Error.none { return; } match p.tag {
+                invalid => { self_.failure = blot_error::Error.changed; }, wildcard, constant => {},
+                bind => { self_.binding(p.a); }, value => { self_.node(p.a); },
+                constructor, record_payload => { self_.pattern(p.b); }, product => { for child in self_.words(List { p.a, p.b , ..}) { self_.pattern(child); } },
             } },
-            Work.projection entry => { let p = self.projectedItem(self.old.projections, self.current.projections, entry.id); self.projectedSlice(self.old.projection_variants, self.current.projection_variants, p.variants); },
+            projection entry => { let p = self_.projectedItem(self_.old.projections, self_.current.projections, entry.id); self_.projectedSlice(self_.old.projection_variants, self_.current.projection_variants, p.variants); },
         }
     }
 }
-fn referencedBinding(self: Scan&, id: u32) -> blot_check_core::Binding {
-    if id >= self.old.bindings.len || id >= self.current.bindings.len { self.failure = Error.changed; return default<blot_check_core::Binding>(); }
-    let before = self.old.bindings[id]; let after = self.current.bindings[id];
-    if !self.constant_types && before.kind == blot_check_check::Kind.global && after.kind == blot_check_check::Kind.global && id < self.origins.len && self.origins[id] {
-        var header = before; header.span = after.span; if !blot_structural::equal(header, after) { self.failure = Error.changed; return default<blot_check_core::Binding>(); }
-        let old_body .= self.old.body(id); let new_body .= self.current.body(id); if !old_body || !new_body || !parameterHeadersEqual(self.old, old_body, self.current, new_body) { self.failure = Error.changed; return default<blot_check_core::Binding>(); } return before;
+fn referencedBinding(self_: Scan&, id: u32) -> blot_check_core::Binding {
+    if id >= self_.old.bindings.len || id >= self_.current.bindings.len { self_.failure = blot_error::Error.changed; return default<blot_check_core::Binding>(); }
+    let before = self_.old.bindings[id]; let after = self_.current.bindings[id];
+    if !self_.constant_types && before.kind == blot_reuse_principal_interface::Kind.global && after.kind == blot_reuse_principal_interface::Kind.global && id < self_.origins.len && self_.origins[id] {
+        var header = before; header.span = after.span; if !blot_structural::equal(header, after) { self_.failure = blot_error::Error.changed; return default<blot_check_core::Binding>(); }
+        let old_body .= self_.old.body(id); let new_body .= self_.current.body(id); if !old_body || !new_body || !parameterHeadersEqual(self_.old, old_body, self_.current, new_body) { self_.failure = blot_error::Error.changed; return default<blot_check_core::Binding>(); } return before;
     }
-    return self.projectedItem(self.old.bindings, self.current.bindings, id);
+    return self_.projectedItem(self_.old.bindings, self_.current.bindings, id);
 }
 fn parameterHeadersEqual(old: const Module&, before: blot_check_core::Body, current: const Module&, after: blot_check_core::Body) -> bool {
     if before.is_function != after.is_function || before.parameters.len != after.parameters.len { return false; } let left = before.parameters; let right = after.parameters;
@@ -189,18 +189,18 @@ fn definitionMode(old: const Module&, current: const Module&, binding: u32, clos
     var workspace = init(old); let result, error = workspace.run(old, current, binding, closures, constant_types, expression, reached, []); workspace.deinit(); return result, error;
 }
 fn expressionNodes(old: const Module&, current: const Module&, root: u32) -> blot_support::Option<u32[:]>, Error {
-    if root == 0 { return blot_support::none<u32[:]>(), Error.none; } var reached: u32[>..<] = [];
-    let same, error = definitionMode(old, current, 0, null, false, root, reached); if error != Error.none || !same { return blot_support::none<u32[:]>(), error; }
-    let owned = owned_words.alloc_slice(reached.len); for value, index in reached { owned[index] = value; } return blot_support::some(owned), Error.none;
+    if root == 0 { return blot_support::none<u32[:]>(), blot_error::Error.none; } var reached: u32[>..<] = [];
+    let same, error = definitionMode(old, current, 0, null, false, root, reached); if error != blot_error::Error.none || !same { return blot_support::none<u32[:]>(), error; }
+    let owned = owned_words.alloc_slice(reached.len); for value, index in reached { owned[index] = value; } return blot_support::some(owned), blot_error::Error.none;
 }
 fn equalConstantType(left: blot_check_core::Types, before: u32, right: blot_check_core::Types, after: u32) -> bool {
     if before >= left.nodes.len || after >= right.nodes.len { return false; } if before == after { return true; }
     let a = left.nodes[before]; let b = right.nodes[after]; if !blot_structural::equal(a, b) { return false; }
     match a.tag {
-        blot_check_types::Tag.unit, blot_check_types::Tag.boolean, blot_check_types::Tag.unsigned32, blot_check_types::Tag.floating32, blot_check_types::Tag.never => { return true; },
-        blot_check_types::Tag.array, blot_check_types::Tag.list, blot_check_types::Tag.cursor => {
+        unit, boolean, unsigned32, floating32, never => { return true; },
+        array, list, cursor => {
             if a.a >= left.nodes.len || b.a >= right.nodes.len || a.b != 0 || a.c != 0 || !blot_structural::equal(left.nodes[a.a], right.nodes[b.a]) { return false; }
-            match left.nodes[a.a].tag { blot_check_types::Tag.unit, blot_check_types::Tag.boolean, blot_check_types::Tag.unsigned32, blot_check_types::Tag.floating32, blot_check_types::Tag.never => { return true; }, _ => { return false; } }
+            match left.nodes[a.a].tag { unit, boolean, unsigned32, floating32, never => { return true; }, _ => { return false; } }
         }, _ => { return false; },
     }
 }
@@ -219,12 +219,12 @@ fn normalizePositions(old: blot_check_core::Obligation&, current: blot_check_cor
 
 fn normalizePositions(old: blot_check_core::Diagnostic&, current: blot_check_core::Diagnostic, shift: i64) -> Error { return normalizePositions(old.span, current.span, shift); }
 
-fn aliases(self: const Scan&, normalized: blot_check_core::Node&, after: blot_check_core::Node) -> bool { if !self.alias(normalized.ty, after.ty) { return false; } return true; }
+fn aliases(self_: const Scan&, normalized: blot_check_core::Node&, after: blot_check_core::Node) -> bool { if !self_.alias(normalized.ty, after.ty) { return false; } return true; }
 
-fn aliases(self: const Scan&, normalized: blot_check_core::Parameter&, after: blot_check_core::Parameter) -> bool { if !self.alias(normalized.ty, after.ty) { return false; } return true; }
+fn aliases(self_: const Scan&, normalized: blot_check_core::Parameter&, after: blot_check_core::Parameter) -> bool { if !self_.alias(normalized.ty, after.ty) { return false; } return true; }
 
-fn aliases(self: const Scan&, normalized: blot_check_core::Binding&, after: blot_check_core::Binding) -> bool { if !self.alias(normalized.ty, after.ty) { return false; } if !self.alias(normalized.scheme.root, after.scheme.root) { return false; } return true; }
+fn aliases(self_: const Scan&, normalized: blot_check_core::Binding&, after: blot_check_core::Binding) -> bool { if !self_.alias(normalized.ty, after.ty) { return false; } if !self_.alias(normalized.scheme.root, after.scheme.root) { return false; } return true; }
 
-fn aliases(self: const Scan&, normalized: blot_check_core::Body&, after: blot_check_core::Body) -> bool { if !self.alias(normalized.scheme.root, after.scheme.root) { return false; } return true; }
+fn aliases(self_: const Scan&, normalized: blot_check_core::Body&, after: blot_check_core::Body) -> bool { if !self_.alias(normalized.scheme.root, after.scheme.root) { return false; } return true; }
 
-fn aliases(self: const Scan&, normalized: blot_check_core::Pattern&, after: blot_check_core::Pattern) -> bool { if !self.alias(normalized.ty, after.ty) { return false; } return true; }
+fn aliases(self_: const Scan&, normalized: blot_check_core::Pattern&, after: blot_check_core::Pattern) -> bool { if !self_.alias(normalized.ty, after.ty) { return false; } return true; }

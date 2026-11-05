@@ -6,38 +6,38 @@ import support.option;
 
 struct Storage {
     layout: blot_backend_layout::Id = 0, bytes: u32 = 0, parent: blot_support::Option<u8>, offset: u32 = 0,
-    word: u8 = 0, references: u16 = 0, tag: blot_support::Option<u32>, guard: blot_support::Option<u8>, unit_payload: bool = false,
+    word: u8 = 0, references: u16 = 0, tag: blot_support::Option<u32>, guard_: blot_support::Option<u8>, unit_payload: bool = false,
 }
 struct Guard { parent: blot_support::Option<u8>, owner: u8 = 0, word: u8 = 0, tag: u32 = 0 }
-struct Leaf { owner: u8 = 0, offset: u32 = 0, floating: bool = false, word: u8 = 0, guard: blot_support::Option<u8>, discriminant: bool = false }
+struct Leaf { owner: u8 = 0, offset: u32 = 0, floating: bool = false, word: u8 = 0, guard_: blot_support::Option<u8>, discriminant: bool = false }
 struct Plan {
     storage: Storage[32] = [Storage {..}; 32], storage_count: u8 = 0, leaves: Leaf[64] = [Leaf {..}; 64], leaf_count: u8 = 0,
     word_count: u8 = 0, guards: Guard[32] = [Guard {..}; 32], guard_count: u8 = 0,
 }
 fn stride(plan: Plan&) -> u32 { plan.word_count as u32 * 4 }
-fn addStorage(plan: Plan&, ty: blot_backend_layout::Id, bytes: u32, parent: blot_support::Option<u8>, offset: u32, tag: blot_support::Option<u32>, guard: blot_support::Option<u8>) -> blot_support::Option<u8> {
+fn addStorage(plan: Plan&, ty: blot_backend_layout::Id, bytes: u32, parent: blot_support::Option<u8>, offset: u32, tag: blot_support::Option<u32>, guard_: blot_support::Option<u8>) -> blot_support::Option<u8> {
     if plan.storage_count == 32 { return blot_support::none<u8>(); }
     let index = plan.storage_count; plan.storage_count++;
-    plan.storage[index] = Storage { layout: ty, bytes: bytes, parent: parent, offset: offset, tag: tag, guard: guard , ..};
+    plan.storage[index] = Storage { layout: ty, bytes: bytes, parent: parent, offset: offset, tag: tag, guard_: guard_ , ..};
     if parent.present { plan.storage[parent.value].references |= 1 as u16 << (offset / 4); }
     return blot_support::some(index);
 }
-recursive fn visit<G>(plan: Plan&, generator: G&, ty: blot_backend_layout::Id, parent: blot_support::Option<u8>, offset: u32, remaining: i64&, depth: i64, guard: blot_support::Option<u8>, word: u8&) -> bool, blot_error::Error {
+recursive fn visit<G>(plan: Plan&, generator: G&, ty: blot_backend_layout::Id, parent: blot_support::Option<u8>, offset: u32, remaining: i64&, depth: i64, guard_: blot_support::Option<u8>, word: u8&) -> bool, blot_error::Error {
     if remaining == 0 || depth >= 16 { return false, blot_error::Error.none; } remaining--;
     let node = generator.representations.store.node(ty);
     if node.tag == blot_backend_layout::Tag.unit || node.tag == blot_backend_layout::Tag.boolean || node.tag == blot_backend_layout::Tag.unsigned32 || node.tag == blot_backend_layout::Tag.floating32 {
         if plan.leaf_count == 64 || !parent.present || word >= 16 { return false, blot_error::Error.none; }
-        plan.leaves[plan.leaf_count] = Leaf { owner: parent.value, offset: offset, floating: node.tag == blot_backend_layout::Tag.floating32, word: word, guard: guard , ..};
+        plan.leaves[plan.leaf_count] = Leaf { owner: parent.value, offset: offset, floating: node.tag == blot_backend_layout::Tag.floating32, word: word, guard_: guard_ , ..};
         plan.leaf_count++; word++; return true, blot_error::Error.none;
     }
     if node.tag == blot_backend_layout::Tag.record || node.tag == blot_backend_layout::Tag.product {
         var step = 1; if node.tag == blot_backend_layout::Tag.record { step = 2; }
         let count = generator.representations.store.children(ty).len / step; if count == 0 || count > 16 { return false, blot_error::Error.none; }
-        let owner = addStorage(plan, ty, (count * 4) as u32, parent, offset, blot_support::none<u32>(), guard); if !owner.present { return false, blot_error::Error.none; }
+        let owner = addStorage(plan, ty, (count * 4) as u32, parent, offset, blot_support::none<u32>(), guard_); if !owner.present { return false, blot_error::Error.none; }
         plan.storage[owner.value].word = word;
         for index in 0..count {
             let child = generator.representations.store.children(ty)[index * step + step - 1];
-            let valid, error = visit(plan, generator, child, owner, (index * 4) as u32, remaining, depth + 1, guard, word); if error != blot_error::Error.none || !valid { return false, error; }
+            let valid, error = visit(plan, generator, child, owner, (index * 4) as u32, remaining, depth + 1, guard_, word); if error != blot_error::Error.none || !valid { return false, error; }
         }
         return true, blot_error::Error.none;
     }
@@ -55,14 +55,14 @@ recursive fn visit<G>(plan: Plan&, generator: G&, ty: blot_backend_layout::Id, p
         let first_owner = plan.storage_count; let tag_word = word;
         if count > 1 {
             if word >= 16 || plan.leaf_count == 64 { return false, blot_error::Error.none; }
-            plan.leaves[plan.leaf_count] = Leaf { owner: first_owner, word: tag_word, guard: guard, discriminant: true , ..}; plan.leaf_count++; word++;
+            plan.leaves[plan.leaf_count] = Leaf { owner: first_owner, word: tag_word, guard_: guard_, discriminant: true , ..}; plan.leaf_count++; word++;
         }
         let payload_start = word; var end = payload_start;
         for tag in tags[..count] {
-            var active = guard;
+            var active = guard_;
             if count > 1 {
                 if plan.guard_count == 32 { return false, blot_error::Error.none; }
-                active = blot_support::some(plan.guard_count); plan.guards[plan.guard_count] = Guard { parent: guard, owner: first_owner, word: tag_word, tag: tag , ..}; plan.guard_count++;
+                active = blot_support::some(plan.guard_count); plan.guards[plan.guard_count] = Guard { parent: guard_, owner: first_owner, word: tag_word, tag: tag , ..}; plan.guard_count++;
             }
             let payload, payload_error = generator.nominalPayload((node.a as u64 << 32) | node.b, tag, ty);
             if payload_error != blot_error::Error.none { if payload_error == blot_error::Error.out_of_memory { return false, payload_error; } return false, blot_error::Error.none; }

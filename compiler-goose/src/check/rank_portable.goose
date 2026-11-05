@@ -1,6 +1,12 @@
 // Rank and package authority share exact binder ownership.
 namespace blot_check_rank_portable;
+import check.core;
+import check.package_core;
+import check.package_portable;
+import check.scheme_equations;
+import reuse.principal_interface;
 import support.error;
+
 fn interface(owner: const blot_reuse_principal_interface::Interface&) -> blot_error::Error {
     if !owner.has_rank_contracts { return blot_error::Error.none; }
     return blot_check_package_portable::interface(owner);

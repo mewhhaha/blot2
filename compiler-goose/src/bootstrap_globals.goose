@@ -1,0 +1,29 @@
+// Imported first: cyclic compiler modules share these inactive headers.
+// Keep this module import-free and initialize referenced leaves before owners.
+let blot_eval_pool_leases::none=blot_eval_pool_leases::Leases {};
+var blot_eval_core_eval::inactive_principal_declines:blot_eval_core_eval::PrincipalDeclinesMap=blot_eval_core_eval::PrincipalDeclinesMap {};
+
+var blot_reuse_code_artifacts::inactive_Context_Job:blot_reuse_code_artifacts::Context_Job=blot_reuse_code_artifacts::Context_Job{..};
+var blot_reuse_code_artifacts::inactive_Context_StampedEvent:blot_reuse_code_artifacts::Context_StampedEvent=blot_reuse_code_artifacts::Context_StampedEvent{..};
+var blot_reuse_code_artifacts::inactive_Context_u32:blot_reuse_code_artifacts::Context_u32=blot_reuse_code_artifacts::Context_u32{..};
+var blot_reuse_code_artifacts::inactive_Context_blot_check_core__BindingRef:blot_reuse_code_artifacts::Context_blot_check_core__BindingRef=blot_reuse_code_artifacts::Context_blot_check_core__BindingRef{..};
+var blot_reuse_code_artifacts::inactive_Context_StaticRead:blot_reuse_code_artifacts::Context_StaticRead=blot_reuse_code_artifacts::Context_StaticRead{..};
+var blot_reuse_code_artifacts::inactive_Context_blot_backend_layout__Mapping:blot_reuse_code_artifacts::Context_blot_backend_layout__Mapping=blot_reuse_code_artifacts::Context_blot_backend_layout__Mapping{..};
+var blot_reuse_code_artifacts::inactive_Context_blot_backend_layout__RowMapping:blot_reuse_code_artifacts::Context_blot_backend_layout__RowMapping=blot_reuse_code_artifacts::Context_blot_backend_layout__RowMapping{..};
+var blot_reuse_code_artifacts::inactive_Context_blot_reuse_substitution_keys__Entry:blot_reuse_code_artifacts::Context_blot_reuse_substitution_keys__Entry=blot_reuse_code_artifacts::Context_blot_reuse_substitution_keys__Entry{..};
+var blot_reuse_code_artifacts::inactive_Context_blot_reuse_independent_call_proof__Record:blot_reuse_code_artifacts::Context_blot_reuse_independent_call_proof__Record=blot_reuse_code_artifacts::Context_blot_reuse_independent_call_proof__Record{..};
+var blot_reuse_code_artifacts::inactive_context_principal_queries:blot_reuse_principal_query::Table=default<blot_reuse_principal_query::Table>();
+var blot_reuse_code_artifacts::inactive_context_principal_graphs:blot_eval_core_eval::RetainedPrincipalGraphs=default<blot_eval_core_eval::RetainedPrincipalGraphs>();
+var blot_reuse_code_artifacts::inactive_context_specialization_queries:blot_eval_selected_query::Table=default<blot_eval_selected_query::Table>();
+var blot_reuse_code_artifacts::inactive_context_refinement_queries:blot_reuse_refinement_receipt::Table=default<blot_reuse_refinement_receipt::Table>();
+var blot_reuse_code_artifacts::inactive_context:blot_reuse_code_artifacts::Context=blot_reuse_code_artifacts::Context{..};
+
+var blot_reuse_artifact_emitter::inactive_Recorder_Record:blot_reuse_artifact_emitter::Recorder_Record=blot_reuse_artifact_emitter::Recorder_Record{..};
+var blot_reuse_artifact_emitter::inactive_Recorder_u8:blot_reuse_artifact_emitter::Recorder_u8=blot_reuse_artifact_emitter::Recorder_u8{..};
+var blot_reuse_artifact_emitter::inactive_Recorder_ValueType:blot_reuse_artifact_emitter::Recorder_ValueType=blot_reuse_artifact_emitter::Recorder_ValueType{..};
+var blot_reuse_artifact_emitter::inactive_Recorder_Operation:blot_reuse_artifact_emitter::Recorder_Operation=blot_reuse_artifact_emitter::Recorder_Operation{..};
+var blot_reuse_artifact_emitter::inactive_Recorder_SymbolicInstruction:blot_reuse_artifact_emitter::Recorder_SymbolicInstruction=blot_reuse_artifact_emitter::Recorder_SymbolicInstruction{..};
+var blot_reuse_artifact_emitter::inactive_recorder:blot_reuse_artifact_emitter::Recorder=blot_reuse_artifact_emitter::Recorder{..};
+
+var blot_reuse_artifact_capture::inactive_queries:blot_reuse_executable_query::FragmentTable=default<blot_reuse_executable_query::FragmentTable>();
+var blot_reuse_artifact_capture::inactive_capture:blot_reuse_artifact_capture::Capture=blot_reuse_artifact_capture::Capture{..};

@@ -1,10 +1,17 @@
 // Shape evidence exposes every operand; emission separately proves lifetimes.
 namespace blot_check_storage_core;
-import std;
+import check.core;
+import check.rank_equal;
+import check.storage_ops;
+import check.storage_types;
+import check.types;
 import support.error;
+import support.option;
+
+import std;
 struct Pair { expected: blot_check_types::Id, actual: blot_check_types::Id }
 struct Contract { pairs: Pair[4] = [default<Pair>(); 4], len: i64 = 0 }
-fn same(self: Contract&, expected: blot_check_types::Id, actual: blot_check_types::Id) { self.pairs[self.len] = Pair { expected, actual , ..}; self.len += 1; }
+fn same(self_: Contract&, expected: blot_check_types::Id, actual: blot_check_types::Id) { self_.pairs[self_.len] = Pair { expected, actual , ..}; self_.len += 1; }
 fn contract(m: const blot_check_core::Module&, id: blot_check_core::Id) -> Contract, blot_error::Error {
     let n = m.node(id); let op, error = blot_check_storage_ops::opFromCode(n.c);
     if error != blot_error::Error.none { return Contract {..}, blot_error::Error.invalid_artifact; }

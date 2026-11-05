@@ -1,6 +1,12 @@
 // Collection shapes require exact immutable type and callback evidence.
 namespace blot_check_collection_contracts;
+import backend.collection_ops;
+import check.core;
+import check.storage_types;
+import check.types;
 import support.error;
+import support.option;
+
 fn validate(types: const blot_check_core::Types&, operation: blot_check_core::ArrayOp,
             inputs: const blot_check_types::Id[:], output_: blot_check_types::Id, proof) -> blot_error::Error {
     if inputs.len == 0 || inputs.len != blot_backend_collection_ops::arity(operation) { return blot_error::Error.invalid_artifact; }

@@ -1,7 +1,13 @@
 // Reconstruct disjointness from one moved binding and literal half-open ranges.
 namespace blot_check_task_regions;
-import std;
+import check.core;
+import check.rank_equal;
+import check.task_types;
+import check.types;
+import parse.ast;
 import support.error;
+
+import std;
 struct Range { first: u32, end: u32 }
 struct Plan { owner: blot_check_core::BindingRef, payload: blot_check_types::Id, ranges: Range[16] = [default<Range>(); 16], len: i64, limit: u32 = 0 }
 fn partition(module: const blot_check_core::Module&, id: blot_check_core::Id) -> Plan, blot_error::Error {
@@ -15,7 +21,7 @@ fn partition(module: const blot_check_core::Module&, id: blot_check_core::Id) ->
     if wrapper.tag != blot_check_types::Tag.usage || wrapper.b != blot_parse_ast::usagekind_unique || wrapper.c != 0 || module.types.node(wrapper.a).tag != blot_check_types::Tag.array { return default<Plan>(), blot_error::Error.invalid_artifact; }
     let ranges = module.node(operands[1]);
     if ranges.tag != blot_check_core::Tag.product || ranges.b == 0 || ranges.b > 16 { return default<Plan>(), blot_error::Error.invalid_artifact; }
-    var result = Plan { owner, wrapper.a, len: ranges.b , ..};
+    var result = Plan { owner: owner, payload: wrapper.a, len: ranges.b , ..};
     for range_id, index in module.children(operands[1]) {
         let range = module.node(range_id); if range.tag != blot_check_core::Tag.product || range.b != 2 { return default<Plan>(), blot_error::Error.invalid_artifact; }
         let endpoints = module.children(range_id); let first = module.node(endpoints[0]); let end = module.node(endpoints[1]);

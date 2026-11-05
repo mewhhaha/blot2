@@ -21,8 +21,8 @@ reusable[] var owned_rows: blot_backend_layout::RowMapping[>..] = [];
 fn init<E>(tables: Tables<E>) -> Store<E> { Store<E> { tables.headers,tables.slots,tables.entries,tables.sinks,tables.payloads } }
 fn create<E>(store: Store<E>&,unit: u32,root: u32,mappings: const blot_backend_layout::Mapping[:],rows: const blot_backend_layout::RowMapping[:]) -> u32,blot_error::Error {
     if store.headers.len >= 4294967295 { return 0,blot_error::Error.module_too_large; }
-    var copied_mappings: const blot_backend_layout::Mapping[:] = []; if mappings.len != 0 { let out = owned_mappings.alloc_slice(mappings.len); for value,index in mappings { out[index] = value; } copied_mappings = out; }
-    var copied_rows: const blot_backend_layout::RowMapping[:] = []; if rows.len != 0 { let out = owned_rows.alloc_slice(rows.len); for value,index in rows { out[index] = value; } copied_rows = out; }
+    var copied_mappings: const blot_backend_layout::Mapping[:] = default<const blot_backend_layout::Mapping[:]>(); if mappings.len != 0 { let out = owned_mappings.alloc_slice(mappings.len); for value,index in mappings { out[index] = value; } copied_mappings = out; }
+    var copied_rows: const blot_backend_layout::RowMapping[:] = default<const blot_backend_layout::RowMapping[:]>(); if rows.len != 0 { let out = owned_rows.alloc_slice(rows.len); for value,index in rows { out[index] = value; } copied_rows = out; }
     store.headers.push(Header { unit: unit,root: root,mappings: copied_mappings,rows: copied_rows , ..}); return store.headers.len as u32,blot_error::Error.none;
 }
 fn header<E>(store: Store<E>&,id: u32) -> Header { assert(id != 0 && id <= store.headers.len && store.headers[id - 1].active); return store.headers[id - 1]; }

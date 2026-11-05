@@ -18,7 +18,7 @@ fn suspends(module: const Module&, inst: Instruction) -> bool {
 }
 fn run(module: const Module&, function: Function) -> blot_support::Option<blot_backend_runtime_ir::DetachedBody>, Error {
     let current, has_current = module.taskImportNamed("current");
-    if !has_current { return blot_support::none<blot_backend_runtime_ir::DetachedBody>(), Error.none; }
+    if !has_current { return blot_support::none<blot_backend_runtime_ir::DetachedBody>(), blot_error::Error.none; }
     let resume_, has_resume = module.taskImportNamed("resume");
     let checkpoint, has_checkpoint = module.taskImportNamed("checkpoint");
     assert(has_resume && has_checkpoint);
@@ -27,7 +27,7 @@ fn run(module: const Module&, function: Function) -> blot_support::Option<blot_b
     locals.append(module.locals(function));
     let context = function.parameters.len + locals.len;
     locals.push(blot_backend_runtime_ir::VT_i32);
-    let source = module.instructions(function);
+    let source = blot_backend_wasm::instructions(module,function);
     for inst, index in source {
         let indirect_annotation = inst.op == blot_backend_runtime_ir::OP_ownership && index + 1 < source.len &&
             blot_backend_runtime_ir::indirectResult(source, index + 1) != blot_backend_runtime_ir::ROLE_unknown;
@@ -58,5 +58,5 @@ fn run(module: const Module&, function: Function) -> blot_support::Option<blot_b
             code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:checkpoint,..});
         }
     }
-    let result,error=blot_backend_runtime_ir::cloneBody(locals[:],code[:]);if error!=Error.none {return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}return blot_support::some(result),Error.none;
+    let result,error=blot_backend_runtime_ir::cloneBody(locals[..],code[..]);if error!=blot_error::Error.none {return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}return blot_support::some(result),blot_error::Error.none;
 }

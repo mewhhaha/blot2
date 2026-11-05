@@ -1,9 +1,30 @@
 // Lexical resizable scratch owners live outside every inference cycle.
 namespace blot_check_check;
-import .check;
-import .check_owners;
+import check.capability_contracts;
+import check.check_scheme_import;
+import check.generative_schemes;
+import check.numeric_proof_bodies;
+import check.numeric_proof_contracts;
+import check.numeric_proof_headers;
+import check.numeric_proof_terms;
+import check.parameter_patterns;
+import check.scheme_dependencies;
+import check.solver_worklist;
+import check.source_sort;
+import check.task_types;
+import check.types;
+import eval.region_arena;
+import parse.ast;
+import parse.symbols;
+import phase_profile;
+import reuse.body_check_packet;
+import reuse.completion_names;
+import reuse.principal_interface;
 import support.error;
 import support.option;
+
+import .check;
+import .check_owners;
 import support.native;
 import std;
 import dictionary;
@@ -138,7 +159,7 @@ var proof_body_introductions:blot_check_numeric_proof_bodies::Introduction[>..<]
 var proof_body_expressions:dictionary<u32,u32>;
 var proof_body_parameters:blot_check_numeric_proof_bodies::Parameter[>..<];
 var proof_body_uses:blot_check_numeric_proof_bodies::Use[>..<];
-var proof_terms:blot_check_numeric_proof_terms::Term[>..<];var proof_index:dictionary<blot_check_numeric_proof_terms::Term,u32>;
+var proof_terms:blot_check_numeric_proof_terms::Term[>..];var proof_index:dictionary<blot_check_numeric_proof_terms::Term,u32>;
 let initialized_types,error=blot_check_types::initWithOptions(blot_check_types::Options{closed_graphs:true, ..});if error!=blot_error::Error.none {return default<Checked>(),error;}var types=initialized_types;
 let patterns,error=blot_check_parameter_patterns::initPooled();if error!=blot_error::Error.none {types.deinit();return default<Checked>(),error;}
 let capabilities,error=blot_check_capability_contracts::initPooled();if error!=blot_error::Error.none {types.deinit();var patterns=patterns;patterns.deinit();return default<Checked>(),error;}
@@ -244,16 +265,16 @@ if engine.capability_roots.len!=0 {blot_check_source_sort::pdqContext(0,engine.c
 result.proof_bodies=blot_check_numeric_proof_bodies::Owned{debits:ownChecked_body_debits(owner,engine.proof_body.debits),operands:ownChecked_body_operands(owner,engine.proof_body.values.terms),introductions:ownChecked_body_introductions(owner,engine.proof_body.introductions),parameters:ownChecked_body_parameters(owner,engine.proof_body.parameters),uses:ownChecked_body_uses(owner,engine.proof_body.uses), ..};
 result.editor=engine.editor_capture;if result.editor.present {let names=result.editor.value.names;result.editor.value.names=ownChecked_editor_names(owner,names);blot_reuse_completion_names::release(names);}engine.editor_capture=blot_support::none<EditorCapture>();return result,blot_error::Error.none;}
 struct CapabilityRootOrder {values:blot_check_capability_contracts::Binding[:]}
-fn lessThan(self:CapabilityRootOrder,left:i64,right:i64)->bool {return self.values[left].binding<self.values[right].binding;}
-fn swap(self:CapabilityRootOrder,left:i64,right:i64) {let old=self.values[left];self.values[left]=self.values[right];self.values[right]=old;}
+fn lessThan(self_:CapabilityRootOrder,left:i64,right:i64)->bool {return self_.values[left].binding<self_.values[right].binding;}
+fn swap(self_:CapabilityRootOrder,left:i64,right:i64) {let old=self_.values[left];self_.values[left]=self_.values[right];self_.values[right]=old;}
 fn initializeEngineAccounting(engine:Engine&,options:ModuleOptions) {engine.proof_body.values.account .= engine.proof_visits;engine.types.projection_limit=inferenceBudget(options);let remaining .= options.associated_remaining;if remaining {engine.types.projection_limit=min(engine.types.projection_limit,remaining);}}
 fn checkEngineBody(engine:Engine&,imports:const ImportedBinding[:],headers:const SourceHeader[:],catalogs:const ImportedCatalog[:],source_catalogs:const SourceCatalog[:],allow_imports:bool,options:ModuleOptions,source_validation:bool,exhaustion:BudgetExhaustion&)->Checked,blot_error::Error {
  engine.effect_families.append(EffectFamily{identity:Identity{0,0, ..},name:0, ..});engine.effect_templates.append(EffectTemplate{identity:Identity{0,0, ..},family:0,name:0,parameter:0,result:0, ..});engine.nominals.append(Nominal{identity:Identity{0,0, ..},name:0,parameters:blot_check_types::List{..},variables:blot_check_types::List{..}, ..});engine.constructors.append(Constructor{identity:Identity{0,0, ..},nominal:0,tag:0,name:0, ..});engine.projection_catalog.append(Projection{nominal:Identity{0,0, ..},field:0,variants:blot_check_types::List{..}, ..});let self_name,present=engine.pool.lookup("self");if present {engine.self_name=self_name;}
- var binding_capacity=imports.len+headers.len+1;for node in engine.tree.nodes.items {if node.tag==blot_parse_ast::tag_value_decl {binding_capacity+=1;}else if !source_validation && (node.tag==blot_parse_ast::tag_parameter || node.tag==blot_parse_ast::tag_pattern_name) {binding_capacity+=1;}}let ignored,error=engine.addBinding(Binding{name:0,declaration:0,owner:0,kind:Kind.local,ty:0, ..});if error!=blot_error::Error.none {return default<Checked>(),error;}for diagnostic in engine.tree.diagnostics.items {engine.diagnostics.append(Diagnostic{code:Code.syntax,span:blot_parse_ast::Span{diagnostic.start,diagnostic.end, ..},node:0, ..});}
+ var binding_capacity=imports.len+headers.len+1;for node in engine.tree.nodes.items {if node.tag==blot_parse_ast::tag_value_decl {binding_capacity+=1;}else if !source_validation && (node.tag==blot_parse_ast::tag_parameter || node.tag==blot_parse_ast::tag_pattern_name) {binding_capacity+=1;}}let ignored,error=engine.addBinding(Binding{name:0,declaration:0,owner:0,kind:blot_reuse_principal_interface::Kind.local,ty:0, ..});if error!=blot_error::Error.none {return default<Checked>(),error;}for diagnostic in engine.tree.diagnostics.items {engine.diagnostics.append(Diagnostic{code:Code.syntax,span:blot_parse_ast::Span{diagnostic.start,diagnostic.end, ..},node:0, ..});}
  let checked,error=checkEngineSemantic(engine,imports,headers,catalogs,source_catalogs,allow_imports,options,source_validation);var steps=engine.completed_projection_steps;var limit=engine.completed_projection_limit;var exhausted=engine.completed_projection_exhausted;if engine.types.lease!=0 {steps=engine.types.projection_steps;limit=engine.types.projection_limit;exhausted=engine.types.projection_exhausted;}let remaining .= options.associated_remaining;if remaining {remaining-=min(remaining,steps);}if exhausted {engine.exhaustBudget();exhaustion.associated=true;exhaustion.associated_limit=limit;}return checked,error;
 }
 fn checkEngineSemantic(engine:Engine&,imports:const ImportedBinding[:],headers:const SourceHeader[:],catalogs:const ImportedCatalog[:],source_catalogs:const SourceCatalog[:],allow_imports:bool,options:ModuleOptions,source_validation:bool)->Checked,blot_error::Error {let error=engine.collectModuleHeaders(imports,headers,catalogs,source_catalogs,allow_imports,options.inherited_fixities);if error!=blot_error::Error.none {return default<Checked>(),error;}let error=engine.validateModuleBodies();if error!=blot_error::Error.none {return default<Checked>(),error;}let value,error=publishChecked(engine);if error!=blot_error::Error.none {return default<Checked>(),error;}var checked=value;if !source_validation && engine.initializer_rejected {let result,error=rejectedSource(checked.diagnostics);checked.deinit();if error!=blot_error::Error.none {return default<Checked>(),error;}var rejected=result;rejected.initializer_rejected=true;rejected.unit=engine.unit;return rejected,blot_error::Error.none;}
- if !source_validation && !engine.editor_marker.present {let retained .= engine.retained_bodies;if retained {let error=blot_reuse_body_check_cache::captureIntoResolved(engine.tree,engine.pool,engine.body_source,checked,engine.body_external_names,engine.bodyAnnotations(),retained);if error==blot_error::Error.out_of_memory {checked.deinit();return default<Checked>(),error;}}}engine.frontend_work.modules=1;engine.frontend_work.type_nodes=checked.types.nodes.len;engine.frontend_work.dependency_hits=engine.scheme_dependencies.hits;engine.frontend_work.dependency_recomputations=engine.scheme_dependencies.recomputations;engine.frontend_work.normalization=checked.types.normalization;for binding in checked.bindings {if binding.kind==Kind.external && binding.read {engine.frontend_work.imported_read+=1;}}blot_phase_profile::recordChecking(engine.frontend_work);return checked,blot_error::Error.none;
+ if !source_validation && !engine.editor_marker.present {let retained .= engine.retained_bodies;if retained {let error=blot_reuse_body_check_cache::captureIntoResolved(engine.tree,engine.pool,engine.body_source,checked,engine.body_external_names,engine.bodyAnnotations(),retained);if error==blot_error::Error.out_of_memory {checked.deinit();return default<Checked>(),error;}}}engine.frontend_work.modules=1;engine.frontend_work.type_nodes=checked.types.nodes.len;engine.frontend_work.dependency_hits=engine.scheme_dependencies.hits;engine.frontend_work.dependency_recomputations=engine.scheme_dependencies.recomputations;engine.frontend_work.normalization=checked.types.normalization;for binding in checked.bindings {if binding.kind==blot_reuse_principal_interface::Kind.external && binding.read {engine.frontend_work.imported_read+=1;}}blot_phase_profile::recordChecking(engine.frontend_work);return checked,blot_error::Error.none;
 }
 fn deinitEngine(engine:Engine&) {
  deinitDiagnosticPayloads(engine.diagnostics);for slot in engine.staged_global_diagnostics.slots {if slot.tag!=0 {deinitDiagnosticPayloads(slot.val);if slot.val.len!=0 {component_diagnostics.free_slice(slot.val);}}}for slot in engine.callee_memo.slots {if slot.tag!=0 {freeDiagnosticText(slot.key);if slot.val.types.len!=0 {equation_type_ids.free_slice(slot.val.types);}if slot.val.rows.len!=0 {equation_type_ids.free_slice(slot.val.rows);}}}engine.type_env.deinit();engine.row_env.deinit();engine.capability_store.deinit();for contract in engine.proof_contracts {if contract.parameters.len!=0 {equation_type_ids.free_slice(contract.parameters);}}engine.proof_body.deinit();if engine.editor_capture.present {blot_reuse_completion_names::release(engine.editor_capture.value.names);if engine.editor_capture.value.context.present {engine.editor_capture.value.context.value.deinit();}}engine.parameter_patterns.deinit();engine.types.deinit();engine.pending_queue.deinit();engine.scheme_dependencies.deinit();engine.scratch_pool.deinit();deinitDiagnosticPayloads(engine.header_diagnostics);

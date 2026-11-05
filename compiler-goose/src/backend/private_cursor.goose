@@ -40,7 +40,7 @@ recursive fn visit(proof: Proof&,id: u32,depth: i64) -> bool {
         break_=>{ if proof.steps.len == 0 { return false; } for value in source.breakValues(id) { if !proof.cursor(value) && !visit(proof,value,depth + 1) { return false; } } return true; },
         project,result_associated=>{ return visit(proof,node.a,depth + 1); },construct=>{ return visit(proof,node.b,depth + 1); },
         scalar,logical,apply,associated,record_merge=>{ return visit(proof,node.a,depth + 1) && visit(proof,node.b,depth + 1); },if_value,if_stmt=>{ return visit(proof,node.a,depth + 1) && visit(proof,node.b,depth + 1) && visit(proof,node.c,depth + 1); },
-        loop_=>{ let loop = source.loopInfo(id); return pattern(proof,loop.pattern,depth + 1) && visit(proof,loop.first,depth + 1) && visit(proof,loop.end,depth + 1) && visit(proof,loop.body,depth + 1); },
+        loop_=>{ let loop_ = source.loopInfo(id); return pattern(proof,loop_.pattern,depth + 1) && visit(proof,loop_.first,depth + 1) && visit(proof,loop_.end,depth + 1) && visit(proof,loop_.body,depth + 1); },
         block_,suite,call,product,record,array=>{ for child in source.children(id) { if !visit(proof,child,depth + 1) { return false; } } return true; },
         pattern_bind=>{ return pattern(proof,node.a,depth + 1) && visit(proof,node.b,depth + 1); },_=>{ return false; },
     }
@@ -55,12 +55,12 @@ fn checkSteps(source: const blot_check_core::Module&,uses: const blot_backend_un
         for index in uses.carries.get(member) { if !closure.carry(source.loop_carries[index]) { return blot_support::none<Family>(); } }
         for id in uses.definitions.get(member) { if !closure.bind(id) { return blot_support::none<Family>(); } } for id in uses.inputs.get(member) { if !closure.bind(id) { return blot_support::none<Family>(); } }
         if steps.len == 0 { continue; }
-        for index in uses.carries.get(member) { if source.loop_carries[index].outgoing != member { continue; } let owner = uses.carry_loops[index]; for exit in uses.exits.get(owner.loop) { if !closure.exitAt(exit,owner.position) { return blot_support::none<Family>(); } } }
+        for index in uses.carries.get(member) { if source.loop_carries[index].outgoing != member { continue; } let owner = uses.carry_loops[index]; for exit in uses.exits.get(owner.loop_) { if !closure.exitAt(exit,owner.position) { return blot_support::none<Family>(); } } }
         for id in uses.references.get(member) { if !closure.cursor(id) { continue; } for entry in uses.values.get(id) { if source.node(source.node(entry.exit).a).tag != blot_check_core::Tag.loop_ { continue; } if !closure.exitAt(entry.exit,entry.position) { return blot_support::none<Family>(); } } }
     }
     var carries: u32[256]; var carry_count: i64 = 0; var nodes: u32[1024]; var node_count: i64 = 0;
     for member in closure.bindings[..closure.len] {
-        for index in uses.carries.get(member) { if contains(carries[..carry_count],index) { continue; } if carry_count == 256 { return blot_support::none<Family>(); } carries[carry_count] = index; carry_count++; if steps.len == 0 { continue; } for exit in uses.exits.get(uses.carry_loops[index].loop) { if !collect(nodes,node_count,exit) { return blot_support::none<Family>(); } } }
+        for index in uses.carries.get(member) { if contains(carries[..carry_count],index) { continue; } if carry_count == 256 { return blot_support::none<Family>(); } carries[carry_count] = index; carry_count++; if steps.len == 0 { continue; } for exit in uses.exits.get(uses.carry_loops[index].loop_) { if !collect(nodes,node_count,exit) { return blot_support::none<Family>(); } } }
         for id in uses.definitions.get(member) { if !collect(nodes,node_count,id) { return blot_support::none<Family>(); } } for id in uses.inputs.get(member) { if !collect(nodes,node_count,id) { return blot_support::none<Family>(); } }
         if steps.len == 0 { continue; } for id in uses.references.get(member) { for entry in uses.values.get(id) { if !collect(nodes,node_count,entry.exit) { return blot_support::none<Family>(); } } }
     }

@@ -1,9 +1,10 @@
 namespace blot_eval_implementation_predicates;
-import check.types;
 import check.core;
 import check.effects;
+import check.types;
+import eval.type_evidence;
 import reuse.dispatch_explanation;
-import .type_evidence;
+
 fn failureOutcome(kind: blot_check_types::ObligationKind) -> blot_reuse_dispatch_explanation::Outcome {
  if kind==blot_check_types::ObligationKind.contract { return blot_reuse_dispatch_explanation::Outcome.requires_evidence; }
  if kind==blot_check_types::ObligationKind.effect_operation||kind==blot_check_types::ObligationKind.effect_rep||kind==blot_check_types::ObligationKind.effect_handler { return blot_reuse_dispatch_explanation::Outcome.incompatible_effect; } return blot_reuse_dispatch_explanation::Outcome.incompatible_type;
@@ -21,7 +22,7 @@ fn currentRow(source: const blot_check_types::Store&,id: u32) -> blot_check_effe
  var row=source.row(id); var at=row.cursor; var depth=0;
  while row.labels.len==0&&depth<256 {
   var variable: u32=0; var is_variable=false; match row.tail { variable v=>{ variable=v.value; is_variable=true; },_=>{}, }
-  if !is_variable { break; } let write=source.effects.replacementAt(variable,at); if !write.present { break; } row=source.row(write.value.replacement); at=write.value.position+1; depth++;
+  if !is_variable { break; } let write,present=source.effects.replacementAt(variable,at); if !present { break; } row=source.row(write.replacement); at=write.position+1; depth++;
  }
  return row;
 }

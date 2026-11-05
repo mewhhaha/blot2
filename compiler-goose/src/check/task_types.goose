@@ -1,9 +1,14 @@
 // Task families are compiler-owned; scopes carry exact lexical group owners.
 namespace blot_check_task_types;
-import support.structural;
-import std;
+import check.effects;
+import check.types;
+import parse.ast;
 import support.error;
 import support.option;
+import support.structural_adapters;
+
+import support.structural;
+import std;
 let group = blot_check_types::NominalIdentity { 0xffffffff, 16 , ..};
 let handle = blot_check_types::NominalIdentity { 0xffffffff, 17 , ..};
 let view = blot_check_types::NominalIdentity { 0xffffffff, 18 , ..};
@@ -164,15 +169,15 @@ fn closed(row: blot_check_effects::Row, rows: const u32[:]) -> bool {
 
 fn opCode(value: Op) -> u32 {
     match value {
-        Op.scope => { return 0; },
-        Op.spawn => { return 1; },
-        Op.join => { return 2; },
-        Op.cancel => { return 3; },
-        Op.split => { return 4; },
-        Op.read => { return 5; },
-        Op.write => { return 6; },
-        Op.collect => { return 7; },
-        Op.receive => { return 8; },
+        scope => { return 0; },
+        spawn => { return 1; },
+        join => { return 2; },
+        cancel => { return 3; },
+        split => { return 4; },
+        read => { return 5; },
+        write => { return 6; },
+        collect => { return 7; },
+        receive => { return 8; },
     }
 }
 fn opFromCode(code: u32) -> Op, blot_error::Error {
@@ -193,10 +198,10 @@ fn blot_structural::equal(left: blot_check_task_types::Op, right: blot_check_tas
 fn blot_structural::hash<S>(sink: S&, value: blot_check_task_types::Op) { blot_structural::hash(sink, blot_check_task_types::opCode(value) as! u32); }
 fn captureIssueCode(value: CaptureIssue) -> u32 {
     match value {
-        CaptureIssue.transfer => { return 0; },
-        CaptureIssue.capability => { return 1; },
-        CaptureIssue.host => { return 2; },
-        CaptureIssue.budget => { return 3; },
+        transfer => { return 0; },
+        capability => { return 1; },
+        host => { return 2; },
+        budget => { return 3; },
     }
 }
 fn captureIssueFromCode(code: u32) -> CaptureIssue, blot_error::Error {

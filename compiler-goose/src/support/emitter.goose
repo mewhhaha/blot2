@@ -9,12 +9,12 @@ import support.error;
 
 type Error = blot_error::Error;
 type Local = blot_backend_runtime_code::Local;
-struct Emitter<M> { code: blot_backend_runtime_code::Code<M>, failure: Error = Error.none }
+struct Emitter<M> { code: blot_backend_runtime_code::Code<M>, failure: Error = blot_error::Error.none }
 fn init<M>(module: M&, function: u32) -> Emitter<M> {
     Emitter<M> { blot_backend_runtime_code::Code<M> { module, function } }
 }
 fn op<M>(emitter: Emitter<M>&, opcode: blot_backend_runtime_ir::Op, operand: u32 = 0) {
-    if emitter.failure != Error.none { return; }
+    if emitter.failure != blot_error::Error.none { return; }
     emitter.failure = blot_backend_runtime_code::op(emitter.code, opcode, operand);
 }
 fn value<M>(emitter: Emitter<M>&, number: u32) {
@@ -24,7 +24,7 @@ fn value<M>(emitter: Emitter<M>&, local: Local) {
     op(emitter, blot_backend_runtime_ir::OP_local_get, local.id);
 }
 fn temp<M>(emitter: Emitter<M>&) -> Local {
-    if emitter.failure != Error.none { return Local {..}; }
+    if emitter.failure != blot_error::Error.none { return Local {..}; }
     let local, error = blot_backend_runtime_code::temp(emitter.code);
     emitter.failure = error;
     return local;
@@ -58,10 +58,10 @@ fn globalGet<M>(emitter: Emitter<M>&, index: u32) { op(emitter, blot_backend_run
 fn globalSet<M>(emitter: Emitter<M>&, index: u32) { op(emitter, blot_backend_runtime_ir::OP_global_set, index); }
 fn call<M>(emitter: Emitter<M>&, function: u32) { op(emitter, blot_backend_runtime_ir::OP_call, function); }
 fn annotation<M>(emitter: Emitter<M>&, item: blot_backend_runtime_ir::Instruction) {
-    if emitter.failure != Error.none { return; }
+    if emitter.failure != blot_error::Error.none { return; }
     emitter.failure = blot_backend_wasm::emit(emitter.code.module, emitter.code.function, item);
 }
 fn value<M>(emitter: Emitter<M>&, instructions: const blot_backend_runtime_ir::Instruction[:]) {
-    if emitter.failure != Error.none { return; }
+    if emitter.failure != blot_error::Error.none { return; }
     emitter.failure = blot_backend_runtime_code::value(emitter.code, instructions);
 }

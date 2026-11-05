@@ -22,7 +22,7 @@ fn uleb(bytes: Bytes&, value: u32) {
 fn sleb(bytes: Bytes&, value: i32) {
     var remaining = value;
     loop {
-        var low = (remaining as! u32 & 127) as u8; remaining >>= 7;
+        var low = ((remaining as! u32) & 127) as u8; remaining >>= 7;
         let done = (remaining == 0 && (low & 64) == 0) || (remaining == -1 && (low & 64) != 0);
         if !done { low |= 128; }
         byte(bytes, low); if done { return; }
@@ -121,9 +121,9 @@ fn scalarCode(op: blot_backend_runtime_ir::Op) -> u8, bool {
 fn encodeInstruction(bytes: Bytes&, inst: blot_backend_runtime_ir::Instruction, functions: i64, table_slots: i64, globals: i64, signatures: i64, imports: u32) -> blot_error::Error {
     if inst.table_reference && (inst.op != blot_backend_runtime_ir::OP_i32_const || inst.operand >= table_slots) { return blot_error::Error.invalid_function_reference; }
     if inst.op == blot_backend_runtime_ir::OP_ownership { return blot_error::Error.none; }
-    let simd, is_simd = blot_backend_wasm_simd_ops::code(inst.op);
+    let simd_, is_simd = blot_backend_wasm_simd_ops::code(inst.op);
     if is_simd {
-        byte(bytes, 0xfd); uleb(bytes, simd);
+        byte(bytes, 0xfd); uleb(bytes, simd_);
         if inst.op == blot_backend_runtime_ir::OP_v128_load || inst.op == blot_backend_runtime_ir::OP_v128_store { uleb(bytes, 2); uleb(bytes, inst.operand); }
         if inst.op == blot_backend_runtime_ir::OP_i32x4_replace_lane || inst.op == blot_backend_runtime_ir::OP_i32x4_extract_lane || inst.op == blot_backend_runtime_ir::OP_f32x4_extract_lane || inst.op == blot_backend_runtime_ir::OP_f32x4_replace_lane {
             if inst.operand >= 4 { return blot_error::Error.module_too_large; }

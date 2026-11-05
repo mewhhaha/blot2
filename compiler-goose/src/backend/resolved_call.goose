@@ -4,9 +4,9 @@ import .layout;
 import reuse.code_artifacts;
 import support.error;
 struct Arrow { parameter: u32,result: u32,row: u32 }
-struct Named { key: blot_reuse_code_artifacts::Key,extra: Arrow[:] = [] }
+struct Named { key: blot_reuse_code_artifacts::Key,extra: Arrow[:] = default<Arrow[:]>() }
 enum Callee { direct { key: blot_reuse_code_artifacts::Key },wrapper { key: blot_reuse_code_artifacts::CallableKey } }
-struct Applied { callee: Callee,consumed: i64,extra: Arrow[:] = [] }
+struct Applied { callee: Callee,consumed: i64,extra: Arrow[:] = default<Arrow[:]>() }
 reusable[] var owned_arrows: Arrow[>..] = [];
 fn release(values: const Arrow[:]) { if values.len != 0 { let first: const Arrow& = values[0]; let at = owned_arrows.index_of(first); owned_arrows.free_slice(owned_arrows[at..at + values.len]); } }
 fn deinit(plan: Named&) { release(plan.extra); plan.extra = []; }

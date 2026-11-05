@@ -1,10 +1,25 @@
 // Owned input relationships are independent of ordinary type/effect headers.
 namespace blot_check_capability_flow;
+import reuse.principal_interface;
+
+import backend.collection_ops;
+import check.capability_contract_core;
+import check.capability_contract_source;
+import check.check_packet_owner;
+import check.core;
+import check.effects;
+import check.frozen_core_scopes;
+import check.rank_equal;
+import check.types;
+import parse.ast;
+import parse.symbols;
+import support.error;
+import support.option;
+import support.structural_adapters;
+
 import .frozen_core_validation;
 type ModuleRef = blot_check_frozen_core_validation::ModuleRef;
 import std;
-import support.error;
-import support.option;
 import support.structural;
 type Error = blot_error::Error;
 type AstId = blot_parse_ast::Id;
@@ -16,26 +31,26 @@ enum Contract { unknown, identity, invoke_unit, member_unit, invoke_with_capabil
 enum ParameterResult { product, invoke_unit, invalid, member_closure_unit, captured_unit, invoke_input, invoke_inputs }
 struct Parameters { kind: ParameterResult = ParameterResult.product, mask: u16 = 0, inputs: u8 = 0, invocation_arguments: u64 = 0, invocation_count: u8 = 0 }
 fn init(inputs: u8, mask: u16) -> Parameters { return Parameters { mask: mask, inputs: inputs , ..}; }
-fn result(self: Parameters) -> u16 { if self.kind == ParameterResult.invoke_input { return (1 as u16) << self.callback(); } return self.mask; }
-fn invokes(self: Parameters) -> bool { return self.kind == ParameterResult.invoke_unit || self.inputInvokes(); }
-fn inputInvokes(self: Parameters) -> bool { return self.kind == ParameterResult.invoke_input || self.kind == ParameterResult.invoke_inputs; }
-fn argumentCount(self: Parameters) -> u8 { if self.kind == ParameterResult.invoke_input { return 1; } if self.kind == ParameterResult.invoke_inputs { return self.invocation_count; } return 0; }
-fn argumentAt(self: Parameters, index: i64) -> u8 { if self.kind == ParameterResult.invoke_input { return self.argument(); } return ((self.invocation_arguments >> (index * 4)) & 15) as u8; }
-fn callback(self: Parameters) -> u8 { if self.kind == ParameterResult.invoke_input { return (self.mask & 15) as u8; } return ctz(self.mask) as u8; }
-fn argument(self: Parameters) -> u8 { return ((self.mask >> 4) & 15) as u8; }
-fn arity(self: Parameters) -> u8 { return self.inputs; }
-fn present(self: Parameters) -> bool { return self.arity() != 0; }
-fn valid(self: Parameters) -> bool {
-    if self.kind == ParameterResult.invalid { return false; } if self.kind != ParameterResult.invoke_inputs && (self.invocation_arguments != 0 || self.invocation_count != 0) { return false; }
-    if self.kind == ParameterResult.invoke_inputs {
-        if self.inputs == 0 || self.inputs > 16 || popcount(self.mask) != 1 || self.callback() >= self.inputs || self.invocation_count < 2 || self.invocation_count > 16 { return false; }
-        if self.invocation_count != 16 && self.invocation_arguments >> (self.invocation_count * 4) != 0 { return false; }
-        for index in 0..self.invocation_count { let selected = self.argumentAt(index); if selected >= self.inputs || selected == self.callback() { return false; } } return true;
+fn result(self_: Parameters) -> u16 { if self_.kind == ParameterResult.invoke_input { return (1 as u16) << self_.callback(); } return self_.mask; }
+fn invokes(self_: Parameters) -> bool { return self_.kind == ParameterResult.invoke_unit || self_.inputInvokes(); }
+fn inputInvokes(self_: Parameters) -> bool { return self_.kind == ParameterResult.invoke_input || self_.kind == ParameterResult.invoke_inputs; }
+fn argumentCount(self_: Parameters) -> u8 { if self_.kind == ParameterResult.invoke_input { return 1; } if self_.kind == ParameterResult.invoke_inputs { return self_.invocation_count; } return 0; }
+fn argumentAt(self_: Parameters, index: i64) -> u8 { if self_.kind == ParameterResult.invoke_input { return self_.argument(); } return ((self_.invocation_arguments >> (index * 4)) & 15) as u8; }
+fn callback(self_: Parameters) -> u8 { if self_.kind == ParameterResult.invoke_input { return (self_.mask & 15) as u8; } return ctz(self_.mask) as u8; }
+fn argument(self_: Parameters) -> u8 { return ((self_.mask >> 4) & 15) as u8; }
+fn arity(self_: Parameters) -> u8 { return self_.inputs; }
+fn present(self_: Parameters) -> bool { return self_.arity() != 0; }
+fn valid(self_: Parameters) -> bool {
+    if self_.kind == ParameterResult.invalid { return false; } if self_.kind != ParameterResult.invoke_inputs && (self_.invocation_arguments != 0 || self_.invocation_count != 0) { return false; }
+    if self_.kind == ParameterResult.invoke_inputs {
+        if self_.inputs == 0 || self_.inputs > 16 || popcount(self_.mask) != 1 || self_.callback() >= self_.inputs || self_.invocation_count < 2 || self_.invocation_count > 16 { return false; }
+        if self_.invocation_count != 16 && self_.invocation_arguments >> (self_.invocation_count * 4) != 0 { return false; }
+        for index in 0..self_.invocation_count { let selected = self_.argumentAt(index); if selected >= self_.inputs || selected == self_.callback() { return false; } } return true;
     }
-    let inputs = self.arity(); if inputs == 0 { return self.kind == ParameterResult.product && self.result() == 0; } if inputs > 16 { return false; }
-    if self.kind == ParameterResult.invoke_input { return self.mask <= 255 && self.callback() < inputs && self.argument() < inputs && self.callback() != self.argument(); }
-    if (self.kind == ParameterResult.member_closure_unit || self.kind == ParameterResult.captured_unit) && inputs == 16 { return false; } let available = ((1 as u32) << inputs) - 1; if (self.result() as u32 & ~available) != 0 { return false; }
-    if self.kind == ParameterResult.invoke_unit || self.kind == ParameterResult.member_closure_unit { return popcount(self.result()) == 1; } return true;
+    let inputs = self_.arity(); if inputs == 0 { return self_.kind == ParameterResult.product && self_.result() == 0; } if inputs > 16 { return false; }
+    if self_.kind == ParameterResult.invoke_input { return self_.mask <= 255 && self_.callback() < inputs && self_.argument() < inputs && self_.callback() != self_.argument(); }
+    if (self_.kind == ParameterResult.member_closure_unit || self_.kind == ParameterResult.captured_unit) && inputs == 16 { return false; } let available = ((1 as u32) << inputs) - 1; if ((self_.result() as u32) & ~available) != 0 { return false; }
+    if self_.kind == ParameterResult.invoke_unit || self_.kind == ParameterResult.member_closure_unit { return popcount(self_.result()) == 1; } return true;
 }
 fn unwrap(tree: const Tree&, initial: AstId) -> AstId { var current = initial; for attempt in 0..128 { if current == 0 || current >= tree.nodes.len { return 0; } let value = tree.node(current); if value.tag != blot_parse_ast::tag_group { return current; } current = value.a; } return 0; }
 fn unwrapped(tree: const Tree&, initial: AstId) -> blot_parse_ast::Node { let id = unwrap(tree, initial); if id == 0 { return blot_parse_ast::Node { tag: blot_parse_ast::tag_invalid , ..}; } return tree.node(id); }
@@ -85,11 +100,11 @@ fn parameterArity(tree: const Tree&, initial: AstId, annotation: AstId) -> u8 {
 }
 struct SourceBinding { name: u32, retained: u16 }
 struct SourceBindings { entries: SourceBinding[128], len: i64 = 0 }
-fn bind(self: SourceBindings&, name: u32, retained: u16) -> Error { if self.len == self.entries.len { return Error.limit; } self.entries[self.len] = SourceBinding { name, retained , ..}; self.len += 1; return Error.none; }
-fn get(self: const SourceBindings&, name: u32) -> Mask { var index = self.len; while index != 0 { index -= 1; if self.entries[index].name == name { return blot_support::some(self.entries[index].retained); } } return blot_support::none<u16>(); }
+fn bind(self_: SourceBindings&, name: u32, retained: u16) -> Error { if self_.len == self_.entries.len { return blot_error::Error.limit; } self_.entries[self_.len] = SourceBinding { name, retained , ..}; self_.len += 1; return blot_error::Error.none; }
+fn get(self_: const SourceBindings&, name: u32) -> Mask { var index = self_.len; while index != 0 { index -= 1; if self_.entries[index].name == name { return blot_support::some(self_.entries[index].retained); } } return blot_support::none<u16>(); }
 fn parameterName(name: u32, names: const u32[:]) -> Mask { var index = names.len; while index != 0 { index -= 1; if name == names[index] { return blot_support::some((1 as u16) << index); } } return blot_support::none<u16>(); }
 struct SourceContracts { engine: const blot_check_check::Engine& }
-fn lookup(self: const SourceContracts&, source: AstId) -> blot_support::Option<Parameters> { return self.engine.invocationContract(source); }
+fn lookup(self_: const SourceContracts&, source: AstId) -> blot_support::Option<Parameters> { return self_.engine.invocationContract(source); }
 fn parameterSource(tree: const Tree&, pool: Pool&, initial: AstId, annotation: AstId) -> Parameters { return parameterSourceWithContracts(tree, pool, initial, annotation, null); }
 fn parameterSourceWithContracts(tree: const Tree&, pool: Pool&, initial: AstId, annotation: AstId, contracts: const SourceContracts?) -> Parameters {
     var names: u32[16]; var count: i64 = 0; var expression = unwrap(tree, initial); if expression == 0 { return Parameters {..}; } var transparent = annotation == 0; var signature = annotation;
@@ -101,7 +116,7 @@ fn parameterSourceWithContracts(tree: const Tree&, pool: Pool&, initial: AstId, 
         if result != 0 && (tree.node(result).tag == blot_parse_ast::tag_type_usage || tree.node(result).tag == blot_parse_ast::tag_type_forall) { break; } transparent = annotation == 0 && lambda.c == 0;
     }
     expression = unwrap(tree, expression); if expression == 0 || count == 0 { return Parameters {..}; } var remaining: i64 = 4096; var bindings = SourceBindings {..};
-    for name, index in names[..count] { if bindings.bind(name, (1 as u16) << index) != Error.none { return Parameters {..}; } }
+    for name, index in names[..count] { if bindings.bind(name, (1 as u16) << index) != blot_error::Error.none { return Parameters {..}; } }
     let invocation = sourceInvocation(tree, expression, bindings, count as u8, contracts, remaining, 0); if invocation.present { return invocation.value; }
     let result = sourceParameters(tree, pool, expression, bindings, remaining, 0); if !result.present { return Parameters {..}; } return init(count as u8, result.value);
 }
@@ -114,10 +129,10 @@ fn unitSourceResult(tree: const Tree&, pool: Pool&, expression: AstId, lambda: b
     let selected = parameterName(receiver, names); if !selected.present { return capturedSource(tree, pool, expression, names); } return Parameters { kind: ParameterResult.member_closure_unit, inputs: names.len as u8, mask: selected.value , ..};
 }
 fn invocationResult(inputs: u8, callback: u16, arguments: const u16[:], unit: bool) -> blot_support::Option<Parameters> {
-    if popcount(callback) != 1 || arguments.len > 16 { return blot_support::none<Parameters>(); } if unit { return blot_support::some(Parameters { kind: ParameterResult.invoke_unit, inputs, mask: callback , ..}); } if arguments.len == 0 { return blot_support::none<Parameters>(); } var selected: u64 = 0;
+    if popcount(callback) != 1 || arguments.len > 16 { return blot_support::none<Parameters>(); } if unit { return blot_support::some(Parameters { kind: ParameterResult.invoke_unit, inputs: inputs, mask: callback , ..}); } if arguments.len == 0 { return blot_support::none<Parameters>(); } var selected: u64 = 0;
     for argument, index in arguments { if popcount(argument) != 1 || argument == callback { return blot_support::none<Parameters>(); } selected |= (ctz(argument) as u64) << (index * 4); }
-    var result = Parameters { kind: ParameterResult.invoke_inputs, inputs, mask: callback, invocation_arguments: selected, invocation_count: arguments.len as u8 , ..};
-    if arguments.len == 1 { result = Parameters { kind: ParameterResult.invoke_input, inputs, mask: (ctz(callback) as u16) | ((selected as u16) << 4) , ..}; } if !result.valid() { return blot_support::none<Parameters>(); } return blot_support::some(result);
+    var result = Parameters { kind: ParameterResult.invoke_inputs, inputs: inputs, mask: callback, invocation_arguments: selected, invocation_count: arguments.len as u8 , ..};
+    if arguments.len == 1 { result = Parameters { kind: ParameterResult.invoke_input, inputs: inputs, mask: (ctz(callback) as u16) | ((selected as u16) << 4) , ..}; } if !result.valid() { return blot_support::none<Parameters>(); } return blot_support::some(result);
 }
 recursive fn sourceInvocation(tree: const Tree&, initial: AstId, bindings: const SourceBindings&, inputs: u8, contracts: const SourceContracts?, remaining: i64&, depth: i64) -> blot_support::Option<Parameters> {
     if remaining == 0 || depth >= 128 { return blot_support::none<Parameters>(); } remaining -= 1; var head = unwrap(tree, initial); if head == 0 { return blot_support::none<Parameters>(); } var reverse: AstId[16]; var count: i64 = 0;
@@ -131,7 +146,7 @@ recursive fn sourceInvocation(tree: const Tree&, initial: AstId, bindings: const
             var selected: u16[16]; for index in 0..contract.argumentCount() { selected[index] = actuals[contract.argumentAt(index)]; } return invocationResult(inputs, actuals[contract.callback()], selected[..contract.argumentCount()], contract.kind == ParameterResult.invoke_unit);
     } }
     if remaining < tree.roots.len { return blot_support::none<Parameters>(); } remaining -= tree.roots.len; let call = localSourceCall(tree, initial); if !call.present { return blot_support::none<Parameters>(); } var nested = SourceBindings {..};
-    for index in 0..call.value.len { let node = unwrapped(tree, call.value.arguments[index]); if node.tag != blot_parse_ast::tag_name { return blot_support::none<Parameters>(); } let retained = bindings.get(node.a); if !retained.present || nested.bind(call.value.parameters[index], retained.value) != Error.none { return blot_support::none<Parameters>(); } }
+    for index in 0..call.value.len { let node = unwrapped(tree, call.value.arguments[index]); if node.tag != blot_parse_ast::tag_name { return blot_support::none<Parameters>(); } let retained = bindings.get(node.a); if !retained.present || nested.bind(call.value.parameters[index], retained.value) != blot_error::Error.none { return blot_support::none<Parameters>(); } }
     return sourceInvocation(tree, call.value.body, nested, inputs, contracts, remaining, depth + 1);
 }
 enum ConstructionKind { computation, provider, state }
@@ -141,7 +156,7 @@ fn constructionSource(tree: const Tree&, pool: Pool&, initial: AstId) -> blot_su
     for attempt in 0..128 { head = unwrap(tree, head); if head == 0 { return blot_support::none<Construction>(); } let node = tree.node(head); if node.tag != blot_parse_ast::tag_apply { finished = true; break; } if count == reverse.len { return blot_support::none<Construction>(); } reverse[count] = node.b; count += 1; head = node.a; }
     if !finished { return blot_support::none<Construction>(); } let node = tree.node(head); if node.tag != blot_parse_ast::tag_intrinsic { return blot_support::none<Construction>(); } let name = pool.get(node.a); var kind = ConstructionKind.computation; var arity: i64 = 1;
     if name == "@effect.provider" { kind = ConstructionKind.provider; arity = 2; } else if name == "@effect.state" { kind = ConstructionKind.state; arity = 3; } else if name != "@computation" { return blot_support::none<Construction>(); }
-    if count != arity { return blot_support::none<Construction>(); } var result = Construction { kind, len: arity , ..}; for index in 0..arity { result.inputs[index] = reverse[arity - index - 1]; } return blot_support::some(result);
+    if count != arity { return blot_support::none<Construction>(); } var result = Construction { kind: kind, len: arity , ..}; for index in 0..arity { result.inputs[index] = reverse[arity - index - 1]; } return blot_support::some(result);
 }
 fn capturedSource(tree: const Tree&, pool: Pool&, expression: AstId, names: const u32[:]) -> Parameters {
     if names.len == 0 || names.len >= 16 { return Parameters {..}; } var bindings = SourceBindings {..}; for name, index in names { bindings.entries[index] = SourceBinding { name, (1 as u16) << index , ..}; } bindings.len = names.len; var remaining: i64 = 4096;
@@ -175,11 +190,11 @@ fn localCoreCall(module: const Module&, id: u32) -> blot_support::Option<LocalCo
 fn coreCallBody(module: const Module&, original: LocalCoreCall) -> blot_support::Option<LocalCoreCall> {
     var result = original; let target = result.target; if (target.unit != 0 && target.unit != module.unit) || target.binding == 0 || target.binding >= module.bindings.len { return blot_support::none<LocalCoreCall>(); } let binding = module.bindings[target.binding];
     if binding.body_id == 0 || binding.body_id >= module.bodies.len { return blot_support::none<LocalCoreCall>(); } let body = module.bodies[binding.body_id]; if body.parameters.len > result.len || body.parameters.start > module.parameters.len || body.parameters.len > module.parameters.len - body.parameters.start { return blot_support::none<LocalCoreCall>(); }
-    var bound: i64 = 0; for parameter in module.parameters[body.parameters.start..body.parameters.start + body.parameters.len] { if parameter.binding == 0 || parameter.binding >= module.bindings.len || module.bindings[parameter.binding].kind != blot_check_check::Kind.parameter { return blot_support::none<LocalCoreCall>(); }
+    var bound: i64 = 0; for parameter in module.parameters[body.parameters.start..body.parameters.start + body.parameters.len] { if parameter.binding == 0 || parameter.binding >= module.bindings.len || module.bindings[parameter.binding].kind != blot_reuse_principal_interface::Kind.parameter { return blot_support::none<LocalCoreCall>(); }
         for index in 0..bound { if result.bindings[index] == parameter.binding { return blot_support::none<LocalCoreCall>(); } } result.bindings[bound] = parameter.binding; bound += 1;
     }
     result.body = body.root; while bound < result.len { if result.body == 0 || result.body >= module.nodes.len { return blot_support::none<LocalCoreCall>(); } let value = module.nodes[result.body]; if value.tag != blot_check_core::Tag.closure || value.a >= module.closures.len { return blot_support::none<LocalCoreCall>(); }
-        let closure = module.closures[value.a]; let parameter = closure.parameter.binding; if parameter == 0 || parameter >= module.bindings.len || module.bindings[parameter].kind != blot_check_check::Kind.parameter { return blot_support::none<LocalCoreCall>(); } for index in 0..bound { if result.bindings[index] == parameter { return blot_support::none<LocalCoreCall>(); } }
+        let closure = module.closures[value.a]; let parameter = closure.parameter.binding; if parameter == 0 || parameter >= module.bindings.len || module.bindings[parameter].kind != blot_reuse_principal_interface::Kind.parameter { return blot_support::none<LocalCoreCall>(); } for index in 0..bound { if result.bindings[index] == parameter { return blot_support::none<LocalCoreCall>(); } }
         result.bindings[bound] = parameter; bound += 1; result.body = closure.body;
     } if result.body == 0 || result.body >= module.nodes.len { return blot_support::none<LocalCoreCall>(); } return blot_support::some(result);
 }
@@ -194,7 +209,7 @@ recursive fn sourcePattern(tree: const Tree&, source: AstId, retained: u16, bind
         blot_parse_ast::tag_pattern_integer, blot_parse_ast::tag_pattern_boolean => { return true; },
         blot_parse_ast::tag_pattern_name, blot_parse_ast::tag_pattern_field => {
             if pattern.tag == blot_parse_ast::tag_pattern_field && pattern.b != 0 { return sourcePattern(tree, pattern.b, retained, bindings, start, remaining, depth + 1); }
-            for index in start..bindings.len { if bindings.entries[index].name == pattern.a { bindings.entries[index].retained |= retained; return true; } } return bindings.bind(pattern.a, retained) == Error.none;
+            for index in start..bindings.len { if bindings.entries[index].name == pattern.a { bindings.entries[index].retained |= retained; return true; } } return bindings.bind(pattern.a, retained) == blot_error::Error.none;
         },
         blot_parse_ast::tag_pattern_constructor => { if pattern.b == 0 { return true; } return sourcePattern(tree, pattern.b, retained, bindings, start, remaining, depth + 1); },
         blot_parse_ast::tag_pattern_product, blot_parse_ast::tag_pattern_record => { for child in tree.children(source) { if !sourcePattern(tree, child, retained, bindings, start, remaining, depth + 1) { return false; } } return true; },
@@ -211,7 +226,7 @@ recursive fn sourceParameters(tree: const Tree&, pool: Pool&, initial: AstId, bi
         blot_parse_ast::tag_integer, blot_parse_ast::tag_float, blot_parse_ast::tag_boolean, blot_parse_ast::tag_unit, blot_parse_ast::tag_constructor_ref => { return blot_support::some(0 as u16); },
         blot_parse_ast::tag_apply => {
             let call = localSourceCall(tree, source); if call.present { if bindings.get(call.value.name).present { return blot_support::none<u16>(); } var nested = SourceBindings {..};
-                for index in 0..call.value.len { let argument = sourceParameters(tree, pool, call.value.arguments[index], bindings, remaining, depth + 1); if !argument.present || nested.bind(call.value.parameters[index], argument.value) != Error.none { return blot_support::none<u16>(); } } return sourceParameters(tree, pool, call.value.body, nested, remaining, depth + 1);
+                for index in 0..call.value.len { let argument = sourceParameters(tree, pool, call.value.arguments[index], bindings, remaining, depth + 1); if !argument.present || nested.bind(call.value.parameters[index], argument.value) != blot_error::Error.none { return blot_support::none<u16>(); } } return sourceParameters(tree, pool, call.value.body, nested, remaining, depth + 1);
             }
             let construction = constructionSource(tree, pool, source); if construction.present { var result: u16 = 0; for index in 0..construction.value.len { let input = sourceParameters(tree, pool, construction.value.inputs[index], bindings, remaining, depth + 1); if !input.present { return input; } result |= input.value; } return blot_support::some(result); }
             let projection = projectionSource(tree, pool, source); if projection.present { let index = sourceParameters(tree, pool, projection.value.index, bindings, remaining, depth + 1); if !index.present { return index; } return sourceParameters(tree, pool, projection.value.receiver, bindings, remaining, depth + 1); }
@@ -222,7 +237,7 @@ recursive fn sourceParameters(tree: const Tree&, pool: Pool&, initial: AstId, bi
         blot_parse_ast::tag_block => {
             if value.c != 0 { return blot_support::none<u16>(); } var environment = bindings; let children = tree.children(source);
             for child, index in children { let statement = tree.node(child); if statement.tag == blot_parse_ast::tag_return_stmt && index + 1 == children.len { return sourceParameters(tree, pool, statement.a, environment, remaining, depth + 1); } if statement.tag != blot_parse_ast::tag_let_stmt { return blot_support::none<u16>(); }
-                let binding = tree.binding(child); let pattern = tree.node(binding.pattern); if pattern.tag != blot_parse_ast::tag_pattern_name || binding.fallback != 0 { return blot_support::none<u16>(); } let retained = sourceParameters(tree, pool, binding.value, environment, remaining, depth + 1); if !retained.present || environment.bind(pattern.a, retained.value) != Error.none { return blot_support::none<u16>(); }
+                let binding = tree.binding(child); let pattern = tree.node(binding.pattern); if pattern.tag != blot_parse_ast::tag_pattern_name || binding.fallback != 0 { return blot_support::none<u16>(); } let retained = sourceParameters(tree, pool, binding.value, environment, remaining, depth + 1); if !retained.present || environment.bind(pattern.a, retained.value) != blot_error::Error.none { return blot_support::none<u16>(); }
             } return blot_support::none<u16>();
         },
         blot_parse_ast::tag_case_expr => { return sourceCaseParameters(tree, pool, value, bindings, remaining, depth); },
@@ -237,7 +252,7 @@ fn sourceCaseParameters(tree: const Tree&, pool: Pool&, value: blot_parse_ast::N
     var result: u16 = 0;
     for arm_id in tree.list(blot_parse_ast::List { value.b, value.c , ..}) { let arm = tree.node(arm_id); var environment = bindings; let start = environment.len;
         for row in tree.list(blot_parse_ast::List { arm.a, arm.b , ..}) { let patterns = tree.children(row); if patterns.len != inputs[1] { return blot_support::none<u16>(); } for pattern, index in patterns { if !sourcePattern(tree, pattern, retained[index], environment, start, remaining, depth + 1) { return blot_support::none<u16>(); } } }
-        let details = tree.extra.items[arm.c..arm.c + 2]; if details[0] != 0 { let guard = sourceParameters(tree, pool, details[0], environment, remaining, depth + 1); if !guard.present { return guard; } }
+        let details = tree.extra.items[arm.c..arm.c + 2]; if details[0] != 0 { let guard_ = sourceParameters(tree, pool, details[0], environment, remaining, depth + 1); if !guard_.present { return guard_; } }
         let mask = sourceParameters(tree, pool, details[1], environment, remaining, depth + 1); if !mask.present { return mask; } result |= mask.value;
     } return blot_support::some(result);
 }
@@ -306,12 +321,12 @@ fn parameterCoreWithOwners(module: const Module&, body: blot_check_core::Body, s
 }
 struct CoreInvocationBinding { binding: u32, mask: u16 }
 struct CoreInvocationBindings { entries: CoreInvocationBinding[16], len: i64 = 0 }
-fn get(self: const CoreInvocationBindings&, binding: u32) -> Mask { for index in 0..self.len { if self.entries[index].binding == binding { return blot_support::some(self.entries[index].mask); } } return blot_support::none<u16>(); }
-fn bind(self: CoreInvocationBindings&, binding: u32, mask: u16) -> bool { if binding == 0 || self.len == self.entries.len || self.get(binding).present { return false; } self.entries[self.len] = CoreInvocationBinding { binding, mask , ..}; self.len += 1; return true; }
+fn get(self_: const CoreInvocationBindings&, binding: u32) -> Mask { for index in 0..self_.len { if self_.entries[index].binding == binding { return blot_support::some(self_.entries[index].mask); } } return blot_support::none<u16>(); }
+fn bind(self_: CoreInvocationBindings&, binding: u32, mask: u16) -> bool { if binding == 0 || self_.len == self_.entries.len || self_.get(binding).present { return false; } self_.entries[self_.len] = CoreInvocationBinding { binding, mask , ..}; self_.len += 1; return true; }
 fn invocationCore(module: const Module&, body: blot_check_core::Body, owners: const ModuleRef[:], remaining: i64&) -> blot_support::Option<Parameters> {
     if !body.is_function || body.parameters.len == 0 || body.parameters.len > 16 || body.parameters.start > module.parameters.len || body.parameters.len > module.parameters.len - body.parameters.start { return blot_support::none<Parameters>(); } var bindings = CoreInvocationBindings {..};
     for parameter, index in module.parameters[body.parameters.start..body.parameters.start + body.parameters.len] { if remaining == 0 { return blot_support::none<Parameters>(); } remaining -= 1;
-        if parameter.binding == 0 || parameter.binding >= module.bindings.len || module.bindings[parameter.binding].kind != blot_check_check::Kind.parameter || !bindings.bind(parameter.binding, (1 as u16) << index) { return blot_support::none<Parameters>(); }
+        if parameter.binding == 0 || parameter.binding >= module.bindings.len || module.bindings[parameter.binding].kind != blot_reuse_principal_interface::Kind.parameter || !bindings.bind(parameter.binding, (1 as u16) << index) { return blot_support::none<Parameters>(); }
     } return coreInvocation(module, body.root, bindings, body.parameters.len as u8, owners, remaining, 0);
 }
 recursive fn coreInvocation(module: const Module&, id: u32, bindings: const CoreInvocationBindings&, inputs: u8, owners: const ModuleRef[:], remaining: i64&, depth: i64) -> blot_support::Option<Parameters> {
@@ -322,19 +337,19 @@ recursive fn coreInvocation(module: const Module&, id: u32, bindings: const Core
             return invocationResult(inputs, callback.value, arguments[..call.len], false);
         }
     }
-    var producer: const Module& = module;
+    var producer: const Module&  = module;
     if call.target.unit != 0 && call.target.unit != module.unit { var selected: const Module? = null;
-        for owner_owner_ref in owners { let owner: const blot_check_core::Module& = owner_owner_ref.value; if remaining == 0 { return blot_support::none<Parameters>(); } remaining -= 1; if owner.unit != call.target.unit { continue; } if selected { if selected.owner_id == 0 || selected.owner_id != owner.owner_id { return blot_support::none<Parameters>(); } } selected .= owner; }
+        for owner_owner_ref in owners { let owner: const blot_check_core::Module&  = owner_owner_ref.value; if remaining == 0 { return blot_support::none<Parameters>(); } remaining -= 1; if owner.unit != call.target.unit { continue; } if selected { if selected.owner_id == 0 || selected.owner_id != owner.owner_id { return blot_support::none<Parameters>(); } } selected .= owner; }
         if !selected { return blot_support::none<Parameters>(); } producer .= selected;
     }
-    if call.target.binding == 0 || call.target.binding >= producer.bindings.len { return blot_support::none<Parameters>(); } let binding = producer.bindings[call.target.binding]; if binding.kind != blot_check_check::Kind.global || binding.body_id == 0 || binding.body_id >= producer.bodies.len { return blot_support::none<Parameters>(); } let body = producer.bodies[binding.body_id];
+    if call.target.binding == 0 || call.target.binding >= producer.bindings.len { return blot_support::none<Parameters>(); } let binding = producer.bindings[call.target.binding]; if binding.kind != blot_reuse_principal_interface::Kind.global || binding.body_id == 0 || binding.body_id >= producer.bodies.len { return blot_support::none<Parameters>(); } let body = producer.bodies[binding.body_id];
     if !body.is_function || body.parameters.len != call.len || body.parameters.start > producer.parameters.len || body.parameters.len > producer.parameters.len - body.parameters.start { return blot_support::none<Parameters>(); } var nested = CoreInvocationBindings {..};
-    for index in 0..call.len { let formal = producer.parameters[body.parameters.start + index]; if formal.binding == 0 || formal.binding >= producer.bindings.len || producer.bindings[formal.binding].kind != blot_check_check::Kind.parameter { return blot_support::none<Parameters>(); } let node = module.node(call.arguments[index]); if node.tag != blot_check_core::Tag.reference || node.a >= module.references.len { return blot_support::none<Parameters>(); }
+    for index in 0..call.len { let formal = producer.parameters[body.parameters.start + index]; if formal.binding == 0 || formal.binding >= producer.bindings.len || producer.bindings[formal.binding].kind != blot_reuse_principal_interface::Kind.parameter { return blot_support::none<Parameters>(); } let node = module.node(call.arguments[index]); if node.tag != blot_check_core::Tag.reference || node.a >= module.references.len { return blot_support::none<Parameters>(); }
         let reference = module.references[node.a]; if reference.unit != 0 && reference.unit != module.unit { return blot_support::none<Parameters>(); } let mask = bindings.get(reference.binding); if !mask.present || !nested.bind(formal.binding, mask.value) { return blot_support::none<Parameters>(); }
     } return coreInvocation(producer, body.root, nested, inputs, owners, remaining, depth + 1);
 }
 fn unaryCore(module: const Module&, body: blot_check_core::Body, contract: Contract) -> bool { return unaryCoreWithOwners(module, body, contract, []); }
-fn equal(module: const Module&, left: u32, right: u32) -> bool { let result, error = blot_check_rank_equal::equal(module.types, left, right, true); return error == Error.none && result; }
+fn equal(module: const Module&, left: u32, right: u32) -> bool { let result, error = blot_check_rank_equal::equal(module.types, left, right, true); return error == blot_error::Error.none && result; }
 fn unaryCoreWithOwners(module: const Module&, body: blot_check_core::Body, contract: Contract, owners: const ModuleRef[:]) -> bool {
     if contract == Contract.input_shape { if body.binding >= module.bindings.len { return false; } return blot_check_capability_contract_core::inputBodyWithOwners(module, body, module.bindings[body.binding].capability_parameters, owners); }
     if contract != Contract.identity && contract != Contract.member_unit { return false; }
@@ -351,41 +366,41 @@ struct CoreAlias { binding: u32, retained: u16 }
 struct Formal { binding: u32 }
 fn retainedCore(module: const Module&, source: u32, bindings: const u32[:], remaining: i64&) -> Mask {
     if bindings.len > 16 { return blot_support::none<u16>(); } var parameters: Formal[16];
-    for binding, index in bindings { if binding == 0 || binding >= module.bindings.len || module.bindings[binding].kind != blot_check_check::Kind.parameter { return blot_support::none<u16>(); } for prior in bindings[..index] { if prior == binding { return blot_support::none<u16>(); } } parameters[index] = Formal { binding , ..}; }
+    for binding, index in bindings { if binding == 0 || binding >= module.bindings.len || module.bindings[binding].kind != blot_reuse_principal_interface::Kind.parameter { return blot_support::none<u16>(); } for prior in bindings[..index] { if prior == binding { return blot_support::none<u16>(); } } parameters[index] = Formal { binding , ..}; }
     return coreParameters(module, source, parameters[..bindings.len], [], remaining, 0);
 }
 fn primitiveType(tag: blot_check_types::Tag) -> bool { return tag == blot_check_types::Tag.unit || tag == blot_check_types::Tag.boolean || tag == blot_check_types::Tag.unsigned32 || tag == blot_check_types::Tag.floating32; }
 recursive fn coreParameters(module: const Module&, source: u32, parameters, aliases: const CoreAlias[:], remaining: i64&, depth: i64) -> Mask {
     if remaining == 0 || depth >= 64 || source == 0 || source >= module.nodes.len { return blot_support::none<u16>(); } remaining -= 1; let value = module.nodes[source];
     match value.tag {
-        blot_check_core::Tag.call, blot_check_core::Tag.apply => { let found = localCoreCall(module, source); if !found.present { return blot_support::none<u16>(); } let call = found.value; var nested: CoreAlias[16];
+        call, apply => { let found = localCoreCall(module, source); if !found.present { return blot_support::none<u16>(); } let call = found.value; var nested: CoreAlias[16];
             for index in 0..call.len { let retained = coreParameters(module, call.arguments[index], parameters, aliases, remaining, depth + 1); if !retained.present { return retained; } nested[index] = CoreAlias { call.bindings[index], retained.value , ..}; } return coreParameters(module, call.body, parameters, nested[..call.len], remaining, depth + 1);
         },
-        blot_check_core::Tag.reference => { if value.a >= module.references.len { return blot_support::none<u16>(); } let reference = module.references[value.a]; if reference.unit != 0 && reference.unit != module.unit { return blot_support::none<u16>(); } var alias = aliases.len;
+        reference => { if value.a >= module.references.len { return blot_support::none<u16>(); } let reference = module.references[value.a]; if reference.unit != 0 && reference.unit != module.unit { return blot_support::none<u16>(); } var alias = aliases.len;
             while alias != 0 { alias -= 1; if aliases[alias].binding == reference.binding { return blot_support::some(aliases[alias].retained); } } for parameter, index in parameters { if reference.binding == parameter.binding { return blot_support::some((1 as u16) << index); } } return blot_support::none<u16>();
         },
-        blot_check_core::Tag.constant => { if value.ty >= module.types.nodes.len || !primitiveType(module.types.nodes[value.ty].tag) { return blot_support::none<u16>(); } return blot_support::some(0 as u16); },
-        blot_check_core::Tag.array_op => { if value.c != blot_backend_collection_ops::opCode(blot_check_core::ArrayOp.get) || value.b != 2 || value.a > module.extra.len || value.b > module.extra.len - value.a { return blot_support::none<u16>(); }
+        constant => { if value.ty >= module.types.nodes.len || !primitiveType(module.types.nodes[value.ty].tag) { return blot_support::none<u16>(); } return blot_support::some(0 as u16); },
+        array_op => { if value.c != blot_backend_collection_ops::opCode(blot_backend_collection_ops::Op.get) || value.b != 2 || value.a > module.extra.len || value.b > module.extra.len - value.a { return blot_support::none<u16>(); }
             let index = coreParameters(module, module.extra[value.a + 1], parameters, aliases, remaining, depth + 1); if !index.present { return index; } return coreParameters(module, module.extra[value.a], parameters, aliases, remaining, depth + 1);
         },
-        blot_check_core::Tag.operation_value => { if value.a >= module.operation_values.len { return blot_support::none<u16>(); } return coreParameters(module, module.operation_values[value.a].capability, parameters, aliases, remaining, depth + 1); },
-        blot_check_core::Tag.computation => { return coreParameters(module, value.a, parameters, aliases, remaining, depth + 1); },
-        blot_check_core::Tag.effect_provider, blot_check_core::Tag.state_provider => { let first = coreParameters(module, value.a, parameters, aliases, remaining, depth + 1); if !first.present { return first; } let second = coreParameters(module, value.b, parameters, aliases, remaining, depth + 1); if !second.present { return second; } var result = first.value | second.value;
+        operation_value => { if value.a >= module.operation_values.len { return blot_support::none<u16>(); } return coreParameters(module, module.operation_values[value.a].capability, parameters, aliases, remaining, depth + 1); },
+        computation => { return coreParameters(module, value.a, parameters, aliases, remaining, depth + 1); },
+        effect_provider, state_provider => { let first = coreParameters(module, value.a, parameters, aliases, remaining, depth + 1); if !first.present { return first; } let second = coreParameters(module, value.b, parameters, aliases, remaining, depth + 1); if !second.present { return second; } var result = first.value | second.value;
             if value.tag == blot_check_core::Tag.state_provider { let third = coreParameters(module, value.c, parameters, aliases, remaining, depth + 1); if !third.present { return third; } result |= third.value; } return blot_support::some(result);
         },
-        blot_check_core::Tag.project => { if value.b >= module.projections.len { return blot_support::none<u16>(); } return coreParameters(module, value.a, parameters, aliases, remaining, depth + 1); },
-        blot_check_core::Tag.construct => { if value.b == 0 { return blot_support::some(0 as u16); } return coreParameters(module, value.b, parameters, aliases, remaining, depth + 1); },
-        blot_check_core::Tag.block_ => { if value.a > module.extra.len || value.b > module.extra.len - value.a || aliases.len > 128 { return blot_support::none<u16>(); } var environment: CoreAlias[128]; for alias, index in aliases { environment[index] = alias; } var count = aliases.len; let children = module.extra[value.a..value.a + value.b];
+        project => { if value.b >= module.projections.len { return blot_support::none<u16>(); } return coreParameters(module, value.a, parameters, aliases, remaining, depth + 1); },
+        construct => { if value.b == 0 { return blot_support::some(0 as u16); } return coreParameters(module, value.b, parameters, aliases, remaining, depth + 1); },
+        block_ => { if value.a > module.extra.len || value.b > module.extra.len - value.a || aliases.len > 128 { return blot_support::none<u16>(); } var environment: CoreAlias[128]; for alias, index in aliases { environment[index] = alias; } var count = aliases.len; let children = module.extra[value.a..value.a + value.b];
             for child, index in children { if child == 0 || child >= module.nodes.len { return blot_support::none<u16>(); } let statement = module.nodes[child]; if statement.tag == blot_check_core::Tag.return_ && index + 1 == children.len { if statement.b != source { return blot_support::none<u16>(); } return coreParameters(module, statement.a, parameters, environment[..count], remaining, depth + 1); }
                 if statement.tag != blot_check_core::Tag.bind || count == environment.len { return blot_support::none<u16>(); } let retained = coreParameters(module, statement.b, parameters, environment[..count], remaining, depth + 1); if !retained.present { return retained; } environment[count] = CoreAlias { statement.a, retained.value , ..}; count += 1;
             } return blot_support::none<u16>();
         },
-        blot_check_core::Tag.if_value => { let condition = coreParameters(module, value.a, parameters, aliases, remaining, depth + 1); if !condition.present { return condition; } let left = coreParameters(module, value.b, parameters, aliases, remaining, depth + 1); if !left.present { return left; } let right = coreParameters(module, value.c, parameters, aliases, remaining, depth + 1); if !right.present { return right; } return blot_support::some(left.value | right.value); },
-        blot_check_core::Tag.match_ => { return coreCaseParameters(module, value, parameters, aliases, remaining, depth); },
-        blot_check_core::Tag.closure => { if value.a >= module.closures.len { return blot_support::none<u16>(); } let closure = module.closures[value.a]; let ignored: u32[1] = [closure.parameter.binding]; let actual = coreCaptures(module, closure.body, parameters, aliases, ignored, remaining, depth + 1, closure.closed_rows); if !actual.present { return actual; }
+        if_value => { let condition = coreParameters(module, value.a, parameters, aliases, remaining, depth + 1); if !condition.present { return condition; } let left = coreParameters(module, value.b, parameters, aliases, remaining, depth + 1); if !left.present { return left; } let right = coreParameters(module, value.c, parameters, aliases, remaining, depth + 1); if !right.present { return right; } return blot_support::some(left.value | right.value); },
+        match_ => { return coreCaseParameters(module, value, parameters, aliases, remaining, depth); },
+        closure => { if value.a >= module.closures.len { return blot_support::none<u16>(); } let closure = module.closures[value.a]; let ignored: u32[1] = [closure.parameter.binding]; let actual = coreCaptures(module, closure.body, parameters, aliases, ignored, remaining, depth + 1, closure.closed_rows); if !actual.present { return actual; }
             let declared = declaredCoreCaptures(module, closure, parameters, aliases, ignored, remaining); if !declared.present { return declared; } return blot_support::some(actual.value | declared.value);
         },
-        blot_check_core::Tag.product, blot_check_core::Tag.record, blot_check_core::Tag.array => { if value.a > module.extra.len || value.b > module.extra.len - value.a { return blot_support::none<u16>(); } var result: u16 = 0; for child in module.extra[value.a..value.a + value.b] { let retained = coreParameters(module, child, parameters, aliases, remaining, depth + 1); if !retained.present { return retained; } result |= retained.value; } return blot_support::some(result); },
+        product, record, array => { if value.a > module.extra.len || value.b > module.extra.len - value.a { return blot_support::none<u16>(); } var result: u16 = 0; for child in module.extra[value.a..value.a + value.b] { let retained = coreParameters(module, child, parameters, aliases, remaining, depth + 1); if !retained.present { return retained; } result |= retained.value; } return blot_support::some(result); },
         _ => { return blot_support::none<u16>(); },
     }
 }
@@ -397,16 +412,16 @@ fn coreCaseParameters(module: const Module&, value: blot_check_core::Node, param
         for row in module.pattern_rows[arm.rows.start..arm.rows.start + arm.rows.len] { if row.patterns.len != info.inputs.len || row.patterns.start > module.extra.len || row.patterns.len > module.extra.len - row.patterns.start { return blot_support::none<u16>(); }
             for pattern, index in module.extra[row.patterns.start..row.patterns.start + row.patterns.len] { if !corePattern(module, pattern, retained[index], environment, count, aliases.len, remaining, depth + 1) { return blot_support::none<u16>(); } }
         }
-        if arm.guard != 0 { let mask = coreParameters(module, arm.guard, parameters, environment[..count], remaining, depth + 1); if !mask.present { return mask; } } let mask = coreParameters(module, arm.body, parameters, environment[..count], remaining, depth + 1); if !mask.present { return mask; } result |= mask.value;
+        if arm.guard_ != 0 { let mask = coreParameters(module, arm.guard_, parameters, environment[..count], remaining, depth + 1); if !mask.present { return mask; } } let mask = coreParameters(module, arm.body, parameters, environment[..count], remaining, depth + 1); if !mask.present { return mask; } result |= mask.value;
     } return blot_support::some(result);
 }
 recursive fn corePattern(module: const Module&, source: u32, retained: u16, environment: CoreAlias[128]&, count: i64&, start: i64, remaining: i64&, depth: i64) -> bool {
     if source == 0 || source >= module.patterns.len || remaining == 0 || depth >= 64 { return false; } remaining -= 1; let pattern = module.patterns[source];
     match pattern.tag {
-        blot_check_core::PatternTag.wildcard, blot_check_core::PatternTag.constant => { return true; },
-        blot_check_core::PatternTag.bind => { for index in start..count { if environment[index].binding == pattern.a { environment[index].retained |= retained; return true; } } if count == environment.len { return false; } environment[count] = CoreAlias { pattern.a, retained , ..}; count += 1; return true; },
-        blot_check_core::PatternTag.constructor, blot_check_core::PatternTag.record_payload => { if pattern.b == 0 { return true; } return corePattern(module, pattern.b, retained, environment, count, start, remaining, depth + 1); },
-        blot_check_core::PatternTag.product => { if pattern.a > module.extra.len || pattern.b > module.extra.len - pattern.a { return false; } for child in module.extra[pattern.a..pattern.a + pattern.b] { if !corePattern(module, child, retained, environment, count, start, remaining, depth + 1) { return false; } } return true; },
+        wildcard, constant => { return true; },
+        bind => { for index in start..count { if environment[index].binding == pattern.a { environment[index].retained |= retained; return true; } } if count == environment.len { return false; } environment[count] = CoreAlias { pattern.a, retained , ..}; count += 1; return true; },
+        constructor, record_payload => { if pattern.b == 0 { return true; } return corePattern(module, pattern.b, retained, environment, count, start, remaining, depth + 1); },
+        product => { if pattern.a > module.extra.len || pattern.b > module.extra.len - pattern.a { return false; } for child in module.extra[pattern.a..pattern.a + pattern.b] { if !corePattern(module, child, retained, environment, count, start, remaining, depth + 1) { return false; } } return true; },
         _ => { return false; },
     }
 }
@@ -420,14 +435,14 @@ fn declaredCoreCaptures(module: const Module&, closure: blot_check_core::Closure
 fn scalarCallOperands(module: const Module&, id: u32, closed_rows: blot_check_types::List, remaining: i64&) -> blot_support::Option<const u32[:]> {
     if id == 0 || id >= module.nodes.len || remaining == 0 { return blot_support::none<const u32[:]>(); } remaining -= 1; let node = module.nodes[id];
     if node.tag != blot_check_core::Tag.call || node.a >= module.calls.len || node.c > 16 || node.b > module.extra.len || node.c > module.extra.len - node.b { return blot_support::none<const u32[:]>(); } let call = module.calls[node.a]; if call.target.binding == 0 { return blot_support::none<const u32[:]>(); }
-    if call.target.unit == 0 || call.target.unit == module.unit { if call.target.binding >= module.bindings.len { return blot_support::none<const u32[:]>(); } let kind = module.bindings[call.target.binding].kind; if kind != blot_check_check::Kind.global && kind != blot_check_check::Kind.external { return blot_support::none<const u32[:]>(); } }
+    if call.target.unit == 0 || call.target.unit == module.unit { if call.target.binding >= module.bindings.len { return blot_support::none<const u32[:]>(); } let kind = module.bindings[call.target.binding].kind; if kind != blot_reuse_principal_interface::Kind.global && kind != blot_reuse_principal_interface::Kind.external { return blot_support::none<const u32[:]>(); } }
     var signature = call.callee_type; let operands = module.extra[node.b..node.b + node.c];
     for operand in operands { if remaining == 0 { return blot_support::none<const u32[:]>(); } remaining -= 1;
         if operand == 0 || operand >= module.nodes.len || signature == 0 || signature >= module.types.nodes.len { return blot_support::none<const u32[:]>(); } let arrow = module.types.node(signature);
         if arrow.tag != blot_check_types::Tag.function || arrow.a == 0 || arrow.a >= module.types.nodes.len || arrow.c >= module.types.effects.rows.len || !primitiveType(module.types.node(arrow.a).tag) || module.nodes[operand].ty != arrow.a { return blot_support::none<const u32[:]>(); } let row = module.types.effects.rows[arrow.c]; if row.labels.len != 0 { return blot_support::none<const u32[:]>(); }
         if row.tail != blot_check_effects::Tail.closed {
             if closed_rows.start > module.types.extra.len || closed_rows.len > module.types.extra.len - closed_rows.start { return blot_support::none<const u32[:]>(); } var variable: u32 = 0;
-            match row.tail { blot_check_effects::Tail.variable payload => { variable = payload.value; }, _ => { return blot_support::none<const u32[:]>(); }, }
+            match row.tail { variable payload => { variable = payload.value; }, _ => { return blot_support::none<const u32[:]>(); }, }
             var certified = false; for candidate in module.types.extra[closed_rows.start..closed_rows.start + closed_rows.len] { if remaining == 0 { return blot_support::none<const u32[:]>(); } remaining -= 1; if candidate == variable { certified = true; } } if !certified { return blot_support::none<const u32[:]>(); }
         } signature = arrow.b;
     }
@@ -436,23 +451,23 @@ fn scalarCallOperands(module: const Module&, id: u32, closed_rows: blot_check_ty
 recursive fn coreCaptures(module: const Module&, source: u32, parameters, aliases: const CoreAlias[:], ignored: const u32[:], remaining: i64&, depth: i64, closed_rows: blot_check_types::List) -> Mask {
     if remaining == 0 || depth >= 64 || source == 0 || source >= module.nodes.len { return blot_support::none<u16>(); } remaining -= 1; let value = module.nodes[source];
     match value.tag {
-        blot_check_core::Tag.reference => { if value.a >= module.references.len { return blot_support::none<u16>(); } let reference = module.references[value.a]; if reference.unit != 0 && reference.unit != module.unit { return blot_support::none<u16>(); } if hasName(ignored, reference.binding) { return blot_support::some(0 as u16); } var alias = aliases.len;
+        reference => { if value.a >= module.references.len { return blot_support::none<u16>(); } let reference = module.references[value.a]; if reference.unit != 0 && reference.unit != module.unit { return blot_support::none<u16>(); } if hasName(ignored, reference.binding) { return blot_support::some(0 as u16); } var alias = aliases.len;
             while alias != 0 { alias -= 1; if aliases[alias].binding == reference.binding { return blot_support::some(aliases[alias].retained); } } for parameter, index in parameters { if reference.binding == parameter.binding { return blot_support::some((1 as u16) << index); } } return blot_support::none<u16>();
         },
-        blot_check_core::Tag.constant => { if value.ty >= module.types.nodes.len || !primitiveType(module.types.nodes[value.ty].tag) { return blot_support::none<u16>(); } return blot_support::some(0 as u16); },
-        blot_check_core::Tag.primitive_function => { return blot_support::some(0 as u16); },
-        blot_check_core::Tag.operation_value => { if value.a >= module.operation_values.len { return blot_support::none<u16>(); } let operation = module.operation_values[value.a]; if operation.capability == 0 { return blot_support::none<u16>(); } return coreCaptures(module, operation.capability, parameters, aliases, ignored, remaining, depth + 1, closed_rows); },
-        blot_check_core::Tag.call => { let operands = scalarCallOperands(module, source, closed_rows, remaining); if !operands.present { return blot_support::none<u16>(); } var result: u16 = 0; for operand in operands.value { let mask = coreCaptures(module, operand, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value; } return blot_support::some(result); },
-        blot_check_core::Tag.apply => { if value.b == 0 || value.b >= module.nodes.len { return blot_support::none<u16>(); } let argument = module.nodes[value.b]; if argument.tag != blot_check_core::Tag.constant || argument.ty != blot_check_types::unit || argument.a != 0 { return blot_support::none<u16>(); }
+        constant => { if value.ty >= module.types.nodes.len || !primitiveType(module.types.nodes[value.ty].tag) { return blot_support::none<u16>(); } return blot_support::some(0 as u16); },
+        primitive_function => { return blot_support::some(0 as u16); },
+        operation_value => { if value.a >= module.operation_values.len { return blot_support::none<u16>(); } let operation = module.operation_values[value.a]; if operation.capability == 0 { return blot_support::none<u16>(); } return coreCaptures(module, operation.capability, parameters, aliases, ignored, remaining, depth + 1, closed_rows); },
+        call => { let operands = scalarCallOperands(module, source, closed_rows, remaining); if !operands.present { return blot_support::none<u16>(); } var result: u16 = 0; for operand in operands.value { let mask = coreCaptures(module, operand, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value; } return blot_support::some(result); },
+        apply => { if value.b == 0 || value.b >= module.nodes.len { return blot_support::none<u16>(); } let argument = module.nodes[value.b]; if argument.tag != blot_check_core::Tag.constant || argument.ty != blot_check_types::unit || argument.a != 0 { return blot_support::none<u16>(); }
             let left = coreCaptures(module, value.a, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !left.present { return left; } let right = coreCaptures(module, value.b, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !right.present { return right; } return blot_support::some(left.value | right.value);
         },
-        blot_check_core::Tag.scalar, blot_check_core::Tag.logical => { let left = coreCaptures(module, value.a, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !left.present || value.b == 0 { return left; } let right = coreCaptures(module, value.b, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !right.present { return right; } return blot_support::some(left.value | right.value); },
-        blot_check_core::Tag.project, blot_check_core::Tag.return_ => { return coreCaptures(module, value.a, parameters, aliases, ignored, remaining, depth + 1, closed_rows); },
-        blot_check_core::Tag.construct => { return coreCaptures(module, value.b, parameters, aliases, ignored, remaining, depth + 1, closed_rows); },
-        blot_check_core::Tag.closure => { if value.a >= module.closures.len || ignored.len == 64 { return blot_support::none<u16>(); } let closure = module.closures[value.a]; var locals: u32[64]; for value, index in ignored { locals[index] = value; } locals[ignored.len] = closure.parameter.binding; let nested = locals[..ignored.len + 1];
+        scalar, logical => { let left = coreCaptures(module, value.a, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !left.present || value.b == 0 { return left; } let right = coreCaptures(module, value.b, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !right.present { return right; } return blot_support::some(left.value | right.value); },
+        project, return_ => { return coreCaptures(module, value.a, parameters, aliases, ignored, remaining, depth + 1, closed_rows); },
+        construct => { return coreCaptures(module, value.b, parameters, aliases, ignored, remaining, depth + 1, closed_rows); },
+        closure => { if value.a >= module.closures.len || ignored.len == 64 { return blot_support::none<u16>(); } let closure = module.closures[value.a]; var locals: u32[64]; for value, index in ignored { locals[index] = value; } locals[ignored.len] = closure.parameter.binding; let nested = locals[..ignored.len + 1];
             let actual = coreCaptures(module, closure.body, parameters, aliases, nested, remaining, depth + 1, closed_rows); if !actual.present { return actual; } let declared = declaredCoreCaptures(module, closure, parameters, aliases, nested, remaining); if !declared.present { return declared; } return blot_support::some(actual.value | declared.value);
         },
-        blot_check_core::Tag.block_, blot_check_core::Tag.suite => { if value.a > module.extra.len || value.b > module.extra.len - value.a || aliases.len > 128 { return blot_support::none<u16>(); } var nested: CoreAlias[128]; for alias, index in aliases { nested[index] = alias; } var count = aliases.len; var result: u16 = 0;
+        block_, suite => { if value.a > module.extra.len || value.b > module.extra.len - value.a || aliases.len > 128 { return blot_support::none<u16>(); } var nested: CoreAlias[128]; for alias, index in aliases { nested[index] = alias; } var count = aliases.len; var result: u16 = 0;
             for child in module.extra[value.a..value.a + value.b] { if child == 0 || child >= module.nodes.len { return blot_support::none<u16>(); } let statement = module.nodes[child];
                 if statement.tag == blot_check_core::Tag.bind { let mask = coreCaptures(module, statement.b, parameters, nested[..count], ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value; if count == nested.len { return blot_support::none<u16>(); } nested[count] = CoreAlias { statement.a, 0 , ..}; count += 1; }
                 else if statement.tag == blot_check_core::Tag.pattern_bind { let mask = coreCaptures(module, statement.b, parameters, nested[..count], ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value;
@@ -461,9 +476,9 @@ recursive fn coreCaptures(module: const Module&, source: u32, parameters, aliase
                 else { let mask = coreCaptures(module, child, parameters, nested[..count], ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value; }
             } return blot_support::some(result);
         },
-        blot_check_core::Tag.match_ => { return coreCaseCaptures(module, value, parameters, aliases, ignored, remaining, depth, closed_rows); },
-        blot_check_core::Tag.if_value => { let condition = coreCaptures(module, value.a, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !condition.present { return condition; } let left = coreCaptures(module, value.b, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !left.present { return left; } let right = coreCaptures(module, value.c, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !right.present { return right; } return blot_support::some(condition.value | left.value | right.value); },
-        blot_check_core::Tag.product, blot_check_core::Tag.record, blot_check_core::Tag.array, blot_check_core::Tag.array_op => { if value.a > module.extra.len || value.b > module.extra.len - value.a { return blot_support::none<u16>(); } var result: u16 = 0; for child in module.extra[value.a..value.a + value.b] { let mask = coreCaptures(module, child, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value; } return blot_support::some(result); },
+        match_ => { return coreCaseCaptures(module, value, parameters, aliases, ignored, remaining, depth, closed_rows); },
+        if_value => { let condition = coreCaptures(module, value.a, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !condition.present { return condition; } let left = coreCaptures(module, value.b, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !left.present { return left; } let right = coreCaptures(module, value.c, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !right.present { return right; } return blot_support::some(condition.value | left.value | right.value); },
+        product, record, array, array_op => { if value.a > module.extra.len || value.b > module.extra.len - value.a { return blot_support::none<u16>(); } var result: u16 = 0; for child in module.extra[value.a..value.a + value.b] { let mask = coreCaptures(module, child, parameters, aliases, ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value; } return blot_support::some(result); },
         _ => { return blot_support::none<u16>(); },
     }
 }
@@ -475,24 +490,24 @@ fn coreCaseCaptures(module: const Module&, value: blot_check_core::Node, paramet
         for row in module.pattern_rows[arm.rows.start..arm.rows.start + arm.rows.len] { if row.patterns.len != info.inputs.len || row.patterns.start > module.extra.len || row.patterns.len > module.extra.len - row.patterns.start { return blot_support::none<u16>(); }
             for pattern in module.extra[row.patterns.start..row.patterns.start + row.patterns.len] { if !corePattern(module, pattern, 0, nested, count, aliases.len, remaining, depth + 1) { return blot_support::none<u16>(); } }
         }
-        if arm.guard != 0 { let mask = coreCaptures(module, arm.guard, parameters, nested[..count], ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value; }
+        if arm.guard_ != 0 { let mask = coreCaptures(module, arm.guard_, parameters, nested[..count], ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value; }
         let mask = coreCaptures(module, arm.body, parameters, nested[..count], ignored, remaining, depth + 1, closed_rows); if !mask.present { return mask; } result |= mask.value;
     } return blot_support::some(result);
 }
 
 fn contractCode(value: Contract) -> u32 {
     match value {
-        Contract.unknown => { return 0; },
-        Contract.identity => { return 1; },
-        Contract.invoke_unit => { return 2; },
-        Contract.member_unit => { return 3; },
-        Contract.invoke_with_capability => { return 4; },
-        Contract.member_first_unit => { return 5; },
-        Contract.member_second_unit => { return 6; },
-        Contract.input_shape => { return 7; },
-        Contract.consume_task => { return 8; },
-        Contract.scope_task => { return 9; },
-        Contract.spawn_task => { return 10; },
+        unknown => { return 0; },
+        identity => { return 1; },
+        invoke_unit => { return 2; },
+        member_unit => { return 3; },
+        invoke_with_capability => { return 4; },
+        member_first_unit => { return 5; },
+        member_second_unit => { return 6; },
+        input_shape => { return 7; },
+        consume_task => { return 8; },
+        scope_task => { return 9; },
+        spawn_task => { return 10; },
     }
 }
 fn contractFromCode(code: u32) -> Contract, blot_error::Error {
@@ -515,13 +530,13 @@ fn blot_structural::equal(left: blot_check_capability_flow::Contract, right: blo
 fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_flow::Contract) { blot_structural::hash(sink, blot_check_capability_flow::contractCode(value) as! u8); }
 fn parameterResultCode(value: ParameterResult) -> u32 {
     match value {
-        ParameterResult.product => { return 0; },
-        ParameterResult.invoke_unit => { return 1; },
-        ParameterResult.invalid => { return 2; },
-        ParameterResult.member_closure_unit => { return 3; },
-        ParameterResult.captured_unit => { return 4; },
-        ParameterResult.invoke_input => { return 5; },
-        ParameterResult.invoke_inputs => { return 6; },
+        product => { return 0; },
+        invoke_unit => { return 1; },
+        invalid => { return 2; },
+        member_closure_unit => { return 3; },
+        captured_unit => { return 4; },
+        invoke_input => { return 5; },
+        invoke_inputs => { return 6; },
     }
 }
 fn parameterResultFromCode(code: u32) -> ParameterResult, blot_error::Error {
@@ -540,9 +555,9 @@ fn blot_structural::equal(left: blot_check_capability_flow::ParameterResult, rig
 fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_flow::ParameterResult) { blot_structural::hash(sink, blot_check_capability_flow::parameterResultCode(value) as! u8); }
 fn constructionKindCode(value: ConstructionKind) -> u32 {
     match value {
-        ConstructionKind.computation => { return 0; },
-        ConstructionKind.provider => { return 1; },
-        ConstructionKind.state => { return 2; },
+        computation => { return 0; },
+        provider => { return 1; },
+        state => { return 2; },
     }
 }
 fn constructionKindFromCode(code: u32) -> ConstructionKind, blot_error::Error {

@@ -22,12 +22,12 @@ struct Proof {
 
 fn childAt(plan: const blot_backend_numeric_rows::Plan&, owner: u8, offset: u32) -> blot_support::Option<Position> {
     for storage, index in plan.storage[..plan.storage_count] {
-        if !storage.guard.present && storage.parent.present && storage.parent.value == owner && storage.offset == offset {
+        if !storage.guard_.present && storage.parent.present && storage.parent.value == owner && storage.offset == offset {
             return blot_support::some(Position { kind: PositionKind.storage, index: index as u8 });
         }
     }
     for leaf, index in plan.leaves[..plan.leaf_count] {
-        if !leaf.guard.present && !leaf.discriminant && leaf.owner == owner && leaf.offset == offset {
+        if !leaf.guard_.present && !leaf.discriminant && leaf.owner == owner && leaf.offset == offset {
             return blot_support::some(Position { kind: PositionKind.leaf, index: index as u8 });
         }
     }
@@ -103,17 +103,17 @@ recursive fn packedPattern(source: const blot_check_core::Module&, id: blot_chec
     if depth >= 32 { return false; }
     let pattern = source.pattern(id);
     match pattern.tag {
-        blot_check_core::PatternTag.wildcard => { return true; },
-        blot_check_core::PatternTag.bind => { return true; },
-        blot_check_core::PatternTag.constant => { return scalarPattern(source, pattern); },
-        blot_check_core::PatternTag.value => { return scalarPattern(source, pattern); },
-        blot_check_core::PatternTag.constructor => { return packedPattern(source, pattern.b, depth + 1); },
-        blot_check_core::PatternTag.record_payload => {
+        wildcard => { return true; },
+        bind => { return true; },
+        constant => { return scalarPattern(source, pattern); },
+        value => { return scalarPattern(source, pattern); },
+        constructor => { return packedPattern(source, pattern.b, depth + 1); },
+        record_payload => {
             if pattern.a != 1 && source.pattern(pattern.b).tag != blot_check_core::PatternTag.wildcard && source.pattern(pattern.b).tag != blot_check_core::PatternTag.product { return false; }
             return packedPattern(source, pattern.b, depth + 1);
         },
-        blot_check_core::PatternTag.product => { for child in source.patternChildren(id) { if !packedPattern(source, child, depth + 1) { return false; } } return true; },
-        blot_check_core::PatternTag.invalid => { return false; },
+        product => { for child in source.patternChildren(id) { if !packedPattern(source, child, depth + 1) { return false; } } return true; },
+        invalid => { return false; },
     }
 }
 fn scalarPattern(source: const blot_check_core::Module&, pattern: blot_check_core::Pattern) -> bool {
@@ -131,14 +131,14 @@ recursive fn pattern(proof: Proof&, id: blot_check_core::PatternId, depth: i64) 
     proof.budget--;
     let value = proof.source.pattern(id);
     match value.tag {
-        blot_check_core::PatternTag.wildcard => { return true; },
-        blot_check_core::PatternTag.constant => { return true; },
-        blot_check_core::PatternTag.bind => { return value.a != proof.binding; },
-        blot_check_core::PatternTag.value => { return visit(proof, value.a, depth + 1); },
-        blot_check_core::PatternTag.constructor => { return pattern(proof, value.b, depth + 1); },
-        blot_check_core::PatternTag.record_payload => { return pattern(proof, value.b, depth + 1); },
-        blot_check_core::PatternTag.product => { for child in proof.source.patternChildren(id) { if !pattern(proof, child, depth + 1) { return false; } } return true; },
-        blot_check_core::PatternTag.invalid => { return false; },
+        wildcard => { return true; },
+        constant => { return true; },
+        bind => { return value.a != proof.binding; },
+        value => { return visit(proof, value.a, depth + 1); },
+        constructor => { return pattern(proof, value.b, depth + 1); },
+        record_payload => { return pattern(proof, value.b, depth + 1); },
+        product => { for child in proof.source.patternChildren(id) { if !pattern(proof, child, depth + 1) { return false; } } return true; },
+        invalid => { return false; },
     }
 }
 recursive fn visit(proof: Proof&, id: blot_check_core::Id, depth: i64) -> bool {
@@ -147,13 +147,13 @@ recursive fn visit(proof: Proof&, id: blot_check_core::Id, depth: i64) -> bool {
     proof.budget--;
     let node = proof.source.node(id);
     match node.tag {
-        blot_check_core::Tag.constant => { return true; },
-        blot_check_core::Tag.constructor_function => { return true; },
-        blot_check_core::Tag.primitive_function => { return true; },
-        blot_check_core::Tag.type_constructor => { return true; },
-        blot_check_core::Tag.panic => { return true; },
-        blot_check_core::Tag.reference => { return !isRow(proof, id); },
-        blot_check_core::Tag.project => {
+        constant => { return true; },
+        constructor_function => { return true; },
+        primitive_function => { return true; },
+        type_constructor => { return true; },
+        panic => { return true; },
+        reference => { return !isRow(proof, id); },
+        project => {
             if proof.numeric != null {
                 if numericOffset(proof.source, id, proof.binding, proof.layouts, proof.numeric).present { return true; }
                 return visit(proof, node.a, depth + 1);
@@ -161,24 +161,24 @@ recursive fn visit(proof: Proof&, id: blot_check_core::Id, depth: i64) -> bool {
             if isRow(proof, node.a) { return fieldOffset(proof.source, node.b, proof.layouts, proof.row).present; }
             return visit(proof, node.a, depth + 1);
         },
-        blot_check_core::Tag.bind => { return node.a != proof.binding && visit(proof, node.b, depth + 1); },
-        blot_check_core::Tag.construct => { return visit(proof, node.b, depth + 1); },
-        blot_check_core::Tag.return_ => { return visit(proof, node.a, depth + 1); },
-        blot_check_core::Tag.result_associated => { return visit(proof, node.a, depth + 1); },
-        blot_check_core::Tag.scalar => { return pair(proof, node.a, node.b, depth); },
-        blot_check_core::Tag.associated => { return pair(proof, node.a, node.b, depth); },
-        blot_check_core::Tag.logical => { return pair(proof, node.a, node.b, depth); },
-        blot_check_core::Tag.record_merge => { return pair(proof, node.a, node.b, depth); },
-        blot_check_core::Tag.apply => {
+        bind => { return node.a != proof.binding && visit(proof, node.b, depth + 1); },
+        construct => { return visit(proof, node.b, depth + 1); },
+        return_ => { return visit(proof, node.a, depth + 1); },
+        result_associated => { return visit(proof, node.a, depth + 1); },
+        scalar => { return pair(proof, node.a, node.b, depth); },
+        associated => { return pair(proof, node.a, node.b, depth); },
+        logical => { return pair(proof, node.a, node.b, depth); },
+        record_merge => { return pair(proof, node.a, node.b, depth); },
+        apply => {
             if isRow(proof, node.b) {
                 if proof.source.types.node(proof.source.typeOf(node.a)).tag != blot_check_types::Tag.function { return false; }
                 return visit(proof, node.a, depth + 1);
             }
             return pair(proof, node.a, node.b, depth);
         },
-        blot_check_core::Tag.if_value => { return branch(proof, id, node, depth); },
-        blot_check_core::Tag.if_stmt => { return branch(proof, id, node, depth); },
-        blot_check_core::Tag.match_ => {
+        if_value => { return branch(proof, id, node, depth); },
+        if_stmt => { return branch(proof, id, node, depth); },
+        match_ => {
             let inputs = proof.source.matchInputs(id);
             for input in inputs {
                 if isRow(proof, input) { if proof.numeric == null { return false; } }
@@ -191,16 +191,16 @@ recursive fn visit(proof: Proof&, id: blot_check_core::Id, depth: i64) -> bool {
                         if !pattern(proof, value, depth + 1) { return false; }
                     }
                 }
-                if !visit(proof, arm.guard, depth + 1) || !visit(proof, arm.body, depth + 1) { return false; }
+                if !visit(proof, arm.guard_, depth + 1) || !visit(proof, arm.body, depth + 1) { return false; }
             }
             return true;
         },
-        blot_check_core::Tag.loop_ => {
+        loop_ => {
             let loop_info = proof.source.loopInfo(id);
             for carry in proof.source.loopCarries(id) { if carry.incoming == proof.binding || carry.backedge == proof.binding { return false; } }
             return pattern(proof, loop_info.pattern, depth + 1) && visit(proof, loop_info.first, depth + 1) && visit(proof, loop_info.end, depth + 1) && visit(proof, loop_info.body, depth + 1);
         },
-        blot_check_core::Tag.call => {
+        call => {
             var callable = proof.source.call(id).callee_type;
             for child in proof.source.children(id) {
                 let arrow = proof.source.types.node(callable);
@@ -211,14 +211,14 @@ recursive fn visit(proof: Proof&, id: blot_check_core::Id, depth: i64) -> bool {
             }
             return true;
         },
-        blot_check_core::Tag.block_ => { return children(proof, id, depth); },
-        blot_check_core::Tag.suite => { return children(proof, id, depth); },
-        blot_check_core::Tag.product => { return children(proof, id, depth); },
-        blot_check_core::Tag.record => { return children(proof, id, depth); },
-        blot_check_core::Tag.array => { return children(proof, id, depth); },
-        blot_check_core::Tag.array_op => { return children(proof, id, depth); },
-        blot_check_core::Tag.storage => { return children(proof, id, depth); },
-        blot_check_core::Tag.break_ => { return children(proof, id, depth); },
+        block_ => { return children(proof, id, depth); },
+        suite => { return children(proof, id, depth); },
+        product => { return children(proof, id, depth); },
+        record => { return children(proof, id, depth); },
+        array => { return children(proof, id, depth); },
+        array_op => { return children(proof, id, depth); },
+        storage => { return children(proof, id, depth); },
+        break_ => { return children(proof, id, depth); },
         _ => { return false; },
     }
 }

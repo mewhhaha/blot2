@@ -1,99 +1,108 @@
 // Concrete retained checker output ownership. No borrowed factory tables escape.
 namespace blot_check_check;
-import std;
+import check.capability_contracts;
+import check.generative_schemes;
+import check.numeric_proof_bodies;
+import check.numeric_proof_contracts;
+import check.numeric_proof_terms;
+import check.types;
+import parse.ast;
+import reuse.principal_interface;
 import support.error;
 import support.native;
+
+import std;
 import .check;
 import .check_packet_owner;
 struct CheckedOwner {lease:u32=0,generation:u64=0}
 struct CheckedHeaderLease {
-value_slots:u32[:]=[],
-proof_slots:u32[:]=[],
-values:blot_check_numeric_proof_terms::Kind[:]=[],
-operands:blot_check_numeric_proof_terms::Term[:]=[],
-requirements:blot_check_numeric_proof_contracts::Requirement[:]=[],
-parameters:u32[:]=[],
+value_slots:u32[:]=default<u32[:]>(),
+proof_slots:u32[:]=default<u32[:]>(),
+values:blot_check_numeric_proof_terms::Kind[:]=default<blot_check_numeric_proof_terms::Kind[:]>(),
+operands:blot_check_numeric_proof_terms::Term[:]=default<blot_check_numeric_proof_terms::Term[:]>(),
+requirements:blot_check_numeric_proof_contracts::Requirement[:]=default<blot_check_numeric_proof_contracts::Requirement[:]>(),
+parameters:u32[:]=default<u32[:]>(),
 }
-struct CheckedOwnerState {generation:u64=0,live:bool=false,headers:CheckedHeaderLease[:]=[],
-function_exit_lambdas:blot_parse_ast::Id[:]=[],
-usage_loans:UsageLoan[:]=[],
-proof_contracts:ProofContract[:]=[],
-rank_implementations:RankImplementation[:]=[],
-generative_bindings:blot_check_generative_schemes::Binder[:]=[],
-dictionary_selections:DictionarySelection[:]=[],
-dictionary_uses:DictionaryUse[:]=[],
-iterator_bodies:blot_parse_ast::Id[:]=[],
-computations:Computation[:]=[],
-request_loops:RequestLoop[:]=[],
-request_arms:RequestArm[:]=[],
-request_controls:RequestControl[:]=[],
-reflections:Reflection[:]=[],
-tag_origins:TagOrigin[:]=[],
-effect_scopes:EffectScope[:]=[],
-effect_scope_ids:u32[:]=[],
-effect_runners:EffectRunner[:]=[],
-effect_runner_ids:u32[:]=[],
-provider_blocks:ProviderBlock[:]=[],
-provider_block_ids:u32[:]=[],
-body_closed_rows:ClosedRow[:]=[],
-lambda_closed_rows:blot_check_types::List[:]=[],
-dispatch_signatures:blot_check_types::Id[:]=[],
-covered_requirements:CoveredRequirement[:]=[],
-effect_families:EffectFamily[:]=[],
-effect_templates:EffectTemplate[:]=[],
-operation_uses:OperationUse[:]=[],
-operation_refs:u32[:]=[],
-expr_types:blot_check_types::Id[:]=[],
-resolved:BindingId[:]=[],
-bindings:Binding[:]=[],
-merges:Merge[:]=[],
-obligations:blot_check_types::Obligation[:]=[],
-diagnostics:Diagnostic[:]=[],
-associated:Associated[:]=[],
-nominals:Nominal[:]=[],
-contracts:Contract[:]=[],
-contract_predicates:blot_check_types::Obligation[:]=[],
-contract_members:ContractMember[:]=[],
-implementations:Implementation[:]=[],
-implementation_predicates:blot_check_types::Obligation[:]=[],
-implementation_members:ImplementationMember[:]=[],
-member_templates:blot_reuse_principal_interface::MemberTemplate[:]=[],
-selected_proofs:blot_reuse_principal_interface::SelectedProof[:]=[],
-selected_members:ImplementationMember[:]=[],
-selected_edges:u32[:]=[],
-selected_uses:blot_reuse_principal_interface::SelectedUse[:]=[],
-constructors:Constructor[:]=[],
-constructor_resolved:u32[:]=[],
-projections:u32[:]=[],
-access_paths:blot_check_types::List[:]=[],
-access_nodes:blot_check_types::List[:]=[],
-access_types:blot_check_types::List[:]=[],
-projection_resolved:u32[:]=[],
-projection_catalog:Projection[:]=[],
-rebindings:Rebinding[:]=[],
-resolver_blocks:ResolverBlock[:]=[],
-resolver_ops:ResolverOp[:]=[],
-resolver_joins:ResolverJoin[:]=[],
-resolver_completions:ResolverCompletion[:]=[],
-resolver_loops:ResolverLoop[:]=[],
-resolver_block_ids:u32[:]=[],
-resolver_op_ids:u32[:]=[],
-resolver_join_ids:u32[:]=[],
-resolver_loop_ids:u32[:]=[],
-loop_carries:LoopCarry[:]=[],
-loop_ranges:blot_check_types::List[:]=[],
-loop_exits:LoopExit[:]=[],
-statement_arms:StatementArm[:]=[],
-declarations:SourceDeclaration[:]=[],
-cap_nodes:blot_check_capability_contracts::Term[:]=[],
-cap_words:u32[:]=[],
-cap_bindings:blot_check_capability_contracts::Binding[:]=[],
-body_debits:blot_check_numeric_proof_bodies::Debit[:]=[],
-body_operands:blot_check_numeric_proof_terms::Term[:]=[],
-body_introductions:blot_check_numeric_proof_bodies::Introduction[:]=[],
-body_parameters:blot_check_numeric_proof_bodies::Parameter[:]=[],
-body_uses:blot_check_numeric_proof_bodies::Use[:]=[],
-editor_names:EditorName[:]=[],
+struct CheckedOwnerState {generation:u64=0,live:bool=false,headers:CheckedHeaderLease[:]=default<CheckedHeaderLease[:]>(),
+function_exit_lambdas:blot_parse_ast::Id[:]=default<blot_parse_ast::Id[:]>(),
+usage_loans:UsageLoan[:]=default<UsageLoan[:]>(),
+proof_contracts:ProofContract[:]=default<ProofContract[:]>(),
+rank_implementations:RankImplementation[:]=default<RankImplementation[:]>(),
+generative_bindings:blot_check_generative_schemes::Binder[:]=default<blot_check_generative_schemes::Binder[:]>(),
+dictionary_selections:DictionarySelection[:]=default<DictionarySelection[:]>(),
+dictionary_uses:DictionaryUse[:]=default<DictionaryUse[:]>(),
+iterator_bodies:blot_parse_ast::Id[:]=default<blot_parse_ast::Id[:]>(),
+computations:Computation[:]=default<Computation[:]>(),
+request_loops:RequestLoop[:]=default<RequestLoop[:]>(),
+request_arms:RequestArm[:]=default<RequestArm[:]>(),
+request_controls:RequestControl[:]=default<RequestControl[:]>(),
+reflections:Reflection[:]=default<Reflection[:]>(),
+tag_origins:TagOrigin[:]=default<TagOrigin[:]>(),
+effect_scopes:EffectScope[:]=default<EffectScope[:]>(),
+effect_scope_ids:u32[:]=default<u32[:]>(),
+effect_runners:EffectRunner[:]=default<EffectRunner[:]>(),
+effect_runner_ids:u32[:]=default<u32[:]>(),
+provider_blocks:ProviderBlock[:]=default<ProviderBlock[:]>(),
+provider_block_ids:u32[:]=default<u32[:]>(),
+body_closed_rows:ClosedRow[:]=default<ClosedRow[:]>(),
+lambda_closed_rows:blot_check_types::List[:]=default<blot_check_types::List[:]>(),
+dispatch_signatures:blot_check_types::Id[:]=default<blot_check_types::Id[:]>(),
+covered_requirements:CoveredRequirement[:]=default<CoveredRequirement[:]>(),
+effect_families:EffectFamily[:]=default<EffectFamily[:]>(),
+effect_templates:EffectTemplate[:]=default<EffectTemplate[:]>(),
+operation_uses:OperationUse[:]=default<OperationUse[:]>(),
+operation_refs:u32[:]=default<u32[:]>(),
+expr_types:blot_check_types::Id[:]=default<blot_check_types::Id[:]>(),
+resolved:BindingId[:]=default<BindingId[:]>(),
+bindings:Binding[:]=default<Binding[:]>(),
+merges:Merge[:]=default<Merge[:]>(),
+obligations:blot_check_types::Obligation[:]=default<blot_check_types::Obligation[:]>(),
+diagnostics:Diagnostic[:]=default<Diagnostic[:]>(),
+associated:Associated[:]=default<Associated[:]>(),
+nominals:Nominal[:]=default<Nominal[:]>(),
+contracts:Contract[:]=default<Contract[:]>(),
+contract_predicates:blot_check_types::Obligation[:]=default<blot_check_types::Obligation[:]>(),
+contract_members:ContractMember[:]=default<ContractMember[:]>(),
+implementations:Implementation[:]=default<Implementation[:]>(),
+implementation_predicates:blot_check_types::Obligation[:]=default<blot_check_types::Obligation[:]>(),
+implementation_members:ImplementationMember[:]=default<ImplementationMember[:]>(),
+member_templates:blot_reuse_principal_interface::MemberTemplate[:]=default<blot_reuse_principal_interface::MemberTemplate[:]>(),
+selected_proofs:blot_reuse_principal_interface::SelectedProof[:]=default<blot_reuse_principal_interface::SelectedProof[:]>(),
+selected_members:ImplementationMember[:]=default<ImplementationMember[:]>(),
+selected_edges:u32[:]=default<u32[:]>(),
+selected_uses:blot_reuse_principal_interface::SelectedUse[:]=default<blot_reuse_principal_interface::SelectedUse[:]>(),
+constructors:Constructor[:]=default<Constructor[:]>(),
+constructor_resolved:u32[:]=default<u32[:]>(),
+projections:u32[:]=default<u32[:]>(),
+access_paths:blot_check_types::List[:]=default<blot_check_types::List[:]>(),
+access_nodes:blot_check_types::List[:]=default<blot_check_types::List[:]>(),
+access_types:blot_check_types::List[:]=default<blot_check_types::List[:]>(),
+projection_resolved:u32[:]=default<u32[:]>(),
+projection_catalog:Projection[:]=default<Projection[:]>(),
+rebindings:Rebinding[:]=default<Rebinding[:]>(),
+resolver_blocks:ResolverBlock[:]=default<ResolverBlock[:]>(),
+resolver_ops:ResolverOp[:]=default<ResolverOp[:]>(),
+resolver_joins:ResolverJoin[:]=default<ResolverJoin[:]>(),
+resolver_completions:ResolverCompletion[:]=default<ResolverCompletion[:]>(),
+resolver_loops:ResolverLoop[:]=default<ResolverLoop[:]>(),
+resolver_block_ids:u32[:]=default<u32[:]>(),
+resolver_op_ids:u32[:]=default<u32[:]>(),
+resolver_join_ids:u32[:]=default<u32[:]>(),
+resolver_loop_ids:u32[:]=default<u32[:]>(),
+loop_carries:LoopCarry[:]=default<LoopCarry[:]>(),
+loop_ranges:blot_check_types::List[:]=default<blot_check_types::List[:]>(),
+loop_exits:LoopExit[:]=default<LoopExit[:]>(),
+statement_arms:StatementArm[:]=default<StatementArm[:]>(),
+declarations:SourceDeclaration[:]=default<SourceDeclaration[:]>(),
+cap_nodes:blot_check_capability_contracts::Term[:]=default<blot_check_capability_contracts::Term[:]>(),
+cap_words:u32[:]=default<u32[:]>(),
+cap_bindings:blot_check_capability_contracts::Binding[:]=default<blot_check_capability_contracts::Binding[:]>(),
+body_debits:blot_check_numeric_proof_bodies::Debit[:]=default<blot_check_numeric_proof_bodies::Debit[:]>(),
+body_operands:blot_check_numeric_proof_terms::Term[:]=default<blot_check_numeric_proof_terms::Term[:]>(),
+body_introductions:blot_check_numeric_proof_bodies::Introduction[:]=default<blot_check_numeric_proof_bodies::Introduction[:]>(),
+body_parameters:blot_check_numeric_proof_bodies::Parameter[:]=default<blot_check_numeric_proof_bodies::Parameter[:]>(),
+body_uses:blot_check_numeric_proof_bodies::Use[:]=default<blot_check_numeric_proof_bodies::Use[:]>(),
+editor_names:EditorName[:]=default<EditorName[:]>(),
 }
 reusable var checked_owners:CheckedOwnerState[>..]=[];
 reusable[] var checked_headers:CheckedHeaderLease[>..];
@@ -182,8 +191,8 @@ reusable[] var checked_header_values:blot_check_numeric_proof_terms::Kind[>..];
 reusable[] var checked_header_operands:blot_check_numeric_proof_terms::Term[>..];
 reusable[] var checked_header_requirements:blot_check_numeric_proof_contracts::Requirement[>..];
 reusable[] var checked_header_parameters:u32[>..];
-fn valid(self:CheckedOwner)->bool {return self.lease!=0 && self.lease-1<checked_owners.len && checked_owners[self.lease-1].live && checked_owners[self.lease-1].generation==self.generation;}
-fn checkedOwnerState(self:CheckedOwner)->CheckedOwnerState& {assert(self.valid());return checked_owners[self.lease-1];}
+fn valid(self_:CheckedOwner)->bool {return self_.lease!=0 && self_.lease-1<checked_owners.len && checked_owners[self_.lease-1].live && checked_owners[self_.lease-1].generation==self_.generation;}
+fn checkedOwnerState(self_:CheckedOwner)->CheckedOwnerState& {assert(self_.valid());return checked_owners[self_.lease-1];}
 fn newCheckedOwner()->CheckedOwner,blot_error::Error {if checked_owners.len>=0xffffffff {return CheckedOwner{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let index=checked_owners.alloc_index(CheckedOwnerState{generation:generation,live:true, ..});return CheckedOwner{(index+1) as u32,generation, ..},blot_error::Error.none;}
 fn ownChecked_function_exit_lambdas(owner:CheckedOwner,values:const blot_parse_ast::Id[:])->blot_parse_ast::Id[:] {let state .= checkedOwnerState(owner);assert(state.function_exit_lambdas.len==0);let result=checked_function_exit_lambdas.alloc_slice(values.len);for value,index in values {result[index]=value;}state.function_exit_lambdas=result;return result;}
 fn ownChecked_usage_loans(owner:CheckedOwner,values:const UsageLoan[:])->UsageLoan[:] {let state .= checkedOwnerState(owner);assert(state.usage_loans.len==0);let result=checked_usage_loans.alloc_slice(values.len);for value,index in values {result[index]=value;}state.usage_loans=result;return result;}
@@ -281,148 +290,148 @@ lease.requirements=checked_header_requirements.alloc_slice(contract.header.requi
 lease.parameters=checked_header_parameters.alloc_slice(contract.parameters.len);for value,slot in contract.parameters {lease.parameters[slot]=value;}contract.parameters=lease.parameters;
 state.headers[index]=lease;}}
 fn releaseCheckedBodies(owner:CheckedOwner) {let state .= checkedOwnerState(owner);
-if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=[];}
-if state.usage_loans.len!=0 {checked_usage_loans.free_slice(state.usage_loans);state.usage_loans=[];}
-if state.proof_contracts.len!=0 {checked_proof_contracts.free_slice(state.proof_contracts);state.proof_contracts=[];}
-if state.rank_implementations.len!=0 {checked_rank_implementations.free_slice(state.rank_implementations);state.rank_implementations=[];}
-if state.generative_bindings.len!=0 {checked_generative_bindings.free_slice(state.generative_bindings);state.generative_bindings=[];}
-if state.dictionary_selections.len!=0 {checked_dictionary_selections.free_slice(state.dictionary_selections);state.dictionary_selections=[];}
-if state.dictionary_uses.len!=0 {checked_dictionary_uses.free_slice(state.dictionary_uses);state.dictionary_uses=[];}
-if state.iterator_bodies.len!=0 {checked_iterator_bodies.free_slice(state.iterator_bodies);state.iterator_bodies=[];}
-if state.computations.len!=0 {checked_computations.free_slice(state.computations);state.computations=[];}
-if state.request_loops.len!=0 {checked_request_loops.free_slice(state.request_loops);state.request_loops=[];}
-if state.request_arms.len!=0 {checked_request_arms.free_slice(state.request_arms);state.request_arms=[];}
-if state.request_controls.len!=0 {checked_request_controls.free_slice(state.request_controls);state.request_controls=[];}
-if state.reflections.len!=0 {checked_reflections.free_slice(state.reflections);state.reflections=[];}
-if state.tag_origins.len!=0 {checked_tag_origins.free_slice(state.tag_origins);state.tag_origins=[];}
-if state.effect_scopes.len!=0 {checked_effect_scopes.free_slice(state.effect_scopes);state.effect_scopes=[];}
-if state.effect_scope_ids.len!=0 {checked_effect_scope_ids.free_slice(state.effect_scope_ids);state.effect_scope_ids=[];}
-if state.effect_runners.len!=0 {checked_effect_runners.free_slice(state.effect_runners);state.effect_runners=[];}
-if state.effect_runner_ids.len!=0 {checked_effect_runner_ids.free_slice(state.effect_runner_ids);state.effect_runner_ids=[];}
-if state.provider_blocks.len!=0 {checked_provider_blocks.free_slice(state.provider_blocks);state.provider_blocks=[];}
-if state.provider_block_ids.len!=0 {checked_provider_block_ids.free_slice(state.provider_block_ids);state.provider_block_ids=[];}
-if state.body_closed_rows.len!=0 {checked_body_closed_rows.free_slice(state.body_closed_rows);state.body_closed_rows=[];}
-if state.lambda_closed_rows.len!=0 {checked_lambda_closed_rows.free_slice(state.lambda_closed_rows);state.lambda_closed_rows=[];}
-if state.dispatch_signatures.len!=0 {checked_dispatch_signatures.free_slice(state.dispatch_signatures);state.dispatch_signatures=[];}
-if state.covered_requirements.len!=0 {checked_covered_requirements.free_slice(state.covered_requirements);state.covered_requirements=[];}
-if state.operation_uses.len!=0 {checked_operation_uses.free_slice(state.operation_uses);state.operation_uses=[];}
-if state.operation_refs.len!=0 {checked_operation_refs.free_slice(state.operation_refs);state.operation_refs=[];}
-if state.expr_types.len!=0 {checked_expr_types.free_slice(state.expr_types);state.expr_types=[];}
-if state.bindings.len!=0 {checked_bindings.free_slice(state.bindings);state.bindings=[];}
-if state.merges.len!=0 {checked_merges.free_slice(state.merges);state.merges=[];}
-if state.obligations.len!=0 {checked_obligations.free_slice(state.obligations);state.obligations=[];}
-if state.constructor_resolved.len!=0 {checked_constructor_resolved.free_slice(state.constructor_resolved);state.constructor_resolved=[];}
-if state.projections.len!=0 {checked_projections.free_slice(state.projections);state.projections=[];}
-if state.access_paths.len!=0 {checked_access_paths.free_slice(state.access_paths);state.access_paths=[];}
-if state.access_nodes.len!=0 {checked_access_nodes.free_slice(state.access_nodes);state.access_nodes=[];}
-if state.access_types.len!=0 {checked_access_types.free_slice(state.access_types);state.access_types=[];}
-if state.projection_resolved.len!=0 {checked_projection_resolved.free_slice(state.projection_resolved);state.projection_resolved=[];}
-if state.projection_catalog.len!=0 {checked_projection_catalog.free_slice(state.projection_catalog);state.projection_catalog=[];}
-if state.rebindings.len!=0 {checked_rebindings.free_slice(state.rebindings);state.rebindings=[];}
-if state.resolver_blocks.len!=0 {checked_resolver_blocks.free_slice(state.resolver_blocks);state.resolver_blocks=[];}
-if state.resolver_ops.len!=0 {checked_resolver_ops.free_slice(state.resolver_ops);state.resolver_ops=[];}
-if state.resolver_joins.len!=0 {checked_resolver_joins.free_slice(state.resolver_joins);state.resolver_joins=[];}
-if state.resolver_completions.len!=0 {checked_resolver_completions.free_slice(state.resolver_completions);state.resolver_completions=[];}
-if state.resolver_loops.len!=0 {checked_resolver_loops.free_slice(state.resolver_loops);state.resolver_loops=[];}
-if state.resolver_block_ids.len!=0 {checked_resolver_block_ids.free_slice(state.resolver_block_ids);state.resolver_block_ids=[];}
-if state.resolver_op_ids.len!=0 {checked_resolver_op_ids.free_slice(state.resolver_op_ids);state.resolver_op_ids=[];}
-if state.resolver_join_ids.len!=0 {checked_resolver_join_ids.free_slice(state.resolver_join_ids);state.resolver_join_ids=[];}
-if state.resolver_loop_ids.len!=0 {checked_resolver_loop_ids.free_slice(state.resolver_loop_ids);state.resolver_loop_ids=[];}
-if state.loop_carries.len!=0 {checked_loop_carries.free_slice(state.loop_carries);state.loop_carries=[];}
-if state.loop_ranges.len!=0 {checked_loop_ranges.free_slice(state.loop_ranges);state.loop_ranges=[];}
-if state.loop_exits.len!=0 {checked_loop_exits.free_slice(state.loop_exits);state.loop_exits=[];}
-if state.statement_arms.len!=0 {checked_statement_arms.free_slice(state.statement_arms);state.statement_arms=[];}
-if state.cap_nodes.len!=0 {checked_cap_nodes.free_slice(state.cap_nodes);state.cap_nodes=[];}
-if state.cap_words.len!=0 {checked_cap_words.free_slice(state.cap_words);state.cap_words=[];}
-if state.cap_bindings.len!=0 {checked_cap_bindings.free_slice(state.cap_bindings);state.cap_bindings=[];}
-if state.body_debits.len!=0 {checked_body_debits.free_slice(state.body_debits);state.body_debits=[];}
-if state.body_operands.len!=0 {checked_body_operands.free_slice(state.body_operands);state.body_operands=[];}
-if state.body_introductions.len!=0 {checked_body_introductions.free_slice(state.body_introductions);state.body_introductions=[];}
-if state.body_parameters.len!=0 {checked_body_parameters.free_slice(state.body_parameters);state.body_parameters=[];}
-if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.body_uses=[];}
-if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=[];}
-for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=[];}
+if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=default<blot_parse_ast::Id[:]>();}
+if state.usage_loans.len!=0 {checked_usage_loans.free_slice(state.usage_loans);state.usage_loans=default<UsageLoan[:]>();}
+if state.proof_contracts.len!=0 {checked_proof_contracts.free_slice(state.proof_contracts);state.proof_contracts=default<ProofContract[:]>();}
+if state.rank_implementations.len!=0 {checked_rank_implementations.free_slice(state.rank_implementations);state.rank_implementations=default<RankImplementation[:]>();}
+if state.generative_bindings.len!=0 {checked_generative_bindings.free_slice(state.generative_bindings);state.generative_bindings=default<blot_check_generative_schemes::Binder[:]>();}
+if state.dictionary_selections.len!=0 {checked_dictionary_selections.free_slice(state.dictionary_selections);state.dictionary_selections=default<DictionarySelection[:]>();}
+if state.dictionary_uses.len!=0 {checked_dictionary_uses.free_slice(state.dictionary_uses);state.dictionary_uses=default<DictionaryUse[:]>();}
+if state.iterator_bodies.len!=0 {checked_iterator_bodies.free_slice(state.iterator_bodies);state.iterator_bodies=default<blot_parse_ast::Id[:]>();}
+if state.computations.len!=0 {checked_computations.free_slice(state.computations);state.computations=default<Computation[:]>();}
+if state.request_loops.len!=0 {checked_request_loops.free_slice(state.request_loops);state.request_loops=default<RequestLoop[:]>();}
+if state.request_arms.len!=0 {checked_request_arms.free_slice(state.request_arms);state.request_arms=default<RequestArm[:]>();}
+if state.request_controls.len!=0 {checked_request_controls.free_slice(state.request_controls);state.request_controls=default<RequestControl[:]>();}
+if state.reflections.len!=0 {checked_reflections.free_slice(state.reflections);state.reflections=default<Reflection[:]>();}
+if state.tag_origins.len!=0 {checked_tag_origins.free_slice(state.tag_origins);state.tag_origins=default<TagOrigin[:]>();}
+if state.effect_scopes.len!=0 {checked_effect_scopes.free_slice(state.effect_scopes);state.effect_scopes=default<EffectScope[:]>();}
+if state.effect_scope_ids.len!=0 {checked_effect_scope_ids.free_slice(state.effect_scope_ids);state.effect_scope_ids=default<u32[:]>();}
+if state.effect_runners.len!=0 {checked_effect_runners.free_slice(state.effect_runners);state.effect_runners=default<EffectRunner[:]>();}
+if state.effect_runner_ids.len!=0 {checked_effect_runner_ids.free_slice(state.effect_runner_ids);state.effect_runner_ids=default<u32[:]>();}
+if state.provider_blocks.len!=0 {checked_provider_blocks.free_slice(state.provider_blocks);state.provider_blocks=default<ProviderBlock[:]>();}
+if state.provider_block_ids.len!=0 {checked_provider_block_ids.free_slice(state.provider_block_ids);state.provider_block_ids=default<u32[:]>();}
+if state.body_closed_rows.len!=0 {checked_body_closed_rows.free_slice(state.body_closed_rows);state.body_closed_rows=default<ClosedRow[:]>();}
+if state.lambda_closed_rows.len!=0 {checked_lambda_closed_rows.free_slice(state.lambda_closed_rows);state.lambda_closed_rows=default<blot_check_types::List[:]>();}
+if state.dispatch_signatures.len!=0 {checked_dispatch_signatures.free_slice(state.dispatch_signatures);state.dispatch_signatures=default<blot_check_types::Id[:]>();}
+if state.covered_requirements.len!=0 {checked_covered_requirements.free_slice(state.covered_requirements);state.covered_requirements=default<CoveredRequirement[:]>();}
+if state.operation_uses.len!=0 {checked_operation_uses.free_slice(state.operation_uses);state.operation_uses=default<OperationUse[:]>();}
+if state.operation_refs.len!=0 {checked_operation_refs.free_slice(state.operation_refs);state.operation_refs=default<u32[:]>();}
+if state.expr_types.len!=0 {checked_expr_types.free_slice(state.expr_types);state.expr_types=default<blot_check_types::Id[:]>();}
+if state.bindings.len!=0 {checked_bindings.free_slice(state.bindings);state.bindings=default<Binding[:]>();}
+if state.merges.len!=0 {checked_merges.free_slice(state.merges);state.merges=default<Merge[:]>();}
+if state.obligations.len!=0 {checked_obligations.free_slice(state.obligations);state.obligations=default<blot_check_types::Obligation[:]>();}
+if state.constructor_resolved.len!=0 {checked_constructor_resolved.free_slice(state.constructor_resolved);state.constructor_resolved=default<u32[:]>();}
+if state.projections.len!=0 {checked_projections.free_slice(state.projections);state.projections=default<u32[:]>();}
+if state.access_paths.len!=0 {checked_access_paths.free_slice(state.access_paths);state.access_paths=default<blot_check_types::List[:]>();}
+if state.access_nodes.len!=0 {checked_access_nodes.free_slice(state.access_nodes);state.access_nodes=default<blot_check_types::List[:]>();}
+if state.access_types.len!=0 {checked_access_types.free_slice(state.access_types);state.access_types=default<blot_check_types::List[:]>();}
+if state.projection_resolved.len!=0 {checked_projection_resolved.free_slice(state.projection_resolved);state.projection_resolved=default<u32[:]>();}
+if state.projection_catalog.len!=0 {checked_projection_catalog.free_slice(state.projection_catalog);state.projection_catalog=default<Projection[:]>();}
+if state.rebindings.len!=0 {checked_rebindings.free_slice(state.rebindings);state.rebindings=default<Rebinding[:]>();}
+if state.resolver_blocks.len!=0 {checked_resolver_blocks.free_slice(state.resolver_blocks);state.resolver_blocks=default<ResolverBlock[:]>();}
+if state.resolver_ops.len!=0 {checked_resolver_ops.free_slice(state.resolver_ops);state.resolver_ops=default<ResolverOp[:]>();}
+if state.resolver_joins.len!=0 {checked_resolver_joins.free_slice(state.resolver_joins);state.resolver_joins=default<ResolverJoin[:]>();}
+if state.resolver_completions.len!=0 {checked_resolver_completions.free_slice(state.resolver_completions);state.resolver_completions=default<ResolverCompletion[:]>();}
+if state.resolver_loops.len!=0 {checked_resolver_loops.free_slice(state.resolver_loops);state.resolver_loops=default<ResolverLoop[:]>();}
+if state.resolver_block_ids.len!=0 {checked_resolver_block_ids.free_slice(state.resolver_block_ids);state.resolver_block_ids=default<u32[:]>();}
+if state.resolver_op_ids.len!=0 {checked_resolver_op_ids.free_slice(state.resolver_op_ids);state.resolver_op_ids=default<u32[:]>();}
+if state.resolver_join_ids.len!=0 {checked_resolver_join_ids.free_slice(state.resolver_join_ids);state.resolver_join_ids=default<u32[:]>();}
+if state.resolver_loop_ids.len!=0 {checked_resolver_loop_ids.free_slice(state.resolver_loop_ids);state.resolver_loop_ids=default<u32[:]>();}
+if state.loop_carries.len!=0 {checked_loop_carries.free_slice(state.loop_carries);state.loop_carries=default<LoopCarry[:]>();}
+if state.loop_ranges.len!=0 {checked_loop_ranges.free_slice(state.loop_ranges);state.loop_ranges=default<blot_check_types::List[:]>();}
+if state.loop_exits.len!=0 {checked_loop_exits.free_slice(state.loop_exits);state.loop_exits=default<LoopExit[:]>();}
+if state.statement_arms.len!=0 {checked_statement_arms.free_slice(state.statement_arms);state.statement_arms=default<StatementArm[:]>();}
+if state.cap_nodes.len!=0 {checked_cap_nodes.free_slice(state.cap_nodes);state.cap_nodes=default<blot_check_capability_contracts::Term[:]>();}
+if state.cap_words.len!=0 {checked_cap_words.free_slice(state.cap_words);state.cap_words=default<u32[:]>();}
+if state.cap_bindings.len!=0 {checked_cap_bindings.free_slice(state.cap_bindings);state.cap_bindings=default<blot_check_capability_contracts::Binding[:]>();}
+if state.body_debits.len!=0 {checked_body_debits.free_slice(state.body_debits);state.body_debits=default<blot_check_numeric_proof_bodies::Debit[:]>();}
+if state.body_operands.len!=0 {checked_body_operands.free_slice(state.body_operands);state.body_operands=default<blot_check_numeric_proof_terms::Term[:]>();}
+if state.body_introductions.len!=0 {checked_body_introductions.free_slice(state.body_introductions);state.body_introductions=default<blot_check_numeric_proof_bodies::Introduction[:]>();}
+if state.body_parameters.len!=0 {checked_body_parameters.free_slice(state.body_parameters);state.body_parameters=default<blot_check_numeric_proof_bodies::Parameter[:]>();}
+if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.body_uses=default<blot_check_numeric_proof_bodies::Use[:]>();}
+if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=default<EditorName[:]>();}
+for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=default<CheckedHeaderLease[:]>();}
 }
-fn deinit(self:CheckedOwner&) {if self.lease==0 {return;}assert(self.valid());let state .= checkedOwnerState(self);
-if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=[];}
-if state.usage_loans.len!=0 {checked_usage_loans.free_slice(state.usage_loans);state.usage_loans=[];}
-if state.proof_contracts.len!=0 {checked_proof_contracts.free_slice(state.proof_contracts);state.proof_contracts=[];}
-if state.rank_implementations.len!=0 {checked_rank_implementations.free_slice(state.rank_implementations);state.rank_implementations=[];}
-if state.generative_bindings.len!=0 {checked_generative_bindings.free_slice(state.generative_bindings);state.generative_bindings=[];}
-if state.dictionary_selections.len!=0 {checked_dictionary_selections.free_slice(state.dictionary_selections);state.dictionary_selections=[];}
-if state.dictionary_uses.len!=0 {checked_dictionary_uses.free_slice(state.dictionary_uses);state.dictionary_uses=[];}
-if state.iterator_bodies.len!=0 {checked_iterator_bodies.free_slice(state.iterator_bodies);state.iterator_bodies=[];}
-if state.computations.len!=0 {checked_computations.free_slice(state.computations);state.computations=[];}
-if state.request_loops.len!=0 {checked_request_loops.free_slice(state.request_loops);state.request_loops=[];}
-if state.request_arms.len!=0 {checked_request_arms.free_slice(state.request_arms);state.request_arms=[];}
-if state.request_controls.len!=0 {checked_request_controls.free_slice(state.request_controls);state.request_controls=[];}
-if state.reflections.len!=0 {checked_reflections.free_slice(state.reflections);state.reflections=[];}
-if state.tag_origins.len!=0 {checked_tag_origins.free_slice(state.tag_origins);state.tag_origins=[];}
-if state.effect_scopes.len!=0 {checked_effect_scopes.free_slice(state.effect_scopes);state.effect_scopes=[];}
-if state.effect_scope_ids.len!=0 {checked_effect_scope_ids.free_slice(state.effect_scope_ids);state.effect_scope_ids=[];}
-if state.effect_runners.len!=0 {checked_effect_runners.free_slice(state.effect_runners);state.effect_runners=[];}
-if state.effect_runner_ids.len!=0 {checked_effect_runner_ids.free_slice(state.effect_runner_ids);state.effect_runner_ids=[];}
-if state.provider_blocks.len!=0 {checked_provider_blocks.free_slice(state.provider_blocks);state.provider_blocks=[];}
-if state.provider_block_ids.len!=0 {checked_provider_block_ids.free_slice(state.provider_block_ids);state.provider_block_ids=[];}
-if state.body_closed_rows.len!=0 {checked_body_closed_rows.free_slice(state.body_closed_rows);state.body_closed_rows=[];}
-if state.lambda_closed_rows.len!=0 {checked_lambda_closed_rows.free_slice(state.lambda_closed_rows);state.lambda_closed_rows=[];}
-if state.dispatch_signatures.len!=0 {checked_dispatch_signatures.free_slice(state.dispatch_signatures);state.dispatch_signatures=[];}
-if state.covered_requirements.len!=0 {checked_covered_requirements.free_slice(state.covered_requirements);state.covered_requirements=[];}
-if state.effect_families.len!=0 {checked_effect_families.free_slice(state.effect_families);state.effect_families=[];}
-if state.effect_templates.len!=0 {checked_effect_templates.free_slice(state.effect_templates);state.effect_templates=[];}
-if state.operation_uses.len!=0 {checked_operation_uses.free_slice(state.operation_uses);state.operation_uses=[];}
-if state.operation_refs.len!=0 {checked_operation_refs.free_slice(state.operation_refs);state.operation_refs=[];}
-if state.expr_types.len!=0 {checked_expr_types.free_slice(state.expr_types);state.expr_types=[];}
-if state.resolved.len!=0 {checked_resolved.free_slice(state.resolved);state.resolved=[];}
-if state.bindings.len!=0 {checked_bindings.free_slice(state.bindings);state.bindings=[];}
-if state.merges.len!=0 {checked_merges.free_slice(state.merges);state.merges=[];}
-if state.obligations.len!=0 {checked_obligations.free_slice(state.obligations);state.obligations=[];}
-if state.diagnostics.len!=0 {checked_diagnostics.free_slice(state.diagnostics);state.diagnostics=[];}
-if state.associated.len!=0 {checked_associated.free_slice(state.associated);state.associated=[];}
-if state.nominals.len!=0 {checked_nominals.free_slice(state.nominals);state.nominals=[];}
-if state.contracts.len!=0 {checked_contracts.free_slice(state.contracts);state.contracts=[];}
-if state.contract_predicates.len!=0 {checked_contract_predicates.free_slice(state.contract_predicates);state.contract_predicates=[];}
-if state.contract_members.len!=0 {checked_contract_members.free_slice(state.contract_members);state.contract_members=[];}
-if state.implementations.len!=0 {checked_implementations.free_slice(state.implementations);state.implementations=[];}
-if state.implementation_predicates.len!=0 {checked_implementation_predicates.free_slice(state.implementation_predicates);state.implementation_predicates=[];}
-if state.implementation_members.len!=0 {checked_implementation_members.free_slice(state.implementation_members);state.implementation_members=[];}
-if state.member_templates.len!=0 {checked_member_templates.free_slice(state.member_templates);state.member_templates=[];}
-if state.selected_proofs.len!=0 {checked_selected_proofs.free_slice(state.selected_proofs);state.selected_proofs=[];}
-if state.selected_members.len!=0 {checked_selected_members.free_slice(state.selected_members);state.selected_members=[];}
-if state.selected_edges.len!=0 {checked_selected_edges.free_slice(state.selected_edges);state.selected_edges=[];}
-if state.selected_uses.len!=0 {checked_selected_uses.free_slice(state.selected_uses);state.selected_uses=[];}
-if state.constructors.len!=0 {checked_constructors.free_slice(state.constructors);state.constructors=[];}
-if state.constructor_resolved.len!=0 {checked_constructor_resolved.free_slice(state.constructor_resolved);state.constructor_resolved=[];}
-if state.projections.len!=0 {checked_projections.free_slice(state.projections);state.projections=[];}
-if state.access_paths.len!=0 {checked_access_paths.free_slice(state.access_paths);state.access_paths=[];}
-if state.access_nodes.len!=0 {checked_access_nodes.free_slice(state.access_nodes);state.access_nodes=[];}
-if state.access_types.len!=0 {checked_access_types.free_slice(state.access_types);state.access_types=[];}
-if state.projection_resolved.len!=0 {checked_projection_resolved.free_slice(state.projection_resolved);state.projection_resolved=[];}
-if state.projection_catalog.len!=0 {checked_projection_catalog.free_slice(state.projection_catalog);state.projection_catalog=[];}
-if state.rebindings.len!=0 {checked_rebindings.free_slice(state.rebindings);state.rebindings=[];}
-if state.resolver_blocks.len!=0 {checked_resolver_blocks.free_slice(state.resolver_blocks);state.resolver_blocks=[];}
-if state.resolver_ops.len!=0 {checked_resolver_ops.free_slice(state.resolver_ops);state.resolver_ops=[];}
-if state.resolver_joins.len!=0 {checked_resolver_joins.free_slice(state.resolver_joins);state.resolver_joins=[];}
-if state.resolver_completions.len!=0 {checked_resolver_completions.free_slice(state.resolver_completions);state.resolver_completions=[];}
-if state.resolver_loops.len!=0 {checked_resolver_loops.free_slice(state.resolver_loops);state.resolver_loops=[];}
-if state.resolver_block_ids.len!=0 {checked_resolver_block_ids.free_slice(state.resolver_block_ids);state.resolver_block_ids=[];}
-if state.resolver_op_ids.len!=0 {checked_resolver_op_ids.free_slice(state.resolver_op_ids);state.resolver_op_ids=[];}
-if state.resolver_join_ids.len!=0 {checked_resolver_join_ids.free_slice(state.resolver_join_ids);state.resolver_join_ids=[];}
-if state.resolver_loop_ids.len!=0 {checked_resolver_loop_ids.free_slice(state.resolver_loop_ids);state.resolver_loop_ids=[];}
-if state.loop_carries.len!=0 {checked_loop_carries.free_slice(state.loop_carries);state.loop_carries=[];}
-if state.loop_ranges.len!=0 {checked_loop_ranges.free_slice(state.loop_ranges);state.loop_ranges=[];}
-if state.loop_exits.len!=0 {checked_loop_exits.free_slice(state.loop_exits);state.loop_exits=[];}
-if state.statement_arms.len!=0 {checked_statement_arms.free_slice(state.statement_arms);state.statement_arms=[];}
-if state.declarations.len!=0 {checked_declarations.free_slice(state.declarations);state.declarations=[];}
-if state.cap_nodes.len!=0 {checked_cap_nodes.free_slice(state.cap_nodes);state.cap_nodes=[];}
-if state.cap_words.len!=0 {checked_cap_words.free_slice(state.cap_words);state.cap_words=[];}
-if state.cap_bindings.len!=0 {checked_cap_bindings.free_slice(state.cap_bindings);state.cap_bindings=[];}
-if state.body_debits.len!=0 {checked_body_debits.free_slice(state.body_debits);state.body_debits=[];}
-if state.body_operands.len!=0 {checked_body_operands.free_slice(state.body_operands);state.body_operands=[];}
-if state.body_introductions.len!=0 {checked_body_introductions.free_slice(state.body_introductions);state.body_introductions=[];}
-if state.body_parameters.len!=0 {checked_body_parameters.free_slice(state.body_parameters);state.body_parameters=[];}
-if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.body_uses=[];}
-if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=[];}
-for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=[];}let index=self.lease-1;state.live=false;checked_owners.free(index);self=CheckedOwner{..};}
-fn deinit(self:Checked&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);if self.editor.present && self.editor.value.context.present {self.editor.value.context.value.deinit();}self.types.deinit();self.parameter_patterns.deinit();releaseCheckedPacket(self.owner);self.owner.deinit();self=default<Checked>();}
-fn deinit(self:SourceValidation&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);self.types.deinit();self.parameter_patterns.deinit();self.owner.deinit();self=default<SourceValidation>();}
+fn deinit(self_:CheckedOwner&) {if self_.lease==0 {return;}assert(self_.valid());let state .= checkedOwnerState(self_);
+if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=default<blot_parse_ast::Id[:]>();}
+if state.usage_loans.len!=0 {checked_usage_loans.free_slice(state.usage_loans);state.usage_loans=default<UsageLoan[:]>();}
+if state.proof_contracts.len!=0 {checked_proof_contracts.free_slice(state.proof_contracts);state.proof_contracts=default<ProofContract[:]>();}
+if state.rank_implementations.len!=0 {checked_rank_implementations.free_slice(state.rank_implementations);state.rank_implementations=default<RankImplementation[:]>();}
+if state.generative_bindings.len!=0 {checked_generative_bindings.free_slice(state.generative_bindings);state.generative_bindings=default<blot_check_generative_schemes::Binder[:]>();}
+if state.dictionary_selections.len!=0 {checked_dictionary_selections.free_slice(state.dictionary_selections);state.dictionary_selections=default<DictionarySelection[:]>();}
+if state.dictionary_uses.len!=0 {checked_dictionary_uses.free_slice(state.dictionary_uses);state.dictionary_uses=default<DictionaryUse[:]>();}
+if state.iterator_bodies.len!=0 {checked_iterator_bodies.free_slice(state.iterator_bodies);state.iterator_bodies=default<blot_parse_ast::Id[:]>();}
+if state.computations.len!=0 {checked_computations.free_slice(state.computations);state.computations=default<Computation[:]>();}
+if state.request_loops.len!=0 {checked_request_loops.free_slice(state.request_loops);state.request_loops=default<RequestLoop[:]>();}
+if state.request_arms.len!=0 {checked_request_arms.free_slice(state.request_arms);state.request_arms=default<RequestArm[:]>();}
+if state.request_controls.len!=0 {checked_request_controls.free_slice(state.request_controls);state.request_controls=default<RequestControl[:]>();}
+if state.reflections.len!=0 {checked_reflections.free_slice(state.reflections);state.reflections=default<Reflection[:]>();}
+if state.tag_origins.len!=0 {checked_tag_origins.free_slice(state.tag_origins);state.tag_origins=default<TagOrigin[:]>();}
+if state.effect_scopes.len!=0 {checked_effect_scopes.free_slice(state.effect_scopes);state.effect_scopes=default<EffectScope[:]>();}
+if state.effect_scope_ids.len!=0 {checked_effect_scope_ids.free_slice(state.effect_scope_ids);state.effect_scope_ids=default<u32[:]>();}
+if state.effect_runners.len!=0 {checked_effect_runners.free_slice(state.effect_runners);state.effect_runners=default<EffectRunner[:]>();}
+if state.effect_runner_ids.len!=0 {checked_effect_runner_ids.free_slice(state.effect_runner_ids);state.effect_runner_ids=default<u32[:]>();}
+if state.provider_blocks.len!=0 {checked_provider_blocks.free_slice(state.provider_blocks);state.provider_blocks=default<ProviderBlock[:]>();}
+if state.provider_block_ids.len!=0 {checked_provider_block_ids.free_slice(state.provider_block_ids);state.provider_block_ids=default<u32[:]>();}
+if state.body_closed_rows.len!=0 {checked_body_closed_rows.free_slice(state.body_closed_rows);state.body_closed_rows=default<ClosedRow[:]>();}
+if state.lambda_closed_rows.len!=0 {checked_lambda_closed_rows.free_slice(state.lambda_closed_rows);state.lambda_closed_rows=default<blot_check_types::List[:]>();}
+if state.dispatch_signatures.len!=0 {checked_dispatch_signatures.free_slice(state.dispatch_signatures);state.dispatch_signatures=default<blot_check_types::Id[:]>();}
+if state.covered_requirements.len!=0 {checked_covered_requirements.free_slice(state.covered_requirements);state.covered_requirements=default<CoveredRequirement[:]>();}
+if state.effect_families.len!=0 {checked_effect_families.free_slice(state.effect_families);state.effect_families=default<EffectFamily[:]>();}
+if state.effect_templates.len!=0 {checked_effect_templates.free_slice(state.effect_templates);state.effect_templates=default<EffectTemplate[:]>();}
+if state.operation_uses.len!=0 {checked_operation_uses.free_slice(state.operation_uses);state.operation_uses=default<OperationUse[:]>();}
+if state.operation_refs.len!=0 {checked_operation_refs.free_slice(state.operation_refs);state.operation_refs=default<u32[:]>();}
+if state.expr_types.len!=0 {checked_expr_types.free_slice(state.expr_types);state.expr_types=default<blot_check_types::Id[:]>();}
+if state.resolved.len!=0 {checked_resolved.free_slice(state.resolved);state.resolved=default<BindingId[:]>();}
+if state.bindings.len!=0 {checked_bindings.free_slice(state.bindings);state.bindings=default<Binding[:]>();}
+if state.merges.len!=0 {checked_merges.free_slice(state.merges);state.merges=default<Merge[:]>();}
+if state.obligations.len!=0 {checked_obligations.free_slice(state.obligations);state.obligations=default<blot_check_types::Obligation[:]>();}
+if state.diagnostics.len!=0 {checked_diagnostics.free_slice(state.diagnostics);state.diagnostics=default<Diagnostic[:]>();}
+if state.associated.len!=0 {checked_associated.free_slice(state.associated);state.associated=default<Associated[:]>();}
+if state.nominals.len!=0 {checked_nominals.free_slice(state.nominals);state.nominals=default<Nominal[:]>();}
+if state.contracts.len!=0 {checked_contracts.free_slice(state.contracts);state.contracts=default<Contract[:]>();}
+if state.contract_predicates.len!=0 {checked_contract_predicates.free_slice(state.contract_predicates);state.contract_predicates=default<blot_check_types::Obligation[:]>();}
+if state.contract_members.len!=0 {checked_contract_members.free_slice(state.contract_members);state.contract_members=default<ContractMember[:]>();}
+if state.implementations.len!=0 {checked_implementations.free_slice(state.implementations);state.implementations=default<Implementation[:]>();}
+if state.implementation_predicates.len!=0 {checked_implementation_predicates.free_slice(state.implementation_predicates);state.implementation_predicates=default<blot_check_types::Obligation[:]>();}
+if state.implementation_members.len!=0 {checked_implementation_members.free_slice(state.implementation_members);state.implementation_members=default<ImplementationMember[:]>();}
+if state.member_templates.len!=0 {checked_member_templates.free_slice(state.member_templates);state.member_templates=default<blot_reuse_principal_interface::MemberTemplate[:]>();}
+if state.selected_proofs.len!=0 {checked_selected_proofs.free_slice(state.selected_proofs);state.selected_proofs=default<blot_reuse_principal_interface::SelectedProof[:]>();}
+if state.selected_members.len!=0 {checked_selected_members.free_slice(state.selected_members);state.selected_members=default<ImplementationMember[:]>();}
+if state.selected_edges.len!=0 {checked_selected_edges.free_slice(state.selected_edges);state.selected_edges=default<u32[:]>();}
+if state.selected_uses.len!=0 {checked_selected_uses.free_slice(state.selected_uses);state.selected_uses=default<blot_reuse_principal_interface::SelectedUse[:]>();}
+if state.constructors.len!=0 {checked_constructors.free_slice(state.constructors);state.constructors=default<Constructor[:]>();}
+if state.constructor_resolved.len!=0 {checked_constructor_resolved.free_slice(state.constructor_resolved);state.constructor_resolved=default<u32[:]>();}
+if state.projections.len!=0 {checked_projections.free_slice(state.projections);state.projections=default<u32[:]>();}
+if state.access_paths.len!=0 {checked_access_paths.free_slice(state.access_paths);state.access_paths=default<blot_check_types::List[:]>();}
+if state.access_nodes.len!=0 {checked_access_nodes.free_slice(state.access_nodes);state.access_nodes=default<blot_check_types::List[:]>();}
+if state.access_types.len!=0 {checked_access_types.free_slice(state.access_types);state.access_types=default<blot_check_types::List[:]>();}
+if state.projection_resolved.len!=0 {checked_projection_resolved.free_slice(state.projection_resolved);state.projection_resolved=default<u32[:]>();}
+if state.projection_catalog.len!=0 {checked_projection_catalog.free_slice(state.projection_catalog);state.projection_catalog=default<Projection[:]>();}
+if state.rebindings.len!=0 {checked_rebindings.free_slice(state.rebindings);state.rebindings=default<Rebinding[:]>();}
+if state.resolver_blocks.len!=0 {checked_resolver_blocks.free_slice(state.resolver_blocks);state.resolver_blocks=default<ResolverBlock[:]>();}
+if state.resolver_ops.len!=0 {checked_resolver_ops.free_slice(state.resolver_ops);state.resolver_ops=default<ResolverOp[:]>();}
+if state.resolver_joins.len!=0 {checked_resolver_joins.free_slice(state.resolver_joins);state.resolver_joins=default<ResolverJoin[:]>();}
+if state.resolver_completions.len!=0 {checked_resolver_completions.free_slice(state.resolver_completions);state.resolver_completions=default<ResolverCompletion[:]>();}
+if state.resolver_loops.len!=0 {checked_resolver_loops.free_slice(state.resolver_loops);state.resolver_loops=default<ResolverLoop[:]>();}
+if state.resolver_block_ids.len!=0 {checked_resolver_block_ids.free_slice(state.resolver_block_ids);state.resolver_block_ids=default<u32[:]>();}
+if state.resolver_op_ids.len!=0 {checked_resolver_op_ids.free_slice(state.resolver_op_ids);state.resolver_op_ids=default<u32[:]>();}
+if state.resolver_join_ids.len!=0 {checked_resolver_join_ids.free_slice(state.resolver_join_ids);state.resolver_join_ids=default<u32[:]>();}
+if state.resolver_loop_ids.len!=0 {checked_resolver_loop_ids.free_slice(state.resolver_loop_ids);state.resolver_loop_ids=default<u32[:]>();}
+if state.loop_carries.len!=0 {checked_loop_carries.free_slice(state.loop_carries);state.loop_carries=default<LoopCarry[:]>();}
+if state.loop_ranges.len!=0 {checked_loop_ranges.free_slice(state.loop_ranges);state.loop_ranges=default<blot_check_types::List[:]>();}
+if state.loop_exits.len!=0 {checked_loop_exits.free_slice(state.loop_exits);state.loop_exits=default<LoopExit[:]>();}
+if state.statement_arms.len!=0 {checked_statement_arms.free_slice(state.statement_arms);state.statement_arms=default<StatementArm[:]>();}
+if state.declarations.len!=0 {checked_declarations.free_slice(state.declarations);state.declarations=default<SourceDeclaration[:]>();}
+if state.cap_nodes.len!=0 {checked_cap_nodes.free_slice(state.cap_nodes);state.cap_nodes=default<blot_check_capability_contracts::Term[:]>();}
+if state.cap_words.len!=0 {checked_cap_words.free_slice(state.cap_words);state.cap_words=default<u32[:]>();}
+if state.cap_bindings.len!=0 {checked_cap_bindings.free_slice(state.cap_bindings);state.cap_bindings=default<blot_check_capability_contracts::Binding[:]>();}
+if state.body_debits.len!=0 {checked_body_debits.free_slice(state.body_debits);state.body_debits=default<blot_check_numeric_proof_bodies::Debit[:]>();}
+if state.body_operands.len!=0 {checked_body_operands.free_slice(state.body_operands);state.body_operands=default<blot_check_numeric_proof_terms::Term[:]>();}
+if state.body_introductions.len!=0 {checked_body_introductions.free_slice(state.body_introductions);state.body_introductions=default<blot_check_numeric_proof_bodies::Introduction[:]>();}
+if state.body_parameters.len!=0 {checked_body_parameters.free_slice(state.body_parameters);state.body_parameters=default<blot_check_numeric_proof_bodies::Parameter[:]>();}
+if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.body_uses=default<blot_check_numeric_proof_bodies::Use[:]>();}
+if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=default<EditorName[:]>();}
+for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=default<CheckedHeaderLease[:]>();}let index=self_.lease-1;state.live=false;checked_owners.free(index);self_=CheckedOwner{..};}
+fn deinit(self_:Checked&) {if !self_.owner.valid() {return;}deinitDiagnosticPayloads(self_.diagnostics);if self_.editor.present && self_.editor.value.context.present {self_.editor.value.context.value.deinit();}self_.types.deinit();self_.parameter_patterns.deinit();releaseCheckedPacket(self_.owner);self_.owner.deinit();self_=default<Checked>();}
+fn deinit(self_:SourceValidation&) {if !self_.owner.valid() {return;}deinitDiagnosticPayloads(self_.diagnostics);self_.types.deinit();self_.parameter_patterns.deinit();self_.owner.deinit();self_=default<SourceValidation>();}

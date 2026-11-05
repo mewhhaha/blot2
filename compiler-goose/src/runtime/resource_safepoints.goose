@@ -24,7 +24,7 @@ fn after(module: const Module&, inst: IR) -> bool {
 }
 fn run(module: const Module&, function: Function) -> blot_support::Option<blot_backend_runtime_ir::DetachedBody>, Error {
     let drain, has_drain = module.resourceDrainImport();
-    if !has_drain { return blot_support::none<blot_backend_runtime_ir::DetachedBody>(), Error.none; }
+    if !has_drain { return blot_support::none<blot_backend_runtime_ir::DetachedBody>(), blot_error::Error.none; }
     var locals: blot_backend_runtime_ir::ValueType[>..<] = [];
     var code: IR[>..<] = [];
     locals.append(module.locals(function));
@@ -37,5 +37,5 @@ fn run(module: const Module&, function: Function) -> blot_support::Option<blot_b
     if source.len == 0 || source[source.len - 1].op != blot_backend_runtime_ir::OP_return_ {
         code.push(IR { op:blot_backend_runtime_ir::OP_call_import,operand:drain,..});
     }
-    let result,error=blot_backend_runtime_ir::cloneBody(locals[:],code[:]);if error!=Error.none {return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}return blot_support::some(result),Error.none;
+    let result,error=blot_backend_runtime_ir::cloneBody(locals[..],code[..]);if error!=blot_error::Error.none {return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}return blot_support::some(result),blot_error::Error.none;
 }

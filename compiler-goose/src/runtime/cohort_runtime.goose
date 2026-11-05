@@ -27,7 +27,7 @@ fn complete(c: Code&, arena: Arena) {
 }
 fn checked(c: Code&, arena: Arena, pointer: Local) -> Local {
     c.value(pointer); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.trap();
-    if c.failure != Error.none { return Local {..}; }
+    if c.failure != blot_error::Error.none { return Local {..}; }
     let head, error = blot_runtime_shared_rc::checkedHead(c.code, pointer);
     c.failure = error; return head;
 }
@@ -94,23 +94,23 @@ fn retire(c: Code&, arena: Arena) -> Error {
     return c.failure;
 }
 fn install(module: Module&) -> Runtime, Error {
-    if module.cohorts.present { return module.cohorts.value, Error.none; }
-    if !module.arena.present { return default<Runtime>(), Error.missing_arena; }
+    if module.cohorts.present { return module.cohorts.value, blot_error::Error.none; }
+    if !module.arena.present { return default<Runtime>(), blot_error::Error.missing_arena; }
     let arena = module.arena.value;
     let begin_id, begin_error = module.addTypedFunction([blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none, blot_backend_runtime_ir::ROLE_scalar);
-    if begin_error != Error.none { return default<Runtime>(), begin_error; }
+    if begin_error != blot_error::Error.none { return default<Runtime>(), begin_error; }
     let allocate_id, allocate_error = module.addTypedFunction([blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::ROLE_reference);
-    if allocate_error != Error.none { return default<Runtime>(), allocate_error; }
+    if allocate_error != blot_error::Error.none { return default<Runtime>(), allocate_error; }
     let retire_id, retire_error = module.addTypedFunction([blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none, blot_backend_runtime_ir::ROLE_scalar);
-    if retire_error != Error.none { return default<Runtime>(), retire_error; }
+    if retire_error != blot_error::Error.none { return default<Runtime>(), retire_error; }
     let runtime = Runtime { begin_id, allocate_id, retire_id , ..};
     let reference = blot_backend_runtime_ir::ROLE_reference;
     let scalar = blot_backend_runtime_ir::ROLE_scalar;
-    { let propagated_error = module.setParameterRoles(runtime.begin, blot_backend_runtime_ir::packParameterRoles([reference])); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
-    { let propagated_error = module.setParameterRoles(runtime.allocate, blot_backend_runtime_ir::packParameterRoles([scalar, scalar, reference])); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
-    { let propagated_error = module.setParameterRoles(runtime.retire_members, blot_backend_runtime_ir::packParameterRoles([reference])); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
-    var begin_code = blot_emitter::init(module, runtime.begin); { let propagated_error = begin(begin_code, arena); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
-    var allocation_code = blot_emitter::init(module, runtime.allocate); { let propagated_error = allocate(allocation_code, arena); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
-    var retirement_code = blot_emitter::init(module, runtime.retire_members); { let propagated_error = retire(retirement_code, arena); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
-    module.cohorts = blot_support::some(runtime); return runtime, Error.none;
+    { let propagated_error = module.setParameterRoles(runtime.begin, blot_backend_runtime_ir::packParameterRoles([reference])); if propagated_error != blot_error::Error.none { return default<Runtime>(), propagated_error; } }
+    { let propagated_error = module.setParameterRoles(runtime.allocate, blot_backend_runtime_ir::packParameterRoles([scalar, scalar, reference])); if propagated_error != blot_error::Error.none { return default<Runtime>(), propagated_error; } }
+    { let propagated_error = module.setParameterRoles(runtime.retire_members, blot_backend_runtime_ir::packParameterRoles([reference])); if propagated_error != blot_error::Error.none { return default<Runtime>(), propagated_error; } }
+    var begin_code = blot_emitter::init(module, runtime.begin); { let propagated_error = begin(begin_code, arena); if propagated_error != blot_error::Error.none { return default<Runtime>(), propagated_error; } }
+    var allocation_code = blot_emitter::init(module, runtime.allocate); { let propagated_error = allocate(allocation_code, arena); if propagated_error != blot_error::Error.none { return default<Runtime>(), propagated_error; } }
+    var retirement_code = blot_emitter::init(module, runtime.retire_members); { let propagated_error = retire(retirement_code, arena); if propagated_error != blot_error::Error.none { return default<Runtime>(), propagated_error; } }
+    module.cohorts = blot_support::some(runtime); return runtime, blot_error::Error.none;
 }

@@ -19,7 +19,7 @@ fn owner(view: View, id: u32) -> blot_support::Option<const u8[:]> {
     if id == 0 || id > view.owners.len { return blot_support::none<const u8[:]>(); }
     return text(view, view.owners[id - 1]);
 }
-struct Metadata {bytes:u8[:]=[],symbols:Name[:]=[],owners:Name[:]=[]}
+struct Metadata {bytes:u8[:] = default<u8[:]>(),symbols:Name[:] = default<Name[:]>(),owners:Name[:] = default<Name[:]>()}
 reusable[] var metadata_bytes:u8[>..]=[];
 reusable[] var metadata_names:Name[>..]=[];
 fn validUtf8(bytes: const u8[:]) -> bool {
@@ -46,7 +46,7 @@ fn capture(pool:const blot_parse_symbols::Pool&,owners:const Owner[:],unit_count
 }
 fn captureInto(metadata:Metadata&,pool:const blot_parse_symbols::Pool&,owners:const Owner[:],unit_count:i64)->blot_error::Error {
  if owners.len!=unit_count||unit_count>=0xffffffff||pool.entries.len>=0xffffffff {return blot_error::Error.invalid_identity;}
- var length=pool.bytes.len;var paths:dictionary<const u8[:],bool>=dictionary<const u8[:],bool> {};
+ var length=pool.bytes.len;var paths:dictionary<const u8[:],bool> =dictionary<const u8[:],bool> {};
  metadata.owners=metadata_names.alloc_slice(unit_count);for &location in metadata.owners {location=Name {..};}
  for item in owners {
   if item.unit==0||item.unit>unit_count||item.path.len==0||!validUtf8(item.path)||metadata.owners[item.unit-1].len!=0 {return blot_error::Error.invalid_identity;}

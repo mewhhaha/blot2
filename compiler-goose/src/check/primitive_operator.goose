@@ -1,6 +1,14 @@
 // Only two-parameter capture-free forwarding spines qualify as scalar adapters.
 namespace blot_check_primitive_operator;
+import reuse.principal_interface;
+
+import backend.function_facts;
+import backend.runtime_ir;
+import check.check_packet_owner;
+import check.core;
+import check.types;
 import support.option;
+
 struct Operation { op: blot_check_core::Op, reverse: bool = false, dependencies: blot_check_core::BindingRef[8] = [default<blot_check_core::BindingRef>(); 8], dependency_count: i64 = 0 }
 fn analyze(units: const blot_check_core::Module[:], target: blot_check_core::BindingRef) -> blot_support::Option<Operation> {
     return visit(units, target, blot_support::Option<blot_backend_runtime_ir::Scalar> { false, 0 , ..}, 8);
@@ -41,7 +49,7 @@ fn resolve(units: const blot_check_core::Module[:], target: blot_check_core::Bin
 recursive fn normalize(units: const blot_check_core::Module[:], target_: blot_check_core::BindingRef, remaining: i64) -> blot_support::Option<blot_check_core::BindingRef> {
     if remaining == 0 { return blot_support::Option<blot_check_core::BindingRef> { false, default<blot_check_core::BindingRef>() , ..}; }
     let owner = source(units, target_); if !owner || target_.binding == 0 || target_.binding >= owner.bindings.len { return blot_support::Option<blot_check_core::BindingRef> { false, default<blot_check_core::BindingRef>() , ..}; }
-    let binding = owner.binding(target_.binding); if binding.kind != blot_check_check::Kind.external { return blot_support::Option<blot_check_core::BindingRef> { true, target_ , ..}; }
+    let binding = owner.binding(target_.binding); if binding.kind != blot_reuse_principal_interface::Kind.external { return blot_support::Option<blot_check_core::BindingRef> { true, target_ , ..}; }
     var next = binding.target; if next.unit == 0 { next.unit = target_.unit; } return normalize(units, next, remaining - 1);
 }
 fn associated(source: const blot_check_core::Module&, origin: u32, scalar: blot_backend_runtime_ir::Scalar,

@@ -38,7 +38,7 @@ recursive fn visit(units: const blot_check_core::Module[:], owner: u32, id: blot
             let value = source.node(handle);
             if value.tag == blot_check_core::Tag.reference {
                 let reference = source.reference(handle); if reference.unit != 0 && reference.unit != owner { return false; }
-                let binding = source.binding(reference.binding); if binding.kind != blot_check_core::BindingKind.local || binding.initializer == 0 { return false; }
+                let binding = source.binding(reference.binding); if binding.kind != blot_reuse_principal_interface::Kind.local || binding.initializer == 0 { return false; }
                 handle = binding.initializer; continue;
             }
             if value.tag != blot_check_core::Tag.task || value.c != blot_check_task_types::opCode(blot_check_task_types::Op.spawn) { return false; }

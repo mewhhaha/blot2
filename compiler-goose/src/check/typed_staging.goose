@@ -1,8 +1,12 @@
 // Typed code arguments retain the result, latent row and qualifiers.
 namespace blot_check_typed_staging;
-import support.structural;
+import check.effects;
+import check.types;
 import support.error;
 import support.option;
+import support.structural_adapters;
+
+import support.structural;
 let code_identity = blot_check_types::NominalIdentity { 0xffffffff, 8 , ..};
 let descriptor_identity = blot_check_types::NominalIdentity { 0xffffffff, 9 , ..};
 enum Op { quote, splice, lift, emit, run, describe, same, fields, evaluate }

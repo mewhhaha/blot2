@@ -1,6 +1,10 @@
 // Four-lane product authority is reconstructed from the intrinsic catalog.
 namespace blot_check_simd_contracts;
+import backend.simd_intrinsics;
+import check.core;
+import check.types;
 import support.error;
+
 fn scalar(types: const blot_check_core::Types&, id: blot_check_types::Id, tag: blot_check_types::Tag) -> bool {
     return id < types.nodes.len && types.node(id).tag == tag;
 }

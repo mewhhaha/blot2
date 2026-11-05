@@ -31,25 +31,25 @@ value.implementation_selection=source.implementation_selection;
 for &binding in value.bindings {binding.name=copyOwned(binding.name);}
 for &predicate in value.predicates {predicate.name=copyOwned(predicate.name);}
 for &member in value.members {member=copyOwned(member);}
-let loops .= source.loops;if loops {let index=loop_owners.alloc_index(Loops{carries:copyOwned(loops.carries),exits:copyOwned(loops.exits),bindings:copyOwned(loops.bindings),live:true,..});value.loops .= loop_owners[index];}
-let auxiliary .= source.auxiliary;if auxiliary {var readable=copy(auxiliary);readable.live=true;let copied,error=blot_reuse_body_auxiliary::clone(readable);if error!=Error.none {value.deinit();return Body{..},error;}value.auxiliary .= copied;}return value,Error.none;
+let loops .= source.loops;if loops {let index=loop_owners.alloc_index(Loops{carries:copyOwned(loops.carries),exits:copyOwned(loops.exits),bindings:copyOwned(loops.bindings),live:true,..});loop_owners[index].slot=(index+1) as u32;value.loops .= loop_owners[index];}
+let auxiliary .= source.auxiliary;if auxiliary {var readable=copy(auxiliary);readable.live=true;let copied,error=blot_reuse_body_auxiliary::clone(readable);if error!=blot_error::Error.none {value.deinit();return Body{..},error;}value.auxiliary .= copied;}return value,blot_error::Error.none;
 }
-fn clonePacketChunk(source:const Chunk&)->Chunk?,Error {let owner,error=blot_reuse_dependency_payload::init();if error!=Error.none {return null,error;}let at=chunks.alloc_index(Chunk{live:true,graph_owner:owner,..});let value:Chunk&=chunks[at];
-let nodes,error=value.graph_owner.copy(source.graph.nodes);if error!=Error.none {value.release();return null,error;}value.graph.nodes=nodes;
-let extra,error=value.graph_owner.copy(source.graph.extra);if error!=Error.none {value.release();return null,error;}value.graph.extra=extra;
-let rows,error=value.graph_owner.copy(source.graph.rows);if error!=Error.none {value.release();return null,error;}value.graph.rows=rows;
-let labels,error=value.graph_owner.copy(source.graph.labels);if error!=Error.none {value.release();return null,error;}value.graph.labels=labels;
-let operations,error=value.graph_owner.copy(source.graph.operations);if error!=Error.none {value.release();return null,error;}value.graph.operations=operations;
+fn clonePacketChunk(source:const Chunk&)->Chunk?,Error {let owner,error=blot_reuse_dependency_payload::init();if error!=blot_error::Error.none {return null,error;}let at=chunks.alloc_index(Chunk{graph_owner:owner,live:true,..});let value:Chunk& =chunks[at];value.slot=(at+1) as u32;
+let nodes,error=value.graph_owner.copy(source.graph.nodes);if error!=blot_error::Error.none {value.release();return null,error;}value.graph.nodes=nodes;
+let extra,error=value.graph_owner.copy(source.graph.extra);if error!=blot_error::Error.none {value.release();return null,error;}value.graph.extra=extra;
+let rows,error=value.graph_owner.copy(source.graph.rows);if error!=blot_error::Error.none {value.release();return null,error;}value.graph.rows=rows;
+let labels,error=value.graph_owner.copy(source.graph.labels);if error!=blot_error::Error.none {value.release();return null,error;}value.graph.labels=labels;
+let operations,error=value.graph_owner.copy(source.graph.operations);if error!=blot_error::Error.none {value.release();return null,error;}value.graph.operations=operations;
 value.graph.row_variable_count=source.graph.row_variable_count;
-let quantifier_goals,error=value.graph_owner.copy(source.graph.quantifier_goals);if error!=Error.none {value.release();return null,error;}value.graph.quantifier_goals=quantifier_goals;
-let quantifier_obligations,error=value.graph_owner.copy(source.graph.quantifier_obligations);if error!=Error.none {value.release();return null,error;}value.graph.quantifier_obligations=quantifier_obligations;
-value.nominals=copyOwned(source.nominals);for &nominal in value.nominals {nominal.name=copyOwned(nominal.name);}
+let quantifier_goals,error=value.graph_owner.copy(source.graph.quantifier_goals);if error!=blot_error::Error.none {value.release();return null,error;}value.graph.quantifier_goals=quantifier_goals;
+let quantifier_obligations,error=value.graph_owner.copy(source.graph.quantifier_obligations);if error!=blot_error::Error.none {value.release();return null,error;}value.graph.quantifier_obligations=quantifier_obligations;
+value.nominals=cloneIdentityReads(source.nominals);
 value.field_names=copyOwned(source.field_names);for &field in value.field_names {field=copyOwned(field);}
 value.qualifications=copyOwned(source.qualifications);value.body_bytes=source.body_bytes;value.type_work=source.type_work;
 value.bodies=owned_Body.alloc_slice(source.bodies.len);for &body in value.bodies {body=Body{owner:value,..};}
-for body,index in source.bodies {let copied,error=clonePacketBody(body,value);if error!=Error.none {value.release();return null,error;}value.bodies[index]=copied;}return value,Error.none;}
+for body,index in source.bodies {let copied,error=clonePacketBody(body,value);if error!=blot_error::Error.none {value.release();return null,error;}value.bodies[index]=copied;}return value,blot_error::Error.none;}
 fn restorePacketIndex(cache:Cache&,slots:const dictionary_slot<const u8[:],i64>[:],count:i64)->Error {
- if count<0||count>slots.len {return Error.invalid_artifact;}if slots.len!=0&&(slots.len&(slots.len-1))!=0 {return Error.invalid_artifact;}var occupied:i64=0;
- for slot in slots {if slot.tag==0 {continue;}occupied++;if slot.value<0||slot.value>=cache.bodies.len||slot.key!=cache.bodies.items[slot.value].body().name {return Error.invalid_artifact;}}if occupied!=count {return Error.invalid_artifact;}
- blot_support_pooled_map::deinit(cache.index,name_slots);let owned=name_slots.alloc_slice(slots.len);for slot,index in slots {owned[index]=slot;if slot.tag!=0 {owned[index].key=cache.bodies.items[slot.value].body().name;}}cache.index.slots=owned;cache.index.count=count;return Error.none;
+ if count<0||count>slots.len {return blot_error::Error.invalid_artifact;}if slots.len!=0&&(slots.len&(slots.len-1))!=0 {return blot_error::Error.invalid_artifact;}var occupied:i64=0;
+ for slot in slots {if slot.tag==0 {continue;}occupied++;if slot.val<0||slot.val>=cache.bodies.len||slot.key!=cache.bodies.items[slot.val].body().name {return blot_error::Error.invalid_artifact;}}if occupied!=count {return blot_error::Error.invalid_artifact;}
+ blot_support_pooled_map::deinit(cache.index,name_slots);let owned=name_slots.alloc_slice(slots.len);for slot,index in slots {owned[index]=slot;if slot.tag!=0 {owned[index].key=cache.bodies.items[slot.val].body().name;}}cache.index.slots=owned;cache.index.count=count;return blot_error::Error.none;
 }

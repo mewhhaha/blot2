@@ -22,9 +22,9 @@ let KEYED: u32 = 16;
 let DERIVE_CONTEXT: u32 = 32;
 let DERIVE_MATERIAL: u32 = 64;
 
-struct Output { cv: u32[8], block: u32[16], counter: u64, length: u32, flags: u32 }
+struct Output { cv: u32[8], block_: u32[16], counter: u64, length: u32, flags: u32 }
 struct Chunk {
-    cv: u32[8], counter: u64 = 0, block: u8[64], length: i64 = 0,
+    cv: u32[8], counter: u64 = 0, block_: u8[64], length: i64 = 0,
     compressed: u8 = 0, flags: u32 = 0,
 }
 struct State {
@@ -38,7 +38,7 @@ fn g(state: u32[16]&, a: i64, b: i64, c: i64, d: i64, x: u32, y: u32) {
     state[a] += state[b] + y; state[d] = rotate(state[d] ^ state[a], 8);
     state[c] += state[d]; state[b] = rotate(state[b] ^ state[c], 7);
 }
-fn compress(cv: u32[8], block: u32[16], counter: u64, length: u32, flags: u32) -> u32[16] {
+fn compress(cv: u32[8], block_: u32[16], counter: u64, length: u32, flags: u32) -> u32[16] {
     var state: u32[16] = default<u32[16]>();
     for index in 8 { state[index] = cv[index]; }
     for index in 4 { state[index + 8] = iv[index]; }
@@ -46,20 +46,20 @@ fn compress(cv: u32[8], block: u32[16], counter: u64, length: u32, flags: u32) -
     state[14] = length; state[15] = flags;
     for round in 7 {
         let s = schedule[round];
-        g(state, 0, 4, 8, 12, block[s[0]], block[s[1]]);
-        g(state, 1, 5, 9, 13, block[s[2]], block[s[3]]);
-        g(state, 2, 6, 10, 14, block[s[4]], block[s[5]]);
-        g(state, 3, 7, 11, 15, block[s[6]], block[s[7]]);
-        g(state, 0, 5, 10, 15, block[s[8]], block[s[9]]);
-        g(state, 1, 6, 11, 12, block[s[10]], block[s[11]]);
-        g(state, 2, 7, 8, 13, block[s[12]], block[s[13]]);
-        g(state, 3, 4, 9, 14, block[s[14]], block[s[15]]);
+        g(state, 0, 4, 8, 12, block_[s[0]], block_[s[1]]);
+        g(state, 1, 5, 9, 13, block_[s[2]], block_[s[3]]);
+        g(state, 2, 6, 10, 14, block_[s[4]], block_[s[5]]);
+        g(state, 3, 7, 11, 15, block_[s[6]], block_[s[7]]);
+        g(state, 0, 5, 10, 15, block_[s[8]], block_[s[9]]);
+        g(state, 1, 6, 11, 12, block_[s[10]], block_[s[11]]);
+        g(state, 2, 7, 8, 13, block_[s[12]], block_[s[13]]);
+        g(state, 3, 4, 9, 14, block_[s[14]], block_[s[15]]);
     }
     for index in 8 { state[index] ^= state[index + 8]; state[index + 8] ^= cv[index]; }
     return state;
 }
 fn chaining(output: Output) -> u32[8] {
-    let words = compress(output.cv, output.block, output.counter, output.length, output.flags);
+    let words = compress(output.cv, output.block_, output.counter, output.length, output.flags);
     var result: u32[8] = default<u32[8]>();
     for index in 8 { result[index] = words[index]; }
     return result;
@@ -74,13 +74,13 @@ fn words(bytes: u8[64]) -> u32[16] {
     return result;
 }
 fn chunk_output(chunk: Chunk) -> Output {
-    Output { chunk.cv, words(chunk.block), chunk.counter, chunk.length as u32,
+    Output { chunk.cv, words(chunk.block_), chunk.counter, chunk.length as u32,
         chunk.flags | start_flag(chunk) | CHUNK_END }
 }
 fn parent_output(left: u32[8], right: u32[8], key: u32[8], flags: u32) -> Output {
-    var block: u32[16] = default<u32[16]>();
-    for index in 8 { block[index] = left[index]; block[index + 8] = right[index]; }
-    return Output { key, block, 0, 64, flags | PARENT , ..};
+    var block_: u32[16] = default<u32[16]>();
+    for index in 8 { block_[index] = left[index]; block_[index + 8] = right[index]; }
+    return Output { key, block_, 0, 64, flags | PARENT , ..};
 }
 fn make_chunk(key: u32[8], counter: u64, flags: u32) -> Chunk {
     Chunk { key, counter, default<u8[64]>(), 0, 0, flags }
@@ -95,13 +95,13 @@ fn update_chunk(chunk: Chunk&, bytes: const u8[:]) {
     var at: i64 = 0;
     while at < bytes.len {
         if chunk.length == 64 {
-            let compressed = compress(chunk.cv, words(chunk.block), chunk.counter, 64,
+            let compressed = compress(chunk.cv, words(chunk.block_), chunk.counter, 64,
                 chunk.flags | start_flag(chunk));
             for index in 8 { chunk.cv[index] = compressed[index]; }
-            chunk.compressed++; chunk.length = 0; chunk.block = default<u8[64]>();
+            chunk.compressed++; chunk.length = 0; chunk.block_ = default<u8[64]>();
         }
         let count = min(64 - chunk.length, bytes.len - at);
-        for index in count { chunk.block[chunk.length + index] = bytes[at + index]; }
+        for index in count { chunk.block_[chunk.length + index] = bytes[at + index]; }
         chunk.length += count; at += count;
     }
 }
@@ -137,9 +137,9 @@ fn finalBytes(state: State, out: u8[:]) {
     var at: i64 = 0;
     var counter: u64 = 0;
     while at < out.len {
-        let block = compress(output.cv, output.block, counter, output.length, output.flags | ROOT);
+        let block_ = compress(output.cv, output.block_, counter, output.length, output.flags | ROOT);
         var encoded: u8[64] = default<u8[64]>();
-        for word in 16 { blot_bytes::put_u32(encoded, word * 4, block[word]); }
+        for word in 16 { blot_bytes::put_u32(encoded, word * 4, block_[word]); }
         let count = min(64, out.len - at);
         for byte in count { out[at + byte] = encoded[byte]; }
         at += count; counter++;

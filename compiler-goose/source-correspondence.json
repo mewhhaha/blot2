@@ -1,6 +1,6 @@
 {
-  "phase": "source_pass_written_runtime_work_pending",
-  "verification_started": false,
+  "phase": "compilation_repair",
+  "verification_started": true,
   "whole_production_port_written": false,
   "oracle_commit": "156f84b4810f630dff7e5efb7014b2194e3160f7",
   "scope": "Every pinned compiler/src Zig file is inventoried. Production compiler behavior is the port scope; native test runners, fault-sweep support, fixtures and benchmark executables remain in the Zig oracle. This classification is not an import-closure proof or a parity result.",
@@ -3680,5 +3680,5 @@
     "Typed-pool retention bounds and allocation observation must be implemented or established in the selected Goose runtime; Zig class/lock statistics are not provided by the source adaptation."
   ],
   "algorithm_first_pass_written": true,
-  "writing_barrier_note": "Every compiler-algorithm module now has an explicit author-reported first source pass, including the five earlier backend leaves reconciled in port-notes/backend.md. This is not declaration-coverage validation or compilability evidence. Recoverable allocation and runtime-retention requirements remain production work. Verification is deferred pending clarification of the all-code-first boundary."
+  "writing_barrier_note": "The user explicitly requested fixing and recompiling the port. Whole-program upstream-Goose parsing/name resolution passes; actual type/lifetime compilation repair is active. Scoped executed probes pass, but the full compiler has not produced a successful executable. Runtime recovered allocation failure remains separate production work."
 }

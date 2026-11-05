@@ -25,13 +25,13 @@ fn valid(c: Code&, context: Local) {
     c.trap();
 }
 fn emit(module: Module&, request_owner: blot_support::Option<u32>) -> Functions, Error {
-    let arena, e1 = module.ensureArena(); if e1 != Error.none { return Functions {..},e1; }
-    let current, e2 = module.addGlobal(blot_backend_runtime_ir::SC_u32,0,true); if e2 != Error.none { return Functions {..},e2; }
-    let i32 = blot_backend_runtime_ir::VT_i32;
-    let create, e3 = module.addTypedFunction([i32],i32,blot_backend_runtime_ir::ROLE_scalar); if e3 != Error.none { return Functions {..},e3; }
-    let save, e4 = module.addTypedFunction([i32],i32,blot_backend_runtime_ir::ROLE_scalar); if e4 != Error.none { return Functions {..},e4; }
-    let restore, e5 = module.addTypedFunction([i32],i32,blot_backend_runtime_ir::ROLE_scalar); if e5 != Error.none { return Functions {..},e5; }
-    let drop, e6 = module.addTypedFunction([i32],i32,blot_backend_runtime_ir::ROLE_scalar); if e6 != Error.none { return Functions {..},e6; }
+    let arena, e1 = module.ensureArena(); if e1 != blot_error::Error.none { return Functions {..},e1; }
+    let current, e2 = module.addGlobal(blot_backend_runtime_ir::SC_u32,0,true); if e2 != blot_error::Error.none { return Functions {..},e2; }
+    let wasm_i32 = blot_backend_runtime_ir::VT_i32;
+    let create, e3 = module.addTypedFunction([wasm_i32],wasm_i32,blot_backend_runtime_ir::ROLE_scalar); if e3 != blot_error::Error.none { return Functions {..},e3; }
+    let save, e4 = module.addTypedFunction([wasm_i32],wasm_i32,blot_backend_runtime_ir::ROLE_scalar); if e4 != blot_error::Error.none { return Functions {..},e4; }
+    let restore, e5 = module.addTypedFunction([wasm_i32],wasm_i32,blot_backend_runtime_ir::ROLE_scalar); if e5 != blot_error::Error.none { return Functions {..},e5; }
+    let drop, e6 = module.addTypedFunction([wasm_i32],wasm_i32,blot_backend_runtime_ir::ROLE_scalar); if e6 != blot_error::Error.none { return Functions {..},e6; }
     let functions = Functions {create,save,restore,drop, ..};
     let fields = [arena.root_page,arena.root_top,arena.root_frame,arena.root_active,arena.root_external,arena.root_started,arena.root_host_cursor,arena.root_host_active];
     let context = Local {0, ..};
@@ -76,7 +76,7 @@ fn emit(module: Module&, request_owner: blot_support::Option<u32>) -> Functions,
         c.value(magic);
         c.store(bytes-4);
         c.value(fresh);
-        if c.failure != Error.none { return Functions {..},c.failure; }
+        if c.failure != blot_error::Error.none { return Functions {..},c.failure; }
     }
     {
         var c = blot_emitter::init(module,functions.save);
@@ -100,7 +100,7 @@ fn emit(module: Module&, request_owner: blot_support::Option<u32>) -> Functions,
         c.value(context);
         c.globalSet(current);
         c.value(0);
-        if c.failure != Error.none { return Functions {..},c.failure; }
+        if c.failure != blot_error::Error.none { return Functions {..},c.failure; }
     }
     {
         var c = blot_emitter::init(module,functions.restore);
@@ -129,7 +129,7 @@ fn emit(module: Module&, request_owner: blot_support::Option<u32>) -> Functions,
         c.value(context);
         c.globalSet(current);
         c.value(0);
-        if c.failure != Error.none { return Functions {..},c.failure; }
+        if c.failure != blot_error::Error.none { return Functions {..},c.failure; }
     }
     {
         var c = blot_emitter::init(module,functions.drop);
@@ -182,7 +182,7 @@ fn emit(module: Module&, request_owner: blot_support::Option<u32>) -> Functions,
         c.globalSet(current);
         c.end();
         c.value(0);
-        if c.failure != Error.none { return Functions {..},c.failure; }
+        if c.failure != blot_error::Error.none { return Functions {..},c.failure; }
     }
-    return functions,Error.none;
+    return functions,blot_error::Error.none;
 }

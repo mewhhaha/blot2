@@ -14,12 +14,12 @@ struct Runtime { allocate: u32, reset: u32, length: u32, base: u32, end: u32, to
 fn configure(module: Module&, runtime: Runtime, base: u32, capacity: u32) -> Error {
     let end = base as u64 + capacity as u64;
     if base == 0 || capacity < 4 || (base | capacity) & 3 != 0 || end > module.fixed_memory_bytes as u64 {
-        return Error.invalid_transport_region;
+        return blot_error::Error.invalid_transport_region;
     }
     module.globals[runtime.base].bits = base;
     module.globals[runtime.end].bits = end as u32;
     module.globals[runtime.top].bits = base;
-    return Error.none;
+    return blot_error::Error.none;
 }
 fn emit(module: Module&) -> Runtime, Error {
     if module.arena.present || module.array_transport.present { abort("transport must precede the arena"); }
@@ -27,17 +27,17 @@ fn emit(module: Module&) -> Runtime, Error {
     let word = blot_backend_runtime_ir::VT_i32;
     let params = [word];
     let allocate, e0 = blot_backend_wasm::addTypedFunction(module, params, word, scalar);
-    if e0 != Error.none { return default<Runtime>(), e0; }
+    if e0 != blot_error::Error.none { return default<Runtime>(), e0; }
     let reset, e1 = blot_backend_wasm::addTypedFunction(module, params, word, scalar);
-    if e1 != Error.none { return default<Runtime>(), e1; }
+    if e1 != blot_error::Error.none { return default<Runtime>(), e1; }
     let length, e2 = blot_backend_wasm::addTypedFunction(module, params, word, scalar);
-    if e2 != Error.none { return default<Runtime>(), e2; }
+    if e2 != blot_error::Error.none { return default<Runtime>(), e2; }
     let base, e3 = blot_backend_wasm::addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, false);
-    if e3 != Error.none { return default<Runtime>(), e3; }
+    if e3 != blot_error::Error.none { return default<Runtime>(), e3; }
     let end, e4 = blot_backend_wasm::addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, false);
-    if e4 != Error.none { return default<Runtime>(), e4; }
+    if e4 != blot_error::Error.none { return default<Runtime>(), e4; }
     let top, e5 = blot_backend_wasm::addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if e5 != Error.none { return default<Runtime>(), e5; }
+    if e5 != blot_error::Error.none { return default<Runtime>(), e5; }
     let runtime = Runtime { allocate, reset, length, base, end, top , ..};
     {
         var c = blot_emitter::init(module, allocate);
@@ -55,12 +55,12 @@ fn emit(module: Module&) -> Runtime, Error {
         blot_emitter::value(c, address); blot_emitter::value(c, bytes);
         blot_emitter::op(c, blot_backend_runtime_ir::OP_i32_add); blot_emitter::globalSet(c, top);
         blot_emitter::value(c, address);
-        if c.failure != Error.none { return default<Runtime>(), c.failure; }
+        if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; }
     }
     {
         var c = blot_emitter::init(module, reset);
         blot_emitter::globalGet(c, base); blot_emitter::globalSet(c, top); blot_emitter::value(c, 0);
-        if c.failure != Error.none { return default<Runtime>(), c.failure; }
+        if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; }
     }
     {
         var c = blot_emitter::init(module, length);
@@ -82,8 +82,8 @@ fn emit(module: Module&) -> Runtime, Error {
         blot_emitter::op(c, blot_backend_runtime_ir::OP_i32_div_u);
         blot_emitter::op(c, blot_backend_runtime_ir::OP_i32_gt_u); blot_emitter::trap(c);
         blot_emitter::value(c, count);
-        if c.failure != Error.none { return default<Runtime>(), c.failure; }
+        if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; }
     }
     module.array_transport = blot_support::some(blot_backend_wasm::ArrayTransport { allocate, reset , ..});
-    return runtime, Error.none;
+    return runtime, blot_error::Error.none;
 }

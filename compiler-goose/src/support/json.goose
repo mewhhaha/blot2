@@ -72,16 +72,15 @@ fn write<T>(writer: Writer&,value: blot_support::Option<T>) -> blot_error::Error
 fn write<T>(writer: Writer&,value: T?) -> blot_error::Error { if value == null { return nullValue(writer); } return write(writer,value); }
 fn write(writer: Writer&,value: Raw) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } writer.out.append(value.bytes); return blot_error::Error.none; }
 fn sourceName(name: const u8[:]) -> const u8[:] {
-    if name == "unsigned32" { return "u32"; } if name == "floating32" { return "f32"; } if name == "block_" { return "block"; } if name == "loop_" { return "loop"; } if name == "match_" { return "match"; } if name == "opaque_" { return "opaque"; } return name;
+    if name == "unsigned32" { return "u32"; } if name == "floating32" { return "f32"; } if name == "block_" { return "block"; } if name == "loop_" { return "loop"; } if name == "match_" { return "match"; } if name == "opaque_" { return "opaque"; } if name == "guard_" { return "guard"; } if name == "recursive_" { return "recursive"; } if name == "reusable_" { return "reusable"; } if name == "simd_" { return "simd"; } if name == "namespace_" { return "namespace"; } if name == "varint_" { return "varint"; } return name;
 }
 fn enumName(writer: Writer&,name: const u8[:]) -> blot_error::Error { quoted(writer,sourceName(name)) }
 fn enumValue<T>(writer: Writer&,value: T) -> blot_error::Error {
     match value { const for <N,V> in variants<T> { V payload => { return enumName(writer,N); }, } }
 }
-fn write<T>(writer: Writer&,value: T) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } let error = jsonStringify(value,writer); if error != blot_error::Error.none { return fail(writer,error); } return blot_error::Error.none; }
 fn jsonStringify<T>(value: T,writer: Writer&) -> blot_error::Error {
     let opened = beginObject(writer); if opened != blot_error::Error.none { return opened; }
-    const for <N,A> in fields<T> { let error = field(writer,N,value.A); if error != blot_error::Error.none { return error; } } return endObject(writer);
+    const for <N,A> in fields<T> { let error = field(writer,sourceName(N),value.A); if error != blot_error::Error.none { return error; } } return endObject(writer);
 }
 fn toBytes<T>(value: T,out: u8[>..]&,options: Options = Options {..}) -> blot_error::Error { var writer = Writer { out,options , ..}; let error = write(writer,value); if error != blot_error::Error.none { return error; } return writer.failure; }
 fn unionValue<T>(writer: Writer&,value: T) -> blot_error::Error {
@@ -90,7 +89,7 @@ fn unionValue<T>(writer: Writer&,value: T) -> blot_error::Error {
             V payload => {
                 var field_count: i64 = 0; const for <FN,A> in fields<V> { field_count++; }
                 if field_count == 0 { return enumName(writer,N); }
-                let opened = beginObject(writer); if opened != blot_error::Error.none { return opened; } let written = field(writer,sourceName(N),payload); if written != blot_error::Error.none { return written; } return endObject(writer);
+                let opened = beginObject(writer); if opened != blot_error::Error.none { return opened; } let named = key(writer,sourceName(N)); if named != blot_error::Error.none { return named; } let written = jsonStringify(payload,writer); if written != blot_error::Error.none { return written; } return endObject(writer);
             },
         }
     }

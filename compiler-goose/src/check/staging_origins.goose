@@ -1,20 +1,24 @@
 // Sparse provenance supplies diagnostics and grants no code authority.
 namespace blot_check_staging_origins;
-import support.structural;
+import check.core;
+import check.typed_staging;
 import support.error;
 import support.option;
+import support.structural_adapters;
+
+import support.structural;
 struct Source { unit: u32, node: blot_check_core::Id }
 struct Location { unit: u32, span: blot_check_core::Span }
 struct Record { value: u32, generator: Source }
 enum Kind { quote, generator, splice, invocation }
 struct Origin { kind: Kind, location: Location }
 struct Trace { entries: Origin[8] = [Origin { Kind.quote, Location { 0, blot_check_core::Span { 0, 0 , ..} , ..} , ..}; 8], len: u8 = 0 }
-fn add(self: Trace&, kind: Kind, location: Location) -> blot_error::Error {
-    for item in items(self) { if item.kind == kind && item.location == location { return blot_error::Error.none; } }
-    if self.len == self.entries.len { return blot_error::Error.limit; }
-    self.entries[self.len] = Origin { kind, location , ..}; self.len += 1; return blot_error::Error.none;
+fn add(self_: Trace&, kind: Kind, location: Location) -> blot_error::Error {
+    for item in items(self_) { if item.kind == kind && item.location == location { return blot_error::Error.none; } }
+    if self_.len == self_.entries.len { return blot_error::Error.limit; }
+    self_.entries[self_.len] = Origin { kind, location , ..}; self_.len += 1; return blot_error::Error.none;
 }
-fn items(self: const Trace&) -> const Origin[:] { return self.entries[..self.len]; }
+fn items(self_: const Trace&) -> const Origin[:] { return self_.entries[..self_.len]; }
 fn generator(records: const Record[:], value: u32) -> blot_support::Option<Source> {
     var start: i64 = 0; var end = records.len;
     while start < end {
@@ -37,7 +41,7 @@ fn sourceLocation(units: const blot_check_core::Module[:], source: Source) -> bl
 fn code(trace: Trace&, units: const blot_check_core::Module[:], metadata, invocation: Source,
          selected_generator: blot_support::Option<Source>, splice: bool) -> blot_error::Error {
     let owner = module(units, metadata.unit); if !owner { return blot_error::Error.invalid_origin; }
-    var remaining: i64 = 65536; var quotation: blot_support::Option<Location> = blot_support::Option<Location> { false, default<Location>() , ..};
+    var remaining: i64 = 65536; var quotation: blot_support::Option<Location>   = blot_support::Option<Location> { false, default<Location>() , ..};
     for node, index in owner.nodes {
         if remaining == 0 { return blot_error::Error.limit; } remaining -= 1;
         if node.tag != blot_check_core::Tag.staging || node.c != blot_check_typed_staging::opCode(blot_check_typed_staging::Op.quote) { continue; }
@@ -58,10 +62,10 @@ fn code(trace: Trace&, units: const blot_check_core::Module[:], metadata, invoca
 
 fn kindCode(value: Kind) -> u32 {
     match value {
-        Kind.quote => { return 0; },
-        Kind.generator => { return 1; },
-        Kind.splice => { return 2; },
-        Kind.invocation => { return 3; },
+        quote => { return 0; },
+        generator => { return 1; },
+        splice => { return 2; },
+        invocation => { return 3; },
     }
 }
 fn kindFromCode(code: u32) -> Kind, blot_error::Error {

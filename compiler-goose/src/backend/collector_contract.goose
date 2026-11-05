@@ -14,7 +14,7 @@ fn helper(arena: blot_backend_wasm::Arena, id: u32) -> bool {
     for function in [arena.allocate_scalar, arena.retain, arena.release, arena.release_lease, arena.retire, arena.free, arena.store_word, arena.copy_words, arena.decrement, arena.recycle, arena.reset, arena.root_reserve, arena.root_pop, arena.root_open, arena.root_close, arena.root_enter, arena.root_leave, arena.root_store, arena.root_authority, arena.cycle_safe, arena.cycle_collect, arena.mark_acyclic] { if function == id { return true; } }
     return false;
 }
-fn analyze<P>(module: const blot_backend_wasm::Module&, bodies: const P[:]) -> Certificate {
+fn analyze<P>(module: const blot_backend_wasm::Module&, bodies: const P[..]) -> Certificate {
     var result = Certificate {..};
     if module.public_arena { result.reason = Reason.public_arena; return result; }
     if module.imports.len != 0 || module.host_references.present { result.reason = Reason.host_import; return result; }

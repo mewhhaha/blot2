@@ -1,7 +1,9 @@
 // Invocation binders become fresh only when the declaring arrow is called.
 namespace blot_check_generative_schemes;
-import dictionary;
+import check.types;
 import support.error;
+
+import dictionary;
 struct Binder { owner: u32 = 0, origin: u32 = 0, arrow: blot_check_types::Id = 0, selection: blot_check_types::Id }
 let limit: i64 = 16;
 fn sameArrow(store: blot_check_types::Store&, left: blot_check_types::Id, right: blot_check_types::Id) -> bool, blot_error::Error {

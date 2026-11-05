@@ -161,7 +161,7 @@ fn equal<T>(left: const T[:], right: const T[:]) -> bool {
 }
 fn startsWith(value: const u8[:], prefix: const u8[:]) -> bool { value.len >= prefix.len && equal(value[..prefix.len], prefix) }
 struct TailCheckpoint {
-    owner: Module&,
+    owner: Module? = null,
     functions: i64, signatures: i64, imports: i64, globals: i64, exports: i64, data: i64,
     types: i64, instructions: i64, names: i64, static_fields: i64, table_functions: i64, table_origins: i64, semantic_sites: i64,
     fixed_memory_bytes: u32, array_transport: blot_support::Option<ArrayTransport>, fixture_helpers_present: bool, fixture_helpers: u32[3],
@@ -179,7 +179,7 @@ fn tailCheckpoint(module: Module&) -> blot_support::Option<TailCheckpoint> {
         defer_cycles: module.defer_cycles, mutable_static: module.mutable_static, indirect: module.indirect, start: module.start , ..});
 }
 fn rollbackTail(module: Module&, mark: TailCheckpoint) {
-    assert(mark.owner .== module && tailCheckpoint(module).present);
+    let owner .= mark.owner; if owner { assert(owner .== module && tailCheckpoint(module).present); } else { abort("invalid tail checkpoint owner"); }
     assert(module.functions.len >= mark.functions && module.signatures.len >= mark.signatures && module.imports.len >= mark.imports && module.globals.len >= mark.globals && module.exports.len >= mark.exports && module.data.len >= mark.data);
     module.functions.resize(mark.functions); module.signatures.resize(mark.signatures); module.imports.resize(mark.imports); module.globals.resize(mark.globals); module.exports.resize(mark.exports); module.data.resize(mark.data);
     module.types.resize(mark.types); module.instructions.resize(mark.instructions); module.names.resize(mark.names);
@@ -198,24 +198,24 @@ fn internType(module: Module&, parameters: const ValueType[:], result: ValueType
     }
     if module.signatures.len == 4294967295 { return 0, blot_error::Error.module_too_large; }
     let id = module.signatures.len as u32;
-    if module.artifacts {
-        let error = blot_reuse_artifact_emitter::signature(module.artifacts, id, parameters, result); if error != blot_error::Error.none { return 0, error; }
+    let artifact_recorder_0 .= module.artifacts; if artifact_recorder_0 {
+        let error = blot_reuse_artifact_emitter::signature(artifact_recorder_0, id, parameters, result); if error != blot_error::Error.none { return 0, error; }
     }
     let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.signature, id, false); if error != blot_error::Error.none { return 0, error; }
     let range = Range { start: module.types.len, len: parameters.len , ..}; module.types.append(parameters); module.signatures.push(Signature { parameters: range, result: result , ..});
     return id, blot_error::Error.none;
 }
-fn addFunction(module: Module&, parameters: const ValueType[:], result: ValueType) -> u32, blot_error::Error { addTypedFunction(module, parameters, result, blot_backend_runtime_ir::ROLE_unknown) }
+fn addFunction(module: Module&, parameters: const ValueType[:], result: ValueType) -> u32, blot_error::Error { return addTypedFunction(module, parameters, result, blot_backend_runtime_ir::ROLE_unknown); }
 fn addTypedFunction(module: Module&, parameters: const ValueType[:], result: ValueType, role: blot_backend_runtime_ir::Role) -> u32, blot_error::Error {
     let signature, error = internType(module, parameters, result); if error != blot_error::Error.none { return 0, error; }
     return addTypedFunctionForSignature(module, signature, role);
 }
-fn addFunctionForSignature(module: Module&, signature: u32) -> u32, blot_error::Error { addTypedFunctionForSignature(module, signature, blot_backend_runtime_ir::ROLE_unknown) }
+fn addFunctionForSignature(module: Module&, signature: u32) -> u32, blot_error::Error { return addTypedFunctionForSignature(module, signature, blot_backend_runtime_ir::ROLE_unknown); }
 fn addTypedFunctionForSignature(module: Module&, signature: u32, role: blot_backend_runtime_ir::Role) -> u32, blot_error::Error {
     assert(signature < module.signatures.len);
     if module.functions.len == 4294967295 { return 0, blot_error::Error.module_too_large; }
     let id = module.functions.len as u32;
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordFunction(module.artifacts, id, signature, role); if error != blot_error::Error.none { return 0, error; } }
+    let artifact_recorder_1 .= module.artifacts; if artifact_recorder_1 { let error = blot_reuse_artifact_emitter::recordFunction(artifact_recorder_1, id, signature, role); if error != blot_error::Error.none { return 0, error; } }
     let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.function, id, false); if error != blot_error::Error.none { return 0, error; }
     let signature_type = module.signatures[signature];
     module.functions.push(Function { parameters: signature_type.parameters, result: signature_type.result, result_role: role, signature: signature , ..});
@@ -223,14 +223,14 @@ fn addTypedFunctionForSignature(module: Module&, signature: u32, role: blot_back
 }
 fn setParameterRoles(module: Module&, id: u32, roles: u64) -> blot_error::Error {
     if roles == 0 { return blot_error::Error.none; }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordParameterRoles(module.artifacts, id, roles); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_2 .= module.artifacts; if artifact_recorder_2 { let error = blot_reuse_artifact_emitter::recordParameterRoles(artifact_recorder_2, id, roles); if error != blot_error::Error.none { return error; } }
     module.functions[id].parameter_roles = roles; return blot_error::Error.none;
 }
 fn setProviderParameter(module: Module&, id: u32, index: u16) -> blot_error::Error {
     if id >= module.functions.len || index == blot_backend_runtime_ir::unknown_provider { return blot_error::Error.invalid_function_reference; }
     let function = module.functions[id];
     if index != blot_backend_runtime_ir::no_provider && (index >= function.parameters.len || module.types[function.parameters.start + index] != blot_backend_runtime_ir::VT_i32 || blot_backend_runtime_ir::parameterRole(function, index) != blot_backend_runtime_ir::ROLE_reference) { return blot_error::Error.invalid_function_reference; }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordProviderParameter(module.artifacts, id, index); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_3 .= module.artifacts; if artifact_recorder_3 { let error = blot_reuse_artifact_emitter::recordProviderParameter(artifact_recorder_3, id, index); if error != blot_error::Error.none { return error; } }
     module.functions[id].provider_parameter = index as u8; return blot_error::Error.none;
 }
 fn importFunction(module: Module&, namespace_name: const u8[:], imported_name: const u8[:], parameters: const ValueType[:], result: ValueType) -> u32, blot_error::Error {
@@ -243,7 +243,7 @@ fn importFunction(module: Module&, namespace_name: const u8[:], imported_name: c
     }
     if module.imports.len >= 4294967295 { return 0, blot_error::Error.module_too_large; }
     let index = module.imports.len as u32;
-    if module.artifacts { let error = blot_reuse_artifact_emitter::importFunction(module.artifacts, index, namespace_name, imported_name, signature); if error != blot_error::Error.none { return 0, error; } }
+    let artifact_recorder_4 .= module.artifacts; if artifact_recorder_4 { let error = blot_reuse_artifact_emitter::importFunction(artifact_recorder_4, index, namespace_name, imported_name, signature); if error != blot_error::Error.none { return 0, error; } }
     let demanded = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.import_, index, false); if demanded != blot_error::Error.none { return 0, demanded; }
     let owned_module = ownName(module, namespace_name); let owned_name = ownName(module, imported_name);
     module.imports.push(Import { module: owned_module, name: owned_name, signature: signature , ..}); return index, blot_error::Error.none;
@@ -272,12 +272,12 @@ fn addLocal(module: Module&, id: u32, ty: ValueType) -> u32, blot_error::Error {
     let materialized = materializeBody(module,id); if materialized != blot_error::Error.none { return 0,materialized; }
     let function = module.functions[id]; let index = function.parameters.len + function.locals.len;
     if index > 4294967295 { return 0, blot_error::Error.module_too_large; }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordLocal(module.artifacts, id, ty); if error != blot_error::Error.none { return 0, error; } }
+    let artifact_recorder_5 .= module.artifacts; if artifact_recorder_5 { let error = blot_reuse_artifact_emitter::recordLocal(artifact_recorder_5, id, ty); if error != blot_error::Error.none { return 0, error; } }
     module.functions[id].locals = appendType(module, function.locals, ty); return index as u32, blot_error::Error.none;
 }
 fn setCallableLayout(module: Module&, id: u32, ty: u32) -> blot_error::Error {
     if id >= module.functions.len || ty == 0 || ty >= 67108864 { return blot_error::Error.invalid_function_reference; }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordCallableLayout(module.artifacts, id, ty); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_6 .= module.artifacts; if artifact_recorder_6 { let error = blot_reuse_artifact_emitter::recordCallableLayout(artifact_recorder_6, id, ty); if error != blot_error::Error.none { return error; } }
     module.functions[id].callable_layout = ty; return blot_error::Error.none;
 }
 fn emit(module: Module&, id: u32, instruction: Instruction) -> blot_error::Error {
@@ -303,7 +303,7 @@ fn emitReference(module: Module&, id: u32, instruction: Instruction, role: blot_
     let table = role == blot_reuse_artifact_emitter::Role.table_function || role == blot_reuse_artifact_emitter::Role.callable_function;
     assert(!table || instruction.op == blot_backend_runtime_ir::OP_i32_const);
     let error = recordTableReference(module, role, instruction.operand, blot_support::some(id), module.functions[id].instructions.len as u32); if error != blot_error::Error.none { return error; }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::appendInstruction(module.artifacts, id, instruction.op, blot_reuse_artifact_emitter::Operand { role: role, value: instruction.operand , ..}); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_7 .= module.artifacts; if artifact_recorder_7 { let error = blot_reuse_artifact_emitter::appendInstruction(artifact_recorder_7, id, instruction.op, blot_reuse_artifact_emitter::Operand { role: role, value: instruction.operand , ..}); if error != blot_error::Error.none { return error; } }
     var owned = instruction;
     if role == blot_reuse_artifact_emitter::Role.callable_layout {
         assert(instruction.op == blot_backend_runtime_ir::OP_ownership && instruction.operand != 0 && instruction.operand < 67108864);
@@ -320,7 +320,7 @@ fn emitSlice(module: Module&, id: u32, code: const Instruction[:]) -> blot_error
     for instruction in code { let error = emit(module, id, instruction); if error != blot_error::Error.none { return error; } } return blot_error::Error.none;
 }
 fn demandResource(module: Module&, kind: blot_reuse_artifact_emitter::ResourceKind, id: u32, hit: bool) -> blot_error::Error {
-    if module.artifacts { return blot_reuse_artifact_emitter::recordDemand(module.artifacts, kind, id, hit); } return blot_error::Error.none;
+    let artifacts .= module.artifacts; if artifacts { return blot_reuse_artifact_emitter::recordDemand(artifacts, kind, id, hit); } return blot_error::Error.none;
 }
 fn recordTableReference(module: Module&, role: blot_reuse_artifact_emitter::Role, target: u32, function: blot_support::Option<u32>, place: u32) -> blot_error::Error {
     if role != blot_reuse_artifact_emitter::Role.table_function && role != blot_reuse_artifact_emitter::Role.callable_function { return blot_error::Error.none; }
@@ -328,27 +328,27 @@ fn recordTableReference(module: Module&, role: blot_reuse_artifact_emitter::Role
     module.table_functions.push(target); module.table_origins.push(TableOrigin { target: target, kind: kind, function: function, place: place , ..}); return blot_error::Error.none;
 }
 fn recordSemanticSite(module: Module&, site: SemanticSite) -> blot_error::Error {
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordSemanticSite(module.artifacts, site); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_8 .= module.artifacts; if artifact_recorder_8 { let error = blot_reuse_artifact_emitter::recordSemanticSite(artifact_recorder_8, site); if error != blot_error::Error.none { return error; } }
     module.semantic_sites.push(site); return blot_error::Error.none;
 }
 fn dataReference(module: Module&, address: u32, operand: blot_reuse_artifact_emitter::Operand) -> blot_error::Error {
     let error = recordTableReference(module, operand.role, operand.value, blot_support::none<u32>(), address); if error != blot_error::Error.none { return error; }
-    if module.artifacts { return blot_reuse_artifact_emitter::recordDataWord(module.artifacts, address, operand); } return blot_error::Error.none;
+    let artifact_recorder_9 .= module.artifacts; if artifact_recorder_9 { return blot_reuse_artifact_emitter::recordDataWord(artifact_recorder_9, address, operand); } return blot_error::Error.none;
 }
 fn setStart(module: Module&, id: u32) -> blot_error::Error {
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordStart(module.artifacts, id); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_10 .= module.artifacts; if artifact_recorder_10 { let error = blot_reuse_artifact_emitter::recordStart(artifact_recorder_10, id); if error != blot_error::Error.none { return error; } }
     module.start = blot_support::some(id); return blot_error::Error.none;
 }
 fn publicArena(module: Module&) -> blot_error::Error {
     if !module.public_arena {
-        if module.artifacts { let error = blot_reuse_artifact_emitter::recordPublicArena(module.artifacts); if error != blot_error::Error.none { return error; } }
+        let artifact_recorder_11 .= module.artifacts; if artifact_recorder_11 { let error = blot_reuse_artifact_emitter::recordPublicArena(artifact_recorder_11); if error != blot_error::Error.none { return error; } }
         module.public_arena = true;
     }
     return blot_error::Error.none;
 }
 fn mutableStatic(module: Module&) -> blot_error::Error {
     if module.mutable_static { return blot_error::Error.none; }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordMutableStatic(module.artifacts); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_12 .= module.artifacts; if artifact_recorder_12 { let error = blot_reuse_artifact_emitter::recordMutableStatic(artifact_recorder_12); if error != blot_error::Error.none { return error; } }
     module.mutable_static = true; return blot_error::Error.none;
 }
 fn staticField(module: Module&, address: u32, role: blot_backend_runtime_ir::Role) -> blot_error::Error {
@@ -356,13 +356,13 @@ fn staticField(module: Module&, address: u32, role: blot_backend_runtime_ir::Rol
     if address % 4 != 0 || address > module.data.len || module.data.len - address < 4 { return blot_error::Error.invalid_global_reference; }
     let encoded = address | role;
     for previous in module.static_fields { if previous == encoded { return blot_error::Error.none; } if (previous & 4294967292) == address { return blot_error::Error.invalid_global_reference; } }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordStaticField(module.artifacts, address, role); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_13 .= module.artifacts; if artifact_recorder_13 { let error = blot_reuse_artifact_emitter::recordStaticField(artifact_recorder_13, address, role); if error != blot_error::Error.none { return error; } }
     module.static_fields.push(encoded); return blot_error::Error.none;
 }
 fn addGlobal(module: Module&, scalar: Scalar, bits: u32, mutable: bool) -> u32, blot_error::Error {
     if module.globals.len == 4294967295 { return 0, blot_error::Error.module_too_large; }
     let id = module.globals.len as u32;
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordGlobal(module.artifacts, id, scalar, blot_reuse_artifact_emitter::Operand { value: bits , ..}, mutable); if error != blot_error::Error.none { return 0, error; } }
+    let artifact_recorder_14 .= module.artifacts; if artifact_recorder_14 { let error = blot_reuse_artifact_emitter::recordGlobal(artifact_recorder_14, id, scalar, blot_reuse_artifact_emitter::Operand { value: bits , ..}, mutable); if error != blot_error::Error.none { return 0, error; } }
     let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.global, id, false); if error != blot_error::Error.none { return 0, error; }
     module.globals.push(Global { scalar: scalar, bits: bits, mutable: mutable , ..}); return id, blot_error::Error.none;
 }
@@ -385,7 +385,7 @@ fn dataWords(module: Module&, words: const u32[:]) -> u32, blot_error::Error {
     for word in words { for index in 0..4 { module.data.push((word >> (index * 8)) as! u8); } }
     let finished = finishStaticData(module, address); return address, finished;
 }
-fn dataObject(module: Module&, fields: const u32[:]) -> u32, blot_error::Error { dataWords(module, fields) }
+fn dataObject(module: Module&, fields: const u32[:]) -> u32, blot_error::Error { return dataWords(module, fields); }
 fn staticBytes(module: Module&, bytes: const u8[:]) -> u32, blot_error::Error {
     let arena, error = ensureArena(module); if error != blot_error::Error.none { return 0, error; }
     if bytes.len % 4 != 0 { return 0, blot_error::Error.invalid_function_reference; }
@@ -394,11 +394,11 @@ fn staticBytes(module: Module&, bytes: const u8[:]) -> u32, blot_error::Error {
     let finished = finishStaticData(module, address); return address, finished;
 }
 fn finishStaticData(module: Module&, address: u32) -> blot_error::Error {
-    if module.artifacts { let error = blot_reuse_artifact_emitter::data(module.artifacts, address, module.data[address..]); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_15 .= module.artifacts; if artifact_recorder_15 { let error = blot_reuse_artifact_emitter::data(artifact_recorder_15, address, module.data[address..]); if error != blot_error::Error.none { return error; } }
     let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.static_data, address, false); if error != blot_error::Error.none { return error; }
     let end = module.data.len as u32; let arena = module.arena.value;
     for id in [arena.heap, arena.base, arena.static_end] {
-        if module.artifacts { let error = blot_reuse_artifact_emitter::recordGlobalBits(module.artifacts, id, blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.static_address, value: end , ..}); if error != blot_error::Error.none { return error; } }
+        let artifact_recorder_16 .= module.artifacts; if artifact_recorder_16 { let error = blot_reuse_artifact_emitter::recordGlobalBits(artifact_recorder_16, id, blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.static_address, value: end , ..}); if error != blot_error::Error.none { return error; } }
         module.globals[id].bits = end;
     }
     return blot_error::Error.none;
@@ -414,7 +414,7 @@ fn finishStaticFields(module: Module&) -> blot_error::Error {
     let values = [address, module.static_fields.len as u32, module.globals.len as u32];
     for id, index in ids {
         var role = blot_reuse_artifact_emitter::Role.literal; if index == 0 { role = blot_reuse_artifact_emitter::Role.static_address; }
-        if module.artifacts { let error = blot_reuse_artifact_emitter::recordGlobalBits(module.artifacts, id, blot_reuse_artifact_emitter::Operand { role: role, value: values[index] , ..}); if error != blot_error::Error.none { return error; } }
+        let artifact_recorder_17 .= module.artifacts; if artifact_recorder_17 { let error = blot_reuse_artifact_emitter::recordGlobalBits(artifact_recorder_17, id, blot_reuse_artifact_emitter::Operand { role: role, value: values[index] , ..}); if error != blot_error::Error.none { return error; } }
         module.globals[id].bits = values[index];
     }
     return blot_error::Error.none;
@@ -434,7 +434,7 @@ fn ensureArena(module: Module&) -> Arena, blot_error::Error {
         writeDataWord(module, address + blot_runtime_runtime_layout::ListDescriptor_immutable, 1);
         writeDataWord(module, address + blot_runtime_runtime_layout::ListDescriptor_leaf_limit, blot_runtime_list_runtime::leafLimit(width as u32));
     }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::data(module.artifacts, 0, module.data[..]); if error != blot_error::Error.none { return Arena {..}, error; } }
+    let artifact_recorder_18 .= module.artifacts; if artifact_recorder_18 { let error = blot_reuse_artifact_emitter::data(artifact_recorder_18, 0, module.data[..]); if error != blot_error::Error.none { return Arena {..}, error; } }
     var arena = Arena {..};
     let heap, heap_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, blot_runtime_arena_runtime::metadata_bytes, true);
     if heap_error != blot_error::Error.none { return Arena {..}, heap_error; } arena.heap = heap;
@@ -580,7 +580,7 @@ fn ensureArena(module: Module&) -> Arena, blot_error::Error {
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_get, arena.heap),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_return_),
     ]); if error != blot_error::Error.none { return Arena {..}, error; }
-    if module.artifacts { error = blot_reuse_artifact_emitter::recordArena(module.artifacts, arena); if error != blot_error::Error.none { return Arena {..}, error; } }
+    let artifact_recorder_19 .= module.artifacts; if artifact_recorder_19 { error = blot_reuse_artifact_emitter::recordArena(artifact_recorder_19, arena); if error != blot_error::Error.none { return Arena {..}, error; } }
     module.arena = blot_support::some(arena);
     error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.arena, 0, false); return arena, error;
 }
@@ -653,7 +653,7 @@ fn ensureHostReferences(module: Module&) -> HostReferences, blot_error::Error {
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),
     ]); if error != blot_error::Error.none { return HostReferences {..}, error; }
     let references = HostReferences { retain: retain, release: release, cursor: cursor, active: active , ..};
-    if module.artifacts { error = blot_reuse_artifact_emitter::recordHostReferences(module.artifacts, references); if error != blot_error::Error.none { return HostReferences {..}, error; } }
+    let artifact_recorder_20 .= module.artifacts; if artifact_recorder_20 { error = blot_reuse_artifact_emitter::recordHostReferences(artifact_recorder_20, references); if error != blot_error::Error.none { return HostReferences {..}, error; } }
     module.host_references = blot_support::some(references);
     if module.arena.present { error = blot_runtime_root_runtime::hostCleanup(module, module.arena.value); if error != blot_error::Error.none { return HostReferences {..}, error; } }
     error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.host_references, 0, false); return references, error;
@@ -689,7 +689,7 @@ fn ensureLists(module: Module&) -> blot_runtime_list_runtime::Runtime, blot_erro
     if module.lists.present { let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.lists, 0, true); return module.lists.value, error; }
     let arena, error = ensureArena(module); if error != blot_error::Error.none { return blot_runtime_list_runtime::Runtime {..}, error; }
     let runtime, emitted = blot_runtime_list_runtime::emit(module, arena); if emitted != blot_error::Error.none { return runtime, emitted; }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordLists(module.artifacts, runtime); if error != blot_error::Error.none { return runtime, error; } }
+    let artifact_recorder_21 .= module.artifacts; if artifact_recorder_21 { let error = blot_reuse_artifact_emitter::recordLists(artifact_recorder_21, runtime); if error != blot_error::Error.none { return runtime, error; } }
     module.lists = blot_support::some(runtime);
     let demanded = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.lists, 0, false); return runtime, demanded;
 }
@@ -698,7 +698,7 @@ fn ensureListSnapshot(module: Module&) -> u32, blot_error::Error {
     if runtime.snapshot.present { return runtime.snapshot.value, blot_error::Error.none; }
     let id, emitted = blot_runtime_list_runtime::emitSnapshot(module); if emitted != blot_error::Error.none { return 0, emitted; }
     var updated = runtime; updated.snapshot = blot_support::some(id);
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordListsExtension(module.artifacts, updated); if error != blot_error::Error.none { return 0, error; } }
+    let artifact_recorder_22 .= module.artifacts; if artifact_recorder_22 { let error = blot_reuse_artifact_emitter::recordListsExtension(artifact_recorder_22, updated); if error != blot_error::Error.none { return 0, error; } }
     module.lists = blot_support::some(updated); return id, blot_error::Error.none;
 }
 fn ensureUncheckedListAddress(module: Module&) -> u32, blot_error::Error {
@@ -706,7 +706,7 @@ fn ensureUncheckedListAddress(module: Module&) -> u32, blot_error::Error {
     if runtime.address_unchecked.present { return runtime.address_unchecked.value, blot_error::Error.none; }
     let id, emitted = blot_runtime_list_runtime::emitUncheckedAddress(module); if emitted != blot_error::Error.none { return 0, emitted; }
     var updated = runtime; updated.address_unchecked = blot_support::some(id);
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordListsExtension(module.artifacts, updated); if error != blot_error::Error.none { return 0, error; } }
+    let artifact_recorder_23 .= module.artifacts; if artifact_recorder_23 { let error = blot_reuse_artifact_emitter::recordListsExtension(artifact_recorder_23, updated); if error != blot_error::Error.none { return 0, error; } }
     module.lists = blot_support::some(updated); return id, blot_error::Error.none;
 }
 fn ensureUncheckedListSet(module: Module&) -> u32, blot_error::Error {
@@ -714,7 +714,7 @@ fn ensureUncheckedListSet(module: Module&) -> u32, blot_error::Error {
     let runtime = module.lists.value; if runtime.set_unchecked.present { return runtime.set_unchecked.value, blot_error::Error.none; }
     let id, emitted = blot_runtime_list_runtime::emitUncheckedSet(module, runtime); if emitted != blot_error::Error.none { return 0, emitted; }
     var updated = runtime; updated.set_unchecked = blot_support::some(id);
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordListsExtension(module.artifacts, updated); if error != blot_error::Error.none { return 0, error; } }
+    let artifact_recorder_24 .= module.artifacts; if artifact_recorder_24 { let error = blot_reuse_artifact_emitter::recordListsExtension(artifact_recorder_24, updated); if error != blot_error::Error.none { return 0, error; } }
     module.lists = blot_support::some(updated); return id, blot_error::Error.none;
 }
 fn isArray(scalar: Scalar) -> bool { scalar == blot_backend_runtime_ir::SC_array_u32 || scalar == blot_backend_runtime_ir::SC_array_f32 }
@@ -736,7 +736,7 @@ fn exportOwnerFunction(module: Module&, id: u32, exported_name: const u8[:], par
         let error = publicArena(module); if error != blot_error::Error.none { return error; }
     }
     let item = Export { name: ownName(module, exported_name), index: id, parameter: parameter, result: result, once: once, parameter_owner: parameter_owner, result_owner: result_owner, owner_adapter: owner_adapter , ..};
-    if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, true); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_25 .= module.artifacts; if artifact_recorder_25 { let error = blot_reuse_artifact_emitter::exportItem(artifact_recorder_25, module, item, true); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); module.functions[id].entry = true; return blot_error::Error.none;
 }
 fn resourceCount(module: const Module&) -> u32 {
@@ -785,12 +785,12 @@ fn resourceImport(module: const Module&, id: i64) -> bool {
 }
 fn exportResourceAdapter(module: Module&, id: u32, exported_name: const u8[:]) -> blot_error::Error {
     let item = Export { name: ownName(module, exported_name), index: id , ..};
-    if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, false); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_26 .= module.artifacts; if artifact_recorder_26 { let error = blot_reuse_artifact_emitter::exportItem(artifact_recorder_26, module, item, false); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); return blot_error::Error.none;
 }
 fn exportTaskAdapter(module: Module&, id: u32, exported_name: const u8[:], runtime: bool) -> blot_error::Error {
     let item = Export { name: ownName(module, exported_name), index: id, task_adapter: true, task_runtime: runtime , ..};
-    if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, false); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_27 .= module.artifacts; if artifact_recorder_27 { let error = blot_reuse_artifact_emitter::exportItem(artifact_recorder_27, module, item, false); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); return blot_error::Error.none;
 }
 fn taskAdapterFunction(module: const Module&, id: i64) -> bool { for item in module.exports { if !item.global && item.index == id && item.task_adapter { return true; } } return false; }
@@ -818,7 +818,7 @@ fn runtimeHelper(module: const Module&, id: i64) -> bool {
     if fixtureHelper(module, id) { return true; }
     if module.regions.present && blot_runtime_region_runtime::contains(module.regions.value.runtime, id) { return true; }
     if module.arena.present { for function in arenaFunctions(module.arena.value) { if id == function { return true; } } }
-    if module.lists.present && blot_runtime_list_runtime::contains(module.lists.value, id) { return true; }
+    if module.lists.present {const for <Name,Field> in fields<blot_runtime_list_runtime::Runtime> {let function=blot_runtime_list_runtime::functionId(module.lists.value,Name);if function.present && function.value==id {return true;}}}
     if module.cohorts.present { let cohorts = module.cohorts.value; if id == cohorts.begin || id == cohorts.allocate || id == cohorts.retire_members { return true; } }
     if module.host_references.present { let references = module.host_references.value; if id == references.retain || id == references.release { return true; } }
     return false;
@@ -854,7 +854,7 @@ fn hostCallbackImport(module: const Module&, id: i64) -> blot_support::Option<Ca
 }
 fn setCleanupDataMetadata(module: Module&, bytes: const u8[:]) -> blot_error::Error {
     if module.cleanup_data.len != 0 { return blot_error::Error.invalid_function_reference; }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::cleanupData(module.artifacts, bytes); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_28 .= module.artifacts; if artifact_recorder_28 { let error = blot_reuse_artifact_emitter::cleanupData(artifact_recorder_28, bytes); if error != blot_error::Error.none { return error; } }
     module.cleanup_data = ownName(module, bytes); return blot_error::Error.none;
 }
 fn importHostCallback(module: Module&, callback: Callback) -> u32, blot_error::Error {
@@ -902,22 +902,22 @@ fn exportOwnerCallbackFunction(module: Module&, id: u32, exported_name: const u8
         let error = publicArena(module); if error != blot_error::Error.none { return error; }
     }
     let item = Export { name: ownName(module, exported_name), index: id, result: result, callback: blot_support::some(callback), once: once, result_owner: result_owner , ..};
-    if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, true); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_29 .= module.artifacts; if artifact_recorder_29 { let error = blot_reuse_artifact_emitter::exportItem(artifact_recorder_29, module, item, true); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); module.functions[id].entry = true; return blot_error::Error.none;
 }
 fn exportConstant(module: Module&, exported_name: const u8[:], scalar: Scalar, bits: u32) -> blot_error::Error {
     let id = module.globals.len as u32; let item = Export { name: ownName(module, exported_name), index: id, result: scalar, global: true , ..};
-    if module.artifacts {
+    let artifact_recorder_30 .= module.artifacts; if artifact_recorder_30 {
         var role = blot_reuse_artifact_emitter::Role.literal; if scalar == blot_backend_runtime_ir::SC_pointer || isArray(scalar) { role = blot_reuse_artifact_emitter::Role.static_address; }
-        var error = blot_reuse_artifact_emitter::recordGlobal(module.artifacts, id, scalar, blot_reuse_artifact_emitter::Operand { role: role, value: bits , ..}, false); if error != blot_error::Error.none { return error; }
-        error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, false); if error != blot_error::Error.none { return error; }
+        var error = blot_reuse_artifact_emitter::recordGlobal(artifact_recorder_30, id, scalar, blot_reuse_artifact_emitter::Operand { role: role, value: bits , ..}, false); if error != blot_error::Error.none { return error; }
+        error = blot_reuse_artifact_emitter::exportItem(artifact_recorder_30, module, item, false); if error != blot_error::Error.none { return error; }
     }
     module.globals.push(Global { scalar: scalar, bits: bits , ..}); module.exports.push(item); return blot_error::Error.none;
 }
 fn exportGlobal(module: Module&, id: u32, exported_name: const u8[:]) -> blot_error::Error {
     if id >= module.globals.len { return blot_error::Error.invalid_global_reference; }
     let item = Export { name: ownName(module, exported_name), index: id, result: module.globals[id].scalar, global: true , ..};
-    if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, false); if error != blot_error::Error.none { return error; } }
+    let artifact_recorder_31 .= module.artifacts; if artifact_recorder_31 { let error = blot_reuse_artifact_emitter::exportItem(artifact_recorder_31, module, item, false); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); return blot_error::Error.none;
 }
 fn scopedEngineBody(module: Module&, parameters: i64, locals: i64, bytes: i64) -> blot_error::Error {
@@ -937,7 +937,7 @@ fn publishBody(module: Module&, locals: const ValueType[:], code: const Instruct
     let code_range = Range { start: module.instructions.len, len: code.len , ..}; module.instructions.append(code);
     return blot_backend_runtime_ir::Body { locals: local_range, instructions: code_range , ..};
 }
-fn clearBorrowed(function: Function&) { function.borrowed_body = false; function.borrowed_locals = []; function.borrowed_instructions = []; }
+fn clearBorrowed(function: Function&) { function.borrowed_body = false; function.borrowed_locals = default<const ValueType[:]>(); function.borrowed_instructions = default<const Instruction[:]>(); }
 fn materializeBody(module: Module&,id: u32) -> blot_error::Error {
     if id >= module.functions.len { return blot_error::Error.invalid_function_reference; } let function = module.functions[id]; if !function.borrowed_body { return blot_error::Error.none; }
     let body = publishBody(module,function.borrowed_locals,function.borrowed_instructions); module.functions[id].locals = body.locals; module.functions[id].instructions = body.instructions; clearBorrowed(module.functions[id]); return blot_error::Error.none;
@@ -982,7 +982,7 @@ type AssemblyOptions = AssembleOptions;
 fn assemble(module: const Module&,out: u8[>..<]&) -> blot_error::Error { assembleWithOptions(module,AssembleOptions {..},out) }
 fn assembleWithOptions(module: const Module&,options: AssembleOptions,out: u8[>..<]&) -> blot_error::Error { assemblePrepared(module,options,true,false,out) }
 fn assembleCheckedWithOptions(module: const Module&,options: AssembleOptions,out: u8[>..<]&) -> blot_error::Error { if module.fixture_helpers_present { return blot_error::Error.invalid_function_reference; } return assemblePrepared(module,options,true,true,out); }
-fn hasOwningFieldLayouts(module: const Module&) -> bool { if !module.arena.present { return false; } let arena = module.arena.value; for function in module.functions { let code = module.instructions(function); for instruction,at in code { if instruction.op != blot_backend_runtime_ir::OP_call || instruction.operand != arena.allocate { continue; } let roles = blot_backend_runtime_ir::allocationAnnotations(code,at); for word in 0..16 { if blot_backend_runtime_ir::wordRole(roles,word) == blot_backend_runtime_ir::ROLE_reference { return true; } } } } return false; }
+fn hasOwningFieldLayouts(module: const Module&) -> bool { if !module.arena.present { return false; } let arena = module.arena.value; for function in module.functions { let code = blot_backend_wasm::instructions(module,function); for instruction,at in code { if instruction.op != blot_backend_runtime_ir::OP_call || instruction.operand != arena.allocate { continue; } let roles = blot_backend_runtime_ir::allocationAnnotations(code,at); for word in 0..16 { if blot_backend_runtime_ir::wordRole(roles,word) == blot_backend_runtime_ir::ROLE_reference { return true; } } } } return false; }
 fn rcUnproven(module: const Module&,function: Function,body: blot_support::Option<blot_backend_runtime_ir::DetachedBody>,passes: blot_backend_runtime_pipeline::Session&) -> bool,blot_error::Error {
     var view = function; if body.present { view.borrowed_body = true; view.borrowed_locals = body.value.locals; view.borrowed_instructions = body.value.instructions; view.locals = Range { len: body.value.locals.len,..}; view.instructions = Range { len: body.value.instructions.len,..}; view.annotations = 0; for instruction in body.value.instructions { if instruction.op == blot_backend_runtime_ir::OP_ownership { view.annotations++; } } } var proof,error = blot_backend_wasm_lifetimes::rcPlan(module,view,passes.summaries,null); if error != blot_error::Error.none { return false,error; } let unproven = !proof.admitted || proof.allocations.items.len != 0; proof.deinit(); return unproven,blot_error::Error.none;
 }
@@ -1003,13 +1003,13 @@ fn assemblePrepared(module: const Module&,options: AssembleOptions,journals: boo
             if options.previous && options.current { let matches,error = blot_backend_optimized_bodies::init(options.previous,options.current); if error != blot_error::Error.none { return error; } matcher = blot_support::some(matches); } if options.stats && matcher.present { options.stats.match_candidates = matcher.value.candidates; options.stats.match_work = matcher.value.work; options.stats.match_budget_exhausted = matcher.value.budget_exhausted; }
             var fallback = initialFallback(module,passes.value.roots); var unproven_function = blot_support::none<u32>(); let batch,batch_error = blot_backend_runtime_parallel::run(options.io,passes.value,matcher,options.workers,fallback == OwnershipFallback.none,options.profile); if batch_error != blot_error::Error.none { return batch_error; } parallel = batch; if options.stats && parallel.present { options.stats.workers = parallel.value.workers; options.stats.parallel_jobs = parallel.value.jobs; options.stats.worker_timings = parallel.value.timings; }
             for function,id in module.functions {
-                if options.stats { options.stats.functions++; } var reused = false; if matcher.present { reused = matcher.value.matches(id); } var body = blot_support::none<blot_backend_runtime_ir::DetachedBody>(); if reused { body = matcher.value.output(id); } else if parallel.present { let output,error = parallel.value.take(id); if error != blot_error::Error.none { return error; } body = output; } else { let output,error = passes.value.optimize(id as u32); if error != blot_error::Error.none { return error; } body = output; } bodies.push(Prepared { body,borrowed: reused,..}); if options.current { let recorded = options.current.recordOutput(id,body); if recorded != blot_error::Error.none { return recorded; } } if options.stats { if reused { options.stats.reused++; } else { options.stats.optimized++; } }
+                if options.stats { options.stats.functions++; } var reused = false; if matcher.present { reused = matcher.value.matches(id); } var body = blot_support::none<blot_backend_runtime_ir::DetachedBody>(); if reused { body = matcher.value.output(id); } else if parallel.present { let output,error = parallel.value.take(id); if error != blot_error::Error.none { return error; } body = output; } else { let output,error = passes.value.optimize(id as u32); if error != blot_error::Error.none { return error; } body = output; } bodies.push(Prepared { body: body,borrowed: reused,..}); if options.current { let recorded = options.current.recordOutput(id,body); if recorded != blot_error::Error.none { return recorded; } } if options.stats { if reused { options.stats.reused++; } else { options.stats.optimized++; } }
                 if fallback == OwnershipFallback.none && !passes.value.runtimeHelper(id as u32) { var cached = blot_support::none<bool>(); if matcher.present { cached = matcher.value.rcUnproven(id); } var prepared = cached; if !prepared.present && parallel.present { prepared = parallel.value.unproven(id); } var unproven: bool; if prepared.present { unproven = prepared.value; } else { let result,error = rcUnproven(module,function,body,passes.value); if error != blot_error::Error.none { return error; } unproven = result; } if options.current { options.current.entries.items[id].rc_unproven = blot_support::some(unproven); } if options.stats { if cached.present { options.stats.rc_reused++; } else { options.stats.rc_checked++; } } if unproven { fallback = OwnershipFallback.unproven_body; unproven_function = blot_support::some(id as u32); } }
             }
-            let admitted = fallback == OwnershipFallback.none; if checked && module.arena.present && (!admitted || !passes.value.roots) { if options.rejection { options.rejection = OwnershipFailure { fallback,function: unproven_function,..}; } return blot_error::Error.incomplete_ownership; }
+            let admitted = fallback == OwnershipFallback.none; if checked && module.arena.present && (!admitted || !passes.value.roots) { if options.rejection { options.rejection = OwnershipFailure { fallback: fallback,function: unproven_function,..}; } return blot_error::Error.incomplete_ownership; }
             if passes.value.roots && !admitted && hasOwningFieldLayouts(module) { if options.current { options.current.reset(); } if options.stats { options.stats = blot_backend_optimized_bodies::Stats {..}; } retry = true; return blot_error::Error.none; }
-            if profile.present { let bound = profile.value.bind(bodies[:]); if bound != blot_error::Error.none { return bound; } } var collector = blot_backend_collector_contract::Certificate { reason: blot_backend_collector_contract::Reason.unchecked_module,..}; if checked { collector = blot_backend_collector_contract::analyze(module,bodies[:]); } if options.require_collector_free && !collector.certified { if options.collector_rejection { options.collector_rejection = collector; } return blot_error::Error.collector_free_unproven; }
-            return encodePrepared(module,options,bodies[:],passes.value.roots,admitted,fallback,collector,profile,matcher,checked,out);
+            if profile.present { let bound = profile.value.bind(bodies[..]); if bound != blot_error::Error.none { return bound; } } var collector = blot_backend_collector_contract::Certificate { reason: blot_backend_collector_contract::Reason.unchecked_module,..}; if checked { collector = blot_backend_collector_contract::analyze(module,bodies[..]); } if options.require_collector_free && !collector.certified { if options.collector_rejection { options.collector_rejection = collector; } return blot_error::Error.collector_free_unproven; }
+            return encodePrepared(module,options,bodies[..],passes.value.roots,admitted,fallback,collector,profile,matcher,checked,out);
         }
         let error = attempt(); for &prepared in bodies { if !prepared.borrowed && prepared.body.present { prepared.body.value.deinit(); } } if parallel.present { parallel.value.deinit(); } if matcher.present { matcher.value.deinit(); } if passes.present { passes.value.deinit(); } if profile.present { profile.value.deinit(); } if error != blot_error::Error.none { return error; } if retry { enable_journals = false; continue; } return blot_error::Error.none;
     }
@@ -1058,17 +1058,17 @@ fn encodeInitializerAndElements(module: const Module&,options: AssembleOptions,c
     if module.start.present { let start = module.start.value; if start >= module.functions.len || module.functions[start].parameters.len != 0 || module.functions[start].result != blot_backend_runtime_ir::VT_none { return blot_error::Error.invalid_function_reference; } payload.uleb(code.function(start) + imports); output.section(8,payload); payload.clear(); } if module.indirect && !options.import_function_table.present { payload.uleb(1); payload.byte(0); payload.raw([0x41,0,0x0b]); payload.uleb(module.functions.len as u32); for id in 0..module.functions.len { payload.uleb(code.function(id as u32) + imports); } output.section(9,payload); payload.clear(); } return output.failure;
 }
 fn encodeCodeSection(module: const Module&,options: AssembleOptions,bodies: const Prepared[:],profile: blot_support::Option<blot_backend_memory_profile::Profile>,matcher: blot_support::Option<blot_backend_optimized_bodies::Matcher>,flags: blot_backend_runtime_flags::Facts,collector: blot_backend_collector_contract::Certificate,code: blot_backend_machine_code_sharing::Index&,imports: u32,output: Wire&,payload: Wire&) -> blot_error::Error {
-    if module.functions.len == 0 { return blot_error::Error.none; } var facts = flags; let encoding = blot_backend_optimized_bodies::Encoding { functions: module.functions.len,unique: code.unique,imports,globals: module.globals.len,signatures: module.signatures.len,root_mode: facts.root_mode,rc_admitted: facts.rc_admitted,wide: facts.wide(),retire: resourceRetire(module),collector_free: collector.certified,..}; var environment = encoding; if profile.present { environment.profile_base = profile.value.base; environment.profile_rows = profile.value.sites.len + 2; } var same = false; if matcher.present { same = matcher.value.encodingSame(environment,code.indexes[:]); } if options.current { let recorded = options.current.recordEncoding(environment,code.indexes[:]); if recorded != blot_error::Error.none { return recorded; } } payload.uleb(code.unique as u32); var body_bytes: u8[>..<] = []; var body = wire(body_bytes);
+    if module.functions.len == 0 { return blot_error::Error.none; } var facts = flags; let encoding = blot_backend_optimized_bodies::Encoding { functions: module.functions.len,unique: code.unique,imports: imports,globals: module.globals.len,signatures: module.signatures.len,root_mode: facts.root_mode,rc_admitted: facts.rc_admitted,wide: facts.wide(),retire: resourceRetire(module),collector_free: collector.certified,..}; var environment = encoding; if profile.present { environment.profile_base = profile.value.base; environment.profile_rows = profile.value.sites.len + 2; } var same = false; if matcher.present { same = matcher.value.encodingSame(environment,code.indexes[..]); } if options.current { let recorded = options.current.recordEncoding(environment,code.indexes[..]); if recorded != blot_error::Error.none { return recorded; } } payload.uleb(code.unique as u32); var body_bytes: u8[>..<] = []; var body = wire(body_bytes);
     for function,id in module.functions {
         if !code.emits(id) { continue; } let optimized = bodies[id].body; var locals = module.locals(function); if optimized.present { locals = optimized.value.locals; } let bounded = scopedEngineBody(module,function.parameters.len,locals.len,0); if bounded != blot_error::Error.none { return bounded; }
         if same { let cached = matcher.value.encodedBody(id); if cached.present { let bounded = scopedEngineBody(module,function.parameters.len,locals.len,cached.value.len); if bounded != blot_error::Error.none { return bounded; } payload.uleb(cached.value.len as u32); payload.raw(cached.value); if payload.failure != blot_error::Error.none { return payload.failure; } if options.current { let recorded = options.current.recordEncoded(id,cached.value); if recorded != blot_error::Error.none { return recorded; } } if options.stats { options.stats.encoded_reused++; options.stats.encoded_reused_bytes += cached.value.len; } continue; } }
-        body.clear(); var instructions = module.instructions(function); if optimized.present { instructions = optimized.value.instructions; } var lowered = blot_backend_runtime_flags::Iterator { facts,instructions,..}; var observer = blot_support::none<blot_backend_memory_profile::Function>(); var observed: u32 = 0; if profile.present { observer = blot_support::some(blot_backend_memory_profile::init(profile.value,id as u32,function.parameters.len + locals.len)); observed = blot_backend_memory_profile::function_local_count as u32; } blot_backend_byte_encoder::encodeLocals(body.bytes,locals,observed); if observer.present { let entered = observer.value.enter(body.bytes,function.entry); if entered != blot_error::Error.none { return entered; } }
+        body.clear(); var instructions = blot_backend_wasm::instructions(module,function); if optimized.present { instructions = optimized.value.instructions; } var lowered = blot_backend_runtime_flags::Iterator { facts,instructions,..}; var observer = blot_support::none<blot_backend_memory_profile::Function>(); var observed: u32 = 0; if profile.present { observer = blot_support::some(blot_backend_memory_profile::init(profile.value,id as u32,function.parameters.len + locals.len)); observed = blot_backend_memory_profile::function_local_count as u32; } blot_backend_byte_encoder::encodeLocals(body.bytes,locals,observed); if observer.present { let entered = observer.value.enter(body.bytes,function.entry); if entered != blot_error::Error.none { return entered; } }
         let omit_collector = collector.certified && module.arena.present && (id == module.arena.value.cycle_safe || id == module.arena.value.cycle_collect); if !omit_collector { loop { let instruction,present = lowered.next(); if !present { break; } if observer.present { let before = observer.value.before(body.bytes,instruction); if before != blot_error::Error.none { return before; } } var encoded = instruction; if encoded.op == blot_backend_runtime_ir::OP_call { if encoded.operand >= module.functions.len { return blot_error::Error.invalid_function_reference; } encoded.operand = code.function(encoded.operand); } let emitted = blot_backend_byte_encoder::encodeInstruction(body.bytes,encoded,code.unique,module.functions.len,module.globals.len,module.signatures.len,imports); if emitted != blot_error::Error.none { return emitted; } if observer.present { let after = observer.value.after(body.bytes,instruction); if after != blot_error::Error.none { return after; } } } }
         if observer.present { let finished = observer.value.finish(body.bytes); if finished != blot_error::Error.none { return finished; } } body.byte(0x0b); let bounded = scopedEngineBody(module,function.parameters.len,locals.len,body.items().len); if bounded != blot_error::Error.none { return bounded; } if options.current { let recorded = options.current.recordEncoded(id,body.items()); if recorded != blot_error::Error.none { return recorded; } } payload.uleb(body.items().len as u32); payload.raw(body.items());
     }
     output.section(10,payload); payload.clear(); if output.failure != blot_error::Error.none { return output.failure; } if options.current { let sealed = options.current.sealQueries(); if sealed != blot_error::Error.none { return sealed; } if options.stats { options.stats.retained_bytes = options.current.bytes(); options.stats.query_records = options.current.queries.records.len; options.stats.query_complete = options.current.queries_complete; options.stats.query_saturated = options.current.queries.saturated; options.stats.query_capacity_bytes = options.current.queries.capacity_bytes; } } return blot_error::Error.none;
 }
-fn encodeDataSection(module: const Module&,output: Wire&,payload: Wire&) -> blot_error::Error { if (!module.arena.present && module.memory_model != MemoryModel.data_stacks) || module.data.len == 0 { return blot_error::Error.none; } var offset: u32 = 0; if module.memory_model == MemoryModel.data_stacks { if module.data.len > module.fixed_memory_bytes { return blot_error::Error.module_too_large; } offset = module.fixed_memory_bytes - module.data.len as u32; } payload.uleb(1); payload.byte(0); payload.byte(0x41); payload.sleb(offset as! i32); payload.byte(0x0b); payload.uleb(module.data.len as u32); payload.raw(module.data[:]); output.section(11,payload); payload.clear(); return output.failure; }
+fn encodeDataSection(module: const Module&,output: Wire&,payload: Wire&) -> blot_error::Error { if (!module.arena.present && module.memory_model != MemoryModel.data_stacks) || module.data.len == 0 { return blot_error::Error.none; } var offset: u32 = 0; if module.memory_model == MemoryModel.data_stacks { if module.data.len > module.fixed_memory_bytes { return blot_error::Error.module_too_large; } offset = module.fixed_memory_bytes - module.data.len as u32; } payload.uleb(1); payload.byte(0); payload.byte(0x41); payload.sleb(offset as! i32); payload.byte(0x0b); payload.uleb(module.data.len as u32); payload.raw(module.data[..]); output.section(11,payload); payload.clear(); return output.failure; }
 struct RuntimeLabel { id: u32,name: const u8[:] }
 fn arenaFunctionName(arena: Arena,id: u32) -> blot_support::Option<const u8[:]> {
     let names: RuntimeLabel[32] = [
@@ -1095,7 +1095,7 @@ fn jsonStringify(value: CertificateJson,writer: blot_json::Writer&) -> blot_erro
 struct CollectorJson { module: const Module&,options: AssembleOptions,certificate: blot_backend_collector_contract::Certificate,code: blot_backend_machine_code_sharing::Index&,imports: u32,profiled: bool }
 fn jsonStringify(value: CollectorJson,writer: blot_json::Writer&) -> blot_error::Error {
     var certificate = value.certificate; if certificate.function.present { certificate.function = blot_support::some(value.code.function(certificate.function.value) + value.imports); } writer.beginObject(); writer.field("certificate",CertificateJson { certificate,..}); writer.field("function_indices","final_wasm"); writer.field("instruction_indices","optimized_logical_body"); var identity = blot_support::none<DigestJson>(); if value.options.compiler_identity.present { identity = blot_support::some(DigestJson { value.options.compiler_identity.value,..}); } writer.field("compiler_identity",identity); writer.key("sources"); writer.beginArray();
-    if value.options.require_collector_free || value.profiled { for digest,index in value.options.source_digests { var filename: const u8[:] = ""; if value.options.source_names.present { let owner = value.options.source_names.value.owner((index + 1) as u32); if owner.present { filename = owner.value; } } writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("filename",filename); writer.field("blake3",DigestJson { digest,..}); writer.endObject(); } } writer.endArray(); writer.field("source_identity_scope","Exact source digests are included for strict and instrumented builds; the embedded certificate always belongs to this complete Wasm module."); writer.field("strict",value.options.require_collector_free); writer.key("roots"); writer.beginArray(); for item in value.module.exports { var index = item.index; if !item.global { index = value.code.function(index) + value.imports; } writer.element(ExportJson { module: value.module,value: item,index,..}); } writer.endArray(); var initializer = blot_support::none<u32>(); if value.module.start.present { initializer = blot_support::some(value.code.function(value.module.start.value) + value.imports); } writer.field("initializer",initializer); return writer.endObject();
+    if value.options.require_collector_free || value.profiled { for digest,index in value.options.source_digests { var filename: const u8[:] = ""; if value.options.source_names.present { let owner = value.options.source_names.value.owner((index + 1) as u32); if owner.present { filename = owner.value; } } writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("filename",filename); writer.field("blake3",DigestJson { digest,..}); writer.endObject(); } } writer.endArray(); writer.field("source_identity_scope","Exact source digests are included for strict and instrumented builds; the embedded certificate always belongs to this complete Wasm module."); writer.field("strict",value.options.require_collector_free); writer.key("roots"); writer.beginArray(); for item in value.module.exports { var index = item.index; if !item.global { index = value.code.function(index) + value.imports; } writer.element(ExportJson { module: value.module,value: item,index: index,..}); } writer.endArray(); var initializer = blot_support::none<u32>(); if value.module.start.present { initializer = blot_support::some(value.code.function(value.module.start.value) + value.imports); } writer.field("initializer",initializer); return writer.endObject();
 }
 fn encodeCollectorSection(module: const Module&,options: AssembleOptions,certificate: blot_backend_collector_contract::Certificate,profiled: bool,code: blot_backend_machine_code_sharing::Index&,imports: u32,output: Wire&,payload: Wire&) -> blot_error::Error { var metadata: u8[>..<] = []; let encoded = blot_json::toBytes(CollectorJson { module,options,certificate,code,imports,profiled,..},metadata); if encoded != blot_error::Error.none { return encoded; } payload.name("blot:collector-contract"); payload.raw(metadata); output.section(0,payload); payload.clear(); return output.failure; }
 fn encodeAbiSection(module: const Module&,roots: bool,admitted: bool,resources: u32,fallback: OwnershipFallback,output: Wire&,payload: Wire&) -> blot_error::Error {
@@ -1111,7 +1111,7 @@ fn encodeAbiSection(module: const Module&,roots: bool,admitted: bool,resources: 
 }
 fn encodePrepared(module: const Module&,options: AssembleOptions,bodies: const Prepared[:],pass_roots: bool,admitted: bool,fallback: OwnershipFallback,collector: blot_backend_collector_contract::Certificate,profile: blot_support::Option<blot_backend_memory_profile::Profile>,matcher: blot_support::Option<blot_backend_optimized_bodies::Matcher>,checked: bool,out: u8[>..<]&) -> blot_error::Error {
     let roots = module.memory_model == MemoryModel.counted && admitted && pass_roots; let resources = module.resourceCount(); if module.memory_model == MemoryModel.data_stacks { if module.arena.present || resources != 0 || module.cleanup_data.len != 0 || taskOpen(module) { return blot_error::Error.invalid_function_reference; } for item in module.exports { if item.parameter_owner.present || item.result_owner.present || item.owner_adapter || item.task_adapter { return blot_error::Error.invalid_function_reference; } if item.callback.present { let callback = item.callback.value; if callback.cleanup || callback.owned || callback.concurrent || callback.data { return blot_error::Error.invalid_function_reference; } } } } if resources != 0 && !roots { return blot_error::Error.invalid_function_reference; }
-    var root_mode: u32 = 0; if module.arena.present { if roots { root_mode = blot_runtime_root_runtime::enabled | blot_runtime_root_runtime::complete; } else { root_mode = module.globals[module.arena.value.root_enabled].bits & ~blot_runtime_root_runtime::complete; } } var flags = blot_backend_runtime_flags::Facts { module,root_mode,rc_admitted: admitted,..}; var canonical: u32[>..<] = []; var indexes: u32[>..<] = []; var code,error = blot_backend_machine_code_sharing::initPrepared(canonical,indexes,module,bodies,options.share_machine_code && !profile.present); if error != blot_error::Error.none { return error; } if options.stats { options.stats.shared = module.functions.len - code.unique; } if checked && module.arena.present && !flags.complete() { return blot_error::Error.incomplete_ownership; }
+    var root_mode: u32 = 0; if module.arena.present { if roots { root_mode = blot_runtime_root_runtime::enabled | blot_runtime_root_runtime::complete; } else { root_mode = module.globals[module.arena.value.root_enabled].bits & ~blot_runtime_root_runtime::complete; } } var flags = blot_backend_runtime_flags::Facts { module: module,root_mode: root_mode,rc_admitted: admitted,..}; var canonical: u32[>..<] = []; var indexes: u32[>..<] = []; var code,error = blot_backend_machine_code_sharing::initPrepared(canonical,indexes,module,bodies,options.share_machine_code && !profile.present); if error != blot_error::Error.none { return error; } if options.stats { options.stats.shared = module.functions.len - code.unique; } if checked && module.arena.present && !flags.complete() { return blot_error::Error.incomplete_ownership; }
     var encoded_bytes: u8[>..<] = []; var output = wire(encoded_bytes); var payload_bytes: u8[>..<] = []; var payload = wire(payload_bytes); output.raw([0,97,115,109,1,0,0,0]); encodeTypeSection(module,output,payload); if output.failure != blot_error::Error.none { return output.failure; } if module.functions.len > 4294967295 - module.imports.len { return blot_error::Error.module_too_large; } let imports = module.imports.len as u32; encodeImportSection(module,options,imports,output,payload); encodeFunctionSection(module,code,output,payload); encodeTableSection(module,options,output,payload); encodeMemorySection(module,profile,output,payload); encodeGlobalSection(module,profile,admitted,root_mode,imports,output,payload); if output.failure != blot_error::Error.none { return output.failure; } let exports = encodeExportSection(module,options,profile,roots,code,imports,output,payload); if exports != blot_error::Error.none { return exports; } let initializer = encodeInitializerAndElements(module,options,code,imports,output,payload); if initializer != blot_error::Error.none { return initializer; }
     let body = encodeCodeSection(module,options,bodies,profile,matcher,flags,collector,code,imports,output,payload); if body != blot_error::Error.none { return body; } let data = encodeDataSection(module,output,payload); if data != blot_error::Error.none { return data; } if profile.present { var observer = profile.value; let observed = encodeProfileSections(module,observer,code,imports,output,payload); if observed != blot_error::Error.none { return observed; } } let certificate = encodeCollectorSection(module,options,collector,profile.present,code,imports,output,payload); if certificate != blot_error::Error.none { return certificate; } let abi = encodeAbiSection(module,roots,admitted,resources,fallback,output,payload); if abi != blot_error::Error.none { return abi; } out.append(output.items()); return blot_error::Error.none;
 }

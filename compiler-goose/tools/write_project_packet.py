@@ -4,9 +4,11 @@ from pathlib import Path
 import re,json
 R=Path(__file__).resolve().parents[1]/'src'
 from source_model import clean,balanced,split
+from normalize_syntax import normalize,finish_syntax
 (R.parent/'build').mkdir(parents=True,exist_ok=True)
 D={};PATHS={}
 for path in R.rglob('*.goose'):
+ if path.name.startswith('_') or (path.parent == R and 'probe' in path.stem):continue
  s=clean(path.read_text());m=re.search(r'namespace\s+(\w+)\s*;',s)
  if not m:continue
  ns=m[1];PATHS.setdefault(ns,path.relative_to(R).with_suffix('').as_posix().replace('/','.'))
@@ -48,7 +50,9 @@ SPECIAL={
  'blot_parse_symbols::Pool':None,
  'blot_reuse_body_check_cache::Cache':None,
  'blot_reuse_body_check_cache::Body':{'owner'},
- 'blot_reuse_body_check_cache::Chunk':{'references','graph_owner','live'},
+ 'blot_reuse_body_check_cache::Loops':{'slot'},
+ 'blot_reuse_body_auxiliary::Owner':{'slot'},
+ 'blot_reuse_body_check_cache::Chunk':{'references','graph_owner','live','slot'},
  'blot_check_type_store_snapshot::Snapshot':{'lease_index','generation'},
  'blot_check_type_store_snapshot::State':{'store_owner_id'},
 }
@@ -76,7 +80,7 @@ for field,t in D['blot_parse_ast::Tree'][2]:
    item=dict(info[2]).get('items')
    if item:CUSTOM_CHILDREN['blot_parse_ast::Tree'].append(q(item,info[3]))
 PRIM={'bool','u8','u16','u32','u64','i8','i16','i32','i64','f32','f64'}
-SEEN={};SLICES={};ARRAYS=set();ENUMS={};IMPORTS=set()
+SEEN={};SLICES={};ARRAYS=set();ENUMS={};STRUCTS={};IMPORTS=set()
 def visit(t,ns='blot_project_packet'):
  t=resolve(t,ns);t=re.sub(r'\s+',' ',t).strip()
  if t in SEEN:return
@@ -108,6 +112,7 @@ def visit(t,ns='blot_project_packet'):
   for name,fs in ENUMS[t]:
    for f,ty in fs:visit(ty,owner)
  elif kind=='struct':
+  STRUCTS[t]=data
   skip=SPECIAL.get(t,set())
   for name,ty in data:
    if skip is not None and name in skip:continue
@@ -132,15 +137,19 @@ for typ,bits in [('f32','u32'),('f64','u64')]:
 for t,values in ENUMS.items():
  body=[]
  for i,(name,fs) in enumerate(values):
-  pat=f'{t}.{name}'
+  pat=name
   if fs:pat+=' payload'
   body.append(pat+'=>{put(self,'+str(i)+' as u32);'+''.join('put(self,payload.'+f+');' for f,ty in fs)+'},')
  code.append('fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}match value {'+''.join(body)+'}self.depth--;}')
  body=[]
  for i,(name,fs) in enumerate(values):
-  temp=''.join('var '+f+':'+ty+'=default<'+ty+'>();get(self,'+f+');' for f,ty in fs)
+  decoded=[]
+  for f,ty in fs:
+   if ty.endswith('?'):decoded.append('let decoded_'+f+':'+ty+'=readOptional(self,default<'+ty[:-1]+'>());')
+   else:decoded.append('var decoded_'+f+':'+ty+'=default<'+ty+'>();get(self,decoded_'+f+');')
+  temp=''.join(decoded)
   ctor=t+'.'+name
-  if fs:ctor+='{'+','.join(f+':'+f for f,ty in fs)+'}'
+  if fs:ctor+='{'+','.join(f+':decoded_'+f for f,ty in fs)+'}'
   body.append(str(i)+'=>{'+temp+'value='+ctor+';},')
  code.append('fn get(self:Reader&,value:'+t+'&) {if !self.enter() {return;}var tag:u32=0;get(self,tag);if self.failure==Error.none {match tag {'+''.join(body)+'_=>{self.failure=Error.invalid_artifact;},}}self.depth--;}')
 for t,n in sorted(ARRAYS):
@@ -152,10 +161,25 @@ for t,skip in [('blot_check_core::Module',{'owner_id','package_payloads'}),('blo
  data=D[t][2];owner=D[t][3]
  code.append('fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}'+''.join('put(self,value.'+f+');' for f,ty in data if f not in skip)+'self.depth--;}')
  trailer=''
- if t=='blot_check_core::Module':trailer='value.owner_id=blot_native::fresh_owner_id();let lanes,error=self.owner.alloc<u32>(value.nodes.len);if error!=Error.none {self.failure=error;}else {for node,index in value.nodes {lanes[index]=0;if node.tag==blot_check_core::Tag.package_pack {lanes[index]=node.a;}}value.package_payloads=lanes;}'
- elif t in ('blot_check_core::Types','blot_check_frozen_types::Graph'):trailer='value.owner_id=blot_native::fresh_owner_id();'
+ if t=='blot_check_core::Module':trailer='value.owner_id=blot_native::fresh_owner_id();let lanes,error=allocate(self.owner,value.nodes.len,default<u32>());if error!=Error.none {self.failure=error;}else {for node,index in value.nodes {lanes[index]=0;if node.tag==blot_check_core::Tag.package_pack {lanes[index]=node.a;}}value.package_payloads=lanes;}'
+ elif t in ('blot_check_core::Types','blot_check_frozen_types::Graph') and any(f=='owner_id' for f,ty in data):trailer='value.owner_id=blot_native::fresh_owner_id();'
  code.append('fn get(self:Reader&,value:'+t+'&) {if !self.enter() {return;}'+''.join('get(self,value.'+f+');' for f,ty in data if f not in skip)+trailer+'self.depth--;}')
-(R/'support/project_packet_codecs.goose').write_text('\n'.join(code)+'\n')
+# Explicit nominal heads avoid ties between the generic record, slice and
+# optional helpers. Reader/writer inference keeps unused codecs uninstantiated.
+private={'blot_check_core::Module','blot_check_core::Types','blot_check_frozen_types::Graph'}
+for t in sorted(STRUCTS):
+ if t in private or (t in SPECIAL and t not in {'blot_reuse_body_check_cache::Loops','blot_reuse_body_auxiliary::Owner'}):continue
+ owner=D[t.split('<')[0]][3]
+ fields=[(f,resolve(q(ty,owner),owner)) for f,ty in STRUCTS[t] if f not in SPECIAL.get(t,set())]
+ code.append('fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}'+''.join('put(self,value.'+f+');' for f,ty in fields)+'self.depth--;}')
+ parts=[]
+ for f,ty in fields:
+  if ty.endswith('?'):parts.append('value.'+f+' .= readOptional(self,default<'+ty[:-1]+'>());')
+  else:parts.append('get(self,value.'+f+');')
+ code.append('fn get(self:Reader&,value:'+t+'&) {if !self.enter() {return;}'+''.join(parts)+'self.depth--;}')
+code=[line.replace('fn put(self:Writer&','fn put<PacketWriter>(self:PacketWriter&').replace('fn get(self:Reader&','fn get<PacketReader>(self:PacketReader&') for line in code]
+syntax_types=PRIM|{name.split('::')[-1] for name in D}
+(R/'support/project_packet_codecs.goose').write_text(finish_syntax(normalize('\n'.join(code)+'\n',syntax_types)))
 # Every family is concrete; no generic cast, byte arena or ownership erasure.
 owner=['// Typed bounded decode journal. The owner is shared only within one process.','namespace blot_project_packet;',imports,'import .project_packet;','struct Owner {slot:u32=0,generation:u64=0}','enum Run {']
 for t in sorted(SLICES):owner.append('run_'+ident(t)+' {values:'+t+'[:]},')
@@ -163,10 +187,9 @@ owner+=['}','struct Link {value:Run,next:u32=0}','struct Lease {generation:u64=0
 for t in sorted(SLICES):owner.append('reusable[] var pool_'+ident(t)+':'+t+'[>..]=[];')
 owner+=['fn valid(self:Owner)->bool {return self.slot!=0&&self.slot-1<leases.len&&leases[self.slot-1].live&&leases[self.slot-1].generation==self.generation;}','fn initOwner()->Owner,Error {if leases.len>=0xffffffff {return Owner{..},Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=leases.alloc_index(Lease{generation:generation,live:true,..});return Owner{(at+1) as u32,generation},Error.none;}','fn retain(self:Owner)->Owner,Error {if !self.valid() {return Owner{..},Error.invalid_artifact;}let state:Lease&=leases[self.slot-1];if state.references==0xffffffffffffffff {return Owner{..},Error.dependency_limit;}state.references++;return self,Error.none;}']
 for t in sorted(SLICES):
- owner.append('fn allocate(self:Owner&,length:i64,witness:'+t+')->'+t+'[:],Error {if !self.valid()||length<0||length>element_limit {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}if links.len>=0xfffffffe {return [],Error.out_of_memory;}let run=pool_'+ident(t)+'.alloc_slice(length);for &item in run {item=default<'+t+'>();}let state:Lease&=leases[self.slot-1];let at=links.alloc_index(Link{Run.run_'+ident(t)+'{run},state.head});state.head=(at+1) as u32;return run,Error.none;}')
-owner.append('fn alloc<T>(self:Owner&,length:i64)->T[:],Error {return allocate(self,length,default<T>());}')
+ owner.append('fn allocate<PacketOwner>(self:PacketOwner&,length:i64,witness:'+t+')->'+t+'[:],Error {if !self.valid()||length<0||length>element_limit {return default<'+t+'[:]>(),Error.invalid_artifact;}if length==0 {return default<'+t+'[:]>(),Error.none;}if links.len>=0xfffffffe {return default<'+t+'[:]>(),Error.out_of_memory;}let run=pool_'+ident(t)+'.alloc_slice(length);let state:Lease& =leases[self.slot-1];let at=links.alloc_index(Link{Run.run_'+ident(t)+'{run},state.head});state.head=(at+1) as u32;return run,Error.none;}')
 owner.append('fn deinit(self:Owner&) {if self.slot==0 {return;}assert(self.valid());let state:Lease&=leases[self.slot-1];assert(state.references!=0);state.references--;if state.references==0 {var next=state.head;while next!=0 {let at=next-1;let link=links[at];next=link.next;match link.value {')
 for t in sorted(SLICES):owner.append('Run.run_'+ident(t)+' value=>{pool_'+ident(t)+'.free_slice(value.values);},')
 owner.append('}links.free(at);}state.live=false;leases.free(self.slot-1);}self=Owner{..};}')
-(R/'support/project_packet_owners.goose').write_text('\n'.join(owner)+'\n')
+(R/'support/project_packet_owners.goose').write_text(finish_syntax(normalize('\n'.join(owner)+'\n',syntax_types)))
 (R.parent/'build/project-packet-model.json').write_text(json.dumps({'definitions':D,'roots':ROOTS,'seen':list(SEEN),'slices':list(SLICES),'imports':sorted(IMPORTS),'special_children':CUSTOM_CHILDREN},indent=2))

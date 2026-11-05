@@ -1,6 +1,9 @@
 // Ordinary schemes own assumptions; all endpoint roots are traversed.
 namespace blot_check_scheme_predicates;
+import check.package_contracts;
+import check.types;
 import support.error;
+
 fn scope(context: blot_check_package_contracts::Context&, goals: const blot_check_types::Obligation[:]) -> blot_error::Error {
     for goal in goals {
         if context.remaining == 0 { return blot_error::Error.invalid_artifact; }

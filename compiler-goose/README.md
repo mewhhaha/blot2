@@ -8,9 +8,9 @@ The remote tag `goose-port-oracle-156f84b` preserves that Zig source baseline.
 Every compiler-algorithm module now has an author-reported **first source
 pass**. The
 complete production port is still pending: recoverable allocation failure and
-runtime retention/observation need implementation work. Verification remains
-deferred under the all-code-first instruction. Files here are unverified source,
-not evidence of compiler parity.
+runtime retention/observation need implementation work. The user has requested compilation repair. The complete import graph now
+parses under upstream Goose; type/lifetime checking is being repaired. No
+successful full compiler executable or parity result exists yet.
 
 The module map follows the Zig implementation. Goose contexts borrow typed
 tables owned by their callers; numeric identities survive growth. Errors travel
@@ -37,8 +37,8 @@ with a C-host header and links the ordinary Goose runtime plus the scalar/OS
 adapter; it never invokes the Zig oracle. Reusable runtime and platform objects
 are keyed by their actual source text, C compiler and flags.
 
-The build has not been run. Once that phase is
-complete, the build entry is `python3 build.py --goose /path/to/goose --cc clang --stdlib /path/to/stdlib`.
+The first build exposed source syntax failures. Those parser failures are
+repaired; full compilation remains in progress. The build entry is `python3 build.py --goose /path/to/goose --cc clang --stdlib /path/to/stdlib`.
 Development defaults to Goose `-O0` and C `-O0`; `--release` selects `-O2` for
 both. Each subprocess stage reports its elapsed time and has a 30-second limit,
 adjustable with `--stage-timeout SECONDS`. A timeout terminates the stage's

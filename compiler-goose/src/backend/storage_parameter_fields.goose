@@ -7,7 +7,7 @@ import support.error;
 import support.option;
 import support.pooled_buffer;
 type Error = blot_error::Error;
-struct Names { storage: u32[:] = [],items: u32[:] = [] }
+struct Names { storage: u32[:] = default<u32[:]>(),items: u32[:] = default<u32[:]>() }
 reusable[] var name_runs: u32[>..] = [];
 struct Fields { names: Names,whole: bool = false }
 fn deinit(fields: Fields&) { blot_support_pooled_buffer::deinit(fields.names,name_runs); }
@@ -27,26 +27,26 @@ struct Walk { module: const blot_check_core::Module&,parameter: u32,nominal: blo
 reusable var walks: Walk[>..] = [];
 fn collect(module: const blot_check_core::Module&,root: u32,parameter: u32,nominal: blot_support::Option<NominalRecord>) -> Fields,Error {
     let index = walks.alloc_index(Walk { module,parameter,nominal , ..}); let walk: Walk& = walks[index]; let error = visit(walk,root,0);
-    if error != Error.none && error != Error.plan_limit { walk.fields.deinit(); walks.free(index); return Fields {..},error; } if error == Error.plan_limit { walk.fields.whole = true; } let fields = walk.fields; walk.fields = Fields {..}; walks.free(index); return fields,Error.none;
+    if error != blot_error::Error.none && error != blot_error::Error.plan_limit { walk.fields.deinit(); walks.free(index); return Fields {..},error; } if error == blot_error::Error.plan_limit { walk.fields.whole = true; } let fields = walk.fields; walk.fields = Fields {..}; walks.free(index); return fields,blot_error::Error.none;
 }
 fn target(walk: const Walk&,reference: blot_check_core::BindingRef) -> bool { (reference.unit == 0 || reference.unit == walk.module.unit) && reference.binding == walk.parameter }
 fn wholeBinding(walk: Walk&,binding: u32) { if binding == walk.parameter { walk.fields.whole = true; } }
 struct Children { walk: Walk&,depth: i64 }
 fn append(children: Children&,id: u32) -> Error { visit(children.walk,id,children.depth) }
-fn appendSlice(children: Children&,ids: const u32[:]) -> Error { for id in ids { let error = append(children,id); if error != Error.none { return error; } } return Error.none; }
+fn appendSlice(children: Children&,ids: const u32[:]) -> Error { for id in ids { let error = append(children,id); if error != blot_error::Error.none { return error; } } return blot_error::Error.none; }
 recursive fn visit(walk: Walk&,id: u32,depth: i64) -> Error {
-    if id == 0 || walk.fields.whole { return Error.none; } if walk.remaining == 0 || depth > 128 { return Error.plan_limit; } walk.remaining--; let module: const blot_check_core::Module& = walk.module; let node = module.node(id);
+    if id == 0 || walk.fields.whole { return blot_error::Error.none; } if walk.remaining == 0 || depth > 128 { return blot_error::Error.plan_limit; } walk.remaining--; let module: const blot_check_core::Module& = walk.module; let node = module.node(id);
     match node.tag {
-        reference=>{ if target(walk,module.reference(id)) { walk.fields.whole = true; } return Error.none; },
-        project=>{ if node.a != 0 && module.node(node.a).tag == blot_check_core::Tag.reference && target(walk,module.reference(node.a)) { let projection = module.projection(node.b); var admitted = false; if walk.nominal.present { admitted = walk.nominal.value.projection(module,node.b,walk.remaining); } else { admitted = (projection.variants.len == 0 || namedRecordProjection(module,node.b)) && module.fieldSpelling(projection.field).present; } if !admitted { walk.fields.whole = true; return Error.none; } var found = false; for name in walk.fields.names.items { if name == projection.field { found = true; break; } } if !found { return blot_support_pooled_buffer::push(walk.fields.names,projection.field,name_runs); } return Error.none; } },
-        closure=>{ for binding in module.closureCaptures(id) { wholeBinding(walk,binding); } return Error.none; },
-        update=>{ var root = module.updateInfo(id).root; var path_depth = depth; while root != 0 && module.node(root).tag == blot_check_core::Tag.project { if walk.remaining == 0 || path_depth >= 128 { return Error.plan_limit; } walk.remaining--; path_depth++; root = module.node(root).a; } if root != 0 && module.node(root).tag == blot_check_core::Tag.reference && target(walk,module.reference(root)) { walk.fields.whole = true; return Error.none; } },
+        reference=>{ if target(walk,module.reference(id)) { walk.fields.whole = true; } return blot_error::Error.none; },
+        project=>{ if node.a != 0 && module.node(node.a).tag == blot_check_core::Tag.reference && target(walk,module.reference(node.a)) { let projection = module.projection(node.b); var admitted = false; if walk.nominal.present { admitted = walk.nominal.value.projection(module,node.b,walk.remaining); } else { admitted = (projection.variants.len == 0 || namedRecordProjection(module,node.b)) && module.fieldSpelling(projection.field).present; } if !admitted { walk.fields.whole = true; return blot_error::Error.none; } var found = false; for name in walk.fields.names.items { if name == projection.field { found = true; break; } } if !found { return blot_support_pooled_buffer::push(walk.fields.names,projection.field,name_runs); } return blot_error::Error.none; } },
+        closure=>{ for binding in module.closureCaptures(id) { wholeBinding(walk,binding); } return blot_error::Error.none; },
+        update=>{ var root = module.updateInfo(id).root; var path_depth = depth; while root != 0 && module.node(root).tag == blot_check_core::Tag.project { if walk.remaining == 0 || path_depth >= 128 { return blot_error::Error.plan_limit; } walk.remaining--; path_depth++; root = module.node(root).a; } if root != 0 && module.node(root).tag == blot_check_core::Tag.reference && target(walk,module.reference(root)) { walk.fields.whole = true; return blot_error::Error.none; } },
         if_value,if_stmt=>{ for merge in module.branchMerges(id) { wholeBinding(walk,merge.then_binding); wholeBinding(walk,merge.else_binding); } },
         loop_=>{ for carry in module.loopCarries(id) { wholeBinding(walk,carry.incoming); wholeBinding(walk,carry.backedge); } },
-        pattern_bind=>{ match module.pattern(node.a).tag { bind,wildcard=>{},_=>{ return Error.plan_limit; }, } },
-        match_=>{ return Error.plan_limit; },
+        pattern_bind=>{ match module.pattern(node.a).tag { bind,wildcard=>{},_=>{ return blot_error::Error.plan_limit; }, } },
+        match_=>{ return blot_error::Error.plan_limit; },
         constant,scalar,associated,logical,apply,record_merge,block_,suite,bind,return_,product,record,construct,array,array_op,storage,call,panic,break_=>{},
-        _=>{ return Error.plan_limit; },
+        _=>{ return blot_error::Error.plan_limit; },
     }
-    var children = Children { walk,depth: depth + 1 , ..}; return blot_eval_body_recipe::appendChildren(children,module,id,false);
+    var children = Children { walk: walk,depth: depth + 1 , ..}; return blot_eval_body_recipe::appendChildren(children,module,id,false);
 }

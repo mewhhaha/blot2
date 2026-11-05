@@ -10,7 +10,7 @@ fn pop(state: State&) -> blot_support::Option<Value> { if state.top == 0 { retur
 fn ordinary(state: State&) -> bool { let value = pop(state); return value.present && value.value == Value.ordinary; }
 fn take(state: State&,wanted: Value) -> bool { let value = pop(state); return value.present && value.value == wanted; }
 fn hostStub(module: const blot_backend_wasm::Module&,body: blot_backend_runtime_ir::Function) -> bool {
-    if !module.host_references.present { return false; } let references = module.host_references.value; let code = module.instructions(body);
+    if !module.host_references.present { return false; } let references = module.host_references.value; let code = blot_backend_wasm::instructions(module,body);
     if body.entry || code.len != 12 || code[11].op != blot_backend_runtime_ir::OP_call_import { return false; }
     let callback = module.hostCallbackImport(code[11].operand); if !callback.present { return false; }
     let parameters: blot_backend_runtime_ir::ValueType[3] = [blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::machine(callback.value.parameter),blot_backend_runtime_ir::VT_i32]; let roles: blot_backend_runtime_ir::Role[3] = [blot_backend_runtime_ir::ROLE_reference,blot_backend_runtime_ir::role(callback.value.parameter),blot_backend_runtime_ir::ROLE_reference];
@@ -22,11 +22,11 @@ fn hostStub(module: const blot_backend_wasm::Module&,body: blot_backend_runtime_
     ];
     for actual,index in code { if actual != expected[index] { return false; } } return true;
 }
-fn confined(module: const blot_backend_wasm::Module&,target: u32,stub: u32,ty: u32,guard: blot_support::Option<u32>) -> bool {
+fn confined(module: const blot_backend_wasm::Module&,target: u32,stub: u32,ty: u32,guard_: blot_support::Option<u32>) -> bool {
     if target >= module.functions.len || stub >= module.functions.len || ty == 0 { return false; } let body = module.functions[target]; let callback = module.functions[stub];
     if body.entry || body.parameters.len != 2 || !blot_backend_wasm::equal(module.parameters(body),[blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::VT_i32]) || blot_backend_runtime_ir::parameterRole(body,0) != blot_backend_runtime_ir::ROLE_reference || body.provider_parameter != 1 { return false; }
     if body.locals.len > 254 || body.instructions.len > 4096 || callback.callable_layout != ty || !hostStub(module,callback) || callback.parameters.len != 3 || blot_backend_runtime_ir::parameterRole(callback,0) != blot_backend_runtime_ir::ROLE_reference || blot_backend_runtime_ir::parameterRole(callback,2) != blot_backend_runtime_ir::ROLE_reference { return false; }
-    var state = State {..}; state.locals[0] = Value.descriptor; let code = module.instructions(body); var at: i64 = 0; var invokes: i64 = 0;
+    var state = State {..}; state.locals[0] = Value.descriptor; let code = blot_backend_wasm::instructions(module,body); var at: i64 = 0; var invokes: i64 = 0;
     while at < code.len {
         let instruction = code[at]; let op = instruction.op;
         if op == blot_backend_runtime_ir::OP_local_get { if instruction.operand >= body.parameters.len + body.locals.len || !push(state,state.locals[instruction.operand]) { return false; } }
@@ -47,7 +47,7 @@ fn confined(module: const blot_backend_wasm::Module&,target: u32,stub: u32,ty: u
         else if op == blot_backend_runtime_ir::OP_block { if at != 0 || instruction.operand != body.result as u32 { return false; } }
         else if op == blot_backend_runtime_ir::OP_end { if at + 1 != code.len { return false; } }
         else if op == blot_backend_runtime_ir::OP_if_ {
-            if !guard.present { return false; } let owner = guard.value;
+            if !guard_.present { return false; } let owner = guard_.value;
             if at == 0 || at + 3 >= code.len || code[at - 1].op != blot_backend_runtime_ir::OP_global_get || code[at - 1].operand != owner || instruction.operand != 0 || code[at + 1].op != blot_backend_runtime_ir::OP_i32_const || code[at + 1].operand != 0 || code[at + 2].op != blot_backend_runtime_ir::OP_return_ || code[at + 3].op != blot_backend_runtime_ir::OP_end || !ordinary(state) { return false; } at += 3;
         } else if op == blot_backend_runtime_ir::OP_br { if at + 3 != code.len || instruction.operand != 0 || state.top != 1 || state.stack[0] != Value.ordinary { return false; } }
         else if op == blot_backend_runtime_ir::OP_unreachable_ { if at + 2 != code.len || at == 0 || code[at - 1].op != blot_backend_runtime_ir::OP_br { return false; } }

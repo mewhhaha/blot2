@@ -26,7 +26,7 @@ type Targets=blot_reuse_frontend_binding_relocation::Targets;
 type Target=blot_reuse_principal_interface::ExternalTarget;
 type ExportKind=blot_reuse_frozen_dependency::ExportKind;
 struct Import {path:u32,target:u32}
-struct Previous {reuse_entry:bool=true,bodies:const blot_reuse_body_check_cache::Cache[:]=[],reuse_modules:bool=false,entry_core:const blot_check_core::Module?=null,entry:u32,prelude:u32,implicit_prelude:bool,names:blot_backend_runtime_identity::View,source:const u8[:],imports:const Import[:]}
+struct Previous {reuse_entry:bool=true,bodies:const blot_reuse_body_check_cache::Cache[:]=default<const blot_reuse_body_check_cache::Cache[:]>(),reuse_modules:bool=false,entry_core:const blot_check_core::Module?=null,entry:u32,prelude:u32,implicit_prelude:bool,names:blot_backend_runtime_identity::View,source:const u8[:],imports:const Import[:]}
 enum Color {unknown,green,green_storage,red}
 struct Stats {
  comparison_hits:i64=0,offered:i64=0,source_matches:i64=0,namespace_matches:i64=0,compared:i64=0,interfaces_changed:i64=0,surfaces_changed:i64=0,storage_rechecks:i64=0,reused:i64=0,
@@ -34,14 +34,14 @@ struct Stats {
 }
 fn confirm<C>(source:const Project&,checked:C&,previous:Previous,stats:Stats&)->bool,Error {
  stats.offered++;let entry=source.entry;
- if source.input_mode!=blot_reuse_project::InputMode.project||entry==0||entry!=source.units.len||source.compiled_modules.len+1!=source.units.len||source.compiled_reuse.len!=source.compiled_modules.len||source.order.len==0||source.order.items[source.order.len-1]!=entry {return false,Error.none;}
- if previous.entry!=entry||previous.prelude!=source.prelude_unit||previous.implicit_prelude!=source.unit(entry).implicit_prelude||previous.source!=source.unit(entry).source {return false,Error.none;}
- let imports=source.unitImports(entry);if imports.len!=previous.imports.len {return false,Error.none;}for current,index in imports {let old=previous.imports[index];if current.path!=old.path||current.target!=old.target {return false,Error.none;}}
- stats.source_matches++;if !namespaceMatches(source,previous.names) {return false,Error.none;}stats.namespace_matches++;
- for unit in 1..source.compiled_modules.len+1 {if checked.compiledModule(source,unit)!=null {continue;}let same,error=interfaceMatches(source,checked,unit as u32,stats);if error!=Error.none||!same {return false,error;}}
- if !storageInputsMatch(source,checked,entry,previous.entry_core,stats) {return false,Error.none;}
- let targets=Targets {units:checked.binding_maps, ..};if targets.changes() {let module=previous.entry_core;if !module||!blot_reuse_frontend_reference_relocation::admits(module,targets) {return false,Error.none;}}
- stats.reused++;return true,Error.none;
+ if source.input_mode!=blot_reuse_project::InputMode.project||entry==0||entry!=source.units.len||source.compiled_modules.len+1!=source.units.len||source.compiled_reuse.len!=source.compiled_modules.len||source.order.len==0||source.order.items[source.order.len-1]!=entry {return false,blot_error::Error.none;}
+ if previous.entry!=entry||previous.prelude!=source.prelude_unit||previous.implicit_prelude!=source.unit(entry).implicit_prelude||previous.source!=source.unit(entry).source {return false,blot_error::Error.none;}
+ let imports=source.unitImports(entry);if imports.len!=previous.imports.len {return false,blot_error::Error.none;}for current,index in imports {let old=previous.imports[index];if current.path!=old.path||current.target!=old.target {return false,blot_error::Error.none;}}
+ stats.source_matches++;if !namespaceMatches(source,previous.names) {return false,blot_error::Error.none;}stats.namespace_matches++;
+ for unit in 1..source.compiled_modules.len+1 {if checked.compiledModule(source,unit)!=null {continue;}let same,error=interfaceMatches(source,checked,unit as u32,stats);if error!=blot_error::Error.none||!same {return false,error;}}
+ if !storageInputsMatch(source,checked,entry,previous.entry_core,stats) {return false,blot_error::Error.none;}
+ let targets=Targets {units:checked.binding_maps, ..};if targets.changes() {let module=previous.entry_core;if !module||!blot_reuse_frontend_reference_relocation::admits(module,targets) {return false,blot_error::Error.none;}}
+ stats.reused++;return true,blot_error::Error.none;
 }
 fn storageInputsMatch<C>(source:const Project&,checked:const C&,unit:u32,previous:const blot_check_core::Module?,stats:Stats&)->bool {
  var changed=false;for color in checked.interface_colors {if color==Color.green_storage {changed=true;break;}}if !changed {return true;}
@@ -58,15 +58,15 @@ fn storageIdentityStable<C>(source:const Project&,checked:const C&,identity:blot
 recursive fn storageTypeStable<C>(source:const Project&,checked:const C&,module:const blot_check_core::Module&,id:u32,depth:i64,remaining:i64&)->bool {
  if depth>=128||remaining==0||id>=module.types.nodes.len {return false;}remaining--;let node=module.types.node(id);
  match node.tag {
-  blot_check_types::Tag.absent,blot_check_types::Tag.unit,blot_check_types::Tag.boolean,blot_check_types::Tag.unsigned32,blot_check_types::Tag.floating32,blot_check_types::Tag.never,blot_check_types::Tag.variable,blot_check_types::Tag.bound,blot_check_types::Tag.erased_proof,blot_check_types::Tag.type_constructor=>{return true;},
-  blot_check_types::Tag.nominal=>{if node.a!=module.unit&&!storageIdentityStable(source,checked,blot_check_types::NominalIdentity {node.a,node.b, ..}) {return false;}for child in module.types.nominalArguments(node) {if !storageTypeStable(source,checked,module,child,depth+1,remaining) {return false;}}return true;},
-  blot_check_types::Tag.array,blot_check_types::Tag.list,blot_check_types::Tag.cursor,blot_check_types::Tag.resolver=>{return storageTypeStable(source,checked,module,node.a,depth+1,remaining);},
-  blot_check_types::Tag.provider=>{return node.c==0&&storageTypeStable(source,checked,module,node.a,depth+1,remaining);},
-  blot_check_types::Tag.function=>{return node.c==0&&storageTypeStable(source,checked,module,node.a,depth+1,remaining)&&storageTypeStable(source,checked,module,node.b,depth+1,remaining);},
-  blot_check_types::Tag.state_provider=>{return storageTypeStable(source,checked,module,node.a,depth+1,remaining)&&storageTypeStable(source,checked,module,node.b,depth+1,remaining)&&storageTypeStable(source,checked,module,node.c,depth+1,remaining);},
-  blot_check_types::Tag.usage=>{return storageTypeStable(source,checked,module,node.a,depth+1,remaining)&&(node.c==0||storageTypeStable(source,checked,module,node.c,depth+1,remaining));},
-  blot_check_types::Tag.product=>{for child in module.types.list(blot_check_types::List {node.a,node.b, ..}) {if !storageTypeStable(source,checked,module,child,depth+1,remaining) {return false;}}return true;},
-  blot_check_types::Tag.record=>{for index in 0..node.b {if !storageTypeStable(source,checked,module,module.types.recordField(node,index).ty,depth+1,remaining) {return false;}}return true;},
+  absent,unit,boolean,unsigned32,floating32,never,variable,bound,erased_proof,type_constructor=>{return true;},
+  nominal=>{if node.a!=module.unit&&!storageIdentityStable(source,checked,blot_check_types::NominalIdentity {node.a,node.b, ..}) {return false;}for child in module.types.nominalArguments(node) {if !storageTypeStable(source,checked,module,child,depth+1,remaining) {return false;}}return true;},
+  array,list,cursor,resolver=>{return storageTypeStable(source,checked,module,node.a,depth+1,remaining);},
+  provider=>{return node.c==0&&storageTypeStable(source,checked,module,node.a,depth+1,remaining);},
+  function=>{return node.c==0&&storageTypeStable(source,checked,module,node.a,depth+1,remaining)&&storageTypeStable(source,checked,module,node.b,depth+1,remaining);},
+  state_provider=>{return storageTypeStable(source,checked,module,node.a,depth+1,remaining)&&storageTypeStable(source,checked,module,node.b,depth+1,remaining)&&storageTypeStable(source,checked,module,node.c,depth+1,remaining);},
+  usage=>{return storageTypeStable(source,checked,module,node.a,depth+1,remaining)&&(node.c==0||storageTypeStable(source,checked,module,node.c,depth+1,remaining));},
+  product=>{for child in module.types.list(blot_check_types::List {node.a,node.b, ..}) {if !storageTypeStable(source,checked,module,child,depth+1,remaining) {return false;}}return true;},
+  record=>{for index in 0..node.b {if !storageTypeStable(source,checked,module,module.types.recordField(node,index).ty,depth+1,remaining) {return false;}}return true;},
   _=>{return false;},
  }
 }
@@ -93,45 +93,45 @@ fn principalEqual(left:Interface,right:Interface)->bool {
 fn interfaceEqual(left:Interface,right:Interface,symbol_count:i64,unit_count:i64)->bool {
  var moved=right;if left.obligation_spans.len==right.obligation_spans.len {moved.obligation_spans=left.obligation_spans;}if semanticEqual(left,moved)||principalEqual(left,moved) {return true;}
  var views:Interface[2]=[left,moved];for &view in views {var count=view.bindings.len;while count!=0 {let binding=view.bindings[count-1];if binding.kind!=blot_reuse_principal_interface::Kind.local&&binding.kind!=blot_reuse_principal_interface::Kind.parameter {break;}let inert=blot_reuse_principal_interface::Binding {private:binding.private,kind:binding.kind,name:0,named_function:false,ty:0,scheme:blot_check_types::Scheme {..},external:blot_support::none<Target>(), ..};if !semanticEqual(binding,inert) {break;}count--;}view.bindings=view.bindings[..count];}
- if views[0].bindings.len==0||(!semanticEqual(views[0],views[1])&&!principalEqual(views[0],views[1])) {return false;}return blot_reuse_dependency_interface_validation::validate(views[0],symbol_count,unit_count)==Error.none;
+ if views[0].bindings.len==0||(!semanticEqual(views[0],views[1])&&!principalEqual(views[0],views[1])) {return false;}return blot_reuse_dependency_interface_validation::validate(views[0],symbol_count,unit_count)==blot_error::Error.none;
 }
 fn interfaceMatches<C>(source:const Project&,checked:C&,unit:u32,stats:Stats&)->bool,Error {
- if unit==0||unit>source.compiled_modules.len {return false,Error.none;}
- if checked.interface_colors.len!=0 {match checked.interface_colors[unit-1] {Color.green,Color.green_storage=>{stats.comparison_hits++;return true,Error.none;},Color.red=>{stats.comparison_hits++;return false,Error.none;},Color.unknown=>{}}}
- var changed=false;let same,error=compareInterface(source,checked,unit,stats,changed);if error!=Error.none {return false,error;}
- if checked.interface_colors.len!=0 {var color=Color.red;if same {color=Color.green;if changed {color=Color.green_storage;}}checked.interface_colors[unit-1]=color;}return same,Error.none;
+ if unit==0||unit>source.compiled_modules.len {return false,blot_error::Error.none;}
+ if checked.interface_colors.len!=0 {match checked.interface_colors[unit-1] {green,green_storage=>{stats.comparison_hits++;return true,blot_error::Error.none;},red=>{stats.comparison_hits++;return false,blot_error::Error.none;},unknown=>{}}}
+ var changed=false;let same,error=compareInterface(source,checked,unit,stats,changed);if error!=blot_error::Error.none {return false,error;}
+ if checked.interface_colors.len!=0 {var color=Color.red;if same {color=Color.green;if changed {color=Color.green_storage;}}checked.interface_colors[unit-1]=color;}return same,blot_error::Error.none;
 }
 fn compareInterface<C>(source:const Project&,checked:C&,unit:u32,stats:Stats&,storage_changed:bool&)->bool,Error {
- let old .= source.compiled_modules[unit-1];let current .= checked.modules[unit-1];if !current.present||!current.value.valid||current.value.checked.diagnostics.len!=0 {return false,Error.none;}
- let tree .= source.unit(unit).tree;var principal,error=blot_reuse_dependency_snapshot::freezePrincipal(tree,current.value.checked);if error!=Error.none {if error==Error.out_of_memory {return false,error;}return false,Error.none;}
+ let old .= source.compiled_modules[unit-1];let current .= checked.modules[unit-1];if !current.present||!current.value.valid||current.value.checked.diagnostics.len!=0 {return false,blot_error::Error.none;}
+ let tree .= source.unit(unit).tree;var principal,error=blot_reuse_dependency_snapshot::freezePrincipal(tree,current.value.checked);if error!=blot_error::Error.none {if error==blot_error::Error.out_of_memory {return false,error;}return false,blot_error::Error.none;}
  stats.compared++;var mapping=blot_support::none<Map>();let same,error=comparePublished(source,checked,unit,old,current.value,principal.value,mapping,stats,storage_changed);
  if mapping.present {mapping.value.deinit();}principal.deinit();return same,error;
 }
 fn comparePublished<C,M>(source:const Project&,checked:C&,unit:u32,old:const blot_reuse_frozen_dependency::Module&,current:const M&,published:const Interface&,mapping:blot_support::Option<Map>&,stats:Stats&,storage_changed:bool&)->bool,Error {
  if !interfaceEqual(old.interface,published,source.symbols.entries.len+1,source.units.len) {
-  if unit>checked.binding_maps.len {stats.interfaces_changed++;return false,Error.none;}
+  if unit>checked.binding_maps.len {stats.interfaces_changed++;return false,blot_error::Error.none;}
   var methods=blot_reuse_frontend_method_sources::Context {before:old.core,after:current.checked,names:source.symbols, ..};var comparisons:i64=0;var progress=blot_reuse_frontend_binding_relocation::Progress {..};
-  let candidate,error=blot_reuse_frontend_binding_relocation::compare(old.interface,published,Targets {units:checked.binding_maps,methods:blot_support::some(methods.view()),comparisons_left:comparisons,progress:progress, ..});if error!=Error.none {return false,error;}mapping=candidate;
+  let candidate,error=blot_reuse_frontend_binding_relocation::compare(old.interface,published,Targets {units:checked.binding_maps,methods:blot_support::some(methods.view()),comparisons_left:comparisons,progress:progress, ..});if error!=blot_error::Error.none {return false,error;}mapping=candidate;
   if !mapping.present {
    if stats.interface_changed_unit==0 {
     stats.interface_changed_unit=unit;stats.interface_comparisons_left=comparisons;stats.interface_progress=progress;stats.interface_old_bindings=old.interface.bindings.len;stats.interface_new_bindings=published.bindings.len;
     var index:u32=0;const for <N,A> in fields<Interface> {if !semanticEqual(old.interface.A,published.A) {stats.interface_changed_fields|=(1 as u64)<<index;}index++;}
     for index in 0..min(old.interface.bindings.len,published.bindings.len) {if !semanticEqual(old.interface.bindings[index],published.bindings[index]) {stats.interface_first_binding=index;break;}}
    }
-   stats.interfaces_changed++;return false,Error.none;
+   stats.interfaces_changed++;return false,blot_error::Error.none;
   }
  }
- if current.exports.len!=old.exports.len {return false,Error.none;}
- for fresh,index in current.exports {let prior=old.exports[index];let target=relocatedTarget(unit,mapping,checked.binding_maps,prior.target);let catalog=relocatedCatalog(unit,mapping,checked.binding_maps,prior);if !target.present||!catalog.present {return false,Error.none;}if fresh.name!=prior.name||fresh.target!=target.value||fresh.kind!=prior.kind||fresh.catalog!=catalog.value {stats.surfaces_changed++;return false,Error.none;}}
+ if current.exports.len!=old.exports.len {return false,blot_error::Error.none;}
+ for fresh,index in current.exports {let prior=old.exports[index];let target=relocatedTarget(unit,mapping,checked.binding_maps,prior.target);let catalog=relocatedCatalog(unit,mapping,checked.binding_maps,prior);if !target.present||!catalog.present {return false,blot_error::Error.none;}if fresh.name!=prior.name||fresh.target!=target.value||fresh.kind!=prior.kind||fresh.catalog!=catalog.value {stats.surfaces_changed++;return false,blot_error::Error.none;}}
  let tree .= source.unit(unit).tree;var fixity_index:i64=0;
  for id in tree.roots.items {
-  if tree.node(id).tag!=blot_parse_ast::tag_fixity_decl {continue;}if fixity_index>=old.fixities.len {return false,Error.none;}let fresh=tree.fixity(id);let prior=old.fixities[fixity_index];fixity_index++;
-  let binding=current.checked.resolved[id];if binding==0||binding>=current.checked.bindings.len {return false,Error.none;}var target=Target {unit,binding, ..};if current.checked.bindings[binding].external.present {target=current.checked.bindings[binding].external.value;}let producer=relocatedTarget(unit,mapping,checked.binding_maps,prior.producer);if !producer.present {return false,Error.none;}
-  if fresh.operator!=prior.operator||fresh.target!=prior.target||fresh.precedence!=prior.precedence||fresh.association!=prior.association||fresh.named!=prior.named||target!=producer.value {return false,Error.none;}
+  if tree.node(id).tag!=blot_parse_ast::tag_fixity_decl {continue;}if fixity_index>=old.fixities.len {return false,blot_error::Error.none;}let fresh=tree.fixity(id);let prior=old.fixities[fixity_index];fixity_index++;
+  let binding=current.checked.resolved[id];if binding==0||binding>=current.checked.bindings.len {return false,blot_error::Error.none;}var target=Target {unit,binding, ..};if current.checked.bindings[binding].external.present {target=current.checked.bindings[binding].external.value;}let producer=relocatedTarget(unit,mapping,checked.binding_maps,prior.producer);if !producer.present {return false,blot_error::Error.none;}
+  if fresh.operator!=prior.operator||fresh.target!=prior.target||fresh.precedence!=prior.precedence||fresh.association!=prior.association||fresh.named!=prior.named||target!=producer.value {return false,blot_error::Error.none;}
  }
- if fixity_index!=old.fixities.len {return false,Error.none;}
- for before,index in old.interface.nominals {if index==0||before.private {continue;}var at=index;if mapping.present {let translated=mapping.value.catalog(ExportKind.nominal,index as u32);if !translated.present {return false,Error.none;}at=translated.value;}if at>=published.nominals.len {return false,Error.none;}let after=published.nominals[at];if before.is_opaque&&before.storage!=after.storage {storage_changed=true;}}
- if mapping.present&&mapping.value.changes() {checked.binding_maps[unit-1]=mapping;mapping.present=false;}return true,Error.none;
+ if fixity_index!=old.fixities.len {return false,blot_error::Error.none;}
+ for before,index in old.interface.nominals {if index==0||before.private {continue;}var at=index;if mapping.present {let translated=mapping.value.catalog(blot_reuse_frozen_dependency::ExportKind.nominal,index as u32);if !translated.present {return false,blot_error::Error.none;}at=translated.value;}if at>=published.nominals.len {return false,blot_error::Error.none;}let after=published.nominals[at];if before.is_opaque&&before.storage!=after.storage {storage_changed=true;}}
+ if mapping.present&&mapping.value.changes() {checked.binding_maps[unit-1]=mapping;mapping.present=false;}return true,blot_error::Error.none;
 }
 fn relocatedCatalog(unit:u32,mapping:blot_support::Option<Map>,prior:const blot_support::Option<Map>[:],exported:blot_reuse_frozen_dependency::Export)->blot_support::Option<u32> {
  if exported.target.unit==unit {if !mapping.present {return blot_support::some(exported.catalog);}return mapping.value.catalog(exported.kind,exported.catalog);}let mapped=Targets {units:prior, ..}.exported(exported);if !mapped.present {return blot_support::none<u32>();}return blot_support::some(mapped.value.catalog);

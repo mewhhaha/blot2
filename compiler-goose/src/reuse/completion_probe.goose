@@ -9,19 +9,19 @@ type Error=blot_error::Error;
 type Span=blot_parse_ast::Span;
 enum Kind {expression,member,selector,constructor,type_,intrinsic}
 let member_marker:const u8[:]="__blot_editor_probe";
-struct Probe {source:u8[:]=[],replace:Span=Span{},prefix:const u8[:]=[],kind:Kind=Kind.expression,marker:Span=Span{},original_start:u32=0,original_end:u32=0,original_length:u32=0}
+struct Probe {source:u8[:]=default<u8[:]>(),replace:Span=Span{},prefix:const u8[:]=default<const u8[:]>(),kind:Kind=Kind.expression,marker:Span=Span{},original_start:u32=0,original_end:u32=0,original_length:u32=0}
 reusable[] var repaired_sources:u8[>..]=[];
-fn deinit(self:Probe&) {if self.source.len!=0 {repaired_sources.free_slice(self.source);}self=Probe{};}
-fn originalOffset(self:Probe,offset:u32)->u32 {if offset<=self.marker.start {return min(offset,self.original_start);}if offset<self.marker.end {return self.original_start;}let tail=offset-self.marker.end;var end:u32=0xffffffff;if tail<=0xffffffff-self.original_end {end=self.original_end+tail;}return min(self.original_length,end);}
-fn originalSpan(self:Probe,span:Span)->Span {let start=self.originalOffset(span.start);var end=self.originalOffset(span.end);if span.end>self.marker.start && span.end<=self.marker.end {end=self.original_end;}return Span{start,max(start,end)};}
+fn deinit(self_:Probe&) {if self_.source.len!=0 {repaired_sources.free_slice(self_.source);}self_=Probe{};}
+fn originalOffset(self_:Probe,offset:u32)->u32 {if offset<=self_.marker.start {return min(offset,self_.original_start);}if offset<self_.marker.end {return self_.original_start;}let tail=offset-self_.marker.end;var end:u32=0xffffffff;if tail<=0xffffffff-self_.original_end {end=self_.original_end+tail;}return min(self_.original_length,end);}
+fn originalSpan(self_:Probe,span:Span)->Span {let start=self_.originalOffset(span.start);var end=self_.originalOffset(span.end);if span.end>self_.marker.start && span.end<=self_.marker.end {end=self_.original_end;}return Span{start,max(start,end)};}
 fn alphanumeric(byte:u8)->bool {return (byte>='a' && byte<='z') || (byte>='A' && byte<='Z') || (byte>='0' && byte<='9');}
 fn capture(source:const u8[:],position:u32)->blot_support::Option<Probe>,Error {
- if source.len>0xffffffff {return blot_support::none<Probe>(),Error.source_limit;}if position>source.len || (position<source.len && (source[position]&0xc0)==0x80) {return blot_support::none<Probe>(),Error.invalid_position;}
- var at:i64=0;while at<source.len {let width=blot_parse_lexer::utf8_width(source[at]);if width==0 || width>source.len-at {return blot_support::none<Probe>(),Error.invalid_source;}let point,error=blot_parse_lexer::decode_point(source[at..at+width]);if error!=Error.none {return blot_support::none<Probe>(),Error.invalid_source;}at+=width;}
- var tokens:blot_parse_token::Token[>..<];var comments:blot_parse_token::Token[>..<];var diagnostics:blot_parse_lexer::Diagnostic[>..<];var lexical=blot_parse_lexer::init(tokens,comments,diagnostics);let error=blot_parse_lexer::lex(source,lexical);if error!=Error.none {return blot_support::none<Probe>(),error;}
- for comment in comments {if comment.start<=position && position<=comment.end {return blot_support::none<Probe>(),Error.none;}}
- for token in tokens {if token.tag!=blot_parse_token::string || position<=token.start {continue;}if position<token.end {return blot_support::none<Probe>(),Error.none;}if position==token.end {for issue in diagnostics {if issue.code==blot_parse_lexer::string_literal && issue.start==token.start {return blot_support::none<Probe>(),Error.none;}}}}
- var replace=Span{position,position};var prefix:const u8[:]=[];var previous=blot_support::none<blot_parse_token::Token>();var hole=false;var intrinsic=false;
+ if source.len>0xffffffff {return blot_support::none<Probe>(),blot_error::Error.source_limit;}if position>source.len || (position<source.len && (source[position]&0xc0)==0x80) {return blot_support::none<Probe>(),blot_error::Error.invalid_position;}
+ var at:i64=0;while at<source.len {let width=blot_parse_lexer::utf8_width(source[at]);if width==0 || width>source.len-at {return blot_support::none<Probe>(),blot_error::Error.invalid_source;}let point,error=blot_parse_lexer::decode_point(source[at..at+width]);if error!=blot_error::Error.none {return blot_support::none<Probe>(),blot_error::Error.invalid_source;}at+=width;}
+ var tokens:blot_parse_token::Token[>..<];var comments:blot_parse_token::Token[>..<];var diagnostics:blot_parse_lexer::Diagnostic[>..<];var lexical=blot_parse_lexer::init(tokens,comments,diagnostics);let error=blot_parse_lexer::lex(source,lexical);if error!=blot_error::Error.none {return blot_support::none<Probe>(),error;}
+ for comment in comments {if comment.start<=position && position<=comment.end {return blot_support::none<Probe>(),blot_error::Error.none;}}
+ for token in tokens {if token.tag!=blot_parse_token::string || position<=token.start {continue;}if position<token.end {return blot_support::none<Probe>(),blot_error::Error.none;}if position==token.end {for issue in diagnostics {if issue.code==blot_parse_lexer::string_literal && issue.start==token.start {return blot_support::none<Probe>(),blot_error::Error.none;}}}}
+ var replace=Span{position,position};var prefix:const u8[:]=default<const u8[:]>();var previous=blot_support::none<blot_parse_token::Token>();var hole=false;var intrinsic=false;
  for token in tokens {
   if token.start>position {break;}
   if token.tag==blot_parse_token::identifier || token.tag==blot_parse_token::type_identifier || token.tag==blot_parse_token::intrinsic || token.tag==blot_parse_token::kw_true || token.tag==blot_parse_token::kw_false {
@@ -40,5 +40,5 @@ fn capture(source:const u8[:],position:u32)->blot_support::Option<Probe>,Error {
   else if token.tag==blot_parse_token::r_paren || token.tag==blot_parse_token::r_bracket {var close:u8=')';if token.tag==blot_parse_token::r_bracket {close=']';}if depth==0 || closing[depth-1]!=close {recover=false;break;}depth--;}
  }
  if !recover {depth=0;}var bytes:u8[>..];bytes.append(source[..original_start]);let marker_start=bytes.len as u32;bytes.append(member_marker);let marker_end=bytes.len as u32;bytes.append(source[replace.end..]);while depth!=0 {depth--;bytes.push(closing[depth]);}
- let owned=repaired_sources.alloc_slice(bytes.len);for byte,index in bytes {owned[index]=byte;}return blot_support::some(Probe{source:owned,replace:replace,prefix:prefix,kind:kind,marker:Span{marker_start,marker_end},original_start:original_start,original_end:replace.end,original_length:source.len as u32}),Error.none;
+ let owned=repaired_sources.alloc_slice(bytes.len);for byte,index in bytes {owned[index]=byte;}return blot_support::some(Probe{source:owned,replace:replace,prefix:prefix,kind:kind,marker:Span{marker_start,marker_end},original_start:original_start,original_end:replace.end,original_length:source.len as u32}),blot_error::Error.none;
 }

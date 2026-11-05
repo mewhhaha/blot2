@@ -13,8 +13,8 @@ recursive fn visit(module: const blot_check_core::Module&,id: u32,budget: i64&) 
         scalar,associated,apply,logical=>{ return visit(module,node.a,budget) && visit(module,node.b,budget); },
         if_value,if_stmt=>{ return visit(module,node.a,budget) && visit(module,node.b,budget) && visit(module,node.c,budget); },
         project,return_=>{ return visit(module,node.a,budget); },construct,bind=>{ return visit(module,node.b,budget); },pattern_bind=>{ return visit(module,node.b,budget) && visit(module,node.c,budget); },
-        match_=>{ for input in module.matchInputs(id) { if !visit(module,input,budget) { return false; } } for arm in module.matchArms(id) { if !visit(module,arm.guard,budget) || !visit(module,arm.body,budget) { return false; } } return true; },
-        loop_=>{ let loop = module.loopInfo(id); return visit(module,loop.first,budget) && visit(module,loop.end,budget) && visit(module,loop.body,budget); },
+        match_=>{ for input in module.matchInputs(id) { if !visit(module,input,budget) { return false; } } for arm in module.matchArms(id) { if !visit(module,arm.guard_,budget) || !visit(module,arm.body,budget) { return false; } } return true; },
+        loop_=>{ let loop_ = module.loopInfo(id); return visit(module,loop_.first,budget) && visit(module,loop_.end,budget) && visit(module,loop_.body,budget); },
         product,record,array,array_op,block_,suite=>{ for child in module.children(id) { if !visit(module,child,budget) { return false; } } return true; },
         call=>{ for child in module.call(id).arguments { if !visit(module,child,budget) { return false; } } return true; },closure=>{ return visit(module,module.closures[node.a].body,budget); },_=>{ return false; },
     }

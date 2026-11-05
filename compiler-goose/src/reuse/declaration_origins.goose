@@ -29,14 +29,14 @@ fn collect(entries: dictionary<const u8[:], Pair>&, module: const blot_check_cor
         }
         entries.insert(spelling.value, pair);
     }
-    return Error.none;
+    return blot_error::Error.none;
 }
 fn mark(old: const blot_check_core::Module&, current: const blot_check_core::Module&, admitted: bool[:]) -> Error {
     if admitted.len != current.bindings.len { abort("declaration origin admission shape"); }
     for &item in admitted { item = false; }
     var entries: dictionary<const u8[:], Pair> = default<dictionary<const u8[:], Pair>>();
-    let first = collect(entries, old, true); if first != Error.none { return first; }
-    let second = collect(entries, current, false); if second != Error.none { return second; }
+    let first = collect(entries, old, true); if first != blot_error::Error.none { return first; }
+    let second = collect(entries, current, false); if second != blot_error::Error.none { return second; }
     for slot in entries.slots {
         if slot.tag == 0 { continue; }
         let pair = slot.val;
@@ -44,5 +44,5 @@ fn mark(old: const blot_check_core::Module&, current: const blot_check_core::Mod
             admitted[pair.after] = true;
         }
     }
-    return Error.none;
+    return blot_error::Error.none;
 }

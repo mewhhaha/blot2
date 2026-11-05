@@ -27,7 +27,7 @@ struct Parser {
  source: const u8[:], tokens: const Token[:], pool: blot_parse_symbols::Pool&, tree: Tree&,
  fixities: Fixity[>..<]&, index: i64=0, expression_end: i64=0x7fffffffffffffff,
  depth: i64=0, declaration_origin: Span=Span {}, collection_names: u32=0,
- failure: Error=Error.none
+ failure: Error=blot_error::Error.none
 }
 fn current(p: Parser&) -> Token {
  if p.index>=p.expression_end { return Token {t_eof,p.tokens[p.index].start,p.tokens[p.index].start}; }
@@ -38,62 +38,62 @@ fn at(p: Parser&,tag: Tag) -> bool { return current(p).tag==tag; }
 fn peek(p: Parser&,offset: i64) -> Tag { if p.index+offset<p.tokens.len { return p.tokens[p.index+offset].tag; } return t_eof; }
 fn text(p: Parser&,t: Token) -> const u8[:] { return p.source[t.start..t.end]; }
 fn word(p: Parser&,bytes: const u8[:]) -> bool { return text(p,current(p))==bytes; }
-fn advance(p: Parser&) -> Token { let t=current(p); if p.failure==Error.none&&p.index<p.tokens.len { p.index++; } return t; }
-fn eat(p: Parser&,tag: Tag) -> bool { if p.failure!=Error.none||!at(p,tag) { return false; } advance(p); return true; }
+fn advance(p: Parser&) -> Token { let t=current(p); if p.failure==blot_error::Error.none&&p.index<p.tokens.len { p.index++; } return t; }
+fn eat(p: Parser&,tag: Tag) -> bool { if p.failure!=blot_error::Error.none||!at(p,tag) { return false; } advance(p); return true; }
 fn report(p: Parser&,code: blot_parse_ast::Code) {
  let t=current(p);
  p.tree.diagnostics.push(blot_parse_ast::Diagnostic {code:code,start:t.start,end:t.end,has_declaration_origin:true,declaration_origin:p.declaration_origin,has_actual_token:true,actual_token:t.tag});
 }
-fn fail(p: Parser&,code: blot_parse_ast::Code) -> Id { if p.failure==Error.none { report(p,code); p.failure=Error.syntax; } return 0; }
+fn fail(p: Parser&,code: blot_parse_ast::Code) -> Id { if p.failure==blot_error::Error.none { report(p,code); p.failure=blot_error::Error.syntax; } return 0; }
 fn expect(p: Parser&,tag: Tag) -> Token {
- if p.failure!=Error.none { return current(p); }
+ if p.failure!=blot_error::Error.none { return current(p); }
  if !at(p,tag) { fail(p,c_expected_token); let i=p.tree.diagnostics.len-1; p.tree.diagnostics.items[i].has_expected_token=true; p.tree.diagnostics.items[i].expected_token=tag; return current(p); }
  return advance(p);
 }
 fn newlines(p: Parser&) { while eat(p,t_newline) {} }
 fn recover(p: Parser&,before: i64) {
- p.failure=Error.none;
+ p.failure=blot_error::Error.none;
  if p.index==before&&!at(p,t_eof) { advance(p); }
  while !at(p,t_newline)&&!at(p,t_eof) { advance(p); }
  newlines(p); while eat(p,t_dedent) { newlines(p); }
 }
-fn enter(p: Parser&) -> bool { if p.failure!=Error.none { return false; } if p.depth>=256 { fail(p,c_nesting_limit); return false; } p.depth++; return true; }
+fn enter(p: Parser&) -> bool { if p.failure!=blot_error::Error.none { return false; } if p.depth>=256 { fail(p,c_nesting_limit); return false; } p.depth++; return true; }
 fn add(p: Parser&,tag: u32,a: u32,b: u32,c: u32,start: u32) -> Id {
- if p.failure!=Error.none { return 0; }
+ if p.failure!=blot_error::Error.none { return 0; }
  if p.tree.nodes.len>=0xffffffff { return fail(p,c_table_limit); }
  let id=p.tree.nodes.len as Id;
- p.tree.nodes.push(blot_parse_ast::Node {tag,a,b,c}); let node_error=p.tree.failure(); if node_error!=Error.none { p.failure=node_error; return 0; }
+ p.tree.nodes.push(blot_parse_ast::Node {tag,a,b,c}); let node_error=p.tree.failure(); if node_error!=blot_error::Error.none { p.failure=node_error; return 0; }
  var end=start; if p.index>0 { end=p.tokens[p.index-1].end; }
  p.tree.spans.push(Span {start,end}); return id;
 }
 fn numeric_failure(p: Parser&,t: Token,code: u32) -> Id { return add(p,a_numeric_error,code,t.start,t.end,t.start); }
 fn integer_literal(p: Parser&,t: Token,tag: u32) -> Id {
- if p.failure!=Error.none { return 0; }
+ if p.failure!=blot_error::Error.none { return 0; }
  let value,err=blot_parse_lexer::integer_value(text(p,t));
- if err==Error.integer_range { return numeric_failure(p,t,blot_parse_ast::numericcode_integer_range); }
- if err!=Error.none { return fail(p,c_invalid_literal); } return add(p,tag,value,0,0,t.start);
+ if err==blot_error::Error.integer_range { return numeric_failure(p,t,blot_parse_ast::numericcode_integer_range); }
+ if err!=blot_error::Error.none { return fail(p,c_invalid_literal); } return add(p,tag,value,0,0,t.start);
 }
 fn extra(p: Parser&,values: const u32[:]) -> u32 {
- if p.failure!=Error.none { return 0; }
+ if p.failure!=blot_error::Error.none { return 0; }
  if values.len>0xffffffff-p.tree.extra.len { return fail(p,c_table_limit); }
  let start=p.tree.extra.len as u32; for v in values { p.tree.extra.push(v); } return start;
 }
 fn list(p: Parser&,values: const u32[:]) -> List { let start=extra(p,values); return List {start,values.len as u32}; }
 fn list_node(p: Parser&,tag: u32,values: const Id[:],start: u32) -> Id { let range=list(p,values); return add(p,tag,range.start,range.len,0,start); }
 fn intern(p: Parser&,bytes: const u8[:]) -> Symbol {
- if p.failure!=Error.none { return 0; }
+ if p.failure!=blot_error::Error.none { return 0; }
  let symbol,err=blot_parse_symbols::intern(p.pool,bytes);
- if err==Error.symbol_limit { return fail(p,c_table_limit); }
- if err!=Error.none { p.failure=err; return 0; } return symbol;
+ if err==blot_error::Error.symbol_limit { return fail(p,c_table_limit); }
+ if err!=blot_error::Error.none { p.failure=err; return 0; } return symbol;
 }
 fn identifier_syntax_at(p: Parser&,t: Token) -> Id {
- if p.failure!=Error.none { return 0; }
+ if p.failure!=blot_error::Error.none { return 0; }
  p.tree.diagnostics.push(blot_parse_ast::Diagnostic {code:c_GPU_FRONTEND_SYNTAX_ERROR,start:p.declaration_origin.start,end:p.declaration_origin.end,has_declaration_origin:true,declaration_origin:p.declaration_origin,has_detail_span:true,detail_span:Span {t.start,t.end},has_actual_token:true,actual_token:t.tag});
- p.failure=Error.syntax; return 0;
+ p.failure=blot_error::Error.syntax; return 0;
 }
 fn identifier_syntax(p: Parser&) -> Id { return identifier_syntax_at(p,current(p)); }
 fn identifier(p: Parser&) -> Symbol {
- if p.failure!=Error.none { return 0; } let t=current(p);
+ if p.failure!=blot_error::Error.none { return 0; } let t=current(p);
  if t.tag!=t_identifier&&t.tag!=t_type_identifier { return fail(p,c_expected_token); }
  advance(p); return intern(p,text(p,t));
 }
@@ -104,19 +104,19 @@ fn type_identifier(p: Parser&) -> Symbol {
 }
 fn qualified(p: Parser&) -> Symbol {
  let first=current(p); let name=identifier(p);
- if p.failure!=Error.none||!at(p,t_dot)||(peek(p,1)!=t_identifier&&peek(p,1)!=t_type_identifier) { return name; }
+ if p.failure!=blot_error::Error.none||!at(p,t_dot)||(peek(p,1)!=t_identifier&&peek(p,1)!=t_type_identifier) { return name; }
  var bytes=Scratchu8Buffer {};  for c in text(p,first) { bytes.push(c); }
- while p.failure==Error.none&&at(p,t_dot)&&(peek(p,1)==t_identifier||peek(p,1)==t_type_identifier) {
+ while p.failure==blot_error::Error.none&&at(p,t_dot)&&(peek(p,1)==t_identifier||peek(p,1)==t_type_identifier) {
   advance(p); let t=advance(p); intern(p,text(p,t)); bytes.push('.'); for c in text(p,t) { bytes.push(c); }
  }
  let __cleanup_result_1_0: Symbol = intern(p,bytes.items); bytes.deinit(); return __cleanup_result_1_0;
  bytes.deinit(); }
 fn constructor_pattern_name(p: Parser&) -> Symbol {
- let name=qualified(p); if p.failure!=Error.none { return 0; }
+ let name=qualified(p); if p.failure!=blot_error::Error.none { return 0; }
  if p.tokens[p.index-1].tag!=t_type_identifier { return identifier_syntax_at(p,p.tokens[p.index-1]); } return name;
 }
 fn string_symbol(p: Parser&) -> Symbol {
- let t=expect(p,t_string); if p.failure!=Error.none { return 0; }
+ let t=expect(p,t_string); if p.failure!=blot_error::Error.none { return 0; }
  let raw=text(p,t); var bytes=Scratchu8Buffer {};  var i=1;
  while i+1<raw.len {
   var ch=raw[i]; if ch=='\\' {
@@ -132,16 +132,16 @@ fn declaration(p: Parser&,declarations_seen: bool,body_declarations_seen: bool) 
  if word(p,"private") { private=true; advance(p); if word(p,"private") { let t=current(p); p.declaration_origin=Span {t.start,t.end}; return fail(p,c_unexpected_token); } }
  if word(p,"opaque")&&peek(p,1)==t_kw_type { is_opaque=true; advance(p); }
  if word(p,"export")&&peek(p,1)==t_l_brace { if private||is_opaque { return fail(p,c_unexpected_token); } return import_decl(p,true); }
- let id=declaration_body(p,declarations_seen,body_declarations_seen,is_opaque); if p.failure!=Error.none { return 0; }
+ let id=declaration_body(p,declarations_seen,body_declarations_seen,is_opaque); if p.failure!=blot_error::Error.none { return 0; }
  if private||is_opaque { let tag=p.tree.node(id).tag; if tag==a_import_decl||tag==a_fixity_decl { return fail(p,c_unexpected_token); } p.tree.declaration_traits.push(blot_parse_ast::DeclarationTraits {id,private,is_opaque}); }
  return id;
 }
 fn declaration_body(p: Parser&,declarations_seen: bool,body_declarations_seen: bool,is_opaque: bool) -> Id {
  let first=current(p); p.declaration_origin=Span {first.start,first.end}; p.collection_names=0; let start=first.start;
  if at(p,t_kw_import) { if declarations_seen { return fail(p,c_unexpected_token); } return import_decl(p,false); }
- var attributes=ScratchIdBuffer {}; 
- while p.failure==Error.none&&at(p,t_at) { let point=current(p).start; eat(p,t_at); expect(p,t_l_bracket); let body=expression(p); expect(p,t_r_bracket); attributes.push(add(p,a_attribute,body,0,0,point)); newlines(p); }
- let attrs=list(p,attributes.items); if p.failure!=Error.none { let __cleanup_result_4_0: Id = 0; attributes.deinit(); return __cleanup_result_4_0; }
+ var attributes=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none&&at(p,t_at) { let point=current(p).start; eat(p,t_at); expect(p,t_l_bracket); let body=expression(p); expect(p,t_r_bracket); attributes.push(add(p,a_attribute,body,0,0,point)); newlines(p); }
+ let attrs=list(p,attributes.items); if p.failure!=blot_error::Error.none { let __cleanup_result_4_0: Id = 0; attributes.deinit(); return __cleanup_result_4_0; }
  if at(p,t_kw_infixl)||at(p,t_kw_infixr)||at(p,t_kw_infix) { let __cleanup_result_5_0: Id = fixity_decl(p,attrs,start); attributes.deinit(); return __cleanup_result_5_0; }
  if word(p,"impl") { if is_opaque||attrs.len!=0 { let __cleanup_result_6_0: Id = fail(p,c_unexpected_token); attributes.deinit(); return __cleanup_result_6_0; } let __cleanup_result_7_0: Id = implementation_declaration(p,start); attributes.deinit(); return __cleanup_result_7_0; }
  if at(p,t_kw_type)||at(p,t_kw_data) { let __cleanup_result_8_0: Id = type_declaration(p,attrs,start,is_opaque); attributes.deinit(); return __cleanup_result_8_0; }
@@ -153,7 +153,7 @@ fn declaration_body(p: Parser&,declarations_seen: bool,body_declarations_seen: b
  let name_point=current(p).start; let name=qualified(p); var annotation: Id=0; if eat(p,t_colon) { annotation=type_expression(p); }
  let constraints=where_clause(p); expect(p,t_equal); let body=expression(p);
  let value=add(p,a_value_decl,name,body,extra(p,[annotation,modifier,runtime,constraints.predicates.start,constraints.predicates.len,attrs.start,attrs.len,flags,constraints.node]),start);
- if p.failure!=Error.none { let __cleanup_result_12_0: Id = 0; attributes.deinit(); return __cleanup_result_12_0; }
+ if p.failure!=blot_error::Error.none { let __cleanup_result_12_0: Id = 0; attributes.deinit(); return __cleanup_result_12_0; }
  if runtime!=0 { p.tree.runtime_names.push(blot_parse_ast::RuntimeName {value,name_point}); } else { p.tree.constant_names.push(blot_parse_ast::RuntimeName {value,name_point}); } let __cleanup_result_13_0: Id = value; attributes.deinit(); return __cleanup_result_13_0;
  attributes.deinit(); }
 fn import_decl(p: Parser&,forwarding: bool) -> Id {
@@ -162,7 +162,7 @@ fn import_decl(p: Parser&,forwarding: bool) -> Id {
  if !forwarding&&eat(p,t_star) { expect(p,t_kw_as); let t=current(p); name_space=lower_identifier(p); namespace_span=Span {t.start,t.end}; }
  else {
   expect(p,t_l_brace);
-  while p.failure==Error.none&&!at(p,t_r_brace) { let point=current(p).start; let name=identifier(p); var alias=name; if eat(p,t_kw_as) { alias=identifier(p); } bindings.push(add(p,a_import_binding,name,alias,0,point)); if !eat(p,t_comma) { break; } }
+  while p.failure==blot_error::Error.none&&!at(p,t_r_brace) { let point=current(p).start; let name=identifier(p); var alias=name; if eat(p,t_kw_as) { alias=identifier(p); } bindings.push(add(p,a_import_binding,name,alias,0,point)); if !eat(p,t_comma) { break; } }
   expect(p,t_r_brace);
  }
  if !eat(p,t_kw_from) { if !word(p,"from") { let __cleanup_result_14_0: Id = fail(p,c_expected_token); bindings.deinit(); return __cleanup_result_14_0; } advance(p); }
@@ -171,20 +171,20 @@ fn import_decl(p: Parser&,forwarding: bool) -> Id {
  bindings.deinit(); }
 fn fixity_decl(p: Parser&,attrs: List,start: u32) -> Id {
  let head=advance(p).tag; var association: u32=2; if head==t_kw_infixl { association=0; } else if head==t_kw_infixr { association=1; }
- let literal=expect(p,t_integer); if p.failure!=Error.none { return 0; }
+ let literal=expect(p,t_integer); if p.failure!=blot_error::Error.none { return 0; }
  var literal_error: Id=0; let raw_precedence,err=blot_parse_lexer::integer_value(text(p,literal)); var precedence=raw_precedence;
- if err==Error.integer_range { literal_error=numeric_failure(p,literal,blot_parse_ast::numericcode_integer_range); precedence=0; }
- else if err!=Error.none { return fail(p,c_invalid_literal); }
+ if err==blot_error::Error.integer_range { literal_error=numeric_failure(p,literal,blot_parse_ast::numericcode_integer_range); precedence=0; }
+ else if err!=blot_error::Error.none { return fail(p,c_invalid_literal); }
  var symbol: Symbol=0; var target: Symbol=0; var target_span=Span {}; var named=false;
  if eat(p,t_backtick) { named=true; let t=current(p); target_span=Span {t.start,t.end}; symbol=qualified(p); target=symbol; expect(p,t_backtick); }
  else { expect(p,t_l_paren); let op=advance(p); if !operator_tag(op.tag)||op.tag==t_kw_and||op.tag==t_kw_or { return fail(p,c_expected_token); } symbol=intern(p,text(p,op)); expect(p,t_r_paren); expect(p,t_equal); let t=current(p); target_span=Span {t.start,t.end}; target=qualified(p); }
- if p.failure!=Error.none { return 0; }
+ if p.failure!=blot_error::Error.none { return 0; }
  var power=precedence; if power>255 { power=255; } var replaced=false;
  for i in 0..p.fixities.len { if p.fixities[i].symbol==symbol&&p.fixities[i].named==named { p.fixities[i]=Fixity {symbol,power,association,named,false}; replaced=true; break; } }
  if !replaced { p.fixities.push(Fixity {symbol,power,association,named,false}); }
  var flags: u32=0; if named { flags|=1; } if attrs.len!=0 { flags|=2; } if literal_error!=0 { flags|=4; }
  let metadata=extra(p,[precedence,association,flags,attrs.start,attrs.len]); if literal_error!=0 { extra(p,[literal_error]); }
- let id=add(p,a_fixity_decl,symbol,target,metadata,start); if p.failure==Error.none { p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:id,span:target_span}); } return id;
+ let id=add(p,a_fixity_decl,symbol,target,metadata,start); if p.failure==blot_error::Error.none { p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:id,span:target_span}); } return id;
 }
 
 let t_eof=blot_parse_token::eof;
@@ -373,9 +373,9 @@ let c_GPU_FRONTEND_SYNTAX_ERROR=blot_parse_ast::code_GPU_FRONTEND_SYNTAX_ERROR;
 let c_function_return_required=blot_parse_ast::code_function_return_required;
 fn type_declaration(p: Parser&,attrs: List,start: u32,is_opaque: bool) -> Id {
  let old_data=eat(p,t_kw_data); if !old_data { expect(p,t_kw_type); }
- let name=type_identifier(p); var params=ScratchIdBuffer {}; 
+ let name=type_identifier(p); var params=ScratchIdBuffer {};
  if type_atom_tag(current(p).tag) { params.push(type_atom(p)); }
- while p.failure==Error.none&&eat(p,t_fat_arrow) { expect(p,t_kw_type); params.push(type_atom(p)); }
+ while p.failure==blot_error::Error.none&&eat(p,t_fat_arrow) { expect(p,t_kw_type); params.push(type_atom(p)); }
  if !old_data&&eat(p,t_equal) {
   let body=type_expression(p); let range=list(p,params.items);
   if is_opaque { let constructor=add(p,a_constructor_ref,name,body,0,start); let constructors=list_node(p,a_constructors,[constructor],start); let __cleanup_result_16_0: Id = add(p,a_data_decl,name,constructors.items,extra(p,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return __cleanup_result_16_0; }
@@ -392,7 +392,7 @@ fn type_declaration(p: Parser&,attrs: List,start: u32,is_opaque: bool) -> Id {
  if effect {
   if eat(p,t_l_brace) {
    var operations=ScratchIdBuffer {};  newlines(p);
-   while p.failure==Error.none&&!at(p,t_r_brace) {
+   while p.failure==blot_error::Error.none&&!at(p,t_r_brace) {
     let point=current(p).start; let field=lower_identifier(p); expect(p,t_colon); let ty=type_expression(p); operations.push(add(p,a_effect_operation,field,ty,0,point));
     if eat(p,t_comma) { newlines(p); continue; } if at(p,t_newline) { newlines(p); continue; } break;
    }
@@ -400,7 +400,7 @@ fn type_declaration(p: Parser&,attrs: List,start: u32,is_opaque: bool) -> Id {
    operations.deinit(); } else { body=type_expression(p); }
  } else {
   var constructors=ScratchIdBuffer {};  eat(p,t_pipe);
-  while p.failure==Error.none {
+  while p.failure==blot_error::Error.none {
    let point=expect(p,t_hash).start; let constructor=type_identifier(p); var payload: Id=0; if type_atom_tag(current(p).tag) { payload=type_expression(p); }
    constructors.push(add(p,a_constructor_ref,constructor,payload,0,point)); if !eat(p,t_pipe) { break; }
   }
@@ -410,18 +410,18 @@ fn type_declaration(p: Parser&,attrs: List,start: u32,is_opaque: bool) -> Id {
  let __cleanup_result_20_0: Id = add(p,tag,name,body,extra(p,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return __cleanup_result_20_0;
  params.deinit(); }
 fn implementation_declaration(p: Parser&,start: u32) -> Id {
- advance(p); let name=type_identifier(p); var parameters=ScratchIdBuffer {}; 
+ advance(p); let name=type_identifier(p); var parameters=ScratchIdBuffer {};
  if type_atom_tag(current(p).tag) { parameters.push(type_atom(p)); }
- while p.failure==Error.none&&eat(p,t_fat_arrow) { expect(p,t_kw_type); parameters.push(type_atom(p)); }
- expect(p,t_colon); let head=contract_item(p,false); let prerequisites=where_clause(p); expect(p,t_equal); let body_start=expect(p,t_l_brace).start; newlines(p); var members=ScratchIdBuffer {}; 
- while p.failure==Error.none&&!at(p,t_r_brace) {
+ while p.failure==blot_error::Error.none&&eat(p,t_fat_arrow) { expect(p,t_kw_type); parameters.push(type_atom(p)); }
+ expect(p,t_colon); let head=contract_item(p,false); let prerequisites=where_clause(p); expect(p,t_equal); let body_start=expect(p,t_l_brace).start; newlines(p); var members=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none&&!at(p,t_r_brace) {
   let member_start=current(p).start;
   if eat(p,t_kw_type) { let member=type_identifier(p); expect(p,t_equal); let ty=type_expression(p); members.push(add(p,a_contract_type_member,member,ty,0,member_start)); }
   else {
    expect(p,t_kw_const); let member=identifier(p); var annotation: Id=0; if eat(p,t_colon) { annotation=type_expression(p); } expect(p,t_equal);
    if !at(p,t_kw_func) { let __cleanup_result_21_0: Id = fail(p,c_expected_token); members.deinit(); parameters.deinit(); return __cleanup_result_21_0; }
    let value=expression(p); let method=add(p,a_value_decl,member,value,extra(p,[annotation,0,0,0,0,0,0,0,0]),member_start);
-   if p.failure!=Error.none { let __cleanup_result_22_0: Id = 0; members.deinit(); parameters.deinit(); return __cleanup_result_22_0; } members.push(method); p.tree.constant_names.push(blot_parse_ast::RuntimeName {method,member_start});
+   if p.failure!=blot_error::Error.none { let __cleanup_result_22_0: Id = 0; members.deinit(); parameters.deinit(); return __cleanup_result_22_0; } members.push(method); p.tree.constant_names.push(blot_parse_ast::RuntimeName {method,member_start});
   }
   if !eat(p,t_comma) { break; } newlines(p);
  }
@@ -430,8 +430,8 @@ fn implementation_declaration(p: Parser&,start: u32) -> Id {
  members.deinit(); parameters.deinit(); }
 fn where_clause(p: Parser&) -> Where { let start=current(p).start; if !eat(p,t_kw_where) { return Where {}; } return predicate_body(p,start,false); }
 fn predicate_body(p: Parser&,start: u32,members: bool) -> Where {
- expect(p,t_l_brace); newlines(p); var predicates=ScratchIdBuffer {}; 
- while p.failure==Error.none&&!at(p,t_r_brace) { predicates.push(contract_item(p,members)); if !eat(p,t_comma) { break; } newlines(p); }
+ expect(p,t_l_brace); newlines(p); var predicates=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none&&!at(p,t_r_brace) { predicates.push(contract_item(p,members)); if !eat(p,t_comma) { break; } newlines(p); }
  newlines(p); expect(p,t_r_brace); let range=list(p,predicates.items); let id=add(p,a_where_clause,range.start,range.len,0,start); let __cleanup_result_24_0: Where = Where {range,id}; predicates.deinit(); return __cleanup_result_24_0;
  predicates.deinit(); }
 fn contract_item(p: Parser&,members: bool) -> Id {
@@ -439,31 +439,31 @@ fn contract_item(p: Parser&,members: bool) -> Id {
  if members&&eat(p,t_kw_type) { let name=type_identifier(p); var value: Id=0; if eat(p,t_equal) { value=type_expression(p); } return add(p,a_contract_type_member,name,value,0,start); }
  if members&&eat(p,t_kw_const) { let name=identifier(p); expect(p,t_colon); let ty=type_expression(p); return add(p,a_contract_value_member,name,ty,0,start); }
  let kind=qualified(p); var member: Symbol=0; if at(p,t_string) { member=string_symbol(p); }
- var args=ScratchIdBuffer {}; 
- while p.failure==Error.none&&type_atom_tag(current(p).tag) {
+ var args=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none&&type_atom_tag(current(p).tag) {
   let point=current(p).start; let grouped=at(p,t_l_paren); var arg=type_atom(p);
-  if p.failure!=Error.none { let __cleanup_result_25_0: Id = 0; args.deinit(); return __cleanup_result_25_0; }
+  if p.failure!=blot_error::Error.none { let __cleanup_result_25_0: Id = 0; args.deinit(); return __cleanup_result_25_0; }
   if grouped&&p.tree.span(arg).start!=point { arg=add(p,a_group,arg,0,0,point); } args.push(arg);
  }
  var row: Id=0; if at(p,t_bang) { row=effect_row(p); } let range=list(p,args.items);
  let __cleanup_result_26_0: Id = add(p,a_constraint,kind,member,extra(p,[range.start,range.len,row]),start); args.deinit(); return __cleanup_result_26_0;
  args.deinit(); }
 fn type_expression(p: Parser&) -> Id {
- if !enter(p) { return 0; } 
+ if !enter(p) { return 0; }
  let start=current(p).start; var parts=ScratchIdBuffer {};  parts.push(type_application(p));
- while p.failure==Error.none&&eat(p,t_arrow) { parts.push(type_application(p)); }
- var row: Id=0; if at(p,t_bang) { row=effect_row(p); } if p.failure!=Error.none { let __cleanup_result_1_0: Id = 0; { p.depth--; } let __cleanup_result_27_0: Id = __cleanup_result_1_0; parts.deinit(); return __cleanup_result_27_0; }
+ while p.failure==blot_error::Error.none&&eat(p,t_arrow) { parts.push(type_application(p)); }
+ var row: Id=0; if at(p,t_bang) { row=effect_row(p); } if p.failure!=blot_error::Error.none { let __cleanup_result_1_0: Id = 0; { p.depth--; } let __cleanup_result_27_0: Id = __cleanup_result_1_0; parts.deinit(); return __cleanup_result_27_0; }
  var value=parts.items[parts.len-1]; var i=parts.len-1;
  while i!=0 {
   i--; let result=value; var effects: Id=0; if i==0 { effects=row; }
-  value=add(p,a_type_function,parts.items[i],result,effects,p.tree.span(parts.items[i]).start); if p.failure!=Error.none { let __cleanup_result_2_0: Id = 0; { p.depth--; } let __cleanup_result_28_0: Id = __cleanup_result_2_0; parts.deinit(); return __cleanup_result_28_0; }
+  value=add(p,a_type_function,parts.items[i],result,effects,p.tree.span(parts.items[i]).start); if p.failure!=blot_error::Error.none { let __cleanup_result_2_0: Id = 0; { p.depth--; } let __cleanup_result_28_0: Id = __cleanup_result_2_0; parts.deinit(); return __cleanup_result_28_0; }
   var end=p.tree.span(result).end; if i==0&&row!=0 { end=p.tree.span(row).end; } p.tree.spans.items[value].end=end;
  }
  if parts.len==1&&row!=0 { let __cleanup_result_3_0: Id = add(p,a_type_effect,value,row,0,start); { p.depth--; } let __cleanup_result_29_0: Id = __cleanup_result_3_0; parts.deinit(); return __cleanup_result_29_0; } let __cleanup_result_4_0: Id = value; { p.depth--; } let __cleanup_result_30_0: Id = __cleanup_result_4_0; parts.deinit(); return __cleanup_result_30_0;
  { p.depth--; }  parts.deinit(); }
 fn type_application(p: Parser&) -> Id {
  let start=current(p).start; var value=type_atom(p);
- while p.failure==Error.none&&type_atom_tag(current(p).tag) { let arg=type_atom(p); value=add(p,a_type_apply,value,arg,0,start); } return value;
+ while p.failure==blot_error::Error.none&&type_atom_tag(current(p).tag) { let arg=type_atom(p); value=add(p,a_type_apply,value,arg,0,start); } return value;
 }
 fn type_atom(p: Parser&) -> Id {
  if !enter(p) { return 0; }  let start=current(p).start;
@@ -493,29 +493,29 @@ fn type_atom(p: Parser&) -> Id {
  }
  if at(p,t_identifier)||at(p,t_type_identifier) { let __cleanup_result_13_0: Id = add(p,a_type_name,qualified(p),0,0,start); { p.depth--; } return __cleanup_result_13_0; }
  if eat(p,t_l_brace) {
-  var fields=ScratchIdBuffer {}; 
-  while p.failure==Error.none&&!at(p,t_r_brace) { let point=current(p).start; let name=lower_identifier(p); var value: Id=0; if eat(p,t_colon) { value=type_expression(p); } fields.push(add(p,a_type_field,name,value,0,point)); if !eat(p,t_comma) { break; } }
+  var fields=ScratchIdBuffer {};
+  while p.failure==blot_error::Error.none&&!at(p,t_r_brace) { let point=current(p).start; let name=lower_identifier(p); var value: Id=0; if eat(p,t_colon) { value=type_expression(p); } fields.push(add(p,a_type_field,name,value,0,point)); if !eat(p,t_comma) { break; } }
   expect(p,t_r_brace); let __cleanup_result_14_0: Id = list_node(p,a_type_record,fields.items,start); { p.depth--; } let __cleanup_result_31_0: Id = __cleanup_result_14_0; fields.deinit(); return __cleanup_result_31_0;
   fields.deinit(); }
  let array=eat(p,t_l_bracket); if !array&&!eat(p,t_l_paren) { let __cleanup_result_15_0: Id = fail(p,c_expected_type); { p.depth--; } return __cleanup_result_15_0; }
  if !array&&at(p,t_identifier)&&peek(p,1)==t_colon { let name=lower_identifier(p); expect(p,t_colon); let annotation=type_expression(p); expect(p,t_r_paren); let __cleanup_result_16_0: Id = add(p,a_type_binder,name,annotation,0,start); { p.depth--; } return __cleanup_result_16_0; }
  var end=t_r_paren; if array { end=t_r_bracket; } var values=ScratchIdBuffer {};  var tuple=false;
- while p.failure==Error.none&&!at(p,end) { values.push(type_expression(p)); if !eat(p,t_comma) { break; } tuple=true; }
- expect(p,end); if p.failure!=Error.none { let __cleanup_result_17_0: Id = 0; { p.depth--; } let __cleanup_result_32_0: Id = __cleanup_result_17_0; values.deinit(); return __cleanup_result_32_0; }
+ while p.failure==blot_error::Error.none&&!at(p,end) { values.push(type_expression(p)); if !eat(p,t_comma) { break; } tuple=true; }
+ expect(p,end); if p.failure!=blot_error::Error.none { let __cleanup_result_17_0: Id = 0; { p.depth--; } let __cleanup_result_32_0: Id = __cleanup_result_17_0; values.deinit(); return __cleanup_result_32_0; }
  if !array&&!tuple&&values.len==1 { p.tree.type_conversion_origins.push(blot_parse_ast::TypeConversionOrigin {values.items[0],start}); let __cleanup_result_18_0: Id = values.items[0]; { p.depth--; } let __cleanup_result_33_0: Id = __cleanup_result_18_0; values.deinit(); return __cleanup_result_33_0; }
  var tag=a_type_product; if array { tag=a_type_array; } let __cleanup_result_19_0: Id = list_node(p,tag,values.items,start); { p.depth--; } let __cleanup_result_34_0: Id = __cleanup_result_19_0; values.deinit(); return __cleanup_result_34_0;
  { p.depth--; }  values.deinit(); }
 fn proof_operand(p: Parser&) -> Id {
  if !enter(p) { return 0; }  let t=current(p);
- if eat(p,t_l_paren) { let value=proof_operand(p); expect(p,t_r_paren); if p.failure==Error.none { p.tree.type_conversion_origins.push(blot_parse_ast::TypeConversionOrigin {value,t.start}); } let __cleanup_result_20_0: Id = value; { p.depth--; } return __cleanup_result_20_0; }
+ if eat(p,t_l_paren) { let value=proof_operand(p); expect(p,t_r_paren); if p.failure==blot_error::Error.none { p.tree.type_conversion_origins.push(blot_parse_ast::TypeConversionOrigin {value,t.start}); } let __cleanup_result_20_0: Id = value; { p.depth--; } return __cleanup_result_20_0; }
  if eat(p,t_integer) { let __cleanup_result_21_0: Id = integer_literal(p,t,a_integer); { p.depth--; } return __cleanup_result_21_0; }
  if at(p,t_identifier) { let __cleanup_result_22_0: Id = add(p,a_type_name,lower_identifier(p),0,0,t.start); { p.depth--; } return __cleanup_result_22_0; }
  if eat(p,t_intrinsic) { let name=text(p,t); if name!="@array.length"&&name!="@list.length" { let __cleanup_result_23_0: Id = fail(p,c_expected_type); { p.depth--; } return __cleanup_result_23_0; } let head=add(p,a_type_name,intern(p,name),0,0,t.start); let arg=proof_operand(p); let __cleanup_result_24_0: Id = add(p,a_type_apply,head,arg,0,t.start); { p.depth--; } return __cleanup_result_24_0; }
  let __cleanup_result_25_0: Id = fail(p,c_expected_type); { p.depth--; } return __cleanup_result_25_0;
  { p.depth--; } }
 fn quantified_binders(p: Parser&) -> List {
- expect(p,t_l_bracket); var binders=ScratchIdBuffer {}; 
- while p.failure==Error.none { let start=current(p).start; var sort: u32=0; if word(p,"row")||word(p,"region") { sort=2; if word(p,"row") { sort=1; } advance(p); } let name=lower_identifier(p); binders.push(add(p,a_quantified_binder,name,sort,0,start)); if !eat(p,t_comma) { break; } }
+ expect(p,t_l_bracket); var binders=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none { let start=current(p).start; var sort: u32=0; if word(p,"row")||word(p,"region") { sort=2; if word(p,"row") { sort=1; } advance(p); } let name=lower_identifier(p); binders.push(add(p,a_quantified_binder,name,sort,0,start)); if !eat(p,t_comma) { break; } }
  expect(p,t_r_bracket); let __cleanup_result_35_0: List = list(p,binders.items); binders.deinit(); return __cleanup_result_35_0;
  binders.deinit(); }
 fn quantified_type(p: Parser&) -> Id {
@@ -524,8 +524,8 @@ fn quantified_type(p: Parser&) -> Id {
  expect(p,t_fat_arrow); let body=type_expression(p); return add(p,tag,binders.start,binders.len,extra(p,[body,where.node]),start);
 }
 fn package_pack(p: Parser&) -> Id {
- let start=advance(p).start; expect(p,t_l_bracket); var witnesses=ScratchIdBuffer {}; 
- while p.failure==Error.none { witnesses.push(type_expression(p)); if !eat(p,t_comma) { break; } }
+ let start=advance(p).start; expect(p,t_l_bracket); var witnesses=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none { witnesses.push(type_expression(p)); if !eat(p,t_comma) { break; } }
  expect(p,t_r_bracket); let value=expression(p); expect(p,t_kw_as); let annotation=type_expression(p); let range=list(p,witnesses.items); let __cleanup_result_36_0: Id = add(p,a_package_pack,range.start,range.len,extra(p,[value,annotation]),start); witnesses.deinit(); return __cleanup_result_36_0;
  witnesses.deinit(); }
 fn package_opening_ahead(p: Parser&) -> bool {
@@ -544,20 +544,20 @@ fn package_unpack(p: Parser&) -> Id {
 }
 fn effect_row(p: Parser&) -> Id { let start=expect(p,t_bang).start; return effect_row_body(p,start); }
 fn effect_row_body(p: Parser&,start: u32) -> Id {
- expect(p,t_l_brace); var labels=ScratchIdBuffer {}; 
- while p.failure==Error.none&&!at(p,t_pipe)&&!at(p,t_r_brace) { labels.push(type_application(p)); if !eat(p,t_comma) { break; } }
+ expect(p,t_l_brace); var labels=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none&&!at(p,t_pipe)&&!at(p,t_r_brace) { labels.push(type_application(p)); if !eat(p,t_comma) { break; } }
  var tail: Id=0; if eat(p,t_pipe) { let t=current(p); let name=lower_identifier(p); tail=add(p,a_type_name,name,0,0,t.start); }
  expect(p,t_r_brace); let range=list(p,labels.items); let __cleanup_result_37_0: Id = add(p,a_effect_row,range.start,range.len,tail,start); labels.deinit(); return __cleanup_result_37_0;
  labels.deinit(); }
 fn expression(p: Parser&) -> Id {
- if !enter(p) { return 0; } 
+ if !enter(p) { return 0; }
  if at(p,t_identifier)&&word(p,"pack")&&peek(p,1)==t_l_bracket { let __cleanup_result_26_0: Id = package_pack(p); { p.depth--; } return __cleanup_result_26_0; }
  if at(p,t_identifier)&&word(p,"unpack")&&package_opening_ahead(p) { let __cleanup_result_27_0: Id = package_unpack(p); { p.depth--; } return __cleanup_result_27_0; }
  if at(p,t_kw_func) { let __cleanup_result_28_0: Id = lambda(p); { p.depth--; } return __cleanup_result_28_0; } if at(p,t_kw_do) { let __cleanup_result_29_0: Id = do_block(p); { p.depth--; } return __cleanup_result_29_0; } if at(p,t_kw_if) { let __cleanup_result_30_0: Id = if_expression(p); { p.depth--; } return __cleanup_result_30_0; } if at(p,t_kw_case) { let __cleanup_result_31_0: Id = case_expression(p); { p.depth--; } return __cleanup_result_31_0; } let __cleanup_result_32_0: Id = infix(p); { p.depth--; } return __cleanup_result_32_0;
  { p.depth--; } }
 fn lambda(p: Parser&) -> Id {
- let start=expect(p,t_kw_func).start; var parameters=ScratchLambdaParameterBuffer {}; 
- while p.failure==Error.none {
+ let start=expect(p,t_kw_func).start; var parameters=ScratchLambdaParameterBuffer {};
+ while p.failure==blot_error::Error.none {
   let point=current(p).start; var unit=false; var name: Symbol=0; var annotation: Id=0; var constraints=Where {}; var pattern_parameter: Id=0;
   if eat(p,t_l_paren) {
    if eat(p,t_r_paren) { unit=true; }
@@ -566,11 +566,11 @@ fn lambda(p: Parser&) -> Id {
   } else { name=lower_identifier(p); }
   var flags: u32=0; if unit { flags=1; }
   let parameter=add(p,a_parameter,name,annotation,extra(p,[flags,constraints.predicates.start,constraints.predicates.len,constraints.node]),point);
-  if p.failure!=Error.none { let __cleanup_result_38_0: Id = 0; parameters.deinit(); return __cleanup_result_38_0; } if pattern_parameter!=0 { p.tree.extra.items[p.tree.node(parameter).c]|=4; }
+  if p.failure!=blot_error::Error.none { let __cleanup_result_38_0: Id = 0; parameters.deinit(); return __cleanup_result_38_0; } if pattern_parameter!=0 { p.tree.extra.items[p.tree.node(parameter).c]|=4; }
   parameters.push(LambdaParameter {parameter,pattern_parameter,name,point}); if !eat(p,t_arrow) { break; } if parameters.len>=256 { let __cleanup_result_39_0: Id = fail(p,c_nesting_limit); parameters.deinit(); return __cleanup_result_39_0; }
  }
  var result: Id=0; if eat(p,t_colon) { result=type_expression(p); } expect(p,t_fat_arrow); let returned=eat(p,t_kw_return);
- if !returned&&!at(p,t_kw_do) { let __cleanup_result_40_0: Id = fail(p,c_function_return_required); parameters.deinit(); return __cleanup_result_40_0; } var body=expression(p); if p.failure!=Error.none { let __cleanup_result_41_0: Id = 0; parameters.deinit(); return __cleanup_result_41_0; }
+ if !returned&&!at(p,t_kw_do) { let __cleanup_result_40_0: Id = fail(p,c_function_return_required); parameters.deinit(); return __cleanup_result_40_0; } var body=expression(p); if p.failure!=blot_error::Error.none { let __cleanup_result_41_0: Id = 0; parameters.deinit(); return __cleanup_result_41_0; }
  if !returned { p.tree.extra.items[p.tree.node(parameters.items[parameters.len-1].node).c]|=2; }
  var index=parameters.len;
  while index!=0 {
@@ -580,7 +580,7 @@ fn lambda(p: Parser&) -> Id {
  }
  let __cleanup_result_42_0: Id = body; parameters.deinit(); return __cleanup_result_42_0;
  parameters.deinit(); }
-fn do_block(p: Parser&) -> Id { let start=expect(p,t_kw_do).start; var resolver: Id=0; if !at(p,t_colon) { resolver=application(p,false); } expect(p,t_colon); let block=suite(p); if p.failure!=Error.none { return 0; } p.tree.nodes.items[block].c=resolver; p.tree.spans.items[block].start=start; return block; }
+fn do_block(p: Parser&) -> Id { let start=expect(p,t_kw_do).start; var resolver: Id=0; if !at(p,t_colon) { resolver=application(p,false); } expect(p,t_colon); let block_=suite(p); if p.failure!=blot_error::Error.none { return 0; } p.tree.nodes.items[block_].c=resolver; p.tree.spans.items[block_].start=start; return block_; }
 fn if_expression(p: Parser&) -> Id { let start=expect(p,t_kw_if).start; let condition=infix(p); expect(p,t_kw_then); let consequence=expression(p); expect(p,t_kw_else); let fallback=expression(p); return add(p,a_if_expr,condition,consequence,fallback,start); }
 fn lookup_fixity(p: Parser&,symbol: Symbol,named: bool) -> Fixity,bool {
  let spelling=p.pool.get(symbol);
@@ -600,45 +600,45 @@ fn read_operator(p: Parser&) -> Operator {
 }
 fn infix(p: Parser&) -> Id {
  let start=current(p).start; let head=prefix(p); var operands=ScratchIdBuffer {};  var operators=ScratchOperatorBuffer {};  var unknown=false;
- while p.failure==Error.none&&(operator_tag(current(p).tag)||at(p,t_backtick)) {
+ while p.failure==blot_error::Error.none&&(operator_tag(current(p).tag)||at(p,t_backtick)) {
   let op=read_operator(p); unknown=unknown||!op.known; operators.push(op); var rhs: Id=0;
   if at(p,t_kw_func)||at(p,t_kw_do)||at(p,t_kw_if)||at(p,t_kw_case) { rhs=expression(p); } else { rhs=prefix(p); } operands.push(rhs);
  }
- if p.failure!=Error.none { let __cleanup_result_43_0: Id = 0; operators.deinit(); operands.deinit(); return __cleanup_result_43_0; } if operators.len==0 { let __cleanup_result_44_0: Id = head; operators.deinit(); operands.deinit(); return __cleanup_result_44_0; }
+ if p.failure!=blot_error::Error.none { let __cleanup_result_43_0: Id = 0; operators.deinit(); operands.deinit(); return __cleanup_result_43_0; } if operators.len==0 { let __cleanup_result_44_0: Id = head; operators.deinit(); operands.deinit(); return __cleanup_result_44_0; }
  if unknown { let __cleanup_result_45_0: Id = infix_chain(p,head,operators.items,operands.items,start); operators.deinit(); operands.deinit(); return __cleanup_result_45_0; }
- var values=ScratchIdBuffer {};  values.append([head]); var stack=ScratchOperatorBuffer {}; 
+ var values=ScratchIdBuffer {};  values.append([head]); var stack=ScratchOperatorBuffer {};
  for op,index in operators.items {
   while stack.len!=0 {
    let top=stack.items[stack.len-1]; if top.precedence<op.precedence { break; }
    if top.precedence==op.precedence { if top.association!=op.association||op.association==2 { let __cleanup_result_46_0: Id = infix_chain(p,head,operators.items,operands.items,start); stack.deinit(); values.deinit(); operators.deinit(); operands.deinit(); return __cleanup_result_46_0; } if op.association==1 { break; } }
-   stack.resize(stack.len-1); reduce(p,values,top); if p.failure!=Error.none { let __cleanup_result_47_0: Id = 0; stack.deinit(); values.deinit(); operators.deinit(); operands.deinit(); return __cleanup_result_47_0; }
+   stack.resize(stack.len-1); reduce(p,values,top); if p.failure!=blot_error::Error.none { let __cleanup_result_47_0: Id = 0; stack.deinit(); values.deinit(); operators.deinit(); operands.deinit(); return __cleanup_result_47_0; }
   }
   stack.push(op); values.push(operands.items[index]);
  }
- while stack.len!=0 { let op=stack.items[stack.len-1]; stack.resize(stack.len-1); reduce(p,values,op); if p.failure!=Error.none { let __cleanup_result_48_0: Id = 0; stack.deinit(); values.deinit(); operators.deinit(); operands.deinit(); return __cleanup_result_48_0; } }
+ while stack.len!=0 { let op=stack.items[stack.len-1]; stack.resize(stack.len-1); reduce(p,values,op); if p.failure!=blot_error::Error.none { let __cleanup_result_48_0: Id = 0; stack.deinit(); values.deinit(); operators.deinit(); operands.deinit(); return __cleanup_result_48_0; } }
  let __cleanup_result_49_0: Id = values.items[0]; stack.deinit(); values.deinit(); operators.deinit(); operands.deinit(); return __cleanup_result_49_0;
  stack.deinit(); values.deinit(); operators.deinit(); operands.deinit(); }
 fn infix_chain(p: Parser&,head: Id,operators: const Operator[:],operands: const Id[:],start: u32) -> Id {
- var tails=ScratchIdBuffer {}; 
+ var tails=ScratchIdBuffer {};
  for op,index in operators {
   var flags=(op.association<<2)|(op.precedence<<4); if op.named { flags|=1; } if op.known { flags|=2; }
-  let rhs=operands[index]; let tail=add(p,a_operator_tail,op.symbol,rhs,flags,op.span.start); if p.failure!=Error.none { let __cleanup_result_50_0: Id = 0; tails.deinit(); return __cleanup_result_50_0; }
+  let rhs=operands[index]; let tail=add(p,a_operator_tail,op.symbol,rhs,flags,op.span.start); if p.failure!=blot_error::Error.none { let __cleanup_result_50_0: Id = 0; tails.deinit(); return __cleanup_result_50_0; }
   p.tree.spans.items[tail].end=p.tree.span(rhs).end; p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:tail,span:op.span}); tails.push(tail);
  }
  let range=list(p,tails.items); let __cleanup_result_51_0: Id = add(p,a_infix_chain,head,range.start,range.len,start); tails.deinit(); return __cleanup_result_51_0;
  tails.deinit(); }
 fn reduce(p: Parser&,values: ScratchIdBuffer&,op: Operator) {
- if p.failure!=Error.none { return; }
+ if p.failure!=blot_error::Error.none { return; }
  let rhs=values.items[values.len-1]; let lhs=values.items[values.len-2]; values.resize(values.len-2); var id: Id=0;
- if op.application { let argument=add(p,a_group,rhs,0,0,p.tree.span(rhs).start); if p.failure!=Error.none { return; } p.tree.spans.items[argument].end=p.tree.span(rhs).end; id=add(p,a_apply,lhs,argument,0,p.tree.span(lhs).start); }
+ if op.application { let argument=add(p,a_group,rhs,0,0,p.tree.span(rhs).start); if p.failure!=blot_error::Error.none { return; } p.tree.spans.items[argument].end=p.tree.span(rhs).end; id=add(p,a_apply,lhs,argument,0,p.tree.span(lhs).start); }
  else { id=add(p,a_binary,op.symbol,lhs,rhs,p.tree.span(lhs).start); }
- if p.failure!=Error.none { return; } p.tree.spans.items[id].end=p.tree.span(rhs).end;
+ if p.failure!=blot_error::Error.none { return; } p.tree.spans.items[id].end=p.tree.span(rhs).end;
  if !op.application { p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:id,span:op.span}); } values.push(id);
 }
 fn prefix(p: Parser&) -> Id {
- if p.failure!=Error.none { return 0; } let t=current(p);
+ if p.failure!=blot_error::Error.none { return 0; } let t=current(p);
  if t.tag==t_caret||(t.tag==t_symbol&&text(p,t)=="&") {
-  advance(p); let operand=postfix(p); if p.failure!=Error.none { return 0; } let node=p.tree.node(operand);
+  advance(p); let operand=postfix(p); if p.failure!=blot_error::Error.none { return 0; } let node=p.tree.node(operand);
   if node.tag==a_index_access { var intrinsic: const u8[:]="@storage.at"; if t.tag==t_caret { intrinsic="@storage.link"; } return collection_intrinsic(p,intrinsic,[node.a,node.b],t.start); }
   if t.tag==t_caret { return fail(p,c_expected_expression); }
   var head=operand; while p.tree.node(head).tag==a_apply { head=p.tree.node(head).a; }
@@ -646,7 +646,7 @@ fn prefix(p: Parser&) -> Id {
   if node.tag!=a_name&&node.tag!=a_field_access { return fail(p,c_expected_expression); }
   return collection_intrinsic(p,"@storage.ref",[operand],t.start);
  }
- if t.tag==t_star&&peek(p,1)==t_l_paren { advance(p); let grouped=atom(p); if p.failure!=Error.none { return 0; } let call=p.tree.node(grouped); if call.tag!=a_group||p.tree.node(call.a).tag!=a_apply { return fail(p,c_task_spark_call); } return spark_call(p,call.a,t.start); }
+ if t.tag==t_star&&peek(p,1)==t_l_paren { advance(p); let grouped=atom(p); if p.failure!=blot_error::Error.none { return 0; } let call=p.tree.node(grouped); if call.tag!=a_group||p.tree.node(call.a).tag!=a_apply { return fail(p,c_task_spark_call); } return spark_call(p,call.a,t.start); }
  if t.tag==t_symbol||t.tag==t_star||t.tag==t_caret { advance(p); let op=intern(p,text(p,t)); let arg=application(p,true); return add(p,a_unary,op,arg,0,t.start); }
  return application(p,true);
 }
@@ -662,7 +662,7 @@ fn spark_call(p: Parser&,call: Id,start: u32) -> Id {
  statements.deinit(); operands.deinit(); }
 fn application(p: Parser&,allow_witness: bool) -> Id {
  let start=current(p).start; var value=postfix(p);
- while p.failure==Error.none {
+ while p.failure==blot_error::Error.none {
   if !atom_tag(current(p).tag)||(!allow_witness&&at(p,t_colon)) { break; }
   if at(p,t_colon)&&peek(p,1)==t_newline { break; }
   let argument=postfix(p); value=add(p,a_apply,value,argument,0,start);
@@ -671,8 +671,8 @@ fn application(p: Parser&,allow_witness: bool) -> Id {
 }
 fn postfix(p: Parser&) -> Id {
  let start=current(p).start; var value=atom(p);
- while p.failure==Error.none {
-  if at(p,t_dot) { let dot=advance(p); let point=current(p).start; let member=identifier(p); value=add(p,a_field_access,value,member,0,start); if p.failure!=Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {dot.start,dot.end},member:member,member_point:point}); }
+ while p.failure==blot_error::Error.none {
+  if at(p,t_dot) { let dot=advance(p); let point=current(p).start; let member=identifier(p); value=add(p,a_field_access,value,member,0,start); if p.failure!=blot_error::Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {dot.start,dot.end},member:member,member_point:point}); }
   else if at(p,t_l_paren)&&current(p).start==p.tree.span(value).end { let argument=atom(p); value=add(p,a_apply,value,argument,0,start); }
   else if at(p,t_l_bracket)&&current(p).start==p.tree.span(value).end {
    advance(p); let index=expression(p);
@@ -695,16 +695,16 @@ fn atom(p: Parser&) -> Id {
   }
   if end>=p.tokens.len||end==p.index { let __cleanup_result_35_0: Id = fail(p,c_expected_expression); { p.depth--; } return __cleanup_result_35_0; }
   let previous=p.expression_end; p.expression_end=end; if previous<end { p.expression_end=previous; }
-  let receiver=expression(p); p.expression_end=previous; if p.failure!=Error.none { let __cleanup_result_36_0: Id = 0; { p.depth--; } return __cleanup_result_36_0; }
+  let receiver=expression(p); p.expression_end=previous; if p.failure!=blot_error::Error.none { let __cleanup_result_36_0: Id = 0; { p.depth--; } return __cleanup_result_36_0; }
   if p.index!=end { let __cleanup_result_37_0: Id = fail(p,c_expected_token); { p.depth--; } return __cleanup_result_37_0; } expect(p,t_pipe); let __cleanup_result_38_0: Id = collection_intrinsic(p,"@task.receive",[receiver],start); { p.depth--; } return __cleanup_result_38_0;
  }
  if t.tag==t_kw_true||t.tag==t_kw_false { advance(p); var value: u32=0; if t.tag==t_kw_true { value=1; } let __cleanup_result_39_0: Id = add(p,a_boolean,value,0,0,start); { p.depth--; } return __cleanup_result_39_0; }
  if t.tag==t_integer { advance(p); let __cleanup_result_40_0: Id = integer_literal(p,t,a_integer); { p.depth--; } return __cleanup_result_40_0; }
  if t.tag==t_float {
   advance(p); let bits,err=blot_parse_lexer::float_bits(text(p,t));
-  if err==Error.float_range { let __cleanup_result_41_0: Id = numeric_failure(p,t,blot_parse_ast::numericcode_float_range); { p.depth--; } return __cleanup_result_41_0; }
-  if err==Error.invalid_float { let __cleanup_result_42_0: Id = numeric_failure(p,t,blot_parse_ast::numericcode_float_literal); { p.depth--; } return __cleanup_result_42_0; }
-  if err!=Error.none { p.failure=err; let __cleanup_result_43_0: Id = 0; { p.depth--; } return __cleanup_result_43_0; } let __cleanup_result_44_0: Id = add(p,a_float,bits,0,0,start); { p.depth--; } return __cleanup_result_44_0;
+  if err==blot_error::Error.float_range { let __cleanup_result_41_0: Id = numeric_failure(p,t,blot_parse_ast::numericcode_float_range); { p.depth--; } return __cleanup_result_41_0; }
+  if err==blot_error::Error.invalid_float { let __cleanup_result_42_0: Id = numeric_failure(p,t,blot_parse_ast::numericcode_float_literal); { p.depth--; } return __cleanup_result_42_0; }
+  if err!=blot_error::Error.none { p.failure=err; let __cleanup_result_43_0: Id = 0; { p.depth--; } return __cleanup_result_43_0; } let __cleanup_result_44_0: Id = add(p,a_float,bits,0,0,start); { p.depth--; } return __cleanup_result_44_0;
  }
  if t.tag==t_string { let __cleanup_result_45_0: Id = add(p,a_string,string_symbol(p),0,0,start); { p.depth--; } return __cleanup_result_45_0; }
  if t.tag==t_intrinsic {
@@ -713,7 +713,7 @@ fn atom(p: Parser&) -> Id {
   let __cleanup_result_46_0: Id = add(p,a_intrinsic,intern(p,text(p,t)),0,0,start); { p.depth--; } return __cleanup_result_46_0;
  }
  if t.tag==t_identifier||t.tag==t_type_identifier {
-  let token_start=p.index; let name=qualified(p); let id=add(p,a_name,name,0,0,start); if p.failure!=Error.none { let __cleanup_result_47_0: Id = 0; { p.depth--; } return __cleanup_result_47_0; }
+  let token_start=p.index; let name=qualified(p); let id=add(p,a_name,name,0,0,start); if p.failure!=blot_error::Error.none { let __cleanup_result_47_0: Id = 0; { p.depth--; } return __cleanup_result_47_0; }
   for index in token_start..p.index { let item=p.tokens[index]; if item.tag==t_dot { let member,found=p.pool.lookup(text(p,p.tokens[index+1])); p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:id,span:Span {item.start,item.end},member:member,member_point:p.tokens[index+1].start}); } } let __cleanup_result_48_0: Id = id; { p.depth--; } return __cleanup_result_48_0;
  }
  if t.tag==t_selector { advance(p); let __cleanup_result_49_0: Id = add(p,a_selector,qualified(p),0,0,start); { p.depth--; } return __cleanup_result_49_0; }
@@ -728,7 +728,7 @@ fn atom(p: Parser&) -> Id {
  if t.tag==t_l_brace { let __cleanup_result_57_0: Id = record(p,0,start); { p.depth--; } return __cleanup_result_57_0; } if t.tag==t_l_bracket { let __cleanup_result_58_0: Id = collection(p,true,start); { p.depth--; } return __cleanup_result_58_0; }
  if t.tag==t_l_paren {
   advance(p); var values=ScratchIdBuffer {};  var tuple=false;
-  while p.failure==Error.none&&!at(p,t_r_paren) { values.push(expression(p)); if !eat(p,t_comma) { break; } tuple=true; }
+  while p.failure==blot_error::Error.none&&!at(p,t_r_paren) { values.push(expression(p)); if !eat(p,t_comma) { break; } tuple=true; }
   expect(p,t_r_paren); if values.len==0 { let __cleanup_result_59_0: Id = add(p,a_unit,0,0,0,start); { p.depth--; } let __cleanup_result_53_0: Id = __cleanup_result_59_0; values.deinit(); return __cleanup_result_53_0; } if !tuple&&values.len==1 { let __cleanup_result_60_0: Id = add(p,a_group,values.items[0],0,0,start); { p.depth--; } let __cleanup_result_54_0: Id = __cleanup_result_60_0; values.deinit(); return __cleanup_result_54_0; } let __cleanup_result_61_0: Id = list_node(p,a_product,values.items,start); { p.depth--; } let __cleanup_result_55_0: Id = __cleanup_result_61_0; values.deinit(); return __cleanup_result_55_0;
   values.deinit(); }
  if t.tag==t_private_from||t.tag==t_private_where { let __cleanup_result_62_0: Id = fail(p,c_private_marker); { p.depth--; } return __cleanup_result_62_0; } let __cleanup_result_63_0: Id = fail(p,c_expected_expression); { p.depth--; } return __cleanup_result_63_0;
@@ -760,22 +760,22 @@ fn collection_loop(p: Parser&,pat: Id,value: Id,end: Id,body: Id,explicit: bool,
   let step_ref=add(p,a_name,step,0,0,start); let unpack=add(p,a_let_stmt,some,step_ref,extra(p,[0,0,0,stop,0]),start);
   let rest_ref=add(p,a_name,rest,0,0,start); let update=add(p,a_rebind_stmt,cursor_ref,rest_ref,0,start);
   let item_ref=add(p,a_name,item,0,0,start); let bind=add(p,a_let_stmt,pat,item_ref,extra(p,[0,0,0,0,0]),start);
-  if p.failure!=Error.none { return 0; } var statements=ScratchIdBuffer {};  statements.append([next_step,unpack,update,bind]); for child in p.tree.children(body) { statements.push(child); }
+  if p.failure!=blot_error::Error.none { return 0; } var statements=ScratchIdBuffer {};  statements.append([next_step,unpack,update,bind]); for child in p.tree.children(body) { statements.push(child); }
   let iteration_body=list_node(p,a_block,statements.items,start); let iteration=add(p,a_forever_stmt,iteration_body,0,0,start); expansion=list_node(p,a_block,[initialize,iteration],start);
   statements.deinit(); }
  var explicit_flag: u32=0; if explicit { explicit_flag=1; } return add(p,a_for_stmt,pat,value,extra(p,[end,body,explicit_flag,expansion]),start);
 }
 fn collection(p: Parser&,is_list: bool,start: u32) -> Id {
  expect(p,t_l_bracket); var values=ScratchIdBuffer {};  var spread: i64=-1;
- while p.failure==Error.none&&!at(p,t_r_bracket) {
+ while p.failure==blot_error::Error.none&&!at(p,t_r_bracket) {
   if eat(p,t_ellipsis) { if spread>=0 { let __cleanup_result_56_0: Id = fail(p,c_unexpected_token); values.deinit(); return __cleanup_result_56_0; } spread=values.len; }
   values.push(collection_element(p));
   if eat(p,t_pipe) { if spread>=0 { let __cleanup_result_57_0: Id = fail(p,c_unexpected_token); values.deinit(); return __cleanup_result_57_0; } if values.len==1&&at(p,t_identifier)&&peek(p,1)==t_left_arrow { let __cleanup_result_58_0: Id = comprehension(p,is_list,values.items[0],start); values.deinit(); return __cleanup_result_58_0; } spread=values.len; values.push(expression(p)); break; }
   if !eat(p,t_comma) { break; }
  }
- expect(p,t_r_bracket); if p.failure!=Error.none { let __cleanup_result_59_0: Id = 0; values.deinit(); return __cleanup_result_59_0; }
+ expect(p,t_r_bracket); if p.failure!=blot_error::Error.none { let __cleanup_result_59_0: Id = 0; values.deinit(); return __cleanup_result_59_0; }
  if spread<0 { let __cleanup_result_60_0: Id = collection_literal(p,is_list,values.items,start); values.deinit(); return __cleanup_result_60_0; }
- var statements=ScratchIdBuffer {};  var refs=ScratchIdBuffer {}; 
+ var statements=ScratchIdBuffer {};  var refs=ScratchIdBuffer {};
  for value in values.items { let name=collection_name(p,start); statements.push(add(p,a_iterator_bind,name,value,0,start)); refs.push(add(p,a_name,name,0,0,start)); }
  var result=refs.items[spread]; var index=spread;
  var prepend: const u8[:]="@array.prepend"; var append: const u8[:]="@array.append"; var identity: const u8[:]="@array.identity";
@@ -785,8 +785,8 @@ fn collection(p: Parser&,is_list: bool,start: u32) -> Id {
  if values.len==1 { result=collection_intrinsic(p,identity,[result],start); } statements.push(add(p,a_return_stmt,result,0,0,start)); let __cleanup_result_61_0: Id = list_node(p,a_block,statements.items,start); refs.deinit(); statements.deinit(); values.deinit(); return __cleanup_result_61_0;
  refs.deinit(); statements.deinit(); values.deinit(); }
 fn comprehension(p: Parser&,is_list: bool,result: Id,start: u32) -> Id {
- var qualifiers=ScratchQualifierBuffer {}; 
- while p.failure==Error.none {
+ var qualifiers=ScratchQualifierBuffer {};
+ while p.failure==blot_error::Error.none {
   let point=current(p).start; var kind: u32=1; var name: Symbol=0;
   if eat(p,t_kw_let) { kind=2; name=lower_identifier(p); expect(p,t_equal); }
   else if at(p,t_identifier)&&peek(p,1)==t_left_arrow { kind=0; name=lower_identifier(p); expect(p,t_left_arrow); }
@@ -796,7 +796,7 @@ fn comprehension(p: Parser&,is_list: bool,result: Id,start: u32) -> Id {
  expect(p,t_r_bracket); let accumulator=collection_name(p,start); let empty=collection_literal(p,true,[],start); let initial=collection_binding(p,accumulator,empty,start);
  let target=add(p,a_name,accumulator,0,0,start); let receiver=add(p,a_name,accumulator,0,0,start); let appended=collection_intrinsic(p,"@list.append",[receiver,result],start);
  let rebind=add(p,a_rebind_stmt,target,appended,0,start); var body=list_node(p,a_block,[rebind],start); var index=qualifiers.len;
- while index!=0&&p.failure==Error.none {
+ while index!=0&&p.failure==blot_error::Error.none {
   index--; let q=qualifiers.items[index]; var statement: Id=0;
   if q.kind==0 { let pat=add(p,a_pattern_name,q.name,0,0,q.start); statement=collection_loop(p,pat,q.value,0,body,false,q.start); }
   else if q.kind==1 { statement=add(p,a_if_stmt,q.value,body,0,q.start); }
@@ -804,22 +804,22 @@ fn comprehension(p: Parser&,is_list: bool,result: Id,start: u32) -> Id {
   body=list_node(p,a_block,[statement],q.start);
  }
  var final=add(p,a_name,accumulator,0,0,start); if !is_list { final=collection_intrinsic(p,"@array.from_list",[final],start); }
- let returned=add(p,a_return_stmt,final,0,0,start); if p.failure!=Error.none { let __cleanup_result_64_0: Id = 0; qualifiers.deinit(); return __cleanup_result_64_0; }
+ let returned=add(p,a_return_stmt,final,0,0,start); if p.failure!=blot_error::Error.none { let __cleanup_result_64_0: Id = 0; qualifiers.deinit(); return __cleanup_result_64_0; }
  var statements=ScratchIdBuffer {};  statements.append([initial]); for child in p.tree.children(body) { statements.push(child); } statements.push(returned); let __cleanup_result_65_0: Id = list_node(p,a_block,statements.items,start); statements.deinit(); qualifiers.deinit(); return __cleanup_result_65_0;
  statements.deinit(); qualifiers.deinit(); }
 fn record(p: Parser&,name: Symbol,start: u32) -> Id {
- expect(p,t_l_brace); var fields=ScratchIdBuffer {}; 
- while p.failure==Error.none&&!at(p,t_r_brace) { let point=current(p).start; let key=lower_identifier(p); var value: Id=0; if eat(p,t_colon) { value=expression(p); } fields.push(add(p,a_field,key,value,0,point)); if !eat(p,t_comma) { break; } }
+ expect(p,t_l_brace); var fields=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none&&!at(p,t_r_brace) { let point=current(p).start; let key=lower_identifier(p); var value: Id=0; if eat(p,t_colon) { value=expression(p); } fields.push(add(p,a_field,key,value,0,point)); if !eat(p,t_comma) { break; } }
  expect(p,t_r_brace); let range=list(p,fields.items); let __cleanup_result_66_0: Id = add(p,a_record,name,range.start,range.len,start); fields.deinit(); return __cleanup_result_66_0;
  fields.deinit(); }
 fn suite(p: Parser&) -> Id {
- if !enter(p) { return 0; } 
+ if !enter(p) { return 0; }
  let start=expect(p,t_newline).start; expect(p,t_indent); var statements=ScratchIdBuffer {};  newlines(p);
- while p.failure==Error.none&&!at(p,t_dedent)&&!at(p,t_eof) { statements.push(statement(p)); if p.failure!=Error.none { let __cleanup_result_64_0: Id = 0; { p.depth--; } let __cleanup_result_67_0: Id = __cleanup_result_64_0; statements.deinit(); return __cleanup_result_67_0; } if !at(p,t_newline)&&!at(p,t_dedent) { let __cleanup_result_65_0: Id = fail(p,c_expected_token); { p.depth--; } let __cleanup_result_68_0: Id = __cleanup_result_65_0; statements.deinit(); return __cleanup_result_68_0; } newlines(p); }
+ while p.failure==blot_error::Error.none&&!at(p,t_dedent)&&!at(p,t_eof) { statements.push(statement(p)); if p.failure!=blot_error::Error.none { let __cleanup_result_64_0: Id = 0; { p.depth--; } let __cleanup_result_67_0: Id = __cleanup_result_64_0; statements.deinit(); return __cleanup_result_67_0; } if !at(p,t_newline)&&!at(p,t_dedent) { let __cleanup_result_65_0: Id = fail(p,c_expected_token); { p.depth--; } let __cleanup_result_68_0: Id = __cleanup_result_65_0; statements.deinit(); return __cleanup_result_68_0; } newlines(p); }
  expect(p,t_dedent); let __cleanup_result_66_0: Id = list_node(p,a_block,statements.items,start); { p.depth--; } let __cleanup_result_69_0: Id = __cleanup_result_66_0; statements.deinit(); return __cleanup_result_69_0;
  { p.depth--; }  statements.deinit(); }
 fn statement(p: Parser&) -> Id {
- if p.failure!=Error.none { return 0; } let start=current(p).start;
+ if p.failure!=blot_error::Error.none { return 0; } let start=current(p).start;
  if eat(p,t_kw_let) {
   let pat=pattern(p); var annotation: Id=0; if eat(p,t_colon) { annotation=type_expression(p); } let constraints=where_clause(p); expect(p,t_equal); let value=expression(p); var fallback: Id=0;
   if eat(p,t_kw_else) { expect(p,t_colon); fallback=suite(p); } return add(p,a_let_stmt,pat,value,extra(p,[annotation,constraints.predicates.start,constraints.predicates.len,fallback,constraints.node]),start);
@@ -840,8 +840,8 @@ fn statement(p: Parser&) -> Id {
  if (at(p,t_type_identifier)||at(p,t_kw_true)||at(p,t_kw_false))&&has_rebinding(p) { return identifier_syntax(p); }
  if at(p,t_identifier)&&has_rebinding(p) {
   let name=lower_identifier(p); var target=add(p,a_name,name,0,0,start);
-  while p.failure==Error.none&&(at(p,t_dot)||at(p,t_l_bracket)) {
-   if at(p,t_dot) { let dot=advance(p); let member=identifier(p); target=add(p,a_field_access,target,member,0,start); if p.failure!=Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:target,span:Span {dot.start,dot.end},member:member}); }
+  while p.failure==blot_error::Error.none&&(at(p,t_dot)||at(p,t_l_bracket)) {
+   if at(p,t_dot) { let dot=advance(p); let member=identifier(p); target=add(p,a_field_access,target,member,0,start); if p.failure!=blot_error::Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:target,span:Span {dot.start,dot.end},member:member}); }
    else { advance(p); let index=expression(p); expect(p,t_r_bracket); target=add(p,a_index_access,target,index,0,start); }
   }
   expect(p,t_colon_equal); let value=expression(p); return add(p,a_rebind_stmt,target,value,0,start);
@@ -882,9 +882,9 @@ fn for_statement(p: Parser&) -> Id {
  let first=expression(p); expect(p,t_dot_dot); let end=expression(p); expect(p,t_colon); let body=suite(p); return add(p,a_range_stmt,first,end,body,start);
 }
 fn constructor_fields(p: Parser&) -> Id {
- if !enter(p) { return 0; } 
- let start=expect(p,t_l_brace).start; var fields=ScratchIdBuffer {}; 
- while p.failure==Error.none&&!at(p,t_r_brace) { let point=current(p).start; let name=lower_identifier(p); var value: Id=0; if eat(p,t_colon) { value=pattern(p); } fields.push(add(p,a_pattern_field,name,value,0,point)); if !eat(p,t_comma) { break; } }
+ if !enter(p) { return 0; }
+ let start=expect(p,t_l_brace).start; var fields=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none&&!at(p,t_r_brace) { let point=current(p).start; let name=lower_identifier(p); var value: Id=0; if eat(p,t_colon) { value=pattern(p); } fields.push(add(p,a_pattern_field,name,value,0,point)); if !eat(p,t_comma) { break; } }
  expect(p,t_r_brace); let __cleanup_result_67_0: Id = list_node(p,a_pattern_record,fields.items,start); { p.depth--; } let __cleanup_result_70_0: Id = __cleanup_result_67_0; fields.deinit(); return __cleanup_result_70_0;
  { p.depth--; }  fields.deinit(); }
 fn pattern(p: Parser&) -> Id {
@@ -895,26 +895,26 @@ fn pattern(p: Parser&) -> Id {
  if eat(p,t_integer) { let __cleanup_result_72_0: Id = integer_literal(p,t,a_pattern_integer); { p.depth--; } return __cleanup_result_72_0; }
  if eat(p,t_hash) { let name=constructor_pattern_name(p); var payload: Id=0; if at(p,t_l_brace) { payload=constructor_fields(p); } else if pattern_tag(current(p).tag) { payload=pattern(p); } let __cleanup_result_73_0: Id = add(p,a_pattern_constructor,name,payload,0,start); { p.depth--; } return __cleanup_result_73_0; }
  if at(p,t_l_brace) { let __cleanup_result_74_0: Id = constructor_fields(p); { p.depth--; } return __cleanup_result_74_0; }
- if eat(p,t_l_paren) { var values=ScratchIdBuffer {};  var tuple=false; while p.failure==Error.none&&!at(p,t_r_paren) { values.push(pattern(p)); if !eat(p,t_comma) { break; } tuple=true; } expect(p,t_r_paren); if !tuple&&values.len==1 { let __cleanup_result_75_0: Id = values.items[0]; { p.depth--; } let __cleanup_result_71_0: Id = __cleanup_result_75_0; values.deinit(); return __cleanup_result_71_0; } let __cleanup_result_76_0: Id = list_node(p,a_pattern_product,values.items,start); { p.depth--; } let __cleanup_result_72_0: Id = __cleanup_result_76_0; values.deinit(); return __cleanup_result_72_0;  values.deinit(); }
+ if eat(p,t_l_paren) { var values=ScratchIdBuffer {};  var tuple=false; while p.failure==blot_error::Error.none&&!at(p,t_r_paren) { values.push(pattern(p)); if !eat(p,t_comma) { break; } tuple=true; } expect(p,t_r_paren); if !tuple&&values.len==1 { let __cleanup_result_75_0: Id = values.items[0]; { p.depth--; } let __cleanup_result_71_0: Id = __cleanup_result_75_0; values.deinit(); return __cleanup_result_71_0; } let __cleanup_result_76_0: Id = list_node(p,a_pattern_product,values.items,start); { p.depth--; } let __cleanup_result_72_0: Id = __cleanup_result_76_0; values.deinit(); return __cleanup_result_72_0;  values.deinit(); }
  let __cleanup_result_77_0: Id = fail(p,c_expected_pattern); { p.depth--; } return __cleanup_result_77_0;
  { p.depth--; } }
-fn pattern_row(p: Parser&) -> Id { let start=current(p).start; var values=ScratchIdBuffer {};  values.push(pattern(p)); while p.failure==Error.none&&eat(p,t_comma) { values.push(pattern(p)); } let __cleanup_result_73_0: Id = list_node(p,a_pattern_row,values.items,start); values.deinit(); return __cleanup_result_73_0;  values.deinit(); }
+fn pattern_row(p: Parser&) -> Id { let start=current(p).start; var values=ScratchIdBuffer {};  values.push(pattern(p)); while p.failure==blot_error::Error.none&&eat(p,t_comma) { values.push(pattern(p)); } let __cleanup_result_73_0: Id = list_node(p,a_pattern_row,values.items,start); values.deinit(); return __cleanup_result_73_0;  values.deinit(); }
 fn case_expression(p: Parser&) -> Id {
- let start=expect(p,t_kw_case).start; let request_name=at(p,t_identifier)&&peek(p,1)==t_kw_of; var values=ScratchIdBuffer {}; 
- values.push(expression(p)); while p.failure==Error.none&&eat(p,t_comma) { values.push(expression(p)); }
+ let start=expect(p,t_kw_case).start; let request_name=at(p,t_identifier)&&peek(p,1)==t_kw_of; var values=ScratchIdBuffer {};
+ values.push(expression(p)); while p.failure==blot_error::Error.none&&eat(p,t_comma) { values.push(expression(p)); }
  expect(p,t_kw_of); expect(p,t_newline); expect(p,t_indent); newlines(p); var arms=ScratchIdBuffer {};  let requests=at(p,t_kw_effect)||at(p,t_kw_complete);
  if requests&&!request_name { let __cleanup_result_74_0: Id = identifier_syntax(p); arms.deinit(); values.deinit(); return __cleanup_result_74_0; }
- while p.failure==Error.none&&!at(p,t_dedent)&&!at(p,t_eof) {
+ while p.failure==blot_error::Error.none&&!at(p,t_dedent)&&!at(p,t_eof) {
   let point=current(p).start;
   if requests {
    let complete=eat(p,t_kw_complete); var operation: Id=0;
    if !complete { expect(p,t_kw_effect); let operation_token=current(p).tag; if operation_token!=t_identifier&&operation_token!=t_type_identifier&&operation_token!=t_l_paren { let __cleanup_result_75_0: Id = identifier_syntax(p); arms.deinit(); values.deinit(); return __cleanup_result_75_0; } let operation_start=current(p).start; if operation_token==t_l_paren { operation=atom(p); } else { operation=add(p,a_name,qualified(p),0,0,operation_start); } }
    let pat=pattern(p); expect(p,t_fat_arrow); let body=suite(p); arms.push(add(p,a_request_arm,operation,pat,body,point));
   } else {
-   var rows=ScratchIdBuffer {};  rows.push(pattern_row(p)); while p.failure==Error.none&&eat(p,t_pipe) { rows.push(pattern_row(p)); } var guard: Id=0; if eat(p,t_kw_if) { guard=expression(p); }
-   expect(p,t_fat_arrow); let body=expression(p); let range=list(p,rows.items); arms.push(add(p,a_case_arm,range.start,range.len,extra(p,[guard,body]),point));
+   var rows=ScratchIdBuffer {};  rows.push(pattern_row(p)); while p.failure==blot_error::Error.none&&eat(p,t_pipe) { rows.push(pattern_row(p)); } var guard_: Id=0; if eat(p,t_kw_if) { guard_=expression(p); }
+   expect(p,t_fat_arrow); let body=expression(p); let range=list(p,rows.items); arms.push(add(p,a_case_arm,range.start,range.len,extra(p,[guard_,body]),point));
    rows.deinit(); }
-  if p.failure!=Error.none { let __cleanup_result_76_0: Id = 0; arms.deinit(); values.deinit(); return __cleanup_result_76_0; } if !at(p,t_newline)&&!at(p,t_dedent) { let __cleanup_result_77_0: Id = fail(p,c_expected_token); arms.deinit(); values.deinit(); return __cleanup_result_77_0; } newlines(p);
+  if p.failure!=blot_error::Error.none { let __cleanup_result_76_0: Id = 0; arms.deinit(); values.deinit(); return __cleanup_result_76_0; } if !at(p,t_newline)&&!at(p,t_dedent) { let __cleanup_result_77_0: Id = fail(p,c_expected_token); arms.deinit(); values.deinit(); return __cleanup_result_77_0; } newlines(p);
  }
  expect(p,t_dedent); let inputs=list(p,values.items); let cases=list(p,arms.items); var tag=a_case_expr; if requests { tag=a_request_case; } let __cleanup_result_78_0: Id = add(p,tag,extra(p,[inputs.start,inputs.len]),cases.start,cases.len,start); arms.deinit(); values.deinit(); return __cleanup_result_78_0;
  arms.deinit(); values.deinit(); }
@@ -929,7 +929,7 @@ fn parse_with_fixities(source: const u8[:],tokens: const Token[:],pool: blot_par
  while !at(p,t_eof) {
   newlines(p); if at(p,t_eof) { break; } let before=p.index; let first_node=tree.nodes.len as Id;
   let root=declaration(p,declarations_seen,body_declarations_seen);
-  if p.failure==Error.syntax { recover(p,before); continue; } if p.failure!=Error.none { return p.failure; }
+  if p.failure==blot_error::Error.syntax { recover(p,before); continue; } if p.failure!=blot_error::Error.none { return p.failure; }
   tree.roots.push(root); tree.declaration_nodes.push(blot_parse_ast::DeclarationNodes {root,first_node,tree.nodes.len as Id});
   let tag=tree.node(root).tag; if tag!=a_import_decl&&tag!=a_export_decl { declarations_seen=true; } if tag!=a_import_decl&&tag!=a_export_decl&&tag!=a_fixity_decl { body_declarations_seen=true; }
   if !at(p,t_newline)&&!at(p,t_eof) { report(p,c_unexpected_token); recover(p,before); } newlines(p);
@@ -938,48 +938,48 @@ fn parse_with_fixities(source: const u8[:],tokens: const Token[:],pool: blot_par
 }
 fn parse(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&) -> Error { return parse_with_fixities(source,tokens,pool,tree,[]); }
 
-struct ScratchIdBuffer { storage: Id[:]=[],items: Id[:]=[],len: i64=0,failure: Error=Error.none }
+struct ScratchIdBuffer { storage: Id[:]=default<Id[:]>(),items: Id[:]=default<Id[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_ScratchIdBuffer: Id[>..]=[];
-fn ensure(self: ScratchIdBuffer&,minimum: i64) -> Error { if self.failure!=Error.none { return self.failure; } let error=blot_support_pooled_buffer::ensure(self,minimum,pool_ScratchIdBuffer); if error!=Error.none { self.failure=error; } return error; }
-fn push(self: ScratchIdBuffer&,value: Id) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,pool_ScratchIdBuffer); self.len=self.items.len; }
-fn append(self: ScratchIdBuffer&,values: const Id[:]) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,pool_ScratchIdBuffer); self.len=self.items.len; }
-fn resize(self: ScratchIdBuffer&,length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: ScratchIdBuffer&,length: i64,value: Id) { if length<=self.len { resize(self,length); return; } let error=ensure(self,length); if error!=Error.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: ScratchIdBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
-fn deinit(self: ScratchIdBuffer&) { blot_support_pooled_buffer::deinit(self,pool_ScratchIdBuffer); self.len=0; self.failure=Error.none; }
-struct ScratchQualifierBuffer { storage: Qualifier[:]=[],items: Qualifier[:]=[],len: i64=0,failure: Error=Error.none }
+fn ensure(self_: ScratchIdBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_ScratchIdBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
+fn push(self_: ScratchIdBuffer&,value: Id) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_ScratchIdBuffer); self_.len=self_.items.len; }
+fn append(self_: ScratchIdBuffer&,values: const Id[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_ScratchIdBuffer); self_.len=self_.items.len; }
+fn resize(self_: ScratchIdBuffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: ScratchIdBuffer&,length: i64,value: Id) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: ScratchIdBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: ScratchIdBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_ScratchIdBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
+struct ScratchQualifierBuffer { storage: Qualifier[:]=default<Qualifier[:]>(),items: Qualifier[:]=default<Qualifier[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_ScratchQualifierBuffer: Qualifier[>..]=[];
-fn ensure(self: ScratchQualifierBuffer&,minimum: i64) -> Error { if self.failure!=Error.none { return self.failure; } let error=blot_support_pooled_buffer::ensure(self,minimum,pool_ScratchQualifierBuffer); if error!=Error.none { self.failure=error; } return error; }
-fn push(self: ScratchQualifierBuffer&,value: Qualifier) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,pool_ScratchQualifierBuffer); self.len=self.items.len; }
-fn append(self: ScratchQualifierBuffer&,values: const Qualifier[:]) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,pool_ScratchQualifierBuffer); self.len=self.items.len; }
-fn resize(self: ScratchQualifierBuffer&,length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: ScratchQualifierBuffer&,length: i64,value: Qualifier) { if length<=self.len { resize(self,length); return; } let error=ensure(self,length); if error!=Error.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: ScratchQualifierBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
-fn deinit(self: ScratchQualifierBuffer&) { blot_support_pooled_buffer::deinit(self,pool_ScratchQualifierBuffer); self.len=0; self.failure=Error.none; }
-struct ScratchOperatorBuffer { storage: Operator[:]=[],items: Operator[:]=[],len: i64=0,failure: Error=Error.none }
+fn ensure(self_: ScratchQualifierBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_ScratchQualifierBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
+fn push(self_: ScratchQualifierBuffer&,value: Qualifier) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_ScratchQualifierBuffer); self_.len=self_.items.len; }
+fn append(self_: ScratchQualifierBuffer&,values: const Qualifier[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_ScratchQualifierBuffer); self_.len=self_.items.len; }
+fn resize(self_: ScratchQualifierBuffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: ScratchQualifierBuffer&,length: i64,value: Qualifier) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: ScratchQualifierBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: ScratchQualifierBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_ScratchQualifierBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
+struct ScratchOperatorBuffer { storage: Operator[:]=default<Operator[:]>(),items: Operator[:]=default<Operator[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_ScratchOperatorBuffer: Operator[>..]=[];
-fn ensure(self: ScratchOperatorBuffer&,minimum: i64) -> Error { if self.failure!=Error.none { return self.failure; } let error=blot_support_pooled_buffer::ensure(self,minimum,pool_ScratchOperatorBuffer); if error!=Error.none { self.failure=error; } return error; }
-fn push(self: ScratchOperatorBuffer&,value: Operator) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,pool_ScratchOperatorBuffer); self.len=self.items.len; }
-fn append(self: ScratchOperatorBuffer&,values: const Operator[:]) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,pool_ScratchOperatorBuffer); self.len=self.items.len; }
-fn resize(self: ScratchOperatorBuffer&,length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: ScratchOperatorBuffer&,length: i64,value: Operator) { if length<=self.len { resize(self,length); return; } let error=ensure(self,length); if error!=Error.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: ScratchOperatorBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
-fn deinit(self: ScratchOperatorBuffer&) { blot_support_pooled_buffer::deinit(self,pool_ScratchOperatorBuffer); self.len=0; self.failure=Error.none; }
-struct ScratchLambdaParameterBuffer { storage: LambdaParameter[:]=[],items: LambdaParameter[:]=[],len: i64=0,failure: Error=Error.none }
+fn ensure(self_: ScratchOperatorBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_ScratchOperatorBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
+fn push(self_: ScratchOperatorBuffer&,value: Operator) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_ScratchOperatorBuffer); self_.len=self_.items.len; }
+fn append(self_: ScratchOperatorBuffer&,values: const Operator[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_ScratchOperatorBuffer); self_.len=self_.items.len; }
+fn resize(self_: ScratchOperatorBuffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: ScratchOperatorBuffer&,length: i64,value: Operator) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: ScratchOperatorBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: ScratchOperatorBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_ScratchOperatorBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
+struct ScratchLambdaParameterBuffer { storage: LambdaParameter[:]=default<LambdaParameter[:]>(),items: LambdaParameter[:]=default<LambdaParameter[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_ScratchLambdaParameterBuffer: LambdaParameter[>..]=[];
-fn ensure(self: ScratchLambdaParameterBuffer&,minimum: i64) -> Error { if self.failure!=Error.none { return self.failure; } let error=blot_support_pooled_buffer::ensure(self,minimum,pool_ScratchLambdaParameterBuffer); if error!=Error.none { self.failure=error; } return error; }
-fn push(self: ScratchLambdaParameterBuffer&,value: LambdaParameter) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,pool_ScratchLambdaParameterBuffer); self.len=self.items.len; }
-fn append(self: ScratchLambdaParameterBuffer&,values: const LambdaParameter[:]) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,pool_ScratchLambdaParameterBuffer); self.len=self.items.len; }
-fn resize(self: ScratchLambdaParameterBuffer&,length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: ScratchLambdaParameterBuffer&,length: i64,value: LambdaParameter) { if length<=self.len { resize(self,length); return; } let error=ensure(self,length); if error!=Error.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: ScratchLambdaParameterBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
-fn deinit(self: ScratchLambdaParameterBuffer&) { blot_support_pooled_buffer::deinit(self,pool_ScratchLambdaParameterBuffer); self.len=0; self.failure=Error.none; }
-struct Scratchu8Buffer { storage: u8[:]=[],items: u8[:]=[],len: i64=0,failure: Error=Error.none }
+fn ensure(self_: ScratchLambdaParameterBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_ScratchLambdaParameterBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
+fn push(self_: ScratchLambdaParameterBuffer&,value: LambdaParameter) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_ScratchLambdaParameterBuffer); self_.len=self_.items.len; }
+fn append(self_: ScratchLambdaParameterBuffer&,values: const LambdaParameter[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_ScratchLambdaParameterBuffer); self_.len=self_.items.len; }
+fn resize(self_: ScratchLambdaParameterBuffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: ScratchLambdaParameterBuffer&,length: i64,value: LambdaParameter) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: ScratchLambdaParameterBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: ScratchLambdaParameterBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_ScratchLambdaParameterBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
+struct Scratchu8Buffer { storage: u8[:]=default<u8[:]>(),items: u8[:]=default<u8[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_Scratchu8Buffer: u8[>..]=[];
-fn ensure(self: Scratchu8Buffer&,minimum: i64) -> Error { if self.failure!=Error.none { return self.failure; } let error=blot_support_pooled_buffer::ensure(self,minimum,pool_Scratchu8Buffer); if error!=Error.none { self.failure=error; } return error; }
-fn push(self: Scratchu8Buffer&,value: u8) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,pool_Scratchu8Buffer); self.len=self.items.len; }
-fn append(self: Scratchu8Buffer&,values: const u8[:]) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,pool_Scratchu8Buffer); self.len=self.items.len; }
-fn resize(self: Scratchu8Buffer&,length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: Scratchu8Buffer&,length: i64,value: u8) { if length<=self.len { resize(self,length); return; } let error=ensure(self,length); if error!=Error.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: Scratchu8Buffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
-fn deinit(self: Scratchu8Buffer&) { blot_support_pooled_buffer::deinit(self,pool_Scratchu8Buffer); self.len=0; self.failure=Error.none; }
+fn ensure(self_: Scratchu8Buffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_Scratchu8Buffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
+fn push(self_: Scratchu8Buffer&,value: u8) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Scratchu8Buffer); self_.len=self_.items.len; }
+fn append(self_: Scratchu8Buffer&,values: const u8[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Scratchu8Buffer); self_.len=self_.items.len; }
+fn resize(self_: Scratchu8Buffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: Scratchu8Buffer&,length: i64,value: u8) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: Scratchu8Buffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: Scratchu8Buffer&) { blot_support_pooled_buffer::deinit(self_,pool_Scratchu8Buffer); self_.len=0; self_.failure=blot_error::Error.none; }

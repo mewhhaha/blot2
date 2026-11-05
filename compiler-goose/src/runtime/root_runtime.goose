@@ -26,16 +26,16 @@ fn count(c: Code&, arena: Arena, add: bool) {
 }
 fn emitOne<F>(module: Module&, function: u32, arena: Arena) -> Error { var code = blot_emitter::init(module, function); F(code, arena); return code.failure; }
 fn emit(module: Module&, arena: Arena) -> Error {
-    { let propagated_error = emitOne(module, arena.root_reserve, arena, reserve); if propagated_error != Error.none { return propagated_error; } }
-    var ordinary = blot_emitter::init(module, arena.root_allocate); allocate(ordinary, arena, arena.allocate_typed); { let propagated_error = ordinary.failure; if propagated_error != Error.none { return propagated_error; } }
-    var shaped = blot_emitter::init(module, arena.root_allocate_shaped); allocate(shaped, arena, arena.allocate_shaped); { let propagated_error = shaped.failure; if propagated_error != Error.none { return propagated_error; } }
-    { let propagated_error = emitOne(module, arena.root_pop, arena, pop); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.root_open, arena, open); if propagated_error != Error.none { return propagated_error; } }
-    { let propagated_error = emitOne(module, arena.root_close, arena, close); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.root_enter, arena, enter); if propagated_error != Error.none { return propagated_error; } }
-    { let propagated_error = emitOne(module, arena.root_leave, arena, leave); if propagated_error != Error.none { return propagated_error; } }
-    if module.host_references.present { { let propagated_error = hostCleanup(module, arena); if propagated_error != Error.none { return propagated_error; } } }
-    { let propagated_error = emitOne(module, arena.root_store, arena, store); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.root_public_allocate, arena, publicAllocate); if propagated_error != Error.none { return propagated_error; } }
-    { let propagated_error = emitOne(module, arena.root_public_reset, arena, publicReset); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.root_authority, arena, authority); if propagated_error != Error.none { return propagated_error; } }
-    return Error.none;
+    { let propagated_error = emitOne(module, arena.root_reserve, arena, reserve); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    var ordinary = blot_emitter::init(module, arena.root_allocate); allocate(ordinary, arena, arena.allocate_typed); { let propagated_error = ordinary.failure; if propagated_error != blot_error::Error.none { return propagated_error; } }
+    var shaped = blot_emitter::init(module, arena.root_allocate_shaped); allocate(shaped, arena, arena.allocate_shaped); { let propagated_error = shaped.failure; if propagated_error != blot_error::Error.none { return propagated_error; } }
+    { let propagated_error = emitOne(module, arena.root_pop, arena, pop); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.root_open, arena, open); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    { let propagated_error = emitOne(module, arena.root_close, arena, close); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.root_enter, arena, enter); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    { let propagated_error = emitOne(module, arena.root_leave, arena, leave); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    if module.host_references.present { { let propagated_error = hostCleanup(module, arena); if propagated_error != blot_error::Error.none { return propagated_error; } } }
+    { let propagated_error = emitOne(module, arena.root_store, arena, store); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.root_public_allocate, arena, publicAllocate); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    { let propagated_error = emitOne(module, arena.root_public_reset, arena, publicReset); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.root_authority, arena, authority); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    return blot_error::Error.none;
 }
 fn reserve(c: Code&, arena: Arena) {
     let page = c.temp(); let slot = c.temp();
@@ -149,7 +149,7 @@ fn publicReset(c: Code&, arena: Arena) {
 fn hostCleanup(module: Module&, arena: Arena) -> Error {
     assert(module.host_references.present); let references = module.host_references.value;
     var entry = blot_emitter::init(module, arena.root_enter); entry.globalGet(references.cursor); entry.globalSet(arena.root_host_cursor);
-    entry.globalGet(references.active); entry.globalSet(arena.root_host_active); { let propagated_error = entry.failure; if propagated_error != Error.none { return propagated_error; } }
+    entry.globalGet(references.active); entry.globalSet(arena.root_host_active); { let propagated_error = entry.failure; if propagated_error != blot_error::Error.none { return propagated_error; } }
     var exit = blot_emitter::init(module, arena.root_leave); exit.globalGet(arena.root_host_cursor); exit.call(references.release);
     exit.globalGet(arena.root_host_active); exit.globalSet(references.active); return exit.failure;
 }

@@ -1,7 +1,9 @@
 // Predicate owner records are sorted exact graph handles.
 namespace blot_check_quantifier_goals;
-import std;
+import check.types;
 import support.error;
+
+import std;
 fn get(records: const blot_check_types::QuantifierGoals[:], obligations: const blot_check_types::Obligation[:],
        owner: blot_check_types::Id) -> const blot_check_types::Obligation[:] {
     var low: i64 = 0; var high = records.len;
@@ -44,7 +46,7 @@ fn validateWithBudget(nodes: const blot_check_types::Node[:], records: const blo
         if record.goals.len == 0 || record.goals.len > 4096 || record.goals.start > obligations.len ||
            record.goals.len > obligations.len - record.goals.start { return blot_error::Error.invalid_artifact; }
         if record.goals.start != claimed { return blot_error::Error.invalid_artifact; }
-        if claimed > 0x7fffffffffffffff - record.goals.len { return blot_error::Error.invalid_artifact; }
+        if claimed > 0x7fffffffffffffff - (record.goals.len as i64) { return blot_error::Error.invalid_artifact; }
         claimed += record.goals.len;
         for goal in obligations[record.goals.start..record.goals.start + record.goals.len] {
             if remaining == 0 { return blot_error::Error.invalid_artifact; }

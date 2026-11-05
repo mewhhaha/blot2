@@ -3,8 +3,9 @@
 ## Current frontier
 
 The active experiment ports the compiler to idiomatic Goose in
-[`compiler-goose/`](compiler-goose/README.md). Write the complete production
-source pass before running verification. Source-only checkpoints are unverified;
+[`compiler-goose/`](compiler-goose/README.md). The user now explicitly requests fixing and recompiling the written port.
+Whole-program parsing passes; type/lifetime repairs and full compilation are
+still pending. Source-only checkpoints are unverified;
 follow `compiler-goose/source-correspondence.json` and its port notes for exact
 writing status and runtime gaps. Keep `compiler/` and the default toolchain
 unchanged as the oracle. The remote tag `goose-port-oracle-156f84b` pins source

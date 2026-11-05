@@ -4,8 +4,8 @@ import .runtime_ir;
 import support.option;
 import support.pooled_buffer;
 import support.error;
-struct Active { storage: bool[:] = [],items: bool[:] = [] }
-struct Stack { storage: i64[:] = [],items: i64[:] = [] }
+struct Active { storage: bool[:] = default<bool[:]>(),items: bool[:] = default<bool[:]>() }
+struct Stack { storage: i64[:] = default<i64[:]>(),items: i64[:] = default<i64[:]>() }
 reusable[] var active_runs: bool[>..] = [];
 reusable[] var stack_runs: i64[>..] = [];
 struct Scopes { cursor: i64 = 0,function: blot_support::Option<u32>,active: Active,stack: Stack,reset_pending: bool = true }

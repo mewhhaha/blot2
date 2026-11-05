@@ -47,34 +47,34 @@ struct Runtime {
     set_unchecked: blot_support::Option<u32>,
     snapshot: blot_support::Option<u32>,
 }
-fn functionId(self: Runtime, field: const u8[:]) -> blot_support::Option<u32> {
-    if field == "new" { return blot_support::some(self.new); }
-    if field == "address" { return blot_support::some(self.address); }
-    if field == "copy" { return blot_support::some(self.copy); }
-    if field == "push" { return blot_support::some(self.push); }
-    if field == "set" { return blot_support::some(self.set); }
-    if field == "from_array" { return blot_support::some(self.from_array); }
-    if field == "to_array" { return blot_support::some(self.to_array); }
-    if field == "chunk_new" { return blot_support::some(self.chunk_new); }
-    if field == "edit" { return blot_support::some(self.edit); }
-    if field == "branch" { return blot_support::some(self.branch); }
-    if field == "own" { return blot_support::some(self.own); }
-    if field == "insert" { return blot_support::some(self.insert); }
-    if field == "replace" { return blot_support::some(self.replace); }
-    if field == "refresh" { return blot_support::some(self.refresh); }
-    if field == "rotate_left" { return blot_support::some(self.rotate_left); }
-    if field == "rotate_right" { return blot_support::some(self.rotate_right); }
-    if field == "balance" { return blot_support::some(self.balance); }
-    if field == "concat" { return blot_support::some(self.concat); }
-    if field == "slice" { return blot_support::some(self.slice); }
-    if field == "join" { return blot_support::some(self.join); }
-    if field == "cut" { return blot_support::some(self.cut); }
-    if field == "directory" { return blot_support::some(self.directory); }
-    if field == "leaf_count" { return blot_support::some(self.leaf_count); }
-    if field == "write_leaves" { return blot_support::some(self.write_leaves); }
-    if field == "address_unchecked" { return self.address_unchecked; }
-    if field == "set_unchecked" { return self.set_unchecked; }
-    if field == "snapshot" { return self.snapshot; }
+fn functionId(receiver: Runtime, field: const u8[:]) -> blot_support::Option<u32> {
+    if field == "new" { return blot_support::some(receiver.new); }
+    if field == "address" { return blot_support::some(receiver.address); }
+    if field == "copy" { return blot_support::some(receiver.copy); }
+    if field == "push" { return blot_support::some(receiver.push); }
+    if field == "set" { return blot_support::some(receiver.set); }
+    if field == "from_array" { return blot_support::some(receiver.from_array); }
+    if field == "to_array" { return blot_support::some(receiver.to_array); }
+    if field == "chunk_new" { return blot_support::some(receiver.chunk_new); }
+    if field == "edit" { return blot_support::some(receiver.edit); }
+    if field == "branch" { return blot_support::some(receiver.branch); }
+    if field == "own" { return blot_support::some(receiver.own); }
+    if field == "insert" { return blot_support::some(receiver.insert); }
+    if field == "replace" { return blot_support::some(receiver.replace); }
+    if field == "refresh" { return blot_support::some(receiver.refresh); }
+    if field == "rotate_left" { return blot_support::some(receiver.rotate_left); }
+    if field == "rotate_right" { return blot_support::some(receiver.rotate_right); }
+    if field == "balance" { return blot_support::some(receiver.balance); }
+    if field == "concat" { return blot_support::some(receiver.concat); }
+    if field == "slice" { return blot_support::some(receiver.slice); }
+    if field == "join" { return blot_support::some(receiver.join); }
+    if field == "cut" { return blot_support::some(receiver.cut); }
+    if field == "directory" { return blot_support::some(receiver.directory); }
+    if field == "leaf_count" { return blot_support::some(receiver.leaf_count); }
+    if field == "write_leaves" { return blot_support::some(receiver.write_leaves); }
+    if field == "address_unchecked" { return receiver.address_unchecked; }
+    if field == "set_unchecked" { return receiver.set_unchecked; }
+    if field == "snapshot" { return receiver.snapshot; }
     return blot_support::none<u32>();
 }
 let frozen: u32 = 1; let acyclic_elements: u32 = 2; let acyclic_kind: u32 = acyclic_elements << 7; let width_bits: u32 = acyclic_kind - 1;
@@ -100,14 +100,14 @@ fn function(module: Module&, parameters: i64, result: blot_backend_runtime_ir::V
     assert(parameters >= 0 && parameters <= 4); let types = [blot_backend_runtime_ir::VT_i32; 4]; return module.addFunction(types[..parameters], result);
 }
 fn reference(c: Code&, address: u32) {
-    if c.failure != Error.none { return; }
-    c.failure = c.code.module.emitReference(c.code.function, Instruction { blot_backend_runtime_ir::OP_i32_const, address , ..}, blot_reuse_artifact_emitter::Role.static_address);
+    if c.failure != blot_error::Error.none { return; }
+    c.failure = c.code.module.emitReference(c.code.function, blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,address), blot_reuse_artifact_emitter::Role.static_address);
 }
 fn proof(descriptor: Local) -> Instruction[7] {
-    return [Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id , ..}, Instruction { blot_backend_runtime_ir::OP_i32_load, d_scalar_elements , ..}, Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id , ..}, Instruction { blot_backend_runtime_ir::OP_i32_load, d_immutable , ..}, Instruction { blot_backend_runtime_ir::OP_i32_const, acyclic_elements , ..}, Instruction { blot_backend_runtime_ir::OP_i32_and , ..}, Instruction { blot_backend_runtime_ir::OP_i32_or , ..}];
+    return [blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,descriptor.id), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,d_scalar_elements), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,descriptor.id), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,d_immutable), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,acyclic_elements), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_and), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_or)];
 }
 fn kindOf(descriptor: Local) -> Instruction[9] {
-    return [Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id , ..}, Instruction { blot_backend_runtime_ir::OP_i32_load, d_scalar_elements , ..}, Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id , ..}, Instruction { blot_backend_runtime_ir::OP_i32_load, d_immutable , ..}, Instruction { blot_backend_runtime_ir::OP_i32_const, acyclic_elements , ..}, Instruction { blot_backend_runtime_ir::OP_i32_and , ..}, Instruction { blot_backend_runtime_ir::OP_i32_const, 7 , ..}, Instruction { blot_backend_runtime_ir::OP_i32_shl , ..}, Instruction { blot_backend_runtime_ir::OP_i32_or , ..}];
+    return [blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,descriptor.id), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,d_scalar_elements), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,descriptor.id), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,d_immutable), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,acyclic_elements), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_and), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,7), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_shl), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_or)];
 }
 fn acyclic(c: Code&, arena: Arena, value: Local, proven: const Instruction[:]) {
     c.globalGet(arena.rc_enabled); c.when(); c.value(proven); c.when();
@@ -117,55 +117,55 @@ fn acyclic(c: Code&, arena: Arena, value: Local, proven: const Instruction[:]) {
 fn freeze(c: Code&, descriptor: Local) { c.value(descriptor); c.value(descriptor); c.value(d_immutable); c.op(blot_backend_runtime_ir::OP_i32_add); c.value(descriptor); c.load(d_immutable); c.value(frozen); c.op(blot_backend_runtime_ir::OP_i32_or); c.call(c.code.module.arena.value.store_word); }
 fn emit(module: Module&, arena: Arena) -> Runtime, Error {
     var r = default<Runtime>();
-    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.new = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.address = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.copy = id; }
-    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.push = id; }
-    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.set = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.from_array = id; }
-    { let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.to_array = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.chunk_new = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.edit = id; }
-    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.branch = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.own = id; }
-    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.insert = id; }
-    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.replace = id; }
-    { let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.refresh = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.rotate_left = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.rotate_right = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.balance = id; }
-    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.concat = id; }
-    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.slice = id; }
-    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.join = id; }
-    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.cut = id; }
-    { let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.directory = id; }
-    { let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.leaf_count = id; }
-    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != Error.none { return default<Runtime>(), error; } r.write_leaves = id; }
-    { var c = blot_emitter::init(module, r.chunk_new); emitNode(c, r, arena); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.branch); emitBranch(c, r, arena); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.refresh); emitRefresh(c); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.own); emitOwn(c, arena); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.rotate_left); emitRotate(c, r, true); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.rotate_right); emitRotate(c, r, false); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.balance); emitBalance(c, r); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.insert); emitInsert(c, r); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.replace); emitReplace(c, r); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.new); emitNew(c, r, arena); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.address); emitAddress(c, true); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.copy); emitCopy(c, r); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.edit); emitEdit(c, arena); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.push); emitPush(c, r); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.set); emitSet(c, r, true); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.from_array); emitConversion(c, r, arena, true); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.to_array); emitConversion(c, r, arena, false); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.join); emitJoin(c, r); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.cut); emitCut(c, r); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.concat); emitConcat(c, r, arena); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.slice); emitSlice(c, r, arena); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.leaf_count); emitLeafCount(c, r); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.write_leaves); emitWriteLeaves(c, r); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    { var c = blot_emitter::init(module, r.directory); emitDirectory(c, r, arena); if c.failure != Error.none { return default<Runtime>(), c.failure; } }
-    return r, Error.none;
+    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.new = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.address = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.copy = id; }
+    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.push = id; }
+    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.set = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.from_array = id; }
+    { let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.to_array = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.chunk_new = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.edit = id; }
+    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.branch = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.own = id; }
+    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.insert = id; }
+    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.replace = id; }
+    { let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.refresh = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.rotate_left = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.rotate_right = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.balance = id; }
+    { let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.concat = id; }
+    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.slice = id; }
+    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.join = id; }
+    { let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.cut = id; }
+    { let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.directory = id; }
+    { let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.leaf_count = id; }
+    { let id, error = function(module, 3, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return default<Runtime>(), error; } r.write_leaves = id; }
+    { var c = blot_emitter::init(module, r.chunk_new); emitNode(c, r, arena); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.branch); emitBranch(c, r, arena); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.refresh); emitRefresh(c); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.own); emitOwn(c, arena); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.rotate_left); emitRotate(c, r, true); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.rotate_right); emitRotate(c, r, false); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.balance); emitBalance(c, r); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.insert); emitInsert(c, r); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.replace); emitReplace(c, r); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.new); emitNew(c, r, arena); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.address); emitAddress(c, true); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.copy); emitCopy(c, r); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.edit); emitEdit(c, arena); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.push); emitPush(c, r); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.set); emitSet(c, r, true); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.from_array); emitConversion(c, r, arena, true); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.to_array); emitConversion(c, r, arena, false); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.join); emitJoin(c, r); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.cut); emitCut(c, r); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.concat); emitConcat(c, r, arena); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.slice); emitSlice(c, r, arena); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.leaf_count); emitLeafCount(c, r); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.write_leaves); emitWriteLeaves(c, r); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    { var c = blot_emitter::init(module, r.directory); emitDirectory(c, r, arena); if c.failure != blot_error::Error.none { return default<Runtime>(), c.failure; } }
+    return r, blot_error::Error.none;
 }
 fn emitNode(c: Code&, r: Runtime, arena: Arena) {
     let count = Local { 0 , ..};
@@ -509,12 +509,12 @@ fn emitDirectory(c: Code&, r: Runtime, arena: Arena) {
     c.value(array);
 }
 fn emitUncheckedAddress(module: Module&) -> u32, Error {
-    let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != Error.none { return 0, error; }
+    let id, error = function(module, 2, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return 0, error; }
     var c = blot_emitter::init(module, id); emitAddress(c, false); return id, c.failure;
 }
 fn emitUncheckedSet(module: Module&, runtime: Runtime) -> u32, Error {
     assert(runtime.address_unchecked.present);
-    let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != Error.none { return 0, error; }
+    let id, error = function(module, 4, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return 0, error; }
     var c = blot_emitter::init(module, id); emitSet(c, runtime, false); return id, c.failure;
 }
 fn emitAddress(c: Code&, checked: bool) {
@@ -601,7 +601,7 @@ fn emitCopy(c: Code&, r: Runtime) {
 /// sharing the tree root also prevents a writer from consuming its old nodes.
 /// Cursor progress and leaf caches remain in each cursor's independent fields.
 fn emitSnapshot(module: Module&) -> u32, Error {
-    let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != Error.none { return 0, error; }
+    let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return 0, error; }
     var c = blot_emitter::init(module, id);
     let sequence = Local { 0 , ..};
     freeze(c, sequence);
@@ -849,48 +849,48 @@ fn emitSlice(c: Code&, r: Runtime, arena: Arena) {
 }
 fn staticChunk(module: Module&, words: const u32[:]) -> u32, Error {
     assert(words.len > 0 && words.len <= capacity);
-    let arena, error = module.ensureArena(); if error != Error.none { return 0, error; }
+    let arena, error = module.ensureArena(); if error != blot_error::Error.none { return 0, error; }
     var buffer: u32[248] = [0; 248];
     buffer[n_length / 4] = words.len as u32; buffer[n_capacity / 4] = words.len as u32;
     for word, index in words { buffer[header / 4 + index] = word; }
-    if words.len > 0x7fffffffffffffff - header / 4 { return 0, Error.module_too_large; }
+    if words.len > 0x7fffffffffffffff - header / 4 { return 0, blot_error::Error.module_too_large; }
     let used = header / 4 + words.len; return module.dataWords(buffer[..used]);
 }
 struct StaticNode { address: u32, height: u32, count: u32 }
 recursive fn staticTree(module: Module&, leaves: const u32[:]) -> StaticNode, Error {
-    if leaves.len == 0 { return StaticNode { 0, 0, 0 , ..}, Error.none; }
-    if leaves.len == 1 { return StaticNode { leaves[0], 0, module.readDataWord(leaves[0] + n_length) , ..}, Error.none; }
-    let left, left_error = staticTree(module, leaves[..leaves.len / 2]); if left_error != Error.none { return default<StaticNode>(), left_error; }
-    let right, right_error = staticTree(module, leaves[leaves.len / 2..]); if right_error != Error.none { return default<StaticNode>(), right_error; }
+    if leaves.len == 0 { return StaticNode { 0, 0, 0 , ..}, blot_error::Error.none; }
+    if leaves.len == 1 { return StaticNode { leaves[0], 0, module.readDataWord(leaves[0] + n_length) , ..}, blot_error::Error.none; }
+    let left, left_error = staticTree(module, leaves[..leaves.len / 2]); if left_error != blot_error::Error.none { return default<StaticNode>(), left_error; }
+    let right, right_error = staticTree(module, leaves[leaves.len / 2..]); if right_error != blot_error::Error.none { return default<StaticNode>(), right_error; }
     let height = max(left.height, right.height) + 1;
     let address, error = module.dataObject([0 as u32, height, left.count + right.count, 0 as u32, left.address, right.address]);
-    if error != Error.none { return default<StaticNode>(), error; }
+    if error != blot_error::Error.none { return default<StaticNode>(), error; }
     let left_reference = module.dataReference(address + n_left, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, left.address , ..});
-    if left_reference != Error.none { return default<StaticNode>(), left_reference; }
+    if left_reference != blot_error::Error.none { return default<StaticNode>(), left_reference; }
     let right_reference = module.dataReference(address + n_right, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, right.address , ..});
-    if right_reference != Error.none { return default<StaticNode>(), right_reference; }
-    return StaticNode { address, height, left.count + right.count , ..}, Error.none;
+    if right_reference != blot_error::Error.none { return default<StaticNode>(), right_reference; }
+    return StaticNode { address, height, left.count + right.count , ..}, blot_error::Error.none;
 }
 fn staticDescriptor(module: Module&, length: u32, leaves: const u32[:]) -> u32, Error { return staticDescriptorKind(module, length, leaves, 0, capacity); }
 fn staticScalarDescriptor(module: Module&, length: u32, leaves: const u32[:], row_words: u32) -> u32, Error { return staticDescriptorKind(module, length, leaves, row_words, leafLimit(row_words)); }
 fn staticDescriptorKind(module: Module&, length: u32, leaves: const u32[:], row_words: u32, leaf_limit: u32) -> u32, Error {
-    let root, error = staticTree(module, leaves); if error != Error.none { return 0, error; } assert(root.count == length);
+    let root, error = staticTree(module, leaves); if error != blot_error::Error.none { return 0, error; } assert(root.count == length);
     var directory: u32 = 0;
     if row_words != 0 && leaves.len > 1 {
         var words: u32[>..<] = []; words.push(leaves.len as u32); words.append(leaves);
-        let data, failure = module.dataWords(words); if failure != Error.none { return 0, failure; } directory = data;
+        let data, failure = module.dataWords(words); if failure != blot_error::Error.none { return 0, failure; } directory = data;
         for leaf, index in leaves {
             let reference = module.dataReference(directory + ((index + 1) * 4) as u32, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, leaf , ..});
-            if reference != Error.none { return 0, reference; }
+            if reference != blot_error::Error.none { return 0, reference; }
         }
     }
     let address, failure = module.dataObject([length, root.address, 0 as u32, 0 as u32, row_words, 1 as u32, leaf_limit, directory]);
-    if failure != Error.none { return 0, failure; }
-    let cached_leaf = module.staticField(address + d_cached_leaf, blot_backend_runtime_ir::ROLE_reference); if cached_leaf != Error.none { return 0, cached_leaf; }
-    let cached_base = module.staticField(address + d_cached_base, blot_backend_runtime_ir::ROLE_scalar); if cached_base != Error.none { return 0, cached_base; }
-    let immutable = module.staticField(address + d_immutable, blot_backend_runtime_ir::ROLE_scalar); if immutable != Error.none { return 0, immutable; }
-    let directory_field = module.staticField(address + d_directory, blot_backend_runtime_ir::ROLE_reference); if directory_field != Error.none { return 0, directory_field; }
-    if directory != 0 { let reference = module.dataReference(address + d_directory, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, directory , ..}); if reference != Error.none { return 0, reference; } }
-    if root.address != 0 { let reference = module.dataReference(address + d_root, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, root.address , ..}); if reference != Error.none { return 0, reference; } }
-    return address, Error.none;
+    if failure != blot_error::Error.none { return 0, failure; }
+    let cached_leaf = module.staticField(address + d_cached_leaf, blot_backend_runtime_ir::ROLE_reference); if cached_leaf != blot_error::Error.none { return 0, cached_leaf; }
+    let cached_base = module.staticField(address + d_cached_base, blot_backend_runtime_ir::ROLE_scalar); if cached_base != blot_error::Error.none { return 0, cached_base; }
+    let immutable = module.staticField(address + d_immutable, blot_backend_runtime_ir::ROLE_scalar); if immutable != blot_error::Error.none { return 0, immutable; }
+    let directory_field = module.staticField(address + d_directory, blot_backend_runtime_ir::ROLE_reference); if directory_field != blot_error::Error.none { return 0, directory_field; }
+    if directory != 0 { let reference = module.dataReference(address + d_directory, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, directory , ..}); if reference != blot_error::Error.none { return 0, reference; } }
+    if root.address != 0 { let reference = module.dataReference(address + d_root, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, root.address , ..}); if reference != blot_error::Error.none { return 0, reference; } }
+    return address, blot_error::Error.none;
 }

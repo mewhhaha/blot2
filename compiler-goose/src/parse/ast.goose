@@ -175,7 +175,7 @@ struct ValueDecl { name: blot_parse_symbols::Symbol, body: Id, annotation: Id, m
 struct ImplementationDecl { name: blot_parse_symbols::Symbol, parameters: List, head: Id, members: List, where: List, where_node: Id }
 struct Parameter { name: blot_parse_symbols::Symbol, annotation: Id, is_unit: bool, requires_return: bool, pattern_bound: bool, where: List, where_node: Id }
 struct Binding { pattern: Id, value: Id, annotation: Id, where: List, where_node: Id, fallback: Id }
-struct ImportDecl { path: blot_parse_symbols::Symbol, namespace: blot_parse_symbols::Symbol, bindings: List, path_span: Span, namespace_span: Span }
+struct ImportDecl { path: blot_parse_symbols::Symbol, namespace_: blot_parse_symbols::Symbol, bindings: List, path_span: Span, namespace_span: Span }
 struct ImportBinding { name: blot_parse_symbols::Symbol, alias: blot_parse_symbols::Symbol }
 struct Fixity { operator: blot_parse_symbols::Symbol, target: blot_parse_symbols::Symbol, precedence: u32, association: u32, named: bool, attributes: List = List {..}, literal_error: Id = 0 }
 struct DeclarationTraits { declaration: Id, private: bool = false, is_opaque: bool = false }
@@ -184,96 +184,96 @@ struct DeclarationNodes { root: Id, first: Id, end: Id }
 struct OperatorOrigin { node: Id, span: Span, member: blot_parse_symbols::Symbol = 0, member_point: u32 = 0 }
 struct TypeConversionOrigin { node: Id, point: u32 }
 type TreeError = blot_error::Error;
-struct NodeBuffer { storage: Node[:]=[], items: Node[:]=[], len: i64=0, failure: TreeError=TreeError.none }
+struct NodeBuffer { storage: Node[:]=default<Node[:]>(), items: Node[:]=default<Node[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_NodeBuffer_runs: Node[>..]=[];
 var inactive_NodeBuffer: NodeBuffer=NodeBuffer {..};
-fn ensure(self: NodeBuffer&, minimum: i64) -> TreeError { if self.failure!=TreeError.none { return self.failure; } self.failure=blot_support_pooled_buffer::ensure(self,minimum,tree_NodeBuffer_runs); return self.failure; }
-fn push(self: NodeBuffer&, value: Node) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,tree_NodeBuffer_runs); self.len=self.items.len; }
-fn append(self: NodeBuffer&, values: const Node[:]) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,tree_NodeBuffer_runs); self.len=self.items.len; }
-fn resize(self: NodeBuffer&, length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: NodeBuffer&, length: i64, value: Node) { if length<=self.len { self.resize(length); return; } if self.ensure(length)!=TreeError.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: NodeBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=TreeError.none; }
-fn deinit(self: NodeBuffer&) { blot_support_pooled_buffer::deinit(self,tree_NodeBuffer_runs); self.len=0; self.failure=TreeError.none; }
-struct SpanBuffer { storage: Span[:]=[], items: Span[:]=[], len: i64=0, failure: TreeError=TreeError.none }
+fn ensure(self_: NodeBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_NodeBuffer_runs); return self_.failure; }
+fn push(self_: NodeBuffer&, value: Node) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_NodeBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: NodeBuffer&, values: const Node[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_NodeBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: NodeBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: NodeBuffer&, length: i64, value: Node) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: NodeBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: NodeBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_NodeBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+struct SpanBuffer { storage: Span[:]=default<Span[:]>(), items: Span[:]=default<Span[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_SpanBuffer_runs: Span[>..]=[];
 var inactive_SpanBuffer: SpanBuffer=SpanBuffer {..};
-fn ensure(self: SpanBuffer&, minimum: i64) -> TreeError { if self.failure!=TreeError.none { return self.failure; } self.failure=blot_support_pooled_buffer::ensure(self,minimum,tree_SpanBuffer_runs); return self.failure; }
-fn push(self: SpanBuffer&, value: Span) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,tree_SpanBuffer_runs); self.len=self.items.len; }
-fn append(self: SpanBuffer&, values: const Span[:]) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,tree_SpanBuffer_runs); self.len=self.items.len; }
-fn resize(self: SpanBuffer&, length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: SpanBuffer&, length: i64, value: Span) { if length<=self.len { self.resize(length); return; } if self.ensure(length)!=TreeError.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: SpanBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=TreeError.none; }
-fn deinit(self: SpanBuffer&) { blot_support_pooled_buffer::deinit(self,tree_SpanBuffer_runs); self.len=0; self.failure=TreeError.none; }
-struct WordBuffer { storage: u32[:]=[], items: u32[:]=[], len: i64=0, failure: TreeError=TreeError.none }
+fn ensure(self_: SpanBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_SpanBuffer_runs); return self_.failure; }
+fn push(self_: SpanBuffer&, value: Span) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_SpanBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: SpanBuffer&, values: const Span[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_SpanBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: SpanBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: SpanBuffer&, length: i64, value: Span) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: SpanBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: SpanBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_SpanBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+struct WordBuffer { storage: u32[:]=default<u32[:]>(), items: u32[:]=default<u32[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_WordBuffer_runs: u32[>..]=[];
 var inactive_WordBuffer: WordBuffer=WordBuffer {..};
-fn ensure(self: WordBuffer&, minimum: i64) -> TreeError { if self.failure!=TreeError.none { return self.failure; } self.failure=blot_support_pooled_buffer::ensure(self,minimum,tree_WordBuffer_runs); return self.failure; }
-fn push(self: WordBuffer&, value: u32) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,tree_WordBuffer_runs); self.len=self.items.len; }
-fn append(self: WordBuffer&, values: const u32[:]) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,tree_WordBuffer_runs); self.len=self.items.len; }
-fn resize(self: WordBuffer&, length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: WordBuffer&, length: i64, value: u32) { if length<=self.len { self.resize(length); return; } if self.ensure(length)!=TreeError.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: WordBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=TreeError.none; }
-fn deinit(self: WordBuffer&) { blot_support_pooled_buffer::deinit(self,tree_WordBuffer_runs); self.len=0; self.failure=TreeError.none; }
-struct NameBuffer { storage: RuntimeName[:]=[], items: RuntimeName[:]=[], len: i64=0, failure: TreeError=TreeError.none }
+fn ensure(self_: WordBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_WordBuffer_runs); return self_.failure; }
+fn push(self_: WordBuffer&, value: u32) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_WordBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: WordBuffer&, values: const u32[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_WordBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: WordBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: WordBuffer&, length: i64, value: u32) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: WordBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: WordBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_WordBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+struct NameBuffer { storage: RuntimeName[:]=default<RuntimeName[:]>(), items: RuntimeName[:]=default<RuntimeName[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_NameBuffer_runs: RuntimeName[>..]=[];
 var inactive_NameBuffer: NameBuffer=NameBuffer {..};
-fn ensure(self: NameBuffer&, minimum: i64) -> TreeError { if self.failure!=TreeError.none { return self.failure; } self.failure=blot_support_pooled_buffer::ensure(self,minimum,tree_NameBuffer_runs); return self.failure; }
-fn push(self: NameBuffer&, value: RuntimeName) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,tree_NameBuffer_runs); self.len=self.items.len; }
-fn append(self: NameBuffer&, values: const RuntimeName[:]) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,tree_NameBuffer_runs); self.len=self.items.len; }
-fn resize(self: NameBuffer&, length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: NameBuffer&, length: i64, value: RuntimeName) { if length<=self.len { self.resize(length); return; } if self.ensure(length)!=TreeError.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: NameBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=TreeError.none; }
-fn deinit(self: NameBuffer&) { blot_support_pooled_buffer::deinit(self,tree_NameBuffer_runs); self.len=0; self.failure=TreeError.none; }
-struct TraitsBuffer { storage: DeclarationTraits[:]=[], items: DeclarationTraits[:]=[], len: i64=0, failure: TreeError=TreeError.none }
+fn ensure(self_: NameBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_NameBuffer_runs); return self_.failure; }
+fn push(self_: NameBuffer&, value: RuntimeName) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_NameBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: NameBuffer&, values: const RuntimeName[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_NameBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: NameBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: NameBuffer&, length: i64, value: RuntimeName) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: NameBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: NameBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_NameBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+struct TraitsBuffer { storage: DeclarationTraits[:]=default<DeclarationTraits[:]>(), items: DeclarationTraits[:]=default<DeclarationTraits[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_TraitsBuffer_runs: DeclarationTraits[>..]=[];
 var inactive_TraitsBuffer: TraitsBuffer=TraitsBuffer {..};
-fn ensure(self: TraitsBuffer&, minimum: i64) -> TreeError { if self.failure!=TreeError.none { return self.failure; } self.failure=blot_support_pooled_buffer::ensure(self,minimum,tree_TraitsBuffer_runs); return self.failure; }
-fn push(self: TraitsBuffer&, value: DeclarationTraits) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,tree_TraitsBuffer_runs); self.len=self.items.len; }
-fn append(self: TraitsBuffer&, values: const DeclarationTraits[:]) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,tree_TraitsBuffer_runs); self.len=self.items.len; }
-fn resize(self: TraitsBuffer&, length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: TraitsBuffer&, length: i64, value: DeclarationTraits) { if length<=self.len { self.resize(length); return; } if self.ensure(length)!=TreeError.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: TraitsBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=TreeError.none; }
-fn deinit(self: TraitsBuffer&) { blot_support_pooled_buffer::deinit(self,tree_TraitsBuffer_runs); self.len=0; self.failure=TreeError.none; }
-struct DeclarationBuffer { storage: DeclarationNodes[:]=[], items: DeclarationNodes[:]=[], len: i64=0, failure: TreeError=TreeError.none }
+fn ensure(self_: TraitsBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_TraitsBuffer_runs); return self_.failure; }
+fn push(self_: TraitsBuffer&, value: DeclarationTraits) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_TraitsBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: TraitsBuffer&, values: const DeclarationTraits[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_TraitsBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: TraitsBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: TraitsBuffer&, length: i64, value: DeclarationTraits) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: TraitsBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: TraitsBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_TraitsBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+struct DeclarationBuffer { storage: DeclarationNodes[:]=default<DeclarationNodes[:]>(), items: DeclarationNodes[:]=default<DeclarationNodes[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_DeclarationBuffer_runs: DeclarationNodes[>..]=[];
 var inactive_DeclarationBuffer: DeclarationBuffer=DeclarationBuffer {..};
-fn ensure(self: DeclarationBuffer&, minimum: i64) -> TreeError { if self.failure!=TreeError.none { return self.failure; } self.failure=blot_support_pooled_buffer::ensure(self,minimum,tree_DeclarationBuffer_runs); return self.failure; }
-fn push(self: DeclarationBuffer&, value: DeclarationNodes) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,tree_DeclarationBuffer_runs); self.len=self.items.len; }
-fn append(self: DeclarationBuffer&, values: const DeclarationNodes[:]) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,tree_DeclarationBuffer_runs); self.len=self.items.len; }
-fn resize(self: DeclarationBuffer&, length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: DeclarationBuffer&, length: i64, value: DeclarationNodes) { if length<=self.len { self.resize(length); return; } if self.ensure(length)!=TreeError.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: DeclarationBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=TreeError.none; }
-fn deinit(self: DeclarationBuffer&) { blot_support_pooled_buffer::deinit(self,tree_DeclarationBuffer_runs); self.len=0; self.failure=TreeError.none; }
-struct DiagnosticBuffer { storage: Diagnostic[:]=[], items: Diagnostic[:]=[], len: i64=0, failure: TreeError=TreeError.none }
+fn ensure(self_: DeclarationBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_DeclarationBuffer_runs); return self_.failure; }
+fn push(self_: DeclarationBuffer&, value: DeclarationNodes) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_DeclarationBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: DeclarationBuffer&, values: const DeclarationNodes[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_DeclarationBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: DeclarationBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: DeclarationBuffer&, length: i64, value: DeclarationNodes) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: DeclarationBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: DeclarationBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_DeclarationBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+struct DiagnosticBuffer { storage: Diagnostic[:]=default<Diagnostic[:]>(), items: Diagnostic[:]=default<Diagnostic[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_DiagnosticBuffer_runs: Diagnostic[>..]=[];
 var inactive_DiagnosticBuffer: DiagnosticBuffer=DiagnosticBuffer {..};
-fn ensure(self: DiagnosticBuffer&, minimum: i64) -> TreeError { if self.failure!=TreeError.none { return self.failure; } self.failure=blot_support_pooled_buffer::ensure(self,minimum,tree_DiagnosticBuffer_runs); return self.failure; }
-fn push(self: DiagnosticBuffer&, value: Diagnostic) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,tree_DiagnosticBuffer_runs); self.len=self.items.len; }
-fn append(self: DiagnosticBuffer&, values: const Diagnostic[:]) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,tree_DiagnosticBuffer_runs); self.len=self.items.len; }
-fn resize(self: DiagnosticBuffer&, length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: DiagnosticBuffer&, length: i64, value: Diagnostic) { if length<=self.len { self.resize(length); return; } if self.ensure(length)!=TreeError.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: DiagnosticBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=TreeError.none; }
-fn deinit(self: DiagnosticBuffer&) { blot_support_pooled_buffer::deinit(self,tree_DiagnosticBuffer_runs); self.len=0; self.failure=TreeError.none; }
-struct OperatorBuffer { storage: OperatorOrigin[:]=[], items: OperatorOrigin[:]=[], len: i64=0, failure: TreeError=TreeError.none }
+fn ensure(self_: DiagnosticBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_DiagnosticBuffer_runs); return self_.failure; }
+fn push(self_: DiagnosticBuffer&, value: Diagnostic) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_DiagnosticBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: DiagnosticBuffer&, values: const Diagnostic[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_DiagnosticBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: DiagnosticBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: DiagnosticBuffer&, length: i64, value: Diagnostic) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: DiagnosticBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: DiagnosticBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_DiagnosticBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+struct OperatorBuffer { storage: OperatorOrigin[:]=default<OperatorOrigin[:]>(), items: OperatorOrigin[:]=default<OperatorOrigin[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_OperatorBuffer_runs: OperatorOrigin[>..]=[];
 var inactive_OperatorBuffer: OperatorBuffer=OperatorBuffer {..};
-fn ensure(self: OperatorBuffer&, minimum: i64) -> TreeError { if self.failure!=TreeError.none { return self.failure; } self.failure=blot_support_pooled_buffer::ensure(self,minimum,tree_OperatorBuffer_runs); return self.failure; }
-fn push(self: OperatorBuffer&, value: OperatorOrigin) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,tree_OperatorBuffer_runs); self.len=self.items.len; }
-fn append(self: OperatorBuffer&, values: const OperatorOrigin[:]) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,tree_OperatorBuffer_runs); self.len=self.items.len; }
-fn resize(self: OperatorBuffer&, length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: OperatorBuffer&, length: i64, value: OperatorOrigin) { if length<=self.len { self.resize(length); return; } if self.ensure(length)!=TreeError.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: OperatorBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=TreeError.none; }
-fn deinit(self: OperatorBuffer&) { blot_support_pooled_buffer::deinit(self,tree_OperatorBuffer_runs); self.len=0; self.failure=TreeError.none; }
-struct ConversionBuffer { storage: TypeConversionOrigin[:]=[], items: TypeConversionOrigin[:]=[], len: i64=0, failure: TreeError=TreeError.none }
+fn ensure(self_: OperatorBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_OperatorBuffer_runs); return self_.failure; }
+fn push(self_: OperatorBuffer&, value: OperatorOrigin) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_OperatorBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: OperatorBuffer&, values: const OperatorOrigin[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_OperatorBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: OperatorBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: OperatorBuffer&, length: i64, value: OperatorOrigin) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: OperatorBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: OperatorBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_OperatorBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
+struct ConversionBuffer { storage: TypeConversionOrigin[:]=default<TypeConversionOrigin[:]>(), items: TypeConversionOrigin[:]=default<TypeConversionOrigin[:]>(), len: i64=0, failure: TreeError=blot_error::Error.none }
 reusable[] var tree_ConversionBuffer_runs: TypeConversionOrigin[>..]=[];
 var inactive_ConversionBuffer: ConversionBuffer=ConversionBuffer {..};
-fn ensure(self: ConversionBuffer&, minimum: i64) -> TreeError { if self.failure!=TreeError.none { return self.failure; } self.failure=blot_support_pooled_buffer::ensure(self,minimum,tree_ConversionBuffer_runs); return self.failure; }
-fn push(self: ConversionBuffer&, value: TypeConversionOrigin) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,tree_ConversionBuffer_runs); self.len=self.items.len; }
-fn append(self: ConversionBuffer&, values: const TypeConversionOrigin[:]) { if self.failure!=TreeError.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,tree_ConversionBuffer_runs); self.len=self.items.len; }
-fn resize(self: ConversionBuffer&, length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
-fn resize(self: ConversionBuffer&, length: i64, value: TypeConversionOrigin) { if length<=self.len { self.resize(length); return; } if self.ensure(length)!=TreeError.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
-fn clear(self: ConversionBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=TreeError.none; }
-fn deinit(self: ConversionBuffer&) { blot_support_pooled_buffer::deinit(self,tree_ConversionBuffer_runs); self.len=0; self.failure=TreeError.none; }
+fn ensure(self_: ConversionBuffer&, minimum: i64) -> TreeError { if self_.failure!=blot_error::Error.none { return self_.failure; } self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,tree_ConversionBuffer_runs); return self_.failure; }
+fn push(self_: ConversionBuffer&, value: TypeConversionOrigin) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,tree_ConversionBuffer_runs); self_.len=self_.items.len; }
+fn append(self_: ConversionBuffer&, values: const TypeConversionOrigin[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,tree_ConversionBuffer_runs); self_.len=self_.items.len; }
+fn resize(self_: ConversionBuffer&, length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
+fn resize(self_: ConversionBuffer&, length: i64, value: TypeConversionOrigin) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
+fn clear(self_: ConversionBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
+fn deinit(self_: ConversionBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_ConversionBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
 struct TreeState { owner_id: u64=0, generation: u64=0,
     nodes: NodeBuffer=NodeBuffer {..},
     spans: SpanBuffer=SpanBuffer {..},
@@ -291,24 +291,24 @@ reusable var tree_states: TreeState[>..]=[];
 var next_tree_generation: u64=1;
 struct Tree {
     owner_id: u64=0, lease: u32=0, generation: u64=0, has_typed_staging: bool=false, has_numeric_proofs: bool=false,
-    nodes: NodeBuffer&=inactive_NodeBuffer,
-    spans: SpanBuffer&=inactive_SpanBuffer,
-    extra: WordBuffer&=inactive_WordBuffer,
-    roots: WordBuffer&=inactive_WordBuffer,
-    runtime_names: NameBuffer&=inactive_NameBuffer,
-    constant_names: NameBuffer&=inactive_NameBuffer,
-    declaration_traits: TraitsBuffer&=inactive_TraitsBuffer,
-    declaration_nodes: DeclarationBuffer&=inactive_DeclarationBuffer,
-    diagnostics: DiagnosticBuffer&=inactive_DiagnosticBuffer,
-    operator_origins: OperatorBuffer&=inactive_OperatorBuffer,
-    type_conversion_origins: ConversionBuffer&=inactive_ConversionBuffer,
+    nodes: NodeBuffer& =inactive_NodeBuffer,
+    spans: SpanBuffer& =inactive_SpanBuffer,
+    extra: WordBuffer& =inactive_WordBuffer,
+    roots: WordBuffer& =inactive_WordBuffer,
+    runtime_names: NameBuffer& =inactive_NameBuffer,
+    constant_names: NameBuffer& =inactive_NameBuffer,
+    declaration_traits: TraitsBuffer& =inactive_TraitsBuffer,
+    declaration_nodes: DeclarationBuffer& =inactive_DeclarationBuffer,
+    diagnostics: DiagnosticBuffer& =inactive_DiagnosticBuffer,
+    operator_origins: OperatorBuffer& =inactive_OperatorBuffer,
+    type_conversion_origins: ConversionBuffer& =inactive_ConversionBuffer,
 }
-fn valid(self: const Tree&) -> bool { return self.lease!=0 && self.owner_id!=0 && self.lease-1<tree_states.len && tree_states[self.lease-1].owner_id==self.owner_id && tree_states[self.lease-1].generation==self.generation; }
+fn valid(self_: const Tree&) -> bool { return self_.lease!=0 && self_.owner_id!=0 && self_.lease-1<tree_states.len && tree_states[self_.lease-1].owner_id==self_.owner_id && tree_states[self_.lease-1].generation==self_.generation; }
 fn initPooled() -> Tree,TreeError {
-    if next_tree_generation==0xffffffffffffffff || tree_states.len>=0xffffffff { return Tree {..},TreeError.out_of_memory; }
+    if next_tree_generation==0xffffffffffffffff || tree_states.len>=0xffffffff { return Tree {..},blot_error::Error.out_of_memory; }
     let generation=next_tree_generation; next_tree_generation++;
     let owner=blot_native::fresh_owner_id(); let index=tree_states.alloc_index(TreeState {owner_id:owner,generation:generation, ..});
-    let state: TreeState&=tree_states[index];
+    let state: TreeState& =tree_states[index];
     var tree=Tree {owner_id:owner,lease:(index+1) as u32,generation:generation,
         nodes:state.nodes,
         spans:state.spans,
@@ -323,39 +323,39 @@ fn initPooled() -> Tree,TreeError {
         type_conversion_origins:state.type_conversion_origins,
      ..};
     tree.nodes.push(Node {..}); tree.spans.push(Span {..});
-    let error=tree.failure(); if error!=TreeError.none { tree.deinit(); return Tree {..},error; }
-    return tree,TreeError.none;
+    let error=tree.failure(); if error!=blot_error::Error.none { tree.deinit(); return Tree {..},error; }
+    return tree,blot_error::Error.none;
 }
 fn init() -> Tree,TreeError { return initPooled(); }
-fn failure(self: const Tree&) -> TreeError {
-    assert(self.valid());
-    if self.nodes.failure!=TreeError.none { return self.nodes.failure; }
-    if self.spans.failure!=TreeError.none { return self.spans.failure; }
-    if self.extra.failure!=TreeError.none { return self.extra.failure; }
-    if self.roots.failure!=TreeError.none { return self.roots.failure; }
-    if self.runtime_names.failure!=TreeError.none { return self.runtime_names.failure; }
-    if self.constant_names.failure!=TreeError.none { return self.constant_names.failure; }
-    if self.declaration_traits.failure!=TreeError.none { return self.declaration_traits.failure; }
-    if self.declaration_nodes.failure!=TreeError.none { return self.declaration_nodes.failure; }
-    if self.diagnostics.failure!=TreeError.none { return self.diagnostics.failure; }
-    if self.operator_origins.failure!=TreeError.none { return self.operator_origins.failure; }
-    if self.type_conversion_origins.failure!=TreeError.none { return self.type_conversion_origins.failure; }
-    return TreeError.none;
+fn failure(self_: const Tree&) -> TreeError {
+    assert(self_.valid());
+    if self_.nodes.failure!=blot_error::Error.none { return self_.nodes.failure; }
+    if self_.spans.failure!=blot_error::Error.none { return self_.spans.failure; }
+    if self_.extra.failure!=blot_error::Error.none { return self_.extra.failure; }
+    if self_.roots.failure!=blot_error::Error.none { return self_.roots.failure; }
+    if self_.runtime_names.failure!=blot_error::Error.none { return self_.runtime_names.failure; }
+    if self_.constant_names.failure!=blot_error::Error.none { return self_.constant_names.failure; }
+    if self_.declaration_traits.failure!=blot_error::Error.none { return self_.declaration_traits.failure; }
+    if self_.declaration_nodes.failure!=blot_error::Error.none { return self_.declaration_nodes.failure; }
+    if self_.diagnostics.failure!=blot_error::Error.none { return self_.diagnostics.failure; }
+    if self_.operator_origins.failure!=blot_error::Error.none { return self_.operator_origins.failure; }
+    if self_.type_conversion_origins.failure!=blot_error::Error.none { return self_.type_conversion_origins.failure; }
+    return blot_error::Error.none;
 }
-fn deinit(self: Tree&) {
-    if self.lease==0 { return; } assert(self.valid());
-    self.nodes.deinit();
-    self.spans.deinit();
-    self.extra.deinit();
-    self.roots.deinit();
-    self.runtime_names.deinit();
-    self.constant_names.deinit();
-    self.declaration_traits.deinit();
-    self.declaration_nodes.deinit();
-    self.diagnostics.deinit();
-    self.operator_origins.deinit();
-    self.type_conversion_origins.deinit();
-    let index=self.lease-1; tree_states[index].owner_id=0; tree_states.free(index); self=Tree {..};
+fn deinit(self_: Tree&) {
+    if self_.lease==0 { return; } assert(self_.valid());
+    self_.nodes.deinit();
+    self_.spans.deinit();
+    self_.extra.deinit();
+    self_.roots.deinit();
+    self_.runtime_names.deinit();
+    self_.constant_names.deinit();
+    self_.declaration_traits.deinit();
+    self_.declaration_nodes.deinit();
+    self_.diagnostics.deinit();
+    self_.operator_origins.deinit();
+    self_.type_conversion_origins.deinit();
+    let index=self_.lease-1; tree_states[index].owner_id=0; tree_states.free(index); self_=Tree {..};
 }
 fn node(tree: const Tree&, id: Id) -> Node { return tree.nodes.items[id]; }
 fn span(tree: const Tree&, id: Id) -> Span { return tree.spans.items[id]; }

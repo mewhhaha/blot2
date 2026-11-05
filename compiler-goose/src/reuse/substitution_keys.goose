@@ -21,7 +21,7 @@ fn get(store: Store&, id: Id) -> const Entry[:] {
     let span = store.spans[id - 1]; return store.entries[span.start..span.start + span.len];
 }
 fn intern(store: Store&, values: const Entry[:]) -> Id, Error {
-    if values.len == 0 { return 0, Error.none; }
+    if values.len == 0 { return 0, blot_error::Error.none; }
     var owned: Entry[>..<] = []; owned.append(values);
     var index: i64 = 1;
     while index < owned.len {
@@ -30,7 +30,7 @@ fn intern(store: Store&, values: const Entry[:]) -> Id, Error {
         owned[at] = value; index++;
     }
     for at in 1..owned.len {
-        if owned[at].variable == owned[at - 1].variable { return 0, Error.conflicting_substitution; }
+        if owned[at].variable == owned[at - 1].variable { return 0, blot_error::Error.conflicting_substitution; }
     }
     var hash = blot_support_wyhash::init(0);
     for entry in owned { hash.value(entry.variable); hash.value(entry.value); }
@@ -40,13 +40,13 @@ fn internHashed(store: Store&, values: const Entry[:], fingerprint: u64) -> Id, 
     var head: Id = 0; { let optional_source_3 .= store.buckets.get(fingerprint); if optional_source_3 { let found = optional_source_3; head = found;  } }
     var candidate = head;
     while candidate != 0 {
-        if get(store, candidate) == values { return candidate, Error.none; }
+        if get(store, candidate) == values { return candidate, blot_error::Error.none; }
         candidate = store.next[candidate - 1];
     }
     if store.spans.len >= 4294967294 || values.len > 4294967295 ||
-        store.entries.len > 4294967295 - values.len { return 0, Error.key_limit; }
+        store.entries.len > 4294967295 - values.len { return 0, blot_error::Error.key_limit; }
     let id = (store.spans.len + 1) as Id;
     store.spans.push(Span { store.entries.len as u32, values.len as u32 , ..});
     store.entries.append(values); store.next.push(head); store.buckets.insert(fingerprint, id);
-    return id, Error.none;
+    return id, blot_error::Error.none;
 }

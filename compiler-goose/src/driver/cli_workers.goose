@@ -15,13 +15,13 @@ fn worker()->blot_error::Error {
   var frame,error=blot_process_pool::readFrame(input);if error==blot_error::Error.end_of_stream {return blot_error::Error.none;}if error!=blot_error::Error.none {return error;}var reply:u8[>..<]=[];
   var failure=frame.failure;if failure==blot_error::Error.none {failure=blot_main::configureInferenceBudget(frame.inference_budget);}if failure==blot_error::Error.none {
    match frame.kind {
-    blot_process_pool::Kind.runtime=>{failure=blot_backend_runtime_parallel::executePacket(frame.bytes,reply);},
-    blot_process_pool::Kind.semantic=>{failure=blot_eval_component_worker::executePacket(frame.bytes,reply);},
-    blot_process_pool::Kind.check=>{failure=blot_project_executor::executeCheckPacket(frame.bytes,reply);},
-    blot_process_pool::Kind.lower=>{failure=blot_project_executor::executeLowerPacket(frame.bytes,reply);},
-    blot_process_pool::Kind.independent=>{failure=blot_reuse_independent_call_proof::executePacket(frame.bytes,reply);},
+    runtime=>{failure=blot_backend_runtime_parallel::executePacket(frame.bytes,reply);},
+    semantic=>{failure=blot_eval_component_worker::executePacket(frame.bytes,reply);},
+    check=>{failure=blot_project_executor::executeCheckPacket(frame.bytes,reply);},
+    lower=>{failure=blot_project_executor::executeLowerPacket(frame.bytes,reply);},
+    independent=>{failure=blot_reuse_independent_call_proof::executePacket(frame.bytes,reply);},
    }
   }
-  let written=blot_process_pool::writeFrame(output,frame.kind,frame.id,reply[:],failure);frame.deinit();if written!=blot_error::Error.none {return written;}
+  let written=blot_process_pool::writeFrame(output,frame.kind,frame.id,reply[..],failure);frame.deinit();if written!=blot_error::Error.none {return written;}
  }
 }

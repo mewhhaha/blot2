@@ -262,7655 +262,7655 @@ reusable[] var pool_blot_reuse_frozen_dependency__Symbol:blot_reuse_frozen_depen
 
 reusable[] var pool_blot_reuse_frozen_dependency__Module:blot_reuse_frozen_dependency::Module[>..]=[];
 
-fn valid(self:const Owner&)->bool {return self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation;}
-fn init()->Owner,Error {if leases.len>=0xffffffff {return Owner {..},Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=leases.alloc_index(Lease {generation:generation,live:true, ..});return Owner {(at+1) as u32,generation, ..},Error.none;}
-fn remember(self:Owner&,value:Run)->Error {assert(unique(self));if links.len>=0xffffffff {return Error.out_of_memory;}let head=leases[self.lease-1].head;let at=links.alloc_index(Link {value,head, ..});leases[self.lease-1].head=(at+1) as u32;return Error.none;}
-fn deinit(self:Owner&) {if self.lease==0 {return;}assert(valid(self));let owner=self.lease-1;assert(leases[owner].references!=0);leases[owner].references-=1;if leases[owner].references!=0 {self=Owner {..};return;}var next=leases[owner].head;while next!=0 {let at=next-1;let link=links[at];next=link.next;match link.value {
-Run.run_header_module run=>{pool_header_module.free_slice(run.values);},
-Run.run_header_path run=>{pool_header_path.free_slice(run.values);},
-Run.run_header_digest run=>{pool_header_digest.free_slice(run.values);},
-Run.run_header_name run=>{pool_header_name.free_slice(run.values);},
-Run.run_header_import run=>{pool_header_import.free_slice(run.values);},
-Run.run_header_owner run=>{pool_header_owner.free_slice(run.values);},
-Run.run_bool run=>{pool_bool.free_slice(run.values);},
+fn valid(self_:const Owner&)->bool {return self_.lease!=0&&self_.lease-1<leases.len&&leases[self_.lease-1].live&&leases[self_.lease-1].generation==self_.generation;}
+fn init()->Owner,Error {if leases.len>=0xffffffff {return Owner {..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=leases.alloc_index(Lease {generation:generation,live:true, ..});return Owner {(at+1) as u32,generation, ..},blot_error::Error.none;}
+fn remember(self_:Owner&,value:Run)->Error {assert(unique(self_));if links.len>=0xffffffff {return blot_error::Error.out_of_memory;}let head=leases[self_.lease-1].head;let at=links.alloc_index(Link {value,head, ..});leases[self_.lease-1].head=(at+1) as u32;return blot_error::Error.none;}
+fn deinit(self_:Owner&) {if self_.lease==0 {return;}assert(valid(self_));let owner=self_.lease-1;assert(leases[owner].references!=0);leases[owner].references-=1;if leases[owner].references!=0 {self_=Owner {..};return;}var next=leases[owner].head;while next!=0 {let at=next-1;let link=links[at];next=link.next;match link.value {
+run_header_module run=>{pool_header_module.free_slice(run.values);},
+run_header_path run=>{pool_header_path.free_slice(run.values);},
+run_header_digest run=>{pool_header_digest.free_slice(run.values);},
+run_header_name run=>{pool_header_name.free_slice(run.values);},
+run_header_import run=>{pool_header_import.free_slice(run.values);},
+run_header_owner run=>{pool_header_owner.free_slice(run.values);},
+run_bool run=>{pool_bool.free_slice(run.values);},
 
 
-Run.run_u32 run=>{pool_u32.free_slice(run.values);},
+run_u32 run=>{pool_u32.free_slice(run.values);},
 
-Run.run_blot_check_numeric_proof_terms__Kind run=>{pool_blot_check_numeric_proof_terms__Kind.free_slice(run.values);},
+run_blot_check_numeric_proof_terms__Kind run=>{pool_blot_check_numeric_proof_terms__Kind.free_slice(run.values);},
 
-Run.run_blot_check_numeric_proof_terms__Term run=>{pool_blot_check_numeric_proof_terms__Term.free_slice(run.values);},
+run_blot_check_numeric_proof_terms__Term run=>{pool_blot_check_numeric_proof_terms__Term.free_slice(run.values);},
 
-Run.run_blot_check_numeric_proof_contracts__Requirement run=>{pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run.values);},
+run_blot_check_numeric_proof_contracts__Requirement run=>{pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run.values);},
 
-Run.run_blot_check_numeric_proof_headers__Named run=>{pool_blot_check_numeric_proof_headers__Named.free_slice(run.values);},
+run_blot_check_numeric_proof_headers__Named run=>{pool_blot_check_numeric_proof_headers__Named.free_slice(run.values);},
 
-Run.run_blot_check_capability_contracts__Term run=>{pool_blot_check_capability_contracts__Term.free_slice(run.values);},
+run_blot_check_capability_contracts__Term run=>{pool_blot_check_capability_contracts__Term.free_slice(run.values);},
 
-Run.run_blot_check_capability_contracts__Binding run=>{pool_blot_check_capability_contracts__Binding.free_slice(run.values);},
+run_blot_check_capability_contracts__Binding run=>{pool_blot_check_capability_contracts__Binding.free_slice(run.values);},
 
-Run.run_blot_check_core__FieldName run=>{pool_blot_check_core__FieldName.free_slice(run.values);},
+run_blot_check_core__FieldName run=>{pool_blot_check_core__FieldName.free_slice(run.values);},
 
-Run.run_blot_check_core__RuntimeName run=>{pool_blot_check_core__RuntimeName.free_slice(run.values);},
+run_blot_check_core__RuntimeName run=>{pool_blot_check_core__RuntimeName.free_slice(run.values);},
 
-Run.run_blot_check_core__DeclarationDependencies run=>{pool_blot_check_core__DeclarationDependencies.free_slice(run.values);},
+run_blot_check_core__DeclarationDependencies run=>{pool_blot_check_core__DeclarationDependencies.free_slice(run.values);},
 
-Run.run_blot_check_core__BindingRef run=>{pool_blot_check_core__BindingRef.free_slice(run.values);},
+run_blot_check_core__BindingRef run=>{pool_blot_check_core__BindingRef.free_slice(run.values);},
 
-Run.run_blot_check_core__DependencyMember run=>{pool_blot_check_core__DependencyMember.free_slice(run.values);},
+run_blot_check_core__DependencyMember run=>{pool_blot_check_core__DependencyMember.free_slice(run.values);},
 
-Run.run_blot_check_core__ErasedDeclarationReference run=>{pool_blot_check_core__ErasedDeclarationReference.free_slice(run.values);},
+run_blot_check_core__ErasedDeclarationReference run=>{pool_blot_check_core__ErasedDeclarationReference.free_slice(run.values);},
 
-Run.run_blot_check_core__RequestLoopInfo run=>{pool_blot_check_core__RequestLoopInfo.free_slice(run.values);},
+run_blot_check_core__RequestLoopInfo run=>{pool_blot_check_core__RequestLoopInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__RequestArm run=>{pool_blot_check_core__RequestArm.free_slice(run.values);},
+run_blot_check_core__RequestArm run=>{pool_blot_check_core__RequestArm.free_slice(run.values);},
 
-Run.run_blot_check_types__Node run=>{pool_blot_check_types__Node.free_slice(run.values);},
+run_blot_check_types__Node run=>{pool_blot_check_types__Node.free_slice(run.values);},
 
-Run.run_blot_check_effects__Row run=>{pool_blot_check_effects__Row.free_slice(run.values);},
+run_blot_check_effects__Row run=>{pool_blot_check_effects__Row.free_slice(run.values);},
 
-Run.run_blot_check_types__Operation run=>{pool_blot_check_types__Operation.free_slice(run.values);},
+run_blot_check_types__Operation run=>{pool_blot_check_types__Operation.free_slice(run.values);},
 
-Run.run_blot_check_types__QuantifierGoals run=>{pool_blot_check_types__QuantifierGoals.free_slice(run.values);},
+run_blot_check_types__QuantifierGoals run=>{pool_blot_check_types__QuantifierGoals.free_slice(run.values);},
 
-Run.run_blot_check_types__Obligation run=>{pool_blot_check_types__Obligation.free_slice(run.values);},
+run_blot_check_types__Obligation run=>{pool_blot_check_types__Obligation.free_slice(run.values);},
 
-Run.run_blot_check_core__Node run=>{pool_blot_check_core__Node.free_slice(run.values);},
+run_blot_check_core__Node run=>{pool_blot_check_core__Node.free_slice(run.values);},
 
-Run.run_blot_parse_ast__Span run=>{pool_blot_parse_ast__Span.free_slice(run.values);},
+run_blot_parse_ast__Span run=>{pool_blot_parse_ast__Span.free_slice(run.values);},
 
-Run.run_blot_check_core__Binding run=>{pool_blot_check_core__Binding.free_slice(run.values);},
+run_blot_check_core__Binding run=>{pool_blot_check_core__Binding.free_slice(run.values);},
 
-Run.run_blot_check_core__Body run=>{pool_blot_check_core__Body.free_slice(run.values);},
+run_blot_check_core__Body run=>{pool_blot_check_core__Body.free_slice(run.values);},
 
-Run.run_blot_check_core__Parameter run=>{pool_blot_check_core__Parameter.free_slice(run.values);},
+run_blot_check_core__Parameter run=>{pool_blot_check_core__Parameter.free_slice(run.values);},
 
-Run.run_blot_check_core__CallInfo run=>{pool_blot_check_core__CallInfo.free_slice(run.values);},
+run_blot_check_core__CallInfo run=>{pool_blot_check_core__CallInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__Merge run=>{pool_blot_check_core__Merge.free_slice(run.values);},
+run_blot_check_core__Merge run=>{pool_blot_check_core__Merge.free_slice(run.values);},
 
-Run.run_blot_check_core__List run=>{pool_blot_check_core__List.free_slice(run.values);},
+run_blot_check_core__List run=>{pool_blot_check_core__List.free_slice(run.values);},
 
-Run.run_u8 run=>{pool_u8.free_slice(run.values);},
+run_u8 run=>{pool_u8.free_slice(run.values);},
 
-Run.run_blot_check_core__Obligation run=>{pool_blot_check_core__Obligation.free_slice(run.values);},
+run_blot_check_core__Obligation run=>{pool_blot_check_core__Obligation.free_slice(run.values);},
 
-Run.run_blot_check_core__Nominal run=>{pool_blot_check_core__Nominal.free_slice(run.values);},
+run_blot_check_core__Nominal run=>{pool_blot_check_core__Nominal.free_slice(run.values);},
 
-Run.run_blot_check_core__OperationName run=>{pool_blot_check_core__OperationName.free_slice(run.values);},
+run_blot_check_core__OperationName run=>{pool_blot_check_core__OperationName.free_slice(run.values);},
 
-Run.run_blot_check_core__Constructor run=>{pool_blot_check_core__Constructor.free_slice(run.values);},
+run_blot_check_core__Constructor run=>{pool_blot_check_core__Constructor.free_slice(run.values);},
 
-Run.run_blot_check_core__Projection run=>{pool_blot_check_core__Projection.free_slice(run.values);},
+run_blot_check_core__Projection run=>{pool_blot_check_core__Projection.free_slice(run.values);},
 
-Run.run_blot_check_core__ProjectionVariant run=>{pool_blot_check_core__ProjectionVariant.free_slice(run.values);},
+run_blot_check_core__ProjectionVariant run=>{pool_blot_check_core__ProjectionVariant.free_slice(run.values);},
 
-Run.run_blot_check_core__Pattern run=>{pool_blot_check_core__Pattern.free_slice(run.values);},
+run_blot_check_core__Pattern run=>{pool_blot_check_core__Pattern.free_slice(run.values);},
 
-Run.run_blot_check_core__PatternRow run=>{pool_blot_check_core__PatternRow.free_slice(run.values);},
+run_blot_check_core__PatternRow run=>{pool_blot_check_core__PatternRow.free_slice(run.values);},
 
-Run.run_blot_check_core__MatchArm run=>{pool_blot_check_core__MatchArm.free_slice(run.values);},
+run_blot_check_core__MatchArm run=>{pool_blot_check_core__MatchArm.free_slice(run.values);},
 
-Run.run_blot_check_core__MatchInfo run=>{pool_blot_check_core__MatchInfo.free_slice(run.values);},
+run_blot_check_core__MatchInfo run=>{pool_blot_check_core__MatchInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__UpdateInfo run=>{pool_blot_check_core__UpdateInfo.free_slice(run.values);},
+run_blot_check_core__UpdateInfo run=>{pool_blot_check_core__UpdateInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__UpdateStep run=>{pool_blot_check_core__UpdateStep.free_slice(run.values);},
+run_blot_check_core__UpdateStep run=>{pool_blot_check_core__UpdateStep.free_slice(run.values);},
 
-Run.run_blot_check_core__ClosureInfo run=>{pool_blot_check_core__ClosureInfo.free_slice(run.values);},
+run_blot_check_core__ClosureInfo run=>{pool_blot_check_core__ClosureInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__Associated run=>{pool_blot_check_core__Associated.free_slice(run.values);},
+run_blot_check_core__Associated run=>{pool_blot_check_core__Associated.free_slice(run.values);},
 
-Run.run_blot_check_core__Contract run=>{pool_blot_check_core__Contract.free_slice(run.values);},
+run_blot_check_core__Contract run=>{pool_blot_check_core__Contract.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__ContractMember run=>{pool_blot_reuse_principal_interface__ContractMember.free_slice(run.values);},
+run_blot_reuse_principal_interface__ContractMember run=>{pool_blot_reuse_principal_interface__ContractMember.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Implementation run=>{pool_blot_reuse_principal_interface__Implementation.free_slice(run.values);},
+run_blot_reuse_principal_interface__Implementation run=>{pool_blot_reuse_principal_interface__Implementation.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__ImplementationMember run=>{pool_blot_reuse_principal_interface__ImplementationMember.free_slice(run.values);},
+run_blot_reuse_principal_interface__ImplementationMember run=>{pool_blot_reuse_principal_interface__ImplementationMember.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__MemberTemplate run=>{pool_blot_reuse_principal_interface__MemberTemplate.free_slice(run.values);},
+run_blot_reuse_principal_interface__MemberTemplate run=>{pool_blot_reuse_principal_interface__MemberTemplate.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__SelectedProof run=>{pool_blot_reuse_principal_interface__SelectedProof.free_slice(run.values);},
+run_blot_reuse_principal_interface__SelectedProof run=>{pool_blot_reuse_principal_interface__SelectedProof.free_slice(run.values);},
 
-Run.run_blot_check_core__SelectedUse run=>{pool_blot_check_core__SelectedUse.free_slice(run.values);},
+run_blot_check_core__SelectedUse run=>{pool_blot_check_core__SelectedUse.free_slice(run.values);},
 
-Run.run_blot_check_core__DictionarySelection run=>{pool_blot_check_core__DictionarySelection.free_slice(run.values);},
+run_blot_check_core__DictionarySelection run=>{pool_blot_check_core__DictionarySelection.free_slice(run.values);},
 
-Run.run_blot_check_core__DictionaryUse run=>{pool_blot_check_core__DictionaryUse.free_slice(run.values);},
+run_blot_check_core__DictionaryUse run=>{pool_blot_check_core__DictionaryUse.free_slice(run.values);},
 
-Run.run_blot_check_core__Primitive run=>{pool_blot_check_core__Primitive.free_slice(run.values);},
+run_blot_check_core__Primitive run=>{pool_blot_check_core__Primitive.free_slice(run.values);},
 
-Run.run_blot_check_core__LoopInfo run=>{pool_blot_check_core__LoopInfo.free_slice(run.values);},
+run_blot_check_core__LoopInfo run=>{pool_blot_check_core__LoopInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__LoopCarry run=>{pool_blot_check_core__LoopCarry.free_slice(run.values);},
+run_blot_check_core__LoopCarry run=>{pool_blot_check_core__LoopCarry.free_slice(run.values);},
 
-Run.run_blot_check_core__ResolverInfo run=>{pool_blot_check_core__ResolverInfo.free_slice(run.values);},
+run_blot_check_core__ResolverInfo run=>{pool_blot_check_core__ResolverInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__OperationValue run=>{pool_blot_check_core__OperationValue.free_slice(run.values);},
+run_blot_check_core__OperationValue run=>{pool_blot_check_core__OperationValue.free_slice(run.values);},
 
-Run.run_blot_check_core__HandleEffects run=>{pool_blot_check_core__HandleEffects.free_slice(run.values);},
+run_blot_check_core__HandleEffects run=>{pool_blot_check_core__HandleEffects.free_slice(run.values);},
 
-Run.run_blot_check_core__Diagnostic run=>{pool_blot_check_core__Diagnostic.free_slice(run.values);},
+run_blot_check_core__Diagnostic run=>{pool_blot_check_core__Diagnostic.free_slice(run.values);},
 
-Run.run_blot_check_parameter_patterns__Node run=>{pool_blot_check_parameter_patterns__Node.free_slice(run.values);},
+run_blot_check_parameter_patterns__Node run=>{pool_blot_check_parameter_patterns__Node.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Binding run=>{pool_blot_reuse_principal_interface__Binding.free_slice(run.values);},
+run_blot_reuse_principal_interface__Binding run=>{pool_blot_reuse_principal_interface__Binding.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Nominal run=>{pool_blot_reuse_principal_interface__Nominal.free_slice(run.values);},
+run_blot_reuse_principal_interface__Nominal run=>{pool_blot_reuse_principal_interface__Nominal.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Constructor run=>{pool_blot_reuse_principal_interface__Constructor.free_slice(run.values);},
+run_blot_reuse_principal_interface__Constructor run=>{pool_blot_reuse_principal_interface__Constructor.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__EffectFamily run=>{pool_blot_reuse_principal_interface__EffectFamily.free_slice(run.values);},
+run_blot_reuse_principal_interface__EffectFamily run=>{pool_blot_reuse_principal_interface__EffectFamily.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__EffectTemplate run=>{pool_blot_reuse_principal_interface__EffectTemplate.free_slice(run.values);},
+run_blot_reuse_principal_interface__EffectTemplate run=>{pool_blot_reuse_principal_interface__EffectTemplate.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Associated run=>{pool_blot_reuse_principal_interface__Associated.free_slice(run.values);},
+run_blot_reuse_principal_interface__Associated run=>{pool_blot_reuse_principal_interface__Associated.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Contract run=>{pool_blot_reuse_principal_interface__Contract.free_slice(run.values);},
+run_blot_reuse_principal_interface__Contract run=>{pool_blot_reuse_principal_interface__Contract.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{pool_blot_reuse_frozen_dependency__ImportResolution.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__ImportResolution run=>{pool_blot_reuse_frozen_dependency__ImportResolution.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__Export run=>{pool_blot_reuse_frozen_dependency__Export.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__Export run=>{pool_blot_reuse_frozen_dependency__Export.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__Fixity run=>{pool_blot_reuse_frozen_dependency__Fixity.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__Fixity run=>{pool_blot_reuse_frozen_dependency__Fixity.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__Symbol run=>{pool_blot_reuse_frozen_dependency__Symbol.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__Symbol run=>{pool_blot_reuse_frozen_dependency__Symbol.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__Module run=>{pool_blot_reuse_frozen_dependency__Module.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__Module run=>{pool_blot_reuse_frozen_dependency__Module.free_slice(run.values);},
 
-}links.free(at);}leases[owner].live=false;self=Owner {..};leases.free(owner);}
-fn deinit<T>(self:Owned<T>&) {self.owner.deinit();self.value=default<T>();}
-fn adopt(self:Owner&,source:Owner&)->Error {
- assert(valid(self)&&valid(source));if !unique(self)||!unique(source) {return Error.invalid_artifact;}if self.lease==source.lease {return Error.invalid_artifact;}
- let at=source.lease-1;let head=leases[at].head;if head!=0 {var tail=head;while links[tail-1].next!=0 {tail=links[tail-1].next;}links[tail-1].next=leases[self.lease-1].head;leases[self.lease-1].head=head;}
- leases[at].live=false;source=Owner {..};leases.free(at);return Error.none;
+}links.free(at);}leases[owner].live=false;self_=Owner {..};leases.free(owner);}
+fn deinit<T>(self_:Owned<T>&) {self_.owner.deinit();self_.value=default<T>();}
+fn adopt(self_:Owner&,source:Owner&)->Error {
+ assert(valid(self_)&&valid(source));if !unique(self_)||!unique(source) {return blot_error::Error.invalid_artifact;}if self_.lease==source.lease {return blot_error::Error.invalid_artifact;}
+ let at=source.lease-1;let head=leases[at].head;if head!=0 {var tail=head;while links[tail-1].next!=0 {tail=links[tail-1].next;}links[tail-1].next=leases[self_.lease-1].head;leases[self_.lease-1].head=head;}
+ leases[at].live=false;source=Owner {..};leases.free(at);return blot_error::Error.none;
 }
-fn alloc<T>(self:Owner&,length:i64)->T[:],Error {return allocate(self,default<T>(),length);}
-fn copy<T>(self:Owner&,values:const T[:])->T[:],Error {let result,error=self.alloc<T>(values.len);if error!=Error.none {return [],error;}for value,index in values {result[index]=value;}return result,Error.none;}
+fn alloc<T>(self_:Owner&,length:i64)->T[:],Error {return allocate(self_,default<T>(),length);}
+fn copy<T>(self_:Owner&,values:const T[:])->T[:],Error {let result,error=blot_reuse_dependency_payload::alloc<T>(self_,values.len);if error!=blot_error::Error.none {return default<T[:]>(),error;}for value,index in values {result[index]=value;}return result,blot_error::Error.none;}
 
-fn allocate(self:Owner&,sample:u32,length:i64)->u32[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_u32.alloc_slice(length);let error=remember(self,Run.run_u32 {run, ..});if error!=Error.none {pool_u32.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:u32,length:i64)->u32[:],Error {
+ assert(unique(self_));if length<0 {return default<u32[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<u32[:]>(),blot_error::Error.none;}
+ let run=pool_u32.alloc_slice(length);let error=remember(self_,Run.run_u32 {run, ..});if error!=blot_error::Error.none {pool_u32.free_slice(run);return default<u32[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const u32[:])->u32[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u32 run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const u32[:])->u32[:] {
+ assert(unique(self_));if values.len==0 {return default<u32[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_u32 run=>{if blot_support::same_slice_identity(run.values,values) {return pool_u32.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const u32[:])->u32[:],Error {
- let result,error=self.alloc<u32>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const u32[:])->u32[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<u32>(self_,values.len);if error!=blot_error::Error.none {return default<u32[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<u32[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_numeric_proof_terms::Kind,length:i64)->blot_check_numeric_proof_terms::Kind[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_numeric_proof_terms__Kind.alloc_slice(length);let error=remember(self,Run.run_blot_check_numeric_proof_terms__Kind {run, ..});if error!=Error.none {pool_blot_check_numeric_proof_terms__Kind.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_numeric_proof_terms::Kind,length:i64)->blot_check_numeric_proof_terms::Kind[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_numeric_proof_terms::Kind[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_numeric_proof_terms::Kind[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_numeric_proof_terms__Kind.alloc_slice(length);let error=remember(self_,Run.run_blot_check_numeric_proof_terms__Kind {run, ..});if error!=blot_error::Error.none {pool_blot_check_numeric_proof_terms__Kind.free_slice(run);return default<blot_check_numeric_proof_terms::Kind[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_numeric_proof_terms::Kind[:])->blot_check_numeric_proof_terms::Kind[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Kind run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_numeric_proof_terms::Kind[:])->blot_check_numeric_proof_terms::Kind[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_numeric_proof_terms::Kind[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Kind run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_numeric_proof_terms__Kind.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_numeric_proof_terms::Kind[:])->blot_check_numeric_proof_terms::Kind[:],Error {
- let result,error=self.alloc<blot_check_numeric_proof_terms::Kind>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_numeric_proof_terms::Kind[:])->blot_check_numeric_proof_terms::Kind[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_numeric_proof_terms::Kind>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_terms::Kind[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_terms::Kind[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_numeric_proof_terms::Term,length:i64)->blot_check_numeric_proof_terms::Term[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_numeric_proof_terms__Term.alloc_slice(length);let error=remember(self,Run.run_blot_check_numeric_proof_terms__Term {run, ..});if error!=Error.none {pool_blot_check_numeric_proof_terms__Term.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_numeric_proof_terms::Term,length:i64)->blot_check_numeric_proof_terms::Term[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_numeric_proof_terms::Term[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_numeric_proof_terms::Term[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_numeric_proof_terms__Term.alloc_slice(length);let error=remember(self_,Run.run_blot_check_numeric_proof_terms__Term {run, ..});if error!=blot_error::Error.none {pool_blot_check_numeric_proof_terms__Term.free_slice(run);return default<blot_check_numeric_proof_terms::Term[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_numeric_proof_terms::Term[:])->blot_check_numeric_proof_terms::Term[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Term run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_numeric_proof_terms::Term[:])->blot_check_numeric_proof_terms::Term[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_numeric_proof_terms::Term[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Term run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_numeric_proof_terms__Term.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_numeric_proof_terms::Term[:])->blot_check_numeric_proof_terms::Term[:],Error {
- let result,error=self.alloc<blot_check_numeric_proof_terms::Term>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_numeric_proof_terms::Term[:])->blot_check_numeric_proof_terms::Term[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_numeric_proof_terms::Term>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_terms::Term[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_terms::Term[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_numeric_proof_contracts::Requirement,length:i64)->blot_check_numeric_proof_contracts::Requirement[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_numeric_proof_contracts__Requirement.alloc_slice(length);let error=remember(self,Run.run_blot_check_numeric_proof_contracts__Requirement {run, ..});if error!=Error.none {pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_numeric_proof_contracts::Requirement,length:i64)->blot_check_numeric_proof_contracts::Requirement[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_numeric_proof_contracts::Requirement[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_numeric_proof_contracts::Requirement[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_numeric_proof_contracts__Requirement.alloc_slice(length);let error=remember(self_,Run.run_blot_check_numeric_proof_contracts__Requirement {run, ..});if error!=blot_error::Error.none {pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run);return default<blot_check_numeric_proof_contracts::Requirement[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:])->blot_check_numeric_proof_contracts::Requirement[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_contracts__Requirement run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:])->blot_check_numeric_proof_contracts::Requirement[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_numeric_proof_contracts::Requirement[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_contracts__Requirement run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_numeric_proof_contracts__Requirement.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:])->blot_check_numeric_proof_contracts::Requirement[:],Error {
- let result,error=self.alloc<blot_check_numeric_proof_contracts::Requirement>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:])->blot_check_numeric_proof_contracts::Requirement[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_numeric_proof_contracts::Requirement>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_contracts::Requirement[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_contracts::Requirement[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_numeric_proof_headers::Named,length:i64)->blot_check_numeric_proof_headers::Named[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_numeric_proof_headers__Named.alloc_slice(length);let error=remember(self,Run.run_blot_check_numeric_proof_headers__Named {run, ..});if error!=Error.none {pool_blot_check_numeric_proof_headers__Named.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_numeric_proof_headers::Named,length:i64)->blot_check_numeric_proof_headers::Named[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_numeric_proof_headers::Named[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_numeric_proof_headers::Named[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_numeric_proof_headers__Named.alloc_slice(length);let error=remember(self_,Run.run_blot_check_numeric_proof_headers__Named {run, ..});if error!=blot_error::Error.none {pool_blot_check_numeric_proof_headers__Named.free_slice(run);return default<blot_check_numeric_proof_headers::Named[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_numeric_proof_headers::Named[:])->blot_check_numeric_proof_headers::Named[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_headers__Named run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_numeric_proof_headers::Named[:])->blot_check_numeric_proof_headers::Named[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_numeric_proof_headers::Named[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_headers__Named run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_numeric_proof_headers__Named.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_numeric_proof_headers::Named[:])->blot_check_numeric_proof_headers::Named[:],Error {
- let result,error=self.alloc<blot_check_numeric_proof_headers::Named>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_numeric_proof_headers::Named[:])->blot_check_numeric_proof_headers::Named[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_numeric_proof_headers::Named>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_headers::Named[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_headers::Named[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_capability_contracts::Term,length:i64)->blot_check_capability_contracts::Term[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_capability_contracts__Term.alloc_slice(length);let error=remember(self,Run.run_blot_check_capability_contracts__Term {run, ..});if error!=Error.none {pool_blot_check_capability_contracts__Term.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_capability_contracts::Term,length:i64)->blot_check_capability_contracts::Term[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_capability_contracts::Term[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_capability_contracts::Term[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_capability_contracts__Term.alloc_slice(length);let error=remember(self_,Run.run_blot_check_capability_contracts__Term {run, ..});if error!=blot_error::Error.none {pool_blot_check_capability_contracts__Term.free_slice(run);return default<blot_check_capability_contracts::Term[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Term run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_capability_contracts::Term[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Term run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_capability_contracts__Term.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:],Error {
- let result,error=self.alloc<blot_check_capability_contracts::Term>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_capability_contracts::Term>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_capability_contracts::Term[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_capability_contracts::Term[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_capability_contracts::Binding,length:i64)->blot_check_capability_contracts::Binding[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_capability_contracts__Binding.alloc_slice(length);let error=remember(self,Run.run_blot_check_capability_contracts__Binding {run, ..});if error!=Error.none {pool_blot_check_capability_contracts__Binding.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_capability_contracts::Binding,length:i64)->blot_check_capability_contracts::Binding[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_capability_contracts::Binding[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_capability_contracts::Binding[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_capability_contracts__Binding.alloc_slice(length);let error=remember(self_,Run.run_blot_check_capability_contracts__Binding {run, ..});if error!=blot_error::Error.none {pool_blot_check_capability_contracts__Binding.free_slice(run);return default<blot_check_capability_contracts::Binding[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Binding run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_capability_contracts::Binding[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_capability_contracts__Binding.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:],Error {
- let result,error=self.alloc<blot_check_capability_contracts::Binding>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_capability_contracts::Binding>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_capability_contracts::Binding[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_capability_contracts::Binding[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::FieldName,length:i64)->blot_check_core::FieldName[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__FieldName.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__FieldName {run, ..});if error!=Error.none {pool_blot_check_core__FieldName.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::FieldName,length:i64)->blot_check_core::FieldName[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::FieldName[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::FieldName[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__FieldName.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__FieldName {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__FieldName.free_slice(run);return default<blot_check_core::FieldName[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::FieldName[:])->blot_check_core::FieldName[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__FieldName run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::FieldName[:])->blot_check_core::FieldName[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::FieldName[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__FieldName run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__FieldName.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::FieldName[:])->blot_check_core::FieldName[:],Error {
- let result,error=self.alloc<blot_check_core::FieldName>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::FieldName[:])->blot_check_core::FieldName[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::FieldName>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::FieldName[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::FieldName[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::RuntimeName,length:i64)->blot_check_core::RuntimeName[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__RuntimeName.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__RuntimeName {run, ..});if error!=Error.none {pool_blot_check_core__RuntimeName.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::RuntimeName,length:i64)->blot_check_core::RuntimeName[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::RuntimeName[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::RuntimeName[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__RuntimeName.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__RuntimeName {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__RuntimeName.free_slice(run);return default<blot_check_core::RuntimeName[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::RuntimeName[:])->blot_check_core::RuntimeName[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RuntimeName run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::RuntimeName[:])->blot_check_core::RuntimeName[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::RuntimeName[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__RuntimeName run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__RuntimeName.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::RuntimeName[:])->blot_check_core::RuntimeName[:],Error {
- let result,error=self.alloc<blot_check_core::RuntimeName>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::RuntimeName[:])->blot_check_core::RuntimeName[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::RuntimeName>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::RuntimeName[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::RuntimeName[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::DeclarationDependencies,length:i64)->blot_check_core::DeclarationDependencies[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__DeclarationDependencies.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__DeclarationDependencies {run, ..});if error!=Error.none {pool_blot_check_core__DeclarationDependencies.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::DeclarationDependencies,length:i64)->blot_check_core::DeclarationDependencies[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::DeclarationDependencies[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::DeclarationDependencies[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__DeclarationDependencies.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__DeclarationDependencies {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__DeclarationDependencies.free_slice(run);return default<blot_check_core::DeclarationDependencies[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::DeclarationDependencies[:])->blot_check_core::DeclarationDependencies[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DeclarationDependencies run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::DeclarationDependencies[:])->blot_check_core::DeclarationDependencies[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::DeclarationDependencies[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DeclarationDependencies run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__DeclarationDependencies.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::DeclarationDependencies[:])->blot_check_core::DeclarationDependencies[:],Error {
- let result,error=self.alloc<blot_check_core::DeclarationDependencies>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::DeclarationDependencies[:])->blot_check_core::DeclarationDependencies[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::DeclarationDependencies>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::DeclarationDependencies[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::DeclarationDependencies[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::BindingRef,length:i64)->blot_check_core::BindingRef[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__BindingRef.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__BindingRef {run, ..});if error!=Error.none {pool_blot_check_core__BindingRef.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::BindingRef,length:i64)->blot_check_core::BindingRef[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::BindingRef[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::BindingRef[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__BindingRef.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__BindingRef {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__BindingRef.free_slice(run);return default<blot_check_core::BindingRef[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::BindingRef[:])->blot_check_core::BindingRef[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__BindingRef run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::BindingRef[:])->blot_check_core::BindingRef[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::BindingRef[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__BindingRef run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__BindingRef.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::BindingRef[:])->blot_check_core::BindingRef[:],Error {
- let result,error=self.alloc<blot_check_core::BindingRef>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::BindingRef[:])->blot_check_core::BindingRef[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::BindingRef>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::BindingRef[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::BindingRef[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::DependencyMember,length:i64)->blot_check_core::DependencyMember[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__DependencyMember.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__DependencyMember {run, ..});if error!=Error.none {pool_blot_check_core__DependencyMember.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::DependencyMember,length:i64)->blot_check_core::DependencyMember[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::DependencyMember[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::DependencyMember[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__DependencyMember.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__DependencyMember {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__DependencyMember.free_slice(run);return default<blot_check_core::DependencyMember[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::DependencyMember[:])->blot_check_core::DependencyMember[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DependencyMember run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::DependencyMember[:])->blot_check_core::DependencyMember[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::DependencyMember[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DependencyMember run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__DependencyMember.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::DependencyMember[:])->blot_check_core::DependencyMember[:],Error {
- let result,error=self.alloc<blot_check_core::DependencyMember>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::DependencyMember[:])->blot_check_core::DependencyMember[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::DependencyMember>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::DependencyMember[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::DependencyMember[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::ErasedDeclarationReference,length:i64)->blot_check_core::ErasedDeclarationReference[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__ErasedDeclarationReference.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__ErasedDeclarationReference {run, ..});if error!=Error.none {pool_blot_check_core__ErasedDeclarationReference.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::ErasedDeclarationReference,length:i64)->blot_check_core::ErasedDeclarationReference[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::ErasedDeclarationReference[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::ErasedDeclarationReference[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__ErasedDeclarationReference.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__ErasedDeclarationReference {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__ErasedDeclarationReference.free_slice(run);return default<blot_check_core::ErasedDeclarationReference[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::ErasedDeclarationReference[:])->blot_check_core::ErasedDeclarationReference[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ErasedDeclarationReference run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::ErasedDeclarationReference[:])->blot_check_core::ErasedDeclarationReference[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::ErasedDeclarationReference[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ErasedDeclarationReference run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__ErasedDeclarationReference.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::ErasedDeclarationReference[:])->blot_check_core::ErasedDeclarationReference[:],Error {
- let result,error=self.alloc<blot_check_core::ErasedDeclarationReference>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::ErasedDeclarationReference[:])->blot_check_core::ErasedDeclarationReference[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::ErasedDeclarationReference>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::ErasedDeclarationReference[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::ErasedDeclarationReference[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::RequestLoopInfo,length:i64)->blot_check_core::RequestLoopInfo[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__RequestLoopInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__RequestLoopInfo {run, ..});if error!=Error.none {pool_blot_check_core__RequestLoopInfo.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::RequestLoopInfo,length:i64)->blot_check_core::RequestLoopInfo[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::RequestLoopInfo[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::RequestLoopInfo[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__RequestLoopInfo.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__RequestLoopInfo {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__RequestLoopInfo.free_slice(run);return default<blot_check_core::RequestLoopInfo[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::RequestLoopInfo[:])->blot_check_core::RequestLoopInfo[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestLoopInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::RequestLoopInfo[:])->blot_check_core::RequestLoopInfo[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::RequestLoopInfo[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__RequestLoopInfo run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__RequestLoopInfo.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::RequestLoopInfo[:])->blot_check_core::RequestLoopInfo[:],Error {
- let result,error=self.alloc<blot_check_core::RequestLoopInfo>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::RequestLoopInfo[:])->blot_check_core::RequestLoopInfo[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::RequestLoopInfo>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::RequestLoopInfo[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::RequestLoopInfo[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::RequestArm,length:i64)->blot_check_core::RequestArm[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__RequestArm.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__RequestArm {run, ..});if error!=Error.none {pool_blot_check_core__RequestArm.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::RequestArm,length:i64)->blot_check_core::RequestArm[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::RequestArm[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::RequestArm[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__RequestArm.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__RequestArm {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__RequestArm.free_slice(run);return default<blot_check_core::RequestArm[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::RequestArm[:])->blot_check_core::RequestArm[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestArm run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::RequestArm[:])->blot_check_core::RequestArm[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::RequestArm[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__RequestArm run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__RequestArm.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::RequestArm[:])->blot_check_core::RequestArm[:],Error {
- let result,error=self.alloc<blot_check_core::RequestArm>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::RequestArm[:])->blot_check_core::RequestArm[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::RequestArm>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::RequestArm[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::RequestArm[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_types::Node,length:i64)->blot_check_types::Node[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_types__Node.alloc_slice(length);let error=remember(self,Run.run_blot_check_types__Node {run, ..});if error!=Error.none {pool_blot_check_types__Node.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_types::Node,length:i64)->blot_check_types::Node[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_types::Node[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_types::Node[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_types__Node.alloc_slice(length);let error=remember(self_,Run.run_blot_check_types__Node {run, ..});if error!=blot_error::Error.none {pool_blot_check_types__Node.free_slice(run);return default<blot_check_types::Node[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_types::Node[:])->blot_check_types::Node[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Node run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_types::Node[:])->blot_check_types::Node[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_types::Node[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__Node run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_types__Node.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_types::Node[:])->blot_check_types::Node[:],Error {
- let result,error=self.alloc<blot_check_types::Node>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_types::Node[:])->blot_check_types::Node[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_types::Node>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_types::Node[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_types::Node[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_effects::Row,length:i64)->blot_check_effects::Row[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_effects__Row.alloc_slice(length);let error=remember(self,Run.run_blot_check_effects__Row {run, ..});if error!=Error.none {pool_blot_check_effects__Row.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_effects::Row,length:i64)->blot_check_effects::Row[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_effects::Row[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_effects::Row[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_effects__Row.alloc_slice(length);let error=remember(self_,Run.run_blot_check_effects__Row {run, ..});if error!=blot_error::Error.none {pool_blot_check_effects__Row.free_slice(run);return default<blot_check_effects::Row[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_effects::Row[:])->blot_check_effects::Row[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_effects__Row run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_effects::Row[:])->blot_check_effects::Row[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_effects::Row[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_effects__Row run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_effects__Row.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_effects::Row[:])->blot_check_effects::Row[:],Error {
- let result,error=self.alloc<blot_check_effects::Row>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_effects::Row[:])->blot_check_effects::Row[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_effects::Row>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_effects::Row[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_effects::Row[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_types::Operation,length:i64)->blot_check_types::Operation[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_types__Operation.alloc_slice(length);let error=remember(self,Run.run_blot_check_types__Operation {run, ..});if error!=Error.none {pool_blot_check_types__Operation.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_types::Operation,length:i64)->blot_check_types::Operation[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_types::Operation[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_types::Operation[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_types__Operation.alloc_slice(length);let error=remember(self_,Run.run_blot_check_types__Operation {run, ..});if error!=blot_error::Error.none {pool_blot_check_types__Operation.free_slice(run);return default<blot_check_types::Operation[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_types::Operation[:])->blot_check_types::Operation[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Operation run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_types::Operation[:])->blot_check_types::Operation[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_types::Operation[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__Operation run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_types__Operation.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_types::Operation[:])->blot_check_types::Operation[:],Error {
- let result,error=self.alloc<blot_check_types::Operation>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_types::Operation[:])->blot_check_types::Operation[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_types::Operation>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_types::Operation[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_types::Operation[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_types::QuantifierGoals,length:i64)->blot_check_types::QuantifierGoals[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_types__QuantifierGoals.alloc_slice(length);let error=remember(self,Run.run_blot_check_types__QuantifierGoals {run, ..});if error!=Error.none {pool_blot_check_types__QuantifierGoals.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_types::QuantifierGoals,length:i64)->blot_check_types::QuantifierGoals[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_types::QuantifierGoals[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_types::QuantifierGoals[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_types__QuantifierGoals.alloc_slice(length);let error=remember(self_,Run.run_blot_check_types__QuantifierGoals {run, ..});if error!=blot_error::Error.none {pool_blot_check_types__QuantifierGoals.free_slice(run);return default<blot_check_types::QuantifierGoals[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_types::QuantifierGoals[:])->blot_check_types::QuantifierGoals[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__QuantifierGoals run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_types::QuantifierGoals[:])->blot_check_types::QuantifierGoals[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_types::QuantifierGoals[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__QuantifierGoals run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_types__QuantifierGoals.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_types::QuantifierGoals[:])->blot_check_types::QuantifierGoals[:],Error {
- let result,error=self.alloc<blot_check_types::QuantifierGoals>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_types::QuantifierGoals[:])->blot_check_types::QuantifierGoals[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_types::QuantifierGoals>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_types::QuantifierGoals[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_types::QuantifierGoals[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_types::Obligation,length:i64)->blot_check_types::Obligation[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_types__Obligation.alloc_slice(length);let error=remember(self,Run.run_blot_check_types__Obligation {run, ..});if error!=Error.none {pool_blot_check_types__Obligation.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_types::Obligation,length:i64)->blot_check_types::Obligation[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_types::Obligation[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_types::Obligation[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_types__Obligation.alloc_slice(length);let error=remember(self_,Run.run_blot_check_types__Obligation {run, ..});if error!=blot_error::Error.none {pool_blot_check_types__Obligation.free_slice(run);return default<blot_check_types::Obligation[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_types::Obligation[:])->blot_check_types::Obligation[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Obligation run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_types::Obligation[:])->blot_check_types::Obligation[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_types::Obligation[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__Obligation run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_types__Obligation.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_types::Obligation[:])->blot_check_types::Obligation[:],Error {
- let result,error=self.alloc<blot_check_types::Obligation>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_types::Obligation[:])->blot_check_types::Obligation[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_types::Obligation>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_types::Obligation[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_types::Obligation[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Node,length:i64)->blot_check_core::Node[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Node.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Node {run, ..});if error!=Error.none {pool_blot_check_core__Node.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Node,length:i64)->blot_check_core::Node[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Node[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Node[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Node.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Node {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Node.free_slice(run);return default<blot_check_core::Node[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Node[:])->blot_check_core::Node[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Node run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Node[:])->blot_check_core::Node[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Node[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Node run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Node.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Node[:])->blot_check_core::Node[:],Error {
- let result,error=self.alloc<blot_check_core::Node>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Node[:])->blot_check_core::Node[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Node>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Node[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Node[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_parse_ast::Span,length:i64)->blot_parse_ast::Span[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_parse_ast__Span.alloc_slice(length);let error=remember(self,Run.run_blot_parse_ast__Span {run, ..});if error!=Error.none {pool_blot_parse_ast__Span.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_parse_ast::Span,length:i64)->blot_parse_ast::Span[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_parse_ast::Span[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_parse_ast::Span[:]>(),blot_error::Error.none;}
+ let run=pool_blot_parse_ast__Span.alloc_slice(length);let error=remember(self_,Run.run_blot_parse_ast__Span {run, ..});if error!=blot_error::Error.none {pool_blot_parse_ast__Span.free_slice(run);return default<blot_parse_ast::Span[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_parse_ast::Span[:])->blot_parse_ast::Span[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_parse_ast__Span run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_parse_ast::Span[:])->blot_parse_ast::Span[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_parse_ast::Span[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_parse_ast__Span run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_parse_ast__Span.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_parse_ast::Span[:])->blot_parse_ast::Span[:],Error {
- let result,error=self.alloc<blot_parse_ast::Span>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_parse_ast::Span[:])->blot_parse_ast::Span[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_parse_ast::Span>(self_,values.len);if error!=blot_error::Error.none {return default<blot_parse_ast::Span[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_parse_ast::Span[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Binding,length:i64)->blot_check_core::Binding[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Binding.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Binding {run, ..});if error!=Error.none {pool_blot_check_core__Binding.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Binding,length:i64)->blot_check_core::Binding[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Binding[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Binding[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Binding.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Binding {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Binding.free_slice(run);return default<blot_check_core::Binding[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Binding[:])->blot_check_core::Binding[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Binding run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Binding[:])->blot_check_core::Binding[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Binding[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Binding.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Binding[:])->blot_check_core::Binding[:],Error {
- let result,error=self.alloc<blot_check_core::Binding>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Binding[:])->blot_check_core::Binding[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Binding>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Binding[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Binding[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Body,length:i64)->blot_check_core::Body[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Body.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Body {run, ..});if error!=Error.none {pool_blot_check_core__Body.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Body,length:i64)->blot_check_core::Body[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Body[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Body[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Body.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Body {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Body.free_slice(run);return default<blot_check_core::Body[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Body[:])->blot_check_core::Body[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Body run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Body[:])->blot_check_core::Body[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Body[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Body run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Body.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Body[:])->blot_check_core::Body[:],Error {
- let result,error=self.alloc<blot_check_core::Body>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Body[:])->blot_check_core::Body[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Body>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Body[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Body[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Parameter,length:i64)->blot_check_core::Parameter[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Parameter.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Parameter {run, ..});if error!=Error.none {pool_blot_check_core__Parameter.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Parameter,length:i64)->blot_check_core::Parameter[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Parameter[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Parameter[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Parameter.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Parameter {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Parameter.free_slice(run);return default<blot_check_core::Parameter[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Parameter[:])->blot_check_core::Parameter[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Parameter run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Parameter[:])->blot_check_core::Parameter[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Parameter[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Parameter run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Parameter.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Parameter[:])->blot_check_core::Parameter[:],Error {
- let result,error=self.alloc<blot_check_core::Parameter>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Parameter[:])->blot_check_core::Parameter[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Parameter>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Parameter[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Parameter[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::CallInfo,length:i64)->blot_check_core::CallInfo[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__CallInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__CallInfo {run, ..});if error!=Error.none {pool_blot_check_core__CallInfo.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::CallInfo,length:i64)->blot_check_core::CallInfo[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::CallInfo[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::CallInfo[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__CallInfo.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__CallInfo {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__CallInfo.free_slice(run);return default<blot_check_core::CallInfo[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::CallInfo[:])->blot_check_core::CallInfo[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__CallInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::CallInfo[:])->blot_check_core::CallInfo[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::CallInfo[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__CallInfo run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__CallInfo.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::CallInfo[:])->blot_check_core::CallInfo[:],Error {
- let result,error=self.alloc<blot_check_core::CallInfo>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::CallInfo[:])->blot_check_core::CallInfo[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::CallInfo>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::CallInfo[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::CallInfo[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Merge,length:i64)->blot_check_core::Merge[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Merge.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Merge {run, ..});if error!=Error.none {pool_blot_check_core__Merge.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Merge,length:i64)->blot_check_core::Merge[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Merge[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Merge[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Merge.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Merge {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Merge.free_slice(run);return default<blot_check_core::Merge[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Merge[:])->blot_check_core::Merge[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Merge run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Merge[:])->blot_check_core::Merge[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Merge[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Merge run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Merge.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Merge[:])->blot_check_core::Merge[:],Error {
- let result,error=self.alloc<blot_check_core::Merge>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Merge[:])->blot_check_core::Merge[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Merge>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Merge[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Merge[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::List,length:i64)->blot_check_core::List[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__List.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__List {run, ..});if error!=Error.none {pool_blot_check_core__List.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::List,length:i64)->blot_check_core::List[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::List[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::List[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__List.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__List {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__List.free_slice(run);return default<blot_check_core::List[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::List[:])->blot_check_core::List[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__List run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::List[:])->blot_check_core::List[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::List[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__List run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__List.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::List[:])->blot_check_core::List[:],Error {
- let result,error=self.alloc<blot_check_core::List>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::List[:])->blot_check_core::List[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::List>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::List[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::List[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:u8,length:i64)->u8[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_u8.alloc_slice(length);let error=remember(self,Run.run_u8 {run, ..});if error!=Error.none {pool_u8.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:u8,length:i64)->u8[:],Error {
+ assert(unique(self_));if length<0 {return default<u8[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<u8[:]>(),blot_error::Error.none;}
+ let run=pool_u8.alloc_slice(length);let error=remember(self_,Run.run_u8 {run, ..});if error!=blot_error::Error.none {pool_u8.free_slice(run);return default<u8[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const u8[:])->u8[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u8 run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const u8[:])->u8[:] {
+ assert(unique(self_));if values.len==0 {return default<u8[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_u8 run=>{if blot_support::same_slice_identity(run.values,values) {return pool_u8.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const u8[:])->u8[:],Error {
- let result,error=self.alloc<u8>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const u8[:])->u8[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<u8>(self_,values.len);if error!=blot_error::Error.none {return default<u8[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<u8[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Obligation,length:i64)->blot_check_core::Obligation[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Obligation.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Obligation {run, ..});if error!=Error.none {pool_blot_check_core__Obligation.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Obligation,length:i64)->blot_check_core::Obligation[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Obligation[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Obligation[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Obligation.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Obligation {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Obligation.free_slice(run);return default<blot_check_core::Obligation[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Obligation[:])->blot_check_core::Obligation[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Obligation run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Obligation[:])->blot_check_core::Obligation[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Obligation[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Obligation run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Obligation.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Obligation[:])->blot_check_core::Obligation[:],Error {
- let result,error=self.alloc<blot_check_core::Obligation>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Obligation[:])->blot_check_core::Obligation[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Obligation>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Obligation[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Obligation[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Nominal,length:i64)->blot_check_core::Nominal[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Nominal.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Nominal {run, ..});if error!=Error.none {pool_blot_check_core__Nominal.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Nominal,length:i64)->blot_check_core::Nominal[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Nominal[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Nominal[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Nominal.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Nominal {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Nominal.free_slice(run);return default<blot_check_core::Nominal[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Nominal[:])->blot_check_core::Nominal[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Nominal run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Nominal[:])->blot_check_core::Nominal[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Nominal[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Nominal run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Nominal.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Nominal[:])->blot_check_core::Nominal[:],Error {
- let result,error=self.alloc<blot_check_core::Nominal>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Nominal[:])->blot_check_core::Nominal[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Nominal>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Nominal[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Nominal[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::OperationName,length:i64)->blot_check_core::OperationName[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__OperationName.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__OperationName {run, ..});if error!=Error.none {pool_blot_check_core__OperationName.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::OperationName,length:i64)->blot_check_core::OperationName[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::OperationName[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::OperationName[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__OperationName.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__OperationName {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__OperationName.free_slice(run);return default<blot_check_core::OperationName[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::OperationName[:])->blot_check_core::OperationName[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationName run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::OperationName[:])->blot_check_core::OperationName[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::OperationName[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__OperationName run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__OperationName.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::OperationName[:])->blot_check_core::OperationName[:],Error {
- let result,error=self.alloc<blot_check_core::OperationName>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::OperationName[:])->blot_check_core::OperationName[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::OperationName>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::OperationName[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::OperationName[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Constructor,length:i64)->blot_check_core::Constructor[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Constructor.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Constructor {run, ..});if error!=Error.none {pool_blot_check_core__Constructor.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Constructor,length:i64)->blot_check_core::Constructor[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Constructor[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Constructor[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Constructor.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Constructor {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Constructor.free_slice(run);return default<blot_check_core::Constructor[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Constructor[:])->blot_check_core::Constructor[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Constructor run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Constructor[:])->blot_check_core::Constructor[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Constructor[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Constructor run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Constructor.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Constructor[:])->blot_check_core::Constructor[:],Error {
- let result,error=self.alloc<blot_check_core::Constructor>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Constructor[:])->blot_check_core::Constructor[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Constructor>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Constructor[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Constructor[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Projection,length:i64)->blot_check_core::Projection[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Projection.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Projection {run, ..});if error!=Error.none {pool_blot_check_core__Projection.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Projection,length:i64)->blot_check_core::Projection[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Projection[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Projection[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Projection.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Projection {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Projection.free_slice(run);return default<blot_check_core::Projection[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Projection[:])->blot_check_core::Projection[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Projection run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Projection[:])->blot_check_core::Projection[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Projection[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Projection run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Projection.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Projection[:])->blot_check_core::Projection[:],Error {
- let result,error=self.alloc<blot_check_core::Projection>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Projection[:])->blot_check_core::Projection[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Projection>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Projection[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Projection[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::ProjectionVariant,length:i64)->blot_check_core::ProjectionVariant[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__ProjectionVariant.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__ProjectionVariant {run, ..});if error!=Error.none {pool_blot_check_core__ProjectionVariant.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::ProjectionVariant,length:i64)->blot_check_core::ProjectionVariant[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::ProjectionVariant[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::ProjectionVariant[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__ProjectionVariant.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__ProjectionVariant {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__ProjectionVariant.free_slice(run);return default<blot_check_core::ProjectionVariant[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::ProjectionVariant[:])->blot_check_core::ProjectionVariant[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ProjectionVariant run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::ProjectionVariant[:])->blot_check_core::ProjectionVariant[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::ProjectionVariant[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ProjectionVariant run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__ProjectionVariant.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::ProjectionVariant[:])->blot_check_core::ProjectionVariant[:],Error {
- let result,error=self.alloc<blot_check_core::ProjectionVariant>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::ProjectionVariant[:])->blot_check_core::ProjectionVariant[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::ProjectionVariant>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::ProjectionVariant[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::ProjectionVariant[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Pattern,length:i64)->blot_check_core::Pattern[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Pattern.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Pattern {run, ..});if error!=Error.none {pool_blot_check_core__Pattern.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Pattern,length:i64)->blot_check_core::Pattern[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Pattern[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Pattern[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Pattern.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Pattern {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Pattern.free_slice(run);return default<blot_check_core::Pattern[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Pattern[:])->blot_check_core::Pattern[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Pattern run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Pattern[:])->blot_check_core::Pattern[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Pattern[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Pattern run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Pattern.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Pattern[:])->blot_check_core::Pattern[:],Error {
- let result,error=self.alloc<blot_check_core::Pattern>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Pattern[:])->blot_check_core::Pattern[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Pattern>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Pattern[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Pattern[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::PatternRow,length:i64)->blot_check_core::PatternRow[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__PatternRow.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__PatternRow {run, ..});if error!=Error.none {pool_blot_check_core__PatternRow.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::PatternRow,length:i64)->blot_check_core::PatternRow[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::PatternRow[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::PatternRow[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__PatternRow.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__PatternRow {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__PatternRow.free_slice(run);return default<blot_check_core::PatternRow[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::PatternRow[:])->blot_check_core::PatternRow[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__PatternRow run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::PatternRow[:])->blot_check_core::PatternRow[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::PatternRow[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__PatternRow run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__PatternRow.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::PatternRow[:])->blot_check_core::PatternRow[:],Error {
- let result,error=self.alloc<blot_check_core::PatternRow>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::PatternRow[:])->blot_check_core::PatternRow[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::PatternRow>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::PatternRow[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::PatternRow[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::MatchArm,length:i64)->blot_check_core::MatchArm[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__MatchArm.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__MatchArm {run, ..});if error!=Error.none {pool_blot_check_core__MatchArm.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::MatchArm,length:i64)->blot_check_core::MatchArm[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::MatchArm[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::MatchArm[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__MatchArm.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__MatchArm {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__MatchArm.free_slice(run);return default<blot_check_core::MatchArm[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::MatchArm[:])->blot_check_core::MatchArm[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchArm run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::MatchArm[:])->blot_check_core::MatchArm[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::MatchArm[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__MatchArm run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__MatchArm.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::MatchArm[:])->blot_check_core::MatchArm[:],Error {
- let result,error=self.alloc<blot_check_core::MatchArm>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::MatchArm[:])->blot_check_core::MatchArm[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::MatchArm>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::MatchArm[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::MatchArm[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::MatchInfo,length:i64)->blot_check_core::MatchInfo[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__MatchInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__MatchInfo {run, ..});if error!=Error.none {pool_blot_check_core__MatchInfo.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::MatchInfo,length:i64)->blot_check_core::MatchInfo[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::MatchInfo[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::MatchInfo[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__MatchInfo.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__MatchInfo {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__MatchInfo.free_slice(run);return default<blot_check_core::MatchInfo[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::MatchInfo[:])->blot_check_core::MatchInfo[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::MatchInfo[:])->blot_check_core::MatchInfo[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::MatchInfo[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__MatchInfo run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__MatchInfo.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::MatchInfo[:])->blot_check_core::MatchInfo[:],Error {
- let result,error=self.alloc<blot_check_core::MatchInfo>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::MatchInfo[:])->blot_check_core::MatchInfo[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::MatchInfo>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::MatchInfo[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::MatchInfo[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::UpdateInfo,length:i64)->blot_check_core::UpdateInfo[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__UpdateInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__UpdateInfo {run, ..});if error!=Error.none {pool_blot_check_core__UpdateInfo.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::UpdateInfo,length:i64)->blot_check_core::UpdateInfo[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::UpdateInfo[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::UpdateInfo[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__UpdateInfo.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__UpdateInfo {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__UpdateInfo.free_slice(run);return default<blot_check_core::UpdateInfo[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::UpdateInfo[:])->blot_check_core::UpdateInfo[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::UpdateInfo[:])->blot_check_core::UpdateInfo[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::UpdateInfo[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__UpdateInfo run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__UpdateInfo.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::UpdateInfo[:])->blot_check_core::UpdateInfo[:],Error {
- let result,error=self.alloc<blot_check_core::UpdateInfo>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::UpdateInfo[:])->blot_check_core::UpdateInfo[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::UpdateInfo>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::UpdateInfo[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::UpdateInfo[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::UpdateStep,length:i64)->blot_check_core::UpdateStep[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__UpdateStep.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__UpdateStep {run, ..});if error!=Error.none {pool_blot_check_core__UpdateStep.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::UpdateStep,length:i64)->blot_check_core::UpdateStep[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::UpdateStep[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::UpdateStep[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__UpdateStep.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__UpdateStep {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__UpdateStep.free_slice(run);return default<blot_check_core::UpdateStep[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::UpdateStep[:])->blot_check_core::UpdateStep[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateStep run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::UpdateStep[:])->blot_check_core::UpdateStep[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::UpdateStep[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__UpdateStep run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__UpdateStep.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::UpdateStep[:])->blot_check_core::UpdateStep[:],Error {
- let result,error=self.alloc<blot_check_core::UpdateStep>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::UpdateStep[:])->blot_check_core::UpdateStep[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::UpdateStep>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::UpdateStep[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::UpdateStep[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::ClosureInfo,length:i64)->blot_check_core::ClosureInfo[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__ClosureInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__ClosureInfo {run, ..});if error!=Error.none {pool_blot_check_core__ClosureInfo.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::ClosureInfo,length:i64)->blot_check_core::ClosureInfo[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::ClosureInfo[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::ClosureInfo[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__ClosureInfo.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__ClosureInfo {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__ClosureInfo.free_slice(run);return default<blot_check_core::ClosureInfo[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::ClosureInfo[:])->blot_check_core::ClosureInfo[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ClosureInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::ClosureInfo[:])->blot_check_core::ClosureInfo[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::ClosureInfo[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ClosureInfo run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__ClosureInfo.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::ClosureInfo[:])->blot_check_core::ClosureInfo[:],Error {
- let result,error=self.alloc<blot_check_core::ClosureInfo>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::ClosureInfo[:])->blot_check_core::ClosureInfo[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::ClosureInfo>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::ClosureInfo[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::ClosureInfo[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Associated,length:i64)->blot_check_core::Associated[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Associated.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Associated {run, ..});if error!=Error.none {pool_blot_check_core__Associated.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Associated,length:i64)->blot_check_core::Associated[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Associated[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Associated[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Associated.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Associated {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Associated.free_slice(run);return default<blot_check_core::Associated[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Associated[:])->blot_check_core::Associated[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Associated run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Associated[:])->blot_check_core::Associated[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Associated[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Associated run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Associated.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Associated[:])->blot_check_core::Associated[:],Error {
- let result,error=self.alloc<blot_check_core::Associated>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Associated[:])->blot_check_core::Associated[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Associated>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Associated[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Associated[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Contract,length:i64)->blot_check_core::Contract[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Contract.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Contract {run, ..});if error!=Error.none {pool_blot_check_core__Contract.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Contract,length:i64)->blot_check_core::Contract[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Contract[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Contract[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Contract.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Contract {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Contract.free_slice(run);return default<blot_check_core::Contract[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Contract[:])->blot_check_core::Contract[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Contract run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Contract[:])->blot_check_core::Contract[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Contract[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Contract run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Contract.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Contract[:])->blot_check_core::Contract[:],Error {
- let result,error=self.alloc<blot_check_core::Contract>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Contract[:])->blot_check_core::Contract[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Contract>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Contract[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Contract[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::ContractMember,length:i64)->blot_reuse_principal_interface::ContractMember[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__ContractMember.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__ContractMember {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__ContractMember.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::ContractMember,length:i64)->blot_reuse_principal_interface::ContractMember[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::ContractMember[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::ContractMember[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__ContractMember.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__ContractMember {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__ContractMember.free_slice(run);return default<blot_reuse_principal_interface::ContractMember[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::ContractMember[:])->blot_reuse_principal_interface::ContractMember[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ContractMember run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::ContractMember[:])->blot_reuse_principal_interface::ContractMember[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::ContractMember[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__ContractMember run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__ContractMember.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::ContractMember[:])->blot_reuse_principal_interface::ContractMember[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::ContractMember>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::ContractMember[:])->blot_reuse_principal_interface::ContractMember[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::ContractMember>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::ContractMember[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::ContractMember[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Implementation,length:i64)->blot_reuse_principal_interface::Implementation[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__Implementation.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Implementation {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__Implementation.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::Implementation,length:i64)->blot_reuse_principal_interface::Implementation[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::Implementation[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::Implementation[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__Implementation.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__Implementation {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__Implementation.free_slice(run);return default<blot_reuse_principal_interface::Implementation[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Implementation[:])->blot_reuse_principal_interface::Implementation[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Implementation run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::Implementation[:])->blot_reuse_principal_interface::Implementation[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::Implementation[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Implementation run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__Implementation.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Implementation[:])->blot_reuse_principal_interface::Implementation[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::Implementation>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::Implementation[:])->blot_reuse_principal_interface::Implementation[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::Implementation>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Implementation[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Implementation[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::ImplementationMember,length:i64)->blot_reuse_principal_interface::ImplementationMember[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__ImplementationMember.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__ImplementationMember {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__ImplementationMember.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::ImplementationMember,length:i64)->blot_reuse_principal_interface::ImplementationMember[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::ImplementationMember[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::ImplementationMember[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__ImplementationMember.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__ImplementationMember {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__ImplementationMember.free_slice(run);return default<blot_reuse_principal_interface::ImplementationMember[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:])->blot_reuse_principal_interface::ImplementationMember[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ImplementationMember run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:])->blot_reuse_principal_interface::ImplementationMember[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::ImplementationMember[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__ImplementationMember run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__ImplementationMember.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:])->blot_reuse_principal_interface::ImplementationMember[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::ImplementationMember>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:])->blot_reuse_principal_interface::ImplementationMember[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::ImplementationMember>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::ImplementationMember[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::ImplementationMember[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::MemberTemplate,length:i64)->blot_reuse_principal_interface::MemberTemplate[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__MemberTemplate.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__MemberTemplate {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__MemberTemplate.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::MemberTemplate,length:i64)->blot_reuse_principal_interface::MemberTemplate[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::MemberTemplate[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::MemberTemplate[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__MemberTemplate.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__MemberTemplate {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__MemberTemplate.free_slice(run);return default<blot_reuse_principal_interface::MemberTemplate[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:])->blot_reuse_principal_interface::MemberTemplate[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__MemberTemplate run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:])->blot_reuse_principal_interface::MemberTemplate[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::MemberTemplate[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__MemberTemplate run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__MemberTemplate.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:])->blot_reuse_principal_interface::MemberTemplate[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::MemberTemplate>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:])->blot_reuse_principal_interface::MemberTemplate[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::MemberTemplate>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::MemberTemplate[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::MemberTemplate[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::SelectedProof,length:i64)->blot_reuse_principal_interface::SelectedProof[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__SelectedProof.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__SelectedProof {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__SelectedProof.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::SelectedProof,length:i64)->blot_reuse_principal_interface::SelectedProof[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::SelectedProof[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::SelectedProof[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__SelectedProof.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__SelectedProof {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__SelectedProof.free_slice(run);return default<blot_reuse_principal_interface::SelectedProof[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::SelectedProof[:])->blot_reuse_principal_interface::SelectedProof[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__SelectedProof run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::SelectedProof[:])->blot_reuse_principal_interface::SelectedProof[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::SelectedProof[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__SelectedProof run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__SelectedProof.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:])->blot_reuse_principal_interface::SelectedProof[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::SelectedProof>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:])->blot_reuse_principal_interface::SelectedProof[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::SelectedProof>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::SelectedProof[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::SelectedProof[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::SelectedUse,length:i64)->blot_check_core::SelectedUse[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__SelectedUse.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__SelectedUse {run, ..});if error!=Error.none {pool_blot_check_core__SelectedUse.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::SelectedUse,length:i64)->blot_check_core::SelectedUse[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::SelectedUse[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::SelectedUse[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__SelectedUse.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__SelectedUse {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__SelectedUse.free_slice(run);return default<blot_check_core::SelectedUse[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::SelectedUse[:])->blot_check_core::SelectedUse[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__SelectedUse run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::SelectedUse[:])->blot_check_core::SelectedUse[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::SelectedUse[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__SelectedUse run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__SelectedUse.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::SelectedUse[:])->blot_check_core::SelectedUse[:],Error {
- let result,error=self.alloc<blot_check_core::SelectedUse>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::SelectedUse[:])->blot_check_core::SelectedUse[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::SelectedUse>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::SelectedUse[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::SelectedUse[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::DictionarySelection,length:i64)->blot_check_core::DictionarySelection[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__DictionarySelection.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__DictionarySelection {run, ..});if error!=Error.none {pool_blot_check_core__DictionarySelection.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::DictionarySelection,length:i64)->blot_check_core::DictionarySelection[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::DictionarySelection[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::DictionarySelection[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__DictionarySelection.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__DictionarySelection {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__DictionarySelection.free_slice(run);return default<blot_check_core::DictionarySelection[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::DictionarySelection[:])->blot_check_core::DictionarySelection[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionarySelection run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::DictionarySelection[:])->blot_check_core::DictionarySelection[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::DictionarySelection[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionarySelection run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__DictionarySelection.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::DictionarySelection[:])->blot_check_core::DictionarySelection[:],Error {
- let result,error=self.alloc<blot_check_core::DictionarySelection>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::DictionarySelection[:])->blot_check_core::DictionarySelection[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::DictionarySelection>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::DictionarySelection[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::DictionarySelection[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::DictionaryUse,length:i64)->blot_check_core::DictionaryUse[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__DictionaryUse.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__DictionaryUse {run, ..});if error!=Error.none {pool_blot_check_core__DictionaryUse.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::DictionaryUse,length:i64)->blot_check_core::DictionaryUse[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::DictionaryUse[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::DictionaryUse[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__DictionaryUse.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__DictionaryUse {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__DictionaryUse.free_slice(run);return default<blot_check_core::DictionaryUse[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::DictionaryUse[:])->blot_check_core::DictionaryUse[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionaryUse run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::DictionaryUse[:])->blot_check_core::DictionaryUse[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::DictionaryUse[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionaryUse run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__DictionaryUse.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::DictionaryUse[:])->blot_check_core::DictionaryUse[:],Error {
- let result,error=self.alloc<blot_check_core::DictionaryUse>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::DictionaryUse[:])->blot_check_core::DictionaryUse[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::DictionaryUse>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::DictionaryUse[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::DictionaryUse[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Primitive,length:i64)->blot_check_core::Primitive[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Primitive.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Primitive {run, ..});if error!=Error.none {pool_blot_check_core__Primitive.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Primitive,length:i64)->blot_check_core::Primitive[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Primitive[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Primitive[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Primitive.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Primitive {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Primitive.free_slice(run);return default<blot_check_core::Primitive[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Primitive[:])->blot_check_core::Primitive[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Primitive run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Primitive[:])->blot_check_core::Primitive[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Primitive[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Primitive run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Primitive.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Primitive[:])->blot_check_core::Primitive[:],Error {
- let result,error=self.alloc<blot_check_core::Primitive>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Primitive[:])->blot_check_core::Primitive[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Primitive>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Primitive[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Primitive[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::LoopInfo,length:i64)->blot_check_core::LoopInfo[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__LoopInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__LoopInfo {run, ..});if error!=Error.none {pool_blot_check_core__LoopInfo.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::LoopInfo,length:i64)->blot_check_core::LoopInfo[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::LoopInfo[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::LoopInfo[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__LoopInfo.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__LoopInfo {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__LoopInfo.free_slice(run);return default<blot_check_core::LoopInfo[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::LoopInfo[:])->blot_check_core::LoopInfo[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::LoopInfo[:])->blot_check_core::LoopInfo[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::LoopInfo[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__LoopInfo run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__LoopInfo.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::LoopInfo[:])->blot_check_core::LoopInfo[:],Error {
- let result,error=self.alloc<blot_check_core::LoopInfo>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::LoopInfo[:])->blot_check_core::LoopInfo[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::LoopInfo>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::LoopInfo[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::LoopInfo[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::LoopCarry,length:i64)->blot_check_core::LoopCarry[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__LoopCarry.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__LoopCarry {run, ..});if error!=Error.none {pool_blot_check_core__LoopCarry.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::LoopCarry,length:i64)->blot_check_core::LoopCarry[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::LoopCarry[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::LoopCarry[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__LoopCarry.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__LoopCarry {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__LoopCarry.free_slice(run);return default<blot_check_core::LoopCarry[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::LoopCarry[:])->blot_check_core::LoopCarry[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopCarry run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::LoopCarry[:])->blot_check_core::LoopCarry[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::LoopCarry[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__LoopCarry run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__LoopCarry.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::LoopCarry[:])->blot_check_core::LoopCarry[:],Error {
- let result,error=self.alloc<blot_check_core::LoopCarry>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::LoopCarry[:])->blot_check_core::LoopCarry[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::LoopCarry>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::LoopCarry[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::LoopCarry[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::ResolverInfo,length:i64)->blot_check_core::ResolverInfo[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__ResolverInfo.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__ResolverInfo {run, ..});if error!=Error.none {pool_blot_check_core__ResolverInfo.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::ResolverInfo,length:i64)->blot_check_core::ResolverInfo[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::ResolverInfo[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::ResolverInfo[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__ResolverInfo.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__ResolverInfo {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__ResolverInfo.free_slice(run);return default<blot_check_core::ResolverInfo[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::ResolverInfo[:])->blot_check_core::ResolverInfo[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ResolverInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::ResolverInfo[:])->blot_check_core::ResolverInfo[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::ResolverInfo[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ResolverInfo run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__ResolverInfo.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::ResolverInfo[:])->blot_check_core::ResolverInfo[:],Error {
- let result,error=self.alloc<blot_check_core::ResolverInfo>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::ResolverInfo[:])->blot_check_core::ResolverInfo[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::ResolverInfo>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::ResolverInfo[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::ResolverInfo[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::OperationValue,length:i64)->blot_check_core::OperationValue[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__OperationValue.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__OperationValue {run, ..});if error!=Error.none {pool_blot_check_core__OperationValue.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::OperationValue,length:i64)->blot_check_core::OperationValue[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::OperationValue[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::OperationValue[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__OperationValue.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__OperationValue {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__OperationValue.free_slice(run);return default<blot_check_core::OperationValue[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::OperationValue[:])->blot_check_core::OperationValue[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationValue run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::OperationValue[:])->blot_check_core::OperationValue[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::OperationValue[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__OperationValue run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__OperationValue.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::OperationValue[:])->blot_check_core::OperationValue[:],Error {
- let result,error=self.alloc<blot_check_core::OperationValue>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::OperationValue[:])->blot_check_core::OperationValue[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::OperationValue>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::OperationValue[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::OperationValue[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::HandleEffects,length:i64)->blot_check_core::HandleEffects[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__HandleEffects.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__HandleEffects {run, ..});if error!=Error.none {pool_blot_check_core__HandleEffects.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::HandleEffects,length:i64)->blot_check_core::HandleEffects[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::HandleEffects[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::HandleEffects[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__HandleEffects.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__HandleEffects {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__HandleEffects.free_slice(run);return default<blot_check_core::HandleEffects[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::HandleEffects[:])->blot_check_core::HandleEffects[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__HandleEffects run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::HandleEffects[:])->blot_check_core::HandleEffects[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::HandleEffects[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__HandleEffects run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__HandleEffects.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::HandleEffects[:])->blot_check_core::HandleEffects[:],Error {
- let result,error=self.alloc<blot_check_core::HandleEffects>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::HandleEffects[:])->blot_check_core::HandleEffects[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::HandleEffects>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::HandleEffects[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::HandleEffects[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_core::Diagnostic,length:i64)->blot_check_core::Diagnostic[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_core__Diagnostic.alloc_slice(length);let error=remember(self,Run.run_blot_check_core__Diagnostic {run, ..});if error!=Error.none {pool_blot_check_core__Diagnostic.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_core::Diagnostic,length:i64)->blot_check_core::Diagnostic[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::Diagnostic[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Diagnostic[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__Diagnostic.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__Diagnostic {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__Diagnostic.free_slice(run);return default<blot_check_core::Diagnostic[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_core::Diagnostic[:])->blot_check_core::Diagnostic[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Diagnostic run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_core::Diagnostic[:])->blot_check_core::Diagnostic[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::Diagnostic[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Diagnostic run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__Diagnostic.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_core::Diagnostic[:])->blot_check_core::Diagnostic[:],Error {
- let result,error=self.alloc<blot_check_core::Diagnostic>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_core::Diagnostic[:])->blot_check_core::Diagnostic[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::Diagnostic>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::Diagnostic[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::Diagnostic[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_check_parameter_patterns::Node,length:i64)->blot_check_parameter_patterns::Node[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_check_parameter_patterns__Node.alloc_slice(length);let error=remember(self,Run.run_blot_check_parameter_patterns__Node {run, ..});if error!=Error.none {pool_blot_check_parameter_patterns__Node.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_check_parameter_patterns::Node,length:i64)->blot_check_parameter_patterns::Node[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_parameter_patterns::Node[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_parameter_patterns::Node[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_parameter_patterns__Node.alloc_slice(length);let error=remember(self_,Run.run_blot_check_parameter_patterns__Node {run, ..});if error!=blot_error::Error.none {pool_blot_check_parameter_patterns__Node.free_slice(run);return default<blot_check_parameter_patterns::Node[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_check_parameter_patterns::Node[:])->blot_check_parameter_patterns::Node[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_parameter_patterns__Node run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_check_parameter_patterns::Node[:])->blot_check_parameter_patterns::Node[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_parameter_patterns::Node[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_parameter_patterns__Node run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_parameter_patterns__Node.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_check_parameter_patterns::Node[:])->blot_check_parameter_patterns::Node[:],Error {
- let result,error=self.alloc<blot_check_parameter_patterns::Node>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_check_parameter_patterns::Node[:])->blot_check_parameter_patterns::Node[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_parameter_patterns::Node>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_parameter_patterns::Node[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_parameter_patterns::Node[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Binding,length:i64)->blot_reuse_principal_interface::Binding[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__Binding.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Binding {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__Binding.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::Binding,length:i64)->blot_reuse_principal_interface::Binding[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::Binding[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::Binding[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__Binding.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__Binding {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__Binding.free_slice(run);return default<blot_reuse_principal_interface::Binding[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Binding[:])->blot_reuse_principal_interface::Binding[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Binding run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::Binding[:])->blot_reuse_principal_interface::Binding[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::Binding[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__Binding.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Binding[:])->blot_reuse_principal_interface::Binding[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::Binding>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::Binding[:])->blot_reuse_principal_interface::Binding[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::Binding>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Binding[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Binding[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Nominal,length:i64)->blot_reuse_principal_interface::Nominal[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__Nominal.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Nominal {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__Nominal.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::Nominal,length:i64)->blot_reuse_principal_interface::Nominal[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::Nominal[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::Nominal[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__Nominal.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__Nominal {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__Nominal.free_slice(run);return default<blot_reuse_principal_interface::Nominal[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Nominal[:])->blot_reuse_principal_interface::Nominal[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Nominal run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::Nominal[:])->blot_reuse_principal_interface::Nominal[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::Nominal[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Nominal run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__Nominal.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Nominal[:])->blot_reuse_principal_interface::Nominal[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::Nominal>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::Nominal[:])->blot_reuse_principal_interface::Nominal[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::Nominal>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Nominal[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Nominal[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Constructor,length:i64)->blot_reuse_principal_interface::Constructor[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__Constructor.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Constructor {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__Constructor.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::Constructor,length:i64)->blot_reuse_principal_interface::Constructor[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::Constructor[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::Constructor[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__Constructor.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__Constructor {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__Constructor.free_slice(run);return default<blot_reuse_principal_interface::Constructor[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Constructor[:])->blot_reuse_principal_interface::Constructor[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Constructor run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::Constructor[:])->blot_reuse_principal_interface::Constructor[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::Constructor[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Constructor run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__Constructor.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Constructor[:])->blot_reuse_principal_interface::Constructor[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::Constructor>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::Constructor[:])->blot_reuse_principal_interface::Constructor[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::Constructor>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Constructor[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Constructor[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::EffectFamily,length:i64)->blot_reuse_principal_interface::EffectFamily[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__EffectFamily.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__EffectFamily {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__EffectFamily.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::EffectFamily,length:i64)->blot_reuse_principal_interface::EffectFamily[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::EffectFamily[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::EffectFamily[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__EffectFamily.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__EffectFamily {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__EffectFamily.free_slice(run);return default<blot_reuse_principal_interface::EffectFamily[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::EffectFamily[:])->blot_reuse_principal_interface::EffectFamily[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectFamily run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::EffectFamily[:])->blot_reuse_principal_interface::EffectFamily[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::EffectFamily[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__EffectFamily run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__EffectFamily.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:])->blot_reuse_principal_interface::EffectFamily[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::EffectFamily>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:])->blot_reuse_principal_interface::EffectFamily[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::EffectFamily>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::EffectFamily[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::EffectFamily[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::EffectTemplate,length:i64)->blot_reuse_principal_interface::EffectTemplate[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__EffectTemplate.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__EffectTemplate {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__EffectTemplate.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::EffectTemplate,length:i64)->blot_reuse_principal_interface::EffectTemplate[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::EffectTemplate[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::EffectTemplate[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__EffectTemplate.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__EffectTemplate {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__EffectTemplate.free_slice(run);return default<blot_reuse_principal_interface::EffectTemplate[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:])->blot_reuse_principal_interface::EffectTemplate[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectTemplate run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:])->blot_reuse_principal_interface::EffectTemplate[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::EffectTemplate[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__EffectTemplate run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__EffectTemplate.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:])->blot_reuse_principal_interface::EffectTemplate[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::EffectTemplate>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:])->blot_reuse_principal_interface::EffectTemplate[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::EffectTemplate>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::EffectTemplate[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::EffectTemplate[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Associated,length:i64)->blot_reuse_principal_interface::Associated[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__Associated.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Associated {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__Associated.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::Associated,length:i64)->blot_reuse_principal_interface::Associated[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::Associated[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::Associated[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__Associated.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__Associated {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__Associated.free_slice(run);return default<blot_reuse_principal_interface::Associated[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Associated[:])->blot_reuse_principal_interface::Associated[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Associated run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::Associated[:])->blot_reuse_principal_interface::Associated[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::Associated[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Associated run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__Associated.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Associated[:])->blot_reuse_principal_interface::Associated[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::Associated>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::Associated[:])->blot_reuse_principal_interface::Associated[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::Associated>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Associated[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Associated[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_principal_interface::Contract,length:i64)->blot_reuse_principal_interface::Contract[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_principal_interface__Contract.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_principal_interface__Contract {run, ..});if error!=Error.none {pool_blot_reuse_principal_interface__Contract.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_principal_interface::Contract,length:i64)->blot_reuse_principal_interface::Contract[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_principal_interface::Contract[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_principal_interface::Contract[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_principal_interface__Contract.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_principal_interface__Contract {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_principal_interface__Contract.free_slice(run);return default<blot_reuse_principal_interface::Contract[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_principal_interface::Contract[:])->blot_reuse_principal_interface::Contract[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Contract run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_principal_interface::Contract[:])->blot_reuse_principal_interface::Contract[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_principal_interface::Contract[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Contract run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_principal_interface__Contract.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_principal_interface::Contract[:])->blot_reuse_principal_interface::Contract[:],Error {
- let result,error=self.alloc<blot_reuse_principal_interface::Contract>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_principal_interface::Contract[:])->blot_reuse_principal_interface::Contract[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::Contract>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Contract[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_principal_interface::Contract[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::ImportResolution,length:i64)->blot_reuse_frozen_dependency::ImportResolution[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_frozen_dependency__ImportResolution.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__ImportResolution {run, ..});if error!=Error.none {pool_blot_reuse_frozen_dependency__ImportResolution.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_frozen_dependency::ImportResolution,length:i64)->blot_reuse_frozen_dependency::ImportResolution[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_frozen_dependency::ImportResolution[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_frozen_dependency::ImportResolution[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_frozen_dependency__ImportResolution.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_frozen_dependency__ImportResolution {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_frozen_dependency__ImportResolution.free_slice(run);return default<blot_reuse_frozen_dependency::ImportResolution[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:])->blot_reuse_frozen_dependency::ImportResolution[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:])->blot_reuse_frozen_dependency::ImportResolution[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_frozen_dependency::ImportResolution[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__ImportResolution run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_frozen_dependency__ImportResolution.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:])->blot_reuse_frozen_dependency::ImportResolution[:],Error {
- let result,error=self.alloc<blot_reuse_frozen_dependency::ImportResolution>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:])->blot_reuse_frozen_dependency::ImportResolution[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_frozen_dependency::ImportResolution>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::ImportResolution[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::ImportResolution[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::Export,length:i64)->blot_reuse_frozen_dependency::Export[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_frozen_dependency__Export.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__Export {run, ..});if error!=Error.none {pool_blot_reuse_frozen_dependency__Export.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_frozen_dependency::Export,length:i64)->blot_reuse_frozen_dependency::Export[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_frozen_dependency::Export[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_frozen_dependency::Export[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_frozen_dependency__Export.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_frozen_dependency__Export {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_frozen_dependency__Export.free_slice(run);return default<blot_reuse_frozen_dependency::Export[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::Export[:])->blot_reuse_frozen_dependency::Export[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Export run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_frozen_dependency::Export[:])->blot_reuse_frozen_dependency::Export[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_frozen_dependency::Export[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Export run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_frozen_dependency__Export.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_frozen_dependency::Export[:])->blot_reuse_frozen_dependency::Export[:],Error {
- let result,error=self.alloc<blot_reuse_frozen_dependency::Export>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_frozen_dependency::Export[:])->blot_reuse_frozen_dependency::Export[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_frozen_dependency::Export>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::Export[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::Export[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::Fixity,length:i64)->blot_reuse_frozen_dependency::Fixity[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_frozen_dependency__Fixity.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__Fixity {run, ..});if error!=Error.none {pool_blot_reuse_frozen_dependency__Fixity.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_frozen_dependency::Fixity,length:i64)->blot_reuse_frozen_dependency::Fixity[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_frozen_dependency::Fixity[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_frozen_dependency::Fixity[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_frozen_dependency__Fixity.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_frozen_dependency__Fixity {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_frozen_dependency__Fixity.free_slice(run);return default<blot_reuse_frozen_dependency::Fixity[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::Fixity[:])->blot_reuse_frozen_dependency::Fixity[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Fixity run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_frozen_dependency::Fixity[:])->blot_reuse_frozen_dependency::Fixity[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_frozen_dependency::Fixity[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Fixity run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_frozen_dependency__Fixity.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:])->blot_reuse_frozen_dependency::Fixity[:],Error {
- let result,error=self.alloc<blot_reuse_frozen_dependency::Fixity>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:])->blot_reuse_frozen_dependency::Fixity[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_frozen_dependency::Fixity>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::Fixity[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::Fixity[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::Symbol,length:i64)->blot_reuse_frozen_dependency::Symbol[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_frozen_dependency__Symbol.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__Symbol {run, ..});if error!=Error.none {pool_blot_reuse_frozen_dependency__Symbol.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_frozen_dependency::Symbol,length:i64)->blot_reuse_frozen_dependency::Symbol[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_frozen_dependency::Symbol[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_frozen_dependency::Symbol[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_frozen_dependency__Symbol.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_frozen_dependency__Symbol {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_frozen_dependency__Symbol.free_slice(run);return default<blot_reuse_frozen_dependency::Symbol[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::Symbol[:])->blot_reuse_frozen_dependency::Symbol[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Symbol run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_frozen_dependency::Symbol[:])->blot_reuse_frozen_dependency::Symbol[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_frozen_dependency::Symbol[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Symbol run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_frozen_dependency__Symbol.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:])->blot_reuse_frozen_dependency::Symbol[:],Error {
- let result,error=self.alloc<blot_reuse_frozen_dependency::Symbol>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:])->blot_reuse_frozen_dependency::Symbol[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_frozen_dependency::Symbol>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::Symbol[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::Symbol[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self:Owner&,sample:blot_reuse_frozen_dependency::Module,length:i64)->blot_reuse_frozen_dependency::Module[:],Error {
- assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}
- let run=pool_blot_reuse_frozen_dependency__Module.alloc_slice(length);let error=remember(self,Run.run_blot_reuse_frozen_dependency__Module {run, ..});if error!=Error.none {pool_blot_reuse_frozen_dependency__Module.free_slice(run);return [],error;}return run,Error.none;
+fn allocate(self_:Owner&,sample:blot_reuse_frozen_dependency::Module,length:i64)->blot_reuse_frozen_dependency::Module[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_reuse_frozen_dependency::Module[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_frozen_dependency::Module[:]>(),blot_error::Error.none;}
+ let run=pool_blot_reuse_frozen_dependency__Module.alloc_slice(length);let error=remember(self_,Run.run_blot_reuse_frozen_dependency__Module {run, ..});if error!=blot_error::Error.none {pool_blot_reuse_frozen_dependency__Module.free_slice(run);return default<blot_reuse_frozen_dependency::Module[:]>(),error;}return run,blot_error::Error.none;
 }
-fn mutable(self:const Owner&,values:const blot_reuse_frozen_dependency::Module[:])->blot_reuse_frozen_dependency::Module[:] {
- assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Module run=>{if run.values .== values {return run.values;}},_=>{}}}
+fn mutable(self_:const Owner&,values:const blot_reuse_frozen_dependency::Module[:])->blot_reuse_frozen_dependency::Module[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_reuse_frozen_dependency::Module[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Module run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_reuse_frozen_dependency__Module.realloc_slice(run.values,run.values.len);}},_=>{}}}
  abort("mutable payload view must name this private owner's exact live run");
 }
-fn cloneValue(self:Owner&,values:const blot_reuse_frozen_dependency::Module[:])->blot_reuse_frozen_dependency::Module[:],Error {
- let result,error=self.alloc<blot_reuse_frozen_dependency::Module>(values.len);if error!=Error.none {return [],error;}
- for value,index in values {let copied,error=cloneValue(self,value);if error!=Error.none {return [],error;}result[index]=copied;}return result,Error.none;
+fn cloneValue(self_:Owner&,values:const blot_reuse_frozen_dependency::Module[:])->blot_reuse_frozen_dependency::Module[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_reuse_frozen_dependency::Module>(self_,values.len);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::Module[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_reuse_frozen_dependency::Module[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn cloneValue(self:Owner&,value:bool)->bool,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:bool)->bool,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:f32)->f32,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:f32)->f32,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:f64)->f64,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:f64)->f64,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:i16)->i16,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:i16)->i16,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:i32)->i32,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:i32)->i32,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:i64)->i64,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:i64)->i64,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:i8)->i8,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:i8)->i8,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:u16)->u16,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:u16)->u16,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:u32)->u32,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:u32)->u32,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:u64)->u64,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:u64)->u64,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:u8)->u8,Error {return value,Error.none;}
+fn cloneValue(self_:Owner&,value:u8)->u8,Error {return value,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:u8[32])->u8[32],Error {var result=default<u8[32]>();for item,index in value {let copied,error=cloneValue(self,item);if error!=Error.none {return result,error;}result[index]=copied;}return result,Error.none;}
+fn cloneValue(self_:Owner&,value:u8[32])->u8[32],Error {var result=default<u8[32]>();for item,index in value {let copied,error=cloneValue(self_,item);if error!=blot_error::Error.none {return result,error;}result[index]=copied;}return result,blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:blot_support::Option<blot_check_numeric_proof_terms::Proposition>)->blot_support::Option<blot_check_numeric_proof_terms::Proposition>,Error {if !value.present {return blot_support::none<blot_check_numeric_proof_terms::Proposition>(),Error.none;}let copied,error=cloneValue(self,value.value);if error!=Error.none {return blot_support::none<blot_check_numeric_proof_terms::Proposition>(),error;}return blot_support::some(copied),Error.none;}
+fn cloneValue(self_:Owner&,value:blot_support::Option<blot_check_numeric_proof_terms::Proposition>)->blot_support::Option<blot_check_numeric_proof_terms::Proposition>,Error {if !value.present {return blot_support::none<blot_check_numeric_proof_terms::Proposition>(),blot_error::Error.none;}let copied,error=cloneValue(self_,value.value);if error!=blot_error::Error.none {return blot_support::none<blot_check_numeric_proof_terms::Proposition>(),error;}return blot_support::some(copied),blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:blot_support::Option<blot_parse_ast::Span>)->blot_support::Option<blot_parse_ast::Span>,Error {if !value.present {return blot_support::none<blot_parse_ast::Span>(),Error.none;}let copied,error=cloneValue(self,value.value);if error!=Error.none {return blot_support::none<blot_parse_ast::Span>(),error;}return blot_support::some(copied),Error.none;}
+fn cloneValue(self_:Owner&,value:blot_support::Option<blot_parse_ast::Span>)->blot_support::Option<blot_parse_ast::Span>,Error {if !value.present {return blot_support::none<blot_parse_ast::Span>(),blot_error::Error.none;}let copied,error=cloneValue(self_,value.value);if error!=blot_error::Error.none {return blot_support::none<blot_parse_ast::Span>(),error;}return blot_support::some(copied),blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:blot_support::Option<blot_reuse_principal_interface::ExternalTarget>)->blot_support::Option<blot_reuse_principal_interface::ExternalTarget>,Error {if !value.present {return blot_support::none<blot_reuse_principal_interface::ExternalTarget>(),Error.none;}let copied,error=cloneValue(self,value.value);if error!=Error.none {return blot_support::none<blot_reuse_principal_interface::ExternalTarget>(),error;}return blot_support::some(copied),Error.none;}
+fn cloneValue(self_:Owner&,value:blot_support::Option<blot_reuse_principal_interface::ExternalTarget>)->blot_support::Option<blot_reuse_principal_interface::ExternalTarget>,Error {if !value.present {return blot_support::none<blot_reuse_principal_interface::ExternalTarget>(),blot_error::Error.none;}let copied,error=cloneValue(self_,value.value);if error!=blot_error::Error.none {return blot_support::none<blot_reuse_principal_interface::ExternalTarget>(),error;}return blot_support::some(copied),blot_error::Error.none;}
 
-fn cloneValue(self:Owner&,value:blot_check_core::Module)->blot_check_core::Module,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Module)->blot_check_core::Module,Error {
 
 var result=default<blot_check_core::Module>();
 
-{let copied,error=cloneValue(self,value.has_rank_contracts);if error!=Error.none {return result,error;}result.has_rank_contracts=copied;}
+{let copied,error=cloneValue(self_,value.has_rank_contracts);if error!=blot_error::Error.none {return result,error;}result.has_rank_contracts=copied;}
 
-{let copied,error=cloneValue(self,value.has_usage_contracts);if error!=Error.none {return result,error;}result.has_usage_contracts=copied;}
+{let copied,error=cloneValue(self_,value.has_usage_contracts);if error!=blot_error::Error.none {return result,error;}result.has_usage_contracts=copied;}
 
-{let copied,error=cloneValue(self,value.has_numeric_proofs);if error!=Error.none {return result,error;}result.has_numeric_proofs=copied;}
+{let copied,error=cloneValue(self_,value.has_numeric_proofs);if error!=blot_error::Error.none {return result,error;}result.has_numeric_proofs=copied;}
 
-{let copied,error=cloneValue(self,value.proof_contracts);if error!=Error.none {return result,error;}result.proof_contracts=copied;}
+{let copied,error=cloneValue(self_,value.proof_contracts);if error!=blot_error::Error.none {return result,error;}result.proof_contracts=copied;}
 
-{let copied,error=cloneValue(self,value.capability_contracts);if error!=Error.none {return result,error;}result.capability_contracts=copied;}
+{let copied,error=cloneValue(self_,value.capability_contracts);if error!=blot_error::Error.none {return result,error;}result.capability_contracts=copied;}
 
-{let copied,error=cloneValue(self,value.field_names);if error!=Error.none {return result,error;}result.field_names=copied;}
+{let copied,error=cloneValue(self_,value.field_names);if error!=blot_error::Error.none {return result,error;}result.field_names=copied;}
 
-{let copied,error=cloneValue(self,value.runtime_names);if error!=Error.none {return result,error;}result.runtime_names=copied;}
+{let copied,error=cloneValue(self_,value.runtime_names);if error!=blot_error::Error.none {return result,error;}result.runtime_names=copied;}
 
-{let copied,error=cloneValue(self,value.source_names);if error!=Error.none {return result,error;}result.source_names=copied;}
+{let copied,error=cloneValue(self_,value.source_names);if error!=blot_error::Error.none {return result,error;}result.source_names=copied;}
 
-{let copied,error=cloneValue(self,value.declaration_dependencies);if error!=Error.none {return result,error;}result.declaration_dependencies=copied;}
+{let copied,error=cloneValue(self_,value.declaration_dependencies);if error!=blot_error::Error.none {return result,error;}result.declaration_dependencies=copied;}
 
-{let copied,error=cloneValue(self,value.dependency_references);if error!=Error.none {return result,error;}result.dependency_references=copied;}
+{let copied,error=cloneValue(self_,value.dependency_references);if error!=blot_error::Error.none {return result,error;}result.dependency_references=copied;}
 
-{let copied,error=cloneValue(self,value.dependency_members);if error!=Error.none {return result,error;}result.dependency_members=copied;}
+{let copied,error=cloneValue(self_,value.dependency_members);if error!=blot_error::Error.none {return result,error;}result.dependency_members=copied;}
 
-{let copied,error=cloneValue(self,value.erased_declaration_references);if error!=Error.none {return result,error;}result.erased_declaration_references=copied;}
+{let copied,error=cloneValue(self_,value.erased_declaration_references);if error!=blot_error::Error.none {return result,error;}result.erased_declaration_references=copied;}
 
-{let copied,error=cloneValue(self,value.request_loops);if error!=Error.none {return result,error;}result.request_loops=copied;}
+{let copied,error=cloneValue(self_,value.request_loops);if error!=blot_error::Error.none {return result,error;}result.request_loops=copied;}
 
-{let copied,error=cloneValue(self,value.request_arms);if error!=Error.none {return result,error;}result.request_arms=copied;}
+{let copied,error=cloneValue(self_,value.request_arms);if error!=blot_error::Error.none {return result,error;}result.request_arms=copied;}
 
-{let copied,error=cloneValue(self,value.tag_calls);if error!=Error.none {return result,error;}result.tag_calls=copied;}
+{let copied,error=cloneValue(self_,value.tag_calls);if error!=blot_error::Error.none {return result,error;}result.tag_calls=copied;}
 
-{let copied,error=cloneValue(self,value.unit);if error!=Error.none {return result,error;}result.unit=copied;}
+{let copied,error=cloneValue(self_,value.unit);if error!=blot_error::Error.none {return result,error;}result.unit=copied;}
 
-{let copied,error=cloneValue(self,value.types);if error!=Error.none {return result,error;}result.types=copied;}
+{let copied,error=cloneValue(self_,value.types);if error!=blot_error::Error.none {return result,error;}result.types=copied;}
 
-{let copied,error=cloneValue(self,value.nodes);if error!=Error.none {return result,error;}result.nodes=copied;}
+{let copied,error=cloneValue(self_,value.nodes);if error!=blot_error::Error.none {return result,error;}result.nodes=copied;}
 
-{let copied,error=cloneValue(self,value.spans);if error!=Error.none {return result,error;}result.spans=copied;}
+{let copied,error=cloneValue(self_,value.spans);if error!=blot_error::Error.none {return result,error;}result.spans=copied;}
 
-{let copied,error=cloneValue(self,value.extra);if error!=Error.none {return result,error;}result.extra=copied;}
+{let copied,error=cloneValue(self_,value.extra);if error!=blot_error::Error.none {return result,error;}result.extra=copied;}
 
-{let copied,error=cloneValue(self,value.bindings);if error!=Error.none {return result,error;}result.bindings=copied;}
+{let copied,error=cloneValue(self_,value.bindings);if error!=blot_error::Error.none {return result,error;}result.bindings=copied;}
 
-{let copied,error=cloneValue(self,value.bodies);if error!=Error.none {return result,error;}result.bodies=copied;}
+{let copied,error=cloneValue(self_,value.bodies);if error!=blot_error::Error.none {return result,error;}result.bodies=copied;}
 
-{let copied,error=cloneValue(self,value.parameters);if error!=Error.none {return result,error;}result.parameters=copied;}
+{let copied,error=cloneValue(self_,value.parameters);if error!=blot_error::Error.none {return result,error;}result.parameters=copied;}
 
-{let copied,error=cloneValue(self,value.references);if error!=Error.none {return result,error;}result.references=copied;}
+{let copied,error=cloneValue(self_,value.references);if error!=blot_error::Error.none {return result,error;}result.references=copied;}
 
-{let copied,error=cloneValue(self,value.calls);if error!=Error.none {return result,error;}result.calls=copied;}
+{let copied,error=cloneValue(self_,value.calls);if error!=blot_error::Error.none {return result,error;}result.calls=copied;}
 
-{let copied,error=cloneValue(self,value.merges);if error!=Error.none {return result,error;}result.merges=copied;}
+{let copied,error=cloneValue(self_,value.merges);if error!=blot_error::Error.none {return result,error;}result.merges=copied;}
 
-{let copied,error=cloneValue(self,value.merge_ranges);if error!=Error.none {return result,error;}result.merge_ranges=copied;}
+{let copied,error=cloneValue(self_,value.merge_ranges);if error!=blot_error::Error.none {return result,error;}result.merge_ranges=copied;}
 
-{let copied,error=cloneValue(self,value.names);if error!=Error.none {return result,error;}result.names=copied;}
+{let copied,error=cloneValue(self_,value.names);if error!=blot_error::Error.none {return result,error;}result.names=copied;}
 
-{let copied,error=cloneValue(self,value.obligations);if error!=Error.none {return result,error;}result.obligations=copied;}
+{let copied,error=cloneValue(self_,value.obligations);if error!=blot_error::Error.none {return result,error;}result.obligations=copied;}
 
-{let copied,error=cloneValue(self,value.nominals);if error!=Error.none {return result,error;}result.nominals=copied;}
+{let copied,error=cloneValue(self_,value.nominals);if error!=blot_error::Error.none {return result,error;}result.nominals=copied;}
 
-{let copied,error=cloneValue(self,value.operation_names);if error!=Error.none {return result,error;}result.operation_names=copied;}
+{let copied,error=cloneValue(self_,value.operation_names);if error!=blot_error::Error.none {return result,error;}result.operation_names=copied;}
 
-{let copied,error=cloneValue(self,value.constructors);if error!=Error.none {return result,error;}result.constructors=copied;}
+{let copied,error=cloneValue(self_,value.constructors);if error!=blot_error::Error.none {return result,error;}result.constructors=copied;}
 
-{let copied,error=cloneValue(self,value.projections);if error!=Error.none {return result,error;}result.projections=copied;}
+{let copied,error=cloneValue(self_,value.projections);if error!=blot_error::Error.none {return result,error;}result.projections=copied;}
 
-{let copied,error=cloneValue(self,value.projection_variants);if error!=Error.none {return result,error;}result.projection_variants=copied;}
+{let copied,error=cloneValue(self_,value.projection_variants);if error!=blot_error::Error.none {return result,error;}result.projection_variants=copied;}
 
-{let copied,error=cloneValue(self,value.patterns);if error!=Error.none {return result,error;}result.patterns=copied;}
+{let copied,error=cloneValue(self_,value.patterns);if error!=blot_error::Error.none {return result,error;}result.patterns=copied;}
 
-{let copied,error=cloneValue(self,value.pattern_rows);if error!=Error.none {return result,error;}result.pattern_rows=copied;}
+{let copied,error=cloneValue(self_,value.pattern_rows);if error!=blot_error::Error.none {return result,error;}result.pattern_rows=copied;}
 
-{let copied,error=cloneValue(self,value.match_arms);if error!=Error.none {return result,error;}result.match_arms=copied;}
+{let copied,error=cloneValue(self_,value.match_arms);if error!=blot_error::Error.none {return result,error;}result.match_arms=copied;}
 
-{let copied,error=cloneValue(self,value.matches);if error!=Error.none {return result,error;}result.matches=copied;}
+{let copied,error=cloneValue(self_,value.matches);if error!=blot_error::Error.none {return result,error;}result.matches=copied;}
 
-{let copied,error=cloneValue(self,value.updates);if error!=Error.none {return result,error;}result.updates=copied;}
+{let copied,error=cloneValue(self_,value.updates);if error!=blot_error::Error.none {return result,error;}result.updates=copied;}
 
-{let copied,error=cloneValue(self,value.update_steps);if error!=Error.none {return result,error;}result.update_steps=copied;}
+{let copied,error=cloneValue(self_,value.update_steps);if error!=blot_error::Error.none {return result,error;}result.update_steps=copied;}
 
-{let copied,error=cloneValue(self,value.closures);if error!=Error.none {return result,error;}result.closures=copied;}
+{let copied,error=cloneValue(self_,value.closures);if error!=blot_error::Error.none {return result,error;}result.closures=copied;}
 
-{let copied,error=cloneValue(self,value.associated);if error!=Error.none {return result,error;}result.associated=copied;}
+{let copied,error=cloneValue(self_,value.associated);if error!=blot_error::Error.none {return result,error;}result.associated=copied;}
 
-{let copied,error=cloneValue(self,value.contracts);if error!=Error.none {return result,error;}result.contracts=copied;}
+{let copied,error=cloneValue(self_,value.contracts);if error!=blot_error::Error.none {return result,error;}result.contracts=copied;}
 
-{let copied,error=cloneValue(self,value.contract_members);if error!=Error.none {return result,error;}result.contract_members=copied;}
+{let copied,error=cloneValue(self_,value.contract_members);if error!=blot_error::Error.none {return result,error;}result.contract_members=copied;}
 
-{let copied,error=cloneValue(self,value.implementations);if error!=Error.none {return result,error;}result.implementations=copied;}
+{let copied,error=cloneValue(self_,value.implementations);if error!=blot_error::Error.none {return result,error;}result.implementations=copied;}
 
-{let copied,error=cloneValue(self,value.implementation_members);if error!=Error.none {return result,error;}result.implementation_members=copied;}
+{let copied,error=cloneValue(self_,value.implementation_members);if error!=blot_error::Error.none {return result,error;}result.implementation_members=copied;}
 
-{let copied,error=cloneValue(self,value.member_templates);if error!=Error.none {return result,error;}result.member_templates=copied;}
+{let copied,error=cloneValue(self_,value.member_templates);if error!=blot_error::Error.none {return result,error;}result.member_templates=copied;}
 
-{let copied,error=cloneValue(self,value.selected_proofs);if error!=Error.none {return result,error;}result.selected_proofs=copied;}
+{let copied,error=cloneValue(self_,value.selected_proofs);if error!=blot_error::Error.none {return result,error;}result.selected_proofs=copied;}
 
-{let copied,error=cloneValue(self,value.selected_members);if error!=Error.none {return result,error;}result.selected_members=copied;}
+{let copied,error=cloneValue(self_,value.selected_members);if error!=blot_error::Error.none {return result,error;}result.selected_members=copied;}
 
-{let copied,error=cloneValue(self,value.selected_edges);if error!=Error.none {return result,error;}result.selected_edges=copied;}
+{let copied,error=cloneValue(self_,value.selected_edges);if error!=blot_error::Error.none {return result,error;}result.selected_edges=copied;}
 
-{let copied,error=cloneValue(self,value.selected_uses);if error!=Error.none {return result,error;}result.selected_uses=copied;}
+{let copied,error=cloneValue(self_,value.selected_uses);if error!=blot_error::Error.none {return result,error;}result.selected_uses=copied;}
 
-{let copied,error=cloneValue(self,value.dictionary_selections);if error!=Error.none {return result,error;}result.dictionary_selections=copied;}
+{let copied,error=cloneValue(self_,value.dictionary_selections);if error!=blot_error::Error.none {return result,error;}result.dictionary_selections=copied;}
 
-{let copied,error=cloneValue(self,value.dictionary_uses);if error!=Error.none {return result,error;}result.dictionary_uses=copied;}
+{let copied,error=cloneValue(self_,value.dictionary_uses);if error!=blot_error::Error.none {return result,error;}result.dictionary_uses=copied;}
 
-{let copied,error=cloneValue(self,value.primitives);if error!=Error.none {return result,error;}result.primitives=copied;}
+{let copied,error=cloneValue(self_,value.primitives);if error!=blot_error::Error.none {return result,error;}result.primitives=copied;}
 
-{let copied,error=cloneValue(self,value.loops);if error!=Error.none {return result,error;}result.loops=copied;}
+{let copied,error=cloneValue(self_,value.loops);if error!=blot_error::Error.none {return result,error;}result.loops=copied;}
 
-{let copied,error=cloneValue(self,value.loop_carries);if error!=Error.none {return result,error;}result.loop_carries=copied;}
+{let copied,error=cloneValue(self_,value.loop_carries);if error!=blot_error::Error.none {return result,error;}result.loop_carries=copied;}
 
-{let copied,error=cloneValue(self,value.resolver_ops);if error!=Error.none {return result,error;}result.resolver_ops=copied;}
+{let copied,error=cloneValue(self_,value.resolver_ops);if error!=blot_error::Error.none {return result,error;}result.resolver_ops=copied;}
 
-{let copied,error=cloneValue(self,value.operation_values);if error!=Error.none {return result,error;}result.operation_values=copied;}
+{let copied,error=cloneValue(self_,value.operation_values);if error!=blot_error::Error.none {return result,error;}result.operation_values=copied;}
 
-{let copied,error=cloneValue(self,value.handle_effects);if error!=Error.none {return result,error;}result.handle_effects=copied;}
+{let copied,error=cloneValue(self_,value.handle_effects);if error!=blot_error::Error.none {return result,error;}result.handle_effects=copied;}
 
-{let copied,error=cloneValue(self,value.dispatch_signatures);if error!=Error.none {return result,error;}result.dispatch_signatures=copied;}
+{let copied,error=cloneValue(self_,value.dispatch_signatures);if error!=blot_error::Error.none {return result,error;}result.dispatch_signatures=copied;}
 
-{let copied,error=cloneValue(self,value.diagnostics);if error!=Error.none {return result,error;}result.diagnostics=copied;}
+{let copied,error=cloneValue(self_,value.diagnostics);if error!=blot_error::Error.none {return result,error;}result.diagnostics=copied;}
 
-{let copied,error=cloneValue(self,value.body_lowerings);if error!=Error.none {return result,error;}result.body_lowerings=copied;}
+{let copied,error=cloneValue(self_,value.body_lowerings);if error!=blot_error::Error.none {return result,error;}result.body_lowerings=copied;}
 
 result.owner_id=blot_native::fresh_owner_id();
 var packages=false;for node in result.nodes {if node.tag==blot_check_core::Tag.package_pack {packages=true;break;}}
-if packages {let run,error=self.alloc<u32>(result.nodes.len);if error!=Error.none {return result,error;}for node,index in result.nodes {run[index]=node.a;}result.package_payloads=run;}
+if packages {let run,error=blot_reuse_dependency_payload::alloc<u32>(self_,result.nodes.len);if error!=blot_error::Error.none {return result,error;}for node,index in result.nodes {run[index]=node.a;}result.package_payloads=run;}
 
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_numeric_proof_headers::Named)->blot_check_numeric_proof_headers::Named,Error {
+fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_headers::Named)->blot_check_numeric_proof_headers::Named,Error {
 
 var result=default<blot_check_numeric_proof_headers::Named>();
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-{let copied,error=cloneValue(self,value.header);if error!=Error.none {return result,error;}result.header=copied;}
+{let copied,error=cloneValue(self_,value.header);if error!=blot_error::Error.none {return result,error;}result.header=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_numeric_proof_headers::Owned)->blot_check_numeric_proof_headers::Owned,Error {
+fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_headers::Owned)->blot_check_numeric_proof_headers::Owned,Error {
 
 var result=default<blot_check_numeric_proof_headers::Owned>();
 
-{let copied,error=cloneValue(self,value.arity);if error!=Error.none {return result,error;}result.arity=copied;}
+{let copied,error=cloneValue(self_,value.arity);if error!=blot_error::Error.none {return result,error;}result.arity=copied;}
 
-{let copied,error=cloneValue(self,value.value_slots);if error!=Error.none {return result,error;}result.value_slots=copied;}
+{let copied,error=cloneValue(self_,value.value_slots);if error!=blot_error::Error.none {return result,error;}result.value_slots=copied;}
 
-{let copied,error=cloneValue(self,value.proof_slots);if error!=Error.none {return result,error;}result.proof_slots=copied;}
+{let copied,error=cloneValue(self_,value.proof_slots);if error!=blot_error::Error.none {return result,error;}result.proof_slots=copied;}
 
-{let copied,error=cloneValue(self,value.values);if error!=Error.none {return result,error;}result.values=copied;}
+{let copied,error=cloneValue(self_,value.values);if error!=blot_error::Error.none {return result,error;}result.values=copied;}
 
-{let copied,error=cloneValue(self,value.operands);if error!=Error.none {return result,error;}result.operands=copied;}
+{let copied,error=cloneValue(self_,value.operands);if error!=blot_error::Error.none {return result,error;}result.operands=copied;}
 
-{let copied,error=cloneValue(self,value.requirements);if error!=Error.none {return result,error;}result.requirements=copied;}
+{let copied,error=cloneValue(self_,value.requirements);if error!=blot_error::Error.none {return result,error;}result.requirements=copied;}
 
-{let copied,error=cloneValue(self,value.result);if error!=Error.none {return result,error;}result.result=copied;}
+{let copied,error=cloneValue(self_,value.result);if error!=blot_error::Error.none {return result,error;}result.result=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_numeric_proof_terms::Kind)->blot_check_numeric_proof_terms::Kind,Error {
+fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Kind)->blot_check_numeric_proof_terms::Kind,Error {
 
 match value {
 
-blot_check_numeric_proof_terms::Kind.unsigned32=>{
-return blot_check_numeric_proof_terms::Kind.unsigned32,Error.none;},
+unsigned32=>{
+return blot_check_numeric_proof_terms::Kind.unsigned32,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Kind.array=>{
-return blot_check_numeric_proof_terms::Kind.array,Error.none;},
+array=>{
+return blot_check_numeric_proof_terms::Kind.array,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Kind.list=>{
-return blot_check_numeric_proof_terms::Kind.list,Error.none;},
-
-}
+list=>{
+return blot_check_numeric_proof_terms::Kind.list,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_numeric_proof_terms::Term)->blot_check_numeric_proof_terms::Term,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Term)->blot_check_numeric_proof_terms::Term,Error {
 
 var result=default<blot_check_numeric_proof_terms::Term>();
 
-{let copied,error=cloneValue(self,value.tag);if error!=Error.none {return result,error;}result.tag=copied;}
+{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.a);if error!=Error.none {return result,error;}result.a=copied;}
+{let copied,error=cloneValue(self_,value.a);if error!=blot_error::Error.none {return result,error;}result.a=copied;}
 
-{let copied,error=cloneValue(self,value.b);if error!=Error.none {return result,error;}result.b=copied;}
+{let copied,error=cloneValue(self_,value.b);if error!=blot_error::Error.none {return result,error;}result.b=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_numeric_proof_terms::Tag)->blot_check_numeric_proof_terms::Tag,Error {
+fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Tag)->blot_check_numeric_proof_terms::Tag,Error {
 
 match value {
 
-blot_check_numeric_proof_terms::Tag.literal=>{
-return blot_check_numeric_proof_terms::Tag.literal,Error.none;},
+literal=>{
+return blot_check_numeric_proof_terms::Tag.literal,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Tag.formal=>{
-return blot_check_numeric_proof_terms::Tag.formal,Error.none;},
+formal=>{
+return blot_check_numeric_proof_terms::Tag.formal,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Tag.capture=>{
-return blot_check_numeric_proof_terms::Tag.capture,Error.none;},
+capture=>{
+return blot_check_numeric_proof_terms::Tag.capture,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Tag.version=>{
-return blot_check_numeric_proof_terms::Tag.version,Error.none;},
+version=>{
+return blot_check_numeric_proof_terms::Tag.version,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Tag.length=>{
-return blot_check_numeric_proof_terms::Tag.length,Error.none;},
+length=>{
+return blot_check_numeric_proof_terms::Tag.length,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Tag.complement=>{
-return blot_check_numeric_proof_terms::Tag.complement,Error.none;},
-
-}
+complement=>{
+return blot_check_numeric_proof_terms::Tag.complement,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_numeric_proof_contracts::Requirement)->blot_check_numeric_proof_contracts::Requirement,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_contracts::Requirement)->blot_check_numeric_proof_contracts::Requirement,Error {
 
 var result=default<blot_check_numeric_proof_contracts::Requirement>();
 
-{let copied,error=cloneValue(self,value.before);if error!=Error.none {return result,error;}result.before=copied;}
+{let copied,error=cloneValue(self_,value.before);if error!=blot_error::Error.none {return result,error;}result.before=copied;}
 
-{let copied,error=cloneValue(self,value.proposition);if error!=Error.none {return result,error;}result.proposition=copied;}
+{let copied,error=cloneValue(self_,value.proposition);if error!=blot_error::Error.none {return result,error;}result.proposition=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_numeric_proof_terms::Proposition)->blot_check_numeric_proof_terms::Proposition,Error {
+fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Proposition)->blot_check_numeric_proof_terms::Proposition,Error {
 
 var result=default<blot_check_numeric_proof_terms::Proposition>();
 
-{let copied,error=cloneValue(self,value.relation);if error!=Error.none {return result,error;}result.relation=copied;}
+{let copied,error=cloneValue(self_,value.relation);if error!=blot_error::Error.none {return result,error;}result.relation=copied;}
 
-{let copied,error=cloneValue(self,value.left);if error!=Error.none {return result,error;}result.left=copied;}
+{let copied,error=cloneValue(self_,value.left);if error!=blot_error::Error.none {return result,error;}result.left=copied;}
 
-{let copied,error=cloneValue(self,value.right);if error!=Error.none {return result,error;}result.right=copied;}
+{let copied,error=cloneValue(self_,value.right);if error!=blot_error::Error.none {return result,error;}result.right=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_numeric_proof_terms::Relation)->blot_check_numeric_proof_terms::Relation,Error {
+fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Relation)->blot_check_numeric_proof_terms::Relation,Error {
 
 match value {
 
-blot_check_numeric_proof_terms::Relation.eq=>{
-return blot_check_numeric_proof_terms::Relation.eq,Error.none;},
+eq=>{
+return blot_check_numeric_proof_terms::Relation.eq,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Relation.lt=>{
-return blot_check_numeric_proof_terms::Relation.lt,Error.none;},
+lt=>{
+return blot_check_numeric_proof_terms::Relation.lt,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Relation.le=>{
-return blot_check_numeric_proof_terms::Relation.le,Error.none;},
+le=>{
+return blot_check_numeric_proof_terms::Relation.le,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Relation.add_fits=>{
-return blot_check_numeric_proof_terms::Relation.add_fits,Error.none;},
+add_fits=>{
+return blot_check_numeric_proof_terms::Relation.add_fits,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Relation.sub_fits=>{
-return blot_check_numeric_proof_terms::Relation.sub_fits,Error.none;},
+sub_fits=>{
+return blot_check_numeric_proof_terms::Relation.sub_fits,blot_error::Error.none;},
 
-blot_check_numeric_proof_terms::Relation.index=>{
-return blot_check_numeric_proof_terms::Relation.index,Error.none;},
-
-}
+index=>{
+return blot_check_numeric_proof_terms::Relation.index,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_capability_contracts::Collection)->blot_check_capability_contracts::Collection,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_capability_contracts::Collection)->blot_check_capability_contracts::Collection,Error {
 
 var result=default<blot_check_capability_contracts::Collection>();
 
-{let copied,error=cloneValue(self,value.nodes);if error!=Error.none {return result,error;}result.nodes=copied;}
+{let copied,error=cloneValue(self_,value.nodes);if error!=blot_error::Error.none {return result,error;}result.nodes=copied;}
 
-{let copied,error=cloneValue(self,value.words);if error!=Error.none {return result,error;}result.words=copied;}
+{let copied,error=cloneValue(self_,value.words);if error!=blot_error::Error.none {return result,error;}result.words=copied;}
 
-{let copied,error=cloneValue(self,value.bindings);if error!=Error.none {return result,error;}result.bindings=copied;}
+{let copied,error=cloneValue(self_,value.bindings);if error!=blot_error::Error.none {return result,error;}result.bindings=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_capability_contracts::Term)->blot_check_capability_contracts::Term,Error {
+fn cloneValue(self_:Owner&,value:blot_check_capability_contracts::Term)->blot_check_capability_contracts::Term,Error {
 
 var result=default<blot_check_capability_contracts::Term>();
 
-{let copied,error=cloneValue(self,value.tag);if error!=Error.none {return result,error;}result.tag=copied;}
+{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
 
-{let copied,error=cloneValue(self,value.a);if error!=Error.none {return result,error;}result.a=copied;}
+{let copied,error=cloneValue(self_,value.a);if error!=blot_error::Error.none {return result,error;}result.a=copied;}
 
-{let copied,error=cloneValue(self,value.b);if error!=Error.none {return result,error;}result.b=copied;}
+{let copied,error=cloneValue(self_,value.b);if error!=blot_error::Error.none {return result,error;}result.b=copied;}
 
-{let copied,error=cloneValue(self,value.c);if error!=Error.none {return result,error;}result.c=copied;}
+{let copied,error=cloneValue(self_,value.c);if error!=blot_error::Error.none {return result,error;}result.c=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_capability_contracts::Tag)->blot_check_capability_contracts::Tag,Error {
+fn cloneValue(self_:Owner&,value:blot_check_capability_contracts::Tag)->blot_check_capability_contracts::Tag,Error {
 
 match value {
 
-blot_check_capability_contracts::Tag.empty=>{
-return blot_check_capability_contracts::Tag.empty,Error.none;},
+empty=>{
+return blot_check_capability_contracts::Tag.empty,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.unknown=>{
-return blot_check_capability_contracts::Tag.unknown,Error.none;},
+unknown=>{
+return blot_check_capability_contracts::Tag.unknown,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.parameter=>{
-return blot_check_capability_contracts::Tag.parameter,Error.none;},
+parameter=>{
+return blot_check_capability_contracts::Tag.parameter,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.authority=>{
-return blot_check_capability_contracts::Tag.authority,Error.none;},
+authority=>{
+return blot_check_capability_contracts::Tag.authority,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.captures=>{
-return blot_check_capability_contracts::Tag.captures,Error.none;},
+captures=>{
+return blot_check_capability_contracts::Tag.captures,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.product=>{
-return blot_check_capability_contracts::Tag.product,Error.none;},
+product=>{
+return blot_check_capability_contracts::Tag.product,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.record=>{
-return blot_check_capability_contracts::Tag.record,Error.none;},
+record=>{
+return blot_check_capability_contracts::Tag.record,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.wrapped=>{
-return blot_check_capability_contracts::Tag.wrapped,Error.none;},
+wrapped=>{
+return blot_check_capability_contracts::Tag.wrapped,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.join=>{
-return blot_check_capability_contracts::Tag.join,Error.none;},
+join=>{
+return blot_check_capability_contracts::Tag.join,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.project=>{
-return blot_check_capability_contracts::Tag.project,Error.none;},
+project=>{
+return blot_check_capability_contracts::Tag.project,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.elements=>{
-return blot_check_capability_contracts::Tag.elements,Error.none;},
+elements=>{
+return blot_check_capability_contracts::Tag.elements,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.argument=>{
-return blot_check_capability_contracts::Tag.argument,Error.none;},
+argument=>{
+return blot_check_capability_contracts::Tag.argument,blot_error::Error.none;},
 
-blot_check_capability_contracts::Tag.callable=>{
-return blot_check_capability_contracts::Tag.callable,Error.none;},
-
-}
+callable=>{
+return blot_check_capability_contracts::Tag.callable,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_capability_contracts::Binding)->blot_check_capability_contracts::Binding,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_capability_contracts::Binding)->blot_check_capability_contracts::Binding,Error {
 
 var result=default<blot_check_capability_contracts::Binding>();
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-{let copied,error=cloneValue(self,value.root);if error!=Error.none {return result,error;}result.root=copied;}
+{let copied,error=cloneValue(self_,value.root);if error!=blot_error::Error.none {return result,error;}result.root=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::FieldName)->blot_check_core::FieldName,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::FieldName)->blot_check_core::FieldName,Error {
 
 var result=default<blot_check_core::FieldName>();
 
-{let copied,error=cloneValue(self,value.symbol);if error!=Error.none {return result,error;}result.symbol=copied;}
+{let copied,error=cloneValue(self_,value.symbol);if error!=blot_error::Error.none {return result,error;}result.symbol=copied;}
 
-{let copied,error=cloneValue(self,value.spelling);if error!=Error.none {return result,error;}result.spelling=copied;}
+{let copied,error=cloneValue(self_,value.spelling);if error!=blot_error::Error.none {return result,error;}result.spelling=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Name)->blot_check_core::Name,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Name)->blot_check_core::Name,Error {
 
 var result=default<blot_check_core::Name>();
 
-{let copied,error=cloneValue(self,value.start);if error!=Error.none {return result,error;}result.start=copied;}
+{let copied,error=cloneValue(self_,value.start);if error!=blot_error::Error.none {return result,error;}result.start=copied;}
 
-{let copied,error=cloneValue(self,value.len);if error!=Error.none {return result,error;}result.len=copied;}
+{let copied,error=cloneValue(self_,value.len);if error!=blot_error::Error.none {return result,error;}result.len=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::RuntimeName)->blot_check_core::RuntimeName,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::RuntimeName)->blot_check_core::RuntimeName,Error {
 
 var result=default<blot_check_core::RuntimeName>();
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-{let copied,error=cloneValue(self,value.point);if error!=Error.none {return result,error;}result.point=copied;}
+{let copied,error=cloneValue(self_,value.point);if error!=blot_error::Error.none {return result,error;}result.point=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::DeclarationDependencies)->blot_check_core::DeclarationDependencies,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::DeclarationDependencies)->blot_check_core::DeclarationDependencies,Error {
 
 var result=default<blot_check_core::DeclarationDependencies>();
 
-{let copied,error=cloneValue(self,value.references);if error!=Error.none {return result,error;}result.references=copied;}
+{let copied,error=cloneValue(self_,value.references);if error!=blot_error::Error.none {return result,error;}result.references=copied;}
 
-{let copied,error=cloneValue(self,value.members);if error!=Error.none {return result,error;}result.members=copied;}
+{let copied,error=cloneValue(self_,value.members);if error!=blot_error::Error.none {return result,error;}result.members=copied;}
 
-{let copied,error=cloneValue(self,value.runtime_metadata);if error!=Error.none {return result,error;}result.runtime_metadata=copied;}
+{let copied,error=cloneValue(self_,value.runtime_metadata);if error!=blot_error::Error.none {return result,error;}result.runtime_metadata=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::List)->blot_check_core::List,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::List)->blot_check_core::List,Error {
 
 var result=default<blot_check_core::List>();
 
-{let copied,error=cloneValue(self,value.start);if error!=Error.none {return result,error;}result.start=copied;}
+{let copied,error=cloneValue(self_,value.start);if error!=blot_error::Error.none {return result,error;}result.start=copied;}
 
-{let copied,error=cloneValue(self,value.len);if error!=Error.none {return result,error;}result.len=copied;}
+{let copied,error=cloneValue(self_,value.len);if error!=blot_error::Error.none {return result,error;}result.len=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::BindingRef)->blot_check_core::BindingRef,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::BindingRef)->blot_check_core::BindingRef,Error {
 
 var result=default<blot_check_core::BindingRef>();
 
-{let copied,error=cloneValue(self,value.unit);if error!=Error.none {return result,error;}result.unit=copied;}
+{let copied,error=cloneValue(self_,value.unit);if error!=blot_error::Error.none {return result,error;}result.unit=copied;}
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::DependencyMember)->blot_check_core::DependencyMember,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::DependencyMember)->blot_check_core::DependencyMember,Error {
 
 var result=default<blot_check_core::DependencyMember>();
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.operator);if error!=Error.none {return result,error;}result.operator=copied;}
+{let copied,error=cloneValue(self_,value.operator);if error!=blot_error::Error.none {return result,error;}result.operator=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::Operator)->blot_check_types::Operator,Error {
+fn cloneValue(self_:Owner&,value:blot_check_types::Operator)->blot_check_types::Operator,Error {
 
 match value {
 
-blot_check_types::Operator.none=>{
-return blot_check_types::Operator.none,Error.none;},
+none=>{
+return blot_check_types::Operator.none,blot_error::Error.none;},
 
-blot_check_types::Operator.add=>{
-return blot_check_types::Operator.add,Error.none;},
+add=>{
+return blot_check_types::Operator.add,blot_error::Error.none;},
 
-blot_check_types::Operator.sub=>{
-return blot_check_types::Operator.sub,Error.none;},
+sub=>{
+return blot_check_types::Operator.sub,blot_error::Error.none;},
 
-blot_check_types::Operator.mul=>{
-return blot_check_types::Operator.mul,Error.none;},
+mul=>{
+return blot_check_types::Operator.mul,blot_error::Error.none;},
 
-blot_check_types::Operator.div=>{
-return blot_check_types::Operator.div,Error.none;},
+div=>{
+return blot_check_types::Operator.div,blot_error::Error.none;},
 
-blot_check_types::Operator.rem=>{
-return blot_check_types::Operator.rem,Error.none;},
+rem=>{
+return blot_check_types::Operator.rem,blot_error::Error.none;},
 
-blot_check_types::Operator.equal=>{
-return blot_check_types::Operator.equal,Error.none;},
+equal=>{
+return blot_check_types::Operator.equal,blot_error::Error.none;},
 
-blot_check_types::Operator.not_equal=>{
-return blot_check_types::Operator.not_equal,Error.none;},
+not_equal=>{
+return blot_check_types::Operator.not_equal,blot_error::Error.none;},
 
-blot_check_types::Operator.less=>{
-return blot_check_types::Operator.less,Error.none;},
+less=>{
+return blot_check_types::Operator.less,blot_error::Error.none;},
 
-blot_check_types::Operator.less_equal=>{
-return blot_check_types::Operator.less_equal,Error.none;},
+less_equal=>{
+return blot_check_types::Operator.less_equal,blot_error::Error.none;},
 
-blot_check_types::Operator.greater=>{
-return blot_check_types::Operator.greater,Error.none;},
+greater=>{
+return blot_check_types::Operator.greater,blot_error::Error.none;},
 
-blot_check_types::Operator.greater_equal=>{
-return blot_check_types::Operator.greater_equal,Error.none;},
+greater_equal=>{
+return blot_check_types::Operator.greater_equal,blot_error::Error.none;},
 
-blot_check_types::Operator.bit_and=>{
-return blot_check_types::Operator.bit_and,Error.none;},
+bit_and=>{
+return blot_check_types::Operator.bit_and,blot_error::Error.none;},
 
-blot_check_types::Operator.bit_or=>{
-return blot_check_types::Operator.bit_or,Error.none;},
+bit_or=>{
+return blot_check_types::Operator.bit_or,blot_error::Error.none;},
 
-blot_check_types::Operator.bit_xor=>{
-return blot_check_types::Operator.bit_xor,Error.none;},
+bit_xor=>{
+return blot_check_types::Operator.bit_xor,blot_error::Error.none;},
 
-blot_check_types::Operator.shift_left=>{
-return blot_check_types::Operator.shift_left,Error.none;},
+shift_left=>{
+return blot_check_types::Operator.shift_left,blot_error::Error.none;},
 
-blot_check_types::Operator.shift_right=>{
-return blot_check_types::Operator.shift_right,Error.none;},
-
-}
+shift_right=>{
+return blot_check_types::Operator.shift_right,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::ErasedDeclarationReference)->blot_check_core::ErasedDeclarationReference,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::ErasedDeclarationReference)->blot_check_core::ErasedDeclarationReference,Error {
 
 var result=default<blot_check_core::ErasedDeclarationReference>();
 
-{let copied,error=cloneValue(self,value.node);if error!=Error.none {return result,error;}result.node=copied;}
+{let copied,error=cloneValue(self_,value.node);if error!=blot_error::Error.none {return result,error;}result.node=copied;}
 
-{let copied,error=cloneValue(self,value.target);if error!=Error.none {return result,error;}result.target=copied;}
+{let copied,error=cloneValue(self_,value.target);if error!=blot_error::Error.none {return result,error;}result.target=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::RequestLoopInfo)->blot_check_core::RequestLoopInfo,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::RequestLoopInfo)->blot_check_core::RequestLoopInfo,Error {
 
 var result=default<blot_check_core::RequestLoopInfo>();
 
-{let copied,error=cloneValue(self,value.computation);if error!=Error.none {return result,error;}result.computation=copied;}
+{let copied,error=cloneValue(self_,value.computation);if error!=blot_error::Error.none {return result,error;}result.computation=copied;}
 
-{let copied,error=cloneValue(self,value.action_type);if error!=Error.none {return result,error;}result.action_type=copied;}
+{let copied,error=cloneValue(self_,value.action_type);if error!=blot_error::Error.none {return result,error;}result.action_type=copied;}
 
-{let copied,error=cloneValue(self,value.value_type);if error!=Error.none {return result,error;}result.value_type=copied;}
+{let copied,error=cloneValue(self_,value.value_type);if error!=blot_error::Error.none {return result,error;}result.value_type=copied;}
 
-{let copied,error=cloneValue(self,value.result_type);if error!=Error.none {return result,error;}result.result_type=copied;}
+{let copied,error=cloneValue(self_,value.result_type);if error!=blot_error::Error.none {return result,error;}result.result_type=copied;}
 
-{let copied,error=cloneValue(self,value.state_type);if error!=Error.none {return result,error;}result.state_type=copied;}
+{let copied,error=cloneValue(self_,value.state_type);if error!=blot_error::Error.none {return result,error;}result.state_type=copied;}
 
-{let copied,error=cloneValue(self,value.arms);if error!=Error.none {return result,error;}result.arms=copied;}
+{let copied,error=cloneValue(self_,value.arms);if error!=blot_error::Error.none {return result,error;}result.arms=copied;}
 
-{let copied,error=cloneValue(self,value.completion_pattern);if error!=Error.none {return result,error;}result.completion_pattern=copied;}
+{let copied,error=cloneValue(self_,value.completion_pattern);if error!=blot_error::Error.none {return result,error;}result.completion_pattern=copied;}
 
-{let copied,error=cloneValue(self,value.completion_body);if error!=Error.none {return result,error;}result.completion_body=copied;}
+{let copied,error=cloneValue(self_,value.completion_body);if error!=blot_error::Error.none {return result,error;}result.completion_body=copied;}
 
-{let copied,error=cloneValue(self,value.completion_state_bindings);if error!=Error.none {return result,error;}result.completion_state_bindings=copied;}
+{let copied,error=cloneValue(self_,value.completion_state_bindings);if error!=blot_error::Error.none {return result,error;}result.completion_state_bindings=copied;}
 
-{let copied,error=cloneValue(self,value.carries);if error!=Error.none {return result,error;}result.carries=copied;}
+{let copied,error=cloneValue(self_,value.carries);if error!=blot_error::Error.none {return result,error;}result.carries=copied;}
 
-{let copied,error=cloneValue(self,value.return_target);if error!=Error.none {return result,error;}result.return_target=copied;}
+{let copied,error=cloneValue(self_,value.return_target);if error!=blot_error::Error.none {return result,error;}result.return_target=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::RequestArm)->blot_check_core::RequestArm,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::RequestArm)->blot_check_core::RequestArm,Error {
 
 var result=default<blot_check_core::RequestArm>();
 
-{let copied,error=cloneValue(self,value.operation);if error!=Error.none {return result,error;}result.operation=copied;}
+{let copied,error=cloneValue(self_,value.operation);if error!=blot_error::Error.none {return result,error;}result.operation=copied;}
 
-{let copied,error=cloneValue(self,value.callback);if error!=Error.none {return result,error;}result.callback=copied;}
+{let copied,error=cloneValue(self_,value.callback);if error!=blot_error::Error.none {return result,error;}result.callback=copied;}
 
-{let copied,error=cloneValue(self,value.selector);if error!=Error.none {return result,error;}result.selector=copied;}
+{let copied,error=cloneValue(self_,value.selector);if error!=blot_error::Error.none {return result,error;}result.selector=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Types)->blot_check_core::Types,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Types)->blot_check_core::Types,Error {
 
 var result=default<blot_check_core::Types>();
 
-{let copied,error=cloneValue(self,value.nodes);if error!=Error.none {return result,error;}result.nodes=copied;}
+{let copied,error=cloneValue(self_,value.nodes);if error!=blot_error::Error.none {return result,error;}result.nodes=copied;}
 
-{let copied,error=cloneValue(self,value.extra);if error!=Error.none {return result,error;}result.extra=copied;}
+{let copied,error=cloneValue(self_,value.extra);if error!=blot_error::Error.none {return result,error;}result.extra=copied;}
 
-{let copied,error=cloneValue(self,value.effects);if error!=Error.none {return result,error;}result.effects=copied;}
+{let copied,error=cloneValue(self_,value.effects);if error!=blot_error::Error.none {return result,error;}result.effects=copied;}
 
-{let copied,error=cloneValue(self,value.operations);if error!=Error.none {return result,error;}result.operations=copied;}
+{let copied,error=cloneValue(self_,value.operations);if error!=blot_error::Error.none {return result,error;}result.operations=copied;}
 
-{let copied,error=cloneValue(self,value.quantifier_goals);if error!=Error.none {return result,error;}result.quantifier_goals=copied;}
+{let copied,error=cloneValue(self_,value.quantifier_goals);if error!=blot_error::Error.none {return result,error;}result.quantifier_goals=copied;}
 
-{let copied,error=cloneValue(self,value.quantifier_obligations);if error!=Error.none {return result,error;}result.quantifier_obligations=copied;}
+{let copied,error=cloneValue(self_,value.quantifier_obligations);if error!=blot_error::Error.none {return result,error;}result.quantifier_obligations=copied;}
 
 result.owner_id=blot_native::fresh_owner_id();
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::Node)->blot_check_types::Node,Error {
+fn cloneValue(self_:Owner&,value:blot_check_types::Node)->blot_check_types::Node,Error {
 
 var result=default<blot_check_types::Node>();
 
-{let copied,error=cloneValue(self,value.tag);if error!=Error.none {return result,error;}result.tag=copied;}
+{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
 
-{let copied,error=cloneValue(self,value.closed_height);if error!=Error.none {return result,error;}result.closed_height=copied;}
+{let copied,error=cloneValue(self_,value.closed_height);if error!=blot_error::Error.none {return result,error;}result.closed_height=copied;}
 
-{let copied,error=cloneValue(self,value.closed_generation);if error!=Error.none {return result,error;}result.closed_generation=copied;}
+{let copied,error=cloneValue(self_,value.closed_generation);if error!=blot_error::Error.none {return result,error;}result.closed_generation=copied;}
 
-{let copied,error=cloneValue(self,value.a);if error!=Error.none {return result,error;}result.a=copied;}
+{let copied,error=cloneValue(self_,value.a);if error!=blot_error::Error.none {return result,error;}result.a=copied;}
 
-{let copied,error=cloneValue(self,value.b);if error!=Error.none {return result,error;}result.b=copied;}
+{let copied,error=cloneValue(self_,value.b);if error!=blot_error::Error.none {return result,error;}result.b=copied;}
 
-{let copied,error=cloneValue(self,value.c);if error!=Error.none {return result,error;}result.c=copied;}
+{let copied,error=cloneValue(self_,value.c);if error!=blot_error::Error.none {return result,error;}result.c=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::Tag)->blot_check_types::Tag,Error {
+fn cloneValue(self_:Owner&,value:blot_check_types::Tag)->blot_check_types::Tag,Error {
 
 match value {
 
-blot_check_types::Tag.absent=>{
-return blot_check_types::Tag.absent,Error.none;},
+absent=>{
+return blot_check_types::Tag.absent,blot_error::Error.none;},
 
-blot_check_types::Tag.unit=>{
-return blot_check_types::Tag.unit,Error.none;},
+unit=>{
+return blot_check_types::Tag.unit,blot_error::Error.none;},
 
-blot_check_types::Tag.boolean=>{
-return blot_check_types::Tag.boolean,Error.none;},
+boolean=>{
+return blot_check_types::Tag.boolean,blot_error::Error.none;},
 
-blot_check_types::Tag.unsigned32=>{
-return blot_check_types::Tag.unsigned32,Error.none;},
+unsigned32=>{
+return blot_check_types::Tag.unsigned32,blot_error::Error.none;},
 
-blot_check_types::Tag.floating32=>{
-return blot_check_types::Tag.floating32,Error.none;},
+floating32=>{
+return blot_check_types::Tag.floating32,blot_error::Error.none;},
 
-blot_check_types::Tag.never=>{
-return blot_check_types::Tag.never,Error.none;},
+never=>{
+return blot_check_types::Tag.never,blot_error::Error.none;},
 
-blot_check_types::Tag.variable=>{
-return blot_check_types::Tag.variable,Error.none;},
+variable=>{
+return blot_check_types::Tag.variable,blot_error::Error.none;},
 
-blot_check_types::Tag.function=>{
-return blot_check_types::Tag.function,Error.none;},
+function=>{
+return blot_check_types::Tag.function,blot_error::Error.none;},
 
-blot_check_types::Tag.product=>{
-return blot_check_types::Tag.product,Error.none;},
+product=>{
+return blot_check_types::Tag.product,blot_error::Error.none;},
 
-blot_check_types::Tag.record=>{
-return blot_check_types::Tag.record,Error.none;},
+record=>{
+return blot_check_types::Tag.record,blot_error::Error.none;},
 
-blot_check_types::Tag.nominal=>{
-return blot_check_types::Tag.nominal,Error.none;},
+nominal=>{
+return blot_check_types::Tag.nominal,blot_error::Error.none;},
 
-blot_check_types::Tag.array=>{
-return blot_check_types::Tag.array,Error.none;},
+array=>{
+return blot_check_types::Tag.array,blot_error::Error.none;},
 
-blot_check_types::Tag.list=>{
-return blot_check_types::Tag.list,Error.none;},
+list=>{
+return blot_check_types::Tag.list,blot_error::Error.none;},
 
-blot_check_types::Tag.cursor=>{
-return blot_check_types::Tag.cursor,Error.none;},
+cursor=>{
+return blot_check_types::Tag.cursor,blot_error::Error.none;},
 
-blot_check_types::Tag.type_constructor=>{
-return blot_check_types::Tag.type_constructor,Error.none;},
+type_constructor=>{
+return blot_check_types::Tag.type_constructor,blot_error::Error.none;},
 
-blot_check_types::Tag.resolver=>{
-return blot_check_types::Tag.resolver,Error.none;},
+resolver=>{
+return blot_check_types::Tag.resolver,blot_error::Error.none;},
 
-blot_check_types::Tag.provider=>{
-return blot_check_types::Tag.provider,Error.none;},
+provider=>{
+return blot_check_types::Tag.provider,blot_error::Error.none;},
 
-blot_check_types::Tag.state_provider=>{
-return blot_check_types::Tag.state_provider,Error.none;},
+state_provider=>{
+return blot_check_types::Tag.state_provider,blot_error::Error.none;},
 
-blot_check_types::Tag.projection=>{
-return blot_check_types::Tag.projection,Error.none;},
+projection=>{
+return blot_check_types::Tag.projection,blot_error::Error.none;},
 
-blot_check_types::Tag.scoped=>{
-return blot_check_types::Tag.scoped,Error.none;},
+scoped=>{
+return blot_check_types::Tag.scoped,blot_error::Error.none;},
 
-blot_check_types::Tag.instance_selection=>{
-return blot_check_types::Tag.instance_selection,Error.none;},
+instance_selection=>{
+return blot_check_types::Tag.instance_selection,blot_error::Error.none;},
 
-blot_check_types::Tag.erased_proof=>{
-return blot_check_types::Tag.erased_proof,Error.none;},
+erased_proof=>{
+return blot_check_types::Tag.erased_proof,blot_error::Error.none;},
 
-blot_check_types::Tag.forall=>{
-return blot_check_types::Tag.forall,Error.none;},
+forall=>{
+return blot_check_types::Tag.forall,blot_error::Error.none;},
 
-blot_check_types::Tag.existential=>{
-return blot_check_types::Tag.existential,Error.none;},
+existential=>{
+return blot_check_types::Tag.existential,blot_error::Error.none;},
 
-blot_check_types::Tag.bound=>{
-return blot_check_types::Tag.bound,Error.none;},
+bound=>{
+return blot_check_types::Tag.bound,blot_error::Error.none;},
 
-blot_check_types::Tag.rigid=>{
-return blot_check_types::Tag.rigid,Error.none;},
+rigid=>{
+return blot_check_types::Tag.rigid,blot_error::Error.none;},
 
-blot_check_types::Tag.usage=>{
-return blot_check_types::Tag.usage,Error.none;},
+usage=>{
+return blot_check_types::Tag.usage,blot_error::Error.none;},
 
-blot_check_types::Tag.instance_version=>{
-return blot_check_types::Tag.instance_version,Error.none;},
-
-}
+instance_version=>{
+return blot_check_types::Tag.instance_version,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::EffectRows)->blot_check_core::EffectRows,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::EffectRows)->blot_check_core::EffectRows,Error {
 
 var result=default<blot_check_core::EffectRows>();
 
-{let copied,error=cloneValue(self,value.rows);if error!=Error.none {return result,error;}result.rows=copied;}
+{let copied,error=cloneValue(self_,value.rows);if error!=blot_error::Error.none {return result,error;}result.rows=copied;}
 
-{let copied,error=cloneValue(self,value.labels);if error!=Error.none {return result,error;}result.labels=copied;}
+{let copied,error=cloneValue(self_,value.labels);if error!=blot_error::Error.none {return result,error;}result.labels=copied;}
 
-{let copied,error=cloneValue(self,value.variable_count);if error!=Error.none {return result,error;}result.variable_count=copied;}
+{let copied,error=cloneValue(self_,value.variable_count);if error!=blot_error::Error.none {return result,error;}result.variable_count=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_effects::Row)->blot_check_effects::Row,Error {
+fn cloneValue(self_:Owner&,value:blot_check_effects::Row)->blot_check_effects::Row,Error {
 
 var result=default<blot_check_effects::Row>();
 
-{let copied,error=cloneValue(self,value.labels);if error!=Error.none {return result,error;}result.labels=copied;}
+{let copied,error=cloneValue(self_,value.labels);if error!=blot_error::Error.none {return result,error;}result.labels=copied;}
 
-{let copied,error=cloneValue(self,value.tail);if error!=Error.none {return result,error;}result.tail=copied;}
+{let copied,error=cloneValue(self_,value.tail);if error!=blot_error::Error.none {return result,error;}result.tail=copied;}
 
-{let copied,error=cloneValue(self,value.cursor);if error!=Error.none {return result,error;}result.cursor=copied;}
+{let copied,error=cloneValue(self_,value.cursor);if error!=blot_error::Error.none {return result,error;}result.cursor=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_effects::List)->blot_check_effects::List,Error {
+fn cloneValue(self_:Owner&,value:blot_check_effects::List)->blot_check_effects::List,Error {
 
 var result=default<blot_check_effects::List>();
 
-{let copied,error=cloneValue(self,value.start);if error!=Error.none {return result,error;}result.start=copied;}
+{let copied,error=cloneValue(self_,value.start);if error!=blot_error::Error.none {return result,error;}result.start=copied;}
 
-{let copied,error=cloneValue(self,value.len);if error!=Error.none {return result,error;}result.len=copied;}
+{let copied,error=cloneValue(self_,value.len);if error!=blot_error::Error.none {return result,error;}result.len=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_effects::Tail)->blot_check_effects::Tail,Error {
+fn cloneValue(self_:Owner&,value:blot_check_effects::Tail)->blot_check_effects::Tail,Error {
 
 match value {
 
-blot_check_effects::Tail.closed=>{
-return blot_check_effects::Tail.closed,Error.none;},
+closed=>{
+return blot_check_effects::Tail.closed,blot_error::Error.none;},
 
-blot_check_effects::Tail.variable payload=>{
-let value,error_value=cloneValue(self,payload.value);if error_value!=Error.none {return default<blot_check_effects::Tail>(),error_value;}
-return blot_check_effects::Tail.variable {value:value, ..},Error.none;},
+variable payload=>{
+let value,error_value=cloneValue(self_,payload.value);if error_value!=blot_error::Error.none {return default<blot_check_effects::Tail>(),error_value;}
+return blot_check_effects::Tail.variable {value:value, ..},blot_error::Error.none;},
 
-blot_check_effects::Tail.parameter payload=>{
-let value,error_value=cloneValue(self,payload.value);if error_value!=Error.none {return default<blot_check_effects::Tail>(),error_value;}
-return blot_check_effects::Tail.parameter {value:value, ..},Error.none;},
+parameter payload=>{
+let value,error_value=cloneValue(self_,payload.value);if error_value!=blot_error::Error.none {return default<blot_check_effects::Tail>(),error_value;}
+return blot_check_effects::Tail.parameter {value:value, ..},blot_error::Error.none;},
 
-blot_check_effects::Tail.formal payload=>{
-let value,error_value=cloneValue(self,payload.value);if error_value!=Error.none {return default<blot_check_effects::Tail>(),error_value;}
-return blot_check_effects::Tail.formal {value:value, ..},Error.none;},
-
-}
+formal payload=>{
+let value,error_value=cloneValue(self_,payload.value);if error_value!=blot_error::Error.none {return default<blot_check_effects::Tail>(),error_value;}
+return blot_check_effects::Tail.formal {value:value, ..},blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::Operation)->blot_check_types::Operation,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_types::Operation)->blot_check_types::Operation,Error {
 
 var result=default<blot_check_types::Operation>();
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.arguments);if error!=Error.none {return result,error;}result.arguments=copied;}
+{let copied,error=cloneValue(self_,value.arguments);if error!=blot_error::Error.none {return result,error;}result.arguments=copied;}
 
-{let copied,error=cloneValue(self,value.instance);if error!=Error.none {return result,error;}result.instance=copied;}
+{let copied,error=cloneValue(self_,value.instance);if error!=blot_error::Error.none {return result,error;}result.instance=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::NominalIdentity)->blot_check_types::NominalIdentity,Error {
+fn cloneValue(self_:Owner&,value:blot_check_types::NominalIdentity)->blot_check_types::NominalIdentity,Error {
 
 var result=default<blot_check_types::NominalIdentity>();
 
-{let copied,error=cloneValue(self,value.unit);if error!=Error.none {return result,error;}result.unit=copied;}
+{let copied,error=cloneValue(self_,value.unit);if error!=blot_error::Error.none {return result,error;}result.unit=copied;}
 
-{let copied,error=cloneValue(self,value.decl);if error!=Error.none {return result,error;}result.decl=copied;}
+{let copied,error=cloneValue(self_,value.decl);if error!=blot_error::Error.none {return result,error;}result.decl=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::List)->blot_check_types::List,Error {
+fn cloneValue(self_:Owner&,value:blot_check_types::List)->blot_check_types::List,Error {
 
 var result=default<blot_check_types::List>();
 
-{let copied,error=cloneValue(self,value.start);if error!=Error.none {return result,error;}result.start=copied;}
+{let copied,error=cloneValue(self_,value.start);if error!=blot_error::Error.none {return result,error;}result.start=copied;}
 
-{let copied,error=cloneValue(self,value.len);if error!=Error.none {return result,error;}result.len=copied;}
+{let copied,error=cloneValue(self_,value.len);if error!=blot_error::Error.none {return result,error;}result.len=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::QuantifierGoals)->blot_check_types::QuantifierGoals,Error {
+fn cloneValue(self_:Owner&,value:blot_check_types::QuantifierGoals)->blot_check_types::QuantifierGoals,Error {
 
 var result=default<blot_check_types::QuantifierGoals>();
 
-{let copied,error=cloneValue(self,value.owner);if error!=Error.none {return result,error;}result.owner=copied;}
+{let copied,error=cloneValue(self_,value.owner);if error!=blot_error::Error.none {return result,error;}result.owner=copied;}
 
-{let copied,error=cloneValue(self,value.goals);if error!=Error.none {return result,error;}result.goals=copied;}
+{let copied,error=cloneValue(self_,value.goals);if error!=blot_error::Error.none {return result,error;}result.goals=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::Obligation)->blot_check_types::Obligation,Error {
+fn cloneValue(self_:Owner&,value:blot_check_types::Obligation)->blot_check_types::Obligation,Error {
 
 var result=default<blot_check_types::Obligation>();
 
-{let copied,error=cloneValue(self,value.ty);if error!=Error.none {return result,error;}result.ty=copied;}
+{let copied,error=cloneValue(self_,value.ty);if error!=blot_error::Error.none {return result,error;}result.ty=copied;}
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.source);if error!=Error.none {return result,error;}result.source=copied;}
+{let copied,error=cloneValue(self_,value.source);if error!=blot_error::Error.none {return result,error;}result.source=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.result);if error!=Error.none {return result,error;}result.result=copied;}
+{let copied,error=cloneValue(self_,value.result);if error!=blot_error::Error.none {return result,error;}result.result=copied;}
 
-{let copied,error=cloneValue(self,value.other);if error!=Error.none {return result,error;}result.other=copied;}
+{let copied,error=cloneValue(self_,value.other);if error!=blot_error::Error.none {return result,error;}result.other=copied;}
 
-{let copied,error=cloneValue(self,value.signature);if error!=Error.none {return result,error;}result.signature=copied;}
+{let copied,error=cloneValue(self_,value.signature);if error!=blot_error::Error.none {return result,error;}result.signature=copied;}
 
-{let copied,error=cloneValue(self,value.operator);if error!=Error.none {return result,error;}result.operator=copied;}
+{let copied,error=cloneValue(self_,value.operator);if error!=blot_error::Error.none {return result,error;}result.operator=copied;}
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.explicit);if error!=Error.none {return result,error;}result.explicit=copied;}
+{let copied,error=cloneValue(self_,value.explicit);if error!=blot_error::Error.none {return result,error;}result.explicit=copied;}
 
-{let copied,error=cloneValue(self,value.qualification_span);if error!=Error.none {return result,error;}result.qualification_span=copied;}
+{let copied,error=cloneValue(self_,value.qualification_span);if error!=blot_error::Error.none {return result,error;}result.qualification_span=copied;}
 
-{let copied,error=cloneValue(self,value.qualification_unit);if error!=Error.none {return result,error;}result.qualification_unit=copied;}
+{let copied,error=cloneValue(self_,value.qualification_unit);if error!=blot_error::Error.none {return result,error;}result.qualification_unit=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::ObligationKind)->blot_check_types::ObligationKind,Error {
+fn cloneValue(self_:Owner&,value:blot_check_types::ObligationKind)->blot_check_types::ObligationKind,Error {
 
 match value {
 
-blot_check_types::ObligationKind.arithmetic=>{
-return blot_check_types::ObligationKind.arithmetic,Error.none;},
+arithmetic=>{
+return blot_check_types::ObligationKind.arithmetic,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.ordered=>{
-return blot_check_types::ObligationKind.ordered,Error.none;},
+ordered=>{
+return blot_check_types::ObligationKind.ordered,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.equality=>{
-return blot_check_types::ObligationKind.equality,Error.none;},
+equality=>{
+return blot_check_types::ObligationKind.equality,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.integer=>{
-return blot_check_types::ObligationKind.integer,Error.none;},
+integer=>{
+return blot_check_types::ObligationKind.integer,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.field=>{
-return blot_check_types::ObligationKind.field,Error.none;},
+field=>{
+return blot_check_types::ObligationKind.field,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.writable_field=>{
-return blot_check_types::ObligationKind.writable_field,Error.none;},
+writable_field=>{
+return blot_check_types::ObligationKind.writable_field,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.dispatch=>{
-return blot_check_types::ObligationKind.dispatch,Error.none;},
+dispatch=>{
+return blot_check_types::ObligationKind.dispatch,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.result_dispatch=>{
-return blot_check_types::ObligationKind.result_dispatch,Error.none;},
+result_dispatch=>{
+return blot_check_types::ObligationKind.result_dispatch,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.monad_factory=>{
-return blot_check_types::ObligationKind.monad_factory,Error.none;},
+monad_factory=>{
+return blot_check_types::ObligationKind.monad_factory,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.resolver_dispatch=>{
-return blot_check_types::ObligationKind.resolver_dispatch,Error.none;},
+resolver_dispatch=>{
+return blot_check_types::ObligationKind.resolver_dispatch,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.resolver_shape=>{
-return blot_check_types::ObligationKind.resolver_shape,Error.none;},
+resolver_shape=>{
+return blot_check_types::ObligationKind.resolver_shape,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.effect_operation=>{
-return blot_check_types::ObligationKind.effect_operation,Error.none;},
+effect_operation=>{
+return blot_check_types::ObligationKind.effect_operation,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.effect_handler=>{
-return blot_check_types::ObligationKind.effect_handler,Error.none;},
+effect_handler=>{
+return blot_check_types::ObligationKind.effect_handler,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.receiver=>{
-return blot_check_types::ObligationKind.receiver,Error.none;},
+receiver=>{
+return blot_check_types::ObligationKind.receiver,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.update=>{
-return blot_check_types::ObligationKind.update,Error.none;},
+update=>{
+return blot_check_types::ObligationKind.update,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.type_rep=>{
-return blot_check_types::ObligationKind.type_rep,Error.none;},
+type_rep=>{
+return blot_check_types::ObligationKind.type_rep,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.effect_rep=>{
-return blot_check_types::ObligationKind.effect_rep,Error.none;},
+effect_rep=>{
+return blot_check_types::ObligationKind.effect_rep,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.type_head=>{
-return blot_check_types::ObligationKind.type_head,Error.none;},
+type_head=>{
+return blot_check_types::ObligationKind.type_head,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.collection=>{
-return blot_check_types::ObligationKind.collection,Error.none;},
+collection=>{
+return blot_check_types::ObligationKind.collection,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.record_merge=>{
-return blot_check_types::ObligationKind.record_merge,Error.none;},
+record_merge=>{
+return blot_check_types::ObligationKind.record_merge,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.callee_use=>{
-return blot_check_types::ObligationKind.callee_use,Error.none;},
+callee_use=>{
+return blot_check_types::ObligationKind.callee_use,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.type_eq=>{
-return blot_check_types::ObligationKind.type_eq,Error.none;},
+type_eq=>{
+return blot_check_types::ObligationKind.type_eq,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.contract=>{
-return blot_check_types::ObligationKind.contract,Error.none;},
+contract=>{
+return blot_check_types::ObligationKind.contract,blot_error::Error.none;},
 
-blot_check_types::ObligationKind.task_receive=>{
-return blot_check_types::ObligationKind.task_receive,Error.none;},
-
-}
+task_receive=>{
+return blot_check_types::ObligationKind.task_receive,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_parse_ast::Span)->blot_parse_ast::Span,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_parse_ast::Span)->blot_parse_ast::Span,Error {
 
 var result=default<blot_parse_ast::Span>();
 
-{let copied,error=cloneValue(self,value.start);if error!=Error.none {return result,error;}result.start=copied;}
+{let copied,error=cloneValue(self_,value.start);if error!=blot_error::Error.none {return result,error;}result.start=copied;}
 
-{let copied,error=cloneValue(self,value.end);if error!=Error.none {return result,error;}result.end=copied;}
+{let copied,error=cloneValue(self_,value.end);if error!=blot_error::Error.none {return result,error;}result.end=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Node)->blot_check_core::Node,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Node)->blot_check_core::Node,Error {
 
 var result=default<blot_check_core::Node>();
 
-{let copied,error=cloneValue(self,value.tag);if error!=Error.none {return result,error;}result.tag=copied;}
+{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
 
-{let copied,error=cloneValue(self,value.op);if error!=Error.none {return result,error;}result.op=copied;}
+{let copied,error=cloneValue(self_,value.op);if error!=blot_error::Error.none {return result,error;}result.op=copied;}
 
-{let copied,error=cloneValue(self,value.ty);if error!=Error.none {return result,error;}result.ty=copied;}
+{let copied,error=cloneValue(self_,value.ty);if error!=blot_error::Error.none {return result,error;}result.ty=copied;}
 
-{let copied,error=cloneValue(self,value.a);if error!=Error.none {return result,error;}result.a=copied;}
+{let copied,error=cloneValue(self_,value.a);if error!=blot_error::Error.none {return result,error;}result.a=copied;}
 
-{let copied,error=cloneValue(self,value.b);if error!=Error.none {return result,error;}result.b=copied;}
+{let copied,error=cloneValue(self_,value.b);if error!=blot_error::Error.none {return result,error;}result.b=copied;}
 
-{let copied,error=cloneValue(self,value.c);if error!=Error.none {return result,error;}result.c=copied;}
+{let copied,error=cloneValue(self_,value.c);if error!=blot_error::Error.none {return result,error;}result.c=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Tag)->blot_check_core::Tag,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Tag)->blot_check_core::Tag,Error {
 
 match value {
 
-blot_check_core::Tag.invalid=>{
-return blot_check_core::Tag.invalid,Error.none;},
+invalid=>{
+return blot_check_core::Tag.invalid,blot_error::Error.none;},
 
-blot_check_core::Tag.constant=>{
-return blot_check_core::Tag.constant,Error.none;},
+constant=>{
+return blot_check_core::Tag.constant,blot_error::Error.none;},
 
-blot_check_core::Tag.reference=>{
-return blot_check_core::Tag.reference,Error.none;},
+reference=>{
+return blot_check_core::Tag.reference,blot_error::Error.none;},
 
-blot_check_core::Tag.scalar=>{
-return blot_check_core::Tag.scalar,Error.none;},
+scalar=>{
+return blot_check_core::Tag.scalar,blot_error::Error.none;},
 
-blot_check_core::Tag.logical=>{
-return blot_check_core::Tag.logical,Error.none;},
+logical=>{
+return blot_check_core::Tag.logical,blot_error::Error.none;},
 
-blot_check_core::Tag.call=>{
-return blot_check_core::Tag.call,Error.none;},
+call=>{
+return blot_check_core::Tag.call,blot_error::Error.none;},
 
-blot_check_core::Tag.if_value=>{
-return blot_check_core::Tag.if_value,Error.none;},
+if_value=>{
+return blot_check_core::Tag.if_value,blot_error::Error.none;},
 
-blot_check_core::Tag.block_=>{
-return blot_check_core::Tag.block_,Error.none;},
+block_=>{
+return blot_check_core::Tag.block_,blot_error::Error.none;},
 
-blot_check_core::Tag.suite=>{
-return blot_check_core::Tag.suite,Error.none;},
+suite=>{
+return blot_check_core::Tag.suite,blot_error::Error.none;},
 
-blot_check_core::Tag.bind=>{
-return blot_check_core::Tag.bind,Error.none;},
+bind=>{
+return blot_check_core::Tag.bind,blot_error::Error.none;},
 
-blot_check_core::Tag.return_=>{
-return blot_check_core::Tag.return_,Error.none;},
+return_=>{
+return blot_check_core::Tag.return_,blot_error::Error.none;},
 
-blot_check_core::Tag.if_stmt=>{
-return blot_check_core::Tag.if_stmt,Error.none;},
+if_stmt=>{
+return blot_check_core::Tag.if_stmt,blot_error::Error.none;},
 
-blot_check_core::Tag.product=>{
-return blot_check_core::Tag.product,Error.none;},
+product=>{
+return blot_check_core::Tag.product,blot_error::Error.none;},
 
-blot_check_core::Tag.record=>{
-return blot_check_core::Tag.record,Error.none;},
+record=>{
+return blot_check_core::Tag.record,blot_error::Error.none;},
 
-blot_check_core::Tag.construct=>{
-return blot_check_core::Tag.construct,Error.none;},
+construct=>{
+return blot_check_core::Tag.construct,blot_error::Error.none;},
 
-blot_check_core::Tag.project=>{
-return blot_check_core::Tag.project,Error.none;},
+project=>{
+return blot_check_core::Tag.project,blot_error::Error.none;},
 
-blot_check_core::Tag.match_=>{
-return blot_check_core::Tag.match_,Error.none;},
+match_=>{
+return blot_check_core::Tag.match_,blot_error::Error.none;},
 
-blot_check_core::Tag.pattern_bind=>{
-return blot_check_core::Tag.pattern_bind,Error.none;},
+pattern_bind=>{
+return blot_check_core::Tag.pattern_bind,blot_error::Error.none;},
 
-blot_check_core::Tag.update=>{
-return blot_check_core::Tag.update,Error.none;},
+update=>{
+return blot_check_core::Tag.update,blot_error::Error.none;},
 
-blot_check_core::Tag.array=>{
-return blot_check_core::Tag.array,Error.none;},
+array=>{
+return blot_check_core::Tag.array,blot_error::Error.none;},
 
-blot_check_core::Tag.array_op=>{
-return blot_check_core::Tag.array_op,Error.none;},
+array_op=>{
+return blot_check_core::Tag.array_op,blot_error::Error.none;},
 
-blot_check_core::Tag.closure=>{
-return blot_check_core::Tag.closure,Error.none;},
+closure=>{
+return blot_check_core::Tag.closure,blot_error::Error.none;},
 
-blot_check_core::Tag.apply=>{
-return blot_check_core::Tag.apply,Error.none;},
+apply=>{
+return blot_check_core::Tag.apply,blot_error::Error.none;},
 
-blot_check_core::Tag.constructor_function=>{
-return blot_check_core::Tag.constructor_function,Error.none;},
+constructor_function=>{
+return blot_check_core::Tag.constructor_function,blot_error::Error.none;},
 
-blot_check_core::Tag.associated=>{
-return blot_check_core::Tag.associated,Error.none;},
+associated=>{
+return blot_check_core::Tag.associated,blot_error::Error.none;},
 
-blot_check_core::Tag.primitive_function=>{
-return blot_check_core::Tag.primitive_function,Error.none;},
+primitive_function=>{
+return blot_check_core::Tag.primitive_function,blot_error::Error.none;},
 
-blot_check_core::Tag.panic=>{
-return blot_check_core::Tag.panic,Error.none;},
+panic=>{
+return blot_check_core::Tag.panic,blot_error::Error.none;},
 
-blot_check_core::Tag.loop_=>{
-return blot_check_core::Tag.loop_,Error.none;},
+loop_=>{
+return blot_check_core::Tag.loop_,blot_error::Error.none;},
 
-blot_check_core::Tag.break_=>{
-return blot_check_core::Tag.break_,Error.none;},
+break_=>{
+return blot_check_core::Tag.break_,blot_error::Error.none;},
 
-blot_check_core::Tag.type_same=>{
-return blot_check_core::Tag.type_same,Error.none;},
+type_same=>{
+return blot_check_core::Tag.type_same,blot_error::Error.none;},
 
-blot_check_core::Tag.result_associated=>{
-return blot_check_core::Tag.result_associated,Error.none;},
+result_associated=>{
+return blot_check_core::Tag.result_associated,blot_error::Error.none;},
 
-blot_check_core::Tag.type_constructor=>{
-return blot_check_core::Tag.type_constructor,Error.none;},
+type_constructor=>{
+return blot_check_core::Tag.type_constructor,blot_error::Error.none;},
 
-blot_check_core::Tag.resolver_op=>{
-return blot_check_core::Tag.resolver_op,Error.none;},
+resolver_op=>{
+return blot_check_core::Tag.resolver_op,blot_error::Error.none;},
 
-blot_check_core::Tag.operation_value=>{
-return blot_check_core::Tag.operation_value,Error.none;},
+operation_value=>{
+return blot_check_core::Tag.operation_value,blot_error::Error.none;},
 
-blot_check_core::Tag.effect_provider=>{
-return blot_check_core::Tag.effect_provider,Error.none;},
+effect_provider=>{
+return blot_check_core::Tag.effect_provider,blot_error::Error.none;},
 
-blot_check_core::Tag.state_provider=>{
-return blot_check_core::Tag.state_provider,Error.none;},
+state_provider=>{
+return blot_check_core::Tag.state_provider,blot_error::Error.none;},
 
-blot_check_core::Tag.handle=>{
-return blot_check_core::Tag.handle,Error.none;},
+handle=>{
+return blot_check_core::Tag.handle,blot_error::Error.none;},
 
-blot_check_core::Tag.effect_reflection=>{
-return blot_check_core::Tag.effect_reflection,Error.none;},
+effect_reflection=>{
+return blot_check_core::Tag.effect_reflection,blot_error::Error.none;},
 
-blot_check_core::Tag.computation=>{
-return blot_check_core::Tag.computation,Error.none;},
+computation=>{
+return blot_check_core::Tag.computation,blot_error::Error.none;},
 
-blot_check_core::Tag.request_loop=>{
-return blot_check_core::Tag.request_loop,Error.none;},
+request_loop=>{
+return blot_check_core::Tag.request_loop,blot_error::Error.none;},
 
-blot_check_core::Tag.request_decision=>{
-return blot_check_core::Tag.request_decision,Error.none;},
+request_decision=>{
+return blot_check_core::Tag.request_decision,blot_error::Error.none;},
 
-blot_check_core::Tag.record_merge=>{
-return blot_check_core::Tag.record_merge,Error.none;},
+record_merge=>{
+return blot_check_core::Tag.record_merge,blot_error::Error.none;},
 
-blot_check_core::Tag.contract_method=>{
-return blot_check_core::Tag.contract_method,Error.none;},
+contract_method=>{
+return blot_check_core::Tag.contract_method,blot_error::Error.none;},
 
-blot_check_core::Tag.effect_scope=>{
-return blot_check_core::Tag.effect_scope,Error.none;},
+effect_scope=>{
+return blot_check_core::Tag.effect_scope,blot_error::Error.none;},
 
-blot_check_core::Tag.proof_guard=>{
-return blot_check_core::Tag.proof_guard,Error.none;},
+proof_guard=>{
+return blot_check_core::Tag.proof_guard,blot_error::Error.none;},
 
-blot_check_core::Tag.package_pack=>{
-return blot_check_core::Tag.package_pack,Error.none;},
+package_pack=>{
+return blot_check_core::Tag.package_pack,blot_error::Error.none;},
 
-blot_check_core::Tag.package_unpack=>{
-return blot_check_core::Tag.package_unpack,Error.none;},
+package_unpack=>{
+return blot_check_core::Tag.package_unpack,blot_error::Error.none;},
 
-blot_check_core::Tag.staging=>{
-return blot_check_core::Tag.staging,Error.none;},
+staging=>{
+return blot_check_core::Tag.staging,blot_error::Error.none;},
 
-blot_check_core::Tag.usage_borrow=>{
-return blot_check_core::Tag.usage_borrow,Error.none;},
+usage_borrow=>{
+return blot_check_core::Tag.usage_borrow,blot_error::Error.none;},
 
-blot_check_core::Tag.usage_read=>{
-return blot_check_core::Tag.usage_read,Error.none;},
+usage_read=>{
+return blot_check_core::Tag.usage_read,blot_error::Error.none;},
 
-blot_check_core::Tag.resource_scope=>{
-return blot_check_core::Tag.resource_scope,Error.none;},
+resource_scope=>{
+return blot_check_core::Tag.resource_scope,blot_error::Error.none;},
 
-blot_check_core::Tag.usage_share=>{
-return blot_check_core::Tag.usage_share,Error.none;},
+usage_share=>{
+return blot_check_core::Tag.usage_share,blot_error::Error.none;},
 
-blot_check_core::Tag.resource_acquire=>{
-return blot_check_core::Tag.resource_acquire,Error.none;},
+resource_acquire=>{
+return blot_check_core::Tag.resource_acquire,blot_error::Error.none;},
 
-blot_check_core::Tag.resource_release=>{
-return blot_check_core::Tag.resource_release,Error.none;},
+resource_release=>{
+return blot_check_core::Tag.resource_release,blot_error::Error.none;},
 
-blot_check_core::Tag.task=>{
-return blot_check_core::Tag.task,Error.none;},
+task=>{
+return blot_check_core::Tag.task,blot_error::Error.none;},
 
-blot_check_core::Tag.storage=>{
-return blot_check_core::Tag.storage,Error.none;},
-
-}
+storage=>{
+return blot_check_core::Tag.storage,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Op)->blot_check_core::Op,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::Op)->blot_check_core::Op,Error {
 
 match value {
 
-blot_check_core::Op.none=>{
-return blot_check_core::Op.none,Error.none;},
+none=>{
+return blot_check_core::Op.none,blot_error::Error.none;},
 
-blot_check_core::Op.add=>{
-return blot_check_core::Op.add,Error.none;},
+add=>{
+return blot_check_core::Op.add,blot_error::Error.none;},
 
-blot_check_core::Op.sub=>{
-return blot_check_core::Op.sub,Error.none;},
+sub=>{
+return blot_check_core::Op.sub,blot_error::Error.none;},
 
-blot_check_core::Op.mul=>{
-return blot_check_core::Op.mul,Error.none;},
+mul=>{
+return blot_check_core::Op.mul,blot_error::Error.none;},
 
-blot_check_core::Op.div=>{
-return blot_check_core::Op.div,Error.none;},
+div=>{
+return blot_check_core::Op.div,blot_error::Error.none;},
 
-blot_check_core::Op.rem=>{
-return blot_check_core::Op.rem,Error.none;},
+rem=>{
+return blot_check_core::Op.rem,blot_error::Error.none;},
 
-blot_check_core::Op.equal=>{
-return blot_check_core::Op.equal,Error.none;},
+equal=>{
+return blot_check_core::Op.equal,blot_error::Error.none;},
 
-blot_check_core::Op.not_equal=>{
-return blot_check_core::Op.not_equal,Error.none;},
+not_equal=>{
+return blot_check_core::Op.not_equal,blot_error::Error.none;},
 
-blot_check_core::Op.less=>{
-return blot_check_core::Op.less,Error.none;},
+less=>{
+return blot_check_core::Op.less,blot_error::Error.none;},
 
-blot_check_core::Op.less_equal=>{
-return blot_check_core::Op.less_equal,Error.none;},
+less_equal=>{
+return blot_check_core::Op.less_equal,blot_error::Error.none;},
 
-blot_check_core::Op.greater=>{
-return blot_check_core::Op.greater,Error.none;},
+greater=>{
+return blot_check_core::Op.greater,blot_error::Error.none;},
 
-blot_check_core::Op.greater_equal=>{
-return blot_check_core::Op.greater_equal,Error.none;},
+greater_equal=>{
+return blot_check_core::Op.greater_equal,blot_error::Error.none;},
 
-blot_check_core::Op.bit_and=>{
-return blot_check_core::Op.bit_and,Error.none;},
+bit_and=>{
+return blot_check_core::Op.bit_and,blot_error::Error.none;},
 
-blot_check_core::Op.bit_or=>{
-return blot_check_core::Op.bit_or,Error.none;},
+bit_or=>{
+return blot_check_core::Op.bit_or,blot_error::Error.none;},
 
-blot_check_core::Op.bit_xor=>{
-return blot_check_core::Op.bit_xor,Error.none;},
+bit_xor=>{
+return blot_check_core::Op.bit_xor,blot_error::Error.none;},
 
-blot_check_core::Op.shift_left=>{
-return blot_check_core::Op.shift_left,Error.none;},
+shift_left=>{
+return blot_check_core::Op.shift_left,blot_error::Error.none;},
 
-blot_check_core::Op.shift_right=>{
-return blot_check_core::Op.shift_right,Error.none;},
+shift_right=>{
+return blot_check_core::Op.shift_right,blot_error::Error.none;},
 
-blot_check_core::Op.and_=>{
-return blot_check_core::Op.and_,Error.none;},
+and_=>{
+return blot_check_core::Op.and_,blot_error::Error.none;},
 
-blot_check_core::Op.or_=>{
-return blot_check_core::Op.or_,Error.none;},
+or_=>{
+return blot_check_core::Op.or_,blot_error::Error.none;},
 
-blot_check_core::Op.neg=>{
-return blot_check_core::Op.neg,Error.none;},
+neg=>{
+return blot_check_core::Op.neg,blot_error::Error.none;},
 
-blot_check_core::Op.abs=>{
-return blot_check_core::Op.abs,Error.none;},
+abs=>{
+return blot_check_core::Op.abs,blot_error::Error.none;},
 
-blot_check_core::Op.ceil=>{
-return blot_check_core::Op.ceil,Error.none;},
+ceil=>{
+return blot_check_core::Op.ceil,blot_error::Error.none;},
 
-blot_check_core::Op.floor=>{
-return blot_check_core::Op.floor,Error.none;},
+floor=>{
+return blot_check_core::Op.floor,blot_error::Error.none;},
 
-blot_check_core::Op.trunc=>{
-return blot_check_core::Op.trunc,Error.none;},
+trunc=>{
+return blot_check_core::Op.trunc,blot_error::Error.none;},
 
-blot_check_core::Op.sqrt=>{
-return blot_check_core::Op.sqrt,Error.none;},
+sqrt=>{
+return blot_check_core::Op.sqrt,blot_error::Error.none;},
 
-blot_check_core::Op.convert_u32_f32=>{
-return blot_check_core::Op.convert_u32_f32,Error.none;},
+convert_u32_f32=>{
+return blot_check_core::Op.convert_u32_f32,blot_error::Error.none;},
 
-blot_check_core::Op.convert_f32_u32=>{
-return blot_check_core::Op.convert_f32_u32,Error.none;},
+convert_f32_u32=>{
+return blot_check_core::Op.convert_f32_u32,blot_error::Error.none;},
 
-blot_check_core::Op.shift_right_signed=>{
-return blot_check_core::Op.shift_right_signed,Error.none;},
+shift_right_signed=>{
+return blot_check_core::Op.shift_right_signed,blot_error::Error.none;},
 
-blot_check_core::Op.min=>{
-return blot_check_core::Op.min,Error.none;},
+min=>{
+return blot_check_core::Op.min,blot_error::Error.none;},
 
-blot_check_core::Op.max=>{
-return blot_check_core::Op.max,Error.none;},
+max=>{
+return blot_check_core::Op.max,blot_error::Error.none;},
 
-blot_check_core::Op.bit_not=>{
-return blot_check_core::Op.bit_not,Error.none;},
+bit_not=>{
+return blot_check_core::Op.bit_not,blot_error::Error.none;},
 
-blot_check_core::Op.bit_andnot=>{
-return blot_check_core::Op.bit_andnot,Error.none;},
+bit_andnot=>{
+return blot_check_core::Op.bit_andnot,blot_error::Error.none;},
 
-blot_check_core::Op.any_true=>{
-return blot_check_core::Op.any_true,Error.none;},
+any_true=>{
+return blot_check_core::Op.any_true,blot_error::Error.none;},
 
-blot_check_core::Op.all_true=>{
-return blot_check_core::Op.all_true,Error.none;},
+all_true=>{
+return blot_check_core::Op.all_true,blot_error::Error.none;},
 
-blot_check_core::Op.select=>{
-return blot_check_core::Op.select,Error.none;},
+select=>{
+return blot_check_core::Op.select,blot_error::Error.none;},
 
-blot_check_core::Op.shuffle=>{
-return blot_check_core::Op.shuffle,Error.none;},
+shuffle=>{
+return blot_check_core::Op.shuffle,blot_error::Error.none;},
 
-blot_check_core::Op.swizzle=>{
-return blot_check_core::Op.swizzle,Error.none;},
+swizzle=>{
+return blot_check_core::Op.swizzle,blot_error::Error.none;},
 
-blot_check_core::Op.broadcast=>{
-return blot_check_core::Op.broadcast,Error.none;},
+broadcast=>{
+return blot_check_core::Op.broadcast,blot_error::Error.none;},
 
-blot_check_core::Op.bits=>{
-return blot_check_core::Op.bits,Error.none;},
+bits=>{
+return blot_check_core::Op.bits,blot_error::Error.none;},
 
-blot_check_core::Op.from_bits=>{
-return blot_check_core::Op.from_bits,Error.none;},
+from_bits=>{
+return blot_check_core::Op.from_bits,blot_error::Error.none;},
 
-blot_check_core::Op.relaxed_madd=>{
-return blot_check_core::Op.relaxed_madd,Error.none;},
+relaxed_madd=>{
+return blot_check_core::Op.relaxed_madd,blot_error::Error.none;},
 
-blot_check_core::Op.relaxed_nmadd=>{
-return blot_check_core::Op.relaxed_nmadd,Error.none;},
+relaxed_nmadd=>{
+return blot_check_core::Op.relaxed_nmadd,blot_error::Error.none;},
 
-blot_check_core::Op.convert_i32_f32=>{
-return blot_check_core::Op.convert_i32_f32,Error.none;},
+convert_i32_f32=>{
+return blot_check_core::Op.convert_i32_f32,blot_error::Error.none;},
 
-blot_check_core::Op.convert_f32_i32=>{
-return blot_check_core::Op.convert_f32_i32,Error.none;},
+convert_f32_i32=>{
+return blot_check_core::Op.convert_f32_i32,blot_error::Error.none;},
 
-blot_check_core::Op.continue_=>{
-return blot_check_core::Op.continue_,Error.none;},
-
-}
+continue_=>{
+return blot_check_core::Op.continue_,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Binding)->blot_check_core::Binding,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::Binding)->blot_check_core::Binding,Error {
 
 var result=default<blot_check_core::Binding>();
 
-{let copied,error=cloneValue(self,value.capability_flow);if error!=Error.none {return result,error;}result.capability_flow=copied;}
+{let copied,error=cloneValue(self_,value.capability_flow);if error!=blot_error::Error.none {return result,error;}result.capability_flow=copied;}
 
-{let copied,error=cloneValue(self,value.capability_parameters);if error!=Error.none {return result,error;}result.capability_parameters=copied;}
+{let copied,error=cloneValue(self_,value.capability_parameters);if error!=blot_error::Error.none {return result,error;}result.capability_parameters=copied;}
 
-{let copied,error=cloneValue(self,value.private);if error!=Error.none {return result,error;}result.private=copied;}
+{let copied,error=cloneValue(self_,value.private);if error!=blot_error::Error.none {return result,error;}result.private=copied;}
 
-{let copied,error=cloneValue(self,value.initializer);if error!=Error.none {return result,error;}result.initializer=copied;}
+{let copied,error=cloneValue(self_,value.initializer);if error!=blot_error::Error.none {return result,error;}result.initializer=copied;}
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.ty);if error!=Error.none {return result,error;}result.ty=copied;}
+{let copied,error=cloneValue(self_,value.ty);if error!=blot_error::Error.none {return result,error;}result.ty=copied;}
 
-{let copied,error=cloneValue(self,value.scheme);if error!=Error.none {return result,error;}result.scheme=copied;}
+{let copied,error=cloneValue(self_,value.scheme);if error!=blot_error::Error.none {return result,error;}result.scheme=copied;}
 
-{let copied,error=cloneValue(self,value.public_variables);if error!=Error.none {return result,error;}result.public_variables=copied;}
+{let copied,error=cloneValue(self_,value.public_variables);if error!=blot_error::Error.none {return result,error;}result.public_variables=copied;}
 
-{let copied,error=cloneValue(self,value.public_rows);if error!=Error.none {return result,error;}result.public_rows=copied;}
+{let copied,error=cloneValue(self_,value.public_rows);if error!=blot_error::Error.none {return result,error;}result.public_rows=copied;}
 
-{let copied,error=cloneValue(self,value.has_explicit);if error!=Error.none {return result,error;}result.has_explicit=copied;}
+{let copied,error=cloneValue(self_,value.has_explicit);if error!=blot_error::Error.none {return result,error;}result.has_explicit=copied;}
 
-{let copied,error=cloneValue(self,value.body_id);if error!=Error.none {return result,error;}result.body_id=copied;}
+{let copied,error=cloneValue(self_,value.body_id);if error!=blot_error::Error.none {return result,error;}result.body_id=copied;}
 
-{let copied,error=cloneValue(self,value.target);if error!=Error.none {return result,error;}result.target=copied;}
+{let copied,error=cloneValue(self_,value.target);if error!=blot_error::Error.none {return result,error;}result.target=copied;}
 
-{let copied,error=cloneValue(self,value.span);if error!=Error.none {return result,error;}result.span=copied;}
+{let copied,error=cloneValue(self_,value.span);if error!=blot_error::Error.none {return result,error;}result.span=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_capability_flow::Contract)->blot_check_capability_flow::Contract,Error {
+fn cloneValue(self_:Owner&,value:blot_check_capability_flow::Contract)->blot_check_capability_flow::Contract,Error {
 
 match value {
 
-blot_check_capability_flow::Contract.unknown=>{
-return blot_check_capability_flow::Contract.unknown,Error.none;},
+unknown=>{
+return blot_check_capability_flow::Contract.unknown,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.identity=>{
-return blot_check_capability_flow::Contract.identity,Error.none;},
+identity=>{
+return blot_check_capability_flow::Contract.identity,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.invoke_unit=>{
-return blot_check_capability_flow::Contract.invoke_unit,Error.none;},
+invoke_unit=>{
+return blot_check_capability_flow::Contract.invoke_unit,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.member_unit=>{
-return blot_check_capability_flow::Contract.member_unit,Error.none;},
+member_unit=>{
+return blot_check_capability_flow::Contract.member_unit,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.invoke_with_capability=>{
-return blot_check_capability_flow::Contract.invoke_with_capability,Error.none;},
+invoke_with_capability=>{
+return blot_check_capability_flow::Contract.invoke_with_capability,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.member_first_unit=>{
-return blot_check_capability_flow::Contract.member_first_unit,Error.none;},
+member_first_unit=>{
+return blot_check_capability_flow::Contract.member_first_unit,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.member_second_unit=>{
-return blot_check_capability_flow::Contract.member_second_unit,Error.none;},
+member_second_unit=>{
+return blot_check_capability_flow::Contract.member_second_unit,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.input_shape=>{
-return blot_check_capability_flow::Contract.input_shape,Error.none;},
+input_shape=>{
+return blot_check_capability_flow::Contract.input_shape,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.consume_task=>{
-return blot_check_capability_flow::Contract.consume_task,Error.none;},
+consume_task=>{
+return blot_check_capability_flow::Contract.consume_task,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.scope_task=>{
-return blot_check_capability_flow::Contract.scope_task,Error.none;},
+scope_task=>{
+return blot_check_capability_flow::Contract.scope_task,blot_error::Error.none;},
 
-blot_check_capability_flow::Contract.spawn_task=>{
-return blot_check_capability_flow::Contract.spawn_task,Error.none;},
-
-}
+spawn_task=>{
+return blot_check_capability_flow::Contract.spawn_task,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_capability_flow::Parameters)->blot_check_capability_flow::Parameters,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_capability_flow::Parameters)->blot_check_capability_flow::Parameters,Error {
 
 var result=default<blot_check_capability_flow::Parameters>();
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.mask);if error!=Error.none {return result,error;}result.mask=copied;}
+{let copied,error=cloneValue(self_,value.mask);if error!=blot_error::Error.none {return result,error;}result.mask=copied;}
 
-{let copied,error=cloneValue(self,value.inputs);if error!=Error.none {return result,error;}result.inputs=copied;}
+{let copied,error=cloneValue(self_,value.inputs);if error!=blot_error::Error.none {return result,error;}result.inputs=copied;}
 
-{let copied,error=cloneValue(self,value.invocation_arguments);if error!=Error.none {return result,error;}result.invocation_arguments=copied;}
+{let copied,error=cloneValue(self_,value.invocation_arguments);if error!=blot_error::Error.none {return result,error;}result.invocation_arguments=copied;}
 
-{let copied,error=cloneValue(self,value.invocation_count);if error!=Error.none {return result,error;}result.invocation_count=copied;}
+{let copied,error=cloneValue(self_,value.invocation_count);if error!=blot_error::Error.none {return result,error;}result.invocation_count=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_capability_flow::ParameterResult)->blot_check_capability_flow::ParameterResult,Error {
+fn cloneValue(self_:Owner&,value:blot_check_capability_flow::ParameterResult)->blot_check_capability_flow::ParameterResult,Error {
 
 match value {
 
-blot_check_capability_flow::ParameterResult.product=>{
-return blot_check_capability_flow::ParameterResult.product,Error.none;},
+product=>{
+return blot_check_capability_flow::ParameterResult.product,blot_error::Error.none;},
 
-blot_check_capability_flow::ParameterResult.invoke_unit=>{
-return blot_check_capability_flow::ParameterResult.invoke_unit,Error.none;},
+invoke_unit=>{
+return blot_check_capability_flow::ParameterResult.invoke_unit,blot_error::Error.none;},
 
-blot_check_capability_flow::ParameterResult.invalid=>{
-return blot_check_capability_flow::ParameterResult.invalid,Error.none;},
+invalid=>{
+return blot_check_capability_flow::ParameterResult.invalid,blot_error::Error.none;},
 
-blot_check_capability_flow::ParameterResult.member_closure_unit=>{
-return blot_check_capability_flow::ParameterResult.member_closure_unit,Error.none;},
+member_closure_unit=>{
+return blot_check_capability_flow::ParameterResult.member_closure_unit,blot_error::Error.none;},
 
-blot_check_capability_flow::ParameterResult.captured_unit=>{
-return blot_check_capability_flow::ParameterResult.captured_unit,Error.none;},
+captured_unit=>{
+return blot_check_capability_flow::ParameterResult.captured_unit,blot_error::Error.none;},
 
-blot_check_capability_flow::ParameterResult.invoke_input=>{
-return blot_check_capability_flow::ParameterResult.invoke_input,Error.none;},
+invoke_input=>{
+return blot_check_capability_flow::ParameterResult.invoke_input,blot_error::Error.none;},
 
-blot_check_capability_flow::ParameterResult.invoke_inputs=>{
-return blot_check_capability_flow::ParameterResult.invoke_inputs,Error.none;},
-
-}
+invoke_inputs=>{
+return blot_check_capability_flow::ParameterResult.invoke_inputs,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::Kind)->blot_reuse_principal_interface::Kind,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Kind)->blot_reuse_principal_interface::Kind,Error {
 
 match value {
 
-blot_reuse_principal_interface::Kind.global=>{
-return blot_reuse_principal_interface::Kind.global,Error.none;},
+global=>{
+return blot_reuse_principal_interface::Kind.global,blot_error::Error.none;},
 
-blot_reuse_principal_interface::Kind.local=>{
-return blot_reuse_principal_interface::Kind.local,Error.none;},
+local=>{
+return blot_reuse_principal_interface::Kind.local,blot_error::Error.none;},
 
-blot_reuse_principal_interface::Kind.parameter=>{
-return blot_reuse_principal_interface::Kind.parameter,Error.none;},
+parameter=>{
+return blot_reuse_principal_interface::Kind.parameter,blot_error::Error.none;},
 
-blot_reuse_principal_interface::Kind.external=>{
-return blot_reuse_principal_interface::Kind.external,Error.none;},
-
-}
+external=>{
+return blot_reuse_principal_interface::Kind.external,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_types::Scheme)->blot_check_types::Scheme,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_types::Scheme)->blot_check_types::Scheme,Error {
 
 var result=default<blot_check_types::Scheme>();
 
-{let copied,error=cloneValue(self,value.root);if error!=Error.none {return result,error;}result.root=copied;}
+{let copied,error=cloneValue(self_,value.root);if error!=blot_error::Error.none {return result,error;}result.root=copied;}
 
-{let copied,error=cloneValue(self,value.variables);if error!=Error.none {return result,error;}result.variables=copied;}
+{let copied,error=cloneValue(self_,value.variables);if error!=blot_error::Error.none {return result,error;}result.variables=copied;}
 
-{let copied,error=cloneValue(self,value.row_variables);if error!=Error.none {return result,error;}result.row_variables=copied;}
+{let copied,error=cloneValue(self_,value.row_variables);if error!=blot_error::Error.none {return result,error;}result.row_variables=copied;}
 
-{let copied,error=cloneValue(self,value.closed_rows);if error!=Error.none {return result,error;}result.closed_rows=copied;}
+{let copied,error=cloneValue(self_,value.closed_rows);if error!=blot_error::Error.none {return result,error;}result.closed_rows=copied;}
 
-{let copied,error=cloneValue(self,value.obligations);if error!=Error.none {return result,error;}result.obligations=copied;}
+{let copied,error=cloneValue(self_,value.obligations);if error!=blot_error::Error.none {return result,error;}result.obligations=copied;}
 
-{let copied,error=cloneValue(self,value.generative);if error!=Error.none {return result,error;}result.generative=copied;}
+{let copied,error=cloneValue(self_,value.generative);if error!=blot_error::Error.none {return result,error;}result.generative=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Body)->blot_check_core::Body,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Body)->blot_check_core::Body,Error {
 
 var result=default<blot_check_core::Body>();
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-{let copied,error=cloneValue(self,value.root);if error!=Error.none {return result,error;}result.root=copied;}
+{let copied,error=cloneValue(self_,value.root);if error!=blot_error::Error.none {return result,error;}result.root=copied;}
 
-{let copied,error=cloneValue(self,value.parameters);if error!=Error.none {return result,error;}result.parameters=copied;}
+{let copied,error=cloneValue(self_,value.parameters);if error!=blot_error::Error.none {return result,error;}result.parameters=copied;}
 
-{let copied,error=cloneValue(self,value.scheme);if error!=Error.none {return result,error;}result.scheme=copied;}
+{let copied,error=cloneValue(self_,value.scheme);if error!=blot_error::Error.none {return result,error;}result.scheme=copied;}
 
-{let copied,error=cloneValue(self,value.closed_rows);if error!=Error.none {return result,error;}result.closed_rows=copied;}
+{let copied,error=cloneValue(self_,value.closed_rows);if error!=blot_error::Error.none {return result,error;}result.closed_rows=copied;}
 
-{let copied,error=cloneValue(self,value.span);if error!=Error.none {return result,error;}result.span=copied;}
+{let copied,error=cloneValue(self_,value.span);if error!=blot_error::Error.none {return result,error;}result.span=copied;}
 
-{let copied,error=cloneValue(self,value.declaration_name);if error!=Error.none {return result,error;}result.declaration_name=copied;}
+{let copied,error=cloneValue(self_,value.declaration_name);if error!=blot_error::Error.none {return result,error;}result.declaration_name=copied;}
 
-{let copied,error=cloneValue(self,value.export_name);if error!=Error.none {return result,error;}result.export_name=copied;}
+{let copied,error=cloneValue(self_,value.export_name);if error!=blot_error::Error.none {return result,error;}result.export_name=copied;}
 
-{let copied,error=cloneValue(self,value.exported);if error!=Error.none {return result,error;}result.exported=copied;}
+{let copied,error=cloneValue(self_,value.exported);if error!=blot_error::Error.none {return result,error;}result.exported=copied;}
 
-{let copied,error=cloneValue(self,value.runtime);if error!=Error.none {return result,error;}result.runtime=copied;}
+{let copied,error=cloneValue(self_,value.runtime);if error!=blot_error::Error.none {return result,error;}result.runtime=copied;}
 
-{let copied,error=cloneValue(self,value.is_function);if error!=Error.none {return result,error;}result.is_function=copied;}
+{let copied,error=cloneValue(self_,value.is_function);if error!=blot_error::Error.none {return result,error;}result.is_function=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Parameter)->blot_check_core::Parameter,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Parameter)->blot_check_core::Parameter,Error {
 
 var result=default<blot_check_core::Parameter>();
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-{let copied,error=cloneValue(self,value.ty);if error!=Error.none {return result,error;}result.ty=copied;}
+{let copied,error=cloneValue(self_,value.ty);if error!=blot_error::Error.none {return result,error;}result.ty=copied;}
 
-{let copied,error=cloneValue(self,value.span);if error!=Error.none {return result,error;}result.span=copied;}
+{let copied,error=cloneValue(self_,value.span);if error!=blot_error::Error.none {return result,error;}result.span=copied;}
 
-{let copied,error=cloneValue(self,value.inferred);if error!=Error.none {return result,error;}result.inferred=copied;}
+{let copied,error=cloneValue(self_,value.inferred);if error!=blot_error::Error.none {return result,error;}result.inferred=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::CallInfo)->blot_check_core::CallInfo,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::CallInfo)->blot_check_core::CallInfo,Error {
 
 var result=default<blot_check_core::CallInfo>();
 
-{let copied,error=cloneValue(self,value.target);if error!=Error.none {return result,error;}result.target=copied;}
+{let copied,error=cloneValue(self_,value.target);if error!=blot_error::Error.none {return result,error;}result.target=copied;}
 
-{let copied,error=cloneValue(self,value.callee_type);if error!=Error.none {return result,error;}result.callee_type=copied;}
+{let copied,error=cloneValue(self_,value.callee_type);if error!=blot_error::Error.none {return result,error;}result.callee_type=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Merge)->blot_check_core::Merge,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Merge)->blot_check_core::Merge,Error {
 
 var result=default<blot_check_core::Merge>();
 
-{let copied,error=cloneValue(self,value.node);if error!=Error.none {return result,error;}result.node=copied;}
+{let copied,error=cloneValue(self_,value.node);if error!=blot_error::Error.none {return result,error;}result.node=copied;}
 
-{let copied,error=cloneValue(self,value.result);if error!=Error.none {return result,error;}result.result=copied;}
+{let copied,error=cloneValue(self_,value.result);if error!=blot_error::Error.none {return result,error;}result.result=copied;}
 
-{let copied,error=cloneValue(self,value.then_binding);if error!=Error.none {return result,error;}result.then_binding=copied;}
+{let copied,error=cloneValue(self_,value.then_binding);if error!=blot_error::Error.none {return result,error;}result.then_binding=copied;}
 
-{let copied,error=cloneValue(self,value.else_binding);if error!=Error.none {return result,error;}result.else_binding=copied;}
+{let copied,error=cloneValue(self_,value.else_binding);if error!=blot_error::Error.none {return result,error;}result.else_binding=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Obligation)->blot_check_core::Obligation,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Obligation)->blot_check_core::Obligation,Error {
 
 var result=default<blot_check_core::Obligation>();
 
-{let copied,error=cloneValue(self,value.ty);if error!=Error.none {return result,error;}result.ty=copied;}
+{let copied,error=cloneValue(self_,value.ty);if error!=blot_error::Error.none {return result,error;}result.ty=copied;}
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.span);if error!=Error.none {return result,error;}result.span=copied;}
+{let copied,error=cloneValue(self_,value.span);if error!=blot_error::Error.none {return result,error;}result.span=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.result);if error!=Error.none {return result,error;}result.result=copied;}
+{let copied,error=cloneValue(self_,value.result);if error!=blot_error::Error.none {return result,error;}result.result=copied;}
 
-{let copied,error=cloneValue(self,value.other);if error!=Error.none {return result,error;}result.other=copied;}
+{let copied,error=cloneValue(self_,value.other);if error!=blot_error::Error.none {return result,error;}result.other=copied;}
 
-{let copied,error=cloneValue(self,value.signature);if error!=Error.none {return result,error;}result.signature=copied;}
+{let copied,error=cloneValue(self_,value.signature);if error!=blot_error::Error.none {return result,error;}result.signature=copied;}
 
-{let copied,error=cloneValue(self,value.operator);if error!=Error.none {return result,error;}result.operator=copied;}
+{let copied,error=cloneValue(self_,value.operator);if error!=blot_error::Error.none {return result,error;}result.operator=copied;}
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.explicit);if error!=Error.none {return result,error;}result.explicit=copied;}
+{let copied,error=cloneValue(self_,value.explicit);if error!=blot_error::Error.none {return result,error;}result.explicit=copied;}
 
-{let copied,error=cloneValue(self,value.qualification_span);if error!=Error.none {return result,error;}result.qualification_span=copied;}
+{let copied,error=cloneValue(self_,value.qualification_span);if error!=blot_error::Error.none {return result,error;}result.qualification_span=copied;}
 
-{let copied,error=cloneValue(self,value.qualification_unit);if error!=Error.none {return result,error;}result.qualification_unit=copied;}
+{let copied,error=cloneValue(self_,value.qualification_unit);if error!=blot_error::Error.none {return result,error;}result.qualification_unit=copied;}
 
-{let copied,error=cloneValue(self,value.diagnostic_name);if error!=Error.none {return result,error;}result.diagnostic_name=copied;}
+{let copied,error=cloneValue(self_,value.diagnostic_name);if error!=blot_error::Error.none {return result,error;}result.diagnostic_name=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Nominal)->blot_check_core::Nominal,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Nominal)->blot_check_core::Nominal,Error {
 
 var result=default<blot_check_core::Nominal>();
 
-{let copied,error=cloneValue(self,value.affine);if error!=Error.none {return result,error;}result.affine=copied;}
+{let copied,error=cloneValue(self_,value.affine);if error!=blot_error::Error.none {return result,error;}result.affine=copied;}
 
-{let copied,error=cloneValue(self,value.has_usage);if error!=Error.none {return result,error;}result.has_usage=copied;}
+{let copied,error=cloneValue(self_,value.has_usage);if error!=blot_error::Error.none {return result,error;}result.has_usage=copied;}
 
-{let copied,error=cloneValue(self,value.closed_storage);if error!=Error.none {return result,error;}result.closed_storage=copied;}
+{let copied,error=cloneValue(self_,value.closed_storage);if error!=blot_error::Error.none {return result,error;}result.closed_storage=copied;}
 
-{let copied,error=cloneValue(self,value.private);if error!=Error.none {return result,error;}result.private=copied;}
+{let copied,error=cloneValue(self_,value.private);if error!=blot_error::Error.none {return result,error;}result.private=copied;}
 
-{let copied,error=cloneValue(self,value.is_opaque);if error!=Error.none {return result,error;}result.is_opaque=copied;}
+{let copied,error=cloneValue(self_,value.is_opaque);if error!=blot_error::Error.none {return result,error;}result.is_opaque=copied;}
 
-{let copied,error=cloneValue(self,value.storage);if error!=Error.none {return result,error;}result.storage=copied;}
+{let copied,error=cloneValue(self_,value.storage);if error!=blot_error::Error.none {return result,error;}result.storage=copied;}
 
-{let copied,error=cloneValue(self,value.diagnostic_name);if error!=Error.none {return result,error;}result.diagnostic_name=copied;}
+{let copied,error=cloneValue(self_,value.diagnostic_name);if error!=blot_error::Error.none {return result,error;}result.diagnostic_name=copied;}
 
-{let copied,error=cloneValue(self,value.diagnostic_origin);if error!=Error.none {return result,error;}result.diagnostic_origin=copied;}
+{let copied,error=cloneValue(self_,value.diagnostic_origin);if error!=blot_error::Error.none {return result,error;}result.diagnostic_origin=copied;}
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.parameters);if error!=Error.none {return result,error;}result.parameters=copied;}
+{let copied,error=cloneValue(self_,value.parameters);if error!=blot_error::Error.none {return result,error;}result.parameters=copied;}
 
-{let copied,error=cloneValue(self,value.variables);if error!=Error.none {return result,error;}result.variables=copied;}
+{let copied,error=cloneValue(self_,value.variables);if error!=blot_error::Error.none {return result,error;}result.variables=copied;}
 
-{let copied,error=cloneValue(self,value.constructors);if error!=Error.none {return result,error;}result.constructors=copied;}
+{let copied,error=cloneValue(self_,value.constructors);if error!=blot_error::Error.none {return result,error;}result.constructors=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_backend_opaque_storage::Storage)->blot_backend_opaque_storage::Storage,Error {
+fn cloneValue(self_:Owner&,value:blot_backend_opaque_storage::Storage)->blot_backend_opaque_storage::Storage,Error {
 
 var result=default<blot_backend_opaque_storage::Storage>();
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.parameter);if error!=Error.none {return result,error;}result.parameter=copied;}
+{let copied,error=cloneValue(self_,value.parameter);if error!=blot_error::Error.none {return result,error;}result.parameter=copied;}
 
-{let copied,error=cloneValue(self,value.selector);if error!=Error.none {return result,error;}result.selector=copied;}
+{let copied,error=cloneValue(self_,value.selector);if error!=blot_error::Error.none {return result,error;}result.selector=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_backend_opaque_storage::Kind)->blot_backend_opaque_storage::Kind,Error {
+fn cloneValue(self_:Owner&,value:blot_backend_opaque_storage::Kind)->blot_backend_opaque_storage::Kind,Error {
 
 match value {
 
-blot_backend_opaque_storage::Kind.unknown=>{
-return blot_backend_opaque_storage::Kind.unknown,Error.none;},
+unknown=>{
+return blot_backend_opaque_storage::Kind.unknown,blot_error::Error.none;},
 
-blot_backend_opaque_storage::Kind.unit=>{
-return blot_backend_opaque_storage::Kind.unit,Error.none;},
+unit=>{
+return blot_backend_opaque_storage::Kind.unit,blot_error::Error.none;},
 
-blot_backend_opaque_storage::Kind.boolean=>{
-return blot_backend_opaque_storage::Kind.boolean,Error.none;},
+boolean=>{
+return blot_backend_opaque_storage::Kind.boolean,blot_error::Error.none;},
 
-blot_backend_opaque_storage::Kind.unsigned32=>{
-return blot_backend_opaque_storage::Kind.unsigned32,Error.none;},
+unsigned32=>{
+return blot_backend_opaque_storage::Kind.unsigned32,blot_error::Error.none;},
 
-blot_backend_opaque_storage::Kind.floating32=>{
-return blot_backend_opaque_storage::Kind.floating32,Error.none;},
+floating32=>{
+return blot_backend_opaque_storage::Kind.floating32,blot_error::Error.none;},
 
-blot_backend_opaque_storage::Kind.reference=>{
-return blot_backend_opaque_storage::Kind.reference,Error.none;},
+reference=>{
+return blot_backend_opaque_storage::Kind.reference,blot_error::Error.none;},
 
-blot_backend_opaque_storage::Kind.parameter=>{
-return blot_backend_opaque_storage::Kind.parameter,Error.none;},
-
-}
+parameter=>{
+return blot_backend_opaque_storage::Kind.parameter,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::OperationName)->blot_check_core::OperationName,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::OperationName)->blot_check_core::OperationName,Error {
 
 var result=default<blot_check_core::OperationName>();
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.diagnostic_name);if error!=Error.none {return result,error;}result.diagnostic_name=copied;}
+{let copied,error=cloneValue(self_,value.diagnostic_name);if error!=blot_error::Error.none {return result,error;}result.diagnostic_name=copied;}
 
-{let copied,error=cloneValue(self,value.diagnostic_origin);if error!=Error.none {return result,error;}result.diagnostic_origin=copied;}
+{let copied,error=cloneValue(self_,value.diagnostic_origin);if error!=blot_error::Error.none {return result,error;}result.diagnostic_origin=copied;}
 
-{let copied,error=cloneValue(self,value.variables);if error!=Error.none {return result,error;}result.variables=copied;}
+{let copied,error=cloneValue(self_,value.variables);if error!=blot_error::Error.none {return result,error;}result.variables=copied;}
 
-{let copied,error=cloneValue(self,value.parameters);if error!=Error.none {return result,error;}result.parameters=copied;}
+{let copied,error=cloneValue(self_,value.parameters);if error!=blot_error::Error.none {return result,error;}result.parameters=copied;}
 
-{let copied,error=cloneValue(self,value.parameter);if error!=Error.none {return result,error;}result.parameter=copied;}
+{let copied,error=cloneValue(self_,value.parameter);if error!=blot_error::Error.none {return result,error;}result.parameter=copied;}
 
-{let copied,error=cloneValue(self,value.result);if error!=Error.none {return result,error;}result.result=copied;}
+{let copied,error=cloneValue(self_,value.result);if error!=blot_error::Error.none {return result,error;}result.result=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Constructor)->blot_check_core::Constructor,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Constructor)->blot_check_core::Constructor,Error {
 
 var result=default<blot_check_core::Constructor>();
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.nominal);if error!=Error.none {return result,error;}result.nominal=copied;}
+{let copied,error=cloneValue(self_,value.nominal);if error!=blot_error::Error.none {return result,error;}result.nominal=copied;}
 
-{let copied,error=cloneValue(self,value.tag);if error!=Error.none {return result,error;}result.tag=copied;}
+{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
 
-{let copied,error=cloneValue(self,value.scheme);if error!=Error.none {return result,error;}result.scheme=copied;}
+{let copied,error=cloneValue(self_,value.scheme);if error!=blot_error::Error.none {return result,error;}result.scheme=copied;}
 
-{let copied,error=cloneValue(self,value.payload);if error!=Error.none {return result,error;}result.payload=copied;}
+{let copied,error=cloneValue(self_,value.payload);if error!=blot_error::Error.none {return result,error;}result.payload=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Projection)->blot_check_core::Projection,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Projection)->blot_check_core::Projection,Error {
 
 var result=default<blot_check_core::Projection>();
 
-{let copied,error=cloneValue(self,value.nominal);if error!=Error.none {return result,error;}result.nominal=copied;}
+{let copied,error=cloneValue(self_,value.nominal);if error!=blot_error::Error.none {return result,error;}result.nominal=copied;}
 
-{let copied,error=cloneValue(self,value.field);if error!=Error.none {return result,error;}result.field=copied;}
+{let copied,error=cloneValue(self_,value.field);if error!=blot_error::Error.none {return result,error;}result.field=copied;}
 
-{let copied,error=cloneValue(self,value.source_type);if error!=Error.none {return result,error;}result.source_type=copied;}
+{let copied,error=cloneValue(self_,value.source_type);if error!=blot_error::Error.none {return result,error;}result.source_type=copied;}
 
-{let copied,error=cloneValue(self,value.result_type);if error!=Error.none {return result,error;}result.result_type=copied;}
+{let copied,error=cloneValue(self_,value.result_type);if error!=blot_error::Error.none {return result,error;}result.result_type=copied;}
 
-{let copied,error=cloneValue(self,value.variants);if error!=Error.none {return result,error;}result.variants=copied;}
+{let copied,error=cloneValue(self_,value.variants);if error!=blot_error::Error.none {return result,error;}result.variants=copied;}
 
-{let copied,error=cloneValue(self,value.diagnostic_point);if error!=Error.none {return result,error;}result.diagnostic_point=copied;}
+{let copied,error=cloneValue(self_,value.diagnostic_point);if error!=blot_error::Error.none {return result,error;}result.diagnostic_point=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::ProjectionVariant)->blot_check_core::ProjectionVariant,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::ProjectionVariant)->blot_check_core::ProjectionVariant,Error {
 
 var result=default<blot_check_core::ProjectionVariant>();
 
-{let copied,error=cloneValue(self,value.tag);if error!=Error.none {return result,error;}result.tag=copied;}
+{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
 
-{let copied,error=cloneValue(self,value.field);if error!=Error.none {return result,error;}result.field=copied;}
+{let copied,error=cloneValue(self_,value.field);if error!=blot_error::Error.none {return result,error;}result.field=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Pattern)->blot_check_core::Pattern,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Pattern)->blot_check_core::Pattern,Error {
 
 var result=default<blot_check_core::Pattern>();
 
-{let copied,error=cloneValue(self,value.tag);if error!=Error.none {return result,error;}result.tag=copied;}
+{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
 
-{let copied,error=cloneValue(self,value.ty);if error!=Error.none {return result,error;}result.ty=copied;}
+{let copied,error=cloneValue(self_,value.ty);if error!=blot_error::Error.none {return result,error;}result.ty=copied;}
 
-{let copied,error=cloneValue(self,value.a);if error!=Error.none {return result,error;}result.a=copied;}
+{let copied,error=cloneValue(self_,value.a);if error!=blot_error::Error.none {return result,error;}result.a=copied;}
 
-{let copied,error=cloneValue(self,value.b);if error!=Error.none {return result,error;}result.b=copied;}
+{let copied,error=cloneValue(self_,value.b);if error!=blot_error::Error.none {return result,error;}result.b=copied;}
 
-{let copied,error=cloneValue(self,value.c);if error!=Error.none {return result,error;}result.c=copied;}
+{let copied,error=cloneValue(self_,value.c);if error!=blot_error::Error.none {return result,error;}result.c=copied;}
 
-{let copied,error=cloneValue(self,value.span);if error!=Error.none {return result,error;}result.span=copied;}
+{let copied,error=cloneValue(self_,value.span);if error!=blot_error::Error.none {return result,error;}result.span=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::PatternTag)->blot_check_core::PatternTag,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::PatternTag)->blot_check_core::PatternTag,Error {
 
 match value {
 
-blot_check_core::PatternTag.invalid=>{
-return blot_check_core::PatternTag.invalid,Error.none;},
+invalid=>{
+return blot_check_core::PatternTag.invalid,blot_error::Error.none;},
 
-blot_check_core::PatternTag.wildcard=>{
-return blot_check_core::PatternTag.wildcard,Error.none;},
+wildcard=>{
+return blot_check_core::PatternTag.wildcard,blot_error::Error.none;},
 
-blot_check_core::PatternTag.bind=>{
-return blot_check_core::PatternTag.bind,Error.none;},
+bind=>{
+return blot_check_core::PatternTag.bind,blot_error::Error.none;},
 
-blot_check_core::PatternTag.constant=>{
-return blot_check_core::PatternTag.constant,Error.none;},
+constant=>{
+return blot_check_core::PatternTag.constant,blot_error::Error.none;},
 
-blot_check_core::PatternTag.value=>{
-return blot_check_core::PatternTag.value,Error.none;},
+value=>{
+return blot_check_core::PatternTag.value,blot_error::Error.none;},
 
-blot_check_core::PatternTag.product=>{
-return blot_check_core::PatternTag.product,Error.none;},
+product=>{
+return blot_check_core::PatternTag.product,blot_error::Error.none;},
 
-blot_check_core::PatternTag.constructor=>{
-return blot_check_core::PatternTag.constructor,Error.none;},
+constructor=>{
+return blot_check_core::PatternTag.constructor,blot_error::Error.none;},
 
-blot_check_core::PatternTag.record_payload=>{
-return blot_check_core::PatternTag.record_payload,Error.none;},
-
-}
+record_payload=>{
+return blot_check_core::PatternTag.record_payload,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::PatternRow)->blot_check_core::PatternRow,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::PatternRow)->blot_check_core::PatternRow,Error {
 
 var result=default<blot_check_core::PatternRow>();
 
-{let copied,error=cloneValue(self,value.patterns);if error!=Error.none {return result,error;}result.patterns=copied;}
+{let copied,error=cloneValue(self_,value.patterns);if error!=blot_error::Error.none {return result,error;}result.patterns=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::MatchArm)->blot_check_core::MatchArm,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::MatchArm)->blot_check_core::MatchArm,Error {
 
 var result=default<blot_check_core::MatchArm>();
 
-{let copied,error=cloneValue(self,value.rows);if error!=Error.none {return result,error;}result.rows=copied;}
+{let copied,error=cloneValue(self_,value.rows);if error!=blot_error::Error.none {return result,error;}result.rows=copied;}
 
-{let copied,error=cloneValue(self,value.guard);if error!=Error.none {return result,error;}result.guard=copied;}
+{let copied,error=cloneValue(self_,value.guard_);if error!=blot_error::Error.none {return result,error;}result.guard_=copied;}
 
-{let copied,error=cloneValue(self,value.body);if error!=Error.none {return result,error;}result.body=copied;}
+{let copied,error=cloneValue(self_,value.body);if error!=blot_error::Error.none {return result,error;}result.body=copied;}
 
-{let copied,error=cloneValue(self,value.span);if error!=Error.none {return result,error;}result.span=copied;}
+{let copied,error=cloneValue(self_,value.span);if error!=blot_error::Error.none {return result,error;}result.span=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::MatchInfo)->blot_check_core::MatchInfo,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::MatchInfo)->blot_check_core::MatchInfo,Error {
 
 var result=default<blot_check_core::MatchInfo>();
 
-{let copied,error=cloneValue(self,value.inputs);if error!=Error.none {return result,error;}result.inputs=copied;}
+{let copied,error=cloneValue(self_,value.inputs);if error!=blot_error::Error.none {return result,error;}result.inputs=copied;}
 
-{let copied,error=cloneValue(self,value.arms);if error!=Error.none {return result,error;}result.arms=copied;}
+{let copied,error=cloneValue(self_,value.arms);if error!=blot_error::Error.none {return result,error;}result.arms=copied;}
 
-{let copied,error=cloneValue(self,value.statement);if error!=Error.none {return result,error;}result.statement=copied;}
+{let copied,error=cloneValue(self_,value.statement);if error!=blot_error::Error.none {return result,error;}result.statement=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::UpdateInfo)->blot_check_core::UpdateInfo,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::UpdateInfo)->blot_check_core::UpdateInfo,Error {
 
 var result=default<blot_check_core::UpdateInfo>();
 
-{let copied,error=cloneValue(self,value.root);if error!=Error.none {return result,error;}result.root=copied;}
+{let copied,error=cloneValue(self_,value.root);if error!=blot_error::Error.none {return result,error;}result.root=copied;}
 
-{let copied,error=cloneValue(self,value.path);if error!=Error.none {return result,error;}result.path=copied;}
+{let copied,error=cloneValue(self_,value.path);if error!=blot_error::Error.none {return result,error;}result.path=copied;}
 
-{let copied,error=cloneValue(self,value.value);if error!=Error.none {return result,error;}result.value=copied;}
+{let copied,error=cloneValue(self_,value.value);if error!=blot_error::Error.none {return result,error;}result.value=copied;}
 
-{let copied,error=cloneValue(self,value.self_binding);if error!=Error.none {return result,error;}result.self_binding=copied;}
+{let copied,error=cloneValue(self_,value.self_binding);if error!=blot_error::Error.none {return result,error;}result.self_binding=copied;}
 
-{let copied,error=cloneValue(self,value.selectors);if error!=Error.none {return result,error;}result.selectors=copied;}
+{let copied,error=cloneValue(self_,value.selectors);if error!=blot_error::Error.none {return result,error;}result.selectors=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::UpdateStep)->blot_check_core::UpdateStep,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::UpdateStep)->blot_check_core::UpdateStep,Error {
 
 var result=default<blot_check_core::UpdateStep>();
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.projection);if error!=Error.none {return result,error;}result.projection=copied;}
+{let copied,error=cloneValue(self_,value.projection);if error!=blot_error::Error.none {return result,error;}result.projection=copied;}
 
-{let copied,error=cloneValue(self,value.index);if error!=Error.none {return result,error;}result.index=copied;}
+{let copied,error=cloneValue(self_,value.index);if error!=blot_error::Error.none {return result,error;}result.index=copied;}
 
-{let copied,error=cloneValue(self,value.source_type);if error!=Error.none {return result,error;}result.source_type=copied;}
+{let copied,error=cloneValue(self_,value.source_type);if error!=blot_error::Error.none {return result,error;}result.source_type=copied;}
 
-{let copied,error=cloneValue(self,value.result_type);if error!=Error.none {return result,error;}result.result_type=copied;}
+{let copied,error=cloneValue(self_,value.result_type);if error!=blot_error::Error.none {return result,error;}result.result_type=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::UpdateKind)->blot_check_core::UpdateKind,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::UpdateKind)->blot_check_core::UpdateKind,Error {
 
 match value {
 
-blot_check_core::UpdateKind.field=>{
-return blot_check_core::UpdateKind.field,Error.none;},
+field=>{
+return blot_check_core::UpdateKind.field,blot_error::Error.none;},
 
-blot_check_core::UpdateKind.index=>{
-return blot_check_core::UpdateKind.index,Error.none;},
-
-}
+index=>{
+return blot_check_core::UpdateKind.index,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::ClosureInfo)->blot_check_core::ClosureInfo,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::ClosureInfo)->blot_check_core::ClosureInfo,Error {
 
 var result=default<blot_check_core::ClosureInfo>();
 
-{let copied,error=cloneValue(self,value.qualifier);if error!=Error.none {return result,error;}result.qualifier=copied;}
+{let copied,error=cloneValue(self_,value.qualifier);if error!=blot_error::Error.none {return result,error;}result.qualifier=copied;}
 
-{let copied,error=cloneValue(self,value.body);if error!=Error.none {return result,error;}result.body=copied;}
+{let copied,error=cloneValue(self_,value.body);if error!=blot_error::Error.none {return result,error;}result.body=copied;}
 
-{let copied,error=cloneValue(self,value.parameter);if error!=Error.none {return result,error;}result.parameter=copied;}
+{let copied,error=cloneValue(self_,value.parameter);if error!=blot_error::Error.none {return result,error;}result.parameter=copied;}
 
-{let copied,error=cloneValue(self,value.captures);if error!=Error.none {return result,error;}result.captures=copied;}
+{let copied,error=cloneValue(self_,value.captures);if error!=blot_error::Error.none {return result,error;}result.captures=copied;}
 
-{let copied,error=cloneValue(self,value.function_type);if error!=Error.none {return result,error;}result.function_type=copied;}
+{let copied,error=cloneValue(self_,value.function_type);if error!=blot_error::Error.none {return result,error;}result.function_type=copied;}
 
-{let copied,error=cloneValue(self,value.closed_rows);if error!=Error.none {return result,error;}result.closed_rows=copied;}
+{let copied,error=cloneValue(self_,value.closed_rows);if error!=blot_error::Error.none {return result,error;}result.closed_rows=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Associated)->blot_check_core::Associated,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Associated)->blot_check_core::Associated,Error {
 
 var result=default<blot_check_core::Associated>();
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.member);if error!=Error.none {return result,error;}result.member=copied;}
+{let copied,error=cloneValue(self_,value.member);if error!=blot_error::Error.none {return result,error;}result.member=copied;}
 
-{let copied,error=cloneValue(self,value.operator);if error!=Error.none {return result,error;}result.operator=copied;}
+{let copied,error=cloneValue(self_,value.operator);if error!=blot_error::Error.none {return result,error;}result.operator=copied;}
 
-{let copied,error=cloneValue(self,value.target);if error!=Error.none {return result,error;}result.target=copied;}
+{let copied,error=cloneValue(self_,value.target);if error!=blot_error::Error.none {return result,error;}result.target=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Contract)->blot_check_core::Contract,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Contract)->blot_check_core::Contract,Error {
 
 var result=default<blot_check_core::Contract>();
 
-{let copied,error=cloneValue(self,value.private);if error!=Error.none {return result,error;}result.private=copied;}
+{let copied,error=cloneValue(self_,value.private);if error!=blot_error::Error.none {return result,error;}result.private=copied;}
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.parameters);if error!=Error.none {return result,error;}result.parameters=copied;}
+{let copied,error=cloneValue(self_,value.parameters);if error!=blot_error::Error.none {return result,error;}result.parameters=copied;}
 
-{let copied,error=cloneValue(self,value.variables);if error!=Error.none {return result,error;}result.variables=copied;}
+{let copied,error=cloneValue(self_,value.variables);if error!=blot_error::Error.none {return result,error;}result.variables=copied;}
 
-{let copied,error=cloneValue(self,value.row_variables);if error!=Error.none {return result,error;}result.row_variables=copied;}
+{let copied,error=cloneValue(self_,value.row_variables);if error!=blot_error::Error.none {return result,error;}result.row_variables=copied;}
 
-{let copied,error=cloneValue(self,value.predicates);if error!=Error.none {return result,error;}result.predicates=copied;}
+{let copied,error=cloneValue(self_,value.predicates);if error!=blot_error::Error.none {return result,error;}result.predicates=copied;}
 
-{let copied,error=cloneValue(self,value.members);if error!=Error.none {return result,error;}result.members=copied;}
+{let copied,error=cloneValue(self_,value.members);if error!=blot_error::Error.none {return result,error;}result.members=copied;}
 
-{let copied,error=cloneValue(self,value.requires_implementation);if error!=Error.none {return result,error;}result.requires_implementation=copied;}
+{let copied,error=cloneValue(self_,value.requires_implementation);if error!=blot_error::Error.none {return result,error;}result.requires_implementation=copied;}
 
-{let copied,error=cloneValue(self,value.row_parameter_names);if error!=Error.none {return result,error;}result.row_parameter_names=copied;}
+{let copied,error=cloneValue(self_,value.row_parameter_names);if error!=blot_error::Error.none {return result,error;}result.row_parameter_names=copied;}
 
-{let copied,error=cloneValue(self,value.row_parameters);if error!=Error.none {return result,error;}result.row_parameters=copied;}
+{let copied,error=cloneValue(self_,value.row_parameters);if error!=blot_error::Error.none {return result,error;}result.row_parameters=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::ContractMember)->blot_reuse_principal_interface::ContractMember,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::ContractMember)->blot_reuse_principal_interface::ContractMember,Error {
 
 var result=default<blot_reuse_principal_interface::ContractMember>();
 
-{let copied,error=cloneValue(self,value.contract);if error!=Error.none {return result,error;}result.contract=copied;}
+{let copied,error=cloneValue(self_,value.contract);if error!=blot_error::Error.none {return result,error;}result.contract=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.root);if error!=Error.none {return result,error;}result.root=copied;}
+{let copied,error=cloneValue(self_,value.root);if error!=blot_error::Error.none {return result,error;}result.root=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::ContractMemberKind)->blot_reuse_principal_interface::ContractMemberKind,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::ContractMemberKind)->blot_reuse_principal_interface::ContractMemberKind,Error {
 
 match value {
 
-blot_reuse_principal_interface::ContractMemberKind.defined_type=>{
-return blot_reuse_principal_interface::ContractMemberKind.defined_type,Error.none;},
+defined_type=>{
+return blot_reuse_principal_interface::ContractMemberKind.defined_type,blot_error::Error.none;},
 
-blot_reuse_principal_interface::ContractMemberKind.abstract_type=>{
-return blot_reuse_principal_interface::ContractMemberKind.abstract_type,Error.none;},
+abstract_type=>{
+return blot_reuse_principal_interface::ContractMemberKind.abstract_type,blot_error::Error.none;},
 
-blot_reuse_principal_interface::ContractMemberKind.value=>{
-return blot_reuse_principal_interface::ContractMemberKind.value,Error.none;},
-
-}
+value=>{
+return blot_reuse_principal_interface::ContractMemberKind.value,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::Implementation)->blot_reuse_principal_interface::Implementation,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Implementation)->blot_reuse_principal_interface::Implementation,Error {
 
 var result=default<blot_reuse_principal_interface::Implementation>();
 
-{let copied,error=cloneValue(self,value.origin_span);if error!=Error.none {return result,error;}result.origin_span=copied;}
+{let copied,error=cloneValue(self_,value.origin_span);if error!=blot_error::Error.none {return result,error;}result.origin_span=copied;}
 
-{let copied,error=cloneValue(self,value.declaration);if error!=Error.none {return result,error;}result.declaration=copied;}
+{let copied,error=cloneValue(self_,value.declaration);if error!=blot_error::Error.none {return result,error;}result.declaration=copied;}
 
-{let copied,error=cloneValue(self,value.private);if error!=Error.none {return result,error;}result.private=copied;}
+{let copied,error=cloneValue(self_,value.private);if error!=blot_error::Error.none {return result,error;}result.private=copied;}
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.contract);if error!=Error.none {return result,error;}result.contract=copied;}
+{let copied,error=cloneValue(self_,value.contract);if error!=blot_error::Error.none {return result,error;}result.contract=copied;}
 
-{let copied,error=cloneValue(self,value.head);if error!=Error.none {return result,error;}result.head=copied;}
+{let copied,error=cloneValue(self_,value.head);if error!=blot_error::Error.none {return result,error;}result.head=copied;}
 
-{let copied,error=cloneValue(self,value.variables);if error!=Error.none {return result,error;}result.variables=copied;}
+{let copied,error=cloneValue(self_,value.variables);if error!=blot_error::Error.none {return result,error;}result.variables=copied;}
 
-{let copied,error=cloneValue(self,value.parameter_names);if error!=Error.none {return result,error;}result.parameter_names=copied;}
+{let copied,error=cloneValue(self_,value.parameter_names);if error!=blot_error::Error.none {return result,error;}result.parameter_names=copied;}
 
-{let copied,error=cloneValue(self,value.row_variables);if error!=Error.none {return result,error;}result.row_variables=copied;}
+{let copied,error=cloneValue(self_,value.row_variables);if error!=blot_error::Error.none {return result,error;}result.row_variables=copied;}
 
-{let copied,error=cloneValue(self,value.row_parameter_names);if error!=Error.none {return result,error;}result.row_parameter_names=copied;}
+{let copied,error=cloneValue(self_,value.row_parameter_names);if error!=blot_error::Error.none {return result,error;}result.row_parameter_names=copied;}
 
-{let copied,error=cloneValue(self,value.row_parameters);if error!=Error.none {return result,error;}result.row_parameters=copied;}
+{let copied,error=cloneValue(self_,value.row_parameters);if error!=blot_error::Error.none {return result,error;}result.row_parameters=copied;}
 
-{let copied,error=cloneValue(self,value.predicates);if error!=Error.none {return result,error;}result.predicates=copied;}
+{let copied,error=cloneValue(self_,value.predicates);if error!=blot_error::Error.none {return result,error;}result.predicates=copied;}
 
-{let copied,error=cloneValue(self,value.members);if error!=Error.none {return result,error;}result.members=copied;}
+{let copied,error=cloneValue(self_,value.members);if error!=blot_error::Error.none {return result,error;}result.members=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::ImplementationMember)->blot_reuse_principal_interface::ImplementationMember,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::ImplementationMember)->blot_reuse_principal_interface::ImplementationMember,Error {
 
 var result=default<blot_reuse_principal_interface::ImplementationMember>();
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.root);if error!=Error.none {return result,error;}result.root=copied;}
+{let copied,error=cloneValue(self_,value.root);if error!=blot_error::Error.none {return result,error;}result.root=copied;}
 
-{let copied,error=cloneValue(self,value.target);if error!=Error.none {return result,error;}result.target=copied;}
+{let copied,error=cloneValue(self_,value.target);if error!=blot_error::Error.none {return result,error;}result.target=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::ImplementationMemberKind)->blot_reuse_principal_interface::ImplementationMemberKind,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::ImplementationMemberKind)->blot_reuse_principal_interface::ImplementationMemberKind,Error {
 
 match value {
 
-blot_reuse_principal_interface::ImplementationMemberKind.type_=>{
-return blot_reuse_principal_interface::ImplementationMemberKind.type_,Error.none;},
+type_=>{
+return blot_reuse_principal_interface::ImplementationMemberKind.type_,blot_error::Error.none;},
 
-blot_reuse_principal_interface::ImplementationMemberKind.value=>{
-return blot_reuse_principal_interface::ImplementationMemberKind.value,Error.none;},
-
-}
+value=>{
+return blot_reuse_principal_interface::ImplementationMemberKind.value,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::ExternalTarget)->blot_reuse_principal_interface::ExternalTarget,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::ExternalTarget)->blot_reuse_principal_interface::ExternalTarget,Error {
 
 var result=default<blot_reuse_principal_interface::ExternalTarget>();
 
-{let copied,error=cloneValue(self,value.unit);if error!=Error.none {return result,error;}result.unit=copied;}
+{let copied,error=cloneValue(self_,value.unit);if error!=blot_error::Error.none {return result,error;}result.unit=copied;}
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::MemberTemplate)->blot_reuse_principal_interface::MemberTemplate,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::MemberTemplate)->blot_reuse_principal_interface::MemberTemplate,Error {
 
 var result=default<blot_reuse_principal_interface::MemberTemplate>();
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-{let copied,error=cloneValue(self,value.contract);if error!=Error.none {return result,error;}result.contract=copied;}
+{let copied,error=cloneValue(self_,value.contract);if error!=blot_error::Error.none {return result,error;}result.contract=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.arguments);if error!=Error.none {return result,error;}result.arguments=copied;}
+{let copied,error=cloneValue(self_,value.arguments);if error!=blot_error::Error.none {return result,error;}result.arguments=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::SelectedProof)->blot_reuse_principal_interface::SelectedProof,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::SelectedProof)->blot_reuse_principal_interface::SelectedProof,Error {
 
 var result=default<blot_reuse_principal_interface::SelectedProof>();
 
-{let copied,error=cloneValue(self,value.predicate_target);if error!=Error.none {return result,error;}result.predicate_target=copied;}
+{let copied,error=cloneValue(self_,value.predicate_target);if error!=blot_error::Error.none {return result,error;}result.predicate_target=copied;}
 
-{let copied,error=cloneValue(self,value.context);if error!=Error.none {return result,error;}result.context=copied;}
+{let copied,error=cloneValue(self_,value.context);if error!=blot_error::Error.none {return result,error;}result.context=copied;}
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.predicate);if error!=Error.none {return result,error;}result.predicate=copied;}
+{let copied,error=cloneValue(self_,value.predicate);if error!=blot_error::Error.none {return result,error;}result.predicate=copied;}
 
-{let copied,error=cloneValue(self,value.implementation);if error!=Error.none {return result,error;}result.implementation=copied;}
+{let copied,error=cloneValue(self_,value.implementation);if error!=blot_error::Error.none {return result,error;}result.implementation=copied;}
 
-{let copied,error=cloneValue(self,value.contract);if error!=Error.none {return result,error;}result.contract=copied;}
+{let copied,error=cloneValue(self_,value.contract);if error!=blot_error::Error.none {return result,error;}result.contract=copied;}
 
-{let copied,error=cloneValue(self,value.arguments);if error!=Error.none {return result,error;}result.arguments=copied;}
+{let copied,error=cloneValue(self_,value.arguments);if error!=blot_error::Error.none {return result,error;}result.arguments=copied;}
 
-{let copied,error=cloneValue(self,value.members);if error!=Error.none {return result,error;}result.members=copied;}
+{let copied,error=cloneValue(self_,value.members);if error!=blot_error::Error.none {return result,error;}result.members=copied;}
 
-{let copied,error=cloneValue(self,value.prerequisites);if error!=Error.none {return result,error;}result.prerequisites=copied;}
+{let copied,error=cloneValue(self_,value.prerequisites);if error!=blot_error::Error.none {return result,error;}result.prerequisites=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::SelectedProofKind)->blot_reuse_principal_interface::SelectedProofKind,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::SelectedProofKind)->blot_reuse_principal_interface::SelectedProofKind,Error {
 
 match value {
 
-blot_reuse_principal_interface::SelectedProofKind.implementation=>{
-return blot_reuse_principal_interface::SelectedProofKind.implementation,Error.none;},
+implementation=>{
+return blot_reuse_principal_interface::SelectedProofKind.implementation,blot_error::Error.none;},
 
-blot_reuse_principal_interface::SelectedProofKind.predicate=>{
-return blot_reuse_principal_interface::SelectedProofKind.predicate,Error.none;},
-
-}
+predicate=>{
+return blot_reuse_principal_interface::SelectedProofKind.predicate,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::SelectedUse)->blot_check_core::SelectedUse,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::SelectedUse)->blot_check_core::SelectedUse,Error {
 
 var result=default<blot_check_core::SelectedUse>();
 
-{let copied,error=cloneValue(self,value.node);if error!=Error.none {return result,error;}result.node=copied;}
+{let copied,error=cloneValue(self_,value.node);if error!=blot_error::Error.none {return result,error;}result.node=copied;}
 
-{let copied,error=cloneValue(self,value.proof);if error!=Error.none {return result,error;}result.proof=copied;}
+{let copied,error=cloneValue(self_,value.proof);if error!=blot_error::Error.none {return result,error;}result.proof=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::DictionarySelection)->blot_check_core::DictionarySelection,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::DictionarySelection)->blot_check_core::DictionarySelection,Error {
 
 var result=default<blot_check_core::DictionarySelection>();
 
-{let copied,error=cloneValue(self,value.owner);if error!=Error.none {return result,error;}result.owner=copied;}
+{let copied,error=cloneValue(self_,value.owner);if error!=blot_error::Error.none {return result,error;}result.owner=copied;}
 
-{let copied,error=cloneValue(self,value.quantifier);if error!=Error.none {return result,error;}result.quantifier=copied;}
+{let copied,error=cloneValue(self_,value.quantifier);if error!=blot_error::Error.none {return result,error;}result.quantifier=copied;}
 
-{let copied,error=cloneValue(self,value.goal);if error!=Error.none {return result,error;}result.goal=copied;}
+{let copied,error=cloneValue(self_,value.goal);if error!=blot_error::Error.none {return result,error;}result.goal=copied;}
 
-{let copied,error=cloneValue(self,value.proof);if error!=Error.none {return result,error;}result.proof=copied;}
+{let copied,error=cloneValue(self_,value.proof);if error!=blot_error::Error.none {return result,error;}result.proof=copied;}
 
-{let copied,error=cloneValue(self,value.members);if error!=Error.none {return result,error;}result.members=copied;}
+{let copied,error=cloneValue(self_,value.members);if error!=blot_error::Error.none {return result,error;}result.members=copied;}
 
-{let copied,error=cloneValue(self,value.contents);if error!=Error.none {return result,error;}result.contents=copied;}
+{let copied,error=cloneValue(self_,value.contents);if error!=blot_error::Error.none {return result,error;}result.contents=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::DictionaryProof)->blot_check_core::DictionaryProof,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::DictionaryProof)->blot_check_core::DictionaryProof,Error {
 
 match value {
 
-blot_check_core::DictionaryProof.selected payload=>{
-let value,error_value=cloneValue(self,payload.value);if error_value!=Error.none {return default<blot_check_core::DictionaryProof>(),error_value;}
-return blot_check_core::DictionaryProof.selected {value:value, ..},Error.none;},
+selected payload=>{
+let value,error_value=cloneValue(self_,payload.value);if error_value!=blot_error::Error.none {return default<blot_check_core::DictionaryProof>(),error_value;}
+return blot_check_core::DictionaryProof.selected {value:value, ..},blot_error::Error.none;},
 
-blot_check_core::DictionaryProof.given payload=>{
-let value,error_value=cloneValue(self,payload.value);if error_value!=Error.none {return default<blot_check_core::DictionaryProof>(),error_value;}
-return blot_check_core::DictionaryProof.given {value:value, ..},Error.none;},
-
-}
+given payload=>{
+let value,error_value=cloneValue(self_,payload.value);if error_value!=blot_error::Error.none {return default<blot_check_core::DictionaryProof>(),error_value;}
+return blot_check_core::DictionaryProof.given {value:value, ..},blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::DictionaryGiven)->blot_check_core::DictionaryGiven,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::DictionaryGiven)->blot_check_core::DictionaryGiven,Error {
 
 var result=default<blot_check_core::DictionaryGiven>();
 
-{let copied,error=cloneValue(self,value.opening);if error!=Error.none {return result,error;}result.opening=copied;}
+{let copied,error=cloneValue(self_,value.opening);if error!=blot_error::Error.none {return result,error;}result.opening=copied;}
 
-{let copied,error=cloneValue(self,value.introduction);if error!=Error.none {return result,error;}result.introduction=copied;}
+{let copied,error=cloneValue(self_,value.introduction);if error!=blot_error::Error.none {return result,error;}result.introduction=copied;}
 
-{let copied,error=cloneValue(self,value.quantifier);if error!=Error.none {return result,error;}result.quantifier=copied;}
+{let copied,error=cloneValue(self_,value.quantifier);if error!=blot_error::Error.none {return result,error;}result.quantifier=copied;}
 
-{let copied,error=cloneValue(self,value.goal);if error!=Error.none {return result,error;}result.goal=copied;}
+{let copied,error=cloneValue(self_,value.goal);if error!=blot_error::Error.none {return result,error;}result.goal=copied;}
 
-{let copied,error=cloneValue(self,value.arguments);if error!=Error.none {return result,error;}result.arguments=copied;}
+{let copied,error=cloneValue(self_,value.arguments);if error!=blot_error::Error.none {return result,error;}result.arguments=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::DictionaryUse)->blot_check_core::DictionaryUse,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::DictionaryUse)->blot_check_core::DictionaryUse,Error {
 
 var result=default<blot_check_core::DictionaryUse>();
 
-{let copied,error=cloneValue(self,value.node);if error!=Error.none {return result,error;}result.node=copied;}
+{let copied,error=cloneValue(self_,value.node);if error!=blot_error::Error.none {return result,error;}result.node=copied;}
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-{let copied,error=cloneValue(self,value.opening);if error!=Error.none {return result,error;}result.opening=copied;}
+{let copied,error=cloneValue(self_,value.opening);if error!=blot_error::Error.none {return result,error;}result.opening=copied;}
 
-{let copied,error=cloneValue(self,value.introduction);if error!=Error.none {return result,error;}result.introduction=copied;}
+{let copied,error=cloneValue(self_,value.introduction);if error!=blot_error::Error.none {return result,error;}result.introduction=copied;}
 
-{let copied,error=cloneValue(self,value.quantifier);if error!=Error.none {return result,error;}result.quantifier=copied;}
+{let copied,error=cloneValue(self_,value.quantifier);if error!=blot_error::Error.none {return result,error;}result.quantifier=copied;}
 
-{let copied,error=cloneValue(self,value.goal);if error!=Error.none {return result,error;}result.goal=copied;}
+{let copied,error=cloneValue(self_,value.goal);if error!=blot_error::Error.none {return result,error;}result.goal=copied;}
 
-{let copied,error=cloneValue(self,value.member);if error!=Error.none {return result,error;}result.member=copied;}
+{let copied,error=cloneValue(self_,value.member);if error!=blot_error::Error.none {return result,error;}result.member=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Primitive)->blot_check_core::Primitive,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Primitive)->blot_check_core::Primitive,Error {
 
 var result=default<blot_check_core::Primitive>();
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.op);if error!=Error.none {return result,error;}result.op=copied;}
+{let copied,error=cloneValue(self_,value.op);if error!=blot_error::Error.none {return result,error;}result.op=copied;}
 
-{let copied,error=cloneValue(self,value.array_op);if error!=Error.none {return result,error;}result.array_op=copied;}
+{let copied,error=cloneValue(self_,value.array_op);if error!=blot_error::Error.none {return result,error;}result.array_op=copied;}
 
-{let copied,error=cloneValue(self,value.arity);if error!=Error.none {return result,error;}result.arity=copied;}
+{let copied,error=cloneValue(self_,value.arity);if error!=blot_error::Error.none {return result,error;}result.arity=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::PrimitiveKind)->blot_check_core::PrimitiveKind,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::PrimitiveKind)->blot_check_core::PrimitiveKind,Error {
 
 match value {
 
-blot_check_core::PrimitiveKind.scalar=>{
-return blot_check_core::PrimitiveKind.scalar,Error.none;},
+scalar=>{
+return blot_check_core::PrimitiveKind.scalar,blot_error::Error.none;},
 
-blot_check_core::PrimitiveKind.array=>{
-return blot_check_core::PrimitiveKind.array,Error.none;},
-
-}
+array=>{
+return blot_check_core::PrimitiveKind.array,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_backend_collection_ops::Op)->blot_backend_collection_ops::Op,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_backend_collection_ops::Op)->blot_backend_collection_ops::Op,Error {
 
 match value {
 
-blot_backend_collection_ops::Op.length=>{
-return blot_backend_collection_ops::Op.length,Error.none;},
+length=>{
+return blot_backend_collection_ops::Op.length,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.get=>{
-return blot_backend_collection_ops::Op.get,Error.none;},
+get=>{
+return blot_backend_collection_ops::Op.get,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.set=>{
-return blot_backend_collection_ops::Op.set,Error.none;},
+set=>{
+return blot_backend_collection_ops::Op.set,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.fill=>{
-return blot_backend_collection_ops::Op.fill,Error.none;},
+fill=>{
+return blot_backend_collection_ops::Op.fill,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.generate=>{
-return blot_backend_collection_ops::Op.generate,Error.none;},
+generate=>{
+return blot_backend_collection_ops::Op.generate,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.append=>{
-return blot_backend_collection_ops::Op.append,Error.none;},
+append=>{
+return blot_backend_collection_ops::Op.append,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.prepend=>{
-return blot_backend_collection_ops::Op.prepend,Error.none;},
+prepend=>{
+return blot_backend_collection_ops::Op.prepend,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.identity=>{
-return blot_backend_collection_ops::Op.identity,Error.none;},
+identity=>{
+return blot_backend_collection_ops::Op.identity,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.convert=>{
-return blot_backend_collection_ops::Op.convert,Error.none;},
+convert=>{
+return blot_backend_collection_ops::Op.convert,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.cursor=>{
-return blot_backend_collection_ops::Op.cursor,Error.none;},
+cursor=>{
+return blot_backend_collection_ops::Op.cursor,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.cursor_has=>{
-return blot_backend_collection_ops::Op.cursor_has,Error.none;},
+cursor_has=>{
+return blot_backend_collection_ops::Op.cursor_has,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.cursor_value=>{
-return blot_backend_collection_ops::Op.cursor_value,Error.none;},
+cursor_value=>{
+return blot_backend_collection_ops::Op.cursor_value,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.cursor_advance=>{
-return blot_backend_collection_ops::Op.cursor_advance,Error.none;},
+cursor_advance=>{
+return blot_backend_collection_ops::Op.cursor_advance,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.concat=>{
-return blot_backend_collection_ops::Op.concat,Error.none;},
+concat=>{
+return blot_backend_collection_ops::Op.concat,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.slice=>{
-return blot_backend_collection_ops::Op.slice,Error.none;},
+slice=>{
+return blot_backend_collection_ops::Op.slice,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.simd_load=>{
-return blot_backend_collection_ops::Op.simd_load,Error.none;},
+simd_load=>{
+return blot_backend_collection_ops::Op.simd_load,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.simd_store=>{
-return blot_backend_collection_ops::Op.simd_store,Error.none;},
+simd_store=>{
+return blot_backend_collection_ops::Op.simd_store,blot_error::Error.none;},
 
-blot_backend_collection_ops::Op.flatten=>{
-return blot_backend_collection_ops::Op.flatten,Error.none;},
-
-}
+flatten=>{
+return blot_backend_collection_ops::Op.flatten,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::LoopInfo)->blot_check_core::LoopInfo,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::LoopInfo)->blot_check_core::LoopInfo,Error {
 
 var result=default<blot_check_core::LoopInfo>();
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.first);if error!=Error.none {return result,error;}result.first=copied;}
+{let copied,error=cloneValue(self_,value.first);if error!=blot_error::Error.none {return result,error;}result.first=copied;}
 
-{let copied,error=cloneValue(self,value.end);if error!=Error.none {return result,error;}result.end=copied;}
+{let copied,error=cloneValue(self_,value.end);if error!=blot_error::Error.none {return result,error;}result.end=copied;}
 
-{let copied,error=cloneValue(self,value.pattern);if error!=Error.none {return result,error;}result.pattern=copied;}
+{let copied,error=cloneValue(self_,value.pattern);if error!=blot_error::Error.none {return result,error;}result.pattern=copied;}
 
-{let copied,error=cloneValue(self,value.body);if error!=Error.none {return result,error;}result.body=copied;}
+{let copied,error=cloneValue(self_,value.body);if error!=blot_error::Error.none {return result,error;}result.body=copied;}
 
-{let copied,error=cloneValue(self,value.carries);if error!=Error.none {return result,error;}result.carries=copied;}
+{let copied,error=cloneValue(self_,value.carries);if error!=blot_error::Error.none {return result,error;}result.carries=copied;}
 
-{let copied,error=cloneValue(self,value.can_exit);if error!=Error.none {return result,error;}result.can_exit=copied;}
+{let copied,error=cloneValue(self_,value.can_exit);if error!=blot_error::Error.none {return result,error;}result.can_exit=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::LoopKind)->blot_check_core::LoopKind,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::LoopKind)->blot_check_core::LoopKind,Error {
 
 match value {
 
-blot_check_core::LoopKind.forever=>{
-return blot_check_core::LoopKind.forever,Error.none;},
+forever=>{
+return blot_check_core::LoopKind.forever,blot_error::Error.none;},
 
-blot_check_core::LoopKind.range=>{
-return blot_check_core::LoopKind.range,Error.none;},
+range=>{
+return blot_check_core::LoopKind.range,blot_error::Error.none;},
 
-blot_check_core::LoopKind.array=>{
-return blot_check_core::LoopKind.array,Error.none;},
-
-}
+array=>{
+return blot_check_core::LoopKind.array,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::LoopCarry)->blot_check_core::LoopCarry,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::LoopCarry)->blot_check_core::LoopCarry,Error {
 
 var result=default<blot_check_core::LoopCarry>();
 
-{let copied,error=cloneValue(self,value.incoming);if error!=Error.none {return result,error;}result.incoming=copied;}
+{let copied,error=cloneValue(self_,value.incoming);if error!=blot_error::Error.none {return result,error;}result.incoming=copied;}
 
-{let copied,error=cloneValue(self,value.iteration);if error!=Error.none {return result,error;}result.iteration=copied;}
+{let copied,error=cloneValue(self_,value.iteration);if error!=blot_error::Error.none {return result,error;}result.iteration=copied;}
 
-{let copied,error=cloneValue(self,value.backedge);if error!=Error.none {return result,error;}result.backedge=copied;}
+{let copied,error=cloneValue(self_,value.backedge);if error!=blot_error::Error.none {return result,error;}result.backedge=copied;}
 
-{let copied,error=cloneValue(self,value.outgoing);if error!=Error.none {return result,error;}result.outgoing=copied;}
+{let copied,error=cloneValue(self_,value.outgoing);if error!=blot_error::Error.none {return result,error;}result.outgoing=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::ResolverInfo)->blot_check_core::ResolverInfo,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::ResolverInfo)->blot_check_core::ResolverInfo,Error {
 
 var result=default<blot_check_core::ResolverInfo>();
 
-{let copied,error=cloneValue(self,value.operation);if error!=Error.none {return result,error;}result.operation=copied;}
+{let copied,error=cloneValue(self_,value.operation);if error!=blot_error::Error.none {return result,error;}result.operation=copied;}
 
-{let copied,error=cloneValue(self,value.resolver);if error!=Error.none {return result,error;}result.resolver=copied;}
+{let copied,error=cloneValue(self_,value.resolver);if error!=blot_error::Error.none {return result,error;}result.resolver=copied;}
 
-{let copied,error=cloneValue(self,value.arguments);if error!=Error.none {return result,error;}result.arguments=copied;}
+{let copied,error=cloneValue(self_,value.arguments);if error!=blot_error::Error.none {return result,error;}result.arguments=copied;}
 
-{let copied,error=cloneValue(self,value.member);if error!=Error.none {return result,error;}result.member=copied;}
+{let copied,error=cloneValue(self_,value.member);if error!=blot_error::Error.none {return result,error;}result.member=copied;}
 
-{let copied,error=cloneValue(self,value.method);if error!=Error.none {return result,error;}result.method=copied;}
+{let copied,error=cloneValue(self_,value.method);if error!=blot_error::Error.none {return result,error;}result.method=copied;}
 
-{let copied,error=cloneValue(self,value.method_type);if error!=Error.none {return result,error;}result.method_type=copied;}
+{let copied,error=cloneValue(self_,value.method_type);if error!=blot_error::Error.none {return result,error;}result.method_type=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::ResolverOperation)->blot_check_core::ResolverOperation,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::ResolverOperation)->blot_check_core::ResolverOperation,Error {
 
 match value {
 
-blot_check_core::ResolverOperation.monad=>{
-return blot_check_core::ResolverOperation.monad,Error.none;},
+monad=>{
+return blot_check_core::ResolverOperation.monad,blot_error::Error.none;},
 
-blot_check_core::ResolverOperation.pure=>{
-return blot_check_core::ResolverOperation.pure,Error.none;},
+pure=>{
+return blot_check_core::ResolverOperation.pure,blot_error::Error.none;},
 
-blot_check_core::ResolverOperation.bind=>{
-return blot_check_core::ResolverOperation.bind,Error.none;},
+bind=>{
+return blot_check_core::ResolverOperation.bind,blot_error::Error.none;},
 
-blot_check_core::ResolverOperation.forward=>{
-return blot_check_core::ResolverOperation.forward,Error.none;},
+forward=>{
+return blot_check_core::ResolverOperation.forward,blot_error::Error.none;},
 
-blot_check_core::ResolverOperation.iterate=>{
-return blot_check_core::ResolverOperation.iterate,Error.none;},
+iterate=>{
+return blot_check_core::ResolverOperation.iterate,blot_error::Error.none;},
 
-blot_check_core::ResolverOperation.run=>{
-return blot_check_core::ResolverOperation.run,Error.none;},
-
-}
+run=>{
+return blot_check_core::ResolverOperation.run,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::OperationValue)->blot_check_core::OperationValue,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::OperationValue)->blot_check_core::OperationValue,Error {
 
 var result=default<blot_check_core::OperationValue>();
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.arguments);if error!=Error.none {return result,error;}result.arguments=copied;}
+{let copied,error=cloneValue(self_,value.arguments);if error!=blot_error::Error.none {return result,error;}result.arguments=copied;}
 
-{let copied,error=cloneValue(self,value.signature);if error!=Error.none {return result,error;}result.signature=copied;}
+{let copied,error=cloneValue(self_,value.signature);if error!=blot_error::Error.none {return result,error;}result.signature=copied;}
 
-{let copied,error=cloneValue(self,value.witness);if error!=Error.none {return result,error;}result.witness=copied;}
+{let copied,error=cloneValue(self_,value.witness);if error!=blot_error::Error.none {return result,error;}result.witness=copied;}
 
-{let copied,error=cloneValue(self,value.witness_result);if error!=Error.none {return result,error;}result.witness_result=copied;}
+{let copied,error=cloneValue(self_,value.witness_result);if error!=blot_error::Error.none {return result,error;}result.witness_result=copied;}
 
-{let copied,error=cloneValue(self,value.instance);if error!=Error.none {return result,error;}result.instance=copied;}
+{let copied,error=cloneValue(self_,value.instance);if error!=blot_error::Error.none {return result,error;}result.instance=copied;}
 
-{let copied,error=cloneValue(self,value.capability);if error!=Error.none {return result,error;}result.capability=copied;}
+{let copied,error=cloneValue(self_,value.capability);if error!=blot_error::Error.none {return result,error;}result.capability=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::HandleEffects)->blot_check_core::HandleEffects,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::HandleEffects)->blot_check_core::HandleEffects,Error {
 
 var result=default<blot_check_core::HandleEffects>();
 
-{let copied,error=cloneValue(self,value.node);if error!=Error.none {return result,error;}result.node=copied;}
+{let copied,error=cloneValue(self_,value.node);if error!=blot_error::Error.none {return result,error;}result.node=copied;}
 
-{let copied,error=cloneValue(self,value.first);if error!=Error.none {return result,error;}result.first=copied;}
+{let copied,error=cloneValue(self_,value.first);if error!=blot_error::Error.none {return result,error;}result.first=copied;}
 
-{let copied,error=cloneValue(self,value.second);if error!=Error.none {return result,error;}result.second=copied;}
+{let copied,error=cloneValue(self_,value.second);if error!=blot_error::Error.none {return result,error;}result.second=copied;}
 
-{let copied,error=cloneValue(self,value.extended);if error!=Error.none {return result,error;}result.extended=copied;}
+{let copied,error=cloneValue(self_,value.extended);if error!=blot_error::Error.none {return result,error;}result.extended=copied;}
 
-{let copied,error=cloneValue(self,value.residual);if error!=Error.none {return result,error;}result.residual=copied;}
+{let copied,error=cloneValue(self_,value.residual);if error!=blot_error::Error.none {return result,error;}result.residual=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Diagnostic)->blot_check_core::Diagnostic,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Diagnostic)->blot_check_core::Diagnostic,Error {
 
 var result=default<blot_check_core::Diagnostic>();
 
-{let copied,error=cloneValue(self,value.code);if error!=Error.none {return result,error;}result.code=copied;}
+{let copied,error=cloneValue(self_,value.code);if error!=blot_error::Error.none {return result,error;}result.code=copied;}
 
-{let copied,error=cloneValue(self,value.span);if error!=Error.none {return result,error;}result.span=copied;}
+{let copied,error=cloneValue(self_,value.span);if error!=blot_error::Error.none {return result,error;}result.span=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_core::Code)->blot_check_core::Code,Error {
+fn cloneValue(self_:Owner&,value:blot_check_core::Code)->blot_check_core::Code,Error {
 
 match value {
 
-blot_check_core::Code.unchecked=>{
-return blot_check_core::Code.unchecked,Error.none;},
+unchecked=>{
+return blot_check_core::Code.unchecked,blot_error::Error.none;},
 
-blot_check_core::Code.unsupported=>{
-return blot_check_core::Code.unsupported,Error.none;},
+unsupported=>{
+return blot_check_core::Code.unsupported,blot_error::Error.none;},
 
-blot_check_core::Code.unresolved_binding=>{
-return blot_check_core::Code.unresolved_binding,Error.none;},
+unresolved_binding=>{
+return blot_check_core::Code.unresolved_binding,blot_error::Error.none;},
 
-blot_check_core::Code.invalid_call=>{
-return blot_check_core::Code.invalid_call,Error.none;},
+invalid_call=>{
+return blot_check_core::Code.invalid_call,blot_error::Error.none;},
 
-blot_check_core::Code.complexity=>{
-return blot_check_core::Code.complexity,Error.none;},
-
-}
+complexity=>{
+return blot_check_core::Code.complexity,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::Interface)->blot_reuse_principal_interface::Interface,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Interface)->blot_reuse_principal_interface::Interface,Error {
 
 var result=default<blot_reuse_principal_interface::Interface>();
 
-{let copied,error=cloneValue(self,value.has_rank_contracts);if error!=Error.none {return result,error;}result.has_rank_contracts=copied;}
+{let copied,error=cloneValue(self_,value.has_rank_contracts);if error!=blot_error::Error.none {return result,error;}result.has_rank_contracts=copied;}
 
-{let copied,error=cloneValue(self,value.has_usage_contracts);if error!=Error.none {return result,error;}result.has_usage_contracts=copied;}
+{let copied,error=cloneValue(self_,value.has_usage_contracts);if error!=blot_error::Error.none {return result,error;}result.has_usage_contracts=copied;}
 
-{let copied,error=cloneValue(self,value.has_numeric_proofs);if error!=Error.none {return result,error;}result.has_numeric_proofs=copied;}
+{let copied,error=cloneValue(self_,value.has_numeric_proofs);if error!=blot_error::Error.none {return result,error;}result.has_numeric_proofs=copied;}
 
-{let copied,error=cloneValue(self,value.proof_contracts);if error!=Error.none {return result,error;}result.proof_contracts=copied;}
+{let copied,error=cloneValue(self_,value.proof_contracts);if error!=blot_error::Error.none {return result,error;}result.proof_contracts=copied;}
 
-{let copied,error=cloneValue(self,value.capability_contracts);if error!=Error.none {return result,error;}result.capability_contracts=copied;}
+{let copied,error=cloneValue(self_,value.capability_contracts);if error!=blot_error::Error.none {return result,error;}result.capability_contracts=copied;}
 
-{let copied,error=cloneValue(self,value.unit);if error!=Error.none {return result,error;}result.unit=copied;}
+{let copied,error=cloneValue(self_,value.unit);if error!=blot_error::Error.none {return result,error;}result.unit=copied;}
 
-{let copied,error=cloneValue(self,value.graph);if error!=Error.none {return result,error;}result.graph=copied;}
+{let copied,error=cloneValue(self_,value.graph);if error!=blot_error::Error.none {return result,error;}result.graph=copied;}
 
-{let copied,error=cloneValue(self,value.patterns);if error!=Error.none {return result,error;}result.patterns=copied;}
+{let copied,error=cloneValue(self_,value.patterns);if error!=blot_error::Error.none {return result,error;}result.patterns=copied;}
 
-{let copied,error=cloneValue(self,value.bindings);if error!=Error.none {return result,error;}result.bindings=copied;}
+{let copied,error=cloneValue(self_,value.bindings);if error!=blot_error::Error.none {return result,error;}result.bindings=copied;}
 
-{let copied,error=cloneValue(self,value.obligations);if error!=Error.none {return result,error;}result.obligations=copied;}
+{let copied,error=cloneValue(self_,value.obligations);if error!=blot_error::Error.none {return result,error;}result.obligations=copied;}
 
-{let copied,error=cloneValue(self,value.obligation_spans);if error!=Error.none {return result,error;}result.obligation_spans=copied;}
+{let copied,error=cloneValue(self_,value.obligation_spans);if error!=blot_error::Error.none {return result,error;}result.obligation_spans=copied;}
 
-{let copied,error=cloneValue(self,value.nominals);if error!=Error.none {return result,error;}result.nominals=copied;}
+{let copied,error=cloneValue(self_,value.nominals);if error!=blot_error::Error.none {return result,error;}result.nominals=copied;}
 
-{let copied,error=cloneValue(self,value.constructors);if error!=Error.none {return result,error;}result.constructors=copied;}
+{let copied,error=cloneValue(self_,value.constructors);if error!=blot_error::Error.none {return result,error;}result.constructors=copied;}
 
-{let copied,error=cloneValue(self,value.effect_families);if error!=Error.none {return result,error;}result.effect_families=copied;}
+{let copied,error=cloneValue(self_,value.effect_families);if error!=blot_error::Error.none {return result,error;}result.effect_families=copied;}
 
-{let copied,error=cloneValue(self,value.effect_templates);if error!=Error.none {return result,error;}result.effect_templates=copied;}
+{let copied,error=cloneValue(self_,value.effect_templates);if error!=blot_error::Error.none {return result,error;}result.effect_templates=copied;}
 
-{let copied,error=cloneValue(self,value.associated);if error!=Error.none {return result,error;}result.associated=copied;}
+{let copied,error=cloneValue(self_,value.associated);if error!=blot_error::Error.none {return result,error;}result.associated=copied;}
 
-{let copied,error=cloneValue(self,value.contracts);if error!=Error.none {return result,error;}result.contracts=copied;}
+{let copied,error=cloneValue(self_,value.contracts);if error!=blot_error::Error.none {return result,error;}result.contracts=copied;}
 
-{let copied,error=cloneValue(self,value.contract_predicates);if error!=Error.none {return result,error;}result.contract_predicates=copied;}
+{let copied,error=cloneValue(self_,value.contract_predicates);if error!=blot_error::Error.none {return result,error;}result.contract_predicates=copied;}
 
-{let copied,error=cloneValue(self,value.contract_members);if error!=Error.none {return result,error;}result.contract_members=copied;}
+{let copied,error=cloneValue(self_,value.contract_members);if error!=blot_error::Error.none {return result,error;}result.contract_members=copied;}
 
-{let copied,error=cloneValue(self,value.implementations);if error!=Error.none {return result,error;}result.implementations=copied;}
+{let copied,error=cloneValue(self_,value.implementations);if error!=blot_error::Error.none {return result,error;}result.implementations=copied;}
 
-{let copied,error=cloneValue(self,value.implementation_predicates);if error!=Error.none {return result,error;}result.implementation_predicates=copied;}
+{let copied,error=cloneValue(self_,value.implementation_predicates);if error!=blot_error::Error.none {return result,error;}result.implementation_predicates=copied;}
 
-{let copied,error=cloneValue(self,value.implementation_members);if error!=Error.none {return result,error;}result.implementation_members=copied;}
+{let copied,error=cloneValue(self_,value.implementation_members);if error!=blot_error::Error.none {return result,error;}result.implementation_members=copied;}
 
-{let copied,error=cloneValue(self,value.member_templates);if error!=Error.none {return result,error;}result.member_templates=copied;}
+{let copied,error=cloneValue(self_,value.member_templates);if error!=blot_error::Error.none {return result,error;}result.member_templates=copied;}
 
-{let copied,error=cloneValue(self,value.selected_proofs);if error!=Error.none {return result,error;}result.selected_proofs=copied;}
+{let copied,error=cloneValue(self_,value.selected_proofs);if error!=blot_error::Error.none {return result,error;}result.selected_proofs=copied;}
 
-{let copied,error=cloneValue(self,value.selected_members);if error!=Error.none {return result,error;}result.selected_members=copied;}
+{let copied,error=cloneValue(self_,value.selected_members);if error!=blot_error::Error.none {return result,error;}result.selected_members=copied;}
 
-{let copied,error=cloneValue(self,value.selected_edges);if error!=Error.none {return result,error;}result.selected_edges=copied;}
+{let copied,error=cloneValue(self_,value.selected_edges);if error!=blot_error::Error.none {return result,error;}result.selected_edges=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_frozen_types::Graph)->blot_check_frozen_types::Graph,Error {
+fn cloneValue(self_:Owner&,value:blot_check_frozen_types::Graph)->blot_check_frozen_types::Graph,Error {
 
 var result=default<blot_check_frozen_types::Graph>();
 
-{let copied,error=cloneValue(self,value.nodes);if error!=Error.none {return result,error;}result.nodes=copied;}
+{let copied,error=cloneValue(self_,value.nodes);if error!=blot_error::Error.none {return result,error;}result.nodes=copied;}
 
-{let copied,error=cloneValue(self,value.extra);if error!=Error.none {return result,error;}result.extra=copied;}
+{let copied,error=cloneValue(self_,value.extra);if error!=blot_error::Error.none {return result,error;}result.extra=copied;}
 
-{let copied,error=cloneValue(self,value.rows);if error!=Error.none {return result,error;}result.rows=copied;}
+{let copied,error=cloneValue(self_,value.rows);if error!=blot_error::Error.none {return result,error;}result.rows=copied;}
 
-{let copied,error=cloneValue(self,value.labels);if error!=Error.none {return result,error;}result.labels=copied;}
+{let copied,error=cloneValue(self_,value.labels);if error!=blot_error::Error.none {return result,error;}result.labels=copied;}
 
-{let copied,error=cloneValue(self,value.operations);if error!=Error.none {return result,error;}result.operations=copied;}
+{let copied,error=cloneValue(self_,value.operations);if error!=blot_error::Error.none {return result,error;}result.operations=copied;}
 
-{let copied,error=cloneValue(self,value.row_variable_count);if error!=Error.none {return result,error;}result.row_variable_count=copied;}
+{let copied,error=cloneValue(self_,value.row_variable_count);if error!=blot_error::Error.none {return result,error;}result.row_variable_count=copied;}
 
-{let copied,error=cloneValue(self,value.quantifier_goals);if error!=Error.none {return result,error;}result.quantifier_goals=copied;}
+{let copied,error=cloneValue(self_,value.quantifier_goals);if error!=blot_error::Error.none {return result,error;}result.quantifier_goals=copied;}
 
-{let copied,error=cloneValue(self,value.quantifier_obligations);if error!=Error.none {return result,error;}result.quantifier_obligations=copied;}
+{let copied,error=cloneValue(self_,value.quantifier_obligations);if error!=blot_error::Error.none {return result,error;}result.quantifier_obligations=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_frozen_types::PatternGraph)->blot_check_frozen_types::PatternGraph,Error {
+fn cloneValue(self_:Owner&,value:blot_check_frozen_types::PatternGraph)->blot_check_frozen_types::PatternGraph,Error {
 
 var result=default<blot_check_frozen_types::PatternGraph>();
 
-{let copied,error=cloneValue(self,value.nodes);if error!=Error.none {return result,error;}result.nodes=copied;}
+{let copied,error=cloneValue(self_,value.nodes);if error!=blot_error::Error.none {return result,error;}result.nodes=copied;}
 
-{let copied,error=cloneValue(self,value.extra);if error!=Error.none {return result,error;}result.extra=copied;}
+{let copied,error=cloneValue(self_,value.extra);if error!=blot_error::Error.none {return result,error;}result.extra=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_parameter_patterns::Node)->blot_check_parameter_patterns::Node,Error {
+fn cloneValue(self_:Owner&,value:blot_check_parameter_patterns::Node)->blot_check_parameter_patterns::Node,Error {
 
 var result=default<blot_check_parameter_patterns::Node>();
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.a);if error!=Error.none {return result,error;}result.a=copied;}
+{let copied,error=cloneValue(self_,value.a);if error!=blot_error::Error.none {return result,error;}result.a=copied;}
 
-{let copied,error=cloneValue(self,value.b);if error!=Error.none {return result,error;}result.b=copied;}
+{let copied,error=cloneValue(self_,value.b);if error!=blot_error::Error.none {return result,error;}result.b=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_check_parameter_patterns::Kind)->blot_check_parameter_patterns::Kind,Error {
+fn cloneValue(self_:Owner&,value:blot_check_parameter_patterns::Kind)->blot_check_parameter_patterns::Kind,Error {
 
 match value {
 
-blot_check_parameter_patterns::Kind.binding=>{
-return blot_check_parameter_patterns::Kind.binding,Error.none;},
+binding=>{
+return blot_check_parameter_patterns::Kind.binding,blot_error::Error.none;},
 
-blot_check_parameter_patterns::Kind.tuple=>{
-return blot_check_parameter_patterns::Kind.tuple,Error.none;},
+tuple=>{
+return blot_check_parameter_patterns::Kind.tuple,blot_error::Error.none;},
 
-blot_check_parameter_patterns::Kind.array=>{
-return blot_check_parameter_patterns::Kind.array,Error.none;},
+array=>{
+return blot_check_parameter_patterns::Kind.array,blot_error::Error.none;},
 
-blot_check_parameter_patterns::Kind.record=>{
-return blot_check_parameter_patterns::Kind.record,Error.none;},
-
-}
+record=>{
+return blot_check_parameter_patterns::Kind.record,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::Binding)->blot_reuse_principal_interface::Binding,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Binding)->blot_reuse_principal_interface::Binding,Error {
 
 var result=default<blot_reuse_principal_interface::Binding>();
 
-{let copied,error=cloneValue(self,value.capability_flow);if error!=Error.none {return result,error;}result.capability_flow=copied;}
+{let copied,error=cloneValue(self_,value.capability_flow);if error!=blot_error::Error.none {return result,error;}result.capability_flow=copied;}
 
-{let copied,error=cloneValue(self,value.capability_parameters);if error!=Error.none {return result,error;}result.capability_parameters=copied;}
+{let copied,error=cloneValue(self_,value.capability_parameters);if error!=blot_error::Error.none {return result,error;}result.capability_parameters=copied;}
 
-{let copied,error=cloneValue(self,value.private);if error!=Error.none {return result,error;}result.private=copied;}
+{let copied,error=cloneValue(self_,value.private);if error!=blot_error::Error.none {return result,error;}result.private=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.named_function);if error!=Error.none {return result,error;}result.named_function=copied;}
+{let copied,error=cloneValue(self_,value.named_function);if error!=blot_error::Error.none {return result,error;}result.named_function=copied;}
 
-{let copied,error=cloneValue(self,value.ty);if error!=Error.none {return result,error;}result.ty=copied;}
+{let copied,error=cloneValue(self_,value.ty);if error!=blot_error::Error.none {return result,error;}result.ty=copied;}
 
-{let copied,error=cloneValue(self,value.scheme);if error!=Error.none {return result,error;}result.scheme=copied;}
+{let copied,error=cloneValue(self_,value.scheme);if error!=blot_error::Error.none {return result,error;}result.scheme=copied;}
 
-{let copied,error=cloneValue(self,value.external);if error!=Error.none {return result,error;}result.external=copied;}
+{let copied,error=cloneValue(self_,value.external);if error!=blot_error::Error.none {return result,error;}result.external=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::Nominal)->blot_reuse_principal_interface::Nominal,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Nominal)->blot_reuse_principal_interface::Nominal,Error {
 
 var result=default<blot_reuse_principal_interface::Nominal>();
 
-{let copied,error=cloneValue(self,value.affine);if error!=Error.none {return result,error;}result.affine=copied;}
+{let copied,error=cloneValue(self_,value.affine);if error!=blot_error::Error.none {return result,error;}result.affine=copied;}
 
-{let copied,error=cloneValue(self,value.has_usage);if error!=Error.none {return result,error;}result.has_usage=copied;}
+{let copied,error=cloneValue(self_,value.has_usage);if error!=blot_error::Error.none {return result,error;}result.has_usage=copied;}
 
-{let copied,error=cloneValue(self,value.closed_storage);if error!=Error.none {return result,error;}result.closed_storage=copied;}
+{let copied,error=cloneValue(self_,value.closed_storage);if error!=blot_error::Error.none {return result,error;}result.closed_storage=copied;}
 
-{let copied,error=cloneValue(self,value.private);if error!=Error.none {return result,error;}result.private=copied;}
+{let copied,error=cloneValue(self_,value.private);if error!=blot_error::Error.none {return result,error;}result.private=copied;}
 
-{let copied,error=cloneValue(self,value.is_opaque);if error!=Error.none {return result,error;}result.is_opaque=copied;}
+{let copied,error=cloneValue(self_,value.is_opaque);if error!=blot_error::Error.none {return result,error;}result.is_opaque=copied;}
 
-{let copied,error=cloneValue(self,value.storage);if error!=Error.none {return result,error;}result.storage=copied;}
+{let copied,error=cloneValue(self_,value.storage);if error!=blot_error::Error.none {return result,error;}result.storage=copied;}
 
-{let copied,error=cloneValue(self,value.declaration);if error!=Error.none {return result,error;}result.declaration=copied;}
+{let copied,error=cloneValue(self_,value.declaration);if error!=blot_error::Error.none {return result,error;}result.declaration=copied;}
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.parameters);if error!=Error.none {return result,error;}result.parameters=copied;}
+{let copied,error=cloneValue(self_,value.parameters);if error!=blot_error::Error.none {return result,error;}result.parameters=copied;}
 
-{let copied,error=cloneValue(self,value.variables);if error!=Error.none {return result,error;}result.variables=copied;}
+{let copied,error=cloneValue(self_,value.variables);if error!=blot_error::Error.none {return result,error;}result.variables=copied;}
 
-{let copied,error=cloneValue(self,value.patterns);if error!=Error.none {return result,error;}result.patterns=copied;}
+{let copied,error=cloneValue(self_,value.patterns);if error!=blot_error::Error.none {return result,error;}result.patterns=copied;}
 
-{let copied,error=cloneValue(self,value.parameter_names);if error!=Error.none {return result,error;}result.parameter_names=copied;}
+{let copied,error=cloneValue(self_,value.parameter_names);if error!=blot_error::Error.none {return result,error;}result.parameter_names=copied;}
 
-{let copied,error=cloneValue(self,value.constructors);if error!=Error.none {return result,error;}result.constructors=copied;}
+{let copied,error=cloneValue(self_,value.constructors);if error!=blot_error::Error.none {return result,error;}result.constructors=copied;}
 
-{let copied,error=cloneValue(self,value.alias);if error!=Error.none {return result,error;}result.alias=copied;}
+{let copied,error=cloneValue(self_,value.alias);if error!=blot_error::Error.none {return result,error;}result.alias=copied;}
 
-{let copied,error=cloneValue(self,value.alias_rows);if error!=Error.none {return result,error;}result.alias_rows=copied;}
+{let copied,error=cloneValue(self_,value.alias_rows);if error!=blot_error::Error.none {return result,error;}result.alias_rows=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::Constructor)->blot_reuse_principal_interface::Constructor,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Constructor)->blot_reuse_principal_interface::Constructor,Error {
 
 var result=default<blot_reuse_principal_interface::Constructor>();
 
-{let copied,error=cloneValue(self,value.private);if error!=Error.none {return result,error;}result.private=copied;}
+{let copied,error=cloneValue(self_,value.private);if error!=blot_error::Error.none {return result,error;}result.private=copied;}
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.nominal);if error!=Error.none {return result,error;}result.nominal=copied;}
+{let copied,error=cloneValue(self_,value.nominal);if error!=blot_error::Error.none {return result,error;}result.nominal=copied;}
 
-{let copied,error=cloneValue(self,value.tag);if error!=Error.none {return result,error;}result.tag=copied;}
+{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.scheme);if error!=Error.none {return result,error;}result.scheme=copied;}
+{let copied,error=cloneValue(self_,value.scheme);if error!=blot_error::Error.none {return result,error;}result.scheme=copied;}
 
-{let copied,error=cloneValue(self,value.payload);if error!=Error.none {return result,error;}result.payload=copied;}
+{let copied,error=cloneValue(self_,value.payload);if error!=blot_error::Error.none {return result,error;}result.payload=copied;}
 
-{let copied,error=cloneValue(self,value.declared_record);if error!=Error.none {return result,error;}result.declared_record=copied;}
+{let copied,error=cloneValue(self_,value.declared_record);if error!=blot_error::Error.none {return result,error;}result.declared_record=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::EffectFamily)->blot_reuse_principal_interface::EffectFamily,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::EffectFamily)->blot_reuse_principal_interface::EffectFamily,Error {
 
 var result=default<blot_reuse_principal_interface::EffectFamily>();
 
-{let copied,error=cloneValue(self,value.private);if error!=Error.none {return result,error;}result.private=copied;}
+{let copied,error=cloneValue(self_,value.private);if error!=blot_error::Error.none {return result,error;}result.private=copied;}
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.callable);if error!=Error.none {return result,error;}result.callable=copied;}
+{let copied,error=cloneValue(self_,value.callable);if error!=blot_error::Error.none {return result,error;}result.callable=copied;}
 
-{let copied,error=cloneValue(self,value.parameters);if error!=Error.none {return result,error;}result.parameters=copied;}
+{let copied,error=cloneValue(self_,value.parameters);if error!=blot_error::Error.none {return result,error;}result.parameters=copied;}
 
-{let copied,error=cloneValue(self,value.variables);if error!=Error.none {return result,error;}result.variables=copied;}
+{let copied,error=cloneValue(self_,value.variables);if error!=blot_error::Error.none {return result,error;}result.variables=copied;}
 
-{let copied,error=cloneValue(self,value.patterns);if error!=Error.none {return result,error;}result.patterns=copied;}
+{let copied,error=cloneValue(self_,value.patterns);if error!=blot_error::Error.none {return result,error;}result.patterns=copied;}
 
-{let copied,error=cloneValue(self,value.parameter_names);if error!=Error.none {return result,error;}result.parameter_names=copied;}
+{let copied,error=cloneValue(self_,value.parameter_names);if error!=blot_error::Error.none {return result,error;}result.parameter_names=copied;}
 
-{let copied,error=cloneValue(self,value.operations);if error!=Error.none {return result,error;}result.operations=copied;}
+{let copied,error=cloneValue(self_,value.operations);if error!=blot_error::Error.none {return result,error;}result.operations=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::EffectTemplate)->blot_reuse_principal_interface::EffectTemplate,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::EffectTemplate)->blot_reuse_principal_interface::EffectTemplate,Error {
 
 var result=default<blot_reuse_principal_interface::EffectTemplate>();
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.family);if error!=Error.none {return result,error;}result.family=copied;}
+{let copied,error=cloneValue(self_,value.family);if error!=blot_error::Error.none {return result,error;}result.family=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.parameter);if error!=Error.none {return result,error;}result.parameter=copied;}
+{let copied,error=cloneValue(self_,value.parameter);if error!=blot_error::Error.none {return result,error;}result.parameter=copied;}
 
-{let copied,error=cloneValue(self,value.result);if error!=Error.none {return result,error;}result.result=copied;}
+{let copied,error=cloneValue(self_,value.result);if error!=blot_error::Error.none {return result,error;}result.result=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::Associated)->blot_reuse_principal_interface::Associated,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Associated)->blot_reuse_principal_interface::Associated,Error {
 
 var result=default<blot_reuse_principal_interface::Associated>();
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.member);if error!=Error.none {return result,error;}result.member=copied;}
+{let copied,error=cloneValue(self_,value.member);if error!=blot_error::Error.none {return result,error;}result.member=copied;}
 
-{let copied,error=cloneValue(self,value.operator);if error!=Error.none {return result,error;}result.operator=copied;}
+{let copied,error=cloneValue(self_,value.operator);if error!=blot_error::Error.none {return result,error;}result.operator=copied;}
 
-{let copied,error=cloneValue(self,value.binding);if error!=Error.none {return result,error;}result.binding=copied;}
+{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_principal_interface::Contract)->blot_reuse_principal_interface::Contract,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Contract)->blot_reuse_principal_interface::Contract,Error {
 
 var result=default<blot_reuse_principal_interface::Contract>();
 
-{let copied,error=cloneValue(self,value.declaration);if error!=Error.none {return result,error;}result.declaration=copied;}
+{let copied,error=cloneValue(self_,value.declaration);if error!=blot_error::Error.none {return result,error;}result.declaration=copied;}
 
-{let copied,error=cloneValue(self,value.private);if error!=Error.none {return result,error;}result.private=copied;}
+{let copied,error=cloneValue(self_,value.private);if error!=blot_error::Error.none {return result,error;}result.private=copied;}
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.parameters);if error!=Error.none {return result,error;}result.parameters=copied;}
+{let copied,error=cloneValue(self_,value.parameters);if error!=blot_error::Error.none {return result,error;}result.parameters=copied;}
 
-{let copied,error=cloneValue(self,value.variables);if error!=Error.none {return result,error;}result.variables=copied;}
+{let copied,error=cloneValue(self_,value.variables);if error!=blot_error::Error.none {return result,error;}result.variables=copied;}
 
-{let copied,error=cloneValue(self,value.patterns);if error!=Error.none {return result,error;}result.patterns=copied;}
+{let copied,error=cloneValue(self_,value.patterns);if error!=blot_error::Error.none {return result,error;}result.patterns=copied;}
 
-{let copied,error=cloneValue(self,value.parameter_names);if error!=Error.none {return result,error;}result.parameter_names=copied;}
+{let copied,error=cloneValue(self_,value.parameter_names);if error!=blot_error::Error.none {return result,error;}result.parameter_names=copied;}
 
-{let copied,error=cloneValue(self,value.row_variables);if error!=Error.none {return result,error;}result.row_variables=copied;}
+{let copied,error=cloneValue(self_,value.row_variables);if error!=blot_error::Error.none {return result,error;}result.row_variables=copied;}
 
-{let copied,error=cloneValue(self,value.row_parameter_names);if error!=Error.none {return result,error;}result.row_parameter_names=copied;}
+{let copied,error=cloneValue(self_,value.row_parameter_names);if error!=blot_error::Error.none {return result,error;}result.row_parameter_names=copied;}
 
-{let copied,error=cloneValue(self,value.row_parameters);if error!=Error.none {return result,error;}result.row_parameters=copied;}
+{let copied,error=cloneValue(self_,value.row_parameters);if error!=blot_error::Error.none {return result,error;}result.row_parameters=copied;}
 
-{let copied,error=cloneValue(self,value.predicates);if error!=Error.none {return result,error;}result.predicates=copied;}
+{let copied,error=cloneValue(self_,value.predicates);if error!=blot_error::Error.none {return result,error;}result.predicates=copied;}
 
-{let copied,error=cloneValue(self,value.members);if error!=Error.none {return result,error;}result.members=copied;}
+{let copied,error=cloneValue(self_,value.members);if error!=blot_error::Error.none {return result,error;}result.members=copied;}
 
-{let copied,error=cloneValue(self,value.requires_implementation);if error!=Error.none {return result,error;}result.requires_implementation=copied;}
+{let copied,error=cloneValue(self_,value.requires_implementation);if error!=blot_error::Error.none {return result,error;}result.requires_implementation=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_frozen_dependency::Module)->blot_reuse_frozen_dependency::Module,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_frozen_dependency::Module)->blot_reuse_frozen_dependency::Module,Error {
 
 var result=default<blot_reuse_frozen_dependency::Module>();
 
-{let copied,error=cloneValue(self,value.identity);if error!=Error.none {return result,error;}result.identity=copied;}
+{let copied,error=cloneValue(self_,value.identity);if error!=blot_error::Error.none {return result,error;}result.identity=copied;}
 
-{let copied,error=cloneValue(self,value.imports);if error!=Error.none {return result,error;}result.imports=copied;}
+{let copied,error=cloneValue(self_,value.imports);if error!=blot_error::Error.none {return result,error;}result.imports=copied;}
 
-{let copied,error=cloneValue(self,value.implicit_prelude);if error!=Error.none {return result,error;}result.implicit_prelude=copied;}
+{let copied,error=cloneValue(self_,value.implicit_prelude);if error!=blot_error::Error.none {return result,error;}result.implicit_prelude=copied;}
 
-{let copied,error=cloneValue(self,value.source_imports);if error!=Error.none {return result,error;}result.source_imports=copied;}
+{let copied,error=cloneValue(self_,value.source_imports);if error!=blot_error::Error.none {return result,error;}result.source_imports=copied;}
 
-{let copied,error=cloneValue(self,value.core);if error!=Error.none {return result,error;}result.core=copied;}
+{let copied,error=cloneValue(self_,value.core);if error!=blot_error::Error.none {return result,error;}result.core=copied;}
 
-{let copied,error=cloneValue(self,value.interface);if error!=Error.none {return result,error;}result.interface=copied;}
+{let copied,error=cloneValue(self_,value.interface);if error!=blot_error::Error.none {return result,error;}result.interface=copied;}
 
-{let copied,error=cloneValue(self,value.exports);if error!=Error.none {return result,error;}result.exports=copied;}
+{let copied,error=cloneValue(self_,value.exports);if error!=blot_error::Error.none {return result,error;}result.exports=copied;}
 
-{let copied,error=cloneValue(self,value.fixities);if error!=Error.none {return result,error;}result.fixities=copied;}
+{let copied,error=cloneValue(self_,value.fixities);if error!=blot_error::Error.none {return result,error;}result.fixities=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_frozen_dependency::Identity)->blot_reuse_frozen_dependency::Identity,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_frozen_dependency::Identity)->blot_reuse_frozen_dependency::Identity,Error {
 
 var result=default<blot_reuse_frozen_dependency::Identity>();
 
-{let copied,error=cloneValue(self,value.normalized_path);if error!=Error.none {return result,error;}result.normalized_path=copied;}
+{let copied,error=cloneValue(self_,value.normalized_path);if error!=blot_error::Error.none {return result,error;}result.normalized_path=copied;}
 
-{let copied,error=cloneValue(self,value.source_digest);if error!=Error.none {return result,error;}result.source_digest=copied;}
+{let copied,error=cloneValue(self_,value.source_digest);if error!=blot_error::Error.none {return result,error;}result.source_digest=copied;}
 
-{let copied,error=cloneValue(self,value.source_bytes);if error!=Error.none {return result,error;}result.source_bytes=copied;}
+{let copied,error=cloneValue(self_,value.source_bytes);if error!=blot_error::Error.none {return result,error;}result.source_bytes=copied;}
 
-{let copied,error=cloneValue(self,value.prelude);if error!=Error.none {return result,error;}result.prelude=copied;}
+{let copied,error=cloneValue(self_,value.prelude);if error!=blot_error::Error.none {return result,error;}result.prelude=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_frozen_dependency::ImportResolution)->blot_reuse_frozen_dependency::ImportResolution,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_frozen_dependency::ImportResolution)->blot_reuse_frozen_dependency::ImportResolution,Error {
 
 var result=default<blot_reuse_frozen_dependency::ImportResolution>();
 
-{let copied,error=cloneValue(self,value.path);if error!=Error.none {return result,error;}result.path=copied;}
+{let copied,error=cloneValue(self_,value.path);if error!=blot_error::Error.none {return result,error;}result.path=copied;}
 
-{let copied,error=cloneValue(self,value.target);if error!=Error.none {return result,error;}result.target=copied;}
+{let copied,error=cloneValue(self_,value.target);if error!=blot_error::Error.none {return result,error;}result.target=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_frozen_dependency::Export)->blot_reuse_frozen_dependency::Export,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_frozen_dependency::Export)->blot_reuse_frozen_dependency::Export,Error {
 
 var result=default<blot_reuse_frozen_dependency::Export>();
 
-{let copied,error=cloneValue(self,value.name);if error!=Error.none {return result,error;}result.name=copied;}
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
-{let copied,error=cloneValue(self,value.target);if error!=Error.none {return result,error;}result.target=copied;}
+{let copied,error=cloneValue(self_,value.target);if error!=blot_error::Error.none {return result,error;}result.target=copied;}
 
-{let copied,error=cloneValue(self,value.kind);if error!=Error.none {return result,error;}result.kind=copied;}
+{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self,value.catalog);if error!=Error.none {return result,error;}result.catalog=copied;}
+{let copied,error=cloneValue(self_,value.catalog);if error!=blot_error::Error.none {return result,error;}result.catalog=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_frozen_dependency::ExportKind)->blot_reuse_frozen_dependency::ExportKind,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_frozen_dependency::ExportKind)->blot_reuse_frozen_dependency::ExportKind,Error {
 
 match value {
 
-blot_reuse_frozen_dependency::ExportKind.value=>{
-return blot_reuse_frozen_dependency::ExportKind.value,Error.none;},
+value=>{
+return blot_reuse_frozen_dependency::ExportKind.value,blot_error::Error.none;},
 
-blot_reuse_frozen_dependency::ExportKind.nominal=>{
-return blot_reuse_frozen_dependency::ExportKind.nominal,Error.none;},
+nominal=>{
+return blot_reuse_frozen_dependency::ExportKind.nominal,blot_error::Error.none;},
 
-blot_reuse_frozen_dependency::ExportKind.constructor=>{
-return blot_reuse_frozen_dependency::ExportKind.constructor,Error.none;},
+constructor=>{
+return blot_reuse_frozen_dependency::ExportKind.constructor,blot_error::Error.none;},
 
-blot_reuse_frozen_dependency::ExportKind.effect_family=>{
-return blot_reuse_frozen_dependency::ExportKind.effect_family,Error.none;},
+effect_family=>{
+return blot_reuse_frozen_dependency::ExportKind.effect_family,blot_error::Error.none;},
 
-blot_reuse_frozen_dependency::ExportKind.contract=>{
-return blot_reuse_frozen_dependency::ExportKind.contract,Error.none;},
+contract=>{
+return blot_reuse_frozen_dependency::ExportKind.contract,blot_error::Error.none;},
 
-blot_reuse_frozen_dependency::ExportKind.implementation=>{
-return blot_reuse_frozen_dependency::ExportKind.implementation,Error.none;},
-
-}
+implementation=>{
+return blot_reuse_frozen_dependency::ExportKind.implementation,blot_error::Error.none;},
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_frozen_dependency::Fixity)->blot_reuse_frozen_dependency::Fixity,Error {
+}
+
+fn cloneValue(self_:Owner&,value:blot_reuse_frozen_dependency::Fixity)->blot_reuse_frozen_dependency::Fixity,Error {
 
 var result=default<blot_reuse_frozen_dependency::Fixity>();
 
-{let copied,error=cloneValue(self,value.operator);if error!=Error.none {return result,error;}result.operator=copied;}
+{let copied,error=cloneValue(self_,value.operator);if error!=blot_error::Error.none {return result,error;}result.operator=copied;}
 
-{let copied,error=cloneValue(self,value.target);if error!=Error.none {return result,error;}result.target=copied;}
+{let copied,error=cloneValue(self_,value.target);if error!=blot_error::Error.none {return result,error;}result.target=copied;}
 
-{let copied,error=cloneValue(self,value.precedence);if error!=Error.none {return result,error;}result.precedence=copied;}
+{let copied,error=cloneValue(self_,value.precedence);if error!=blot_error::Error.none {return result,error;}result.precedence=copied;}
 
-{let copied,error=cloneValue(self,value.association);if error!=Error.none {return result,error;}result.association=copied;}
+{let copied,error=cloneValue(self_,value.association);if error!=blot_error::Error.none {return result,error;}result.association=copied;}
 
-{let copied,error=cloneValue(self,value.named);if error!=Error.none {return result,error;}result.named=copied;}
+{let copied,error=cloneValue(self_,value.named);if error!=blot_error::Error.none {return result,error;}result.named=copied;}
 
-{let copied,error=cloneValue(self,value.producer);if error!=Error.none {return result,error;}result.producer=copied;}
+{let copied,error=cloneValue(self_,value.producer);if error!=blot_error::Error.none {return result,error;}result.producer=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_frozen_dependency::FrozenDependency)->blot_reuse_frozen_dependency::FrozenDependency,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_frozen_dependency::FrozenDependency)->blot_reuse_frozen_dependency::FrozenDependency,Error {
 
 var result=default<blot_reuse_frozen_dependency::FrozenDependency>();
 
-{let copied,error=cloneValue(self,value.symbols);if error!=Error.none {return result,error;}result.symbols=copied;}
+{let copied,error=cloneValue(self_,value.symbols);if error!=blot_error::Error.none {return result,error;}result.symbols=copied;}
 
-{let copied,error=cloneValue(self,value.modules);if error!=Error.none {return result,error;}result.modules=copied;}
+{let copied,error=cloneValue(self_,value.modules);if error!=blot_error::Error.none {return result,error;}result.modules=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self:Owner&,value:blot_reuse_frozen_dependency::Symbol)->blot_reuse_frozen_dependency::Symbol,Error {
+fn cloneValue(self_:Owner&,value:blot_reuse_frozen_dependency::Symbol)->blot_reuse_frozen_dependency::Symbol,Error {
 
 var result=default<blot_reuse_frozen_dependency::Symbol>();
 
-{let copied,error=cloneValue(self,value.text);if error!=Error.none {return result,error;}result.text=copied;}
+{let copied,error=cloneValue(self_,value.text);if error!=blot_error::Error.none {return result,error;}result.text=copied;}
 
-return result,Error.none;
+return result,blot_error::Error.none;
 
 }
 
 fn clone(value:const blot_check_core::Module&)->Owned<blot_check_core::Module>,Error {
- var owner,error=init();if error!=Error.none {return default<Owned<blot_check_core::Module>>(),error;}
- let result,error=cloneValue(owner,value);if error!=Error.none {owner.deinit();return default<Owned<blot_check_core::Module>>(),error;}return Owned<blot_check_core::Module> {result,owner, ..},Error.none;
+ var owner,error=init();if error!=blot_error::Error.none {return default<Owned<blot_check_core::Module>>(),error;}
+ let result,error=cloneValue(owner,value);if error!=blot_error::Error.none {owner.deinit();return default<Owned<blot_check_core::Module>>(),error;}return Owned<blot_check_core::Module> {result,owner, ..},blot_error::Error.none;
 }
 
 fn clone(value:const blot_reuse_principal_interface::Interface&)->Owned<blot_reuse_principal_interface::Interface>,Error {
- var owner,error=init();if error!=Error.none {return default<Owned<blot_reuse_principal_interface::Interface>>(),error;}
- let result,error=cloneValue(owner,value);if error!=Error.none {owner.deinit();return default<Owned<blot_reuse_principal_interface::Interface>>(),error;}return Owned<blot_reuse_principal_interface::Interface> {result,owner, ..},Error.none;
+ var owner,error=init();if error!=blot_error::Error.none {return default<Owned<blot_reuse_principal_interface::Interface>>(),error;}
+ let result,error=cloneValue(owner,value);if error!=blot_error::Error.none {owner.deinit();return default<Owned<blot_reuse_principal_interface::Interface>>(),error;}return Owned<blot_reuse_principal_interface::Interface> {result,owner, ..},blot_error::Error.none;
 }
 
 fn clone(value:const blot_reuse_frozen_dependency::Module&)->Owned<blot_reuse_frozen_dependency::Module>,Error {
- var owner,error=init();if error!=Error.none {return default<Owned<blot_reuse_frozen_dependency::Module>>(),error;}
- let result,error=cloneValue(owner,value);if error!=Error.none {owner.deinit();return default<Owned<blot_reuse_frozen_dependency::Module>>(),error;}return Owned<blot_reuse_frozen_dependency::Module> {result,owner, ..},Error.none;
+ var owner,error=init();if error!=blot_error::Error.none {return default<Owned<blot_reuse_frozen_dependency::Module>>(),error;}
+ let result,error=cloneValue(owner,value);if error!=blot_error::Error.none {owner.deinit();return default<Owned<blot_reuse_frozen_dependency::Module>>(),error;}return Owned<blot_reuse_frozen_dependency::Module> {result,owner, ..},blot_error::Error.none;
 }
 
 fn clone(value:const blot_reuse_frozen_dependency::FrozenDependency&)->Owned<blot_reuse_frozen_dependency::FrozenDependency>,Error {
- var owner,error=init();if error!=Error.none {return default<Owned<blot_reuse_frozen_dependency::FrozenDependency>>(),error;}
- let result,error=cloneValue(owner,value);if error!=Error.none {owner.deinit();return default<Owned<blot_reuse_frozen_dependency::FrozenDependency>>(),error;}return Owned<blot_reuse_frozen_dependency::FrozenDependency> {result,owner, ..},Error.none;
+ var owner,error=init();if error!=blot_error::Error.none {return default<Owned<blot_reuse_frozen_dependency::FrozenDependency>>(),error;}
+ let result,error=cloneValue(owner,value);if error!=blot_error::Error.none {owner.deinit();return default<Owned<blot_reuse_frozen_dependency::FrozenDependency>>(),error;}return Owned<blot_reuse_frozen_dependency::FrozenDependency> {result,owner, ..},blot_error::Error.none;
 }
 
 // Split existing registered runs without copying a retained module.
 struct Mark {owner:u32,generation:u64,head:u32}
-fn mark(self:const Owner&)->Mark {assert(unique(self));return Mark {self.lease,self.generation,leases[self.lease-1].head, ..};}
-fn rollback(self:Owner&,mark:Mark) {
- assert(unique(self)&&self.lease==mark.owner&&self.generation==mark.generation);
- var check=leases[self.lease-1].head;while check!=mark.head {assert(check!=0);check=links[check-1].next;}
- while leases[self.lease-1].head!=mark.head {let head=leases[self.lease-1].head;let link=links[head-1];leases[self.lease-1].head=link.next;match link.value {
-Run.run_header_module run=>{pool_header_module.free_slice(run.values);},
-Run.run_header_path run=>{pool_header_path.free_slice(run.values);},
-Run.run_header_digest run=>{pool_header_digest.free_slice(run.values);},
-Run.run_header_name run=>{pool_header_name.free_slice(run.values);},
-Run.run_header_import run=>{pool_header_import.free_slice(run.values);},
-Run.run_header_owner run=>{pool_header_owner.free_slice(run.values);},
-Run.run_bool run=>{pool_bool.free_slice(run.values);},
+fn mark(self_:const Owner&)->Mark {assert(unique(self_));return Mark {self_.lease,self_.generation,leases[self_.lease-1].head, ..};}
+fn rollback(self_:Owner&,mark:Mark) {
+ assert(unique(self_)&&self_.lease==mark.owner&&self_.generation==mark.generation);
+ var check=leases[self_.lease-1].head;while check!=mark.head {assert(check!=0);check=links[check-1].next;}
+ while leases[self_.lease-1].head!=mark.head {let head=leases[self_.lease-1].head;let link=links[head-1];leases[self_.lease-1].head=link.next;match link.value {
+run_header_module run=>{pool_header_module.free_slice(run.values);},
+run_header_path run=>{pool_header_path.free_slice(run.values);},
+run_header_digest run=>{pool_header_digest.free_slice(run.values);},
+run_header_name run=>{pool_header_name.free_slice(run.values);},
+run_header_import run=>{pool_header_import.free_slice(run.values);},
+run_header_owner run=>{pool_header_owner.free_slice(run.values);},
+run_bool run=>{pool_bool.free_slice(run.values);},
 
 
-Run.run_u32 run=>{pool_u32.free_slice(run.values);},
+run_u32 run=>{pool_u32.free_slice(run.values);},
 
-Run.run_blot_check_numeric_proof_terms__Kind run=>{pool_blot_check_numeric_proof_terms__Kind.free_slice(run.values);},
+run_blot_check_numeric_proof_terms__Kind run=>{pool_blot_check_numeric_proof_terms__Kind.free_slice(run.values);},
 
-Run.run_blot_check_numeric_proof_terms__Term run=>{pool_blot_check_numeric_proof_terms__Term.free_slice(run.values);},
+run_blot_check_numeric_proof_terms__Term run=>{pool_blot_check_numeric_proof_terms__Term.free_slice(run.values);},
 
-Run.run_blot_check_numeric_proof_contracts__Requirement run=>{pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run.values);},
+run_blot_check_numeric_proof_contracts__Requirement run=>{pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run.values);},
 
-Run.run_blot_check_numeric_proof_headers__Named run=>{pool_blot_check_numeric_proof_headers__Named.free_slice(run.values);},
+run_blot_check_numeric_proof_headers__Named run=>{pool_blot_check_numeric_proof_headers__Named.free_slice(run.values);},
 
-Run.run_blot_check_capability_contracts__Term run=>{pool_blot_check_capability_contracts__Term.free_slice(run.values);},
+run_blot_check_capability_contracts__Term run=>{pool_blot_check_capability_contracts__Term.free_slice(run.values);},
 
-Run.run_blot_check_capability_contracts__Binding run=>{pool_blot_check_capability_contracts__Binding.free_slice(run.values);},
+run_blot_check_capability_contracts__Binding run=>{pool_blot_check_capability_contracts__Binding.free_slice(run.values);},
 
-Run.run_blot_check_core__FieldName run=>{pool_blot_check_core__FieldName.free_slice(run.values);},
+run_blot_check_core__FieldName run=>{pool_blot_check_core__FieldName.free_slice(run.values);},
 
-Run.run_blot_check_core__RuntimeName run=>{pool_blot_check_core__RuntimeName.free_slice(run.values);},
+run_blot_check_core__RuntimeName run=>{pool_blot_check_core__RuntimeName.free_slice(run.values);},
 
-Run.run_blot_check_core__DeclarationDependencies run=>{pool_blot_check_core__DeclarationDependencies.free_slice(run.values);},
+run_blot_check_core__DeclarationDependencies run=>{pool_blot_check_core__DeclarationDependencies.free_slice(run.values);},
 
-Run.run_blot_check_core__BindingRef run=>{pool_blot_check_core__BindingRef.free_slice(run.values);},
+run_blot_check_core__BindingRef run=>{pool_blot_check_core__BindingRef.free_slice(run.values);},
 
-Run.run_blot_check_core__DependencyMember run=>{pool_blot_check_core__DependencyMember.free_slice(run.values);},
+run_blot_check_core__DependencyMember run=>{pool_blot_check_core__DependencyMember.free_slice(run.values);},
 
-Run.run_blot_check_core__ErasedDeclarationReference run=>{pool_blot_check_core__ErasedDeclarationReference.free_slice(run.values);},
+run_blot_check_core__ErasedDeclarationReference run=>{pool_blot_check_core__ErasedDeclarationReference.free_slice(run.values);},
 
-Run.run_blot_check_core__RequestLoopInfo run=>{pool_blot_check_core__RequestLoopInfo.free_slice(run.values);},
+run_blot_check_core__RequestLoopInfo run=>{pool_blot_check_core__RequestLoopInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__RequestArm run=>{pool_blot_check_core__RequestArm.free_slice(run.values);},
+run_blot_check_core__RequestArm run=>{pool_blot_check_core__RequestArm.free_slice(run.values);},
 
-Run.run_blot_check_types__Node run=>{pool_blot_check_types__Node.free_slice(run.values);},
+run_blot_check_types__Node run=>{pool_blot_check_types__Node.free_slice(run.values);},
 
-Run.run_blot_check_effects__Row run=>{pool_blot_check_effects__Row.free_slice(run.values);},
+run_blot_check_effects__Row run=>{pool_blot_check_effects__Row.free_slice(run.values);},
 
-Run.run_blot_check_types__Operation run=>{pool_blot_check_types__Operation.free_slice(run.values);},
+run_blot_check_types__Operation run=>{pool_blot_check_types__Operation.free_slice(run.values);},
 
-Run.run_blot_check_types__QuantifierGoals run=>{pool_blot_check_types__QuantifierGoals.free_slice(run.values);},
+run_blot_check_types__QuantifierGoals run=>{pool_blot_check_types__QuantifierGoals.free_slice(run.values);},
 
-Run.run_blot_check_types__Obligation run=>{pool_blot_check_types__Obligation.free_slice(run.values);},
+run_blot_check_types__Obligation run=>{pool_blot_check_types__Obligation.free_slice(run.values);},
 
-Run.run_blot_check_core__Node run=>{pool_blot_check_core__Node.free_slice(run.values);},
+run_blot_check_core__Node run=>{pool_blot_check_core__Node.free_slice(run.values);},
 
-Run.run_blot_parse_ast__Span run=>{pool_blot_parse_ast__Span.free_slice(run.values);},
+run_blot_parse_ast__Span run=>{pool_blot_parse_ast__Span.free_slice(run.values);},
 
-Run.run_blot_check_core__Binding run=>{pool_blot_check_core__Binding.free_slice(run.values);},
+run_blot_check_core__Binding run=>{pool_blot_check_core__Binding.free_slice(run.values);},
 
-Run.run_blot_check_core__Body run=>{pool_blot_check_core__Body.free_slice(run.values);},
+run_blot_check_core__Body run=>{pool_blot_check_core__Body.free_slice(run.values);},
 
-Run.run_blot_check_core__Parameter run=>{pool_blot_check_core__Parameter.free_slice(run.values);},
+run_blot_check_core__Parameter run=>{pool_blot_check_core__Parameter.free_slice(run.values);},
 
-Run.run_blot_check_core__CallInfo run=>{pool_blot_check_core__CallInfo.free_slice(run.values);},
+run_blot_check_core__CallInfo run=>{pool_blot_check_core__CallInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__Merge run=>{pool_blot_check_core__Merge.free_slice(run.values);},
+run_blot_check_core__Merge run=>{pool_blot_check_core__Merge.free_slice(run.values);},
 
-Run.run_blot_check_core__List run=>{pool_blot_check_core__List.free_slice(run.values);},
+run_blot_check_core__List run=>{pool_blot_check_core__List.free_slice(run.values);},
 
-Run.run_u8 run=>{pool_u8.free_slice(run.values);},
+run_u8 run=>{pool_u8.free_slice(run.values);},
 
-Run.run_blot_check_core__Obligation run=>{pool_blot_check_core__Obligation.free_slice(run.values);},
+run_blot_check_core__Obligation run=>{pool_blot_check_core__Obligation.free_slice(run.values);},
 
-Run.run_blot_check_core__Nominal run=>{pool_blot_check_core__Nominal.free_slice(run.values);},
+run_blot_check_core__Nominal run=>{pool_blot_check_core__Nominal.free_slice(run.values);},
 
-Run.run_blot_check_core__OperationName run=>{pool_blot_check_core__OperationName.free_slice(run.values);},
+run_blot_check_core__OperationName run=>{pool_blot_check_core__OperationName.free_slice(run.values);},
 
-Run.run_blot_check_core__Constructor run=>{pool_blot_check_core__Constructor.free_slice(run.values);},
+run_blot_check_core__Constructor run=>{pool_blot_check_core__Constructor.free_slice(run.values);},
 
-Run.run_blot_check_core__Projection run=>{pool_blot_check_core__Projection.free_slice(run.values);},
+run_blot_check_core__Projection run=>{pool_blot_check_core__Projection.free_slice(run.values);},
 
-Run.run_blot_check_core__ProjectionVariant run=>{pool_blot_check_core__ProjectionVariant.free_slice(run.values);},
+run_blot_check_core__ProjectionVariant run=>{pool_blot_check_core__ProjectionVariant.free_slice(run.values);},
 
-Run.run_blot_check_core__Pattern run=>{pool_blot_check_core__Pattern.free_slice(run.values);},
+run_blot_check_core__Pattern run=>{pool_blot_check_core__Pattern.free_slice(run.values);},
 
-Run.run_blot_check_core__PatternRow run=>{pool_blot_check_core__PatternRow.free_slice(run.values);},
+run_blot_check_core__PatternRow run=>{pool_blot_check_core__PatternRow.free_slice(run.values);},
 
-Run.run_blot_check_core__MatchArm run=>{pool_blot_check_core__MatchArm.free_slice(run.values);},
+run_blot_check_core__MatchArm run=>{pool_blot_check_core__MatchArm.free_slice(run.values);},
 
-Run.run_blot_check_core__MatchInfo run=>{pool_blot_check_core__MatchInfo.free_slice(run.values);},
+run_blot_check_core__MatchInfo run=>{pool_blot_check_core__MatchInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__UpdateInfo run=>{pool_blot_check_core__UpdateInfo.free_slice(run.values);},
+run_blot_check_core__UpdateInfo run=>{pool_blot_check_core__UpdateInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__UpdateStep run=>{pool_blot_check_core__UpdateStep.free_slice(run.values);},
+run_blot_check_core__UpdateStep run=>{pool_blot_check_core__UpdateStep.free_slice(run.values);},
 
-Run.run_blot_check_core__ClosureInfo run=>{pool_blot_check_core__ClosureInfo.free_slice(run.values);},
+run_blot_check_core__ClosureInfo run=>{pool_blot_check_core__ClosureInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__Associated run=>{pool_blot_check_core__Associated.free_slice(run.values);},
+run_blot_check_core__Associated run=>{pool_blot_check_core__Associated.free_slice(run.values);},
 
-Run.run_blot_check_core__Contract run=>{pool_blot_check_core__Contract.free_slice(run.values);},
+run_blot_check_core__Contract run=>{pool_blot_check_core__Contract.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__ContractMember run=>{pool_blot_reuse_principal_interface__ContractMember.free_slice(run.values);},
+run_blot_reuse_principal_interface__ContractMember run=>{pool_blot_reuse_principal_interface__ContractMember.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Implementation run=>{pool_blot_reuse_principal_interface__Implementation.free_slice(run.values);},
+run_blot_reuse_principal_interface__Implementation run=>{pool_blot_reuse_principal_interface__Implementation.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__ImplementationMember run=>{pool_blot_reuse_principal_interface__ImplementationMember.free_slice(run.values);},
+run_blot_reuse_principal_interface__ImplementationMember run=>{pool_blot_reuse_principal_interface__ImplementationMember.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__MemberTemplate run=>{pool_blot_reuse_principal_interface__MemberTemplate.free_slice(run.values);},
+run_blot_reuse_principal_interface__MemberTemplate run=>{pool_blot_reuse_principal_interface__MemberTemplate.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__SelectedProof run=>{pool_blot_reuse_principal_interface__SelectedProof.free_slice(run.values);},
+run_blot_reuse_principal_interface__SelectedProof run=>{pool_blot_reuse_principal_interface__SelectedProof.free_slice(run.values);},
 
-Run.run_blot_check_core__SelectedUse run=>{pool_blot_check_core__SelectedUse.free_slice(run.values);},
+run_blot_check_core__SelectedUse run=>{pool_blot_check_core__SelectedUse.free_slice(run.values);},
 
-Run.run_blot_check_core__DictionarySelection run=>{pool_blot_check_core__DictionarySelection.free_slice(run.values);},
+run_blot_check_core__DictionarySelection run=>{pool_blot_check_core__DictionarySelection.free_slice(run.values);},
 
-Run.run_blot_check_core__DictionaryUse run=>{pool_blot_check_core__DictionaryUse.free_slice(run.values);},
+run_blot_check_core__DictionaryUse run=>{pool_blot_check_core__DictionaryUse.free_slice(run.values);},
 
-Run.run_blot_check_core__Primitive run=>{pool_blot_check_core__Primitive.free_slice(run.values);},
+run_blot_check_core__Primitive run=>{pool_blot_check_core__Primitive.free_slice(run.values);},
 
-Run.run_blot_check_core__LoopInfo run=>{pool_blot_check_core__LoopInfo.free_slice(run.values);},
+run_blot_check_core__LoopInfo run=>{pool_blot_check_core__LoopInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__LoopCarry run=>{pool_blot_check_core__LoopCarry.free_slice(run.values);},
+run_blot_check_core__LoopCarry run=>{pool_blot_check_core__LoopCarry.free_slice(run.values);},
 
-Run.run_blot_check_core__ResolverInfo run=>{pool_blot_check_core__ResolverInfo.free_slice(run.values);},
+run_blot_check_core__ResolverInfo run=>{pool_blot_check_core__ResolverInfo.free_slice(run.values);},
 
-Run.run_blot_check_core__OperationValue run=>{pool_blot_check_core__OperationValue.free_slice(run.values);},
+run_blot_check_core__OperationValue run=>{pool_blot_check_core__OperationValue.free_slice(run.values);},
 
-Run.run_blot_check_core__HandleEffects run=>{pool_blot_check_core__HandleEffects.free_slice(run.values);},
+run_blot_check_core__HandleEffects run=>{pool_blot_check_core__HandleEffects.free_slice(run.values);},
 
-Run.run_blot_check_core__Diagnostic run=>{pool_blot_check_core__Diagnostic.free_slice(run.values);},
+run_blot_check_core__Diagnostic run=>{pool_blot_check_core__Diagnostic.free_slice(run.values);},
 
-Run.run_blot_check_parameter_patterns__Node run=>{pool_blot_check_parameter_patterns__Node.free_slice(run.values);},
+run_blot_check_parameter_patterns__Node run=>{pool_blot_check_parameter_patterns__Node.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Binding run=>{pool_blot_reuse_principal_interface__Binding.free_slice(run.values);},
+run_blot_reuse_principal_interface__Binding run=>{pool_blot_reuse_principal_interface__Binding.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Nominal run=>{pool_blot_reuse_principal_interface__Nominal.free_slice(run.values);},
+run_blot_reuse_principal_interface__Nominal run=>{pool_blot_reuse_principal_interface__Nominal.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Constructor run=>{pool_blot_reuse_principal_interface__Constructor.free_slice(run.values);},
+run_blot_reuse_principal_interface__Constructor run=>{pool_blot_reuse_principal_interface__Constructor.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__EffectFamily run=>{pool_blot_reuse_principal_interface__EffectFamily.free_slice(run.values);},
+run_blot_reuse_principal_interface__EffectFamily run=>{pool_blot_reuse_principal_interface__EffectFamily.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__EffectTemplate run=>{pool_blot_reuse_principal_interface__EffectTemplate.free_slice(run.values);},
+run_blot_reuse_principal_interface__EffectTemplate run=>{pool_blot_reuse_principal_interface__EffectTemplate.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Associated run=>{pool_blot_reuse_principal_interface__Associated.free_slice(run.values);},
+run_blot_reuse_principal_interface__Associated run=>{pool_blot_reuse_principal_interface__Associated.free_slice(run.values);},
 
-Run.run_blot_reuse_principal_interface__Contract run=>{pool_blot_reuse_principal_interface__Contract.free_slice(run.values);},
+run_blot_reuse_principal_interface__Contract run=>{pool_blot_reuse_principal_interface__Contract.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{pool_blot_reuse_frozen_dependency__ImportResolution.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__ImportResolution run=>{pool_blot_reuse_frozen_dependency__ImportResolution.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__Export run=>{pool_blot_reuse_frozen_dependency__Export.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__Export run=>{pool_blot_reuse_frozen_dependency__Export.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__Fixity run=>{pool_blot_reuse_frozen_dependency__Fixity.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__Fixity run=>{pool_blot_reuse_frozen_dependency__Fixity.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__Symbol run=>{pool_blot_reuse_frozen_dependency__Symbol.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__Symbol run=>{pool_blot_reuse_frozen_dependency__Symbol.free_slice(run.values);},
 
-Run.run_blot_reuse_frozen_dependency__Module run=>{pool_blot_reuse_frozen_dependency__Module.free_slice(run.values);},
+run_blot_reuse_frozen_dependency__Module run=>{pool_blot_reuse_frozen_dependency__Module.free_slice(run.values);},
 
 }links.free(head-1);}
 }
 
-fn detach(self:Owner&,destination:Owner&,values:const u32[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const u32[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u32 run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_u32 run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_u32 run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_u32 run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const u32[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const u32[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Kind run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_numeric_proof_terms__Kind run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Kind run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_terms__Kind run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Term run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_numeric_proof_terms__Term run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Term run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_terms__Term run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_contracts__Requirement run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_numeric_proof_contracts__Requirement run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_contracts__Requirement run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_contracts__Requirement run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_headers__Named run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_numeric_proof_headers__Named run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_headers__Named run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_headers__Named run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Term run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_capability_contracts__Term run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Term run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_capability_contracts__Term run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Binding run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_capability_contracts__Binding run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_capability_contracts__Binding run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__FieldName run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__FieldName run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__FieldName run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__FieldName run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RuntimeName[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::RuntimeName[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RuntimeName run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__RuntimeName run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__RuntimeName run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__RuntimeName run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::RuntimeName[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::RuntimeName[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DeclarationDependencies[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::DeclarationDependencies[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DeclarationDependencies run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__DeclarationDependencies run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DeclarationDependencies run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DeclarationDependencies run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DeclarationDependencies[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::DeclarationDependencies[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::BindingRef[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::BindingRef[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__BindingRef run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__BindingRef run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__BindingRef run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__BindingRef run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::BindingRef[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::BindingRef[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DependencyMember[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::DependencyMember[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DependencyMember run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__DependencyMember run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DependencyMember run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DependencyMember run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DependencyMember[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::DependencyMember[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ErasedDeclarationReference[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::ErasedDeclarationReference[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ErasedDeclarationReference run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__ErasedDeclarationReference run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ErasedDeclarationReference run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ErasedDeclarationReference run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ErasedDeclarationReference[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::ErasedDeclarationReference[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RequestLoopInfo[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::RequestLoopInfo[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestLoopInfo run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__RequestLoopInfo run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__RequestLoopInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__RequestLoopInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::RequestLoopInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::RequestLoopInfo[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RequestArm[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::RequestArm[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestArm run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__RequestArm run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__RequestArm run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__RequestArm run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::RequestArm[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::RequestArm[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Node[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::Node[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Node run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_types__Node run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__Node run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__Node run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::Node[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_types::Node[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_effects::Row[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_effects::Row[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_effects__Row run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_effects__Row run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_effects__Row run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_effects__Row run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_effects::Row[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_effects::Row[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Operation[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::Operation[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Operation run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_types__Operation run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__Operation run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__Operation run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::Operation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_types::Operation[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__QuantifierGoals run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_types__QuantifierGoals run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__QuantifierGoals run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__QuantifierGoals run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Obligation[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::Obligation[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Obligation run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_types__Obligation run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__Obligation run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__Obligation run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::Obligation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_types::Obligation[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Node[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Node[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Node run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Node run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Node run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Node run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Node[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Node[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_parse_ast__Span run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_parse_ast__Span run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_parse_ast__Span run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_parse_ast__Span run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Binding[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Binding[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Binding run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Binding run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Binding run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Binding[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Binding[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Body[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Body[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Body run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Body run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Body run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Body run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Body[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Body[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Parameter[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Parameter[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Parameter run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Parameter run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Parameter run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Parameter run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Parameter[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Parameter[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::CallInfo[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::CallInfo[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__CallInfo run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__CallInfo run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__CallInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__CallInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::CallInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::CallInfo[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Merge[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Merge[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Merge run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Merge run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Merge run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Merge run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Merge[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Merge[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::List[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::List[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__List run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__List run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__List run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__List run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::List[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::List[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const u8[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const u8[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u8 run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_u8 run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_u8 run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_u8 run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const u8[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const u8[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Obligation[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Obligation[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Obligation run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Obligation run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Obligation run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Obligation run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Obligation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Obligation[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Nominal[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Nominal[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Nominal run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Nominal run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Nominal run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Nominal run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Nominal[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Nominal[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::OperationName[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::OperationName[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationName run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__OperationName run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__OperationName run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__OperationName run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::OperationName[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::OperationName[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Constructor[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Constructor[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Constructor run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Constructor run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Constructor run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Constructor run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Constructor[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Constructor[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Projection[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Projection[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Projection run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Projection run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Projection run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Projection run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Projection[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Projection[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ProjectionVariant[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::ProjectionVariant[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ProjectionVariant run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__ProjectionVariant run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ProjectionVariant run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ProjectionVariant run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ProjectionVariant[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::ProjectionVariant[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Pattern[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Pattern[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Pattern run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Pattern run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Pattern run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Pattern run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Pattern[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Pattern[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::PatternRow[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::PatternRow[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__PatternRow run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__PatternRow run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__PatternRow run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__PatternRow run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::PatternRow[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::PatternRow[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::MatchArm[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::MatchArm[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchArm run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__MatchArm run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__MatchArm run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__MatchArm run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::MatchArm[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::MatchArm[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::MatchInfo[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::MatchInfo[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchInfo run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__MatchInfo run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__MatchInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__MatchInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::MatchInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::MatchInfo[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateInfo[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::UpdateInfo[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateInfo run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__UpdateInfo run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__UpdateInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__UpdateInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::UpdateInfo[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateStep[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::UpdateStep[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateStep run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__UpdateStep run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__UpdateStep run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__UpdateStep run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateStep[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::UpdateStep[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ClosureInfo[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::ClosureInfo[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ClosureInfo run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__ClosureInfo run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ClosureInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ClosureInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ClosureInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::ClosureInfo[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Associated[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Associated[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Associated run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Associated run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Associated run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Associated run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Associated[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Associated[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Contract[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Contract[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Contract run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Contract run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Contract run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Contract run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Contract[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Contract[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ContractMember[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ContractMember[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ContractMember run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__ContractMember run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__ContractMember run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__ContractMember run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ContractMember[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ContractMember[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Implementation[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Implementation[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Implementation run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Implementation run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Implementation run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Implementation run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Implementation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Implementation[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ImplementationMember run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__ImplementationMember run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__ImplementationMember run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__ImplementationMember run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__MemberTemplate run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__MemberTemplate run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__MemberTemplate run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__MemberTemplate run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__SelectedProof run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__SelectedProof run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__SelectedProof run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__SelectedProof run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::SelectedUse[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::SelectedUse[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__SelectedUse run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__SelectedUse run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__SelectedUse run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__SelectedUse run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::SelectedUse[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::SelectedUse[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionarySelection run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__DictionarySelection run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionarySelection run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DictionarySelection run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionaryUse run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__DictionaryUse run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionaryUse run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DictionaryUse run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Primitive[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Primitive[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Primitive run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Primitive run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Primitive run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Primitive run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Primitive[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Primitive[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopInfo run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__LoopInfo run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__LoopInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__LoopInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::LoopCarry[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::LoopCarry[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopCarry run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__LoopCarry run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__LoopCarry run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__LoopCarry run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::LoopCarry[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::LoopCarry[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ResolverInfo[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::ResolverInfo[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ResolverInfo run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__ResolverInfo run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ResolverInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ResolverInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ResolverInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::ResolverInfo[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::OperationValue[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::OperationValue[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationValue run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__OperationValue run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__OperationValue run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__OperationValue run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::OperationValue[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::OperationValue[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::HandleEffects[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::HandleEffects[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__HandleEffects run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__HandleEffects run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__HandleEffects run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__HandleEffects run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::HandleEffects[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::HandleEffects[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Diagnostic[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Diagnostic[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Diagnostic run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Diagnostic run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Diagnostic run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Diagnostic run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Diagnostic[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::Diagnostic[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_check_parameter_patterns::Node[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_parameter_patterns::Node[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_parameter_patterns__Node run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_parameter_patterns__Node run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_parameter_patterns__Node run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_parameter_patterns__Node run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_parameter_patterns::Node[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_parameter_patterns::Node[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Binding[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Binding[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Binding run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Binding run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Binding run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Binding[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Binding[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Nominal[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Nominal[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Nominal run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Nominal run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Nominal run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Nominal run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Nominal[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Nominal[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Constructor[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Constructor[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Constructor run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Constructor run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Constructor run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Constructor run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Constructor[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Constructor[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectFamily run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__EffectFamily run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__EffectFamily run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__EffectFamily run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectTemplate run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__EffectTemplate run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__EffectTemplate run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__EffectTemplate run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Associated[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Associated[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Associated run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Associated run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Associated run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Associated run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Associated[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Associated[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Contract[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Contract[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Contract run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Contract run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Contract run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Contract run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Contract[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Contract[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__ImportResolution run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__ImportResolution run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Export[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Export[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Export run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__Export run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Export run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Export run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Export[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Export[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Fixity run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__Fixity run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Fixity run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Fixity run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Symbol run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__Symbol run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Symbol run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Symbol run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Module[:]) {
- assert(unique(self)&&unique(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Module[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
  // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Module run=>{if run.values .== values {return;}},_=>{}}}
- var previous:u32=0;next=leases[self.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__Module run=>{found=run.values .== values;},_=>{}}
- if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Module run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Module run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
-fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Module[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Module[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:bool) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:bool) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:f32) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:f32) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:f64) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:f64) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:i16) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:i16) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:i32) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:i32) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:i64) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:i64) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:i8) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:i8) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:u16) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:u16) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:u32) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:u32) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:u64) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:u64) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:u8) {}
+fn partitionInto(self_:Owner&,destination:Owner&,value:u8) {}
 
-fn partitionInto(self:Owner&,destination:Owner&,values:u8[32]) {for value in values {partitionInto(self,destination,value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,values:u8[32]) {for value in values {partitionInto(self_,destination,value);}}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_support::Option<blot_check_numeric_proof_terms::Proposition>) {if value.present {partitionInto(self,destination,value.value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_support::Option<blot_check_numeric_proof_terms::Proposition>) {if value.present {partitionInto(self_,destination,value.value);}}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_support::Option<blot_parse_ast::Span>) {if value.present {partitionInto(self,destination,value.value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_support::Option<blot_parse_ast::Span>) {if value.present {partitionInto(self_,destination,value.value);}}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_support::Option<blot_reuse_principal_interface::ExternalTarget>) {if value.present {partitionInto(self,destination,value.value);}}
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_support::Option<blot_reuse_principal_interface::ExternalTarget>) {if value.present {partitionInto(self_,destination,value.value);}}
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Module) {
-partitionInto(self,destination,value.package_payloads);
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Module) {
+partitionInto(self_,destination,value.package_payloads);
 
 
-partitionInto(self,destination,value.has_rank_contracts);
+partitionInto(self_,destination,value.has_rank_contracts);
 
-partitionInto(self,destination,value.has_usage_contracts);
+partitionInto(self_,destination,value.has_usage_contracts);
 
-partitionInto(self,destination,value.has_numeric_proofs);
+partitionInto(self_,destination,value.has_numeric_proofs);
 
-partitionInto(self,destination,value.proof_contracts);
+partitionInto(self_,destination,value.proof_contracts);
 
-partitionInto(self,destination,value.capability_contracts);
+partitionInto(self_,destination,value.capability_contracts);
 
-partitionInto(self,destination,value.field_names);
+partitionInto(self_,destination,value.field_names);
 
-partitionInto(self,destination,value.runtime_names);
+partitionInto(self_,destination,value.runtime_names);
 
-partitionInto(self,destination,value.source_names);
+partitionInto(self_,destination,value.source_names);
 
-partitionInto(self,destination,value.declaration_dependencies);
+partitionInto(self_,destination,value.declaration_dependencies);
 
-partitionInto(self,destination,value.dependency_references);
+partitionInto(self_,destination,value.dependency_references);
 
-partitionInto(self,destination,value.dependency_members);
+partitionInto(self_,destination,value.dependency_members);
 
-partitionInto(self,destination,value.erased_declaration_references);
+partitionInto(self_,destination,value.erased_declaration_references);
 
-partitionInto(self,destination,value.request_loops);
+partitionInto(self_,destination,value.request_loops);
 
-partitionInto(self,destination,value.request_arms);
+partitionInto(self_,destination,value.request_arms);
 
-partitionInto(self,destination,value.tag_calls);
+partitionInto(self_,destination,value.tag_calls);
 
-partitionInto(self,destination,value.unit);
+partitionInto(self_,destination,value.unit);
 
-partitionInto(self,destination,value.types);
+partitionInto(self_,destination,value.types);
 
-partitionInto(self,destination,value.nodes);
+partitionInto(self_,destination,value.nodes);
 
-partitionInto(self,destination,value.spans);
+partitionInto(self_,destination,value.spans);
 
-partitionInto(self,destination,value.extra);
+partitionInto(self_,destination,value.extra);
 
-partitionInto(self,destination,value.bindings);
+partitionInto(self_,destination,value.bindings);
 
-partitionInto(self,destination,value.bodies);
+partitionInto(self_,destination,value.bodies);
 
-partitionInto(self,destination,value.parameters);
+partitionInto(self_,destination,value.parameters);
 
-partitionInto(self,destination,value.references);
+partitionInto(self_,destination,value.references);
 
-partitionInto(self,destination,value.calls);
+partitionInto(self_,destination,value.calls);
 
-partitionInto(self,destination,value.merges);
+partitionInto(self_,destination,value.merges);
 
-partitionInto(self,destination,value.merge_ranges);
+partitionInto(self_,destination,value.merge_ranges);
 
-partitionInto(self,destination,value.names);
+partitionInto(self_,destination,value.names);
 
-partitionInto(self,destination,value.obligations);
+partitionInto(self_,destination,value.obligations);
 
-partitionInto(self,destination,value.nominals);
+partitionInto(self_,destination,value.nominals);
 
-partitionInto(self,destination,value.operation_names);
+partitionInto(self_,destination,value.operation_names);
 
-partitionInto(self,destination,value.constructors);
+partitionInto(self_,destination,value.constructors);
 
-partitionInto(self,destination,value.projections);
+partitionInto(self_,destination,value.projections);
 
-partitionInto(self,destination,value.projection_variants);
+partitionInto(self_,destination,value.projection_variants);
 
-partitionInto(self,destination,value.patterns);
+partitionInto(self_,destination,value.patterns);
 
-partitionInto(self,destination,value.pattern_rows);
+partitionInto(self_,destination,value.pattern_rows);
 
-partitionInto(self,destination,value.match_arms);
+partitionInto(self_,destination,value.match_arms);
 
-partitionInto(self,destination,value.matches);
+partitionInto(self_,destination,value.matches);
 
-partitionInto(self,destination,value.updates);
+partitionInto(self_,destination,value.updates);
 
-partitionInto(self,destination,value.update_steps);
+partitionInto(self_,destination,value.update_steps);
 
-partitionInto(self,destination,value.closures);
+partitionInto(self_,destination,value.closures);
 
-partitionInto(self,destination,value.associated);
+partitionInto(self_,destination,value.associated);
 
-partitionInto(self,destination,value.contracts);
+partitionInto(self_,destination,value.contracts);
 
-partitionInto(self,destination,value.contract_members);
+partitionInto(self_,destination,value.contract_members);
 
-partitionInto(self,destination,value.implementations);
+partitionInto(self_,destination,value.implementations);
 
-partitionInto(self,destination,value.implementation_members);
+partitionInto(self_,destination,value.implementation_members);
 
-partitionInto(self,destination,value.member_templates);
+partitionInto(self_,destination,value.member_templates);
 
-partitionInto(self,destination,value.selected_proofs);
+partitionInto(self_,destination,value.selected_proofs);
 
-partitionInto(self,destination,value.selected_members);
+partitionInto(self_,destination,value.selected_members);
 
-partitionInto(self,destination,value.selected_edges);
+partitionInto(self_,destination,value.selected_edges);
 
-partitionInto(self,destination,value.selected_uses);
+partitionInto(self_,destination,value.selected_uses);
 
-partitionInto(self,destination,value.dictionary_selections);
+partitionInto(self_,destination,value.dictionary_selections);
 
-partitionInto(self,destination,value.dictionary_uses);
+partitionInto(self_,destination,value.dictionary_uses);
 
-partitionInto(self,destination,value.primitives);
+partitionInto(self_,destination,value.primitives);
 
-partitionInto(self,destination,value.loops);
+partitionInto(self_,destination,value.loops);
 
-partitionInto(self,destination,value.loop_carries);
+partitionInto(self_,destination,value.loop_carries);
 
-partitionInto(self,destination,value.resolver_ops);
+partitionInto(self_,destination,value.resolver_ops);
 
-partitionInto(self,destination,value.operation_values);
+partitionInto(self_,destination,value.operation_values);
 
-partitionInto(self,destination,value.handle_effects);
+partitionInto(self_,destination,value.handle_effects);
 
-partitionInto(self,destination,value.dispatch_signatures);
+partitionInto(self_,destination,value.dispatch_signatures);
 
-partitionInto(self,destination,value.diagnostics);
+partitionInto(self_,destination,value.diagnostics);
 
-partitionInto(self,destination,value.body_lowerings);
+partitionInto(self_,destination,value.body_lowerings);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_headers::Named) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_headers::Named) {
 
-partitionInto(self,destination,value.binding);
+partitionInto(self_,destination,value.binding);
 
-partitionInto(self,destination,value.header);
+partitionInto(self_,destination,value.header);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_headers::Owned) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_headers::Owned) {
 
-partitionInto(self,destination,value.arity);
+partitionInto(self_,destination,value.arity);
 
-partitionInto(self,destination,value.value_slots);
+partitionInto(self_,destination,value.value_slots);
 
-partitionInto(self,destination,value.proof_slots);
+partitionInto(self_,destination,value.proof_slots);
 
-partitionInto(self,destination,value.values);
+partitionInto(self_,destination,value.values);
 
-partitionInto(self,destination,value.operands);
+partitionInto(self_,destination,value.operands);
 
-partitionInto(self,destination,value.requirements);
+partitionInto(self_,destination,value.requirements);
 
-partitionInto(self,destination,value.result);
+partitionInto(self_,destination,value.result);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Kind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Kind) {
 
 match value {
 
-blot_check_numeric_proof_terms::Kind.unsigned32=>{
+unsigned32=>{
 },
 
-blot_check_numeric_proof_terms::Kind.array=>{
+array=>{
 },
 
-blot_check_numeric_proof_terms::Kind.list=>{
-},
-
-}
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Term) {
-
-partitionInto(self,destination,value.tag);
-
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.a);
-
-partitionInto(self,destination,value.b);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Tag) {
-
-match value {
-
-blot_check_numeric_proof_terms::Tag.literal=>{
-},
-
-blot_check_numeric_proof_terms::Tag.formal=>{
-},
-
-blot_check_numeric_proof_terms::Tag.capture=>{
-},
-
-blot_check_numeric_proof_terms::Tag.version=>{
-},
-
-blot_check_numeric_proof_terms::Tag.length=>{
-},
-
-blot_check_numeric_proof_terms::Tag.complement=>{
+list=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_contracts::Requirement) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Term) {
 
-partitionInto(self,destination,value.before);
+partitionInto(self_,destination,value.tag);
 
-partitionInto(self,destination,value.proposition);
+partitionInto(self_,destination,value.kind);
 
-}
+partitionInto(self_,destination,value.a);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Proposition) {
-
-partitionInto(self,destination,value.relation);
-
-partitionInto(self,destination,value.left);
-
-partitionInto(self,destination,value.right);
+partitionInto(self_,destination,value.b);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Relation) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Tag) {
 
 match value {
 
-blot_check_numeric_proof_terms::Relation.eq=>{
+literal=>{
 },
 
-blot_check_numeric_proof_terms::Relation.lt=>{
+formal=>{
 },
 
-blot_check_numeric_proof_terms::Relation.le=>{
+capture=>{
 },
 
-blot_check_numeric_proof_terms::Relation.add_fits=>{
+version=>{
 },
 
-blot_check_numeric_proof_terms::Relation.sub_fits=>{
+length=>{
 },
 
-blot_check_numeric_proof_terms::Relation.index=>{
+complement=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_contracts::Collection) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_contracts::Requirement) {
 
-partitionInto(self,destination,value.nodes);
+partitionInto(self_,destination,value.before);
 
-partitionInto(self,destination,value.words);
-
-partitionInto(self,destination,value.bindings);
+partitionInto(self_,destination,value.proposition);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_contracts::Term) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Proposition) {
 
-partitionInto(self,destination,value.tag);
+partitionInto(self_,destination,value.relation);
 
-partitionInto(self,destination,value.a);
+partitionInto(self_,destination,value.left);
 
-partitionInto(self,destination,value.b);
-
-partitionInto(self,destination,value.c);
+partitionInto(self_,destination,value.right);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_contracts::Tag) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Relation) {
 
 match value {
 
-blot_check_capability_contracts::Tag.empty=>{
+eq=>{
 },
 
-blot_check_capability_contracts::Tag.unknown=>{
+lt=>{
 },
 
-blot_check_capability_contracts::Tag.parameter=>{
+le=>{
 },
 
-blot_check_capability_contracts::Tag.authority=>{
+add_fits=>{
 },
 
-blot_check_capability_contracts::Tag.captures=>{
+sub_fits=>{
 },
 
-blot_check_capability_contracts::Tag.product=>{
-},
-
-blot_check_capability_contracts::Tag.record=>{
-},
-
-blot_check_capability_contracts::Tag.wrapped=>{
-},
-
-blot_check_capability_contracts::Tag.join=>{
-},
-
-blot_check_capability_contracts::Tag.project=>{
-},
-
-blot_check_capability_contracts::Tag.elements=>{
-},
-
-blot_check_capability_contracts::Tag.argument=>{
-},
-
-blot_check_capability_contracts::Tag.callable=>{
+index=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_contracts::Binding) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_contracts::Collection) {
 
-partitionInto(self,destination,value.binding);
+partitionInto(self_,destination,value.nodes);
 
-partitionInto(self,destination,value.root);
+partitionInto(self_,destination,value.words);
 
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::FieldName) {
-
-partitionInto(self,destination,value.symbol);
-
-partitionInto(self,destination,value.spelling);
+partitionInto(self_,destination,value.bindings);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Name) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_contracts::Term) {
 
-partitionInto(self,destination,value.start);
+partitionInto(self_,destination,value.tag);
 
-partitionInto(self,destination,value.len);
+partitionInto(self_,destination,value.a);
 
-}
+partitionInto(self_,destination,value.b);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::RuntimeName) {
-
-partitionInto(self,destination,value.binding);
-
-partitionInto(self,destination,value.point);
+partitionInto(self_,destination,value.c);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DeclarationDependencies) {
-
-partitionInto(self,destination,value.references);
-
-partitionInto(self,destination,value.members);
-
-partitionInto(self,destination,value.runtime_metadata);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::List) {
-
-partitionInto(self,destination,value.start);
-
-partitionInto(self,destination,value.len);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::BindingRef) {
-
-partitionInto(self,destination,value.unit);
-
-partitionInto(self,destination,value.binding);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DependencyMember) {
-
-partitionInto(self,destination,value.name);
-
-partitionInto(self,destination,value.operator);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Operator) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_contracts::Tag) {
 
 match value {
 
-blot_check_types::Operator.none=>{
+empty=>{
 },
 
-blot_check_types::Operator.add=>{
+unknown=>{
 },
 
-blot_check_types::Operator.sub=>{
+parameter=>{
 },
 
-blot_check_types::Operator.mul=>{
+authority=>{
 },
 
-blot_check_types::Operator.div=>{
+captures=>{
 },
 
-blot_check_types::Operator.rem=>{
+product=>{
 },
 
-blot_check_types::Operator.equal=>{
+record=>{
 },
 
-blot_check_types::Operator.not_equal=>{
+wrapped=>{
 },
 
-blot_check_types::Operator.less=>{
+join=>{
 },
 
-blot_check_types::Operator.less_equal=>{
+project=>{
 },
 
-blot_check_types::Operator.greater=>{
+elements=>{
 },
 
-blot_check_types::Operator.greater_equal=>{
+argument=>{
 },
 
-blot_check_types::Operator.bit_and=>{
-},
-
-blot_check_types::Operator.bit_or=>{
-},
-
-blot_check_types::Operator.bit_xor=>{
-},
-
-blot_check_types::Operator.shift_left=>{
-},
-
-blot_check_types::Operator.shift_right=>{
+callable=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ErasedDeclarationReference) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_contracts::Binding) {
 
-partitionInto(self,destination,value.node);
+partitionInto(self_,destination,value.binding);
 
-partitionInto(self,destination,value.target);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::RequestLoopInfo) {
-
-partitionInto(self,destination,value.computation);
-
-partitionInto(self,destination,value.action_type);
-
-partitionInto(self,destination,value.value_type);
-
-partitionInto(self,destination,value.result_type);
-
-partitionInto(self,destination,value.state_type);
-
-partitionInto(self,destination,value.arms);
-
-partitionInto(self,destination,value.completion_pattern);
-
-partitionInto(self,destination,value.completion_body);
-
-partitionInto(self,destination,value.completion_state_bindings);
-
-partitionInto(self,destination,value.carries);
-
-partitionInto(self,destination,value.return_target);
+partitionInto(self_,destination,value.root);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::RequestArm) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::FieldName) {
 
-partitionInto(self,destination,value.operation);
+partitionInto(self_,destination,value.symbol);
 
-partitionInto(self,destination,value.callback);
-
-partitionInto(self,destination,value.selector);
+partitionInto(self_,destination,value.spelling);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Types) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Name) {
 
-partitionInto(self,destination,value.nodes);
+partitionInto(self_,destination,value.start);
 
-partitionInto(self,destination,value.extra);
-
-partitionInto(self,destination,value.effects);
-
-partitionInto(self,destination,value.operations);
-
-partitionInto(self,destination,value.quantifier_goals);
-
-partitionInto(self,destination,value.quantifier_obligations);
+partitionInto(self_,destination,value.len);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Node) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::RuntimeName) {
 
-partitionInto(self,destination,value.tag);
+partitionInto(self_,destination,value.binding);
 
-partitionInto(self,destination,value.closed_height);
-
-partitionInto(self,destination,value.closed_generation);
-
-partitionInto(self,destination,value.a);
-
-partitionInto(self,destination,value.b);
-
-partitionInto(self,destination,value.c);
+partitionInto(self_,destination,value.point);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Tag) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DeclarationDependencies) {
+
+partitionInto(self_,destination,value.references);
+
+partitionInto(self_,destination,value.members);
+
+partitionInto(self_,destination,value.runtime_metadata);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::List) {
+
+partitionInto(self_,destination,value.start);
+
+partitionInto(self_,destination,value.len);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::BindingRef) {
+
+partitionInto(self_,destination,value.unit);
+
+partitionInto(self_,destination,value.binding);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DependencyMember) {
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.operator);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::Operator) {
 
 match value {
 
-blot_check_types::Tag.absent=>{
+none=>{
 },
 
-blot_check_types::Tag.unit=>{
+add=>{
 },
 
-blot_check_types::Tag.boolean=>{
+sub=>{
 },
 
-blot_check_types::Tag.unsigned32=>{
+mul=>{
 },
 
-blot_check_types::Tag.floating32=>{
+div=>{
 },
 
-blot_check_types::Tag.never=>{
+rem=>{
 },
 
-blot_check_types::Tag.variable=>{
+equal=>{
 },
 
-blot_check_types::Tag.function=>{
+not_equal=>{
 },
 
-blot_check_types::Tag.product=>{
+less=>{
 },
 
-blot_check_types::Tag.record=>{
+less_equal=>{
 },
 
-blot_check_types::Tag.nominal=>{
+greater=>{
 },
 
-blot_check_types::Tag.array=>{
+greater_equal=>{
 },
 
-blot_check_types::Tag.list=>{
+bit_and=>{
 },
 
-blot_check_types::Tag.cursor=>{
+bit_or=>{
 },
 
-blot_check_types::Tag.type_constructor=>{
+bit_xor=>{
 },
 
-blot_check_types::Tag.resolver=>{
+shift_left=>{
 },
 
-blot_check_types::Tag.provider=>{
-},
-
-blot_check_types::Tag.state_provider=>{
-},
-
-blot_check_types::Tag.projection=>{
-},
-
-blot_check_types::Tag.scoped=>{
-},
-
-blot_check_types::Tag.instance_selection=>{
-},
-
-blot_check_types::Tag.erased_proof=>{
-},
-
-blot_check_types::Tag.forall=>{
-},
-
-blot_check_types::Tag.existential=>{
-},
-
-blot_check_types::Tag.bound=>{
-},
-
-blot_check_types::Tag.rigid=>{
-},
-
-blot_check_types::Tag.usage=>{
-},
-
-blot_check_types::Tag.instance_version=>{
+shift_right=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::EffectRows) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::ErasedDeclarationReference) {
 
-partitionInto(self,destination,value.rows);
+partitionInto(self_,destination,value.node);
 
-partitionInto(self,destination,value.labels);
-
-partitionInto(self,destination,value.variable_count);
+partitionInto(self_,destination,value.target);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_effects::Row) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::RequestLoopInfo) {
 
-partitionInto(self,destination,value.labels);
+partitionInto(self_,destination,value.computation);
 
-partitionInto(self,destination,value.tail);
+partitionInto(self_,destination,value.action_type);
 
-partitionInto(self,destination,value.cursor);
+partitionInto(self_,destination,value.value_type);
+
+partitionInto(self_,destination,value.result_type);
+
+partitionInto(self_,destination,value.state_type);
+
+partitionInto(self_,destination,value.arms);
+
+partitionInto(self_,destination,value.completion_pattern);
+
+partitionInto(self_,destination,value.completion_body);
+
+partitionInto(self_,destination,value.completion_state_bindings);
+
+partitionInto(self_,destination,value.carries);
+
+partitionInto(self_,destination,value.return_target);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_effects::List) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::RequestArm) {
 
-partitionInto(self,destination,value.start);
+partitionInto(self_,destination,value.operation);
 
-partitionInto(self,destination,value.len);
+partitionInto(self_,destination,value.callback);
+
+partitionInto(self_,destination,value.selector);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_effects::Tail) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Types) {
+
+partitionInto(self_,destination,value.nodes);
+
+partitionInto(self_,destination,value.extra);
+
+partitionInto(self_,destination,value.effects);
+
+partitionInto(self_,destination,value.operations);
+
+partitionInto(self_,destination,value.quantifier_goals);
+
+partitionInto(self_,destination,value.quantifier_obligations);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::Node) {
+
+partitionInto(self_,destination,value.tag);
+
+partitionInto(self_,destination,value.closed_height);
+
+partitionInto(self_,destination,value.closed_generation);
+
+partitionInto(self_,destination,value.a);
+
+partitionInto(self_,destination,value.b);
+
+partitionInto(self_,destination,value.c);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::Tag) {
 
 match value {
 
-blot_check_effects::Tail.closed=>{
+absent=>{
 },
 
-blot_check_effects::Tail.variable payload=>{
-partitionInto(self,destination,payload.value);
+unit=>{
 },
 
-blot_check_effects::Tail.parameter payload=>{
-partitionInto(self,destination,payload.value);
+boolean=>{
 },
 
-blot_check_effects::Tail.formal payload=>{
-partitionInto(self,destination,payload.value);
+unsigned32=>{
+},
+
+floating32=>{
+},
+
+never=>{
+},
+
+variable=>{
+},
+
+function=>{
+},
+
+product=>{
+},
+
+record=>{
+},
+
+nominal=>{
+},
+
+array=>{
+},
+
+list=>{
+},
+
+cursor=>{
+},
+
+type_constructor=>{
+},
+
+resolver=>{
+},
+
+provider=>{
+},
+
+state_provider=>{
+},
+
+projection=>{
+},
+
+scoped=>{
+},
+
+instance_selection=>{
+},
+
+erased_proof=>{
+},
+
+forall=>{
+},
+
+existential=>{
+},
+
+bound=>{
+},
+
+rigid=>{
+},
+
+usage=>{
+},
+
+instance_version=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Operation) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::EffectRows) {
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.rows);
 
-partitionInto(self,destination,value.arguments);
+partitionInto(self_,destination,value.labels);
 
-partitionInto(self,destination,value.instance);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::NominalIdentity) {
-
-partitionInto(self,destination,value.unit);
-
-partitionInto(self,destination,value.decl);
+partitionInto(self_,destination,value.variable_count);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::List) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_effects::Row) {
 
-partitionInto(self,destination,value.start);
+partitionInto(self_,destination,value.labels);
 
-partitionInto(self,destination,value.len);
+partitionInto(self_,destination,value.tail);
 
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::QuantifierGoals) {
-
-partitionInto(self,destination,value.owner);
-
-partitionInto(self,destination,value.goals);
+partitionInto(self_,destination,value.cursor);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Obligation) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_effects::List) {
 
-partitionInto(self,destination,value.ty);
+partitionInto(self_,destination,value.start);
 
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.source);
-
-partitionInto(self,destination,value.name);
-
-partitionInto(self,destination,value.result);
-
-partitionInto(self,destination,value.other);
-
-partitionInto(self,destination,value.signature);
-
-partitionInto(self,destination,value.operator);
-
-partitionInto(self,destination,value.identity);
-
-partitionInto(self,destination,value.explicit);
-
-partitionInto(self,destination,value.qualification_span);
-
-partitionInto(self,destination,value.qualification_unit);
+partitionInto(self_,destination,value.len);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::ObligationKind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_effects::Tail) {
 
 match value {
 
-blot_check_types::ObligationKind.arithmetic=>{
+closed=>{
 },
 
-blot_check_types::ObligationKind.ordered=>{
+variable payload=>{
+partitionInto(self_,destination,payload.value);
 },
 
-blot_check_types::ObligationKind.equality=>{
+parameter payload=>{
+partitionInto(self_,destination,payload.value);
 },
 
-blot_check_types::ObligationKind.integer=>{
-},
-
-blot_check_types::ObligationKind.field=>{
-},
-
-blot_check_types::ObligationKind.writable_field=>{
-},
-
-blot_check_types::ObligationKind.dispatch=>{
-},
-
-blot_check_types::ObligationKind.result_dispatch=>{
-},
-
-blot_check_types::ObligationKind.monad_factory=>{
-},
-
-blot_check_types::ObligationKind.resolver_dispatch=>{
-},
-
-blot_check_types::ObligationKind.resolver_shape=>{
-},
-
-blot_check_types::ObligationKind.effect_operation=>{
-},
-
-blot_check_types::ObligationKind.effect_handler=>{
-},
-
-blot_check_types::ObligationKind.receiver=>{
-},
-
-blot_check_types::ObligationKind.update=>{
-},
-
-blot_check_types::ObligationKind.type_rep=>{
-},
-
-blot_check_types::ObligationKind.effect_rep=>{
-},
-
-blot_check_types::ObligationKind.type_head=>{
-},
-
-blot_check_types::ObligationKind.collection=>{
-},
-
-blot_check_types::ObligationKind.record_merge=>{
-},
-
-blot_check_types::ObligationKind.callee_use=>{
-},
-
-blot_check_types::ObligationKind.type_eq=>{
-},
-
-blot_check_types::ObligationKind.contract=>{
-},
-
-blot_check_types::ObligationKind.task_receive=>{
+formal payload=>{
+partitionInto(self_,destination,payload.value);
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_parse_ast::Span) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::Operation) {
 
-partitionInto(self,destination,value.start);
+partitionInto(self_,destination,value.identity);
 
-partitionInto(self,destination,value.end);
+partitionInto(self_,destination,value.arguments);
 
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Node) {
-
-partitionInto(self,destination,value.tag);
-
-partitionInto(self,destination,value.op);
-
-partitionInto(self,destination,value.ty);
-
-partitionInto(self,destination,value.a);
-
-partitionInto(self,destination,value.b);
-
-partitionInto(self,destination,value.c);
+partitionInto(self_,destination,value.instance);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Tag) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::NominalIdentity) {
+
+partitionInto(self_,destination,value.unit);
+
+partitionInto(self_,destination,value.decl);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::List) {
+
+partitionInto(self_,destination,value.start);
+
+partitionInto(self_,destination,value.len);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::QuantifierGoals) {
+
+partitionInto(self_,destination,value.owner);
+
+partitionInto(self_,destination,value.goals);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::Obligation) {
+
+partitionInto(self_,destination,value.ty);
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.source);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.result);
+
+partitionInto(self_,destination,value.other);
+
+partitionInto(self_,destination,value.signature);
+
+partitionInto(self_,destination,value.operator);
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.explicit);
+
+partitionInto(self_,destination,value.qualification_span);
+
+partitionInto(self_,destination,value.qualification_unit);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::ObligationKind) {
 
 match value {
 
-blot_check_core::Tag.invalid=>{
+arithmetic=>{
 },
 
-blot_check_core::Tag.constant=>{
+ordered=>{
 },
 
-blot_check_core::Tag.reference=>{
+equality=>{
 },
 
-blot_check_core::Tag.scalar=>{
+integer=>{
 },
 
-blot_check_core::Tag.logical=>{
+field=>{
 },
 
-blot_check_core::Tag.call=>{
+writable_field=>{
 },
 
-blot_check_core::Tag.if_value=>{
+dispatch=>{
 },
 
-blot_check_core::Tag.block_=>{
+result_dispatch=>{
 },
 
-blot_check_core::Tag.suite=>{
+monad_factory=>{
 },
 
-blot_check_core::Tag.bind=>{
+resolver_dispatch=>{
 },
 
-blot_check_core::Tag.return_=>{
+resolver_shape=>{
 },
 
-blot_check_core::Tag.if_stmt=>{
+effect_operation=>{
 },
 
-blot_check_core::Tag.product=>{
+effect_handler=>{
 },
 
-blot_check_core::Tag.record=>{
+receiver=>{
 },
 
-blot_check_core::Tag.construct=>{
+update=>{
 },
 
-blot_check_core::Tag.project=>{
+type_rep=>{
 },
 
-blot_check_core::Tag.match_=>{
+effect_rep=>{
 },
 
-blot_check_core::Tag.pattern_bind=>{
+type_head=>{
 },
 
-blot_check_core::Tag.update=>{
+collection=>{
 },
 
-blot_check_core::Tag.array=>{
+record_merge=>{
 },
 
-blot_check_core::Tag.array_op=>{
+callee_use=>{
 },
 
-blot_check_core::Tag.closure=>{
+type_eq=>{
 },
 
-blot_check_core::Tag.apply=>{
+contract=>{
 },
 
-blot_check_core::Tag.constructor_function=>{
-},
-
-blot_check_core::Tag.associated=>{
-},
-
-blot_check_core::Tag.primitive_function=>{
-},
-
-blot_check_core::Tag.panic=>{
-},
-
-blot_check_core::Tag.loop_=>{
-},
-
-blot_check_core::Tag.break_=>{
-},
-
-blot_check_core::Tag.type_same=>{
-},
-
-blot_check_core::Tag.result_associated=>{
-},
-
-blot_check_core::Tag.type_constructor=>{
-},
-
-blot_check_core::Tag.resolver_op=>{
-},
-
-blot_check_core::Tag.operation_value=>{
-},
-
-blot_check_core::Tag.effect_provider=>{
-},
-
-blot_check_core::Tag.state_provider=>{
-},
-
-blot_check_core::Tag.handle=>{
-},
-
-blot_check_core::Tag.effect_reflection=>{
-},
-
-blot_check_core::Tag.computation=>{
-},
-
-blot_check_core::Tag.request_loop=>{
-},
-
-blot_check_core::Tag.request_decision=>{
-},
-
-blot_check_core::Tag.record_merge=>{
-},
-
-blot_check_core::Tag.contract_method=>{
-},
-
-blot_check_core::Tag.effect_scope=>{
-},
-
-blot_check_core::Tag.proof_guard=>{
-},
-
-blot_check_core::Tag.package_pack=>{
-},
-
-blot_check_core::Tag.package_unpack=>{
-},
-
-blot_check_core::Tag.staging=>{
-},
-
-blot_check_core::Tag.usage_borrow=>{
-},
-
-blot_check_core::Tag.usage_read=>{
-},
-
-blot_check_core::Tag.resource_scope=>{
-},
-
-blot_check_core::Tag.usage_share=>{
-},
-
-blot_check_core::Tag.resource_acquire=>{
-},
-
-blot_check_core::Tag.resource_release=>{
-},
-
-blot_check_core::Tag.task=>{
-},
-
-blot_check_core::Tag.storage=>{
+task_receive=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Op) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_parse_ast::Span) {
+
+partitionInto(self_,destination,value.start);
+
+partitionInto(self_,destination,value.end);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Node) {
+
+partitionInto(self_,destination,value.tag);
+
+partitionInto(self_,destination,value.op);
+
+partitionInto(self_,destination,value.ty);
+
+partitionInto(self_,destination,value.a);
+
+partitionInto(self_,destination,value.b);
+
+partitionInto(self_,destination,value.c);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Tag) {
 
 match value {
 
-blot_check_core::Op.none=>{
+invalid=>{
 },
 
-blot_check_core::Op.add=>{
+constant=>{
 },
 
-blot_check_core::Op.sub=>{
+reference=>{
 },
 
-blot_check_core::Op.mul=>{
+scalar=>{
 },
 
-blot_check_core::Op.div=>{
+logical=>{
 },
 
-blot_check_core::Op.rem=>{
+call=>{
 },
 
-blot_check_core::Op.equal=>{
+if_value=>{
 },
 
-blot_check_core::Op.not_equal=>{
+block_=>{
 },
 
-blot_check_core::Op.less=>{
+suite=>{
 },
 
-blot_check_core::Op.less_equal=>{
+bind=>{
 },
 
-blot_check_core::Op.greater=>{
+return_=>{
 },
 
-blot_check_core::Op.greater_equal=>{
+if_stmt=>{
 },
 
-blot_check_core::Op.bit_and=>{
+product=>{
 },
 
-blot_check_core::Op.bit_or=>{
+record=>{
 },
 
-blot_check_core::Op.bit_xor=>{
+construct=>{
 },
 
-blot_check_core::Op.shift_left=>{
+project=>{
 },
 
-blot_check_core::Op.shift_right=>{
+match_=>{
 },
 
-blot_check_core::Op.and_=>{
+pattern_bind=>{
 },
 
-blot_check_core::Op.or_=>{
+update=>{
 },
 
-blot_check_core::Op.neg=>{
+array=>{
 },
 
-blot_check_core::Op.abs=>{
+array_op=>{
 },
 
-blot_check_core::Op.ceil=>{
+closure=>{
 },
 
-blot_check_core::Op.floor=>{
+apply=>{
 },
 
-blot_check_core::Op.trunc=>{
+constructor_function=>{
 },
 
-blot_check_core::Op.sqrt=>{
+associated=>{
 },
 
-blot_check_core::Op.convert_u32_f32=>{
+primitive_function=>{
 },
 
-blot_check_core::Op.convert_f32_u32=>{
+panic=>{
 },
 
-blot_check_core::Op.shift_right_signed=>{
+loop_=>{
 },
 
-blot_check_core::Op.min=>{
+break_=>{
 },
 
-blot_check_core::Op.max=>{
+type_same=>{
 },
 
-blot_check_core::Op.bit_not=>{
+result_associated=>{
 },
 
-blot_check_core::Op.bit_andnot=>{
+type_constructor=>{
 },
 
-blot_check_core::Op.any_true=>{
+resolver_op=>{
 },
 
-blot_check_core::Op.all_true=>{
+operation_value=>{
 },
 
-blot_check_core::Op.select=>{
+effect_provider=>{
 },
 
-blot_check_core::Op.shuffle=>{
+state_provider=>{
 },
 
-blot_check_core::Op.swizzle=>{
+handle=>{
 },
 
-blot_check_core::Op.broadcast=>{
+effect_reflection=>{
 },
 
-blot_check_core::Op.bits=>{
+computation=>{
 },
 
-blot_check_core::Op.from_bits=>{
+request_loop=>{
 },
 
-blot_check_core::Op.relaxed_madd=>{
+request_decision=>{
 },
 
-blot_check_core::Op.relaxed_nmadd=>{
+record_merge=>{
 },
 
-blot_check_core::Op.convert_i32_f32=>{
+contract_method=>{
 },
 
-blot_check_core::Op.convert_f32_i32=>{
+effect_scope=>{
 },
 
-blot_check_core::Op.continue_=>{
+proof_guard=>{
+},
+
+package_pack=>{
+},
+
+package_unpack=>{
+},
+
+staging=>{
+},
+
+usage_borrow=>{
+},
+
+usage_read=>{
+},
+
+resource_scope=>{
+},
+
+usage_share=>{
+},
+
+resource_acquire=>{
+},
+
+resource_release=>{
+},
+
+task=>{
+},
+
+storage=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Binding) {
-
-partitionInto(self,destination,value.capability_flow);
-
-partitionInto(self,destination,value.capability_parameters);
-
-partitionInto(self,destination,value.private);
-
-partitionInto(self,destination,value.initializer);
-
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.ty);
-
-partitionInto(self,destination,value.scheme);
-
-partitionInto(self,destination,value.public_variables);
-
-partitionInto(self,destination,value.public_rows);
-
-partitionInto(self,destination,value.has_explicit);
-
-partitionInto(self,destination,value.body_id);
-
-partitionInto(self,destination,value.target);
-
-partitionInto(self,destination,value.span);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_flow::Contract) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Op) {
 
 match value {
 
-blot_check_capability_flow::Contract.unknown=>{
+none=>{
 },
 
-blot_check_capability_flow::Contract.identity=>{
+add=>{
 },
 
-blot_check_capability_flow::Contract.invoke_unit=>{
+sub=>{
 },
 
-blot_check_capability_flow::Contract.member_unit=>{
+mul=>{
 },
 
-blot_check_capability_flow::Contract.invoke_with_capability=>{
+div=>{
 },
 
-blot_check_capability_flow::Contract.member_first_unit=>{
+rem=>{
 },
 
-blot_check_capability_flow::Contract.member_second_unit=>{
+equal=>{
 },
 
-blot_check_capability_flow::Contract.input_shape=>{
+not_equal=>{
 },
 
-blot_check_capability_flow::Contract.consume_task=>{
+less=>{
 },
 
-blot_check_capability_flow::Contract.scope_task=>{
+less_equal=>{
 },
 
-blot_check_capability_flow::Contract.spawn_task=>{
+greater=>{
+},
+
+greater_equal=>{
+},
+
+bit_and=>{
+},
+
+bit_or=>{
+},
+
+bit_xor=>{
+},
+
+shift_left=>{
+},
+
+shift_right=>{
+},
+
+and_=>{
+},
+
+or_=>{
+},
+
+neg=>{
+},
+
+abs=>{
+},
+
+ceil=>{
+},
+
+floor=>{
+},
+
+trunc=>{
+},
+
+sqrt=>{
+},
+
+convert_u32_f32=>{
+},
+
+convert_f32_u32=>{
+},
+
+shift_right_signed=>{
+},
+
+min=>{
+},
+
+max=>{
+},
+
+bit_not=>{
+},
+
+bit_andnot=>{
+},
+
+any_true=>{
+},
+
+all_true=>{
+},
+
+select=>{
+},
+
+shuffle=>{
+},
+
+swizzle=>{
+},
+
+broadcast=>{
+},
+
+bits=>{
+},
+
+from_bits=>{
+},
+
+relaxed_madd=>{
+},
+
+relaxed_nmadd=>{
+},
+
+convert_i32_f32=>{
+},
+
+convert_f32_i32=>{
+},
+
+continue_=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_flow::Parameters) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Binding) {
 
-partitionInto(self,destination,value.kind);
+partitionInto(self_,destination,value.capability_flow);
 
-partitionInto(self,destination,value.mask);
+partitionInto(self_,destination,value.capability_parameters);
 
-partitionInto(self,destination,value.inputs);
+partitionInto(self_,destination,value.private);
 
-partitionInto(self,destination,value.invocation_arguments);
+partitionInto(self_,destination,value.initializer);
 
-partitionInto(self,destination,value.invocation_count);
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.ty);
+
+partitionInto(self_,destination,value.scheme);
+
+partitionInto(self_,destination,value.public_variables);
+
+partitionInto(self_,destination,value.public_rows);
+
+partitionInto(self_,destination,value.has_explicit);
+
+partitionInto(self_,destination,value.body_id);
+
+partitionInto(self_,destination,value.target);
+
+partitionInto(self_,destination,value.span);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_flow::ParameterResult) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_flow::Contract) {
 
 match value {
 
-blot_check_capability_flow::ParameterResult.product=>{
+unknown=>{
 },
 
-blot_check_capability_flow::ParameterResult.invoke_unit=>{
+identity=>{
 },
 
-blot_check_capability_flow::ParameterResult.invalid=>{
+invoke_unit=>{
 },
 
-blot_check_capability_flow::ParameterResult.member_closure_unit=>{
+member_unit=>{
 },
 
-blot_check_capability_flow::ParameterResult.captured_unit=>{
+invoke_with_capability=>{
 },
 
-blot_check_capability_flow::ParameterResult.invoke_input=>{
+member_first_unit=>{
 },
 
-blot_check_capability_flow::ParameterResult.invoke_inputs=>{
+member_second_unit=>{
+},
+
+input_shape=>{
+},
+
+consume_task=>{
+},
+
+scope_task=>{
+},
+
+spawn_task=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Kind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_flow::Parameters) {
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.mask);
+
+partitionInto(self_,destination,value.inputs);
+
+partitionInto(self_,destination,value.invocation_arguments);
+
+partitionInto(self_,destination,value.invocation_count);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_flow::ParameterResult) {
 
 match value {
 
-blot_reuse_principal_interface::Kind.global=>{
+product=>{
 },
 
-blot_reuse_principal_interface::Kind.local=>{
+invoke_unit=>{
 },
 
-blot_reuse_principal_interface::Kind.parameter=>{
+invalid=>{
 },
 
-blot_reuse_principal_interface::Kind.external=>{
+member_closure_unit=>{
+},
+
+captured_unit=>{
+},
+
+invoke_input=>{
+},
+
+invoke_inputs=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Scheme) {
-
-partitionInto(self,destination,value.root);
-
-partitionInto(self,destination,value.variables);
-
-partitionInto(self,destination,value.row_variables);
-
-partitionInto(self,destination,value.closed_rows);
-
-partitionInto(self,destination,value.obligations);
-
-partitionInto(self,destination,value.generative);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Body) {
-
-partitionInto(self,destination,value.binding);
-
-partitionInto(self,destination,value.root);
-
-partitionInto(self,destination,value.parameters);
-
-partitionInto(self,destination,value.scheme);
-
-partitionInto(self,destination,value.closed_rows);
-
-partitionInto(self,destination,value.span);
-
-partitionInto(self,destination,value.declaration_name);
-
-partitionInto(self,destination,value.export_name);
-
-partitionInto(self,destination,value.exported);
-
-partitionInto(self,destination,value.runtime);
-
-partitionInto(self,destination,value.is_function);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Parameter) {
-
-partitionInto(self,destination,value.binding);
-
-partitionInto(self,destination,value.ty);
-
-partitionInto(self,destination,value.span);
-
-partitionInto(self,destination,value.inferred);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::CallInfo) {
-
-partitionInto(self,destination,value.target);
-
-partitionInto(self,destination,value.callee_type);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Merge) {
-
-partitionInto(self,destination,value.node);
-
-partitionInto(self,destination,value.result);
-
-partitionInto(self,destination,value.then_binding);
-
-partitionInto(self,destination,value.else_binding);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Obligation) {
-
-partitionInto(self,destination,value.ty);
-
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.span);
-
-partitionInto(self,destination,value.name);
-
-partitionInto(self,destination,value.result);
-
-partitionInto(self,destination,value.other);
-
-partitionInto(self,destination,value.signature);
-
-partitionInto(self,destination,value.operator);
-
-partitionInto(self,destination,value.identity);
-
-partitionInto(self,destination,value.explicit);
-
-partitionInto(self,destination,value.qualification_span);
-
-partitionInto(self,destination,value.qualification_unit);
-
-partitionInto(self,destination,value.diagnostic_name);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Nominal) {
-
-partitionInto(self,destination,value.affine);
-
-partitionInto(self,destination,value.has_usage);
-
-partitionInto(self,destination,value.closed_storage);
-
-partitionInto(self,destination,value.private);
-
-partitionInto(self,destination,value.is_opaque);
-
-partitionInto(self,destination,value.storage);
-
-partitionInto(self,destination,value.diagnostic_name);
-
-partitionInto(self,destination,value.diagnostic_origin);
-
-partitionInto(self,destination,value.identity);
-
-partitionInto(self,destination,value.parameters);
-
-partitionInto(self,destination,value.variables);
-
-partitionInto(self,destination,value.constructors);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_backend_opaque_storage::Storage) {
-
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.parameter);
-
-partitionInto(self,destination,value.selector);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_backend_opaque_storage::Kind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Kind) {
 
 match value {
 
-blot_backend_opaque_storage::Kind.unknown=>{
+global=>{
 },
 
-blot_backend_opaque_storage::Kind.unit=>{
+local=>{
 },
 
-blot_backend_opaque_storage::Kind.boolean=>{
+parameter=>{
 },
 
-blot_backend_opaque_storage::Kind.unsigned32=>{
-},
-
-blot_backend_opaque_storage::Kind.floating32=>{
-},
-
-blot_backend_opaque_storage::Kind.reference=>{
-},
-
-blot_backend_opaque_storage::Kind.parameter=>{
+external=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::OperationName) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::Scheme) {
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.root);
 
-partitionInto(self,destination,value.diagnostic_name);
+partitionInto(self_,destination,value.variables);
 
-partitionInto(self,destination,value.diagnostic_origin);
+partitionInto(self_,destination,value.row_variables);
 
-partitionInto(self,destination,value.variables);
+partitionInto(self_,destination,value.closed_rows);
 
-partitionInto(self,destination,value.parameters);
+partitionInto(self_,destination,value.obligations);
 
-partitionInto(self,destination,value.parameter);
-
-partitionInto(self,destination,value.result);
+partitionInto(self_,destination,value.generative);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Constructor) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Body) {
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.binding);
 
-partitionInto(self,destination,value.nominal);
+partitionInto(self_,destination,value.root);
 
-partitionInto(self,destination,value.tag);
+partitionInto(self_,destination,value.parameters);
 
-partitionInto(self,destination,value.scheme);
+partitionInto(self_,destination,value.scheme);
 
-partitionInto(self,destination,value.payload);
+partitionInto(self_,destination,value.closed_rows);
 
-}
+partitionInto(self_,destination,value.span);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Projection) {
+partitionInto(self_,destination,value.declaration_name);
 
-partitionInto(self,destination,value.nominal);
+partitionInto(self_,destination,value.export_name);
 
-partitionInto(self,destination,value.field);
+partitionInto(self_,destination,value.exported);
 
-partitionInto(self,destination,value.source_type);
+partitionInto(self_,destination,value.runtime);
 
-partitionInto(self,destination,value.result_type);
-
-partitionInto(self,destination,value.variants);
-
-partitionInto(self,destination,value.diagnostic_point);
+partitionInto(self_,destination,value.is_function);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ProjectionVariant) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Parameter) {
 
-partitionInto(self,destination,value.tag);
+partitionInto(self_,destination,value.binding);
 
-partitionInto(self,destination,value.field);
+partitionInto(self_,destination,value.ty);
 
-}
+partitionInto(self_,destination,value.span);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Pattern) {
-
-partitionInto(self,destination,value.tag);
-
-partitionInto(self,destination,value.ty);
-
-partitionInto(self,destination,value.a);
-
-partitionInto(self,destination,value.b);
-
-partitionInto(self,destination,value.c);
-
-partitionInto(self,destination,value.span);
+partitionInto(self_,destination,value.inferred);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::PatternTag) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::CallInfo) {
+
+partitionInto(self_,destination,value.target);
+
+partitionInto(self_,destination,value.callee_type);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Merge) {
+
+partitionInto(self_,destination,value.node);
+
+partitionInto(self_,destination,value.result);
+
+partitionInto(self_,destination,value.then_binding);
+
+partitionInto(self_,destination,value.else_binding);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Obligation) {
+
+partitionInto(self_,destination,value.ty);
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.span);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.result);
+
+partitionInto(self_,destination,value.other);
+
+partitionInto(self_,destination,value.signature);
+
+partitionInto(self_,destination,value.operator);
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.explicit);
+
+partitionInto(self_,destination,value.qualification_span);
+
+partitionInto(self_,destination,value.qualification_unit);
+
+partitionInto(self_,destination,value.diagnostic_name);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Nominal) {
+
+partitionInto(self_,destination,value.affine);
+
+partitionInto(self_,destination,value.has_usage);
+
+partitionInto(self_,destination,value.closed_storage);
+
+partitionInto(self_,destination,value.private);
+
+partitionInto(self_,destination,value.is_opaque);
+
+partitionInto(self_,destination,value.storage);
+
+partitionInto(self_,destination,value.diagnostic_name);
+
+partitionInto(self_,destination,value.diagnostic_origin);
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.parameters);
+
+partitionInto(self_,destination,value.variables);
+
+partitionInto(self_,destination,value.constructors);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_backend_opaque_storage::Storage) {
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.parameter);
+
+partitionInto(self_,destination,value.selector);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_backend_opaque_storage::Kind) {
 
 match value {
 
-blot_check_core::PatternTag.invalid=>{
+unknown=>{
 },
 
-blot_check_core::PatternTag.wildcard=>{
+unit=>{
 },
 
-blot_check_core::PatternTag.bind=>{
+boolean=>{
 },
 
-blot_check_core::PatternTag.constant=>{
+unsigned32=>{
 },
 
-blot_check_core::PatternTag.value=>{
+floating32=>{
 },
 
-blot_check_core::PatternTag.product=>{
+reference=>{
 },
 
-blot_check_core::PatternTag.constructor=>{
-},
-
-blot_check_core::PatternTag.record_payload=>{
+parameter=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::PatternRow) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::OperationName) {
 
-partitionInto(self,destination,value.patterns);
+partitionInto(self_,destination,value.identity);
 
-}
+partitionInto(self_,destination,value.diagnostic_name);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::MatchArm) {
+partitionInto(self_,destination,value.diagnostic_origin);
 
-partitionInto(self,destination,value.rows);
+partitionInto(self_,destination,value.variables);
 
-partitionInto(self,destination,value.guard);
+partitionInto(self_,destination,value.parameters);
 
-partitionInto(self,destination,value.body);
+partitionInto(self_,destination,value.parameter);
 
-partitionInto(self,destination,value.span);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::MatchInfo) {
-
-partitionInto(self,destination,value.inputs);
-
-partitionInto(self,destination,value.arms);
-
-partitionInto(self,destination,value.statement);
+partitionInto(self_,destination,value.result);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::UpdateInfo) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Constructor) {
 
-partitionInto(self,destination,value.root);
+partitionInto(self_,destination,value.identity);
 
-partitionInto(self,destination,value.path);
+partitionInto(self_,destination,value.nominal);
 
-partitionInto(self,destination,value.value);
+partitionInto(self_,destination,value.tag);
 
-partitionInto(self,destination,value.self_binding);
+partitionInto(self_,destination,value.scheme);
 
-partitionInto(self,destination,value.selectors);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::UpdateStep) {
-
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.projection);
-
-partitionInto(self,destination,value.index);
-
-partitionInto(self,destination,value.source_type);
-
-partitionInto(self,destination,value.result_type);
+partitionInto(self_,destination,value.payload);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::UpdateKind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Projection) {
+
+partitionInto(self_,destination,value.nominal);
+
+partitionInto(self_,destination,value.field);
+
+partitionInto(self_,destination,value.source_type);
+
+partitionInto(self_,destination,value.result_type);
+
+partitionInto(self_,destination,value.variants);
+
+partitionInto(self_,destination,value.diagnostic_point);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::ProjectionVariant) {
+
+partitionInto(self_,destination,value.tag);
+
+partitionInto(self_,destination,value.field);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Pattern) {
+
+partitionInto(self_,destination,value.tag);
+
+partitionInto(self_,destination,value.ty);
+
+partitionInto(self_,destination,value.a);
+
+partitionInto(self_,destination,value.b);
+
+partitionInto(self_,destination,value.c);
+
+partitionInto(self_,destination,value.span);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::PatternTag) {
 
 match value {
 
-blot_check_core::UpdateKind.field=>{
+invalid=>{
 },
 
-blot_check_core::UpdateKind.index=>{
+wildcard=>{
+},
+
+bind=>{
+},
+
+constant=>{
+},
+
+value=>{
+},
+
+product=>{
+},
+
+constructor=>{
+},
+
+record_payload=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ClosureInfo) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::PatternRow) {
 
-partitionInto(self,destination,value.qualifier);
-
-partitionInto(self,destination,value.body);
-
-partitionInto(self,destination,value.parameter);
-
-partitionInto(self,destination,value.captures);
-
-partitionInto(self,destination,value.function_type);
-
-partitionInto(self,destination,value.closed_rows);
+partitionInto(self_,destination,value.patterns);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Associated) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::MatchArm) {
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.rows);
 
-partitionInto(self,destination,value.member);
+partitionInto(self_,destination,value.guard_);
 
-partitionInto(self,destination,value.operator);
+partitionInto(self_,destination,value.body);
 
-partitionInto(self,destination,value.target);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Contract) {
-
-partitionInto(self,destination,value.private);
-
-partitionInto(self,destination,value.identity);
-
-partitionInto(self,destination,value.name);
-
-partitionInto(self,destination,value.parameters);
-
-partitionInto(self,destination,value.variables);
-
-partitionInto(self,destination,value.row_variables);
-
-partitionInto(self,destination,value.predicates);
-
-partitionInto(self,destination,value.members);
-
-partitionInto(self,destination,value.requires_implementation);
-
-partitionInto(self,destination,value.row_parameter_names);
-
-partitionInto(self,destination,value.row_parameters);
+partitionInto(self_,destination,value.span);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ContractMember) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::MatchInfo) {
 
-partitionInto(self,destination,value.contract);
+partitionInto(self_,destination,value.inputs);
 
-partitionInto(self,destination,value.name);
+partitionInto(self_,destination,value.arms);
 
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.root);
+partitionInto(self_,destination,value.statement);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ContractMemberKind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::UpdateInfo) {
+
+partitionInto(self_,destination,value.root);
+
+partitionInto(self_,destination,value.path);
+
+partitionInto(self_,destination,value.value);
+
+partitionInto(self_,destination,value.self_binding);
+
+partitionInto(self_,destination,value.selectors);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::UpdateStep) {
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.projection);
+
+partitionInto(self_,destination,value.index);
+
+partitionInto(self_,destination,value.source_type);
+
+partitionInto(self_,destination,value.result_type);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::UpdateKind) {
 
 match value {
 
-blot_reuse_principal_interface::ContractMemberKind.defined_type=>{
+field=>{
 },
 
-blot_reuse_principal_interface::ContractMemberKind.abstract_type=>{
-},
-
-blot_reuse_principal_interface::ContractMemberKind.value=>{
+index=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Implementation) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::ClosureInfo) {
 
-partitionInto(self,destination,value.origin_span);
+partitionInto(self_,destination,value.qualifier);
 
-partitionInto(self,destination,value.declaration);
+partitionInto(self_,destination,value.body);
 
-partitionInto(self,destination,value.private);
+partitionInto(self_,destination,value.parameter);
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.captures);
 
-partitionInto(self,destination,value.name);
+partitionInto(self_,destination,value.function_type);
 
-partitionInto(self,destination,value.contract);
-
-partitionInto(self,destination,value.head);
-
-partitionInto(self,destination,value.variables);
-
-partitionInto(self,destination,value.parameter_names);
-
-partitionInto(self,destination,value.row_variables);
-
-partitionInto(self,destination,value.row_parameter_names);
-
-partitionInto(self,destination,value.row_parameters);
-
-partitionInto(self,destination,value.predicates);
-
-partitionInto(self,destination,value.members);
+partitionInto(self_,destination,value.closed_rows);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ImplementationMember) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Associated) {
 
-partitionInto(self,destination,value.name);
+partitionInto(self_,destination,value.identity);
 
-partitionInto(self,destination,value.kind);
+partitionInto(self_,destination,value.member);
 
-partitionInto(self,destination,value.root);
+partitionInto(self_,destination,value.operator);
 
-partitionInto(self,destination,value.target);
+partitionInto(self_,destination,value.target);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ImplementationMemberKind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Contract) {
+
+partitionInto(self_,destination,value.private);
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.parameters);
+
+partitionInto(self_,destination,value.variables);
+
+partitionInto(self_,destination,value.row_variables);
+
+partitionInto(self_,destination,value.predicates);
+
+partitionInto(self_,destination,value.members);
+
+partitionInto(self_,destination,value.requires_implementation);
+
+partitionInto(self_,destination,value.row_parameter_names);
+
+partitionInto(self_,destination,value.row_parameters);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ContractMember) {
+
+partitionInto(self_,destination,value.contract);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.root);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ContractMemberKind) {
 
 match value {
 
-blot_reuse_principal_interface::ImplementationMemberKind.type_=>{
+defined_type=>{
 },
 
-blot_reuse_principal_interface::ImplementationMemberKind.value=>{
+abstract_type=>{
+},
+
+value=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ExternalTarget) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Implementation) {
 
-partitionInto(self,destination,value.unit);
+partitionInto(self_,destination,value.origin_span);
 
-partitionInto(self,destination,value.binding);
+partitionInto(self_,destination,value.declaration);
 
-}
+partitionInto(self_,destination,value.private);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::MemberTemplate) {
+partitionInto(self_,destination,value.identity);
 
-partitionInto(self,destination,value.binding);
+partitionInto(self_,destination,value.name);
 
-partitionInto(self,destination,value.contract);
+partitionInto(self_,destination,value.contract);
 
-partitionInto(self,destination,value.name);
+partitionInto(self_,destination,value.head);
 
-partitionInto(self,destination,value.arguments);
+partitionInto(self_,destination,value.variables);
 
-}
+partitionInto(self_,destination,value.parameter_names);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::SelectedProof) {
+partitionInto(self_,destination,value.row_variables);
 
-partitionInto(self,destination,value.predicate_target);
+partitionInto(self_,destination,value.row_parameter_names);
 
-partitionInto(self,destination,value.context);
+partitionInto(self_,destination,value.row_parameters);
 
-partitionInto(self,destination,value.kind);
+partitionInto(self_,destination,value.predicates);
 
-partitionInto(self,destination,value.predicate);
-
-partitionInto(self,destination,value.implementation);
-
-partitionInto(self,destination,value.contract);
-
-partitionInto(self,destination,value.arguments);
-
-partitionInto(self,destination,value.members);
-
-partitionInto(self,destination,value.prerequisites);
+partitionInto(self_,destination,value.members);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::SelectedProofKind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ImplementationMember) {
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.root);
+
+partitionInto(self_,destination,value.target);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ImplementationMemberKind) {
 
 match value {
 
-blot_reuse_principal_interface::SelectedProofKind.implementation=>{
+type_=>{
 },
 
-blot_reuse_principal_interface::SelectedProofKind.predicate=>{
+value=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::SelectedUse) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ExternalTarget) {
 
-partitionInto(self,destination,value.node);
+partitionInto(self_,destination,value.unit);
 
-partitionInto(self,destination,value.proof);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DictionarySelection) {
-
-partitionInto(self,destination,value.owner);
-
-partitionInto(self,destination,value.quantifier);
-
-partitionInto(self,destination,value.goal);
-
-partitionInto(self,destination,value.proof);
-
-partitionInto(self,destination,value.members);
-
-partitionInto(self,destination,value.contents);
+partitionInto(self_,destination,value.binding);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DictionaryProof) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::MemberTemplate) {
+
+partitionInto(self_,destination,value.binding);
+
+partitionInto(self_,destination,value.contract);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.arguments);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::SelectedProof) {
+
+partitionInto(self_,destination,value.predicate_target);
+
+partitionInto(self_,destination,value.context);
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.predicate);
+
+partitionInto(self_,destination,value.implementation);
+
+partitionInto(self_,destination,value.contract);
+
+partitionInto(self_,destination,value.arguments);
+
+partitionInto(self_,destination,value.members);
+
+partitionInto(self_,destination,value.prerequisites);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::SelectedProofKind) {
 
 match value {
 
-blot_check_core::DictionaryProof.selected payload=>{
-partitionInto(self,destination,payload.value);
+implementation=>{
 },
 
-blot_check_core::DictionaryProof.given payload=>{
-partitionInto(self,destination,payload.value);
+predicate=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DictionaryGiven) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::SelectedUse) {
 
-partitionInto(self,destination,value.opening);
+partitionInto(self_,destination,value.node);
 
-partitionInto(self,destination,value.introduction);
-
-partitionInto(self,destination,value.quantifier);
-
-partitionInto(self,destination,value.goal);
-
-partitionInto(self,destination,value.arguments);
+partitionInto(self_,destination,value.proof);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DictionaryUse) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DictionarySelection) {
 
-partitionInto(self,destination,value.node);
+partitionInto(self_,destination,value.owner);
 
-partitionInto(self,destination,value.binding);
+partitionInto(self_,destination,value.quantifier);
 
-partitionInto(self,destination,value.opening);
+partitionInto(self_,destination,value.goal);
 
-partitionInto(self,destination,value.introduction);
+partitionInto(self_,destination,value.proof);
 
-partitionInto(self,destination,value.quantifier);
+partitionInto(self_,destination,value.members);
 
-partitionInto(self,destination,value.goal);
-
-partitionInto(self,destination,value.member);
+partitionInto(self_,destination,value.contents);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Primitive) {
-
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.op);
-
-partitionInto(self,destination,value.array_op);
-
-partitionInto(self,destination,value.arity);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::PrimitiveKind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DictionaryProof) {
 
 match value {
 
-blot_check_core::PrimitiveKind.scalar=>{
+selected payload=>{
+partitionInto(self_,destination,payload.value);
 },
 
-blot_check_core::PrimitiveKind.array=>{
+given payload=>{
+partitionInto(self_,destination,payload.value);
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_backend_collection_ops::Op) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DictionaryGiven) {
+
+partitionInto(self_,destination,value.opening);
+
+partitionInto(self_,destination,value.introduction);
+
+partitionInto(self_,destination,value.quantifier);
+
+partitionInto(self_,destination,value.goal);
+
+partitionInto(self_,destination,value.arguments);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DictionaryUse) {
+
+partitionInto(self_,destination,value.node);
+
+partitionInto(self_,destination,value.binding);
+
+partitionInto(self_,destination,value.opening);
+
+partitionInto(self_,destination,value.introduction);
+
+partitionInto(self_,destination,value.quantifier);
+
+partitionInto(self_,destination,value.goal);
+
+partitionInto(self_,destination,value.member);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Primitive) {
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.op);
+
+partitionInto(self_,destination,value.array_op);
+
+partitionInto(self_,destination,value.arity);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::PrimitiveKind) {
 
 match value {
 
-blot_backend_collection_ops::Op.length=>{
+scalar=>{
 },
 
-blot_backend_collection_ops::Op.get=>{
-},
-
-blot_backend_collection_ops::Op.set=>{
-},
-
-blot_backend_collection_ops::Op.fill=>{
-},
-
-blot_backend_collection_ops::Op.generate=>{
-},
-
-blot_backend_collection_ops::Op.append=>{
-},
-
-blot_backend_collection_ops::Op.prepend=>{
-},
-
-blot_backend_collection_ops::Op.identity=>{
-},
-
-blot_backend_collection_ops::Op.convert=>{
-},
-
-blot_backend_collection_ops::Op.cursor=>{
-},
-
-blot_backend_collection_ops::Op.cursor_has=>{
-},
-
-blot_backend_collection_ops::Op.cursor_value=>{
-},
-
-blot_backend_collection_ops::Op.cursor_advance=>{
-},
-
-blot_backend_collection_ops::Op.concat=>{
-},
-
-blot_backend_collection_ops::Op.slice=>{
-},
-
-blot_backend_collection_ops::Op.simd_load=>{
-},
-
-blot_backend_collection_ops::Op.simd_store=>{
-},
-
-blot_backend_collection_ops::Op.flatten=>{
+array=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::LoopInfo) {
-
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.first);
-
-partitionInto(self,destination,value.end);
-
-partitionInto(self,destination,value.pattern);
-
-partitionInto(self,destination,value.body);
-
-partitionInto(self,destination,value.carries);
-
-partitionInto(self,destination,value.can_exit);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::LoopKind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_backend_collection_ops::Op) {
 
 match value {
 
-blot_check_core::LoopKind.forever=>{
+length=>{
 },
 
-blot_check_core::LoopKind.range=>{
+get=>{
 },
 
-blot_check_core::LoopKind.array=>{
+set=>{
+},
+
+fill=>{
+},
+
+generate=>{
+},
+
+append=>{
+},
+
+prepend=>{
+},
+
+identity=>{
+},
+
+convert=>{
+},
+
+cursor=>{
+},
+
+cursor_has=>{
+},
+
+cursor_value=>{
+},
+
+cursor_advance=>{
+},
+
+concat=>{
+},
+
+slice=>{
+},
+
+simd_load=>{
+},
+
+simd_store=>{
+},
+
+flatten=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::LoopCarry) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::LoopInfo) {
 
-partitionInto(self,destination,value.incoming);
+partitionInto(self_,destination,value.kind);
 
-partitionInto(self,destination,value.iteration);
+partitionInto(self_,destination,value.first);
 
-partitionInto(self,destination,value.backedge);
+partitionInto(self_,destination,value.end);
 
-partitionInto(self,destination,value.outgoing);
+partitionInto(self_,destination,value.pattern);
 
-}
+partitionInto(self_,destination,value.body);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ResolverInfo) {
+partitionInto(self_,destination,value.carries);
 
-partitionInto(self,destination,value.operation);
-
-partitionInto(self,destination,value.resolver);
-
-partitionInto(self,destination,value.arguments);
-
-partitionInto(self,destination,value.member);
-
-partitionInto(self,destination,value.method);
-
-partitionInto(self,destination,value.method_type);
+partitionInto(self_,destination,value.can_exit);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ResolverOperation) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::LoopKind) {
 
 match value {
 
-blot_check_core::ResolverOperation.monad=>{
+forever=>{
 },
 
-blot_check_core::ResolverOperation.pure=>{
+range=>{
 },
 
-blot_check_core::ResolverOperation.bind=>{
-},
-
-blot_check_core::ResolverOperation.forward=>{
-},
-
-blot_check_core::ResolverOperation.iterate=>{
-},
-
-blot_check_core::ResolverOperation.run=>{
+array=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::OperationValue) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::LoopCarry) {
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.incoming);
 
-partitionInto(self,destination,value.arguments);
+partitionInto(self_,destination,value.iteration);
 
-partitionInto(self,destination,value.signature);
+partitionInto(self_,destination,value.backedge);
 
-partitionInto(self,destination,value.witness);
-
-partitionInto(self,destination,value.witness_result);
-
-partitionInto(self,destination,value.instance);
-
-partitionInto(self,destination,value.capability);
+partitionInto(self_,destination,value.outgoing);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::HandleEffects) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::ResolverInfo) {
 
-partitionInto(self,destination,value.node);
+partitionInto(self_,destination,value.operation);
 
-partitionInto(self,destination,value.first);
+partitionInto(self_,destination,value.resolver);
 
-partitionInto(self,destination,value.second);
+partitionInto(self_,destination,value.arguments);
 
-partitionInto(self,destination,value.extended);
+partitionInto(self_,destination,value.member);
 
-partitionInto(self,destination,value.residual);
+partitionInto(self_,destination,value.method);
 
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Diagnostic) {
-
-partitionInto(self,destination,value.code);
-
-partitionInto(self,destination,value.span);
+partitionInto(self_,destination,value.method_type);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Code) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::ResolverOperation) {
 
 match value {
 
-blot_check_core::Code.unchecked=>{
+monad=>{
 },
 
-blot_check_core::Code.unsupported=>{
+pure=>{
 },
 
-blot_check_core::Code.unresolved_binding=>{
+bind=>{
 },
 
-blot_check_core::Code.invalid_call=>{
+forward=>{
 },
 
-blot_check_core::Code.complexity=>{
+iterate=>{
+},
+
+run=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Interface) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::OperationValue) {
 
-partitionInto(self,destination,value.has_rank_contracts);
+partitionInto(self_,destination,value.identity);
 
-partitionInto(self,destination,value.has_usage_contracts);
+partitionInto(self_,destination,value.arguments);
 
-partitionInto(self,destination,value.has_numeric_proofs);
+partitionInto(self_,destination,value.signature);
 
-partitionInto(self,destination,value.proof_contracts);
+partitionInto(self_,destination,value.witness);
 
-partitionInto(self,destination,value.capability_contracts);
+partitionInto(self_,destination,value.witness_result);
 
-partitionInto(self,destination,value.unit);
+partitionInto(self_,destination,value.instance);
 
-partitionInto(self,destination,value.graph);
-
-partitionInto(self,destination,value.patterns);
-
-partitionInto(self,destination,value.bindings);
-
-partitionInto(self,destination,value.obligations);
-
-partitionInto(self,destination,value.obligation_spans);
-
-partitionInto(self,destination,value.nominals);
-
-partitionInto(self,destination,value.constructors);
-
-partitionInto(self,destination,value.effect_families);
-
-partitionInto(self,destination,value.effect_templates);
-
-partitionInto(self,destination,value.associated);
-
-partitionInto(self,destination,value.contracts);
-
-partitionInto(self,destination,value.contract_predicates);
-
-partitionInto(self,destination,value.contract_members);
-
-partitionInto(self,destination,value.implementations);
-
-partitionInto(self,destination,value.implementation_predicates);
-
-partitionInto(self,destination,value.implementation_members);
-
-partitionInto(self,destination,value.member_templates);
-
-partitionInto(self,destination,value.selected_proofs);
-
-partitionInto(self,destination,value.selected_members);
-
-partitionInto(self,destination,value.selected_edges);
+partitionInto(self_,destination,value.capability);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_frozen_types::Graph) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::HandleEffects) {
 
-partitionInto(self,destination,value.nodes);
+partitionInto(self_,destination,value.node);
 
-partitionInto(self,destination,value.extra);
+partitionInto(self_,destination,value.first);
 
-partitionInto(self,destination,value.rows);
+partitionInto(self_,destination,value.second);
 
-partitionInto(self,destination,value.labels);
+partitionInto(self_,destination,value.extended);
 
-partitionInto(self,destination,value.operations);
-
-partitionInto(self,destination,value.row_variable_count);
-
-partitionInto(self,destination,value.quantifier_goals);
-
-partitionInto(self,destination,value.quantifier_obligations);
+partitionInto(self_,destination,value.residual);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_frozen_types::PatternGraph) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Diagnostic) {
 
-partitionInto(self,destination,value.nodes);
+partitionInto(self_,destination,value.code);
 
-partitionInto(self,destination,value.extra);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_parameter_patterns::Node) {
-
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.a);
-
-partitionInto(self,destination,value.b);
+partitionInto(self_,destination,value.span);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_parameter_patterns::Kind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Code) {
 
 match value {
 
-blot_check_parameter_patterns::Kind.binding=>{
+unchecked=>{
 },
 
-blot_check_parameter_patterns::Kind.tuple=>{
+unsupported=>{
 },
 
-blot_check_parameter_patterns::Kind.array=>{
+unresolved_binding=>{
 },
 
-blot_check_parameter_patterns::Kind.record=>{
+invalid_call=>{
+},
+
+complexity=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Binding) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Interface) {
 
-partitionInto(self,destination,value.capability_flow);
+partitionInto(self_,destination,value.has_rank_contracts);
 
-partitionInto(self,destination,value.capability_parameters);
+partitionInto(self_,destination,value.has_usage_contracts);
 
-partitionInto(self,destination,value.private);
+partitionInto(self_,destination,value.has_numeric_proofs);
 
-partitionInto(self,destination,value.name);
+partitionInto(self_,destination,value.proof_contracts);
 
-partitionInto(self,destination,value.kind);
+partitionInto(self_,destination,value.capability_contracts);
 
-partitionInto(self,destination,value.named_function);
+partitionInto(self_,destination,value.unit);
 
-partitionInto(self,destination,value.ty);
+partitionInto(self_,destination,value.graph);
 
-partitionInto(self,destination,value.scheme);
+partitionInto(self_,destination,value.patterns);
 
-partitionInto(self,destination,value.external);
+partitionInto(self_,destination,value.bindings);
 
-}
+partitionInto(self_,destination,value.obligations);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Nominal) {
+partitionInto(self_,destination,value.obligation_spans);
 
-partitionInto(self,destination,value.affine);
+partitionInto(self_,destination,value.nominals);
 
-partitionInto(self,destination,value.has_usage);
+partitionInto(self_,destination,value.constructors);
 
-partitionInto(self,destination,value.closed_storage);
+partitionInto(self_,destination,value.effect_families);
 
-partitionInto(self,destination,value.private);
+partitionInto(self_,destination,value.effect_templates);
 
-partitionInto(self,destination,value.is_opaque);
+partitionInto(self_,destination,value.associated);
 
-partitionInto(self,destination,value.storage);
+partitionInto(self_,destination,value.contracts);
 
-partitionInto(self,destination,value.declaration);
+partitionInto(self_,destination,value.contract_predicates);
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.contract_members);
 
-partitionInto(self,destination,value.name);
+partitionInto(self_,destination,value.implementations);
 
-partitionInto(self,destination,value.parameters);
+partitionInto(self_,destination,value.implementation_predicates);
 
-partitionInto(self,destination,value.variables);
+partitionInto(self_,destination,value.implementation_members);
 
-partitionInto(self,destination,value.patterns);
+partitionInto(self_,destination,value.member_templates);
 
-partitionInto(self,destination,value.parameter_names);
+partitionInto(self_,destination,value.selected_proofs);
 
-partitionInto(self,destination,value.constructors);
+partitionInto(self_,destination,value.selected_members);
 
-partitionInto(self,destination,value.alias);
-
-partitionInto(self,destination,value.alias_rows);
+partitionInto(self_,destination,value.selected_edges);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Constructor) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_frozen_types::Graph) {
 
-partitionInto(self,destination,value.private);
+partitionInto(self_,destination,value.nodes);
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.extra);
 
-partitionInto(self,destination,value.nominal);
+partitionInto(self_,destination,value.rows);
 
-partitionInto(self,destination,value.tag);
+partitionInto(self_,destination,value.labels);
 
-partitionInto(self,destination,value.name);
+partitionInto(self_,destination,value.operations);
 
-partitionInto(self,destination,value.scheme);
+partitionInto(self_,destination,value.row_variable_count);
 
-partitionInto(self,destination,value.payload);
+partitionInto(self_,destination,value.quantifier_goals);
 
-partitionInto(self,destination,value.declared_record);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::EffectFamily) {
-
-partitionInto(self,destination,value.private);
-
-partitionInto(self,destination,value.identity);
-
-partitionInto(self,destination,value.name);
-
-partitionInto(self,destination,value.callable);
-
-partitionInto(self,destination,value.parameters);
-
-partitionInto(self,destination,value.variables);
-
-partitionInto(self,destination,value.patterns);
-
-partitionInto(self,destination,value.parameter_names);
-
-partitionInto(self,destination,value.operations);
+partitionInto(self_,destination,value.quantifier_obligations);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::EffectTemplate) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_frozen_types::PatternGraph) {
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.nodes);
 
-partitionInto(self,destination,value.family);
-
-partitionInto(self,destination,value.name);
-
-partitionInto(self,destination,value.parameter);
-
-partitionInto(self,destination,value.result);
+partitionInto(self_,destination,value.extra);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Associated) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_parameter_patterns::Node) {
 
-partitionInto(self,destination,value.identity);
+partitionInto(self_,destination,value.kind);
 
-partitionInto(self,destination,value.member);
+partitionInto(self_,destination,value.a);
 
-partitionInto(self,destination,value.operator);
-
-partitionInto(self,destination,value.binding);
+partitionInto(self_,destination,value.b);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Contract) {
-
-partitionInto(self,destination,value.declaration);
-
-partitionInto(self,destination,value.private);
-
-partitionInto(self,destination,value.identity);
-
-partitionInto(self,destination,value.name);
-
-partitionInto(self,destination,value.parameters);
-
-partitionInto(self,destination,value.variables);
-
-partitionInto(self,destination,value.patterns);
-
-partitionInto(self,destination,value.parameter_names);
-
-partitionInto(self,destination,value.row_variables);
-
-partitionInto(self,destination,value.row_parameter_names);
-
-partitionInto(self,destination,value.row_parameters);
-
-partitionInto(self,destination,value.predicates);
-
-partitionInto(self,destination,value.members);
-
-partitionInto(self,destination,value.requires_implementation);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Module) {
-
-partitionInto(self,destination,value.identity);
-
-partitionInto(self,destination,value.imports);
-
-partitionInto(self,destination,value.implicit_prelude);
-
-partitionInto(self,destination,value.source_imports);
-
-partitionInto(self,destination,value.core);
-
-partitionInto(self,destination,value.interface);
-
-partitionInto(self,destination,value.exports);
-
-partitionInto(self,destination,value.fixities);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Identity) {
-
-partitionInto(self,destination,value.normalized_path);
-
-partitionInto(self,destination,value.source_digest);
-
-partitionInto(self,destination,value.source_bytes);
-
-partitionInto(self,destination,value.prelude);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::ImportResolution) {
-
-partitionInto(self,destination,value.path);
-
-partitionInto(self,destination,value.target);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Export) {
-
-partitionInto(self,destination,value.name);
-
-partitionInto(self,destination,value.target);
-
-partitionInto(self,destination,value.kind);
-
-partitionInto(self,destination,value.catalog);
-
-}
-
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::ExportKind) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_parameter_patterns::Kind) {
 
 match value {
 
-blot_reuse_frozen_dependency::ExportKind.value=>{
+binding=>{
 },
 
-blot_reuse_frozen_dependency::ExportKind.nominal=>{
+tuple=>{
 },
 
-blot_reuse_frozen_dependency::ExportKind.constructor=>{
+array=>{
 },
 
-blot_reuse_frozen_dependency::ExportKind.effect_family=>{
-},
-
-blot_reuse_frozen_dependency::ExportKind.contract=>{
-},
-
-blot_reuse_frozen_dependency::ExportKind.implementation=>{
+record=>{
 },
 
 }
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Fixity) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Binding) {
 
-partitionInto(self,destination,value.operator);
+partitionInto(self_,destination,value.capability_flow);
 
-partitionInto(self,destination,value.target);
+partitionInto(self_,destination,value.capability_parameters);
 
-partitionInto(self,destination,value.precedence);
+partitionInto(self_,destination,value.private);
 
-partitionInto(self,destination,value.association);
+partitionInto(self_,destination,value.name);
 
-partitionInto(self,destination,value.named);
+partitionInto(self_,destination,value.kind);
 
-partitionInto(self,destination,value.producer);
+partitionInto(self_,destination,value.named_function);
 
-}
+partitionInto(self_,destination,value.ty);
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::FrozenDependency) {
+partitionInto(self_,destination,value.scheme);
 
-partitionInto(self,destination,value.symbols);
-
-partitionInto(self,destination,value.modules);
+partitionInto(self_,destination,value.external);
 
 }
 
-fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Symbol) {
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Nominal) {
 
-partitionInto(self,destination,value.text);
+partitionInto(self_,destination,value.affine);
+
+partitionInto(self_,destination,value.has_usage);
+
+partitionInto(self_,destination,value.closed_storage);
+
+partitionInto(self_,destination,value.private);
+
+partitionInto(self_,destination,value.is_opaque);
+
+partitionInto(self_,destination,value.storage);
+
+partitionInto(self_,destination,value.declaration);
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.parameters);
+
+partitionInto(self_,destination,value.variables);
+
+partitionInto(self_,destination,value.patterns);
+
+partitionInto(self_,destination,value.parameter_names);
+
+partitionInto(self_,destination,value.constructors);
+
+partitionInto(self_,destination,value.alias);
+
+partitionInto(self_,destination,value.alias_rows);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Constructor) {
+
+partitionInto(self_,destination,value.private);
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.nominal);
+
+partitionInto(self_,destination,value.tag);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.scheme);
+
+partitionInto(self_,destination,value.payload);
+
+partitionInto(self_,destination,value.declared_record);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::EffectFamily) {
+
+partitionInto(self_,destination,value.private);
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.callable);
+
+partitionInto(self_,destination,value.parameters);
+
+partitionInto(self_,destination,value.variables);
+
+partitionInto(self_,destination,value.patterns);
+
+partitionInto(self_,destination,value.parameter_names);
+
+partitionInto(self_,destination,value.operations);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::EffectTemplate) {
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.family);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.parameter);
+
+partitionInto(self_,destination,value.result);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Associated) {
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.member);
+
+partitionInto(self_,destination,value.operator);
+
+partitionInto(self_,destination,value.binding);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Contract) {
+
+partitionInto(self_,destination,value.declaration);
+
+partitionInto(self_,destination,value.private);
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.parameters);
+
+partitionInto(self_,destination,value.variables);
+
+partitionInto(self_,destination,value.patterns);
+
+partitionInto(self_,destination,value.parameter_names);
+
+partitionInto(self_,destination,value.row_variables);
+
+partitionInto(self_,destination,value.row_parameter_names);
+
+partitionInto(self_,destination,value.row_parameters);
+
+partitionInto(self_,destination,value.predicates);
+
+partitionInto(self_,destination,value.members);
+
+partitionInto(self_,destination,value.requires_implementation);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Module) {
+
+partitionInto(self_,destination,value.identity);
+
+partitionInto(self_,destination,value.imports);
+
+partitionInto(self_,destination,value.implicit_prelude);
+
+partitionInto(self_,destination,value.source_imports);
+
+partitionInto(self_,destination,value.core);
+
+partitionInto(self_,destination,value.interface);
+
+partitionInto(self_,destination,value.exports);
+
+partitionInto(self_,destination,value.fixities);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Identity) {
+
+partitionInto(self_,destination,value.normalized_path);
+
+partitionInto(self_,destination,value.source_digest);
+
+partitionInto(self_,destination,value.source_bytes);
+
+partitionInto(self_,destination,value.prelude);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::ImportResolution) {
+
+partitionInto(self_,destination,value.path);
+
+partitionInto(self_,destination,value.target);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Export) {
+
+partitionInto(self_,destination,value.name);
+
+partitionInto(self_,destination,value.target);
+
+partitionInto(self_,destination,value.kind);
+
+partitionInto(self_,destination,value.catalog);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::ExportKind) {
+
+match value {
+
+value=>{
+},
+
+nominal=>{
+},
+
+constructor=>{
+},
+
+effect_family=>{
+},
+
+contract=>{
+},
+
+implementation=>{
+},
+
+}
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Fixity) {
+
+partitionInto(self_,destination,value.operator);
+
+partitionInto(self_,destination,value.target);
+
+partitionInto(self_,destination,value.precedence);
+
+partitionInto(self_,destination,value.association);
+
+partitionInto(self_,destination,value.named);
+
+partitionInto(self_,destination,value.producer);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::FrozenDependency) {
+
+partitionInto(self_,destination,value.symbols);
+
+partitionInto(self_,destination,value.modules);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Symbol) {
+
+partitionInto(self_,destination,value.text);
 
 }
 
 // Retained readers share immutable runs; every mutation requires the sole lease.
-fn unique(self:const Owner&)->bool {return valid(self)&&leases[self.lease-1].references==1;}
-fn retain(self:Owner)->Owner,Error {if !valid(self) {return Owner{..},Error.invalid_artifact;}let at=self.lease-1;if leases[at].references==0xffffffffffffffff {return Owner{..},Error.dependency_limit;}leases[at].references+=1;return self,Error.none;}
-fn release(self:Owner&) {self.deinit();}
+fn unique(self_:const Owner&)->bool {return valid(self_)&&leases[self_.lease-1].references==1;}
+fn retain(self_:Owner)->Owner,Error {if !valid(self_) {return Owner{..},blot_error::Error.invalid_artifact;}let at=self_.lease-1;if leases[at].references==0xffffffffffffffff {return Owner{..},blot_error::Error.dependency_limit;}leases[at].references+=1;return self_,blot_error::Error.none;}
+fn release(self_:Owner&) {self_.deinit();}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
 reusable[] var pool_header_module:blot_check_core::Module[>..]=[];
-fn allocate(self:Owner&,sample:blot_check_core::Module,length:i64)->blot_check_core::Module[:],Error {assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}let run=pool_header_module.alloc_slice(length);let error=remember(self,Run.run_header_module{run, ..});if error!=Error.none {pool_header_module.free_slice(run);return [],error;}return run,Error.none;}
-fn mutable(self:const Owner&,values:const blot_check_core::Module[:])->blot_check_core::Module[:] {assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_header_module run=>{if run.values .== values {return run.values;}},_=>{}}}abort("private header view must name this unique journal");}
+fn allocate(self_:Owner&,sample:blot_check_core::Module,length:i64)->blot_check_core::Module[:],Error {assert(unique(self_));if length<0 {return default<blot_check_core::Module[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Module[:]>(),blot_error::Error.none;}let run=pool_header_module.alloc_slice(length);let error=remember(self_,Run.run_header_module{run, ..});if error!=blot_error::Error.none {pool_header_module.free_slice(run);return default<blot_check_core::Module[:]>(),error;}return run,blot_error::Error.none;}
+fn mutable(self_:const Owner&,values:const blot_check_core::Module[:])->blot_check_core::Module[:] {assert(unique(self_));if values.len==0 {return default<blot_check_core::Module[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_header_module run=>{if blot_support::same_slice_identity(run.values,values) {return pool_header_module.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
 reusable[] var pool_header_path:HeaderPath[>..]=[];
-fn allocate(self:Owner&,sample:HeaderPath,length:i64)->HeaderPath[:],Error {assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}let run=pool_header_path.alloc_slice(length);let error=remember(self,Run.run_header_path{run, ..});if error!=Error.none {pool_header_path.free_slice(run);return [],error;}return run,Error.none;}
-fn mutable(self:const Owner&,values:const HeaderPath[:])->HeaderPath[:] {assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_header_path run=>{if run.values .== values {return run.values;}},_=>{}}}abort("private header view must name this unique journal");}
+fn allocate(self_:Owner&,sample:HeaderPath,length:i64)->HeaderPath[:],Error {assert(unique(self_));if length<0 {return default<HeaderPath[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<HeaderPath[:]>(),blot_error::Error.none;}let run=pool_header_path.alloc_slice(length);let error=remember(self_,Run.run_header_path{run, ..});if error!=blot_error::Error.none {pool_header_path.free_slice(run);return default<HeaderPath[:]>(),error;}return run,blot_error::Error.none;}
+fn mutable(self_:const Owner&,values:const HeaderPath[:])->HeaderPath[:] {assert(unique(self_));if values.len==0 {return default<HeaderPath[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_header_path run=>{if blot_support::same_slice_identity(run.values,values) {return pool_header_path.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
 reusable[] var pool_header_digest:HeaderDigest[>..]=[];
-fn allocate(self:Owner&,sample:HeaderDigest,length:i64)->HeaderDigest[:],Error {assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}let run=pool_header_digest.alloc_slice(length);let error=remember(self,Run.run_header_digest{run, ..});if error!=Error.none {pool_header_digest.free_slice(run);return [],error;}return run,Error.none;}
-fn mutable(self:const Owner&,values:const HeaderDigest[:])->HeaderDigest[:] {assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_header_digest run=>{if run.values .== values {return run.values;}},_=>{}}}abort("private header view must name this unique journal");}
+fn allocate(self_:Owner&,sample:HeaderDigest,length:i64)->HeaderDigest[:],Error {assert(unique(self_));if length<0 {return default<HeaderDigest[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<HeaderDigest[:]>(),blot_error::Error.none;}let run=pool_header_digest.alloc_slice(length);let error=remember(self_,Run.run_header_digest{run, ..});if error!=blot_error::Error.none {pool_header_digest.free_slice(run);return default<HeaderDigest[:]>(),error;}return run,blot_error::Error.none;}
+fn mutable(self_:const Owner&,values:const HeaderDigest[:])->HeaderDigest[:] {assert(unique(self_));if values.len==0 {return default<HeaderDigest[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_header_digest run=>{if blot_support::same_slice_identity(run.values,values) {return pool_header_digest.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
 reusable[] var pool_header_name:blot_backend_runtime_identity::Name[>..]=[];
-fn allocate(self:Owner&,sample:blot_backend_runtime_identity::Name,length:i64)->blot_backend_runtime_identity::Name[:],Error {assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}let run=pool_header_name.alloc_slice(length);let error=remember(self,Run.run_header_name{run, ..});if error!=Error.none {pool_header_name.free_slice(run);return [],error;}return run,Error.none;}
-fn mutable(self:const Owner&,values:const blot_backend_runtime_identity::Name[:])->blot_backend_runtime_identity::Name[:] {assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_header_name run=>{if run.values .== values {return run.values;}},_=>{}}}abort("private header view must name this unique journal");}
+fn allocate(self_:Owner&,sample:blot_backend_runtime_identity::Name,length:i64)->blot_backend_runtime_identity::Name[:],Error {assert(unique(self_));if length<0 {return default<blot_backend_runtime_identity::Name[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_backend_runtime_identity::Name[:]>(),blot_error::Error.none;}let run=pool_header_name.alloc_slice(length);let error=remember(self_,Run.run_header_name{run, ..});if error!=blot_error::Error.none {pool_header_name.free_slice(run);return default<blot_backend_runtime_identity::Name[:]>(),error;}return run,blot_error::Error.none;}
+fn mutable(self_:const Owner&,values:const blot_backend_runtime_identity::Name[:])->blot_backend_runtime_identity::Name[:] {assert(unique(self_));if values.len==0 {return default<blot_backend_runtime_identity::Name[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_header_name run=>{if blot_support::same_slice_identity(run.values,values) {return pool_header_name.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
 reusable[] var pool_header_import:blot_reuse_entry_frontend_cutoff::Import[>..]=[];
-fn allocate(self:Owner&,sample:blot_reuse_entry_frontend_cutoff::Import,length:i64)->blot_reuse_entry_frontend_cutoff::Import[:],Error {assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}let run=pool_header_import.alloc_slice(length);let error=remember(self,Run.run_header_import{run, ..});if error!=Error.none {pool_header_import.free_slice(run);return [],error;}return run,Error.none;}
-fn mutable(self:const Owner&,values:const blot_reuse_entry_frontend_cutoff::Import[:])->blot_reuse_entry_frontend_cutoff::Import[:] {assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_header_import run=>{if run.values .== values {return run.values;}},_=>{}}}abort("private header view must name this unique journal");}
+fn allocate(self_:Owner&,sample:blot_reuse_entry_frontend_cutoff::Import,length:i64)->blot_reuse_entry_frontend_cutoff::Import[:],Error {assert(unique(self_));if length<0 {return default<blot_reuse_entry_frontend_cutoff::Import[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_entry_frontend_cutoff::Import[:]>(),blot_error::Error.none;}let run=pool_header_import.alloc_slice(length);let error=remember(self_,Run.run_header_import{run, ..});if error!=blot_error::Error.none {pool_header_import.free_slice(run);return default<blot_reuse_entry_frontend_cutoff::Import[:]>(),error;}return run,blot_error::Error.none;}
+fn mutable(self_:const Owner&,values:const blot_reuse_entry_frontend_cutoff::Import[:])->blot_reuse_entry_frontend_cutoff::Import[:] {assert(unique(self_));if values.len==0 {return default<blot_reuse_entry_frontend_cutoff::Import[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_header_import run=>{if blot_support::same_slice_identity(run.values,values) {return pool_header_import.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
 reusable[] var pool_header_owner:Owner[>..]=[];
-fn allocate(self:Owner&,sample:Owner,length:i64)->Owner[:],Error {assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}let run=pool_header_owner.alloc_slice(length);let error=remember(self,Run.run_header_owner{run, ..});if error!=Error.none {pool_header_owner.free_slice(run);return [],error;}return run,Error.none;}
-fn mutable(self:const Owner&,values:const Owner[:])->Owner[:] {assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_header_owner run=>{if run.values .== values {return run.values;}},_=>{}}}abort("private header view must name this unique journal");}
+fn allocate(self_:Owner&,sample:Owner,length:i64)->Owner[:],Error {assert(unique(self_));if length<0 {return default<Owner[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<Owner[:]>(),blot_error::Error.none;}let run=pool_header_owner.alloc_slice(length);let error=remember(self_,Run.run_header_owner{run, ..});if error!=blot_error::Error.none {pool_header_owner.free_slice(run);return default<Owner[:]>(),error;}return run,blot_error::Error.none;}
+fn mutable(self_:const Owner&,values:const Owner[:])->Owner[:] {assert(unique(self_));if values.len==0 {return default<Owner[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_header_owner run=>{if blot_support::same_slice_identity(run.values,values) {return pool_header_owner.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
 reusable[] var pool_bool:bool[>..]=[];
-fn allocate(self:Owner&,sample:bool,length:i64)->bool[:],Error {assert(unique(self));if length<0 {return [],Error.invalid_artifact;}if length==0 {return [],Error.none;}let run=pool_bool.alloc_slice(length);let error=remember(self,Run.run_bool{run, ..});if error!=Error.none {pool_bool.free_slice(run);return [],error;}return run,Error.none;}
-fn mutable(self:const Owner&,values:const bool[:])->bool[:] {assert(unique(self));if values.len==0 {return [];}var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_bool run=>{if run.values .== values {return run.values;}},_=>{}}}abort("private header view must name this unique journal");}
+fn allocate(self_:Owner&,sample:bool,length:i64)->bool[:],Error {assert(unique(self_));if length<0 {return default<bool[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<bool[:]>(),blot_error::Error.none;}let run=pool_bool.alloc_slice(length);let error=remember(self_,Run.run_bool{run, ..});if error!=blot_error::Error.none {pool_bool.free_slice(run);return default<bool[:]>(),error;}return run,blot_error::Error.none;}
+fn mutable(self_:const Owner&,values:const bool[:])->bool[:] {assert(unique(self_));if values.len==0 {return default<bool[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_bool run=>{if blot_support::same_slice_identity(run.values,values) {return pool_bool.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}

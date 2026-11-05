@@ -20,7 +20,7 @@ fn resolve(units: const blot_check_core::Module[:], unit: u32, id: blot_check_co
     let node = source.node(root);
     if node.tag == blot_check_core::Tag.reference {
         let reference = source.reference(root);
-        if reference.unit == 0 && source.binding(reference.binding).kind != blot_check_core::BindingKind.global && source.binding(reference.binding).kind != blot_check_core::BindingKind.external { return blot_support::none<Call>(); }
+        if reference.unit == 0 && source.binding(reference.binding).kind != blot_reuse_principal_interface::Kind.global && source.binding(reference.binding).kind != blot_reuse_principal_interface::Kind.external { return blot_support::none<Call>(); }
         result.target = reference; result.signature = node.ty;
     } else if node.tag == blot_check_core::Tag.project {
         if result.count == 16 || source.projectionVariants(node.b).len != 0 { return blot_support::none<Call>(); }
@@ -41,7 +41,7 @@ fn wrapper(units: const blot_check_core::Module[:], owner: u32, call: Call) -> b
         if target.unit == 0 || target.unit > units.len { return blot_support::none<Wrapper>(); }
         let source .= units[target.unit - 1]; if target.binding == 0 || target.binding >= source.bindings.len { return blot_support::none<Wrapper>(); }
         let binding = source.binding(target.binding);
-        if binding.kind == blot_check_core::BindingKind.external { let previous = target.unit; target = binding.target; if target.unit == 0 { target.unit = previous; } continue; }
+        if binding.kind == blot_reuse_principal_interface::Kind.external { let previous = target.unit; target = binding.target; if target.unit == 0 { target.unit = previous; } continue; }
         let body .= source.body(target.binding); if body == null { return blot_support::none<Wrapper>(); }
         if source.types.node(binding.ty).tag == blot_check_types::Tag.function && body.parameters.len == 0 && source.node(body.root).tag == blot_check_core::Tag.reference {
             let previous = target.unit; target = source.reference(body.root); if target.unit == 0 { target.unit = previous; } continue;

@@ -14,25 +14,25 @@ struct Resolver { entries: const AuthorityEntry[:] }
 fn lookup(resolver: Resolver,identity: blot_check_types::NominalIdentity) -> const Authority? {
     for &entry in resolver.entries { if entry.identity == identity { return entry.authority; } } return null;
 }
-struct Frame { parameters: const blot_check_types::Id[:] = [],arguments: const blot_check_types::Id[:] = [],parent: u32 = 0 }
+struct Frame { parameters: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>(),arguments: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>(),parent: u32 = 0 }
 struct Context { frames: Frame[256]&,current: u32 = 0 }
-fn infer<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], nominal_index: u32, remaining: i64&) -> Storage {
+fn infer<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], nominal_index: u32, remaining: i64&) -> Storage {
     let nominal = nominals[nominal_index]; let constructor_ids = source.list(nominal.constructors);
     if !nominal.is_opaque || constructor_ids.len != 1 { return Storage {..}; }
     return inferPayload(source, nominals, constructors, constructors[constructor_ids[0]].payload, nominal.parameters, remaining);
 }
-fn inferPayload<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, remaining: i64&) -> Storage {
+fn inferPayload<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, remaining: i64&) -> Storage {
     var frames: Frame[256] = [Frame {..};256]; frames[0] = Frame { parameters: source.list(parameters),arguments: [] , ..}; let context = Context { frames , ..};
     return expression(source, nominals, constructors, payload, context, 0, remaining, false, 0, Resolver { entries: [] , ..});
 }
-fn inferPayloadAuthoritative<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, local_unit: u32, resolver: Resolver, remaining: i64&) -> Storage {
+fn inferPayloadAuthoritative<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, local_unit: u32, resolver: Resolver, remaining: i64&) -> Storage {
     var frames: Frame[256] = [Frame {..};256]; frames[0] = Frame { parameters: source.list(parameters),arguments: [] , ..}; let context = Context { frames , ..};
     return authoritativeExpression(source, nominals, constructors, payload, context, local_unit, resolver, 0, remaining);
 }
-recursive fn authoritativeExpression<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], original: blot_check_types::Id, context: const Context&, local_unit: u32, resolver: Resolver, depth: i64, remaining: i64&) -> Storage {
+recursive fn authoritativeExpression<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], original: blot_check_types::Id, context: const Context&, local_unit: u32, resolver: Resolver, depth: i64, remaining: i64&) -> Storage {
     expression(source, nominals, constructors, original, context, depth, remaining, true, local_unit, resolver)
 }
-recursive fn expression<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], original: blot_check_types::Id, context: const Context&, depth: i64, remaining: i64&, authoritative: bool, local_unit: u32, resolver: Resolver) -> Storage {
+recursive fn expression<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], original: blot_check_types::Id, context: const Context&, depth: i64, remaining: i64&, authoritative: bool, local_unit: u32, resolver: Resolver) -> Storage {
     if depth >= 256 || remaining == 0 { return Storage {..}; } remaining--;
     let ty = source.head(original, 0); let node = source.node(ty);
     if node.tag == blot_check_types::Tag.unit { return Storage { kind: Kind.unit , ..}; }
@@ -78,7 +78,7 @@ recursive fn expression<N, C>(source: blot_check_frozen_types::Source, nominals:
             }
             let ids = source.list(blot_check_types::List { start: nominal.constructors.start, len: nominal.constructors.len , ..});
             if ids.len != 1 { return Storage {..}; }
-            if context.current + 1 >= 256 { return Storage {..}; } let frame = context.current + 1; context.frames[frame] = Frame { parameters: source.list(blot_check_types::List { start: nominal.parameters.start,len: nominal.parameters.len , ..}),arguments,parent: context.current + 1 , ..}; let nested = Context { context.frames,frame , ..};
+            if context.current + 1 >= 256 { return Storage {..}; } let frame = context.current + 1; context.frames[frame] = Frame { parameters: source.list(blot_check_types::List { start: nominal.parameters.start,len: nominal.parameters.len , ..}),arguments: arguments,parent: context.current + 1 , ..}; let nested = Context { context.frames,frame , ..};
             return expression(source, nominals, constructors, constructors[ids[0]].payload, nested, depth + 1, remaining, authoritative, local_unit, resolver);
         }
         return Storage {..};

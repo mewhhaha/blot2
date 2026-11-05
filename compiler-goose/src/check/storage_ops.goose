@@ -1,8 +1,11 @@
 // Storage operations remain explicit through Core and ownership planning.
 namespace blot_check_storage_ops;
+import support.error;
+import support.option;
+import support.structural_adapters;
+
 import support.structural;
 import std;
-import support.option;
 enum Op { ref, at, link, view, load, write, length, read, push, pop, truncate, freeze, copy, reserve }
 fn lookup(name: const u8[:]) -> blot_support::Option<Op> {
     if !starts_with(name, "@storage.") { return blot_support::Option<Op> { false, Op.ref , ..}; }

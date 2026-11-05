@@ -71,21 +71,21 @@ fn scan_number(source: const u8[:],start: i64) -> Number {
 fn integer_value(text: const u8[:]) -> u32,Error {
  var radix: u32=10; var at=0;
  if text.len>=2 && text[0]=='0' && (text[1]=='x'||text[1]=='X') { radix=16; at=2; }
- let first=at; if at==text.len { return 0,Error.invalid_integer; }
+ let first=at; if at==text.len { return 0,blot_error::Error.invalid_integer; }
  var value: u32=0;
  while at<text.len {
   let c=text[at];
   if c=='_' {
    var valid=false; if at+1<text.len { valid=digit(text[at+1]); if radix==16 { valid=hex(text[at+1]); } }
-   if at==first || at+1==text.len || text[at-1]=='_' || !valid { return 0,Error.invalid_integer; }
+   if at==first || at+1==text.len || text[at-1]=='_' || !valid { return 0,blot_error::Error.invalid_integer; }
    at++; continue;
   }
-  var valid=digit(c); if radix==16 { valid=hex(c); } if !valid { return 0,Error.invalid_integer; }
+  var valid=digit(c); if radix==16 { valid=hex(c); } if !valid { return 0,blot_error::Error.invalid_integer; }
   var n: u32=0; if digit(c) { n=(c-'0') as u32; } else if upper(c) { n=(c-'A'+10) as u32; } else { n=(c-'a'+10) as u32; }
-  if value>(0xffffffff-n)/radix { return 0,Error.integer_range; }
+  if value>(0xffffffff-n)/radix { return 0,blot_error::Error.integer_range; }
   value=value*radix+n; at++;
  }
- return value,Error.none;
+ return value,blot_error::Error.none;
 }
 // Exact decimal-to-binary32 rounding. Comparing integer significands to dyadic
 // midpoints avoids a binary64 intermediate, including subnormal halfway cases.
@@ -116,9 +116,9 @@ fn dyadic(bits: u32) -> u64,i64 {
  return (fraction|0x800000) as u64,(exponent as i64)-150;
 }
 fn float_bits(text: const u8[:]) -> u32,Error {
- if text.len==0 || !digit(text[0]) { return 0,Error.invalid_float; }
+ if text.len==0 || !digit(text[0]) { return 0,blot_error::Error.invalid_float; }
  let scanned=scan_number(text,0);
- if scanned.tag!=blot_parse_token::float || scanned.end!=text.len { return 0,Error.invalid_float; }
+ if scanned.tag!=blot_parse_token::float || scanned.end!=text.len { return 0,blot_error::Error.invalid_float; }
  var significant: u8[>..]=[]; var exp10: i64=0; var fractional=false; var at=0;
  while at<text.len && text[at]!='e' && text[at]!='E' {
   let c=text[at]; if c=='.' { fractional=true; } else if c!='_' { significant.push(c); if fractional { exp10--; } } at++;
@@ -130,9 +130,9 @@ fn float_bits(text: const u8[:]) -> u32,Error {
   if negative { exp10-=exponent; } else { exp10+=exponent; }
  }
  var leading=0; while leading<significant.len && significant[leading]=='0' { leading++; }
- if leading==significant.len { return 0,Error.none; }
+ if leading==significant.len { return 0,blot_error::Error.none; }
  let exact=significant[leading..]; let magnitude=exact.len+exp10;
- if magnitude>40 { return 0,Error.float_range; } if magnitude < -46 { return 0,Error.none; }
+ if magnitude>40 { return 0,blot_error::Error.float_range; } if magnitude < -46 { return 0,blot_error::Error.none; }
  var low: u32=0; var high: u32=0x7f800000;
  while low+1<high {
   let mid=low+(high-low)/2; let h,p=dyadic(mid);
@@ -144,27 +144,27 @@ fn float_bits(text: const u8[:]) -> u32,Error {
  let midpoint=(lh<<(lp-base))+(hh<<(hp-base));
  let comparison=compare_decimal(exact,exp10,midpoint,base-1);
  var rounded=low; if comparison>0 || (comparison==0 && (low&1)!=0) { rounded=high; }
- if rounded>=0x7f800000 { return 0,Error.float_range; }
- return rounded,Error.none;
+ if rounded>=0x7f800000 { return 0,blot_error::Error.float_range; }
+ return rounded,blot_error::Error.none;
 }
 fn utf8_width(c: u8) -> i64 {
  if c<0x80 { return 1; } if c>=0xc2 && c<=0xdf { return 2; }
  if c>=0xe0 && c<=0xef { return 3; } if c>=0xf0 && c<=0xf4 { return 4; } return 0;
 }
 fn decode_point(bytes: const u8[:]) -> u32,Error {
- if bytes.len<1||bytes.len>4||utf8_width(bytes[0])!=bytes.len { return 0,Error.invalid_utf8; }
- if bytes.len==1 { return bytes[0] as u32,Error.none; }
+ if bytes.len<1||bytes.len>4||utf8_width(bytes[0])!=bytes.len { return 0,blot_error::Error.invalid_utf8; }
+ if bytes.len==1 { return bytes[0] as u32,blot_error::Error.none; }
  var point=(bytes[0] & ((1 << (7-bytes.len))-1)) as u32;
- for i in 1..bytes.len { if (bytes[i]&0xc0)!=0x80 { return 0,Error.invalid_utf8; } point=(point<<6)|(bytes[i]&63); }
- if (bytes.len==2&&point<0x80)||(bytes.len==3&&point<0x800)||(bytes.len==4&&point<0x10000)||point>0x10ffff||(point>=0xd800&&point<=0xdfff) { return 0,Error.invalid_utf8; }
- return point,Error.none;
+ for i in 1..bytes.len { if (bytes[i]&0xc0)!=0x80 { return 0,blot_error::Error.invalid_utf8; } point=(point<<6)|(bytes[i]&63); }
+ if (bytes.len==2&&point<0x80)||(bytes.len==3&&point<0x800)||(bytes.len==4&&point<0x10000)||point>0x10ffff||(point>=0xd800&&point<=0xdfff) { return 0,blot_error::Error.invalid_utf8; }
+ return point,blot_error::Error.none;
 }
 fn validate_source(source: const u8[:],result: Result&) {
  var at=0;
  while at<source.len {
   let width=utf8_width(source[at]); if width==0 { diagnose(result,invalid_utf8,at,at+1); return; }
   if width>source.len-at { diagnose(result,invalid_utf8,at,source.len); return; }
-  let point,err=decode_point(source[at..at+width]); if err!=Error.none { diagnose(result,invalid_utf8,at,at+width); return; }
+  let point,err=decode_point(source[at..at+width]); if err!=blot_error::Error.none { diagnose(result,invalid_utf8,at,at+width); return; }
   if point>=0xe000 && point<=0xe002 { diagnose(result,reserved_layout,at,at+width); return; }
   at+=width;
  }
@@ -314,10 +314,10 @@ fn contextual(source: const u8[:],result: Result&) {
  }
 }
 fn lex(source: const u8[:],result: Result&) -> Error {
- if source.len>0xffffffff { return Error.source_limit; }
+ if source.len>0xffffffff { return blot_error::Error.source_limit; }
  validate_source(source,result); if result.diagnostics.len==0 { scan(source,result); }
  if result.diagnostics.len==0 { layout(source,result); if result.diagnostics.len==0 { contextual(source,result); } }
- emit(result.tokens,blot_parse_token::eof,source.len,source.len); return Error.none;
+ emit(result.tokens,blot_parse_token::eof,source.len,source.len); return blot_error::Error.none;
 }
 
 fn code_name(code: Code) -> const u8[:] {

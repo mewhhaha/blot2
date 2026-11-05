@@ -61,6 +61,7 @@ def fields(body):
 
 SKIP = {'support/json_adapters.goose'}
 models = {}
+structs = {}
 scalar_projections = {}
 aliases = {}
 custom = {}
@@ -68,6 +69,8 @@ arrays = set()
 imports = set()
 primitives = {'bool','u8','u16','u32','u64','i8','i16','i32','i64','f32','f64'}
 for path in sorted(ROOT.rglob('*.goose')):
+    if path.name.startswith('_') or (path.parent == ROOT and 'probe' in path.stem):
+        continue
     if path.relative_to(ROOT).as_posix() in SKIP:
         continue
     text = clean(path.read_text())
@@ -88,6 +91,12 @@ for path in sorted(ROOT.rglob('*.goose')):
                 if variant:
                     variants[variant[1] or variant[2]] = variant[3].strip()
             native_unions[union[1]] = variants
+    for declaration in re.finditer(r'\bstruct\s+(\w+)(?:<([^>{}]+)>)?\s*\{', text):
+        name, generic = declaration.groups()
+        qualified = ns+'::'+name
+        if generic:
+            qualified += '<'+generic+'>'
+        structs[qualified] = (generic, module)
     for alias in re.finditer(r'\btype\s+(\w+)\s*=\s*([^;]+);', text):
         aliases[ns+'::'+alias[1]] = (alias[2].strip(), ns)
     for match in re.finditer(r'\benum\s+(\w+)\s*\{', text):
@@ -149,7 +158,7 @@ for path in sorted(ROOT.rglob('*.goose')):
         custom[qualified] = (ns, generic, module, returns_error, output_bytes)
     for match in re.finditer(r'\b(?:struct|enum)\s+\w+\s*\{', text):
         end = balanced(text, match.end()-1)
-        for raw in re.finditer(r'(?<![\w:])(?:const\s+)?((?:\w+::)?\w+)\s*\[(\d+)\]', text[match.end():end]):
+        for raw in re.finditer(r'(?<!\w)(?:const\s+)?((?:\w+::)?\w+)\s*\[(\d+)\]', text[match.end():end]):
             inner, width = raw.groups()
             if inner not in primitives and '::' not in inner:
                 inner = ns+'::'+inner
@@ -160,31 +169,42 @@ out = ['// Generated source by tools/write_json_adapters.py; unverified.',
        'namespace blot_json;', 'import support.json;']
 for _, (_, module) in models.items():
     imports.add(module)
+for _, (_, module) in structs.items():
+    imports.add(module)
 for _, (_, _, module, _, _) in custom.items():
     imports.add(module)
 for _, _, module in arrays:
     imports.add(module)
 out.extend('import '+module+';' for module in sorted(imports) if module != 'support.json')
+for name, (generic, _) in sorted(structs.items()):
+    if name in custom or name in {'blot_support::Option<T>', 'blot_json::Raw'}:
+        continue
+    parameters = '<JsonWriter'
+    if generic:
+        parameters += ','+generic
+    parameters += '>'
+    out.append('fn write'+parameters+'(writer:JsonWriter&,value:'+name+')->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}')
 for name, (payload, _) in sorted(models.items()):
     if name in custom:
         continue
     implementation = 'unionValue' if payload else 'enumValue'
     projections = scalar_projections.get(name, [])
     if not projections:
-        out.append('fn write(writer:Writer&,value:'+name+')->blot_error::Error {return '+implementation+'(writer,value);}')
+        out.append('fn write<JsonWriter>(writer:JsonWriter&,value:'+name+')->blot_error::Error {return '+implementation+'(writer,value);}')
         continue
-    out.append('fn write(writer:Writer&,value:'+name+')->blot_error::Error {match value {')
+    out.append('fn write<JsonWriter>(writer:JsonWriter&,value:'+name+')->blot_error::Error {match value {')
     for variant, member in projections:
-        out.append(name+'.'+variant+' payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("'+variant+'"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.'+member+');if written!=blot_error::Error.none {return written;}return endObject(writer);},')
+        out.append(variant+' payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("'+variant+'"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.'+member+');if written!=blot_error::Error.none {return written;}return endObject(writer);},')
     out.append('_=>{return '+implementation+'(writer,value);},}}')
 for name, (ns, generic, _, returns_error, output_bytes) in sorted(custom.items()):
-    type_parameters = ''
+    type_parameters = '<JsonWriter'
     if generic:
-        type_parameters = '<'+generic+'>'
-    prefix = 'fn write'+type_parameters+'(writer:Writer&,value:'+name+')->blot_error::Error {'
+        type_parameters += ','+generic
+    type_parameters += '>'
+    prefix = 'fn write'+type_parameters+'(writer:JsonWriter&,value:'+name+')->blot_error::Error {'
     prefix += 'if writer.failure!=blot_error::Error.none {return writer.failure;}'
     if output_bytes:
-        body = 'var bytes:u8[>..]=[];'+ns+'::jsonStringify(value,bytes);return write(writer,Raw{bytes[:]});'
+        body = 'var bytes:u8[>..]=[];'+ns+'::jsonStringify(value,bytes);return write(writer,Raw{bytes[..]});'
     elif returns_error:
         body = 'let error='+ns+'::jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;'
     else:
@@ -212,5 +232,5 @@ for inner, width, _ in sorted(arrays):
         continue
     seen.add(key)
     # Fixed arrays are JSON arrays, including u8; only byte slices are strings.
-    out.append('fn write(writer:Writer&,values:'+inner+'['+str(width)+'])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}')
+    out.append('fn write<JsonWriter>(writer:JsonWriter&,values:'+inner+'['+str(width)+'])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}')
 (ROOT/'support/json_adapters.goose').write_text('\n'.join(out)+'\n')

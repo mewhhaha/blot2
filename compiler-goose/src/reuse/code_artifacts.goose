@@ -2,8 +2,10 @@
 namespace blot_reuse_code_artifacts;
 import check.core;
 import backend.layout;
+import backend.call_limits;
 import backend.provider_chain;
 import support.error;
+import support.pooled_buffer;
 import support.option;
 import support.native;
 import eval.type_evidence;
@@ -27,7 +29,7 @@ import reuse.principal_inputs;
 import reuse.semantic_query_table;
 
 type Error = blot_error::Error;
-let max_parameters: i64 = 16;
+const max_parameters: i64 = blot_backend_call_limits::max_parameters;
 struct Key {
     dictionaries: bool = false, instance_arguments: u32 = 0,
     target: blot_check_core::BindingRef,
@@ -66,7 +68,7 @@ struct ValueResult { value: u32, layout: u32 }
 struct StaticRead { target: blot_check_core::BindingRef, value: u32 }
 struct Span { start: u32 = 0, len: u32 = 0 }
 struct Job {
-    parent: u32, request: Request, reusable: bool = true,
+    parent: u32, request: Request, reusable_: bool = true,
     inline_bodies: Span, static_reads: Span, inline_capacity: u32 = 0, static_capacity: u32 = 0, state: State = State.pending,
     function: blot_support::Option<u32>, target_job: u32 = 0,
     mappings: Span, rows: Span, templates: Span, solved: bool = false,
@@ -76,7 +78,7 @@ struct Job {
 fn hasStaticValues(job: Job) -> bool {
     if job.static_reads.len != 0 { return true; }
     match job.request {
-        Request.closure key => { return key.key.static_values != 0 || key.key.staged != 0; },
+        closure key => { return key.key.static_values != 0 || key.key.staged != 0; },
         _ => { return false; },
     }
 }
@@ -107,142 +109,128 @@ fn freshToken() -> Token { blot_native::fresh_owner_id() }
 // Per-job slices are ranges into caller-owned journal tables. Inline/static
 // reads reserve a private run, so nested jobs do not invalidate their ranges.
 // A range moves only when its own capacity grows.
-import support.pooled_buffer;
-struct Context_Job {storage:Job[:]=[],items:Job[:]=[],len:i64=0,failure:Error=Error.none}
+struct Context_Job {storage:Job[:]=default<Job[:]>(),items:Job[:]=default<Job[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_Job:Job[>..]=[];
-var inactive_Context_Job:Context_Job=Context_Job{..};
-fn ensure(self:Context_Job&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_Job);return self.failure;}
-fn push(self:Context_Job&,value:Job) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_Job);self.len=self.items.len;}
-fn append(self:Context_Job&,values:const Job[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_Job);self.len=self.items.len;}
-fn resize(self:Context_Job&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
-fn resize(self:Context_Job&,length:i64,value:Job) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
-fn clear(self:Context_Job&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
-fn deinit(self:Context_Job&) {blot_support_pooled_buffer::deinit(self,pool_Context_Job);self.len=0;self.failure=Error.none;}
-struct Context_StampedEvent {storage:StampedEvent[:]=[],items:StampedEvent[:]=[],len:i64=0,failure:Error=Error.none}
+fn ensure(self_:Context_Job&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_Job);return self_.failure;}
+fn push(self_:Context_Job&,value:Job) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_Job);self_.len=self_.items.len;}
+fn append(self_:Context_Job&,values:const Job[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_Job);self_.len=self_.items.len;}
+fn resize(self_:Context_Job&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Context_Job&,length:i64,value:Job) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn clear(self_:Context_Job&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:Context_Job&) {blot_support_pooled_buffer::deinit(self_,pool_Context_Job);self_.len=0;self_.failure=blot_error::Error.none;}
+struct Context_StampedEvent {storage:StampedEvent[:]=default<StampedEvent[:]>(),items:StampedEvent[:]=default<StampedEvent[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_StampedEvent:StampedEvent[>..]=[];
-var inactive_Context_StampedEvent:Context_StampedEvent=Context_StampedEvent{..};
-fn ensure(self:Context_StampedEvent&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_StampedEvent);return self.failure;}
-fn push(self:Context_StampedEvent&,value:StampedEvent) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_StampedEvent);self.len=self.items.len;}
-fn append(self:Context_StampedEvent&,values:const StampedEvent[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_StampedEvent);self.len=self.items.len;}
-fn resize(self:Context_StampedEvent&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
-fn resize(self:Context_StampedEvent&,length:i64,value:StampedEvent) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
-fn clear(self:Context_StampedEvent&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
-fn deinit(self:Context_StampedEvent&) {blot_support_pooled_buffer::deinit(self,pool_Context_StampedEvent);self.len=0;self.failure=Error.none;}
-struct Context_u32 {storage:u32[:]=[],items:u32[:]=[],len:i64=0,failure:Error=Error.none}
+fn ensure(self_:Context_StampedEvent&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_StampedEvent);return self_.failure;}
+fn push(self_:Context_StampedEvent&,value:StampedEvent) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_StampedEvent);self_.len=self_.items.len;}
+fn append(self_:Context_StampedEvent&,values:const StampedEvent[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_StampedEvent);self_.len=self_.items.len;}
+fn resize(self_:Context_StampedEvent&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Context_StampedEvent&,length:i64,value:StampedEvent) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn clear(self_:Context_StampedEvent&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:Context_StampedEvent&) {blot_support_pooled_buffer::deinit(self_,pool_Context_StampedEvent);self_.len=0;self_.failure=blot_error::Error.none;}
+struct Context_u32 {storage:u32[:]=default<u32[:]>(),items:u32[:]=default<u32[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_u32:u32[>..]=[];
-var inactive_Context_u32:Context_u32=Context_u32{..};
-fn ensure(self:Context_u32&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_u32);return self.failure;}
-fn push(self:Context_u32&,value:u32) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_u32);self.len=self.items.len;}
-fn append(self:Context_u32&,values:const u32[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_u32);self.len=self.items.len;}
-fn resize(self:Context_u32&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
-fn resize(self:Context_u32&,length:i64,value:u32) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
-fn clear(self:Context_u32&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
-fn deinit(self:Context_u32&) {blot_support_pooled_buffer::deinit(self,pool_Context_u32);self.len=0;self.failure=Error.none;}
-struct Context_blot_check_core__BindingRef {storage:blot_check_core::BindingRef[:]=[],items:blot_check_core::BindingRef[:]=[],len:i64=0,failure:Error=Error.none}
+fn ensure(self_:Context_u32&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_u32);return self_.failure;}
+fn push(self_:Context_u32&,value:u32) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_u32);self_.len=self_.items.len;}
+fn append(self_:Context_u32&,values:const u32[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_u32);self_.len=self_.items.len;}
+fn resize(self_:Context_u32&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Context_u32&,length:i64,value:u32) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn clear(self_:Context_u32&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:Context_u32&) {blot_support_pooled_buffer::deinit(self_,pool_Context_u32);self_.len=0;self_.failure=blot_error::Error.none;}
+struct Context_blot_check_core__BindingRef {storage:blot_check_core::BindingRef[:]=default<blot_check_core::BindingRef[:]>(),items:blot_check_core::BindingRef[:]=default<blot_check_core::BindingRef[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_blot_check_core__BindingRef:blot_check_core::BindingRef[>..]=[];
-var inactive_Context_blot_check_core__BindingRef:Context_blot_check_core__BindingRef=Context_blot_check_core__BindingRef{..};
-fn ensure(self:Context_blot_check_core__BindingRef&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_check_core__BindingRef);return self.failure;}
-fn push(self:Context_blot_check_core__BindingRef&,value:blot_check_core::BindingRef) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_check_core__BindingRef);self.len=self.items.len;}
-fn append(self:Context_blot_check_core__BindingRef&,values:const blot_check_core::BindingRef[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_check_core__BindingRef);self.len=self.items.len;}
-fn resize(self:Context_blot_check_core__BindingRef&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
-fn resize(self:Context_blot_check_core__BindingRef&,length:i64,value:blot_check_core::BindingRef) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
-fn clear(self:Context_blot_check_core__BindingRef&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
-fn deinit(self:Context_blot_check_core__BindingRef&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_check_core__BindingRef);self.len=0;self.failure=Error.none;}
-struct Context_StaticRead {storage:StaticRead[:]=[],items:StaticRead[:]=[],len:i64=0,failure:Error=Error.none}
+fn ensure(self_:Context_blot_check_core__BindingRef&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_blot_check_core__BindingRef);return self_.failure;}
+fn push(self_:Context_blot_check_core__BindingRef&,value:blot_check_core::BindingRef) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_blot_check_core__BindingRef);self_.len=self_.items.len;}
+fn append(self_:Context_blot_check_core__BindingRef&,values:const blot_check_core::BindingRef[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_blot_check_core__BindingRef);self_.len=self_.items.len;}
+fn resize(self_:Context_blot_check_core__BindingRef&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Context_blot_check_core__BindingRef&,length:i64,value:blot_check_core::BindingRef) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn clear(self_:Context_blot_check_core__BindingRef&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:Context_blot_check_core__BindingRef&) {blot_support_pooled_buffer::deinit(self_,pool_Context_blot_check_core__BindingRef);self_.len=0;self_.failure=blot_error::Error.none;}
+struct Context_StaticRead {storage:StaticRead[:]=default<StaticRead[:]>(),items:StaticRead[:]=default<StaticRead[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_StaticRead:StaticRead[>..]=[];
-var inactive_Context_StaticRead:Context_StaticRead=Context_StaticRead{..};
-fn ensure(self:Context_StaticRead&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_StaticRead);return self.failure;}
-fn push(self:Context_StaticRead&,value:StaticRead) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_StaticRead);self.len=self.items.len;}
-fn append(self:Context_StaticRead&,values:const StaticRead[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_StaticRead);self.len=self.items.len;}
-fn resize(self:Context_StaticRead&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
-fn resize(self:Context_StaticRead&,length:i64,value:StaticRead) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
-fn clear(self:Context_StaticRead&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
-fn deinit(self:Context_StaticRead&) {blot_support_pooled_buffer::deinit(self,pool_Context_StaticRead);self.len=0;self.failure=Error.none;}
-struct Context_blot_backend_layout__Mapping {storage:blot_backend_layout::Mapping[:]=[],items:blot_backend_layout::Mapping[:]=[],len:i64=0,failure:Error=Error.none}
+fn ensure(self_:Context_StaticRead&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_StaticRead);return self_.failure;}
+fn push(self_:Context_StaticRead&,value:StaticRead) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_StaticRead);self_.len=self_.items.len;}
+fn append(self_:Context_StaticRead&,values:const StaticRead[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_StaticRead);self_.len=self_.items.len;}
+fn resize(self_:Context_StaticRead&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Context_StaticRead&,length:i64,value:StaticRead) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn clear(self_:Context_StaticRead&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:Context_StaticRead&) {blot_support_pooled_buffer::deinit(self_,pool_Context_StaticRead);self_.len=0;self_.failure=blot_error::Error.none;}
+struct Context_blot_backend_layout__Mapping {storage:blot_backend_layout::Mapping[:]=default<blot_backend_layout::Mapping[:]>(),items:blot_backend_layout::Mapping[:]=default<blot_backend_layout::Mapping[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_blot_backend_layout__Mapping:blot_backend_layout::Mapping[>..]=[];
-var inactive_Context_blot_backend_layout__Mapping:Context_blot_backend_layout__Mapping=Context_blot_backend_layout__Mapping{..};
-fn ensure(self:Context_blot_backend_layout__Mapping&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_backend_layout__Mapping);return self.failure;}
-fn push(self:Context_blot_backend_layout__Mapping&,value:blot_backend_layout::Mapping) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_backend_layout__Mapping);self.len=self.items.len;}
-fn append(self:Context_blot_backend_layout__Mapping&,values:const blot_backend_layout::Mapping[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_backend_layout__Mapping);self.len=self.items.len;}
-fn resize(self:Context_blot_backend_layout__Mapping&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
-fn resize(self:Context_blot_backend_layout__Mapping&,length:i64,value:blot_backend_layout::Mapping) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
-fn clear(self:Context_blot_backend_layout__Mapping&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
-fn deinit(self:Context_blot_backend_layout__Mapping&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_backend_layout__Mapping);self.len=0;self.failure=Error.none;}
-struct Context_blot_backend_layout__RowMapping {storage:blot_backend_layout::RowMapping[:]=[],items:blot_backend_layout::RowMapping[:]=[],len:i64=0,failure:Error=Error.none}
+fn ensure(self_:Context_blot_backend_layout__Mapping&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_blot_backend_layout__Mapping);return self_.failure;}
+fn push(self_:Context_blot_backend_layout__Mapping&,value:blot_backend_layout::Mapping) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_blot_backend_layout__Mapping);self_.len=self_.items.len;}
+fn append(self_:Context_blot_backend_layout__Mapping&,values:const blot_backend_layout::Mapping[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_blot_backend_layout__Mapping);self_.len=self_.items.len;}
+fn resize(self_:Context_blot_backend_layout__Mapping&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Context_blot_backend_layout__Mapping&,length:i64,value:blot_backend_layout::Mapping) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn clear(self_:Context_blot_backend_layout__Mapping&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:Context_blot_backend_layout__Mapping&) {blot_support_pooled_buffer::deinit(self_,pool_Context_blot_backend_layout__Mapping);self_.len=0;self_.failure=blot_error::Error.none;}
+struct Context_blot_backend_layout__RowMapping {storage:blot_backend_layout::RowMapping[:]=default<blot_backend_layout::RowMapping[:]>(),items:blot_backend_layout::RowMapping[:]=default<blot_backend_layout::RowMapping[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_blot_backend_layout__RowMapping:blot_backend_layout::RowMapping[>..]=[];
-var inactive_Context_blot_backend_layout__RowMapping:Context_blot_backend_layout__RowMapping=Context_blot_backend_layout__RowMapping{..};
-fn ensure(self:Context_blot_backend_layout__RowMapping&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_backend_layout__RowMapping);return self.failure;}
-fn push(self:Context_blot_backend_layout__RowMapping&,value:blot_backend_layout::RowMapping) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_backend_layout__RowMapping);self.len=self.items.len;}
-fn append(self:Context_blot_backend_layout__RowMapping&,values:const blot_backend_layout::RowMapping[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_backend_layout__RowMapping);self.len=self.items.len;}
-fn resize(self:Context_blot_backend_layout__RowMapping&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
-fn resize(self:Context_blot_backend_layout__RowMapping&,length:i64,value:blot_backend_layout::RowMapping) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
-fn clear(self:Context_blot_backend_layout__RowMapping&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
-fn deinit(self:Context_blot_backend_layout__RowMapping&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_backend_layout__RowMapping);self.len=0;self.failure=Error.none;}
-struct Context_blot_reuse_substitution_keys__Entry {storage:blot_reuse_substitution_keys::Entry[:]=[],items:blot_reuse_substitution_keys::Entry[:]=[],len:i64=0,failure:Error=Error.none}
+fn ensure(self_:Context_blot_backend_layout__RowMapping&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_blot_backend_layout__RowMapping);return self_.failure;}
+fn push(self_:Context_blot_backend_layout__RowMapping&,value:blot_backend_layout::RowMapping) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_blot_backend_layout__RowMapping);self_.len=self_.items.len;}
+fn append(self_:Context_blot_backend_layout__RowMapping&,values:const blot_backend_layout::RowMapping[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_blot_backend_layout__RowMapping);self_.len=self_.items.len;}
+fn resize(self_:Context_blot_backend_layout__RowMapping&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Context_blot_backend_layout__RowMapping&,length:i64,value:blot_backend_layout::RowMapping) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn clear(self_:Context_blot_backend_layout__RowMapping&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:Context_blot_backend_layout__RowMapping&) {blot_support_pooled_buffer::deinit(self_,pool_Context_blot_backend_layout__RowMapping);self_.len=0;self_.failure=blot_error::Error.none;}
+struct Context_blot_reuse_substitution_keys__Entry {storage:blot_reuse_substitution_keys::Entry[:]=default<blot_reuse_substitution_keys::Entry[:]>(),items:blot_reuse_substitution_keys::Entry[:]=default<blot_reuse_substitution_keys::Entry[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_blot_reuse_substitution_keys__Entry:blot_reuse_substitution_keys::Entry[>..]=[];
-var inactive_Context_blot_reuse_substitution_keys__Entry:Context_blot_reuse_substitution_keys__Entry=Context_blot_reuse_substitution_keys__Entry{..};
-fn ensure(self:Context_blot_reuse_substitution_keys__Entry&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_reuse_substitution_keys__Entry);return self.failure;}
-fn push(self:Context_blot_reuse_substitution_keys__Entry&,value:blot_reuse_substitution_keys::Entry) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_reuse_substitution_keys__Entry);self.len=self.items.len;}
-fn append(self:Context_blot_reuse_substitution_keys__Entry&,values:const blot_reuse_substitution_keys::Entry[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_reuse_substitution_keys__Entry);self.len=self.items.len;}
-fn resize(self:Context_blot_reuse_substitution_keys__Entry&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
-fn resize(self:Context_blot_reuse_substitution_keys__Entry&,length:i64,value:blot_reuse_substitution_keys::Entry) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
-fn clear(self:Context_blot_reuse_substitution_keys__Entry&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
-fn deinit(self:Context_blot_reuse_substitution_keys__Entry&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_reuse_substitution_keys__Entry);self.len=0;self.failure=Error.none;}
-struct Context_blot_reuse_independent_call_proof__Record {storage:blot_reuse_independent_call_proof::Record[:]=[],items:blot_reuse_independent_call_proof::Record[:]=[],len:i64=0,failure:Error=Error.none}
+fn ensure(self_:Context_blot_reuse_substitution_keys__Entry&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_blot_reuse_substitution_keys__Entry);return self_.failure;}
+fn push(self_:Context_blot_reuse_substitution_keys__Entry&,value:blot_reuse_substitution_keys::Entry) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_blot_reuse_substitution_keys__Entry);self_.len=self_.items.len;}
+fn append(self_:Context_blot_reuse_substitution_keys__Entry&,values:const blot_reuse_substitution_keys::Entry[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_blot_reuse_substitution_keys__Entry);self_.len=self_.items.len;}
+fn resize(self_:Context_blot_reuse_substitution_keys__Entry&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Context_blot_reuse_substitution_keys__Entry&,length:i64,value:blot_reuse_substitution_keys::Entry) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn clear(self_:Context_blot_reuse_substitution_keys__Entry&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:Context_blot_reuse_substitution_keys__Entry&) {blot_support_pooled_buffer::deinit(self_,pool_Context_blot_reuse_substitution_keys__Entry);self_.len=0;self_.failure=blot_error::Error.none;}
+struct Context_blot_reuse_independent_call_proof__Record {storage:blot_reuse_independent_call_proof::Record[:]=default<blot_reuse_independent_call_proof::Record[:]>(),items:blot_reuse_independent_call_proof::Record[:]=default<blot_reuse_independent_call_proof::Record[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_blot_reuse_independent_call_proof__Record:blot_reuse_independent_call_proof::Record[>..]=[];
-var inactive_Context_blot_reuse_independent_call_proof__Record:Context_blot_reuse_independent_call_proof__Record=Context_blot_reuse_independent_call_proof__Record{..};
-fn ensure(self:Context_blot_reuse_independent_call_proof__Record&,minimum:i64)->Error {if self.failure!=Error.none {return self.failure;}self.failure=blot_support_pooled_buffer::ensure(self,minimum,pool_Context_blot_reuse_independent_call_proof__Record);return self.failure;}
-fn push(self:Context_blot_reuse_independent_call_proof__Record&,value:blot_reuse_independent_call_proof::Record) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::push(self,value,pool_Context_blot_reuse_independent_call_proof__Record);self.len=self.items.len;}
-fn append(self:Context_blot_reuse_independent_call_proof__Record&,values:const blot_reuse_independent_call_proof::Record[:]) {if self.failure!=Error.none {return;}self.failure=blot_support_pooled_buffer::append(self,values,pool_Context_blot_reuse_independent_call_proof__Record);self.len=self.items.len;}
-fn resize(self:Context_blot_reuse_independent_call_proof__Record&,length:i64) {blot_support_pooled_buffer::resize(self,length);self.len=length;}
-fn resize(self:Context_blot_reuse_independent_call_proof__Record&,length:i64,value:blot_reuse_independent_call_proof::Record) {if length<=self.len {self.resize(length);return;}if self.ensure(length)!=Error.none {return;}for index in self.len..length {self.storage[index]=value;}self.items=self.storage[..length];self.len=length;}
-fn clear(self:Context_blot_reuse_independent_call_proof__Record&) {blot_support_pooled_buffer::clear(self);self.len=0;self.failure=Error.none;}
-fn deinit(self:Context_blot_reuse_independent_call_proof__Record&) {blot_support_pooled_buffer::deinit(self,pool_Context_blot_reuse_independent_call_proof__Record);self.len=0;self.failure=Error.none;}
-var inactive_context_principal_queries:blot_reuse_principal_query::Table=default<blot_reuse_principal_query::Table>();
-var inactive_context_principal_graphs:blot_eval_core_eval::RetainedPrincipalGraphs=default<blot_eval_core_eval::RetainedPrincipalGraphs>();
-var inactive_context_specialization_queries:blot_eval_selected_query::Table=default<blot_eval_selected_query::Table>();
-var inactive_context_refinement_queries:blot_reuse_refinement_receipt::Table=default<blot_reuse_refinement_receipt::Table>();
+fn ensure(self_:Context_blot_reuse_independent_call_proof__Record&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_blot_reuse_independent_call_proof__Record);return self_.failure;}
+fn push(self_:Context_blot_reuse_independent_call_proof__Record&,value:blot_reuse_independent_call_proof::Record) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_blot_reuse_independent_call_proof__Record);self_.len=self_.items.len;}
+fn append(self_:Context_blot_reuse_independent_call_proof__Record&,values:const blot_reuse_independent_call_proof::Record[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_blot_reuse_independent_call_proof__Record);self_.len=self_.items.len;}
+fn resize(self_:Context_blot_reuse_independent_call_proof__Record&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn resize(self_:Context_blot_reuse_independent_call_proof__Record&,length:i64,value:blot_reuse_independent_call_proof::Record) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn clear(self_:Context_blot_reuse_independent_call_proof__Record&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:Context_blot_reuse_independent_call_proof__Record&) {blot_support_pooled_buffer::deinit(self_,pool_Context_blot_reuse_independent_call_proof__Record);self_.len=0;self_.failure=blot_error::Error.none;}
 
 struct Context {
     context_lease:u32=0,context_generation:u64=0,
     allocation_owner: u64 = 0,
     active_job: u32 = 0, clock: u64 = 0,
-    jobs: Context_Job&=inactive_Context_Job, events: Context_StampedEvent&=inactive_Context_StampedEvent,
-    function_jobs: Context_u32&=inactive_Context_u32, global_jobs: Context_u32&=inactive_Context_u32,
-    inline_bodies: Context_blot_check_core__BindingRef&=inactive_Context_blot_check_core__BindingRef, static_reads: Context_StaticRead&=inactive_Context_StaticRead,
-    mappings: Context_blot_backend_layout__Mapping&=inactive_Context_blot_backend_layout__Mapping, rows: Context_blot_backend_layout__RowMapping&=inactive_Context_blot_backend_layout__RowMapping,
-    templates: Context_blot_reuse_substitution_keys__Entry&=inactive_Context_blot_reuse_substitution_keys__Entry,
-    pools: blot_support::Option<Pools>=blot_support::none<Pools>(),
-    principal_queries: blot_reuse_principal_query::Table&=inactive_context_principal_queries,
-    principal_graphs: blot_eval_core_eval::RetainedPrincipalGraphs&=inactive_context_principal_graphs,
-    specialization_queries: blot_eval_selected_query::Table&=inactive_context_specialization_queries,
-    independent_calls: Context_blot_reuse_independent_call_proof__Record&=inactive_Context_blot_reuse_independent_call_proof__Record,
-    refinement_queries: blot_reuse_refinement_receipt::Table&=inactive_context_refinement_queries,
+    jobs: Context_Job& =inactive_Context_Job, events: Context_StampedEvent& =inactive_Context_StampedEvent,
+    function_jobs: Context_u32& =inactive_Context_u32, global_jobs: Context_u32& =inactive_Context_u32,
+    inline_bodies: Context_blot_check_core__BindingRef& =inactive_Context_blot_check_core__BindingRef, static_reads: Context_StaticRead& =inactive_Context_StaticRead,
+    mappings: Context_blot_backend_layout__Mapping& =inactive_Context_blot_backend_layout__Mapping, rows: Context_blot_backend_layout__RowMapping& =inactive_Context_blot_backend_layout__RowMapping,
+    templates: Context_blot_reuse_substitution_keys__Entry& =inactive_Context_blot_reuse_substitution_keys__Entry,
+    pools: blot_support::Option<Pools> =blot_support::none<Pools>(),
+    principal_queries: blot_reuse_principal_query::Table& =inactive_context_principal_queries,
+    principal_graphs: blot_eval_core_eval::RetainedPrincipalGraphs& =inactive_context_principal_graphs,
+    specialization_queries: blot_eval_selected_query::Table& =inactive_context_specialization_queries,
+    independent_calls: Context_blot_reuse_independent_call_proof__Record& =inactive_Context_blot_reuse_independent_call_proof__Record,
+    refinement_queries: blot_reuse_refinement_receipt::Table& =inactive_context_refinement_queries,
 }
 struct Scope { context: Context&?, id: u32, parent: u32, live: bool = true }
-fn depth(self: const Context&) -> i64 {
-    var id = self.active_job; var count: i64 = 0;
-    while id != 0 { id = self.jobs.items[id - 1].parent; count++; }
+fn depth(self_: const Context&) -> i64 {
+    var id = self_.active_job; var count: i64 = 0;
+    while id != 0 { id = self_.jobs.items[id - 1].parent; count++; }
     return count;
 }
-fn appendEvent(self: Context&, event: Event) {
-    self.events.push(StampedEvent { self.clock, event , ..}); self.clock++;
+fn appendEvent(self_: Context&, event: Event) {
+    self_.events.push(StampedEvent { self_.clock, event , ..}); self_.clock++;
 }
-fn enter(self: Context&, request: Request) -> Scope, Error {
-    if self.jobs.len == 4294967295 { return Scope { self, 0, 0, false , ..}, Error.out_of_memory; }
-    let id = (self.jobs.len + 1) as u32;
-    let parent = self.active_job;
-    self.jobs.push(Job { parent: parent, request: request , ..});if self.jobs.failure!=Error.none {return Scope{context:self,id:0,parent:parent,live:false,..},self.jobs.failure;}
-    appendEvent(self, Event.enter { id , ..});if self.events.failure!=Error.none {self.jobs.resize(self.jobs.len-1);return Scope{context:self,id:0,parent:parent,live:false,..},self.events.failure;}self.active_job = id;
-    return Scope { self, id, parent , ..}, Error.none;
+fn enter(self_: Context&, request: Request) -> Scope, Error {
+    if self_.jobs.len == 4294967295 { return Scope { self_, 0, 0, false , ..}, blot_error::Error.out_of_memory; }
+    let id = (self_.jobs.len + 1) as u32;
+    let parent = self_.active_job;
+    self_.jobs.push(Job { parent: parent, request: request , ..});if self_.jobs.failure!=blot_error::Error.none {return Scope{context:self_,id:0,parent:parent,live:false,..},self_.jobs.failure;}
+    appendEvent(self_, Event.enter { id , ..});if self_.events.failure!=blot_error::Error.none {self_.jobs.resize(self_.jobs.len-1);return Scope{context:self_,id:0,parent:parent,live:false,..},self_.events.failure;}self_.active_job = id;
+    return Scope { self_, id, parent , ..}, blot_error::Error.none;
 }
-fn requireFreshCode(self: Context&) {
-    if self.active_job != 0 { self.jobs.items[self.active_job - 1].reusable = false; }
+fn requireFreshCode(self_: Context&) {
+    if self_.active_job != 0 { self_.jobs.items[self_.active_job - 1].reusable_ = false; }
 }
-fn materializeStaticValue(self: Context&) {
-    if self.active_job == 0 { return; }
-    let job = self.jobs.items[self.active_job - 1];
-    match job.request { Request.constant => {}, _ => { if !job.hasStaticValues() { self.requireFreshCode(); } } }
+fn materializeStaticValue(self_: Context&) {
+    if self_.active_job == 0 { return; }
+    let job = self_.jobs.items[self_.active_job - 1];
+    match job.request { constant => {}, _ => { if !job.hasStaticValues() { self_.requireFreshCode(); } } }
 }
 fn appendSpan<T,B>(items: B&, span: Span, value: T, capacity: u32&) -> Span {
     var start = span.start;
@@ -260,106 +248,106 @@ fn appendSpan<T,B>(items: B&, span: Span, value: T, capacity: u32&) -> Span {
     }
     items.items[start + span.len] = value; return Span { start, span.len + 1 , ..};
 }
-fn readInlineBody(self: Context&, target: blot_check_core::BindingRef) -> Error {
-    if self.active_job == 0 { return Error.none; }
-    let index = self.active_job - 1; let span = self.jobs.items[index].inline_bodies;
-    for at in span.len { if self.inline_bodies.items[span.start + at] == target { return Error.none; } }
-    self.jobs.items[index].inline_bodies = appendSpan(self.inline_bodies, span, target, self.jobs.items[index].inline_capacity);
-    return Error.none;
+fn readInlineBody(self_: Context&, target: blot_check_core::BindingRef) -> Error {
+    if self_.active_job == 0 { return blot_error::Error.none; }
+    let index = self_.active_job - 1; let span = self_.jobs.items[index].inline_bodies;
+    for at in span.len { if self_.inline_bodies.items[span.start + at] == target { return blot_error::Error.none; } }
+    self_.jobs.items[index].inline_bodies = appendSpan(self_.inline_bodies, span, target, self_.jobs.items[index].inline_capacity);
+    return blot_error::Error.none;
 }
-fn readStaticValue(self: Context&, target: blot_check_core::BindingRef, value: u32) -> Error {
-    if self.active_job == 0 { return Error.none; }
-    let index = self.active_job - 1; let span = self.jobs.items[index].static_reads;
+fn readStaticValue(self_: Context&, target: blot_check_core::BindingRef, value: u32) -> Error {
+    if self_.active_job == 0 { return blot_error::Error.none; }
+    let index = self_.active_job - 1; let span = self_.jobs.items[index].static_reads;
     for at in span.len {
-        let read = self.static_reads.items[span.start + at];
-        if read.target == target && read.value == value { return Error.none; }
+        let read = self_.static_reads.items[span.start + at];
+        if read.target == target && read.value == value { return blot_error::Error.none; }
     }
-    self.jobs.items[index].static_reads = appendSpan(self.static_reads, span, StaticRead { target, value , ..}, self.jobs.items[index].static_capacity);
-    return Error.none;
+    self_.jobs.items[index].static_reads = appendSpan(self_.static_reads, span, StaticRead { target, value , ..}, self_.jobs.items[index].static_capacity);
+    return blot_error::Error.none;
 }
-fn hasStaticValues(self: const Context&) -> bool {
-    return self.active_job != 0 && self.jobs.items[self.active_job - 1].hasStaticValues();
+fn hasStaticValues(self_: const Context&) -> bool {
+    return self_.active_job != 0 && self_.jobs.items[self_.active_job - 1].hasStaticValues();
 }
-fn functionCapacity(self: Context&, function: u32) {
-    while self.function_jobs.len <= function { self.function_jobs.push(0); }
+fn functionCapacity(self_: Context&, function: u32) {
+    while self_.function_jobs.len <= function { self_.function_jobs.push(0); }
 }
-fn hit(self: Scope&, function: u32) -> Error {
-    assert(self.context != null);
-    assert(self.live && self.context.active_job == self.id);
-    self.context.functionCapacity(function);
-    let target = self.context.function_jobs.items[function];
-    self.context.appendEvent(Event.hit { self.id, target, function , ..});
-    self.context.jobs.items[self.id - 1].function = blot_support::some(function);
-    self.context.jobs.items[self.id - 1].target_job = target;
-    self.context.jobs.items[self.id - 1].state = State.hit; return Error.none;
+fn hit(self_: Scope&, function: u32) -> Error {
+    assert(self_.context != null);
+    assert(self_.live && self_.context.active_job == self_.id);
+    self_.context.functionCapacity(function);
+    let target = self_.context.function_jobs.items[function];
+    self_.context.appendEvent(Event.hit { self_.id, target, function , ..});
+    self_.context.jobs.items[self_.id - 1].function = blot_support::some(function);
+    self_.context.jobs.items[self_.id - 1].target_job = target;
+    self_.context.jobs.items[self_.id - 1].state = State.hit; return blot_error::Error.none;
 }
-fn reserve(self: Scope&, function: u32) -> Error {
-    assert(self.context != null);
-    assert(self.live && self.context.active_job == self.id);
-    self.context.functionCapacity(function); assert(self.context.function_jobs.items[function] == 0);
-    self.context.appendEvent(Event.reserve { self.id, function , ..});
-    self.context.function_jobs.items[function] = self.id;
-    self.context.jobs.items[self.id - 1].function = blot_support::some(function);
-    self.context.jobs.items[self.id - 1].state = State.reserved; return Error.none;
+fn reserve(self_: Scope&, function: u32) -> Error {
+    assert(self_.context != null);
+    assert(self_.live && self_.context.active_job == self_.id);
+    self_.context.functionCapacity(function); assert(self_.context.function_jobs.items[function] == 0);
+    self_.context.appendEvent(Event.reserve { self_.id, function , ..});
+    self_.context.function_jobs.items[function] = self_.id;
+    self_.context.jobs.items[self_.id - 1].function = blot_support::some(function);
+    self_.context.jobs.items[self_.id - 1].state = State.reserved; return blot_error::Error.none;
 }
-fn solved(self: Scope&, mappings: const blot_backend_layout::Mapping[:],
+fn solved(self_: Scope&, mappings: const blot_backend_layout::Mapping[:],
     rows: const blot_backend_layout::RowMapping[:], templates: const blot_reuse_substitution_keys::Entry[:]) -> Error {
-    assert(self.context != null);
-    assert(self.live && self.context.active_job == self.id);
-    let m = Span { self.context.mappings.len as u32, mappings.len as u32 , ..};
-    let r = Span { self.context.rows.len as u32, rows.len as u32 , ..};
-    let t = Span { self.context.templates.len as u32, templates.len as u32 , ..};
-    self.context.mappings.append(mappings); self.context.rows.append(rows); self.context.templates.append(templates);
-    self.context.appendEvent(Event.solved { self.id , ..});
-    self.context.jobs.items[self.id - 1].mappings = m; self.context.jobs.items[self.id - 1].rows = r;
-    self.context.jobs.items[self.id - 1].templates = t; self.context.jobs.items[self.id - 1].solved = true;
-    return Error.none;
+    assert(self_.context != null);
+    assert(self_.live && self_.context.active_job == self_.id);
+    let m = Span { self_.context.mappings.len as u32, mappings.len as u32 , ..};
+    let r = Span { self_.context.rows.len as u32, rows.len as u32 , ..};
+    let t = Span { self_.context.templates.len as u32, templates.len as u32 , ..};
+    self_.context.mappings.append(mappings); self_.context.rows.append(rows); self_.context.templates.append(templates);
+    self_.context.appendEvent(Event.solved { self_.id , ..});
+    self_.context.jobs.items[self_.id - 1].mappings = m; self_.context.jobs.items[self_.id - 1].rows = r;
+    self_.context.jobs.items[self_.id - 1].templates = t; self_.context.jobs.items[self_.id - 1].solved = true;
+    return blot_error::Error.none;
 }
-fn complete(self: Scope&, function: u32, result_template: blot_support::Option<u32>) -> Error {
-    assert(self.context != null);
-    assert(self.live && self.context.active_job == self.id);
-    self.context.functionCapacity(function); let owner = self.context.function_jobs.items[function];
-    assert(owner == 0 || owner == self.id);
-    self.context.appendEvent(Event.complete { self.id, function, result_template , ..});
-    self.context.function_jobs.items[function] = self.id;
-    self.context.jobs.items[self.id - 1].function = blot_support::some(function);
-    self.context.jobs.items[self.id - 1].result_template = result_template;
-    self.context.jobs.items[self.id - 1].state = State.complete; return Error.none;
+fn complete(self_: Scope&, function: u32, result_template: blot_support::Option<u32>) -> Error {
+    assert(self_.context != null);
+    assert(self_.live && self_.context.active_job == self_.id);
+    self_.context.functionCapacity(function); let owner = self_.context.function_jobs.items[function];
+    assert(owner == 0 || owner == self_.id);
+    self_.context.appendEvent(Event.complete { self_.id, function, result_template , ..});
+    self_.context.function_jobs.items[function] = self_.id;
+    self_.context.jobs.items[self_.id - 1].function = blot_support::some(function);
+    self_.context.jobs.items[self_.id - 1].result_template = result_template;
+    self_.context.jobs.items[self_.id - 1].state = State.complete; return blot_error::Error.none;
 }
-fn completeValue(self: Scope&, value: u32, shape: u32) -> Error {
-    assert(self.context != null);
-    assert(self.live && self.context.active_job == self.id);
+fn completeValue(self_: Scope&, value: u32, shape: u32) -> Error {
+    assert(self_.context != null);
+    assert(self_.live && self_.context.active_job == self_.id);
     let result = ValueResult { value, shape , ..};
-    self.context.appendEvent(Event.complete_value { self.id, result , ..});
-    self.context.jobs.items[self.id - 1].value = blot_support::some(result);
-    self.context.jobs.items[self.id - 1].state = State.complete; return Error.none;
+    self_.context.appendEvent(Event.complete_value { self_.id, result , ..});
+    self_.context.jobs.items[self_.id - 1].value = blot_support::some(result);
+    self_.context.jobs.items[self_.id - 1].state = State.complete; return blot_error::Error.none;
 }
-fn completeGlobal(self: Scope&, global: u32) -> Error {
-    assert(self.context != null);
-    assert(self.live && self.context.active_job == self.id);
-    while self.context.global_jobs.len <= global { self.context.global_jobs.push(0); }
-    assert(self.context.global_jobs.items[global] == 0);
-    self.context.appendEvent(Event.complete_global { self.id, global , ..});
-    self.context.global_jobs.items[global] = self.id;
-    self.context.jobs.items[self.id - 1].global = blot_support::some(global);
-    self.context.jobs.items[self.id - 1].state = State.complete; return Error.none;
+fn completeGlobal(self_: Scope&, global: u32) -> Error {
+    assert(self_.context != null);
+    assert(self_.live && self_.context.active_job == self_.id);
+    while self_.context.global_jobs.len <= global { self_.context.global_jobs.push(0); }
+    assert(self_.context.global_jobs.items[global] == 0);
+    self_.context.appendEvent(Event.complete_global { self_.id, global , ..});
+    self_.context.global_jobs.items[global] = self_.id;
+    self_.context.jobs.items[self_.id - 1].global = blot_support::some(global);
+    self_.context.jobs.items[self_.id - 1].state = State.complete; return blot_error::Error.none;
 }
-fn hitGlobal(self: Scope&, global: u32) -> Error {
-    assert(self.context != null);
-    assert(self.live && self.context.active_job == self.id);
-    var target: u32 = 0; if global < self.context.global_jobs.len { target = self.context.global_jobs.items[global]; }
-    self.context.appendEvent(Event.hit_global { self.id, target, global , ..});
-    self.context.jobs.items[self.id - 1].global = blot_support::some(global);
-    self.context.jobs.items[self.id - 1].target_job = target;
-    self.context.jobs.items[self.id - 1].state = State.hit; return Error.none;
+fn hitGlobal(self_: Scope&, global: u32) -> Error {
+    assert(self_.context != null);
+    assert(self_.live && self_.context.active_job == self_.id);
+    var target: u32 = 0; if global < self_.context.global_jobs.len { target = self_.context.global_jobs.items[global]; }
+    self_.context.appendEvent(Event.hit_global { self_.id, target, global , ..});
+    self_.context.jobs.items[self_.id - 1].global = blot_support::some(global);
+    self_.context.jobs.items[self_.id - 1].target_job = target;
+    self_.context.jobs.items[self_.id - 1].state = State.hit; return blot_error::Error.none;
 }
-fn deinit(self: Scope&) {
-    assert(self.context != null);
-    assert(self.live && self.context.active_job == self.id);
-    let state = self.context.jobs.items[self.id - 1].state;
-    if state == State.pending || state == State.reserved { self.context.jobs.items[self.id - 1].state = State.failed; }
-    self.context.appendEvent(Event.leave { self.id, self.parent , ..});
-    self.context.active_job = self.parent; self.live = false;
+fn deinit(self_: Scope&) {
+    assert(self_.context != null);
+    assert(self_.live && self_.context.active_job == self_.id);
+    let state = self_.context.jobs.items[self_.id - 1].state;
+    if state == State.pending || state == State.reserved { self_.context.jobs.items[self_.id - 1].state = State.failed; }
+    self_.context.appendEvent(Event.leave { self_.id, self_.parent , ..});
+    self_.context.active_job = self_.parent; self_.live = false;
 }
 
 let stamp_buffer_bytes: i64 = 4096;
@@ -378,23 +366,23 @@ struct StampHash {
     hash: blot_support_blake3::State, bytes: u8[4096], len: i64 = 0,
     buffered: bool, counts: StampCounts = StampCounts {..},
 }
-fn flush(self: StampHash&) {
-    if self.len == 0 { return; }
-    self.hash.update(self.bytes[..self.len]); self.counts.hash_updates++;
-    self.counts.buffer_flushes++; self.len = 0;
+fn flush(self_: StampHash&) {
+    if self_.len == 0 { return; }
+    self_.hash.update(self_.bytes[..self_.len]); self_.counts.hash_updates++;
+    self_.counts.buffer_flushes++; self_.len = 0;
 }
-fn update(self: StampHash&, source: const u8[:]) {
-    self.counts.input_updates++; self.counts.bytes += source.len;
-    if !self.buffered { self.hash.update(source); self.counts.hash_updates++; return; }
+fn update(self_: StampHash&, source: const u8[:]) {
+    self_.counts.input_updates++; self_.counts.bytes += source.len;
+    if !self_.buffered { self_.hash.update(source); self_.counts.hash_updates++; return; }
     if source.len >= stamp_buffer_bytes {
-        self.flush(); self.hash.update(source); self.counts.hash_updates++; self.counts.direct_chunks++; return;
+        self_.flush(); self_.hash.update(source); self_.counts.hash_updates++; self_.counts.direct_chunks++; return;
     }
     var at: i64 = 0;
     while at < source.len {
-        var take = stamp_buffer_bytes - self.len;
+        var take = stamp_buffer_bytes - self_.len;
         if take > source.len - at { take = source.len - at; }
-        for index in take { self.bytes[self.len + index] = source[at + index]; }
-        self.len += take; at += take; if self.len == stamp_buffer_bytes { self.flush(); }
+        for index in take { self_.bytes[self_.len + index] = source[at + index]; }
+        self_.len += take; at += take; if self_.len == stamp_buffer_bytes { self_.flush(); }
     }
 }
 fn stamp<T>(options: Stamping, value: T) -> u8[32] {
@@ -422,11 +410,11 @@ fn sameStorage(left: blot_check_core::Module, right: blot_check_core::Module) ->
     return headerPrint(left) == headerPrint(right);
 }
 struct CompareStream { bytes: u8[>..<]&, compare: bool = false, at: i64 = 0, same: bool = true }
-fn update(self: CompareStream&, bytes: const u8[:]) {
-    if !self.compare { self.bytes.append(bytes); return; }
-    if self.at > self.bytes.len || bytes.len > self.bytes.len - self.at { self.same = false; return; }
-    if self.same { for byte, index in bytes { if byte != self.bytes[self.at + index] { self.same = false; break; } } }
-    self.at += bytes.len;
+fn update(self_: CompareStream&, bytes: const u8[:]) {
+    if !self_.compare { self_.bytes.append(bytes); return; }
+    if self_.at > self_.bytes.len || bytes.len > self_.bytes.len - self_.at { self_.same = false; return; }
+    if self_.same { for byte, index in bytes { if byte != self_.bytes[self_.at + index] { self_.same = false; break; } } }
+    self_.at += bytes.len;
 }
 fn sameStampValue<T>(left: T, right: T) -> bool {
     var bytes: u8[>..<] = []; var sink = CompareStream { bytes: bytes , ..};
@@ -437,8 +425,9 @@ fn sameStampValue(left: blot_check_core::Module, right: blot_check_core::Module)
     return sameStampValue(blot_check_core::stampView(left), blot_check_core::stampView(right));
 }
 fn stamp(module: blot_check_core::Module) -> u8[32] { stamp(blot_check_core::stampView(module)) }
+var inactive_pin_module: blot_check_core::Module = blot_check_core::Module {..};
 struct ModulePin {
-    unit: u32, module: const blot_check_core::Module&, canonical_path: const u8[:], token: Token,
+    unit: u32, module: const blot_check_core::Module& = inactive_pin_module, canonical_path: const u8[:], token: Token,
     header: blot_check_core::StampView, stamp: blot_support::Option<u8[32]>,
 }
 fn init(unit: u32, module: const blot_check_core::Module&, path: const u8[:]) -> ModulePin {
@@ -450,131 +439,132 @@ fn validated(unit: u32, module: const blot_check_core::Module&, path: const u8[:
 struct ModuleStampEntry {
     module: blot_check_core::Module, token: Token, digest: blot_support::Option<u8[32]>,
 }
+reusable[] var module_stamp_entries: ModuleStampEntry[>..] = [];
 struct ModuleStamps {
     current: const blot_check_core::Module[:], previous: const Pools? = null,
     compare_contents: bool = false, validate: bool = false,
-    entries: ModuleStampEntry[>..<]&, computed: i64 = 0, reused: i64 = 0,
+    entries: blot_support_pooled_buffer::Buffer<ModuleStampEntry> = blot_support_pooled_buffer::Buffer<ModuleStampEntry>{..}, computed: i64 = 0, reused: i64 = 0,
     comparisons: i64 = 0, copied: i64 = 0, hashed: i64 = 0,
 }
-fn deinit(self: ModuleStamps&) { self.entries.clear(); }
-fn owns(self: const ModuleStamps&, module: const blot_check_core::Module&) -> bool {
-    for &candidate in self.current { if candidate .== module { return true; } }
-    { let optional_source_15 .= self.previous; if optional_source_15 { let old .= optional_source_15;
+fn deinit(self_: ModuleStamps&) { blot_support_pooled_buffer::deinit(self_.entries,module_stamp_entries); }
+fn owns(self_: const ModuleStamps&, module: const blot_check_core::Module&) -> bool {
+    for &candidate in self_.current { if candidate .== module { return true; } }
+    { let optional_source_15 .= self_.previous; if optional_source_15 { let old .= optional_source_15;
         if module.unit != 0 && module.unit <= old.modules.len && old.modules[module.unit - 1].module .== module { return true; }
         for pin in old.modules { if pin.module .== module { return true; } }
      } }
     return false;
 }
-fn find(self: const ModuleStamps&, module: blot_check_core::Module) -> blot_support::Option<i64> {
-    for entry, index in self.entries {
+fn find(self_: const ModuleStamps&, module: blot_check_core::Module) -> blot_support::Option<i64> {
+    for entry, index in self_.entries.items {
         if entry.module.unit == module.unit && sameStorage(entry.module, module) { return blot_support::some(index); }
     }
     return blot_support::none<i64>();
 }
-fn record(self: ModuleStamps&, module: blot_check_core::Module, token: Token,
+fn record(self_: ModuleStamps&, module: blot_check_core::Module, token: Token,
     digest: blot_support::Option<u8[32]>) -> i64, Error {
     var known = digest;
-    if self.validate && !known.present { known = blot_support::some(stamp(module)); self.hashed++; }
-    let index = self.entries.len; self.entries.push(ModuleStampEntry { module, token, known , ..});
-    return index, Error.none;
+    if self_.validate && !known.present { known = blot_support::some(stamp(module)); self_.hashed++; }
+    let index = self_.entries.items.len; let error=blot_support_pooled_buffer::push(self_.entries,ModuleStampEntry{module,token,known,..},module_stamp_entries);if error!=blot_error::Error.none {return 0,error;}
+    return index, blot_error::Error.none;
 }
-fn proveSame(self: ModuleStamps&, left: const blot_check_core::Module&, right: const blot_check_core::Module&) -> bool, Error {
-    if !self.compare_contents || !self.owns(left) || !self.owns(right) { return false, Error.none; }
-    let known = self.find(left); if !known.present { return false, Error.none; }
-    let entry = self.entries[known.value]; if sameStorage(left, right) { return true, Error.none; }
-    self.comparisons++; if !sameStampValue(left, right) { return false, Error.none; }
-    let index, error = self.record(right, entry.token, entry.digest); if error != Error.none { return false, error; }
-    self.reused++; self.copied++; return true, Error.none;
+fn proveSame(self_: ModuleStamps&, left: const blot_check_core::Module&, right: const blot_check_core::Module&) -> bool, Error {
+    if !self_.compare_contents || !self_.owns(left) || !self_.owns(right) { return false, blot_error::Error.none; }
+    let known = self_.find(left); if !known.present { return false, blot_error::Error.none; }
+    let entry = self_.entries.items[known.value]; if sameStorage(left, right) { return true, blot_error::Error.none; }
+    self_.comparisons++; if !sameStampValue(left, right) { return false, blot_error::Error.none; }
+    let index, error = self_.record(right, entry.token, entry.digest); if error != blot_error::Error.none { return false, error; }
+    self_.reused++; self_.copied++; return true, blot_error::Error.none;
 }
-fn tokenEntry(self: ModuleStamps&, module: const blot_check_core::Module&) -> blot_support::Option<i64>, Error {
-    if !self.owns(module) { return blot_support::none<i64>(), Error.none; }
-    let found = self.find(module); if found.present { self.reused++; return found, Error.none; }
-    { let optional_source_14 .= self.previous; if optional_source_14 { let old .= optional_source_14;
+fn tokenEntry(self_: ModuleStamps&, module: const blot_check_core::Module&) -> blot_support::Option<i64>, Error {
+    if !self_.owns(module) { return blot_support::none<i64>(), blot_error::Error.none; }
+    let found = self_.find(module); if found.present { self_.reused++; return found, blot_error::Error.none; }
+    { let optional_source_14 .= self_.previous; if optional_source_14 { let old .= optional_source_14;
         for pin in old.modules {
             if pin.module.unit != module.unit || !sameStorage(pin.module, module) || headerPrint(pin.module) != pin.header { continue; }
-            self.reused++; let index, error = self.record(module, pin.token, blot_support::none<u8[32]>());
+            self_.reused++; let index, error = self_.record(module, pin.token, blot_support::none<u8[32]>());
             return blot_support::some(index), error;
         }
      } }
-    if self.compare_contents {
-        let count = self.entries.len;
+    if self_.compare_contents {
+        let count = self_.entries.items.len;
         for index in count {
-            let known = self.entries[index]; if known.module.unit != module.unit { continue; }
-            self.comparisons++; if !sameStampValue(known.module, module) { continue; }
-            self.reused++; self.copied++; let id, error = self.record(module, known.token, known.digest);
+            let known = self_.entries.items[index]; if known.module.unit != module.unit { continue; }
+            self_.comparisons++; if !sameStampValue(known.module, module) { continue; }
+            self_.reused++; self_.copied++; let id, error = self_.record(module, known.token, known.digest);
             return blot_support::some(id), error;
         }
     }
-    self.computed++; let index, error = self.record(module, freshToken(), blot_support::none<u8[32]>());
+    self_.computed++; let index, error = self_.record(module, freshToken(), blot_support::none<u8[32]>());
     return blot_support::some(index), error;
 }
-fn get(self: ModuleStamps&, module: const blot_check_core::Module&) -> Token, Error {
-    let known, error = self.tokenEntry(module); if error != Error.none { return 0, error; }
-    if !known.present { return freshToken(), Error.none; }
-    return self.entries[known.value].token, Error.none;
+fn get(self_: ModuleStamps&, module: const blot_check_core::Module&) -> Token, Error {
+    let known, error = self_.tokenEntry(module); if error != blot_error::Error.none { return 0, error; }
+    if !known.present { return freshToken(), blot_error::Error.none; }
+    return self_.entries.items[known.value].token, blot_error::Error.none;
 }
-fn intact(self: ModuleStamps&, pin: const ModulePin&) -> bool, Error {
-    if headerPrint(pin.module) != pin.header { return false, Error.none; }
-    let known, error = self.tokenEntry(pin.module); if error != Error.none { return false, error; }
+fn intact(self_: ModuleStamps&, pin: const ModulePin&) -> bool, Error {
+    if headerPrint(pin.module) != pin.header { return false, blot_error::Error.none; }
+    let known, error = self_.tokenEntry(pin.module); if error != blot_error::Error.none { return false, error; }
     if !known.present { return pinIntact(pin, null); }
-    if self.entries[known.value].token != pin.token { return false, Error.none; }
-    if !pin.stamp.present { return true, Error.none; }
-    if !self.entries[known.value].digest.present {
-        self.entries[known.value].digest = blot_support::some(stamp(self.entries[known.value].module)); self.hashed++;
+    if self_.entries.items[known.value].token != pin.token { return false, blot_error::Error.none; }
+    if !pin.stamp.present { return true, blot_error::Error.none; }
+    if !self_.entries.items[known.value].digest.present {
+        self_.entries.items[known.value].digest = blot_support::some(stamp(self_.entries.items[known.value].module)); self_.hashed++;
     }
-    return pin.stamp.value == self.entries[known.value].digest.value, Error.none;
+    return pin.stamp.value == self_.entries.items[known.value].digest.value, blot_error::Error.none;
 }
-fn digestOf(self: ModuleStamps&, module: const blot_check_core::Module&) -> blot_support::Option<u8[32]>, Error {
-    if !self.validate { return blot_support::none<u8[32]>(), Error.none; }
-    let known, error = self.tokenEntry(module); if error != Error.none { return blot_support::none<u8[32]>(), error; }
-    if !known.present { return blot_support::some(stamp(module)), Error.none; }
-    return self.entries[known.value].digest, Error.none;
+fn digestOf(self_: ModuleStamps&, module: const blot_check_core::Module&) -> blot_support::Option<u8[32]>, Error {
+    if !self_.validate { return blot_support::none<u8[32]>(), blot_error::Error.none; }
+    let known, error = self_.tokenEntry(module); if error != blot_error::Error.none { return blot_support::none<u8[32]>(), error; }
+    if !known.present { return blot_support::some(stamp(module)), blot_error::Error.none; }
+    return self_.entries.items[known.value].digest, blot_error::Error.none;
 }
 recursive fn pinIntact(pin: const ModulePin&, memo: ModuleStamps? = null) -> bool, Error {
     { let optional_source_13 .= memo; if optional_source_13 { let tokens .= optional_source_13; if tokens.owns(pin.module) { return tokens.intact(pin); }  } }
-    if headerPrint(pin.module) != pin.header { return false, Error.none; }
-    if !pin.stamp.present { return true, Error.none; }
-    return pin.stamp.value == stamp(pin.module), Error.none;
+    if headerPrint(pin.module) != pin.header { return false, blot_error::Error.none; }
+    if !pin.stamp.present { return true, blot_error::Error.none; }
+    return pin.stamp.value == stamp(pin.module), blot_error::Error.none;
 }
 
 struct IdentityMetadata { bytes: const u8[:], symbols: const blot_backend_runtime_identity::Name[:], owners: const blot_backend_runtime_identity::Name[:] }
-fn view(self: IdentityMetadata) -> blot_backend_runtime_identity::View {
-    return blot_backend_runtime_identity::View { self.bytes, self.symbols, self.owners , ..};
+fn view(self_: IdentityMetadata) -> blot_backend_runtime_identity::View {
+    return blot_backend_runtime_identity::View { self_.bytes, self_.symbols, self_.owners , ..};
 }
-struct Substitutions { entries: const blot_reuse_substitution_keys::Entry[:] = [], spans: const Span[:] = [] }
-fn get(self: const Substitutions&, id: u32) -> const blot_reuse_substitution_keys::Entry[:] {
-    if id == 0 { return []; } let span = self.spans[id - 1]; return self.entries[span.start..span.start + span.len];
+struct Substitutions { entries: const blot_reuse_substitution_keys::Entry[:] = default<const blot_reuse_substitution_keys::Entry[:]>(), spans: const Span[:] = default<const Span[:]>() }
+fn get(self_: const Substitutions&, id: u32) -> const blot_reuse_substitution_keys::Entry[:] {
+    if id == 0 { return default<const blot_reuse_substitution_keys::Entry[:]>(); } let span = self_.spans[id - 1]; return self_.entries[span.start..span.start + span.len];
 }
 struct Layouts {
     nodes: const blot_backend_layout::Node[:], extra: const u32[:],
     effects: blot_check_effect_evidence::Snapshot,
-    universal_dictionaries: const blot_backend_layout::UniversalDictionaries[:] = [],
+    universal_dictionaries: const blot_backend_layout::UniversalDictionaries[:] = default<const blot_backend_layout::UniversalDictionaries[:]>(),
 }
-fn children(self: const Layouts&, id: u32) -> const u32[:] {
-    let n = self.nodes[id];
+fn children(self_: const Layouts&, id: u32) -> const u32[:] {
+    let n = self_.nodes[id];
     match n.tag {
-        blot_backend_layout::Tag.product => { return self.extra[n.a..n.a + n.b]; },
-        blot_backend_layout::Tag.record => { return self.extra[n.a..n.a + n.b * 2]; },
-        blot_backend_layout::Tag.nominal => { return self.extra[n.c + 1..n.c + 1 + self.extra[n.c]]; },
-        blot_backend_layout::Tag.universal, blot_backend_layout::Tag.existential => { return self.extra[n.c..n.c + n.b]; },
-        _ => { return []; },
+        product => { return self_.extra[n.a..n.a + n.b]; },
+        record => { return self_.extra[n.a..n.a + n.b * 2]; },
+        nominal => { return self_.extra[n.c + 1..n.c + 1 + self_.extra[n.c]]; },
+        universal, existential => { return self_.extra[n.c..n.c + n.b]; },
+        _ => { return default<const u32[:]>(); },
     }
 }
-fn dictionaryRecord(self: const Layouts&, owner: u32) -> blot_support::Option<blot_backend_layout::UniversalDictionaries> {
-    var low: i64 = 0; var high = self.universal_dictionaries.len;
+fn dictionaryRecord(self_: const Layouts&, owner: u32) -> blot_support::Option<blot_backend_layout::UniversalDictionaries> {
+    var low: i64 = 0; var high = self_.universal_dictionaries.len;
     while low < high {
         let middle = low + (high - low) / 2;
-        if self.universal_dictionaries[middle].owner < owner { low = middle + 1; } else { high = middle; }
+        if self_.universal_dictionaries[middle].owner < owner { low = middle + 1; } else { high = middle; }
     }
-    if low == self.universal_dictionaries.len || self.universal_dictionaries[low].owner != owner {
+    if low == self_.universal_dictionaries.len || self_.universal_dictionaries[low].owner != owner {
         return blot_support::none<blot_backend_layout::UniversalDictionaries>();
     }
-    return blot_support::some(self.universal_dictionaries[low]);
+    return blot_support::some(self_.universal_dictionaries[low]);
 }
-fn hasDictionaryABI(self: const Layouts&, owner: u32) -> bool { self.dictionaryRecord(owner).present }
-fn dictionarySlots(self: const Layouts&, owner: u32) -> const u32[:] {
-    let record = self.dictionaryRecord(owner); if !record.present { return []; }
-    return self.extra[record.value.start..record.value.start + record.value.len];
+fn hasDictionaryABI(self_: const Layouts&, owner: u32) -> bool { self_.dictionaryRecord(owner).present }
+fn dictionarySlots(self_: const Layouts&, owner: u32) -> const u32[:] {
+    let record = self_.dictionaryRecord(owner); if !record.present { return default<const u32[:]>(); }
+    return self_.extra[record.value.start..record.value.start + record.value.len];
 }
 struct Bridge {
     nodes: const blot_reuse_code_expectation::Node[:], extra: const u32[:], to: const u32[:], from: const u32[:],
@@ -605,178 +595,165 @@ struct Pools {
 reusable[] var owned_bytes: u8[>..] = [];
 fn allocateOwned_bytes(len: i64) -> u8[:] { return owned_bytes.alloc_slice(len); }
 fn copyOwned(source: const u8[:]) -> const u8[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const u8[:]>(); }
     let out = owned_bytes.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const u8[:]) {
     if source.len == 0 { return; }
-    let first: const u8& = source[0]; let start = owned_bytes.index_of(first);
-    assert(start >= 0); owned_bytes.free_slice(owned_bytes[start..start + source.len]);
+    owned_bytes.free_slice(source);
 }
 reusable[] var owned_words: u32[>..] = [];
 fn allocateOwned_words(len: i64) -> u32[:] { return owned_words.alloc_slice(len); }
 fn copyOwned(source: const u32[:]) -> const u32[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const u32[:]>(); }
     let out = owned_words.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const u32[:]) {
     if source.len == 0 { return; }
-    let first: const u32& = source[0]; let start = owned_words.index_of(first);
-    assert(start >= 0); owned_words.free_slice(owned_words[start..start + source.len]);
+    owned_words.free_slice(source);
 }
 reusable[] var owned_sizes: i64[>..] = [];
 fn allocateOwned_sizes(len: i64) -> i64[:] { return owned_sizes.alloc_slice(len); }
 fn copyOwned(source: const i64[:]) -> const i64[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const i64[:]>(); }
     let out = owned_sizes.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const i64[:]) {
     if source.len == 0 { return; }
-    let first: const i64& = source[0]; let start = owned_sizes.index_of(first);
-    assert(start >= 0); owned_sizes.free_slice(owned_sizes[start..start + source.len]);
+    owned_sizes.free_slice(source);
 }
 reusable[] var owned_bits: bool[>..] = [];
 fn allocateOwned_bits(len: i64) -> bool[:] { return owned_bits.alloc_slice(len); }
 fn copyOwned(source: const bool[:]) -> const bool[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const bool[:]>(); }
     let out = owned_bits.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const bool[:]) {
     if source.len == 0 { return; }
-    let first: const bool& = source[0]; let start = owned_bits.index_of(first);
-    assert(start >= 0); owned_bits.free_slice(owned_bits[start..start + source.len]);
+    owned_bits.free_slice(source);
 }
 reusable[] var owned_pins: ModulePin[>..] = [];
 fn allocateOwned_pins(len: i64) -> ModulePin[:] { return owned_pins.alloc_slice(len); }
 fn copyOwned(source: const ModulePin[:]) -> const ModulePin[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const ModulePin[:]>(); }
     let out = owned_pins.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const ModulePin[:]) {
     if source.len == 0 { return; }
-    let first: const ModulePin& = source[0]; let start = owned_pins.index_of(first);
-    assert(start >= 0); owned_pins.free_slice(owned_pins[start..start + source.len]);
+    owned_pins.free_slice(source);
 }
 // Retarget uniquely owned pin records after the publication owner copied every
 // immutable Core header and retained its actual payload journal. No proof grows.
 fn rebindModuleHeaders(pools:Pools&,headers:const blot_check_core::Module[:])->Error {
- if pools.modules.len!=headers.len {return Error.invalid_artifact;}
- for pin,index in pools.modules {let header=headers[index];var unit=header.unit;if unit==0 {unit=(index+1) as u32;}if pin.unit!=unit || pin.header!=headerPrint(header) || !sameStorage(pin.module,header) {return Error.invalid_artifact;}}
- if pools.modules.len==0 {return Error.none;}let first:const ModulePin&=pools.modules[0];let start=owned_pins.index_of(first);if start<0 {return Error.invalid_artifact;}
- for index in headers.len {owned_pins[start+index].module .= headers[index];}return Error.none;
+ if pools.modules.len!=headers.len {return blot_error::Error.invalid_artifact;}
+ for pin,index in pools.modules {let header=headers[index];var unit=header.unit;if unit==0 {unit=(index+1) as u32;}if pin.unit!=unit || pin.header!=headerPrint(header) || !sameStorage(pin.module,header) {return blot_error::Error.invalid_artifact;}}
+ if pools.modules.len==0 {return blot_error::Error.none;}
+ let pins=owned_pins.realloc_slice(pools.modules,pools.modules.len);
+ for index in headers.len {pins[index].module .= headers[index];}return blot_error::Error.none;
 }
 reusable[] var owned_spans: Span[>..] = [];
 fn allocateOwned_spans(len: i64) -> Span[:] { return owned_spans.alloc_slice(len); }
 fn copyOwned(source: const Span[:]) -> const Span[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const Span[:]>(); }
     let out = owned_spans.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const Span[:]) {
     if source.len == 0 { return; }
-    let first: const Span& = source[0]; let start = owned_spans.index_of(first);
-    assert(start >= 0); owned_spans.free_slice(owned_spans[start..start + source.len]);
+    owned_spans.free_slice(source);
 }
 reusable[] var owned_entries: blot_reuse_substitution_keys::Entry[>..] = [];
 fn allocateOwned_entries(len: i64) -> blot_reuse_substitution_keys::Entry[:] { return owned_entries.alloc_slice(len); }
 fn copyOwned(source: const blot_reuse_substitution_keys::Entry[:]) -> const blot_reuse_substitution_keys::Entry[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const blot_reuse_substitution_keys::Entry[:]>(); }
     let out = owned_entries.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const blot_reuse_substitution_keys::Entry[:]) {
     if source.len == 0 { return; }
-    let first: const blot_reuse_substitution_keys::Entry& = source[0]; let start = owned_entries.index_of(first);
-    assert(start >= 0); owned_entries.free_slice(owned_entries[start..start + source.len]);
+    owned_entries.free_slice(source);
 }
 reusable[] var owned_nodes: blot_eval_type_evidence::Node[>..] = [];
 fn allocateOwned_nodes(len: i64) -> blot_eval_type_evidence::Node[:] { return owned_nodes.alloc_slice(len); }
 fn copyOwned(source: const blot_eval_type_evidence::Node[:]) -> const blot_eval_type_evidence::Node[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const blot_eval_type_evidence::Node[:]>(); }
     let out = owned_nodes.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const blot_eval_type_evidence::Node[:]) {
     if source.len == 0 { return; }
-    let first: const blot_eval_type_evidence::Node& = source[0]; let start = owned_nodes.index_of(first);
-    assert(start >= 0); owned_nodes.free_slice(owned_nodes[start..start + source.len]);
+    owned_nodes.free_slice(source);
 }
 reusable[] var owned_instances: blot_check_types::NominalIdentity[>..] = [];
 fn allocateOwned_instances(len: i64) -> blot_check_types::NominalIdentity[:] { return owned_instances.alloc_slice(len); }
 fn copyOwned(source: const blot_check_types::NominalIdentity[:]) -> const blot_check_types::NominalIdentity[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const blot_check_types::NominalIdentity[:]>(); }
     let out = owned_instances.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const blot_check_types::NominalIdentity[:]) {
     if source.len == 0 { return; }
-    let first: const blot_check_types::NominalIdentity& = source[0]; let start = owned_instances.index_of(first);
-    assert(start >= 0); owned_instances.free_slice(owned_instances[start..start + source.len]);
+    owned_instances.free_slice(source);
 }
 reusable[] var owned_instance_spans: blot_eval_instance_arguments::Span[>..] = [];
 fn allocateOwned_instance_spans(len: i64) -> blot_eval_instance_arguments::Span[:] { return owned_instance_spans.alloc_slice(len); }
 fn copyOwned(source: const blot_eval_instance_arguments::Span[:]) -> const blot_eval_instance_arguments::Span[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const blot_eval_instance_arguments::Span[:]>(); }
     let out = owned_instance_spans.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const blot_eval_instance_arguments::Span[:]) {
     if source.len == 0 { return; }
-    let first: const blot_eval_instance_arguments::Span& = source[0]; let start = owned_instance_spans.index_of(first);
-    assert(start >= 0); owned_instance_spans.free_slice(owned_instance_spans[start..start + source.len]);
+    owned_instance_spans.free_slice(source);
 }
 reusable[] var owned_operations: Operation[>..] = [];
 fn allocateOwned_operations(len: i64) -> Operation[:] { return owned_operations.alloc_slice(len); }
 fn copyOwned(source: const Operation[:]) -> const Operation[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const Operation[:]>(); }
     let out = owned_operations.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const Operation[:]) {
     if source.len == 0 { return; }
-    let first: const Operation& = source[0]; let start = owned_operations.index_of(first);
-    assert(start >= 0); owned_operations.free_slice(owned_operations[start..start + source.len]);
+    owned_operations.free_slice(source);
 }
 reusable[] var owned_arrays: ArrayProof[>..] = [];
 fn allocateOwned_arrays(len: i64) -> ArrayProof[:] { return owned_arrays.alloc_slice(len); }
 fn copyOwned(source: const ArrayProof[:]) -> const ArrayProof[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const ArrayProof[:]>(); }
     let out = owned_arrays.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const ArrayProof[:]) {
     if source.len == 0 { return; }
-    let first: const ArrayProof& = source[0]; let start = owned_arrays.index_of(first);
-    assert(start >= 0); owned_arrays.free_slice(owned_arrays[start..start + source.len]);
+    owned_arrays.free_slice(source);
 }
 reusable[] var owned_discards: DiscardProof[>..] = [];
 fn allocateOwned_discards(len: i64) -> DiscardProof[:] { return owned_discards.alloc_slice(len); }
 fn copyOwned(source: const DiscardProof[:]) -> const DiscardProof[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const DiscardProof[:]>(); }
     let out = owned_discards.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const DiscardProof[:]) {
     if source.len == 0 { return; }
-    let first: const DiscardProof& = source[0]; let start = owned_discards.index_of(first);
-    assert(start >= 0); owned_discards.free_slice(owned_discards[start..start + source.len]);
+    owned_discards.free_slice(source);
 }
 reusable[] var owned_constants: blot_reuse_constant_receipt::Record[>..] = [];
 fn allocateOwned_constants(len: i64) -> blot_reuse_constant_receipt::Record[:] { return owned_constants.alloc_slice(len); }
 fn copyOwned(source: const blot_reuse_constant_receipt::Record[:]) -> const blot_reuse_constant_receipt::Record[:] {
-    if source.len == 0 { return []; }
+    if source.len == 0 { return default<const blot_reuse_constant_receipt::Record[:]>(); }
     let out = owned_constants.alloc_slice(source.len);
     for value, index in source { out[index] = value; } return out;
 }
 fn releaseOwned(source: const blot_reuse_constant_receipt::Record[:]) {
     if source.len == 0 { return; }
-    let first: const blot_reuse_constant_receipt::Record& = source[0]; let start = owned_constants.index_of(first);
-    assert(start >= 0); owned_constants.free_slice(owned_constants[start..start + source.len]);
+    owned_constants.free_slice(source);
 }
 
 fn capture(store: const blot_reuse_substitution_keys::Store&) -> Substitutions {
@@ -785,318 +762,318 @@ fn capture(store: const blot_reuse_substitution_keys::Store&) -> Substitutions {
     for from, index in store.spans { spans[index] = Span { from.start, from.len , ..}; }
     return Substitutions { entries, spans , ..};
 }
-fn deinit(self: Substitutions&) { releaseOwned(self.entries); releaseOwned(self.spans); self = Substitutions {..}; }
+fn deinit(self_: Substitutions&) { releaseOwned(self_.entries); releaseOwned(self_.spans); self_ = Substitutions {..}; }
 fn captureBridge<C>(store: const C&) -> Bridge {
     return Bridge { copyOwned(store.partial.nodes), copyOwned(store.partial.extra),
         copyOwned(store.to), copyOwned(store.from), copyOwned(store.row_to), copyOwned(store.row_from), copyOwned(store.shapes) , ..};
 }
-fn deinit(self: Bridge&) {
-    releaseOwned(self.nodes); releaseOwned(self.extra); releaseOwned(self.to); releaseOwned(self.from);
-    releaseOwned(self.row_to); releaseOwned(self.row_from); releaseOwned(self.shapes);
+fn deinit(self_: Bridge&) {
+    releaseOwned(self_.nodes); releaseOwned(self_.extra); releaseOwned(self_.to); releaseOwned(self_.from);
+    releaseOwned(self_.row_to); releaseOwned(self_.row_from); releaseOwned(self_.shapes);
 }
-struct CaptureState { shared: blot_eval_pool_leases::Builder, failure: Error = Error.none }
-fn capture_identity_bytes(self: CaptureState&, source: const u8[:], previous: const u8[:]) -> const u8[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_identity_bytes(self.shared, source, previous);
-    self.failure = error; return result;
+struct CaptureState { shared: blot_eval_pool_leases::Builder, failure: Error = blot_error::Error.none }
+fn capture_identity_bytes(self_: CaptureState&, source: const u8[:], previous: const u8[:]) -> const u8[:] {
+    if self_.failure != blot_error::Error.none { return default<const u8[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_identity_bytes(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_identity_symbols(self: CaptureState&, source: const blot_backend_runtime_identity::Name[:], previous: const blot_backend_runtime_identity::Name[:]) -> const blot_backend_runtime_identity::Name[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_identity_symbols(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_identity_symbols(self_: CaptureState&, source: const blot_backend_runtime_identity::Name[:], previous: const blot_backend_runtime_identity::Name[:]) -> const blot_backend_runtime_identity::Name[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_backend_runtime_identity::Name[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_identity_symbols(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_identity_owners(self: CaptureState&, source: const blot_backend_runtime_identity::Name[:], previous: const blot_backend_runtime_identity::Name[:]) -> const blot_backend_runtime_identity::Name[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_identity_owners(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_identity_owners(self_: CaptureState&, source: const blot_backend_runtime_identity::Name[:], previous: const blot_backend_runtime_identity::Name[:]) -> const blot_backend_runtime_identity::Name[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_backend_runtime_identity::Name[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_identity_owners(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_layout_nodes(self: CaptureState&, source: const blot_backend_layout::Node[:], previous: const blot_backend_layout::Node[:]) -> const blot_backend_layout::Node[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_layout_nodes(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_layout_nodes(self_: CaptureState&, source: const blot_backend_layout::Node[:], previous: const blot_backend_layout::Node[:]) -> const blot_backend_layout::Node[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_backend_layout::Node[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_layout_nodes(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_layout_extra(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_layout_extra(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_layout_extra(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_layout_extra(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_layout_universal_dictionaries(self: CaptureState&, source: const blot_backend_layout::UniversalDictionaries[:], previous: const blot_backend_layout::UniversalDictionaries[:]) -> const blot_backend_layout::UniversalDictionaries[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_layout_universal_dictionaries(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_layout_universal_dictionaries(self_: CaptureState&, source: const blot_backend_layout::UniversalDictionaries[:], previous: const blot_backend_layout::UniversalDictionaries[:]) -> const blot_backend_layout::UniversalDictionaries[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_backend_layout::UniversalDictionaries[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_layout_universal_dictionaries(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_layout_operations(self: CaptureState&, source: const blot_check_effect_evidence::Operation[:], previous: const blot_check_effect_evidence::Operation[:]) -> const blot_check_effect_evidence::Operation[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_layout_operations(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_layout_operations(self_: CaptureState&, source: const blot_check_effect_evidence::Operation[:], previous: const blot_check_effect_evidence::Operation[:]) -> const blot_check_effect_evidence::Operation[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_check_effect_evidence::Operation[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_layout_operations(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_layout_arguments(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_layout_arguments(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_layout_arguments(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_layout_arguments(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_layout_rows(self: CaptureState&, source: const blot_check_effect_evidence::Row[:], previous: const blot_check_effect_evidence::Row[:]) -> const blot_check_effect_evidence::Row[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_layout_rows(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_layout_rows(self_: CaptureState&, source: const blot_check_effect_evidence::Row[:], previous: const blot_check_effect_evidence::Row[:]) -> const blot_check_effect_evidence::Row[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_check_effect_evidence::Row[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_layout_rows(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_layout_labels(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_layout_labels(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_layout_labels(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_layout_labels(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_values(self: CaptureState&, source: const blot_eval_eval_values::ValueInfo[:], previous: const blot_eval_eval_values::ValueInfo[:]) -> const blot_eval_eval_values::ValueInfo[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_values(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_values(self_: CaptureState&, source: const blot_eval_eval_values::ValueInfo[:], previous: const blot_eval_eval_values::ValueInfo[:]) -> const blot_eval_eval_values::ValueInfo[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_eval_eval_values::ValueInfo[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_values(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_children(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_children(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_children(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_children(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_closures(self: CaptureState&, source: const blot_eval_eval_values::ClosureValue[:], previous: const blot_eval_eval_values::ClosureValue[:]) -> const blot_eval_eval_values::ClosureValue[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_closures(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_closures(self_: CaptureState&, source: const blot_eval_eval_values::ClosureValue[:], previous: const blot_eval_eval_values::ClosureValue[:]) -> const blot_eval_eval_values::ClosureValue[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_eval_eval_values::ClosureValue[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_closures(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_value_evidence(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_value_evidence(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_value_evidence(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_value_evidence(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_type_mappings(self: CaptureState&, source: const blot_eval_type_evidence::Mapping[:], previous: const blot_eval_type_evidence::Mapping[:]) -> const blot_eval_type_evidence::Mapping[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_type_mappings(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_type_mappings(self_: CaptureState&, source: const blot_eval_type_evidence::Mapping[:], previous: const blot_eval_type_evidence::Mapping[:]) -> const blot_eval_type_evidence::Mapping[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_eval_type_evidence::Mapping[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_type_mappings(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_row_mappings(self: CaptureState&, source: const blot_eval_type_evidence::RowMapping[:], previous: const blot_eval_type_evidence::RowMapping[:]) -> const blot_eval_type_evidence::RowMapping[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_row_mappings(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_row_mappings(self_: CaptureState&, source: const blot_eval_type_evidence::RowMapping[:], previous: const blot_eval_type_evidence::RowMapping[:]) -> const blot_eval_type_evidence::RowMapping[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_eval_type_evidence::RowMapping[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_row_mappings(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_evidence_nodes(self: CaptureState&, source: const blot_eval_type_evidence::Node[:], previous: const blot_eval_type_evidence::Node[:]) -> const blot_eval_type_evidence::Node[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_evidence_nodes(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_evidence_nodes(self_: CaptureState&, source: const blot_eval_type_evidence::Node[:], previous: const blot_eval_type_evidence::Node[:]) -> const blot_eval_type_evidence::Node[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_eval_type_evidence::Node[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_evidence_nodes(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_evidence_extra(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_evidence_extra(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_evidence_extra(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_evidence_extra(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_evidence_quantifier_goals(self: CaptureState&, source: const blot_eval_type_evidence::QuantifierGoals[:], previous: const blot_eval_type_evidence::QuantifierGoals[:]) -> const blot_eval_type_evidence::QuantifierGoals[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_evidence_quantifier_goals(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_evidence_quantifier_goals(self_: CaptureState&, source: const blot_eval_type_evidence::QuantifierGoals[:], previous: const blot_eval_type_evidence::QuantifierGoals[:]) -> const blot_eval_type_evidence::QuantifierGoals[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_eval_type_evidence::QuantifierGoals[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_evidence_quantifier_goals(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_evidence_quantifier_obligations(self: CaptureState&, source: const blot_eval_type_evidence::Goal[:], previous: const blot_eval_type_evidence::Goal[:]) -> const blot_eval_type_evidence::Goal[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_evidence_quantifier_obligations(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_evidence_quantifier_obligations(self_: CaptureState&, source: const blot_eval_type_evidence::Goal[:], previous: const blot_eval_type_evidence::Goal[:]) -> const blot_eval_type_evidence::Goal[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_eval_type_evidence::Goal[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_evidence_quantifier_obligations(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_evidence_operations(self: CaptureState&, source: const blot_check_effect_evidence::Operation[:], previous: const blot_check_effect_evidence::Operation[:]) -> const blot_check_effect_evidence::Operation[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_evidence_operations(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_evidence_operations(self_: CaptureState&, source: const blot_check_effect_evidence::Operation[:], previous: const blot_check_effect_evidence::Operation[:]) -> const blot_check_effect_evidence::Operation[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_check_effect_evidence::Operation[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_evidence_operations(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_evidence_arguments(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_evidence_arguments(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_evidence_arguments(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_evidence_arguments(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_evidence_rows(self: CaptureState&, source: const blot_check_effect_evidence::Row[:], previous: const blot_check_effect_evidence::Row[:]) -> const blot_check_effect_evidence::Row[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_evidence_rows(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_evidence_rows(self_: CaptureState&, source: const blot_check_effect_evidence::Row[:], previous: const blot_check_effect_evidence::Row[:]) -> const blot_check_effect_evidence::Row[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_check_effect_evidence::Row[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_evidence_rows(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_evidence_labels(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_evidence_labels(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_evidence_labels(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_evidence_labels(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_value_records(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_value_records(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_value_records(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_value_records(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_record_layouts(self: CaptureState&, source: const blot_check_core::List[:], previous: const blot_check_core::List[:]) -> const blot_check_core::List[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_record_layouts(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_record_layouts(self_: CaptureState&, source: const blot_check_core::List[:], previous: const blot_check_core::List[:]) -> const blot_check_core::List[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_check_core::List[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_record_layouts(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_field_names(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_field_names(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_field_names(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_field_names(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_implementation_proofs(self: CaptureState&, source: const blot_eval_implementation_evidence::Proof[:], previous: const blot_eval_implementation_evidence::Proof[:]) -> const blot_eval_implementation_evidence::Proof[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_implementation_proofs(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_implementation_proofs(self_: CaptureState&, source: const blot_eval_implementation_evidence::Proof[:], previous: const blot_eval_implementation_evidence::Proof[:]) -> const blot_eval_implementation_evidence::Proof[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_eval_implementation_evidence::Proof[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_implementation_proofs(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_implementation_arguments(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_implementation_arguments(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_implementation_arguments(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_implementation_arguments(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_implementation_members(self: CaptureState&, source: const blot_eval_implementation_evidence::Member[:], previous: const blot_eval_implementation_evidence::Member[:]) -> const blot_eval_implementation_evidence::Member[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_implementation_members(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_implementation_members(self_: CaptureState&, source: const blot_eval_implementation_evidence::Member[:], previous: const blot_eval_implementation_evidence::Member[:]) -> const blot_eval_implementation_evidence::Member[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_eval_implementation_evidence::Member[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_implementation_members(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_implementation_edges(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_implementation_edges(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_implementation_edges(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_implementation_edges(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_captures(self: CaptureState&, source: const blot_reuse_code_artifacts::CapturedTemplate[:], previous: const blot_reuse_code_artifacts::CapturedTemplate[:]) -> const blot_reuse_code_artifacts::CapturedTemplate[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_captures(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_captures(self_: CaptureState&, source: const blot_reuse_code_artifacts::CapturedTemplate[:], previous: const blot_reuse_code_artifacts::CapturedTemplate[:]) -> const blot_reuse_code_artifacts::CapturedTemplate[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_reuse_code_artifacts::CapturedTemplate[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_captures(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_field_locations(self: CaptureState&, source: const blot_reuse_code_artifacts::FieldLocation[:], previous: const blot_reuse_code_artifacts::FieldLocation[:]) -> const blot_reuse_code_artifacts::FieldLocation[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_field_locations(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_field_locations(self_: CaptureState&, source: const blot_reuse_code_artifacts::FieldLocation[:], previous: const blot_reuse_code_artifacts::FieldLocation[:]) -> const blot_reuse_code_artifacts::FieldLocation[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_reuse_code_artifacts::FieldLocation[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_field_locations(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_functions(self: CaptureState&, source: const blot_reuse_code_artifacts::Function[:], previous: const blot_reuse_code_artifacts::Function[:]) -> const blot_reuse_code_artifacts::Function[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_functions(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_functions(self_: CaptureState&, source: const blot_reuse_code_artifacts::Function[:], previous: const blot_reuse_code_artifacts::Function[:]) -> const blot_reuse_code_artifacts::Function[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_reuse_code_artifacts::Function[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_functions(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_serialized(self: CaptureState&, source: const blot_reuse_code_artifacts::Serialized[:], previous: const blot_reuse_code_artifacts::Serialized[:]) -> const blot_reuse_code_artifacts::Serialized[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_serialized(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_serialized(self_: CaptureState&, source: const blot_reuse_code_artifacts::Serialized[:], previous: const blot_reuse_code_artifacts::Serialized[:]) -> const blot_reuse_code_artifacts::Serialized[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_reuse_code_artifacts::Serialized[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_serialized(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_runtime_globals(self: CaptureState&, source: const blot_reuse_code_artifacts::RuntimeGlobal[:], previous: const blot_reuse_code_artifacts::RuntimeGlobal[:]) -> const blot_reuse_code_artifacts::RuntimeGlobal[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_runtime_globals(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_runtime_globals(self_: CaptureState&, source: const blot_reuse_code_artifacts::RuntimeGlobal[:], previous: const blot_reuse_code_artifacts::RuntimeGlobal[:]) -> const blot_reuse_code_artifacts::RuntimeGlobal[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_reuse_code_artifacts::RuntimeGlobal[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_runtime_globals(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_runtime_order(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_runtime_order(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_runtime_order(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_runtime_order(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_binding_offsets(self: CaptureState&, source: const i64[:], previous: const i64[:]) -> const i64[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_binding_offsets(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_binding_offsets(self_: CaptureState&, source: const i64[:], previous: const i64[:]) -> const i64[:] {
+    if self_.failure != blot_error::Error.none { return default<const i64[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_binding_offsets(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_node_offsets(self: CaptureState&, source: const i64[:], previous: const i64[:]) -> const i64[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_node_offsets(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_node_offsets(self_: CaptureState&, source: const i64[:], previous: const i64[:]) -> const i64[:] {
+    if self_.failure != blot_error::Error.none { return default<const i64[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_node_offsets(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_slots(self: CaptureState&, source: const blot_reuse_code_artifacts::Slot[:], previous: const blot_reuse_code_artifacts::Slot[:]) -> const blot_reuse_code_artifacts::Slot[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_slots(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_slots(self_: CaptureState&, source: const blot_reuse_code_artifacts::Slot[:], previous: const blot_reuse_code_artifacts::Slot[:]) -> const blot_reuse_code_artifacts::Slot[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_reuse_code_artifacts::Slot[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_slots(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_visited_nodes(self: CaptureState&, source: const bool[:], previous: const bool[:]) -> const bool[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_visited_nodes(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_visited_nodes(self_: CaptureState&, source: const bool[:], previous: const bool[:]) -> const bool[:] {
+    if self_.failure != blot_error::Error.none { return default<const bool[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_visited_nodes(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_provider_frames(self: CaptureState&, source: const blot_backend_provider_chain::Frame[:], previous: const blot_backend_provider_chain::Frame[:]) -> const blot_backend_provider_chain::Frame[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_provider_frames(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_provider_frames(self_: CaptureState&, source: const blot_backend_provider_chain::Frame[:], previous: const blot_backend_provider_chain::Frame[:]) -> const blot_backend_provider_chain::Frame[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_backend_provider_chain::Frame[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_provider_frames(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_provider_cells(self: CaptureState&, source: const blot_backend_provider_chain::Cell[:], previous: const blot_backend_provider_chain::Cell[:]) -> const blot_backend_provider_chain::Cell[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_provider_cells(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_provider_cells(self_: CaptureState&, source: const blot_backend_provider_chain::Cell[:], previous: const blot_backend_provider_chain::Cell[:]) -> const blot_backend_provider_chain::Cell[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_backend_provider_chain::Cell[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_provider_cells(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_request_cells(self: CaptureState&, source: const blot_reuse_code_artifacts::RequestCell[:], previous: const blot_reuse_code_artifacts::RequestCell[:]) -> const blot_reuse_code_artifacts::RequestCell[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_request_cells(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_request_cells(self_: CaptureState&, source: const blot_reuse_code_artifacts::RequestCell[:], previous: const blot_reuse_code_artifacts::RequestCell[:]) -> const blot_reuse_code_artifacts::RequestCell[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_reuse_code_artifacts::RequestCell[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_request_cells(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_request_handlers(self: CaptureState&, source: const blot_reuse_code_artifacts::RequestHandler[:], previous: const blot_reuse_code_artifacts::RequestHandler[:]) -> const blot_reuse_code_artifacts::RequestHandler[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_request_handlers(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_request_handlers(self_: CaptureState&, source: const blot_reuse_code_artifacts::RequestHandler[:], previous: const blot_reuse_code_artifacts::RequestHandler[:]) -> const blot_reuse_code_artifacts::RequestHandler[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_reuse_code_artifacts::RequestHandler[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_request_handlers(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_break_values(self: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_break_values(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_break_values(self_: CaptureState&, source: const u32[:], previous: const u32[:]) -> const u32[:] {
+    if self_.failure != blot_error::Error.none { return default<const u32[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_break_values(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_operation_relocations(self: CaptureState&, source: const blot_reuse_code_artifacts::OperationRelocation[:], previous: const blot_reuse_code_artifacts::OperationRelocation[:]) -> const blot_reuse_code_artifacts::OperationRelocation[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_operation_relocations(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_operation_relocations(self_: CaptureState&, source: const blot_reuse_code_artifacts::OperationRelocation[:], previous: const blot_reuse_code_artifacts::OperationRelocation[:]) -> const blot_reuse_code_artifacts::OperationRelocation[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_reuse_code_artifacts::OperationRelocation[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_operation_relocations(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
-fn capture_code_origins(self: CaptureState&, source: const blot_check_staging_origins::Record[:], previous: const blot_check_staging_origins::Record[:]) -> const blot_check_staging_origins::Record[:] {
-    if self.failure != Error.none { return []; }
-    let result, error = blot_eval_pool_leases::dupe_code_origins(self.shared, source, previous);
-    self.failure = error; return result;
+fn capture_code_origins(self_: CaptureState&, source: const blot_check_staging_origins::Record[:], previous: const blot_check_staging_origins::Record[:]) -> const blot_check_staging_origins::Record[:] {
+    if self_.failure != blot_error::Error.none { return default<const blot_check_staging_origins::Record[:]>(); }
+    let result, error = blot_eval_pool_leases::dupe_code_origins(self_.shared, source, previous);
+    self_.failure = error; return result;
 }
 
-fn deinit(self: Pools&) {
-    for record in self.constant_records { var owned = record; owned.deinit(); }
-    releaseOwned(self.constant_records);
-    if self.dependency_certificate.present { self.dependency_certificate.value.deinit(); }
-    let leases = self.leases;
-    if self.identity.present { let error = blot_eval_pool_leases::free_identity_bytes(leases, self.identity.value.bytes); assert(error == Error.none); }
-    if self.identity.present { let error = blot_eval_pool_leases::free_identity_symbols(leases, self.identity.value.symbols); assert(error == Error.none); }
-    if self.identity.present { let error = blot_eval_pool_leases::free_identity_owners(leases, self.identity.value.owners); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_layout_nodes(leases, self.layouts.nodes); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_layout_extra(leases, self.layouts.extra); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_layout_universal_dictionaries(leases, self.layouts.universal_dictionaries); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_layout_operations(leases, self.layouts.effects.operations); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_layout_arguments(leases, self.layouts.effects.arguments); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_layout_rows(leases, self.layouts.effects.rows); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_layout_labels(leases, self.layouts.effects.labels); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_values(leases, self.evaluator.values); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_children(leases, self.evaluator.children); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_closures(leases, self.evaluator.closures); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_value_evidence(leases, self.evaluator.value_evidence); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_type_mappings(leases, self.evaluator.type_mappings); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_row_mappings(leases, self.evaluator.row_mappings); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_evidence_nodes(leases, self.evaluator.evidence.nodes); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_evidence_extra(leases, self.evaluator.evidence.extra); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_evidence_quantifier_goals(leases, self.evaluator.evidence.quantifier_goals); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_evidence_quantifier_obligations(leases, self.evaluator.evidence.quantifier_obligations); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_evidence_operations(leases, self.evaluator.evidence.effects.operations); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_evidence_arguments(leases, self.evaluator.evidence.effects.arguments); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_evidence_rows(leases, self.evaluator.evidence.effects.rows); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_evidence_labels(leases, self.evaluator.evidence.effects.labels); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_value_records(leases, self.evaluator.value_records); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_record_layouts(leases, self.evaluator.record_layouts); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_field_names(leases, self.evaluator.field_names); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_implementation_proofs(leases, self.evaluator.implementation_proofs.proofs); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_implementation_arguments(leases, self.evaluator.implementation_proofs.arguments); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_implementation_members(leases, self.evaluator.implementation_proofs.members); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_implementation_edges(leases, self.evaluator.implementation_proofs.edges); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_captures(leases, self.captures); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_field_locations(leases, self.field_locations); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_functions(leases, self.functions); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_serialized(leases, self.serialized); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_runtime_globals(leases, self.runtime_globals); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_runtime_order(leases, self.runtime_order); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_binding_offsets(leases, self.binding_offsets); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_node_offsets(leases, self.node_offsets); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_slots(leases, self.slots); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_visited_nodes(leases, self.visited_nodes); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_provider_frames(leases, self.provider_frames); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_provider_cells(leases, self.provider_cells); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_request_cells(leases, self.request_cells); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_request_handlers(leases, self.request_handlers); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_break_values(leases, self.break_values); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_operation_relocations(leases, self.operation_relocations); assert(error == Error.none); }
-    block { let error = blot_eval_pool_leases::free_code_origins(leases, self.evaluator.code_origins); assert(error == Error.none); }
-    for pin in self.modules { releaseOwned(pin.canonical_path); } releaseOwned(self.modules);
-    self.rows.deinit(); self.templates.deinit(); self.static_values.deinit();
-    releaseOwned(self.instance_arguments.values); releaseOwned(self.instance_arguments.spans);
-    if self.bridge.present { self.bridge.value.deinit(); }
-    for operation in self.operations { releaseOwned(operation.key); } releaseOwned(self.operations);
-    for proof in self.array_proofs { releaseOwned(proof.updates); } releaseOwned(self.array_proofs);
-    for proof in self.discard_proofs { releaseOwned(proof.unused); } releaseOwned(self.discard_proofs);
-    self = default<Pools>();
+fn deinit(self_: Pools&) {
+    for record in self_.constant_records { var owned = record; owned.deinit(); }
+    releaseOwned(self_.constant_records);
+    if self_.dependency_certificate.present { self_.dependency_certificate.value.deinit(); }
+    let leases = self_.leases;
+    if self_.identity.present { let error = blot_eval_pool_leases::free_identity_bytes(leases, self_.identity.value.bytes); assert(error == blot_error::Error.none); }
+    if self_.identity.present { let error = blot_eval_pool_leases::free_identity_symbols(leases, self_.identity.value.symbols); assert(error == blot_error::Error.none); }
+    if self_.identity.present { let error = blot_eval_pool_leases::free_identity_owners(leases, self_.identity.value.owners); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_layout_nodes(leases, self_.layouts.nodes); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_layout_extra(leases, self_.layouts.extra); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_layout_universal_dictionaries(leases, self_.layouts.universal_dictionaries); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_layout_operations(leases, self_.layouts.effects.operations); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_layout_arguments(leases, self_.layouts.effects.arguments); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_layout_rows(leases, self_.layouts.effects.rows); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_layout_labels(leases, self_.layouts.effects.labels); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_values(leases, self_.evaluator.values); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_children(leases, self_.evaluator.children); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_closures(leases, self_.evaluator.closures); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_value_evidence(leases, self_.evaluator.value_evidence); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_type_mappings(leases, self_.evaluator.type_mappings); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_row_mappings(leases, self_.evaluator.row_mappings); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_evidence_nodes(leases, self_.evaluator.evidence.nodes); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_evidence_extra(leases, self_.evaluator.evidence.extra); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_evidence_quantifier_goals(leases, self_.evaluator.evidence.quantifier_goals); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_evidence_quantifier_obligations(leases, self_.evaluator.evidence.quantifier_obligations); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_evidence_operations(leases, self_.evaluator.evidence.effects.operations); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_evidence_arguments(leases, self_.evaluator.evidence.effects.arguments); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_evidence_rows(leases, self_.evaluator.evidence.effects.rows); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_evidence_labels(leases, self_.evaluator.evidence.effects.labels); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_value_records(leases, self_.evaluator.value_records); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_record_layouts(leases, self_.evaluator.record_layouts); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_field_names(leases, self_.evaluator.field_names); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_implementation_proofs(leases, self_.evaluator.implementation_proofs.proofs); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_implementation_arguments(leases, self_.evaluator.implementation_proofs.arguments); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_implementation_members(leases, self_.evaluator.implementation_proofs.members); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_implementation_edges(leases, self_.evaluator.implementation_proofs.edges); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_captures(leases, self_.captures); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_field_locations(leases, self_.field_locations); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_functions(leases, self_.functions); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_serialized(leases, self_.serialized); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_runtime_globals(leases, self_.runtime_globals); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_runtime_order(leases, self_.runtime_order); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_binding_offsets(leases, self_.binding_offsets); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_node_offsets(leases, self_.node_offsets); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_slots(leases, self_.slots); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_visited_nodes(leases, self_.visited_nodes); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_provider_frames(leases, self_.provider_frames); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_provider_cells(leases, self_.provider_cells); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_request_cells(leases, self_.request_cells); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_request_handlers(leases, self_.request_handlers); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_break_values(leases, self_.break_values); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_operation_relocations(leases, self_.operation_relocations); assert(error == blot_error::Error.none); }
+    block { let error = blot_eval_pool_leases::free_code_origins(leases, self_.evaluator.code_origins); assert(error == blot_error::Error.none); }
+    for pin in self_.modules { releaseOwned(pin.canonical_path); } releaseOwned(self_.modules);
+    self_.rows.deinit(); self_.templates.deinit(); self_.static_values.deinit();
+    releaseOwned(self_.instance_arguments.values); releaseOwned(self_.instance_arguments.spans);
+    if self_.bridge.present { self_.bridge.value.deinit(); }
+    for operation in self_.operations { releaseOwned(operation.key); } releaseOwned(self_.operations);
+    for proof in self_.array_proofs { releaseOwned(proof.updates); } releaseOwned(self_.array_proofs);
+    for proof in self_.discard_proofs { releaseOwned(proof.unused); } releaseOwned(self_.discard_proofs);
+    self_ = default<Pools>();
 }
 
 fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps? = null) -> Pools, Error {
@@ -1118,7 +1095,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     let modules = allocateOwned_pins(generator.units.len);
     for &module, index in generator.units {
         var unit = module.unit; if unit == 0 { unit = (index + 1) as u32; }
-        var path: const u8[:] = [];
+        var path: const u8[:] = default<const u8[:]>();
         if candidate.identity.present {
             let found = candidate.identity.value.view().owner(unit); if found.present { path = found.value; }
         }
@@ -1128,10 +1105,10 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     { let optional_source_9 .= memo; if optional_source_9 { let tokens .= optional_source_9;
         for index in modules.len {
             let token, token_error = tokens.get(modules[index].module);
-            if token_error != Error.none { candidate.leases = copying.shared.leases; candidate.deinit(); return default<Pools>(), token_error; }
+            if token_error != blot_error::Error.none { candidate.leases = copying.shared.leases; candidate.deinit(); return default<Pools>(), token_error; }
             modules[index].token = token;
             let digest, digest_error = tokens.digestOf(modules[index].module);
-            if digest_error != Error.none { candidate.leases = copying.shared.leases; candidate.deinit(); return default<Pools>(), digest_error; }
+            if digest_error != blot_error::Error.none { candidate.leases = copying.shared.leases; candidate.deinit(); return default<Pools>(), digest_error; }
             modules[index].stamp = digest;
         }
      } }
@@ -1179,7 +1156,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     var constants: blot_reuse_constant_receipt::Record[>..<] = [];
     for record in session.retained.constant_records {
         let owned, error = record.clone();
-        if error != Error.none {
+        if error != blot_error::Error.none {
             for &prior in constants { prior.deinit(); }
             candidate.leases = copying.shared.leases; candidate.deinit(); return default<Pools>(), error;
         }
@@ -1319,74 +1296,73 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     candidate.evaluator_steps = session.steps; candidate.evaluator_demanded = session.demanded;
     candidate.evaluator_traced_bodies = session.traced_bodies; candidate.evaluator_traced_nodes = session.traced_nodes;
     candidate.leases = copying.shared.leases;
-    if copying.failure != Error.none {
+    if copying.failure != blot_error::Error.none {
         let error = copying.failure; candidate.deinit(); return default<Pools>(), error;
     }
     session.counters.metadata_shared_fields += copying.shared.stats.shared_fields;
     session.counters.metadata_shared_bytes += copying.shared.stats.shared_bytes;
     session.counters.metadata_copied_fields += copying.shared.stats.copied_fields;
     session.counters.metadata_copied_bytes += copying.shared.stats.copied_bytes;
-    return candidate, Error.none;
+    return candidate, blot_error::Error.none;
 }
-fn capturePools<G>(self: Context&, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>) -> Error {
-    return self.capturePoolsWithStamps(generator, identity, null);
+fn capturePools<G>(self_: Context&, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>) -> Error {
+    return self_.capturePoolsWithStamps(generator, identity, null);
 }
-fn capturePoolsWithStamps<G>(self: Context&, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps?) -> Error {
-    let table_error=self.tableFailure();if table_error!=Error.none {return table_error;}
+fn capturePoolsWithStamps<G>(self_: Context&, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps?) -> Error {
+    let table_error=self_.tableFailure();if table_error!=blot_error::Error.none {return table_error;}
 
-    assert(self.active_job == 0);
-    var candidate, error = capture(generator, identity, memo); if error != Error.none { return error; }
+    assert(self_.active_job == 0);
+    var candidate, error = capture(generator, identity, memo); if error != blot_error::Error.none { return error; }
     candidate.generation = 1;
-    if self.pools.present { candidate.generation = self.pools.value.generation + 1; self.pools.value.deinit(); }
-    self.pools = blot_support::some(candidate); return Error.none;
+    if self_.pools.present { candidate.generation = self_.pools.value.generation + 1; self_.pools.value.deinit(); }
+    self_.pools = blot_support::some(candidate); return blot_error::Error.none;
 }
 
 type PrincipalProof = blot_reuse_principal_query::Record;
-fn recordPrincipal(self: Context&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options,
+fn recordPrincipal(self_: Context&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options,
     solved: blot_eval_core_eval::SolvedEvidence, inputs: const blot_reuse_principal_inputs::Key? = null) -> Error {
-    if solved.selected.len != 0 { return Error.none; }
-    var cursor = self.principal_queries.candidates(blot_reuse_principal_query::fingerprint(target), blot_reuse_semantic_query_table::Order.oldest_first);
+    if solved.selected.len != 0 { return blot_error::Error.none; }
+    var cursor = self_.principal_queries.candidates(blot_reuse_principal_query::fingerprint(target), blot_reuse_semantic_query_table::Order.oldest_first);
     loop {
         let position = cursor.next(); if !position.present { break; }
-        if self.principal_queries.records[position.value].key.target == target { return Error.none; }
+        if self_.principal_queries.records[position.value].key.target == target { return blot_error::Error.none; }
     }
     let mappings = blot_eval_core_eval::copySolvedTypes(solved.types);
     let rows = blot_eval_core_eval::copySolvedRows(solved.rows);
     var input_key = blot_support::none<blot_reuse_principal_inputs::Key>();
     { let optional_source_4 .= inputs; if optional_source_4 { let observed .= optional_source_4;
         let owned, error = observed.clone();
-        if error != Error.none { blot_eval_core_eval::releaseSolvedTypes(mappings); blot_eval_core_eval::releaseSolvedRows(rows); return error; }
+        if error != blot_error::Error.none { blot_eval_core_eval::releaseSolvedTypes(mappings); blot_eval_core_eval::releaseSolvedRows(rows); return error; }
         input_key = blot_support::some(owned);
      } }
-    var builder = self.principal_queries.begin(blot_reuse_principal_query::Key { target, options , ..});
+    var builder = self_.principal_queries.begin(blot_reuse_principal_query::Key { target, options , ..});
     builder.read(blot_reuse_principal_query::Dependencies { input_key , ..});
     builder.stage(blot_eval_core_eval::SolvedEvidence { types: mappings, rows: rows , ..});
     var candidate = builder.complete(); builder.abort();
-    if !candidate.present { return Error.none; }
-    let prepared, error = self.principal_queries.prepare(candidate.value);
-    if error != Error.none { candidate.value.abort(); return error; }
-    if !prepared.present { candidate.value.abort(); return Error.none; }
-    let handle = self.principal_queries.publish(prepared.value, candidate.value);
-    candidate.value.abort(); return Error.none;
+    if !candidate.present { return blot_error::Error.none; }
+    let prepared, error = self_.principal_queries.prepare(candidate.value);
+    if error != blot_error::Error.none { candidate.value.abort(); return error; }
+    if !prepared.present { candidate.value.abort(); return blot_error::Error.none; }
+    let handle = self_.principal_queries.publish(prepared.value, candidate.value);
+    candidate.value.abort(); return blot_error::Error.none;
 }
-fn deinit(self: Context&) {
-    assert(self.active_job == 0);
-    self.principal_queries.deinit(); self.principal_graphs.queries.deinit(); self.specialization_queries.deinit(); self.refinement_queries.deinit();
-    for &record in self.independent_calls.items { record.deinit(); } self.independent_calls.clear();
-    self.jobs.clear(); self.events.clear(); self.function_jobs.clear(); self.global_jobs.clear();
-    self.inline_bodies.clear(); self.static_reads.clear(); self.mappings.clear(); self.rows.clear(); self.templates.clear();
-    if self.pools.present { self.pools.value.deinit(); self.pools.present = false; }
+fn deinit(self_: Context&) {
+    assert(self_.active_job == 0);
+    self_.principal_queries.deinit(); self_.principal_graphs.queries.deinit(); self_.specialization_queries.deinit(); self_.refinement_queries.deinit();
+    for &record in self_.independent_calls.items { record.deinit(); } self_.independent_calls.clear();
+    self_.jobs.clear(); self_.events.clear(); self_.function_jobs.clear(); self_.global_jobs.clear();
+    self_.inline_bodies.clear(); self_.static_reads.clear(); self_.mappings.clear(); self_.rows.clear(); self_.templates.clear();
+    if self_.pools.present { self_.pools.value.deinit(); self_.pools.present = false; }
 }
 
 fn requestCode(request: Request) -> u8 {
     match request {
-        Request.named => 0, Request.closure => 1, Request.callable => 2, Request.constructor => 3,
-        Request.primitive => 4, Request.operation => 5, Request.host => 6, Request.constant => 7, Request.runtime_global => 8,
+        named => 0, closure => 1, callable => 2, constructor => 3,
+        primitive => 4, operation => 5, host => 6, constant => 7, runtime_global => 8,
     }
 }
 
 // Canonical metadata is owned independently of a lexical compiler invocation.
-var inactive_context:Context=Context{..};
 struct ContextOwner {live:bool=false,generation:u64=0,
 jobs:Context_Job=Context_Job{..},
 events:Context_StampedEvent=Context_StampedEvent{..},
@@ -1404,34 +1380,34 @@ specialization_queries:blot_eval_selected_query::Table=default<blot_eval_selecte
 refinement_queries:blot_reuse_refinement_receipt::Table=default<blot_reuse_refinement_receipt::Table>(),
 canonical:Context=Context{..}}
 reusable var context_owners:ContextOwner[>..]=[];
-fn validContext(self:const Context&)->bool {return self.context_lease!=0 && self.context_lease-1<context_owners.len && context_owners[self.context_lease-1].live && context_owners[self.context_lease-1].generation==self.context_generation;}
+fn validContext(self_:const Context&)->bool {return self_.context_lease!=0 && self_.context_lease-1<context_owners.len && context_owners[self_.context_lease-1].live && context_owners[self_.context_lease-1].generation==self_.context_generation;}
 fn initPooledRef(allocation_owner:u64=0)->Context?,Error {
- if context_owners.len>=0xffffffff {return null,Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=context_owners.alloc_index(ContextOwner{live:true,generation:generation,..});let state:ContextOwner&=context_owners[at];
+ if context_owners.len>=0xffffffff {return null,blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=context_owners.alloc_index(ContextOwner{live:true,generation:generation,..});let state:ContextOwner& =context_owners[at];
  state.principal_queries=blot_reuse_principal_query::init();state.principal_graphs=blot_eval_core_eval::initRetainedPrincipalGraphs();state.specialization_queries=blot_eval_selected_query::init();state.refinement_queries=blot_reuse_refinement_receipt::init();
  state.canonical=Context{context_lease:(at+1) as u32,context_generation:generation,allocation_owner:allocation_owner,
-jobs:state.jobs,events:state.events,function_jobs:state.function_jobs,global_jobs:state.global_jobs,inline_bodies:state.inline_bodies,static_reads:state.static_reads,mappings:state.mappings,rows:state.rows,templates:state.templates,independent_calls:state.independent_calls,principal_queries:state.principal_queries,principal_graphs:state.principal_graphs,specialization_queries:state.specialization_queries,refinement_queries:state.refinement_queries,..};return state.canonical,Error.none;
+jobs:state.jobs,events:state.events,function_jobs:state.function_jobs,global_jobs:state.global_jobs,inline_bodies:state.inline_bodies,static_reads:state.static_reads,mappings:state.mappings,rows:state.rows,templates:state.templates,independent_calls:state.independent_calls,principal_queries:state.principal_queries,principal_graphs:state.principal_graphs,specialization_queries:state.specialization_queries,refinement_queries:state.refinement_queries,..};return state.canonical,blot_error::Error.none;
 }
-fn tableFailure(self:const Context&)->Error {
-if self.jobs.failure!=Error.none {return self.jobs.failure;}
-if self.events.failure!=Error.none {return self.events.failure;}
-if self.function_jobs.failure!=Error.none {return self.function_jobs.failure;}
-if self.global_jobs.failure!=Error.none {return self.global_jobs.failure;}
-if self.inline_bodies.failure!=Error.none {return self.inline_bodies.failure;}
-if self.static_reads.failure!=Error.none {return self.static_reads.failure;}
-if self.mappings.failure!=Error.none {return self.mappings.failure;}
-if self.rows.failure!=Error.none {return self.rows.failure;}
-if self.templates.failure!=Error.none {return self.templates.failure;}
-if self.independent_calls.failure!=Error.none {return self.independent_calls.failure;}
-return Error.none;}
-fn releasePooled(self:Context&) {if self.context_lease==0 {return;}assert(self.validContext());let at=self.context_lease-1;self.deinit();
-self.jobs.deinit();
-self.events.deinit();
-self.function_jobs.deinit();
-self.global_jobs.deinit();
-self.inline_bodies.deinit();
-self.static_reads.deinit();
-self.mappings.deinit();
-self.rows.deinit();
-self.templates.deinit();
-self.independent_calls.deinit();
-self.principal_graphs.deinit();context_owners[at].live=false;self=Context{..};context_owners.free(at);}
+fn tableFailure(self_:const Context&)->Error {
+if self_.jobs.failure!=blot_error::Error.none {return self_.jobs.failure;}
+if self_.events.failure!=blot_error::Error.none {return self_.events.failure;}
+if self_.function_jobs.failure!=blot_error::Error.none {return self_.function_jobs.failure;}
+if self_.global_jobs.failure!=blot_error::Error.none {return self_.global_jobs.failure;}
+if self_.inline_bodies.failure!=blot_error::Error.none {return self_.inline_bodies.failure;}
+if self_.static_reads.failure!=blot_error::Error.none {return self_.static_reads.failure;}
+if self_.mappings.failure!=blot_error::Error.none {return self_.mappings.failure;}
+if self_.rows.failure!=blot_error::Error.none {return self_.rows.failure;}
+if self_.templates.failure!=blot_error::Error.none {return self_.templates.failure;}
+if self_.independent_calls.failure!=blot_error::Error.none {return self_.independent_calls.failure;}
+return blot_error::Error.none;}
+fn releasePooled(self_:Context&) {if self_.context_lease==0 {return;}assert(self_.validContext());let at=self_.context_lease-1;self_.deinit();
+self_.jobs.deinit();
+self_.events.deinit();
+self_.function_jobs.deinit();
+self_.global_jobs.deinit();
+self_.inline_bodies.deinit();
+self_.static_reads.deinit();
+self_.mappings.deinit();
+self_.rows.deinit();
+self_.templates.deinit();
+self_.independent_calls.deinit();
+self_.principal_graphs.deinit();context_owners[at].live=false;self_=Context{..};context_owners.free(at);}

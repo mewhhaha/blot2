@@ -1,6 +1,8 @@
 // Canonical binders and lexical-depth references own their exact scope.
 namespace blot_check_package_evidence;
+import eval.type_evidence;
 import support.error;
+
 fn validate(source: blot_eval_type_evidence::View) -> blot_error::Error {
     if source.nodes.len > 4096 { return blot_error::Error.invalid_artifact; }
     var remaining: i64 = 65536;
