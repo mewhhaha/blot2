@@ -7,7 +7,7 @@ type Error = blot_error::Error;
 fn productBytes(fields: const u32[:]) -> u32,Error { var size: u32 = 0; for field in fields { if field == 0 || (field & 3) != 0 || field > 4294967295 - size { return 0,blot_error::Error.invalid_layout; } size += field; } return max(alignment,size),blot_error::Error.none; }
 fn variantBytes(payloads: const u32[:]) -> u32,Error { if payloads.len == 0 { return 0,blot_error::Error.invalid_layout; } var payload: u32 = 0; for size in payloads { if size == 0 || (size & 3) != 0 { return 0,blot_error::Error.invalid_layout; } payload = max(payload,size); } if payload > 4294967295 - alignment { return 0,blot_error::Error.invalid_layout; } return alignment + payload,blot_error::Error.none; }
 struct InlineFields {}
-fn children<V>(context: InlineFields,value: V) -> const V[..] { value.fields }
+fn children<V>(context: InlineFields,value: V) -> const V[:] { value.fields }
 recursive fn bytes<V>(value: V) -> u32,Error { return bytes(InlineFields {..},value); }
 recursive fn bytes<C,V>(context: const C&,value: V) -> u32,Error {
     match value.tag {

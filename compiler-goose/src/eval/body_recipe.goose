@@ -19,32 +19,35 @@ struct Pending { items: u32[>..<]&,limit: i64 }
 fn append(self_: Pending&,id: u32) -> Error { if self_.items.len==self_.limit { return blot_error::Error.plan_limit; } self_.items.push(id); return blot_error::Error.none; }
 fn appendSlice(self_: Pending&,ids: const u32[:]) -> Error { if ids.len>self_.limit-self_.items.len { return blot_error::Error.plan_limit; } self_.items.append(ids); return blot_error::Error.none; }
 fn pop(self_: Pending&) -> u32,bool { if self_.items.len==0 { return 0,false; } let id=self_.items[self_.items.len-1]; self_.items.resize(self_.items.len-1); return id,true; }
-fn appendChildren<W>(work: W&,module: const Module&,id: u32,callables: bool) -> Error {
+fn appendChild<W,A,B>(work:W&,first:A&,second:B&,id:u32)->Error {return work.append(id);}
+fn appendChildSlice<W,A,B>(work:W&,first:A&,second:B&,ids:const u32[:])->Error {return work.appendSlice(ids);}
+fn appendChildren<W>(work:W&,module:const Module&,id:u32,callables:bool)->Error {var first:u8=0;var second:u8=0;return visitChildren<W,u8,u8>(work,first,second,module,id,callables,appendChild,appendChildSlice);}
+recursive fn visitChildren<W,A,B,F,G>(work: W&,first:A&,second:B&,module: const Module&,id: u32,callables: bool) -> Error {
  let n=module.node(id); let tag=n.tag;
- if callables&&tag==blot_check_core::Tag.apply&&module.node(n.a).tag==blot_check_core::Tag.closure { let err=work.append(module.closure(n.a).body); if err!=blot_error::Error.none { return err; } }
- if tag==blot_check_core::Tag.resource_release||tag==blot_check_core::Tag.usage_share||tag==blot_check_core::Tag.usage_read||tag==blot_check_core::Tag.package_pack { return work.append(n.a); }
- if tag==blot_check_core::Tag.package_unpack { return work.appendSlice([n.a,module.packageOpening(id).body]); }
- if tag==blot_check_core::Tag.staging||tag==blot_check_core::Tag.scalar||tag==blot_check_core::Tag.associated||tag==blot_check_core::Tag.logical||tag==blot_check_core::Tag.record_merge||tag==blot_check_core::Tag.type_same||tag==blot_check_core::Tag.apply||tag==blot_check_core::Tag.effect_provider||tag==blot_check_core::Tag.handle||tag==blot_check_core::Tag.proof_guard||tag==blot_check_core::Tag.resource_acquire||tag==blot_check_core::Tag.usage_borrow { return work.appendSlice([n.a,n.b]); }
- if tag==blot_check_core::Tag.resource_scope||tag==blot_check_core::Tag.if_value||tag==blot_check_core::Tag.if_stmt||tag==blot_check_core::Tag.state_provider { return work.appendSlice([n.a,n.b,n.c]); }
- if tag==blot_check_core::Tag.task||tag==blot_check_core::Tag.block_||tag==blot_check_core::Tag.suite||tag==blot_check_core::Tag.product||tag==blot_check_core::Tag.record||tag==blot_check_core::Tag.array||tag==blot_check_core::Tag.array_op||tag==blot_check_core::Tag.storage||tag==blot_check_core::Tag.call||tag==blot_check_core::Tag.contract_method { return work.appendSlice(module.children(id)); }
- if tag==blot_check_core::Tag.bind { return work.append(n.b); }
- if tag==blot_check_core::Tag.return_||tag==blot_check_core::Tag.project||tag==blot_check_core::Tag.result_associated { return work.append(n.a); }
- if tag==blot_check_core::Tag.construct { return work.append(n.b); }
- if tag==blot_check_core::Tag.pattern_bind { return work.appendSlice([n.b,n.c]); }
- if tag==blot_check_core::Tag.match_ { let err=work.appendSlice(module.matchInputs(id)); if err!=blot_error::Error.none { return err; } for arm in module.matchArms(id) { let error=work.appendSlice([arm.guard_,arm.body]); if error!=blot_error::Error.none { return error; } } return blot_error::Error.none; }
- if tag==blot_check_core::Tag.loop_ { let iteration=module.loopInfo(id); return work.appendSlice([iteration.first,iteration.end,iteration.body]); }
- if tag==blot_check_core::Tag.break_ { return work.appendSlice(module.breakValues(id)); }
+ if callables&&tag==blot_check_core::Tag.apply&&module.node(n.a).tag==blot_check_core::Tag.closure { let err=F(work,first,second,module.closure(n.a).body); if err!=blot_error::Error.none { return err; } }
+ if tag==blot_check_core::Tag.resource_release||tag==blot_check_core::Tag.usage_share||tag==blot_check_core::Tag.usage_read||tag==blot_check_core::Tag.package_pack { return F(work,first,second,n.a); }
+ if tag==blot_check_core::Tag.package_unpack { return G(work,first,second,[n.a,module.packageOpening(id).body]); }
+ if tag==blot_check_core::Tag.staging||tag==blot_check_core::Tag.scalar||tag==blot_check_core::Tag.associated||tag==blot_check_core::Tag.logical||tag==blot_check_core::Tag.record_merge||tag==blot_check_core::Tag.type_same||tag==blot_check_core::Tag.apply||tag==blot_check_core::Tag.effect_provider||tag==blot_check_core::Tag.handle||tag==blot_check_core::Tag.proof_guard||tag==blot_check_core::Tag.resource_acquire||tag==blot_check_core::Tag.usage_borrow { return G(work,first,second,[n.a,n.b]); }
+ if tag==blot_check_core::Tag.resource_scope||tag==blot_check_core::Tag.if_value||tag==blot_check_core::Tag.if_stmt||tag==blot_check_core::Tag.state_provider { return G(work,first,second,[n.a,n.b,n.c]); }
+ if tag==blot_check_core::Tag.task||tag==blot_check_core::Tag.block_||tag==blot_check_core::Tag.suite||tag==blot_check_core::Tag.product||tag==blot_check_core::Tag.record||tag==blot_check_core::Tag.array||tag==blot_check_core::Tag.array_op||tag==blot_check_core::Tag.storage||tag==blot_check_core::Tag.call||tag==blot_check_core::Tag.contract_method { return G(work,first,second,module.children(id)); }
+ if tag==blot_check_core::Tag.bind { return F(work,first,second,n.b); }
+ if tag==blot_check_core::Tag.return_||tag==blot_check_core::Tag.project||tag==blot_check_core::Tag.result_associated { return F(work,first,second,n.a); }
+ if tag==blot_check_core::Tag.construct { return F(work,first,second,n.b); }
+ if tag==blot_check_core::Tag.pattern_bind { return G(work,first,second,[n.b,n.c]); }
+ if tag==blot_check_core::Tag.match_ { let err=G(work,first,second,module.matchInputs(id)); if err!=blot_error::Error.none { return err; } for arm in module.matchArms(id) { let error=G(work,first,second,[arm.guard_,arm.body]); if error!=blot_error::Error.none { return error; } } return blot_error::Error.none; }
+ if tag==blot_check_core::Tag.loop_ { let iteration=module.loopInfo(id); return G(work,first,second,[iteration.first,iteration.end,iteration.body]); }
+ if tag==blot_check_core::Tag.break_ { return G(work,first,second,module.breakValues(id)); }
  if tag==blot_check_core::Tag.resolver_op {
-  let metadata=module.resolverInfo(id); let e=work.append(metadata.resolver); if e!=blot_error::Error.none { return e; } let error=work.appendSlice(module.resolverArguments(id)); if error!=blot_error::Error.none { return error; }
-  if callables&&(metadata.operation==blot_check_core::ResolverOperation.run||metadata.operation==blot_check_core::ResolverOperation.bind||metadata.operation==blot_check_core::ResolverOperation.iterate) { for argument in module.resolverArguments(id) { if module.node(argument).tag==blot_check_core::Tag.closure { let err=work.append(module.closure(argument).body); if err!=blot_error::Error.none { return err; } } } } return blot_error::Error.none;
+  let metadata=module.resolverInfo(id); let e=F(work,first,second,metadata.resolver); if e!=blot_error::Error.none { return e; } let error=G(work,first,second,module.resolverArguments(id)); if error!=blot_error::Error.none { return error; }
+  if callables&&(metadata.operation==blot_check_core::ResolverOperation.run||metadata.operation==blot_check_core::ResolverOperation.bind||metadata.operation==blot_check_core::ResolverOperation.iterate) { for argument in module.resolverArguments(id) { if module.node(argument).tag==blot_check_core::Tag.closure { let err=F(work,first,second,module.closure(argument).body); if err!=blot_error::Error.none { return err; } } } } return blot_error::Error.none;
  }
- if tag==blot_check_core::Tag.update { let update=module.updateInfo(id); let e=work.appendSlice([update.root,update.value]); if e!=blot_error::Error.none { return e; } for selector in module.updateSelectors(id) { if selector.kind==blot_check_core::UpdateKind.index { let err=work.append(selector.index); if err!=blot_error::Error.none { return err; } } } return blot_error::Error.none; }
+ if tag==blot_check_core::Tag.update { let update=module.updateInfo(id); let e=G(work,first,second,[update.root,update.value]); if e!=blot_error::Error.none { return e; } for selector in module.updateSelectors(id) { if selector.kind==blot_check_core::UpdateKind.index { let err=F(work,first,second,selector.index); if err!=blot_error::Error.none { return err; } } } return blot_error::Error.none; }
  if tag==blot_check_core::Tag.effect_reflection {
-  let kind,known=blot_check_check::reflectionKindFromCode(n.a); if known&&(kind==blot_check_check::ReflectionKind.count||kind==blot_check_check::ReflectionKind.has||kind==blot_check_check::ReflectionKind.same) { let e=work.append(n.b); if e!=blot_error::Error.none { return e; } } if n.c!=0 { return work.append(n.c); } return blot_error::Error.none;
+  let kind,known=blot_check_check::reflectionKindFromCode(n.a); if known&&(kind==blot_check_check::ReflectionKind.count||kind==blot_check_check::ReflectionKind.has||kind==blot_check_check::ReflectionKind.same) { let e=F(work,first,second,n.b); if e!=blot_error::Error.none { return e; } } if n.c!=0 { return F(work,first,second,n.c); } return blot_error::Error.none;
  }
- if tag==blot_check_core::Tag.computation||tag==blot_check_core::Tag.effect_scope { return work.append(n.a); }
- if tag==blot_check_core::Tag.request_decision { return work.appendSlice([n.b,n.c]); }
- if tag==blot_check_core::Tag.request_loop { let metadata=module.requestLoopInfo(id); let e=work.appendSlice([metadata.computation,metadata.completion_body]); if e!=blot_error::Error.none { return e; } for arm in module.requestArms(id) { let err=work.append(arm.callback); if err!=blot_error::Error.none { return err; } if arm.selector!=0 { let error=work.append(arm.selector); if error!=blot_error::Error.none { return error; } } } }
+ if tag==blot_check_core::Tag.computation||tag==blot_check_core::Tag.effect_scope { return F(work,first,second,n.a); }
+ if tag==blot_check_core::Tag.request_decision { return G(work,first,second,[n.b,n.c]); }
+ if tag==blot_check_core::Tag.request_loop { let metadata=module.requestLoopInfo(id); let e=G(work,first,second,[metadata.computation,metadata.completion_body]); if e!=blot_error::Error.none { return e; } for arm in module.requestArms(id) { let err=F(work,first,second,arm.callback); if err!=blot_error::Error.none { return err; } if arm.selector!=0 { let error=F(work,first,second,arm.selector); if error!=blot_error::Error.none { return error; } } } }
  return blot_error::Error.none;
 }
 // Every published recipe and its visit run has a stable owner until reset.

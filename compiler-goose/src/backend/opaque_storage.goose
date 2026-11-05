@@ -1,4 +1,5 @@
 namespace blot_backend_opaque_storage;
+import parse.ast;
 import check.types;
 import check.frozen_types;
 import support.option;
@@ -14,25 +15,25 @@ struct Resolver { entries: const AuthorityEntry[:] }
 fn lookup(resolver: Resolver,identity: blot_check_types::NominalIdentity) -> const Authority? {
     for &entry in resolver.entries { if entry.identity == identity { return entry.authority; } } return null;
 }
-struct Frame { parameters: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>(),arguments: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>(),parent: u32 = 0 }
-struct Context { frames: Frame[256]&,current: u32 = 0 }
-fn infer<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], nominal_index: u32, remaining: i64&) -> Storage {
+// Frames retain source ranges while the source stays a recursion argument.
+struct Frame { parameters: blot_check_types::List=blot_check_types::List{..},arguments: blot_check_types::List=blot_check_types::List{..},parent:u32=0 }
+fn infer<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], nominal_index: u32, remaining: i64&) -> Storage {
     let nominal = nominals[nominal_index]; let constructor_ids = source.list(nominal.constructors);
     if !nominal.is_opaque || constructor_ids.len != 1 { return Storage {..}; }
     return inferPayload(source, nominals, constructors, constructors[constructor_ids[0]].payload, nominal.parameters, remaining);
 }
-fn inferPayload<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, remaining: i64&) -> Storage {
-    var frames: Frame[256] = [Frame {..};256]; frames[0] = Frame { parameters: source.list(parameters),arguments: [] , ..}; let context = Context { frames , ..};
-    return expression(source, nominals, constructors, payload, context, 0, remaining, false, 0, Resolver { entries: [] , ..});
+fn inferPayload<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, remaining: i64&) -> Storage {
+    var frames: Frame[256] = [Frame {..};256]; frames[0] = Frame { parameters: parameters, ..};
+    return expression(source, nominals, constructors, payload, frames,0, 0, remaining, false, 0, Resolver { entries: [] , ..});
 }
-fn inferPayloadAuthoritative<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, local_unit: u32, resolver: Resolver, remaining: i64&) -> Storage {
-    var frames: Frame[256] = [Frame {..};256]; frames[0] = Frame { parameters: source.list(parameters),arguments: [] , ..}; let context = Context { frames , ..};
-    return authoritativeExpression(source, nominals, constructors, payload, context, local_unit, resolver, 0, remaining);
+fn inferPayloadAuthoritative<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, local_unit: u32, resolver: Resolver, remaining: i64&) -> Storage {
+    var frames: Frame[256] = [Frame {..};256]; frames[0] = Frame { parameters: parameters, ..};
+    return authoritativeExpression(source, nominals, constructors, payload, frames,0, local_unit, resolver, 0, remaining);
 }
-recursive fn authoritativeExpression<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], original: blot_check_types::Id, context: const Context&, local_unit: u32, resolver: Resolver, depth: i64, remaining: i64&) -> Storage {
-    expression(source, nominals, constructors, original, context, depth, remaining, true, local_unit, resolver)
+recursive fn authoritativeExpression<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], original: blot_check_types::Id, frames:Frame[256]&,current:u32, local_unit: u32, resolver: Resolver, depth: i64, remaining: i64&) -> Storage {
+    expression(source, nominals, constructors, original, frames,current, depth, remaining, true, local_unit, resolver)
 }
-recursive fn expression<N, C>(source: blot_check_frozen_types::Source, nominals: const N[..], constructors: const C[:], original: blot_check_types::Id, context: const Context&, depth: i64, remaining: i64&, authoritative: bool, local_unit: u32, resolver: Resolver) -> Storage {
+recursive fn expression<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], original: blot_check_types::Id, frames:Frame[256]&,current:u32, depth: i64, remaining: i64&, authoritative: bool, local_unit: u32, resolver: Resolver) -> Storage {
     if depth >= 256 || remaining == 0 { return Storage {..}; } remaining--;
     let ty = source.head(original, 0); let node = source.node(ty);
     if node.tag == blot_check_types::Tag.unit { return Storage { kind: Kind.unit , ..}; }
@@ -40,13 +41,13 @@ recursive fn expression<N, C>(source: blot_check_frozen_types::Source, nominals:
     if node.tag == blot_check_types::Tag.unsigned32 || node.tag == blot_check_types::Tag.never || node.tag == blot_check_types::Tag.type_constructor { return Storage { kind: Kind.unsigned32 , ..}; }
     if node.tag == blot_check_types::Tag.floating32 { return Storage { kind: Kind.floating32 , ..}; }
     if node.tag == blot_check_types::Tag.variable {
-        for parameter, index in context.frames[context.current].parameters {
+        for parameter, index in source.list(frames[current].parameters) {
             if remaining == 0 { return Storage {..}; } remaining--;
             var selector: u32 = 0; var actual: blot_check_types::Id = 0;
-            if context.frames[context.current].parent != 0 { if index >= context.frames[context.current].arguments.len { return Storage {..}; } actual = context.frames[context.current].arguments[index]; }
+            if frames[current].parent != 0 { if index >= frames[current].arguments.len { return Storage {..}; } actual = source.list(frames[current].arguments)[index]; }
             let selected = select(source, parameter, actual, Target { by_ordinal: false, value: ty , ..}, selector, depth + 1, remaining);
             if !selected.present { continue; }
-            if context.frames[context.current].parent != 0 { return expression(source, nominals, constructors, selected.value.actual, Context { context.frames,context.frames[context.current].parent - 1 , ..}, depth + 1, remaining, authoritative, local_unit, resolver); }
+            if frames[current].parent != 0 { return expression(source, nominals, constructors, selected.value.actual, frames,frames[current].parent - 1, depth + 1, remaining, authoritative, local_unit, resolver); }
             return Storage { kind: Kind.parameter, parameter: index as u32, selector: selected.value.selector , ..};
         }
         return Storage {..};
@@ -57,12 +58,12 @@ recursive fn expression<N, C>(source: blot_check_frozen_types::Source, nominals:
             let authority .= lookup(resolver, blot_check_types::NominalIdentity { unit: node.a, decl: node.b , ..}); if authority == null { return Storage {..}; }
             if !authority.is_opaque { return Storage { kind: Kind.reference , ..}; }
             let storage = authority.storage; if storage.kind == Kind.unknown { return Storage {..}; } if storage.kind != Kind.parameter { return storage; }
-            let parameter_source = blot_check_frozen_types::Source.frozen { value: authority.graph , ..}; let declared = parameter_source.list(authority.parameters);
+            let declared = authority.graph.extra[authority.parameters.start..authority.parameters.start+authority.parameters.len];
             if storage.parameter >= declared.len || storage.parameter >= arguments.len { return Storage {..}; }
             var ordinal: u32 = 0;
-            let argument = selectAcross(parameter_source, declared[storage.parameter], source, arguments[storage.parameter], storage.selector, ordinal, depth + 1, remaining);
+            let argument = selectAcross(authority.graph, declared[storage.parameter], source, arguments[storage.parameter], storage.selector, ordinal, depth + 1, remaining);
             if !argument.present { return Storage {..}; }
-            return expression(source, nominals, constructors, argument.value, context, depth + 1, remaining, true, local_unit, resolver);
+            return expression(source, nominals, constructors, argument.value, frames,current, depth + 1, remaining, true, local_unit, resolver);
         }
         for nominal in nominals {
             if remaining == 0 { return Storage {..}; } remaining--;
@@ -74,19 +75,19 @@ recursive fn expression<N, C>(source: blot_check_frozen_types::Source, nominals:
                 var ordinal: u32 = 0;
                 let argument = selectOrdinal(source, source.list(nominal.parameters)[nominal.storage.parameter], arguments[nominal.storage.parameter], nominal.storage.selector, ordinal, depth + 1, remaining);
                 if !argument.present { return Storage {..}; }
-                return expression(source, nominals, constructors, argument.value, context, depth + 1, remaining, false, local_unit, resolver);
+                return expression(source, nominals, constructors, argument.value, frames,current, depth + 1, remaining, false, local_unit, resolver);
             }
             let ids = source.list(blot_check_types::List { start: nominal.constructors.start, len: nominal.constructors.len , ..});
             if ids.len != 1 { return Storage {..}; }
-            if context.current + 1 >= 256 { return Storage {..}; } let frame = context.current + 1; context.frames[frame] = Frame { parameters: source.list(blot_check_types::List { start: nominal.parameters.start,len: nominal.parameters.len , ..}),arguments: arguments,parent: context.current + 1 , ..}; let nested = Context { context.frames,frame , ..};
-            return expression(source, nominals, constructors, constructors[ids[0]].payload, nested, depth + 1, remaining, authoritative, local_unit, resolver);
+            if current + 1 >= 256 { return Storage {..}; } let frame = current + 1; frames[frame] = Frame { parameters: blot_check_types::List { start: nominal.parameters.start,len: nominal.parameters.len , ..},arguments: blot_check_types::List{start:node.c+1,len:arguments.len as u32},parent: current + 1 , ..};
+            return expression(source, nominals, constructors, constructors[ids[0]].payload, frames,frame, depth + 1, remaining, authoritative, local_unit, resolver);
         }
         return Storage {..};
     }
     if node.tag == blot_check_types::Tag.array || node.tag == blot_check_types::Tag.list || node.tag == blot_check_types::Tag.cursor || node.tag == blot_check_types::Tag.record || node.tag == blot_check_types::Tag.product || node.tag == blot_check_types::Tag.function || node.tag == blot_check_types::Tag.provider || node.tag == blot_check_types::Tag.state_provider { return Storage { kind: Kind.reference , ..}; }
     if node.tag == blot_check_types::Tag.usage {
-        if node.b == blot_check_types::usagekind_unique || node.b == blot_check_types::usagekind_shared { return Storage { kind: Kind.reference , ..}; }
-        return expression(source, nominals, constructors, node.a, context, depth + 1, remaining, authoritative, local_unit, resolver);
+        if node.b == blot_parse_ast::usagekind_unique || node.b == blot_parse_ast::usagekind_shared { return Storage { kind: Kind.reference , ..}; }
+        return expression(source, nominals, constructors, node.a, frames,current, depth + 1, remaining, authoritative, local_unit, resolver);
     }
     return Storage {..};
 }
@@ -120,13 +121,13 @@ recursive fn select(source: blot_check_frozen_types::Source, parameter: blot_che
     }
     return blot_support::none<Selected>();
 }
-recursive fn selectAcross(parameter_source: blot_check_frozen_types::Source, parameter: blot_check_types::Id, actual_source: blot_check_frozen_types::Source, actual: blot_check_types::Id, target: u32, ordinal: u32&, depth: i64, remaining: i64&) -> blot_support::Option<blot_check_types::Id> {
+recursive fn selectAcross(parameter_source: const blot_check_frozen_types::Graph&, parameter: blot_check_types::Id, actual_source: blot_check_frozen_types::Source, actual: blot_check_types::Id, target: u32, ordinal: u32&, depth: i64, remaining: i64&) -> blot_support::Option<blot_check_types::Id> {
     if depth >= 256 || remaining == 0 { return blot_support::none<blot_check_types::Id>(); } remaining--;
-    let node = parameter_source.node(parameter_source.head(parameter, 0));
+    let node = parameter_source.nodes[parameter];
     if node.tag == blot_check_types::Tag.variable { let selected = ordinal; ordinal++; if selected == target { return blot_support::some(actual); } return blot_support::none<blot_check_types::Id>(); }
     let argument = actual_source.node(actual_source.head(actual, 0));
     if node.tag == blot_check_types::Tag.product {
-        let children = parameter_source.list(blot_check_types::List { start: node.a, len: node.b , ..});
+        let children = parameter_source.extra[node.a..node.a+node.b];
         if actual != 0 && (argument.tag != blot_check_types::Tag.product || argument.b != node.b) { return blot_support::none<blot_check_types::Id>(); }
         for child, index in children {
             var supplied: u32 = 0; if actual != 0 { supplied = actual_source.list(blot_check_types::List { start: argument.a, len: argument.b , ..})[index]; }
@@ -135,7 +136,7 @@ recursive fn selectAcross(parameter_source: blot_check_frozen_types::Source, par
     } else if node.tag == blot_check_types::Tag.record {
         if actual != 0 && argument.tag != blot_check_types::Tag.record { return blot_support::none<blot_check_types::Id>(); }
         for index in 0..node.b {
-            let field = parameter_source.recordField(node, index); var supplied: u32 = 0;
+            let field = blot_check_types::Field{parameter_source.extra[node.a+index*2],parameter_source.extra[node.a+index*2+1],..}; var supplied: u32 = 0;
             if actual != 0 {
                 for slot in 0..argument.b { if remaining == 0 { return blot_support::none<blot_check_types::Id>(); } remaining--; let candidate = actual_source.recordField(argument, slot); if candidate.name == field.name { supplied = candidate.ty; break; } }
                 if supplied == 0 { return blot_support::none<blot_check_types::Id>(); }

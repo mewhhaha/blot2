@@ -1,5 +1,6 @@
 // Interned physical representation evidence, independently owned from inference.
 namespace blot_backend_layout;
+import parse.ast;
 import std;
 import dictionary;
 import .runtime_ir;
@@ -200,7 +201,7 @@ fn internFieldsWithDictionaries(store: Store&, tag: Tag, a: u32, b: u32, row: u3
     if tag == Tag.nominal && a == blot_check_task_types::handle.unit && b == blot_check_task_types::handle.decl { return intern(store, Tag.product, 0, 0, [blot_check_types::u32_type, blot_check_types::u32_type]); }
     if tag == Tag.nominal && blot_check_typed_staging::isIdentity(a, b) { return 0, blot_error::Error.unresolved_type; }
     if tag != Tag.state_provider && tag != Tag.scoped && tag != Tag.opened && tag != Tag.associated && ((row != unknown_row && row >= store.effects.rows.len) || (row != 0 && tag != Tag.function && tag != Tag.provider)) { return 0, blot_error::Error.type_mismatch; }
-    if tag == Tag.owning && (a == 0 || a >= store.nodes.len || row != 0 || values.len != 0 || (b != blot_check_types::usagekind_unique && b != blot_check_types::usagekind_shared)) { return 0, blot_error::Error.type_mismatch; }
+    if tag == Tag.owning && (a == 0 || a >= store.nodes.len || row != 0 || values.len != 0 || (b != blot_parse_ast::usagekind_unique && b != blot_parse_ast::usagekind_shared)) { return 0, blot_error::Error.type_mismatch; }
     if tag == Tag.scoped && (a == 0 || a >= store.nodes.len || node(store, a).tag != Tag.nominal || b == 0 || row == 0 || values.len != 0) { return 0, blot_error::Error.type_mismatch; }
     if tag == Tag.state_provider && (a == 0 || b == 0 || row == 0 || a >= store.nodes.len || b >= store.nodes.len || row >= store.nodes.len || values.len != 0) { return 0, blot_error::Error.type_mismatch; }
     var hash = blot_support_wyhash::init(0); blot_support_wyhash::value(hash, tagCode(tag)); blot_support_wyhash::value(hash, a); blot_support_wyhash::value(hash, b); blot_support_wyhash::value(hash, row);
@@ -334,7 +335,7 @@ recursive fn fromTypeNode(store: Store&, module: const blot_check_core::Module&,
     if n.tag == blot_check_types::Tag.variable { if allow_erased { return erased, blot_error::Error.none; } return 0, blot_error::Error.unresolved_type; }
     if n.tag == blot_check_types::Tag.usage {
         let payload, error = fromTypeDepth(store, module, n.a, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; }
-        if n.b == blot_check_types::usagekind_unique || n.b == blot_check_types::usagekind_shared { return intern(store, Tag.owning, payload, n.b, []); } return payload, blot_error::Error.none;
+        if n.b == blot_parse_ast::usagekind_unique || n.b == blot_parse_ast::usagekind_shared { return intern(store, Tag.owning, payload, n.b, []); } return payload, blot_error::Error.none;
     }
     if n.tag == blot_check_types::Tag.forall || n.tag == blot_check_types::Tag.existential {
         if n.c == 0 || n.c > 128 || depth >= 128 || store.type_owners.len >= 128 { return 0, blot_error::Error.layout_limit; }
@@ -511,7 +512,7 @@ recursive fn fromEvidenceDepth(store: Store&, view: blot_eval_type_evidence::Vie
     if n.tag == blot_eval_type_evidence::Tag.bound { return internWithEffects(store, Tag.opened, n.a, n.c, n.b, []); }
     if n.tag == blot_eval_type_evidence::Tag.usage {
         let payload, error = fromEvidenceDepth(store, view, n.a, depth + 1, budget); if error != blot_error::Error.none { return 0, error; }
-        if n.b == blot_check_types::usagekind_unique || n.b == blot_check_types::usagekind_shared { return intern(store, Tag.owning, payload, n.b, []); } return payload, blot_error::Error.none;
+        if n.b == blot_parse_ast::usagekind_unique || n.b == blot_parse_ast::usagekind_shared { return intern(store, Tag.owning, payload, n.b, []); } return payload, blot_error::Error.none;
     }
     if n.tag == blot_eval_type_evidence::Tag.erased_proof { return intern(store, Tag.erased_proof, 0, 0, []); }
     if n.tag == blot_eval_type_evidence::Tag.absent { return 0, blot_error::Error.unresolved_type; }
@@ -639,7 +640,7 @@ recursive fn fromSolverDepth(store: Store&, source: blot_check_types::Store&, ty
     if n.tag == blot_check_types::Tag.variable { return erased, blot_error::Error.none; }
     if n.tag == blot_check_types::Tag.usage {
         let payload, error = fromSolverDepth(store, source, n.a, depth + 1, budget); if error != blot_error::Error.none { return 0, error; }
-        if n.b == blot_check_types::usagekind_unique || n.b == blot_check_types::usagekind_shared { return intern(store, Tag.owning, payload, n.b, []); } return payload, blot_error::Error.none;
+        if n.b == blot_parse_ast::usagekind_unique || n.b == blot_parse_ast::usagekind_shared { return intern(store, Tag.owning, payload, n.b, []); } return payload, blot_error::Error.none;
     }
     if n.tag == blot_check_types::Tag.forall || n.tag == blot_check_types::Tag.existential {
         if n.c == 0 || n.c > 128 { return 0, blot_error::Error.layout_limit; }

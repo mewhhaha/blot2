@@ -116,7 +116,7 @@ fn concurrentHost(store, raw: blot_check_types::Id) -> bool {
     }
     return true;
 }
-recursive fn readLoanData(store, raw: blot_check_types::Id, remaining: i64&, depth: i64) -> bool, blot_error::Error {
+recursive fn readLoanData<S>(store:S, raw: blot_check_types::Id, remaining: i64&, depth: i64) -> bool, blot_error::Error {
     if remaining == 0 || depth >= 128 { return false, blot_error::Error.none; } remaining -= 1;
     let node = store.node(store.head(raw, 0));
     match node.tag {
@@ -129,7 +129,7 @@ recursive fn readLoanData(store, raw: blot_check_types::Id, remaining: i64&, dep
 }
 enum CaptureIssue { transfer, capability, host, budget }
 fn captureIssue(store, root: blot_check_types::Id, owning: bool, remaining: i64&, depth: i64) -> blot_support::Option<CaptureIssue>, blot_error::Error { return captureIssueWithRows(store, root, owning, remaining, depth, []); }
-recursive fn captureIssueWithRows(store, root: blot_check_types::Id, owning: bool, remaining: i64&, depth: i64, closed_rows: const u32[:]) -> blot_support::Option<CaptureIssue>, blot_error::Error {
+recursive fn captureIssueWithRows<S>(store:S, root: blot_check_types::Id, owning: bool, remaining: i64&, depth: i64, closed_rows: const u32[:]) -> blot_support::Option<CaptureIssue>, blot_error::Error {
     if remaining == 0 || depth >= 128 { return blot_support::Option<CaptureIssue> { true, CaptureIssue.budget , ..}, blot_error::Error.none; } remaining -= 1;
     let node = store.node(store.head(root, 0));
     match node.tag {

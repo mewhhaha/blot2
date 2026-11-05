@@ -1,5 +1,6 @@
 // Named code instances and constants share the checked immutable Core graph.
 namespace blot_backend_core_backend;
+import parse.ast;
 import .result_publication;
 import .result_owner;
 import reuse.dependency_payload;
@@ -1241,7 +1242,7 @@ fn hostCallback(generator: const Generator&, ty: u32) -> blot_support::Option<bl
     let arrow = generator.representations.store.node(ty); if arrow.tag != blot_backend_layout::Tag.function || !foreignRow(generator, arrow.c, true) { return blot_support::none<blot_backend_wasm::Callback>(); }
     let argument = generator.representations.store.node(arrow.a);
     if argument.tag == blot_backend_layout::Tag.owning {
-        if argument.b != blot_check_types::usagekind_unique || generator.representations.store.node(arrow.b).tag != blot_backend_layout::Tag.unit { return blot_support::none<blot_backend_wasm::Callback>(); }
+        if argument.b != blot_parse_ast::usagekind_unique || generator.representations.store.node(arrow.b).tag != blot_backend_layout::Tag.unit { return blot_support::none<blot_backend_wasm::Callback>(); }
         let payload = generator.representations.store.node(argument.a);
         if payload.tag == blot_backend_layout::Tag.unit || payload.tag == blot_backend_layout::Tag.boolean || payload.tag == blot_backend_layout::Tag.unsigned32 || payload.tag == blot_backend_layout::Tag.floating32 || (payload.tag == blot_backend_layout::Tag.array && (generator.representations.store.node(payload.a).tag == blot_backend_layout::Tag.unsigned32 || generator.representations.store.node(payload.a).tag == blot_backend_layout::Tag.floating32)) {
             let parameter = generator.representations.store.abi(argument.a); if !parameter.present { return blot_support::none<blot_backend_wasm::Callback>(); }
@@ -1456,7 +1457,7 @@ fn ownerRuntime(generator: Generator&) -> blot_runtime_public_owners::Runtime, b
     generator.public_owners = blot_support::some(runtime); return runtime,blot_error::Error.none;
 }
 fn ownerBoundary(generator: const Generator&, ty: u32) -> blot_support::Option<blot_backend_wasm::OwnerBoundary> {
-    let n = generator.representations.store.node(ty); if n.tag != blot_backend_layout::Tag.owning { return blot_support::none<blot_backend_wasm::OwnerBoundary>(); } var kind: u8 = 1; if n.b == blot_check_types::usagekind_shared { kind = 2; } return blot_support::some(blot_backend_wasm::OwnerBoundary { schema: n.a,kind: kind , ..});
+    let n = generator.representations.store.node(ty); if n.tag != blot_backend_layout::Tag.owning { return blot_support::none<blot_backend_wasm::OwnerBoundary>(); } var kind: u8 = 1; if n.b == blot_parse_ast::usagekind_shared { kind = 2; } return blot_support::some(blot_backend_wasm::OwnerBoundary { schema: n.a,kind: kind , ..});
 }
 fn freshOwnerInput(generator: const Generator&, ty: u32) -> blot_support::Option<Scalar> {
     let payload = generator.representations.store.node(ty);
@@ -1576,18 +1577,18 @@ recursive fn entryClosedData(generator: const Generator&,view: blot_eval_type_ev
 }
 fn entryOwnerPayload(generator: const Generator&,view: blot_eval_type_evidence::View,id: u32) -> bool { var remaining: i64 = 65536; return entryClosedData(generator,view,id,0,remaining); }
 fn entryOwner(generator: const Generator&,view: blot_eval_type_evidence::View,id: u32) -> bool {
-    let owner = view.node(id); if owner.tag != blot_eval_type_evidence::Tag.usage || owner.c != 0 || (owner.b != blot_check_types::usagekind_unique && owner.b != blot_check_types::usagekind_shared) { return false; } var remaining: i64 = 65536; return entryClosedData(generator,view,owner.a,0,remaining);
+    let owner = view.node(id); if owner.tag != blot_eval_type_evidence::Tag.usage || owner.c != 0 || (owner.b != blot_parse_ast::usagekind_unique && owner.b != blot_parse_ast::usagekind_shared) { return false; } var remaining: i64 = 65536; return entryClosedData(generator,view,owner.a,0,remaining);
 }
 fn entryInterfaceAdmissible(generator: const Generator&,view: blot_eval_type_evidence::View,id: u32) -> bool {
     let n = view.node(id); if n.tag != blot_eval_type_evidence::Tag.function { return entryData(view,id,false); }
     if (!entryData(view,n.b,true) && !entryOwner(generator,view,n.b)) || !entryForeign(view,n.c,false) { return false; }
     if entryData(view,n.a,true) { return true; } let parameter = view.node(n.a);
-    if parameter.tag == blot_eval_type_evidence::Tag.usage && parameter.b == blot_check_types::usagekind_concurrent && parameter.c == 0 {
+    if parameter.tag == blot_eval_type_evidence::Tag.usage && parameter.b == blot_parse_ast::usagekind_concurrent && parameter.c == 0 {
         let host = view.node(parameter.a); return host.tag == blot_eval_type_evidence::Tag.function && entryData(view,host.a,true) && entryData(view,host.b,true) && entryForeign(view,host.c,true);
     }
-    if parameter.tag == blot_eval_type_evidence::Tag.usage && parameter.b == blot_check_types::usagekind_cleanup && parameter.c == 0 {
+    if parameter.tag == blot_eval_type_evidence::Tag.usage && parameter.b == blot_parse_ast::usagekind_cleanup && parameter.c == 0 {
         let cleanup = view.node(parameter.a); if cleanup.tag != blot_eval_type_evidence::Tag.function || view.node(cleanup.b).tag != blot_eval_type_evidence::Tag.unit || !entryForeign(view,cleanup.c,true) { return false; }
-        let owner = view.node(cleanup.a); return owner.tag == blot_eval_type_evidence::Tag.usage && owner.b == blot_check_types::usagekind_unique && owner.c == 0 && entryOwnerPayload(generator,view,owner.a);
+        let owner = view.node(cleanup.a); return owner.tag == blot_eval_type_evidence::Tag.usage && owner.b == blot_parse_ast::usagekind_unique && owner.c == 0 && entryOwnerPayload(generator,view,owner.a);
     }
     if entryOwner(generator,view,n.a) { return true; } return parameter.tag == blot_eval_type_evidence::Tag.function && entryData(view,parameter.a,true) && entryData(view,parameter.b,true) && entryForeign(view,parameter.c,true);
 }
@@ -1634,11 +1635,11 @@ fn generate(generator: Generator&,entry: u32,unit_order: const u32[:]) -> blot_e
             if !generator.persistent_outputs && payload.present { owner_input = blot_support::none<blot_backend_wasm::OwnerBoundary>(); } if !callback.present && !parameter.present { return decline(generator,entry,body.span,blot_check_diagnostic_code::Code.entry_type); }
             let function_id,function_error = function(generator,key); if function_error != blot_error::Error.none { return function_error; }
             var header = source.types.node(body.scheme.root); while header.tag == blot_check_types::Tag.forall { header = source.types.node(header.a); }
-            let once = header.tag == blot_check_types::Tag.usage && header.b == blot_check_types::usagekind_once; var guard_ = blot_support::none<u32>();
+            let once = header.tag == blot_check_types::Tag.usage && header.b == blot_parse_ast::usagekind_once; var guard_ = blot_support::none<u32>();
             if once { let global,error = generator.module.addGlobal(blot_backend_runtime_ir::SC_u32,0,true); if error != blot_error::Error.none { return error; } guard_ = blot_support::some(global); }
             if callback.present {
                 var host = callback.value; var signature = source.types.node(body.scheme.root); while signature.tag == blot_check_types::Tag.forall || signature.tag == blot_check_types::Tag.usage { signature = source.types.node(signature.a); } let qualified = source.types.node(signature.a);
-                if qualified.tag == blot_check_types::Tag.usage && qualified.b == blot_check_types::usagekind_concurrent { host.concurrent = true; let runtime,error = taskRuntime(generator); if error != blot_error::Error.none { return error; } }
+                if qualified.tag == blot_check_types::Tag.usage && qualified.b == blot_parse_ast::usagekind_concurrent { host.concurrent = true; let runtime,error = taskRuntime(generator); if error != blot_error::Error.none { return error; } }
                 let wrapper,error = entryCallbackFunction(generator,function_id,key.parameters[0],result.value,guard_,output); if error != blot_error::Error.none { return error; }
                 let exported = generator.module.exportOwnerCallbackFunction(wrapper,source.name(body.export_name),host,result.value,once,output); if exported != blot_error::Error.none { return exported; }
             } else {

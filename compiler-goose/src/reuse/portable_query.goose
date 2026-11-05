@@ -14,7 +14,7 @@ fn claimCode(value:Claim)->u32 {match value {principal_complete_proof=>1,optimiz
 fn claimFromCode(value:u32)->Claim,Error {match value {1=>{return Claim.principal_complete_proof,blot_error::Error.none;},2=>{return Claim.optimizer_output,blot_error::Error.none;},3=>{return Claim.selected_complete_proof,blot_error::Error.none;},_=>{return Claim.principal_complete_proof,blot_error::Error.invalid_artifact;}}}
 struct Header {version:u32,kind:blot_reuse_semantic_query_table::Kind,schema:u32,claim:Claim}
 fn header(claim:Claim)->Header {var kind=blot_reuse_semantic_query_table::Kind.principal;match claim {principal_complete_proof=>{},optimizer_output=>{kind=blot_reuse_semantic_query_table::Kind.executable;},selected_complete_proof=>{kind=blot_reuse_semantic_query_table::Kind.specialization;}}return Header{version,kind,1,claim, ..};}
-struct Section<R> {header:Header,records:const R[..]}
+struct Section<R> {header:Header,records:const R[:]}
 fn admitted<R>(self_:Section<R>,claim:Claim)->bool {return self_.header==header(claim);}
 fn validSpan(length:i64,start:i64,count:i64)->bool {return start<=length && count<=length-start;}
 fn child(value:u32,parent:i64)->bool {return value!=0 && value<parent;}

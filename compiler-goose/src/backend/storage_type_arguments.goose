@@ -10,7 +10,7 @@ type Error = blot_error::Error;
 let absent: i64 = 9223372036854775807;
 struct Stats { lookups: u64 = 0,synchronized: u64 = 0,captures: u64 = 0,capture_hits: u64 = 0 }
 struct Positions { any: blot_support::Option<i64>,nonidentity: blot_support::Option<i64> }
-struct Snapshot<A> { items: const A[..],owner_id: u64 }
+struct Snapshot<A> { items: const A[:],owner_id: u64 }
 struct Undo<A> { positions: Positions,snapshot: blot_support::Option<Snapshot<A>>,previous: i64,next: i64 = absent }
 struct Pools<A> { arguments: A[>..]&,undo: Undo<A>[>..]&,positions: dictionary_slot<u64,Positions>[>..]&,snapshots: A[>..]&,indexes: i64[>..]& }
 struct Stack<A> {
@@ -34,7 +34,7 @@ fn appendAssumeCapacity<A>(stack: Stack<A>&,argument: A) {
     let at = stack.undo.items.len; assert(at < stack.undo.storage.len); stack.undo.storage[at] = Undo<A> { positions: positions,snapshot: stack.snapshot,previous: stack.last_active , ..}; stack.undo.items = stack.undo.storage[..at + 1]; let position = stack.arguments.items.len; link(stack,position); assert(position < stack.arguments.storage.len); stack.arguments.storage[position] = argument; stack.arguments.items = stack.arguments.storage[..position + 1]; stack.items = stack.arguments.items; positions.any = blot_support::some(position); if argument.argument_unit != argument.unit || argument.argument != argument.parameter { positions.nonidentity = blot_support::some(position); } blot_support_pooled_map::insert(stack.positions,lookup,positions,stack.pools.positions); stack.snapshot = blot_support::none<Snapshot<A>>(); increase(stack.stats.synchronized);
 }
 fn append<A>(stack: Stack<A>&,argument: A) -> Error { let error = reserve(stack,1); if error != blot_error::Error.none { return error; } appendAssumeCapacity(stack,argument); return blot_error::Error.none; }
-fn appendSlice<A>(stack: Stack<A>&,arguments: const A[..]) -> Error { if arguments.len == 0 { return blot_error::Error.none; } let error = reserve(stack,arguments.len); if error != blot_error::Error.none { return error; } for argument in arguments { appendAssumeCapacity(stack,argument); } return blot_error::Error.none; }
+fn appendSlice<A>(stack: Stack<A>&,arguments: const A[:]) -> Error { if arguments.len == 0 { return blot_error::Error.none; } let error = reserve(stack,arguments.len); if error != blot_error::Error.none { return error; } for argument in arguments { appendAssumeCapacity(stack,argument); } return blot_error::Error.none; }
 fn sift(indexes: i64[:],start: i64,end: i64) { var root = start; while root * 2 + 1 < end { var child = root * 2 + 1; if child + 1 < end && indexes[child] < indexes[child + 1] { child++; } if indexes[root] >= indexes[child] { return; } let value = indexes[root]; indexes[root] = indexes[child]; indexes[child] = value; root = child; } }
 fn sort(indexes: i64[:]) { var start = indexes.len / 2; while start != 0 { start--; sift(indexes,start,indexes.len); } var end = indexes.len; while end > 1 { end--; let value = indexes[0]; indexes[0] = indexes[end]; indexes[end] = value; sift(indexes,0,end); } }
 fn inheritActive<A>(stack: Stack<A>&,source: const Stack<A>&) -> i64,Error {
@@ -50,6 +50,6 @@ fn shrinkRetainingCapacity<A>(stack: Stack<A>&,length: i64) {
 fn clearRetainingCapacity<A>(stack: Stack<A>&) { if stack.positions.count == 0 { return; } blot_support_pooled_buffer::clear(stack.arguments); blot_support_pooled_buffer::clear(stack.undo); blot_support_pooled_map::clear(stack.positions); stack.active_count = 0; stack.first_active = absent; stack.last_active = absent; stack.items = stack.arguments.items; stack.snapshot = blot_support::none<Snapshot<A>>(); }
 fn latestAny<A>(stack: Stack<A>&,unit: u32,parameter: u32) -> blot_support::Option<i64> { increase(stack.stats.lookups); let positions .= blot_support_pooled_map::get(stack.positions,key(unit,parameter)); if positions == null { return blot_support::none<i64>(); } return positions.any; }
 fn latestNonidentity<A>(stack: Stack<A>&,unit: u32,parameter: u32) -> blot_support::Option<i64> { increase(stack.stats.lookups); let positions .= blot_support_pooled_map::get(stack.positions,key(unit,parameter)); if positions == null { return blot_support::none<i64>(); } return positions.nonidentity; }
-fn capture<A>(stack: Stack<A>&) -> const A[..],Error {
+fn capture<A>(stack: Stack<A>&) -> const A[:],Error {
     assert(stack.pools != null); if stack.snapshot.present { increase(stack.stats.capture_hits); return stack.snapshot.value.items,blot_error::Error.none; } var result: A[..] = []; if stack.active_count != 0 { result = stack.pools.snapshots.alloc_slice(stack.active_count); } var count: i64 = 0; var index = stack.first_active; while index != absent { result[count] = stack.items[index]; count++; index = stack.undo.items[index].next; } assert(count == result.len); stack.snapshot = blot_support::some(Snapshot<A> { items: result,owner_id: blot_native::fresh_owner_id() , ..}); increase(stack.stats.captures); return result,blot_error::Error.none;
 }

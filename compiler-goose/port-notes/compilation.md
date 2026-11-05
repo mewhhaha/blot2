@@ -4,8 +4,8 @@ The user explicitly requested fixing and recompiling the port. Verification is
 active; there is no remaining approval or source-writing barrier. Keep the Zig
 compiler, normal toolchain, saved oracle and siblings unchanged.
 
-Checkpoint `ec5f0a96e201262f95bf44686c996ace437fa538` is pushed to main. It preserves
-the engine dependency cuts and pooled-view repairs; it is not a full compiler build.
+Checkpoint `36c733f3b5ae4ea23fa93166c37ca38b43faf6e9` is pushed to main. It preserves
+recursive checker repairs and executable engine laws; it is not a full compiler build.
 Upstream Goose parses roughly 35,700 declarations across 435 files in about
 1.1 seconds. Whole-program type checking has not completed successfully.
 
@@ -14,18 +14,23 @@ The runner caps and kills the process group and saves full diagnostics under
 `build/goose-port/verification/`. Check mode uses streaming text diagnostics;
 JSON diagnostics buffer until completion and hid errors in capped runs.
 Check mode stops the process group after the first error; recent failed
-iterations take four to eight seconds. One coordinator runs whole-program
-checks at a time; backend currently owns this loop while errors remain in its files.
+iterations take roughly eight to sixteen seconds. One coordinator runs
+whole-program checks at a time; backend currently owns the substitution-family
+frontier in `check/types.goose`.
 
 The actual build entry remains `compiler-goose/build.py`, with explicit Goose
 binary, standard-library directory and 30-second stage caps. Do not claim a
 working compiler until C emission, linking and execution have succeeded.
 
-The official repair loop has advanced through semantic worker packet handling
-and capability validation into scoped-backend type shapes (check60). Optimizer growing instruction views pass
-through helpers rather than being stored in analysis records; module
-copy-coalescing inputs use numeric tape ranges. Whole-program parsing passes
-after recursive-checker repairs (35,798 declarations, 436 files, 1.002 seconds).
+The official repair loop has advanced through capability, usage and task
+validation into substitution scratch ownership (check99). Opaque inference
+frames hold numeric ranges, while borrowed instruction/type inputs pass directly
+down helpers. Usage exit/staging frames use numeric indices; direct child
+visitors avoid storing recursive borrows. Named scope frames contain only scalar
+identity/view/parent data in a reusable pool. Astra reviewed identity, scope,
+16-view ordering, work charging, depth bounds and all cleanup paths without
+finding an introduced regression. This is static review, not runtime parity.
+Whole-program parsing continues to pass at about one second.
 Scoped tests pass for lexer, interning, graph
 SCCs, arena ownership, byte/hash/JSON helpers, maps and buffers, wire/IR emission,
 native JSON and WGSL fixtures. A fresh exact C-host startup probe passes with
@@ -59,18 +64,14 @@ pool free/reallocation receipts, numeric process-local owner slots, pooled
 planning/query buffers and ordered bootstrap globals. Copied packets omit the
 new process-local Chunk/Loops/Auxiliary slot fields.
 
-Astra's private toolchain experiment is isolated under
-`build/goose-port/fast-goose/`. The first candidate hash is
-`b493cdeac83a1833d645503cf5eeb7d5d5f1c32ffa64ee9634719480fa7502b3`.
-Readiness hash traversal plus successful-graph descendant caching passes 12
-actual-header laws, 37 differential frontend fixtures and eight runtime laws.
-Neither this candidate nor a second private global-narrowing experiment
-demonstrated a whole-Blot timing win within matched 30-second caps. A newer
-frozen-prefix comparison reaches an official diagnostic in 7.296 seconds while
-the second private candidate hits its 12.244-second cap without a diagnostic;
-this also supplies no performance or acceptance result. Neither
-experiment is accepted into the toolchain. Keep the installed compiler and
-upstream checkout intact.
+The installed upstream compiler remains selected and unchanged. Three private
+checker experiments passed their small differential fixtures but did not meet
+the frozen-prefix acceptance/time target. The private O0 and official O3 builds
+also prevent attributing timing differences to the algorithm changes alone.
+No experiment is accepted into the toolchain. Latest rejected-run evidence:
+`build/goose-port/fast-goose-positive/decision.json`; prior source/checkpoint
+history retains the other measurements. Do not rebuild these candidates without
+a new measured lever.
 
 Runtime recoverable physical OOM and retention parity remain separate known
 production requirements; null/unavailable metrics do not close them.

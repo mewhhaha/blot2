@@ -309,9 +309,9 @@ fn bindRankAnnotation(self_: Store&, slot: Id, required: Id) -> Error {
     if recursive_ { return blot_error::Error.infinite_type; }
     return appendVersion(self_, root, required);
 }
-fn reownQuantified(self_: Store&, tag: Tag, body: Id, binders: const Id[:], goals: Obligation[:]) -> Id, Error {
-    var replacements: Id[>..] = [];
-    for binder in binders { let leaf = node(self_, binder); let replacement, error = boundType(self_, leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; } replacements.push(replacement); }
+recursive fn reownQuantified(self_:Store&,tag:Tag,body:Id,binders:const Id[:],goals:Obligation[:])->Id,Error {let replacements=substitution_ids.alloc_slice(binders.len);let result,error=reownQuantifiedValues(self_,tag,body,binders,goals,replacements);substitution_ids.free_slice(replacements);return result,error;}
+recursive fn reownQuantifiedValues(self_: Store&, tag: Tag, body: Id, binders: const Id[:], goals: Obligation[:], replacements:Id[:]) -> Id, Error {
+    for binder,index in binders { let leaf = node(self_, binder); let replacement, error = boundType(self_, leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; } replacements[index]=replacement; }
     let owned_body, be = substitute(self_, body, binders, replacements); if be != blot_error::Error.none { return 0, be; }
     for &goal in goals { let replaced, error = substituteGoal(self_, goal, binders, replacements); if error != blot_error::Error.none { return 0, error; } goal = replaced; }
     return quantifiedWithGoals(self_, tag, owned_body, replacements, goals);
@@ -320,7 +320,7 @@ fn saveQuantifierGoals(self_: Store&, goals: const Obligation[:]) -> List, Error
     if goals.len > 4096 || goals.len > none - self_.quantifier_obligations.len { return List {..}, blot_error::Error.type_limit; }
     let start = self_.quantifier_obligations.len as u32; self_.quantifier_obligations.append(goals);if self_.quantifier_obligations.failure!=blot_error::Error.none {return default<List>(),self_.quantifier_obligations.failure;} return List { start, goals.len as u32 , ..}, blot_error::Error.none;
 }
-fn substituteGoal(self_: Store&, goal: Obligation, old: const Id[:], fresh_ids: const Id[:]) -> Obligation, Error {
+recursive fn substituteGoal(self_: Store&, goal: Obligation, old: const Id[:], fresh_ids: const Id[:]) -> Obligation, Error {
     var result = goal;
     if goal.ty != 0 { let value, error = substitute(self_, goal.ty, old, fresh_ids); if error != blot_error::Error.none { return default<Obligation>(), error; } result.ty = value; }
     if goal.other != 0 { let value, error = substitute(self_, goal.other, old, fresh_ids); if error != blot_error::Error.none { return default<Obligation>(), error; } result.other = value; }
@@ -1218,8 +1218,8 @@ fn equalGraphWalk(self_: Store&, left: Id, right: Id, symbolic: bool) -> bool, E
                 var repeated = false; for prior in few[..few_count] { if prior.a == pair.a && prior.b == pair.b { repeated = true; break; } }
                 if repeated { continue; } few[few_count] = pair; few_count += 1;
             } else {
-                if seen.count == 0 { for prior in few { seen.insert(prior, true); } }
-                if seen.contains(pair) { continue; } seen.insert(pair, true);
+                if seen.count == 0 { for prior in few { ::insert(seen,prior, true); } }
+                if ::contains(seen,pair) { continue; } ::insert(seen,pair, true);
             }
         }
         if budget == 0 { return false, blot_error::Error.type_limit; } budget -= 1;
@@ -1304,7 +1304,7 @@ fn unifyInner(self_: Store&, left: Id, right: Id, reporter, associated: bool) ->
         if bn.tag == Tag.variable && self_.variables.items[bn.a].region && !regionIdentity(self_, a) { return mismatch(self_, reporter, a, b); }
         if a == b || a == never || b == never { continue; }
         if self_.has_rank_types && (isRank(an.tag) || isRank(bn.tag)) { rank_active = true; }
-        if bounded || rank_active { let key = Pair { a, b , ..}; if seen.contains(key) { continue; } seen.insert(key, true); }
+        if bounded || rank_active { let key = Pair { a, b , ..}; if ::contains(seen,key) { continue; } ::insert(seen,key, true); }
         if an.tag == Tag.variable && bn.tag == Tag.variable && an.a == bn.a { continue; }
         if an.tag == Tag.variable {
             if bn.tag == Tag.forall { return mismatch(self_, reporter, a, b); }
@@ -1397,7 +1397,7 @@ fn freeVariablesMode(self_: Store&, root: Id, bounded: bool) -> Id[>..], Error {
     while pending.len > 0 {
         let id = pending.pop(); self_.normalization.free_type_visits += 1;
         if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return [], error; } }
-        if bounded && closedHeight(self_, id) != 0 { continue; } if seen.contains(id) { continue; } seen.insert(id, true);
+        if bounded && closedHeight(self_, id) != 0 { continue; } if ::contains(seen,id) { continue; } ::insert(seen,id, true);
         let value = node(self_, id);
         if value.tag == Tag.function || value.tag == Tag.provider { for label in rowLabels(self_, value.c) { pending.append(operationArguments(self_, label)); let instance = operation(self_, label).instance; if instance.unit == 0 && instance.decl != 0 { pending.push(instance.decl); } } }
         if value.tag == Tag.variable { values.push(id); } else { appendChildren(self_, pending, id, true); }
@@ -1412,7 +1412,7 @@ fn containsProjection(self_: Store&, root: Id) -> bool, Error {
     while pending.len > 0 {
         let item = pending.pop(); if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return false, error; } }
         if remaining == 0 { return false, blot_error::Error.type_limit; } remaining -= 1;
-        if seen.contains(item) { continue; } seen.insert(item, true);
+        if ::contains(seen,item) { continue; } ::insert(seen,item, true);
         if item.row { for label in rowLabels(self_, item.root) { for argument in operationArguments(self_, label) { pending.push(ProjectionWork { argument , ..}); } } continue; }
         let id = head(self_, item.root, 0); if closedHeight(self_, id) != 0 { continue; } let value = node(self_, id);
         if value.tag == Tag.projection { return true, blot_error::Error.none; }
@@ -1439,7 +1439,7 @@ fn freeRowVariablesMode(self_: Store&, root: Id, bounded: bool) -> u32[>..], Err
             if id <= never || node(self_, id).tag == Tag.variable || node(self_, id).tag == Tag.type_constructor { continue; }
             let height = closedHeight(self_, id); if height != 0 { if work.depth + height > 1024 { return [], blot_error::Error.type_limit; } continue; }
         }
-        let key = ((id as u64) << 32) | at; if seen.contains(key) { continue; } seen.insert(key, true); let value = node(self_, id);
+        let key = ((id as u64) << 32) | at; if ::contains(seen,key) { continue; } ::insert(seen,key, true); let value = node(self_, id);
         if value.tag == Tag.function || value.tag == Tag.provider {
             var row_ = self_.effects.node(value.c); var row_at = max(at, row_.cursor);
             loop {
@@ -1461,156 +1461,176 @@ struct Substitution {
     leaves: dictionary<Id, u32>&, row_leaves: dictionary<u32, u32>&,
     checked: blot_support::Option<KindStamp>   = blot_support::Option<KindStamp> { false, default<KindStamp>() , ..},
 }
-fn deinit(self_: Substitution&) { self_.leaves.clear(); self_.row_leaves.clear(); self_.checked.present = false; }
-fn typeIndex(self_: const Substitution&, root: Id) -> i64, bool {
-    if self_.leaves.count != 0 { let index = self_.leaves.get(root); if index { return index as i64, true; } return 0, false; }
-    for before, index in self_.old { if before == root { return index, true; } } return 0, false;
+fn deinit(self_:Substitution&) {::clear(self_.leaves);::clear(self_.row_leaves);self_.checked.present=false;}
+fn substitutionLeaf(leaves:const dictionary<u32,u32>&,key:u32)->u32? {return ::get(leaves,key);}
+fn substitutionLeaf(leaves:const Map_associated_equations&,key:u32)->u32? {return get(leaves,key);}
+fn typeIndex<L>(old:const Id[:],leaves:const L&,root:Id) -> i64, bool {
+    if leaves.count != 0 { let index = substitutionLeaf(leaves,root); if index { return index as i64, true; } return 0, false; }
+    for before, index in old { if before == root { return index, true; } } return 0, false;
 }
-fn rowIndex(self_: const Substitution&, variable: u32, from: i64) -> i64, bool {
-    if from == 0 && self_.row_leaves.count != 0 { let index = self_.row_leaves.get(variable); if index { return index as i64, true; } return 0, false; }
-    for before, offset in self_.old_rows[from..] { if before == variable { return from + offset, true; } } return 0, false;
+fn rowIndex<R>(old_rows:const u32[:],row_leaves:const R&,variable:u32,from:i64) -> i64, bool {
+    if from == 0 && row_leaves.count != 0 { let index = substitutionLeaf(row_leaves,variable); if index { return index as i64, true; } return 0, false; }
+    for before, offset in old_rows[from..] { if before == variable { return from + offset, true; } } return 0, false;
 }
 fn prepareSubstitution(self_: Store&, old: const Id[:], fresh_ids: const Id[:], old_rows: const u32[:], fresh_rows: const blot_check_effects::Id[:],
                        leaves: dictionary<Id, u32>&, row_leaves: dictionary<u32, u32>&) -> Substitution, Error {
     assert(old.len == fresh_ids.len && old_rows.len == fresh_rows.len);
     var result = Substitution { old, fresh_ids, old_rows, fresh_rows, leaves, row_leaves , ..};
-    if old.len > 16 { for before, index in old { if !leaves.contains(before) { leaves.insert(before, index as u32); } } }
-    if old_rows.len > 16 { for before, index in old_rows { if !row_leaves.contains(before) { row_leaves.insert(before, index as u32); } } }
+    if old.len > 16 { for before, index in old { if !::contains(leaves,before) { ::insert(leaves,before, index as u32); } } }
+    if old_rows.len > 16 { for before, index in old_rows { if !::contains(row_leaves,before) { ::insert(row_leaves,before, index as u32); } } }
     return result, blot_error::Error.none;
 }
-fn substitute(self_: Store&, root: Id, old: const Id[:], fresh_ids: const Id[:]) -> Id, Error { return substituteWithRows(self_, root, old, fresh_ids, [], []); }
-fn substituteWithRows(self_: Store&, root: Id, old: const Id[:], fresh_ids: const Id[:], old_rows: const u32[:], fresh_rows: const blot_check_effects::Id[:]) -> Id, Error {
-    assert(old.len == fresh_ids.len && old_rows.len == fresh_rows.len);
-    var leaves = dictionary<Id, u32> {}; var row_leaves = dictionary<u32, u32> {};
-    var substitution = Substitution { old, fresh_ids, old_rows, fresh_rows, leaves, row_leaves , ..};
-    return substitutePrepared(self_, substitution, root);
+recursive fn substitute(self_:Store&,root:Id,old:const Id[:],fresh_ids:const Id[:])->Id,Error {return substituteWithRows(self_,root,old,fresh_ids,[],[]);}
+recursive fn substituteWithRows(self_:Store&,root:Id,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:])->Id,Error {
+ assert(old.len==fresh_ids.len && old_rows.len==fresh_rows.len);
+ var leaves=Map_associated_equations{..};var row_leaves=Map_associated_equations{..};var checked=blot_support::none<KindStamp>();
+ return substituteInputs(self_,root,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,checked);
 }
-fn substitutePrepared(self_: Store&, substitution: Substitution&, root: Id) -> Id, Error {
-    let attribution_start = self_.nodes.len; let result, error = substitutePreparedInner(self_, substitution, root);
-    saturatedAdd(self_.normalization.substitute_nodes_added, (self_.nodes.len - attribution_start) as u64); return result, error;
+recursive fn substitutePrepared(self_:Store&,substitution:Substitution&,root:Id)->Id,Error {
+ return substituteInputs(self_,root,substitution.old,substitution.fresh_ids,substitution.old_rows,substitution.fresh_rows,substitution.leaves,substitution.row_leaves,substitution.checked);
 }
-fn substitutePreparedInner(self_: Store&, substitution: Substitution&, root: Id) -> Id, Error {
-    let error = checkReplacementKinds(self_, substitution); if error != blot_error::Error.none { return 0, error; }
-    if substitution.old.len == 0 && substitution.old_rows.len == 0 { return root, blot_error::Error.none; }
-    var copied = dictionary<Id, Id> {}; return substituteDepth(self_, root, substitution, copied, 0);
+recursive fn substituteInputs<L,R>(self_:Store&,root:Id,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,checked:blot_support::Option<KindStamp>&)->Id,Error {
+ let attribution_start=self_.nodes.len;let result,error=substituteInputsInner(self_,root,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,checked);
+ saturatedAdd(self_.normalization.substitute_nodes_added,(self_.nodes.len-attribution_start) as u64);return result,error;
 }
-fn checkReplacementKinds(self_: Store&, substitution: Substitution&) -> Error {
+recursive fn substituteInputsInner<L,R>(self_:Store&,root:Id,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,checked:blot_support::Option<KindStamp>&)->Id,Error {
+ let error=checkReplacementKinds(self_,old,fresh_ids,checked);if error!=blot_error::Error.none {return 0,error;}
+ if old.len==0 && old_rows.len==0 {return root,blot_error::Error.none;}
+ var copied=Map_associated_equations{..};let result,error=substituteDepth(self_,root,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,0);copied.deinit();return result,error;
+}
+fn checkReplacementKinds(self_: Store&, old:const Id[:],fresh_ids:const Id[:],checked:blot_support::Option<KindStamp>&) -> Error {
     let stamp = KindStamp { self_.mutation_epoch, self_.has_rank_types, self_.has_proof_kinds , ..};
-    if substitution.checked.present && stamp.mutation_epoch != 0xffffffffffffffff && substitution.checked.value == stamp { return blot_error::Error.none; }
-    for original, i in substitution.old {
-        let replacement_id = substitution.fresh_ids[i]; let leaf = node(self_, original);
+    if checked.present && stamp.mutation_epoch != 0xffffffffffffffff && checked.value == stamp { return blot_error::Error.none; }
+    for original, i in old {
+        let replacement_id = fresh_ids[i]; let leaf = node(self_, original);
         if (leaf.tag == Tag.bound && leaf.b == 1) || (leaf.tag == Tag.rigid && leaf.c == 1) { if !rowIdentity(self_, replacement_id) { return blot_error::Error.type_mismatch; } }
         else if (leaf.tag == Tag.bound && leaf.b == 2) || (leaf.tag == Tag.rigid && leaf.c == 2) { if !regionIdentity(self_, replacement_id) { return blot_error::Error.type_mismatch; } }
         else { let error = dataKind(self_, replacement_id); if error != blot_error::Error.none { return error; } }
     }
-    substitution.checked = blot_support::Option<KindStamp> { true, stamp , ..}; return blot_error::Error.none;
+    checked = blot_support::Option<KindStamp> { true, stamp , ..}; return blot_error::Error.none;
 }
-recursive fn substitutedRow(self_: Store&, root: blot_check_effects::Id, substitution: const Substitution&, copied: dictionary<Id, Id>&, depth: i64) -> blot_check_effects::Id, Error {
+recursive fn substitutedRow<L,R>(self_: Store&, root: blot_check_effects::Id, old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&, copied:Map_associated_equations&, depth: i64) -> blot_check_effects::Id, Error {
     if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
     let row_ = row(self_, root); var labels: blot_check_effects::Label[>..] = []; var changed = false;
     for index in row_.labels.len {
         let label = self_.effects.list(row_.labels)[index]; if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
         let operation_ = operation(self_, label); var arguments: Id[>..] = []; var argument_changed = false;
         for offset in operation_.arguments.len {
-            let argument = list(self_, operation_.arguments)[offset]; let next, error = substituteDepth(self_, argument, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; }
+            let argument = list(self_, operation_.arguments)[offset]; let next, error = substituteDepth(self_, argument, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; }
             argument_changed = argument_changed || next != argument; arguments.push(next);
         }
         var instance = operation_.instance;
-        if instance.unit == 0 && instance.decl != 0 { let next, error = substituteDepth(self_, instance.decl, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } instance.decl = next; }
+        if instance.unit == 0 && instance.decl != 0 { let next, error = substituteDepth(self_, instance.decl, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } instance.decl = next; }
         var next = label;
         if argument_changed || instance != operation_.instance { let result, error = internResolvedOperation(self_, operation_.identity, instance, arguments, true); if error != blot_error::Error.none { return 0, error; } next = result; }
         changed = changed || next != label; labels.push(next);
     }
     var result = root;
     match row_.tail { formal v => {
-        let index, found = typeIndex(substitution, v.value);
-        if found { let replacement_row, re = rowType(self_, substitution.fresh_ids[index]); if re != blot_error::Error.none { return 0, re; }
-            let next, error = self_.effects.substituteFormal(root, substitution.old[index], replacement_row); if error != blot_error::Error.none { return 0, effectError(error); } result = next; }
+        let index, found = typeIndex(old,leaves, v.value);
+        if found { let replacement_row, re = rowType(self_, fresh_ids[index]); if re != blot_error::Error.none { return 0, re; }
+            let next, error = self_.effects.substituteFormal(root, old[index], replacement_row); if error != blot_error::Error.none { return 0, effectError(error); } result = next; }
     }, _ => {}, }
     if changed {
         let replaced = row(self_, result); if result != root { labels.append(self_.effects.list(replaced.labels)[row_.labels.len..]); }
         let next, error = self_.effects.rowAt(labels, replaced.tail, max(row_.cursor, replaced.cursor)); if error != blot_error::Error.none { return 0, effectError(error); } result = next;
     }
     var from: i64 = 0;
-    while from < substitution.old_rows.len {
+    while from < old_rows.len {
         var variable = none; match self_.effects.node(result).tail { variable v => { variable = v.value; }, _ => { break; }, }
-        let index, found = rowIndex(substitution, variable, from); if !found { break; }
-        let next, error = self_.effects.substitute(result, substitution.old_rows[index], substitution.fresh_rows[index]); if error != blot_error::Error.none { return 0, effectError(error); } result = next; from = index + 1;
+        let index, found = rowIndex(old_rows,row_leaves, variable, from); if !found { break; }
+        let next, error = self_.effects.substitute(result, old_rows[index], fresh_rows[index]); if error != blot_error::Error.none { return 0, effectError(error); } result = next; from = index + 1;
     }
     return result, blot_error::Error.none;
 }
-recursive fn substituteDepth(self_: Store&, root: Id, substitution: const Substitution&, copied: dictionary<Id, Id>&, depth: i64) -> Id, Error {
+recursive fn substituteDepth<L,R>(self_: Store&, root: Id, old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&, copied:Map_associated_equations&, depth: i64) -> Id, Error {
     increment(self_.normalization.substitute_depth_entries); if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
     if depth >= 1024 { return 0, blot_error::Error.type_limit; }
-    let index, found = typeIndex(substitution, root); if found { return substitution.fresh_ids[index], blot_error::Error.none; }
+    let index, found = typeIndex(old,leaves, root); if found { return fresh_ids[index], blot_error::Error.none; }
     if root <= never || node(self_, root).tag == Tag.variable { return root, blot_error::Error.none; }
-    if depth != 0 { let known = copied.get(root); if known { increment(self_.normalization.substitute_memo_hits); return known, blot_error::Error.none; } }
-    let result, error = substituteNode(self_, root, substitution, copied, depth); if error != blot_error::Error.none { return 0, error; }
-    if result == root { increment(self_.normalization.substitute_unchanged); } if depth != 0 { copied.insert(root, result); }
+    if depth != 0 { let known = get(copied,root); if known { increment(self_.normalization.substitute_memo_hits); return known, blot_error::Error.none; } }
+    let result, error = substituteNode(self_, root, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth); if error != blot_error::Error.none { return 0, error; }
+    if result == root { increment(self_.normalization.substitute_unchanged); } if depth != 0 { insert(copied,root,result);if copied.failure!=blot_error::Error.none {return 0,copied.failure;} }
     return result, blot_error::Error.none;
 }
-recursive fn substituteNode(self_: Store&, root: Id, substitution: const Substitution&, copied: dictionary<Id, Id>&, depth: i64) -> Id, Error {
+recursive fn substituteNode<L,R>(self_: Store&, root: Id, old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&, copied:Map_associated_equations&, depth: i64) -> Id, Error {
     if depth >= 1024 { return 0, blot_error::Error.type_limit; } let value = node(self_, root);
     match value.tag {
         forall, existential => {
-            var binders: Id[>..] = []; binders.append(list(self_, List { value.b, value.c , ..}));
-            let body, be = substituteDepth(self_, value.a, substitution, copied, depth + 1); if be != blot_error::Error.none { return 0, be; }
-            var goals: Obligation[>..] = []; goals.append(quantifierGoals(self_, root)); var changed = body != value.a;
-            for &goal in goals {
-                if goal.ty != 0 { let next, error = substituteDepth(self_, goal.ty, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.ty; goal.ty = next; }
-                if goal.other != 0 { let next, error = substituteDepth(self_, goal.other, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.other; goal.other = next; }
-                if goal.result != 0 { let next, error = substituteDepth(self_, goal.result, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.result; goal.result = next; }
-                if goal.signature != 0 { let next, error = substituteDepth(self_, goal.signature, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.signature; goal.signature = next; }
-            }
-            if !changed { return root, blot_error::Error.none; } return reownQuantified(self_, value.tag, body, binders, goals);
+            let source_binders=list(self_,List{value.b,value.c,..});let binders=resolution_binders.alloc_slice(source_binders.len);for binder,index in source_binders {binders[index]=binder;}
+            let result,error=substituteQuantified(self_,root,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,binders);resolution_binders.free_slice(binders);return result,error;
         },
         usage => {
-            let payload, pe = substituteDepth(self_, value.a, substitution, copied, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
-            var region: Id = 0; if value.c != 0 { let next, error = substituteDepth(self_, value.c, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } region = next; }
+            let payload, pe = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
+            var region: Id = 0; if value.c != 0 { let next, error = substituteDepth(self_, value.c, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } region = next; }
             return usage(self_, payload, value.b, region);
         },
         scoped => {
-            let descriptor, de = substituteDepth(self_, value.a, substitution, copied, depth + 1); if de != blot_error::Error.none { return 0, de; }
-            var instance = NominalIdentity { value.b, value.c , ..}; if instance.unit == 0 { let next, error = substituteDepth(self_, instance.decl, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } instance.decl = next; }
+            let descriptor, de = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if de != blot_error::Error.none { return 0, de; }
+            var instance = NominalIdentity { value.b, value.c , ..}; if instance.unit == 0 { let next, error = substituteDepth(self_, instance.decl, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } instance.decl = next; }
             return scoped(self_, descriptor, instance);
         },
         function => {
-            let parameter, pe = substituteDepth(self_, value.a, substitution, copied, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
-            let result, re = substituteDepth(self_, value.b, substitution, copied, depth + 1); if re != blot_error::Error.none { return 0, re; }
-            let row_, ee = substitutedRow(self_, value.c, substitution, copied, depth + 1); if ee != blot_error::Error.none { return 0, ee; }
+            let parameter, pe = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
+            let result, re = substituteDepth(self_, value.b, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if re != blot_error::Error.none { return 0, re; }
+            let row_, ee = substitutedRow(self_, value.c, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if ee != blot_error::Error.none { return 0, ee; }
             return functionWithEffects(self_, parameter, result, row_);
         },
         product => {
-            var fields: Id[>..] = []; for i in value.b { let next, error = substituteDepth(self_, self_.extra.items[value.a + i], substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } fields.push(next); } return product(self_, fields);
+            let fields=substitution_ids.alloc_slice(value.b);let result,error=substituteProduct(self_,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,fields);substitution_ids.free_slice(fields);return result,error;
         },
         array, list, cursor, resolver => {
-            let next, error = substituteDepth(self_, value.a, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; }
+            let next, error = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; }
             if value.tag == Tag.resolver { return resolver(self_, next); } return sequence(self_, value.tag, next);
         },
         provider => {
-            let child, ce = substituteDepth(self_, value.a, substitution, copied, depth + 1); if ce != blot_error::Error.none { return 0, ce; }
-            let row_, re = substitutedRow(self_, value.c, substitution, copied, depth + 1); if re != blot_error::Error.none { return 0, re; }
+            let child, ce = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if ce != blot_error::Error.none { return 0, ce; }
+            let row_, re = substitutedRow(self_, value.c, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if re != blot_error::Error.none { return 0, re; }
             return provider(self_, child, row_);
         },
         state_provider => {
-            let read, re = substituteDepth(self_, value.a, substitution, copied, depth + 1); if re != blot_error::Error.none { return 0, re; }
-            let write, we = substituteDepth(self_, value.b, substitution, copied, depth + 1); if we != blot_error::Error.none { return 0, we; }
-            let state, se = substituteDepth(self_, value.c, substitution, copied, depth + 1); if se != blot_error::Error.none { return 0, se; }
+            let read, re = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if re != blot_error::Error.none { return 0, re; }
+            let write, we = substituteDepth(self_, value.b, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if we != blot_error::Error.none { return 0, we; }
+            let state, se = substituteDepth(self_, value.c, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if se != blot_error::Error.none { return 0, se; }
             return stateProvider(self_, read, write, state);
         },
         record => {
-            var fields: Field[>..] = []; for i in value.b { let field = recordField(self_, value, i); let next, error = substituteDepth(self_, field.ty, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } fields.push(Field { field.name, next , ..}); } return record(self_, fields);
+            let fields=substitution_fields.alloc_slice(value.b);let result,error=substituteRecord(self_,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,fields);substitution_fields.free_slice(fields);return result,error;
         },
         nominal, projection, instance_selection => {
-            var prior: Id[>..] = []; prior.append(nominalArguments(self_, value)); var args: Id[>..] = [];
-            for child in prior { let next, error = substituteDepth(self_, child, substitution, copied, depth + 1); if error != blot_error::Error.none { return 0, error; } args.push(next); }
-            if value.tag == Tag.projection { return projection(self_, NominalIdentity { value.a, value.b , ..}, projectionMember(self_, value), args); }
-            if value.tag == Tag.instance_selection { return instanceSelection(self_, NominalIdentity { value.a, value.b , ..}, args); }
-            return nominal(self_, NominalIdentity { value.a, value.b , ..}, args);
+            let original=nominalArguments(self_,value);let prior=substitution_ids.alloc_slice(original.len);for item,index in original {prior[index]=item;}let args=substitution_ids.alloc_slice(prior.len);
+            let result,error=substituteArguments(self_,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,prior,args);substitution_ids.free_slice(args);substitution_ids.free_slice(prior);return result,error;
         },
         _ => { return root, blot_error::Error.none; },
     }
 }
+recursive fn substituteQuantified<L,R>(self_:Store&,root:Id,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,binders:const Id[:])->Id,Error {
+            let body, be = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if be != blot_error::Error.none { return 0, be; }
+            let source_goals=quantifierGoals(self_,root);let goals=resolution_goals.alloc_slice(source_goals.len);for goal,index in source_goals {goals[index]=goal;}
+ let result,error=substituteQuantifiedGoals(self_,root,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,binders,body,goals);resolution_goals.free_slice(goals);return result,error;
+}
+recursive fn substituteQuantifiedGoals<L,R>(self_:Store&,root:Id,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,binders:const Id[:],body:Id,goals:Obligation[:])->Id,Error {
+ var changed = body != value.a;
+            for &goal in goals {
+                if goal.ty != 0 { let next, error = substituteDepth(self_, goal.ty, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.ty; goal.ty = next; }
+                if goal.other != 0 { let next, error = substituteDepth(self_, goal.other, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.other; goal.other = next; }
+                if goal.result != 0 { let next, error = substituteDepth(self_, goal.result, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.result; goal.result = next; }
+                if goal.signature != 0 { let next, error = substituteDepth(self_, goal.signature, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.signature; goal.signature = next; }
+            }
+            if !changed { return root, blot_error::Error.none; } return reownQuantified(self_, value.tag, body, binders, goals);
+
+}
+reusable[] var substitution_ids:Id[>..];
+reusable[] var substitution_fields:Field[>..];
+recursive fn substituteProduct<L,R>(self_:Store&,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,fields:Id[:])->Id,Error {for i in value.b {let next,error=substituteDepth(self_,self_.extra.items[value.a+i],old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth+1);if error!=blot_error::Error.none {return 0,error;}fields[i]=next;}return product(self_,fields);}
+recursive fn substituteRecord<L,R>(self_:Store&,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,fields:Field[:])->Id,Error {for i in value.b {let field=recordField(self_,value,i);let next,error=substituteDepth(self_,field.ty,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth+1);if error!=blot_error::Error.none {return 0,error;}fields[i]=Field{field.name,next,..};}return record(self_,fields);}
+recursive fn substituteArguments<L,R>(self_:Store&,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,prior:const Id[:],args:Id[:])->Id,Error {
+            for child,index in prior { let next, error = substituteDepth(self_, child, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } args[index]=next; }
+            if value.tag == Tag.projection { return projection(self_, NominalIdentity { value.a, value.b , ..}, projectionMember(self_, value), args); }
+            if value.tag == Tag.instance_selection { return instanceSelection(self_, NominalIdentity { value.a, value.b , ..}, args); }
+            return nominal(self_, NominalIdentity { value.a, value.b , ..}, args);
+}
+
 struct CovariantInput { root: Id, depth: i64 }
 fn hash(value: CovariantInput) -> u64 { return ::hash_combine(::hash(value.root), ::hash(value.depth)); }
 struct CovariantEntry { root: Id, depth: i64, protected: List, result: Id }
@@ -1698,7 +1718,7 @@ fn covariantInputs(self_: Store&, root: Id, out: u32[>..]&, depth: i64) -> Error
 recursive fn covariantInputsSeen(self_: Store&, root: Id, out: u32[>..]&, depth: i64, seen: dictionary<CovariantInput, bool>&) -> Error {
     if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return error; } }
     if depth >= 1024 { return blot_error::Error.type_limit; }
-    if self_.has_projections || self_.use_closed_graphs { let key = CovariantInput { root, depth , ..}; if seen.contains(key) { return blot_error::Error.none; } seen.insert(key, true); }
+    if self_.has_projections || self_.use_closed_graphs { let key = CovariantInput { root, depth , ..}; if ::contains(seen,key) { return blot_error::Error.none; } ::insert(seen,key, true); }
     let value = node(self_, root);
     match value.tag {
         function => { let free, error = freeRowVariables(self_, value.a); if error != blot_error::Error.none { return error; } let added = unionInto(self_, out, free); if added != blot_error::Error.none { return added; } return covariantInputsSeen(self_, value.b, out, depth + 1, seen); },
@@ -1717,9 +1737,9 @@ recursive fn openCovariantDepth(self_: Store&, root: Id, memo: dictionary<Covari
     increment(self_.normalization.open_depth_entries);
     if !self_.has_projections { if depth >= 1024 { return 0, blot_error::Error.type_limit; } match node(self_, root).tag { function, provider, product, record, usage, array, list, cursor => {}, _ => { return root, blot_error::Error.none; }, } }
     var query = CovariantInput { root, depth , ..}; if self_.has_projections { query.depth = 0; }
-    block { let known = memo.get(query); if known { return known, blot_error::Error.none; } }
+    block { let known = ::get(memo,query); if known { return known, blot_error::Error.none; } }
     let result, error = openCovariantNode(self_, root, memo, depth); if error != blot_error::Error.none { return 0, error; }
-    if (self_.has_projections || result == root) && memo.count < 65536 { memo.insert(query, result); } return result, blot_error::Error.none;
+    if (self_.has_projections || result == root) && memo.count < 65536 { ::insert(memo,query, result); } return result, blot_error::Error.none;
 }
 recursive fn openCovariantNode(self_: Store&, root: Id, memo: dictionary<CovariantInput, Id>&, depth: i64) -> Id, Error {
     if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } } if depth >= 1024 { return 0, blot_error::Error.type_limit; }

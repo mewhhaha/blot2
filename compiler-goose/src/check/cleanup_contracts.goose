@@ -34,7 +34,7 @@ fn typeBound<S,N>(self_: const NominalTypes<S,N>&, id: Id) -> bool { return id <
 fn rowBound<S,N>(self_: const NominalTypes<S,N>&, id: u32) -> bool { return id < self_.store.effects.rows.len; }
 fn payload(store, id: Id) -> bool { let empty: const blot_check_core::Nominal[:] = default<const blot_check_core::Nominal[:]>(); return payloadNominal(store, empty, id); }
 fn payloadNominal(store, nominals, id: Id) -> bool { var budget = Budget {..}; return payloadDepth(store, nominals, id, budget, 0); }
-recursive fn payloadDepth(store, nominals, id: Id, budget: Budget&, depth: i64) -> bool {
+recursive fn payloadDepth<S,N>(store:S, nominals:const N[:], id: Id, budget: Budget&, depth: i64) -> bool {
     if budget.charge(depth) != blot_error::Error.none || !typeBound(store, id) { return false; } let node = store.node(store.head(id, 0));
     if scalar(node.tag) { return node.a == 0 && node.b == 0 && node.c == 0; }
     if node.tag == blot_check_types::Tag.array || node.tag == blot_check_types::Tag.list { return node.b == 0 && node.c == 0 && payloadDepth(store, nominals, node.a, budget, depth + 1); }
@@ -220,7 +220,7 @@ fn checkAdapter(walker: CoreWalker&, ty: Id, parameter: blot_check_core::Paramet
     let error = expression(walker, body, 0); if error != blot_error::Error.none { return error; } if walker.host != (header.c != 0) { return blot_error::Error.unsafe_cleanup; } return blot_error::Error.none;
 }
 fn validate(module: const blot_check_core::Module&) -> Error {
-    if closedStorage(module) != blot_error::Error.none { return blot_error::Error.invalid_artifact; } var owned: Id[4096]; var count: i64 = 0; var budget = Budget {..};
+    if closedStorage(module) != blot_error::Error.none { return blot_error::Error.invalid_artifact; } var owned: Id[4096]=[0;4096]; var count: i64 = 0; var budget = Budget {..};
     for node, id in module.nodes {
         if budget.charge(0) != blot_error::Error.none { return blot_error::Error.invalid_artifact; }
         if node.tag == blot_check_core::Tag.resource_scope || node.tag == blot_check_core::Tag.resource_acquire { if count == owned.len || node.b == 0 || node.b >= module.nodes.len { return blot_error::Error.invalid_artifact; } owned[count] = module.typeOf(node.b); count += 1; }

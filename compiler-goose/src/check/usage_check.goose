@@ -37,8 +37,10 @@ fn list<S,N>(self_: const NominalStore<S,N>&, values: blot_check_types::List) ->
 fn recordField<S,N>(self_: const NominalStore<S,N>&, value: blot_check_types::Node, index: i64) -> blot_check_types::Field { return self_.store.recordField(value, index); }
 fn nominalArguments<S,N>(self_: const NominalStore<S,N>&, value: blot_check_types::Node) -> const Id[:] { return self_.store.nominalArguments(value); }
 fn valid<S,N>(self_: const NominalStore<S,N>&, id: Id) -> bool { return id < self_.store.nodes.len; }
+fn extraValues(values:const Id[:])->const Id[:] {return values;}
+fn extraValues(values:const blot_check_types::Table_extra&)->const Id[:] {return values.items;}
 fn shape<S,N>(self_: const NominalStore<S,N>&, value: blot_check_types::Node) -> Error {
-    let values = self_.store.extra;
+    let values = extraValues(self_.store.extra);
     match value.tag {
         usage, array, list, cursor, forall, existential, resolver, provider, scoped => { if !self_.valid(value.a) { return blot_error::Error.type_limit; } },
         function => { if !self_.valid(value.a) || !self_.valid(value.b) { return blot_error::Error.type_limit; } },
@@ -78,7 +80,7 @@ fn containsNominalMemoWork(store: const blot_check_types::Store&, nominals, root
 struct Pending { ids: Id[4096], slots: u16[8192] = [0; 8192], count: i64 = 0 }
 fn add(self_: Pending&, source, raw: Id, budget: Work&, known: Memo?) -> Error {
     if !source.valid(raw) { return blot_error::Error.type_limit; } let id = source.head(raw, 0); if !source.valid(id) { return blot_error::Error.type_limit; }
-    { let optional_binding_72 .= known; if optional_binding_72 { let cache .= optional_binding_72; let error = budget.charge(1); if error != blot_error::Error.none { return error; } if cache.safe.contains(id) { return blot_error::Error.none; }  } }
+    { let optional_binding_72 .= known; if optional_binding_72 { let cache .= optional_binding_72; let error = budget.charge(1); if error != blot_error::Error.none { return error; } if ::contains(cache.safe,id) { return blot_error::Error.none; }  } }
     var slot = ((id as u64 * 0x9e3779b1) & (self_.slots.len as u64 - 1)) as i64;
     while true { let error = budget.charge(1); if error != blot_error::Error.none { return error; } let prior = self_.slots[slot]; if prior == 0 { break; } if self_.ids[prior - 1] == id { return blot_error::Error.none; } slot = (slot + 1) & (self_.slots.len - 1); }
     if self_.count == self_.ids.len { return blot_error::Error.type_limit; } self_.ids[self_.count] = id; self_.count += 1; self_.slots[slot] = self_.count as u16; return blot_error::Error.none;
@@ -93,16 +95,16 @@ fn inspectWithMemo(store, root: Id, mode: Mode, work: Work&, memo: Memo?) -> boo
             if mode == Mode.borrow { if kind == blot_parse_ast::usagekind_borrow || kind == blot_parse_ast::usagekind_borrow_mut { return true, blot_error::Error.none; } }
             else if kind == blot_parse_ast::usagekind_unique || kind == blot_parse_ast::usagekind_borrow_mut || kind == blot_parse_ast::usagekind_once { return true, blot_error::Error.none; }
         }
-        var child: Id[1] = [node.a]; var edges: const Id[:] = default<const Id[:]>();
+
         match node.tag {
-            usage, array, list, cursor, forall, existential => { edges = child; },
-            product => { edges = store.list(blot_check_types::List { node.a, node.b , ..}); },
-            nominal, projection => { edges = store.nominalArguments(node); },
+            usage, array, list, cursor, forall, existential => { let error=work.charge(1); if error!=blot_error::Error.none {return false,error;} let error=pending.add(store,node.a,work,memo); if error!=blot_error::Error.none {return false,error;} },
+            product => { let edges=store.list(blot_check_types::List { node.a, node.b , ..}); let error = work.charge(edges.len); if error != blot_error::Error.none { return false, error; } for edge in edges { let error = pending.add(store, edge, work, memo); if error != blot_error::Error.none { return false, error; } } },
+            nominal, projection => { let edges=store.nominalArguments(node); let error = work.charge(edges.len); if error != blot_error::Error.none { return false, error; } for edge in edges { let error = pending.add(store, edge, work, memo); if error != blot_error::Error.none { return false, error; } } },
             function => { if mode == Mode.any { let error = pending.add(store, node.a, work, memo); if error != blot_error::Error.none { return false, error; } let error = pending.add(store, node.b, work, memo); if error != blot_error::Error.none { return false, error; } } },
             record => { for index in 0..node.b { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } let error = pending.add(store, store.recordField(node, index).ty, work, memo); if error != blot_error::Error.none { return false, error; } } },
             _ => {},
         }
-        let error = work.charge(edges.len); if error != blot_error::Error.none { return false, error; } for edge in edges { let error = pending.add(store, edge, work, memo); if error != blot_error::Error.none { return false, error; } }
+
     }
     { let optional_binding_71 .= memo; if optional_binding_71 { let cache .= optional_binding_71; for index in 0..pending.count { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } cache.safe.insert(pending.ids[index], true); }  } } return false, blot_error::Error.none;
 }
@@ -418,7 +420,7 @@ fn containsNominalMemoWork(store: const blot_check_types::Store&, nominals, root
 }
 fn addPooled(self_: Pending&, source, raw: Id, budget: Work&, known: PooledMemo?) -> Error {
     if !source.valid(raw) { return blot_error::Error.type_limit; } let id = source.head(raw, 0); if !source.valid(id) { return blot_error::Error.type_limit; }
-    { let optional_binding_72 .= known; if optional_binding_72 { let cache .= optional_binding_72; let error = budget.charge(1); if error != blot_error::Error.none { return error; } if cache.safe.contains(id) { return blot_error::Error.none; }  } }
+    { let optional_binding_72 .= known; if optional_binding_72 { let cache .= optional_binding_72; let error = budget.charge(1); if error != blot_error::Error.none { return error; } if blot_support_pooled_map::contains(cache.safe,id) { return blot_error::Error.none; }  } }
     var slot = ((id as u64 * 0x9e3779b1) & (self_.slots.len as u64 - 1)) as i64;
     while true { let error = budget.charge(1); if error != blot_error::Error.none { return error; } let prior = self_.slots[slot]; if prior == 0 { break; } if self_.ids[prior - 1] == id { return blot_error::Error.none; } slot = (slot + 1) & (self_.slots.len - 1); }
     if self_.count == self_.ids.len { return blot_error::Error.type_limit; } self_.ids[self_.count] = id; self_.count += 1; self_.slots[slot] = self_.count as u16; return blot_error::Error.none;
@@ -433,16 +435,16 @@ fn inspectWithPooledMemo(store, root: Id, mode: Mode, work: Work&, memo: PooledM
             if mode == Mode.borrow { if kind == blot_parse_ast::usagekind_borrow || kind == blot_parse_ast::usagekind_borrow_mut { return true, blot_error::Error.none; } }
             else if kind == blot_parse_ast::usagekind_unique || kind == blot_parse_ast::usagekind_borrow_mut || kind == blot_parse_ast::usagekind_once { return true, blot_error::Error.none; }
         }
-        var child: Id[1] = [node.a]; var edges: const Id[:] = default<const Id[:]>();
+
         match node.tag {
-            usage, array, list, cursor, forall, existential => { edges = child; },
-            product => { edges = store.list(blot_check_types::List { node.a, node.b , ..}); },
-            nominal, projection => { edges = store.nominalArguments(node); },
+            usage, array, list, cursor, forall, existential => { let error=work.charge(1); if error!=blot_error::Error.none {return false,error;} let error=pending.addPooled(store,node.a,work,memo); if error!=blot_error::Error.none {return false,error;} },
+            product => { let edges=store.list(blot_check_types::List { node.a, node.b , ..}); let error = work.charge(edges.len); if error != blot_error::Error.none { return false, error; } for edge in edges { let error = pending.addPooled(store, edge, work, memo); if error != blot_error::Error.none { return false, error; } } },
+            nominal, projection => { let edges=store.nominalArguments(node); let error = work.charge(edges.len); if error != blot_error::Error.none { return false, error; } for edge in edges { let error = pending.addPooled(store, edge, work, memo); if error != blot_error::Error.none { return false, error; } } },
             function => { if mode == Mode.any { let error = pending.addPooled(store, node.a, work, memo); if error != blot_error::Error.none { return false, error; } let error = pending.addPooled(store, node.b, work, memo); if error != blot_error::Error.none { return false, error; } } },
             record => { for index in 0..node.b { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } let error = pending.addPooled(store, store.recordField(node, index).ty, work, memo); if error != blot_error::Error.none { return false, error; } } },
             _ => {},
         }
-        let error = work.charge(edges.len); if error != blot_error::Error.none { return false, error; } for edge in edges { let error = pending.addPooled(store, edge, work, memo); if error != blot_error::Error.none { return false, error; } }
+
     }
     { let optional_binding_71 .= memo; if optional_binding_71 { let cache .= optional_binding_71; for index in 0..pending.count { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } blot_support_pooled_map::insert(cache.safe,pending.ids[index],true,pooled_safe_slots); }  } } return false, blot_error::Error.none;
 }
