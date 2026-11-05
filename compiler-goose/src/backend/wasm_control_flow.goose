@@ -8,7 +8,7 @@ struct Predecessor { from: u32, next: u32 }
 struct Control { start: u32, alternate: u32 = absent }
 struct Graph { nodes: Node[>..]&, predecessors: Predecessor[>..]&, valid: bool = true }
 fn init(nodes: Node[>..]&, predecessors: Predecessor[>..]&, instructions: const blot_backend_runtime_ir::Instruction[:]) -> Graph {
-    nodes.clear(); predecessors.clear();
+    assert(nodes.len == 0 && predecessors.len == 0);
     for index in 0..instructions.len + 1 { nodes.push(Node {..}); }
     var graph = Graph { nodes: nodes, predecessors: predecessors , ..};
     var ends: u32[>..] = []; var controls: Control[>..] = [];

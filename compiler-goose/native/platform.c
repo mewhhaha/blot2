@@ -18,6 +18,10 @@
 #include <spawn.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sys/file.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 
 _Static_assert(sizeof(void *) == 8, "the native port uses the Goose C.2 64-bit host layout");
 _Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24,
@@ -220,6 +224,12 @@ void blot_platform_entry_init(int argc, char **argv) {
     blot_argc = argc;
     blot_argv = argv;
     signal(SIGPIPE, SIG_IGN);
+#ifdef __linux__
+    if (argc > 1 && strcmp(argv[1], "--worker") == 0) {
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        if (getppid() == 1) _exit(1);
+    }
+#endif
 }
 int64_t blot_argument_count(void) { return blot_argc; }
 int64_t blot_argument_size(int64_t index) {
@@ -306,4 +316,48 @@ int32_t blot_worker_stop(uint32_t slot) {
     do { waited = waitpid(worker.pid, &status, 0); } while (waited < 0 && errno == EINTR);
     if (waited < 0 && errno != ECHILD) return -errno;
     return 0;
+}
+
+int32_t blot_lock_open(const uint8_t *path) {
+    int fd;
+    do { fd = open((const char *)path, O_RDWR | O_CREAT | O_CLOEXEC, 0666); } while (fd < 0 && errno == EINTR);
+    if (fd < 0) return -errno;
+    return fd;
+}
+int32_t blot_try_lock(int32_t fd, _Bool exclusive) {
+    int operation = LOCK_SH | LOCK_NB;
+    if (exclusive) operation = LOCK_EX | LOCK_NB;
+    if (flock(fd, operation) < 0) return -errno;
+    return 0;
+}
+int32_t blot_unlock(int32_t fd) { if (flock(fd, LOCK_UN) < 0) return -errno; return 0; }
+int32_t blot_truncate(int32_t fd, uint64_t length) {
+    if (length > INT64_MAX) return -EOVERFLOW;
+    if (ftruncate(fd, (off_t)length) < 0) return -errno;
+    return 0;
+}
+int64_t blot_pwrite(int32_t fd, const uint8_t *data, uint64_t count, uint64_t offset) {
+    if (count > SSIZE_MAX || offset > INT64_MAX) return -EOVERFLOW;
+    ssize_t written;
+    do { written = pwrite(fd, data, (size_t)count, (off_t)offset); } while (written < 0 && errno == EINTR);
+    if (written < 0) return -(int64_t)errno;
+    return written;
+}
+void blot_sleep_ms(uint64_t milliseconds) {
+    struct timespec pause = { (time_t)(milliseconds / 1000), (long)((milliseconds % 1000) * 1000000) };
+    while (nanosleep(&pause, &pause) < 0 && errno == EINTR) {}
+}
+int64_t blot_fork(void) { pid_t pid = fork(); if (pid < 0) return -(int64_t)errno; return pid; }
+int32_t blot_detach_session(void) { if (setsid() < 0) return -errno; return 0; }
+_Bool blot_wait_success(uint32_t pid) {
+    int status;
+    pid_t result;
+    do { result = waitpid((pid_t)pid, &status, 0); } while (result < 0 && errno == EINTR);
+    return result == (pid_t)pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+void blot_null_standard_io(void) {
+    int sink = open("/dev/null", O_RDWR);
+    if (sink < 0) return;
+    for (int fd = 0; fd < 3; ++fd) dup2(sink, fd);
+    if (sink > 2) close(sink);
 }

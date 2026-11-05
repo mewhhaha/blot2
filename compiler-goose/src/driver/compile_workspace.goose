@@ -56,7 +56,7 @@ fn construct(frame:Frame)->Error {
 fn release(self:Frame&)->Error {
  if self.slot==0 {return Error.none;}if !self.valid() {return Error.invalid_artifact;}let at=self.slot-1;let state:FrameState&=frames[at];
  if state.references>1 {state.references--;self=Frame{..};return Error.none;}
- if state.workspace {if !blot_backend_core_backend::publicationCanReclaim(state.workspace) {return Error.invalid_artifact;}}
+ if state.workspace {if state.workspace.publication_owner.slot!=0&&!blot_backend_core_backend::publicationCanReclaim(state.workspace) {return Error.invalid_artifact;}}
  assert(active==self);destroyContexts(state);state.live=false;state.session .= null;state.generator .= null;state.workspace .= null;state.capture .= null;state.capture_token=0;
  frames.free(at);active=Frame{..};self=Frame{..};return Error.none;
 }

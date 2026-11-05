@@ -1,0 +1,159 @@
+// Whole-body proof keeps private provider heads outside source graphs.
+namespace blot_backend_provider_flow;
+import dictionary;
+import .runtime_ir;
+import .wasm;
+import .provider_origins;
+import .wasm_control_flow;
+import support.option;
+import support.error;
+type Error = blot_error::Error;
+type Module = blot_backend_wasm::Module;
+type Function = blot_backend_runtime_ir::Function;
+type Instruction = blot_backend_runtime_ir::Instruction;
+type Fact = blot_backend_provider_origins::Fact;
+let frame: u8 = 1;
+let ordinary: u8 = 2;
+let zero: u8 = 4;
+struct Condition {local: u32,version: u32,kinds: u8}
+struct Value {kinds: u8 = zero,constant: blot_support::Option<u32> = blot_support::some(0 as u32),offset: u32 = 0,frame_kinds: u8 = 0,local: blot_support::Option<u32> = blot_support::none<u32>(),version: u32 = 0,kind_source: blot_support::Option<u32> = blot_support::none<u32>(),kind_version: u32 = 0,condition: blot_support::Option<Condition> = blot_support::none<Condition>(),pointer: bool = false,borrowed_head: bool = false,owned_sources: u64 = 0}
+fn hasFrame(self: Value) -> bool {return (self.kinds & frame) != 0;}
+fn head(self: Value) -> bool {return (self.kinds & ordinary) == 0 && self.offset == 0;}
+struct Control {height: i64,result: bool,conditional: bool = false,value: Value = Value {kinds: 0,constant: blot_support::none<u32>(),..},condition: blot_support::Option<Condition> = blot_support::none<Condition>(),alternate: bool = false}
+fn merge(left: Value&,right: Value) -> bool {
+    let changed = (left.kinds | right.kinds) != left.kinds || (left.constant.present && left.constant != right.constant) || (left.offset != 4294967295 && left.offset != right.offset) || (left.frame_kinds | right.frame_kinds) != left.frame_kinds || (!left.pointer && right.pointer) || (!left.borrowed_head && right.borrowed_head) || (left.owned_sources | right.owned_sources) != left.owned_sources;
+    left.kinds |= right.kinds;if left.constant != right.constant {left.constant = blot_support::none<u32>();}if left.offset != right.offset {left.offset = 4294967295;}left.frame_kinds |= right.frame_kinds;left.pointer = left.pointer || right.pointer;left.borrowed_head = left.borrowed_head || right.borrowed_head;left.owned_sources |= right.owned_sources;left.local = blot_support::none<u32>();left.kind_source = blot_support::none<u32>();left.condition = blot_support::none<Condition>();return changed;
+}
+struct Stack {items: Value[>..<]&,valid: bool = true}
+fn pop(self: Stack&) -> Value {if self.items.len == 0 {self.valid = false;return Value {..};}return self.items.pop();}
+fn push(self: Stack&,value: Value) {self.items.push(value);}
+fn dead(controls: const Control[:],locals: const Value[:],versions: const u32[:],observed: bool[:]) -> bool {
+    for control in controls {if !control.condition.present {continue;}let condition = control.condition.value;if condition.local >= locals.len || versions[condition.local] != condition.version {continue;}observed[condition.local] = true;var kinds = locals[condition.local].frame_kinds;
+        for branch in controls {if !branch.condition.present {continue;}let other = branch.condition.value;if other.local == condition.local && other.version == condition.version {if branch.alternate {kinds &= ~other.kinds;}else {kinds &= other.kinds;}}}if kinds == 0 {return true;}
+    }return false;
+}
+fn constructionAt(constructions: const Fact[:],at: i64) -> blot_support::Option<Fact> {for fact in constructions {if fact.allocation == at {return blot_support::some(fact);}}return blot_support::none<Fact>();}
+fn firstBit(value: u64) -> i64 {assert(value != 0);var bits = value;var index: i64 = 0;while (bits & 1) == 0 {bits >>= 1;index++;}return index;}
+fn bitCount(value: u64) -> u32 {var bits = value;var count: u32 = 0;while bits != 0 {bits &= bits - 1;count++;}return count;}
+struct Positions {words: dictionary<u64,u64>&,count: u32 = 0}
+fn key(at: u32,local: u32) -> u64 {return (local as u64 << 32) | (at >> 6) as u64;}
+fn bit(at: u32) -> u64 {return 1 as u64 << (at & 63);}
+fn contains(self: const Positions&,at: u32,local: u32) -> bool {let word .= self.words.get(key(at,local));if !word {return false;}return (word & bit(at)) != 0;}
+fn insert(self: Positions&,at: u32,local: u32) -> bool {let position = key(at,local);var previous: u64 = 0;{let word .= self.words.get(position);if word {previous = word;}}let present = (previous & bit(at)) != 0;if !present {self.count++;}self.words.insert(position,previous | bit(at));return present;}
+fn clear(self: Positions&) {self.words.clear();self.count = 0;}
+fn include(self: Positions&,other: const Positions&) {for slot in other.words.slots {if slot.tag == 0 {continue;}var previous: u64 = 0;{let word .= self.words.get(slot.key);if word {previous = word;}}self.count += bitCount(slot.val & ~previous);self.words.insert(slot.key,previous | slot.val);}}
+struct Position {at: u32,local: u32}
+struct Guards {graph: blot_backend_wasm_control_flow::Graph,reachable: bool[>..<]&,cache: Positions,pending: Position[>..<]&,seen: Positions,initialized: bool = false}
+fn ensure(self: Guards&,code: const Instruction[:]) {
+    if self.initialized {return;}self.graph = blot_backend_wasm_control_flow::init(self.graph.nodes,self.graph.predecessors,code);self.initialized = true;for node in self.graph.nodes {self.reachable.push(false);}var pending: u32[>..] = [];pending.push(0);self.reachable[0] = true;var cursor: i64 = 0;while cursor < pending.len {for next in self.graph.nodes[pending[cursor]].next {if next == blot_backend_wasm_control_flow::absent || self.reachable[next] {continue;}self.reachable[next] = true;pending.push(next);}cursor++;}
+}
+fn nonnull(self: Guards&,code: const Instruction[:],constructions: const Fact[:],at: u32,local: u32) -> bool {
+    if self.cache.contains(at,local) || !self.reachable[at] {return true;}self.pending.clear();self.seen.clear();self.pending.push(Position {at,local});var valid = true;var cursor: i64 = 0;
+    while cursor < self.pending.len {if cursor == 16384 {valid = false;break;}let point = self.pending[cursor];cursor++;if self.cache.contains(point.at,point.local) || self.seen.insert(point.at,point.local) {continue;}if point.at == 0 {valid = false;break;}var edge = self.graph.nodes[point.at].first;if edge == blot_backend_wasm_control_flow::absent {valid = false;break;}
+        while edge != blot_backend_wasm_control_flow::absent {let predecessor = self.graph.predecessors[edge];edge = predecessor.next;let before = predecessor.from;if !self.reachable[before] {continue;}let inst = code[before];
+            if inst.op == blot_backend_runtime_ir::OP_end && before >= 4 {let guard = code[before - 4..before + 1];if guard[0].op == blot_backend_runtime_ir::OP_local_get && guard[0].operand == point.local && guard[1].op == blot_backend_runtime_ir::OP_i32_eqz && guard[2].op == blot_backend_runtime_ir::OP_if_ && guard[2].operand == 0 && guard[3].op == blot_backend_runtime_ir::OP_unreachable_ {continue;}}
+            var tracked = point.local;if (inst.op == blot_backend_runtime_ir::OP_local_set || inst.op == blot_backend_runtime_ir::OP_local_tee) && inst.operand == point.local {if before != 0 {let fact = constructionAt(constructions,before - 1);if fact.present && fact.value.local == point.local {continue;}}if before == 0 || code[before - 1].op != blot_backend_runtime_ir::OP_local_get {valid = false;break;}tracked = code[before - 1].operand;}self.pending.push(Position {at: before,local: tracked});
+        }if !valid {break;}
+    }
+    if valid && self.seen.count <= max(16384 as i64 - self.cache.count,0) {self.cache.include(self.seen);}return valid;
+}
+fn runtimeArgument(module: const Module&,target: u32,index: i64,values: const Value[:]) -> bool {
+    if !module.arena.present {return false;}let arena = module.arena.value;if module.regions.present && target == module.regions.value.runtime.member_at && index == 0 && values[index].head() {return true;}
+    if module.cohorts.present {let cohorts = module.cohorts.value;if target == cohorts.begin && index == 0 && values[index].head() && !values[index].borrowed_head {return true;}if target == cohorts.allocate && index == 2 && values[index].head() {return true;}}
+    if index == 0 && values[index].head() {if target == arena.retain {return true;}if !values[index].borrowed_head {for function in [arena.release,arena.release_lease,arena.retire,arena.free,arena.recycle,arena.decrement,arena.mark_acyclic] {if target == function {return true;}}}}
+    return (index == 0 || index == 1) && target == arena.store_word && values.len == 3 && values[0].head() && (values[1].kinds & ordinary) == 0 && values[1].offset == 4 && (values[1].frame_kinds & ~48 as u8) == 0 && !values[2].hasFrame();
+}
+fn arguments(module: const Module&,target: u32,values: const Value[:]) -> bool {if target >= module.functions.len {return false;}let callee = module.functions[target];if values.len != callee.parameters.len || !blot_backend_runtime_ir::validProviderParameter(module,callee) {return false;}for value,index in values {if index == callee.provider_parameter {if !value.head() {return false;}}else if value.hasFrame() && !runtimeArgument(module,target,index,values) {return false;}}return true;}
+fn indirect(module: const Module&,signature: u32,values: const Value[:]) -> bool {if signature >= module.signatures.len {return false;}for target in module.table_functions {if target >= module.functions.len {return false;}let body = module.functions[target];if body.signature != signature {continue;}if body.provider_parameter == blot_backend_runtime_ir::unknown_provider || !arguments(module,target,values) {return false;}}return true;}
+fn retirementCall(module: const Module&,target: u32) -> bool {assert(module.arena.present);let arena = module.arena.value;if target >= module.functions.len || module.functions[target].parameters.len != 1 {return false;}for function in [arena.release,arena.release_lease,arena.free,arena.recycle,arena.retire,arena.decrement] {if target == function {return true;}}return false;}
+fn inheritedSources(parents: const u64[64]&,initial: u64) -> u64 {var sources = initial;var result: u64 = 0;while sources != 0 {let index = firstBit(sources);sources &= sources - 1;result |= parents[index];}return result;}
+fn borrowerSources(next: const u64[64]&,outer: const u64[64]&,initial: u64) -> u64 {var result = initial;var pending = initial;while pending != 0 {let index = firstBit(pending);pending &= pending - 1;let parents = next[index] | outer[index];pending |= parents & ~result;result |= parents;}return result;}
+fn bodyFlow(module: const Module&,body: Function,frame_kinds: u8,stack_heads: bool) -> bool {
+    let count = body.parameters.len + module.locals(body).len;let code = module.instructions(body);if count > 8192 || code.len > 4096 || !blot_backend_runtime_ir::validProviderParameter(module,body) {return false;}if body.provider_parameter == blot_backend_runtime_ir::unknown_provider && !body.entry {return false;}if stack_heads && body.entry && body.provider_parameter != blot_backend_runtime_ir::unknown_provider && body.provider_parameter != blot_backend_runtime_ir::no_provider {return false;}
+    var locals: Value[>..<] = [];var observed: bool[>..<] = [];var versions: u32[>..<] = [];for index in 0..count {locals.push(Value {..});observed.push(false);versions.push(0);}
+    for machine,index in module.parameters(body) {var kinds = ordinary;var frames: u8 = 0;if index == body.provider_parameter {kinds = frame;frames = frame_kinds;}locals[index] = Value {kinds,constant: blot_support::none<u32>(),frame_kinds: frames,pointer: blot_backend_runtime_ir::parameterRole(body,index) == blot_backend_runtime_ir::ROLE_reference,borrowed_head: index == body.provider_parameter,..};}
+    var constructions: Fact[>..] = [];for inst,at in code {if inst.op != blot_backend_runtime_ir::OP_ownership {continue;}let marker = blot_backend_runtime_ir::ownership(inst.operand);if marker.kind != blot_backend_runtime_ir::OWN_rest || marker.chunk != blot_backend_provider_origins::begin_chunk {continue;}let fact = blot_backend_provider_origins::constructor(module,body,at);if !fact.present || constructionAt(constructions,fact.value.allocation).present {return false;}constructions.push(fact.value);}
+    let tracking = stack_heads && constructions.len != 0;var source_ids: u64[>..<] = [];if tracking {for inst in code {source_ids.push(0);}}var source_count: i64 = 0;if stack_heads {for fact in constructions {if source_count == 64 {return false;}source_ids[fact.allocation] = 1 as u64 << source_count;source_count++;}}
+    var next_sources: u64[64] = [0;64];var outer_sources: u64[64] = [0;64];var stack_items: Value[>..<] = [];var stack = Stack {items: stack_items};var controls: Control[>..<] = [];
+    var graph_nodes: blot_backend_wasm_control_flow::Node[>..] = [];var graph_predecessors: blot_backend_wasm_control_flow::Predecessor[>..] = [];var reachable: bool[>..<] = [];var cache_words: dictionary<u64,u64> = {};var seen_words: dictionary<u64,u64> = {};var pending: Position[>..<] = [];
+    var guards = Guards {graph: blot_backend_wasm_control_flow::Graph {nodes: graph_nodes,predecessors: graph_predecessors,..},reachable,cache: Positions {words: cache_words,..},pending,seen: Positions {words: seen_words,..},..};
+    var uses: u64[>..<] = [];var retirements: u64[>..<] = [];if tracking {for inst in code {uses.push(0);retirements.push(0);}}
+    for pass in 0..32 {
+        stack.items.clear();controls.clear();for index in 0..count {versions[index] = 0;observed[index] = false;}var changed = false;
+        for inst,at in code {
+            if !stack.valid {return false;}let op = inst.op;
+            if tracking {for value,index in stack.items {let cleanup = op == blot_backend_runtime_ir::OP_call && retirementCall(module,inst.operand) && index + 1 == stack.items.len;if !cleanup && value.hasFrame() {uses[at] |= value.owned_sources;}}}
+            if op == blot_backend_runtime_ir::OP_ownership {let marker = blot_backend_runtime_ir::ownership(inst.operand);if marker.kind != blot_backend_runtime_ir::OWN_scope {continue;}match marker.chunk {2,3,5,6=>{if marker.roles >= count || locals[marker.roles].hasFrame() {return false;}observed[marker.roles] = true;},4=>{let slot = marker.roles & 8191;let value = marker.roles >> 13;if slot >= count || value >= count || locals[slot].hasFrame() || locals[value].hasFrame() {return false;}observed[slot] = true;observed[value] = true;},_=>{},}}
+            else if op == blot_backend_runtime_ir::OP_nop {}
+            else if op == blot_backend_runtime_ir::OP_local_get {
+                if inst.operand >= count {return false;}observed[inst.operand] = true;var value = locals[inst.operand];if tracking && value.hasFrame() {let cleanup = at + 1 < code.len && code[at + 1].op == blot_backend_runtime_ir::OP_call && retirementCall(module,code[at + 1].operand);if !cleanup {uses[at] |= value.owned_sources;}}
+                value.local = blot_support::some(inst.operand);value.version = versions[inst.operand];for control in controls {if control.condition.present {let condition = control.condition.value;if condition.local == inst.operand && condition.version == value.version {if control.alternate {value.frame_kinds &= ~condition.kinds;}else {value.frame_kinds &= condition.kinds;}}}}if dead(controls,locals,versions,observed) {value.kinds = 0;}stack.push(value);
+            }
+            else if op == blot_backend_runtime_ir::OP_local_set || op == blot_backend_runtime_ir::OP_local_tee {if inst.operand >= count {return false;}let value = stack.pop();versions[inst.operand]++;if merge(locals[inst.operand],value) && observed[inst.operand] {changed = true;}if op == blot_backend_runtime_ir::OP_local_tee {stack.push(value);}}
+            else if op == blot_backend_runtime_ir::OP_i32_const {var kinds = ordinary;if inst.operand == 0 && !inst.table_reference {kinds = zero;}var constant = blot_support::none<u32>();if !inst.table_reference {constant = blot_support::some(inst.operand);}let constructor,constructed = blot_backend_runtime_ir::staticConstructor(code,at);assert(module.arena.present);stack.push(Value {kinds,constant,pointer: !inst.table_reference && inst.operand < module.globals[module.arena.value.static_end].bits && (blot_backend_runtime_ir::hasImmortalReference(code,at) || constructed),..});}
+            else if op == blot_backend_runtime_ir::OP_global_get {stack.push(Value {kinds: ordinary,constant: blot_support::none<u32>(),pointer: blot_backend_runtime_ir::role(module.globals[inst.operand].scalar) == blot_backend_runtime_ir::ROLE_reference,..});}
+            else if op == blot_backend_runtime_ir::OP_f32_const || op == blot_backend_runtime_ir::OP_memory_size || op == blot_backend_runtime_ir::OP_host_ref_null || op == blot_backend_runtime_ir::OP_host_ref_size {stack.push(Value {kinds: ordinary,constant: blot_support::none<u32>(),..});}
+            else if op == blot_backend_runtime_ir::OP_i32_load || op == blot_backend_runtime_ir::OP_f32_load || op == blot_backend_runtime_ir::OP_v128_load {
+                let address = stack.pop();if !address.hasFrame() && address.kinds != 0 && !address.pointer {return false;}
+                if address.hasFrame() {
+                    if inst.operand > 4294967295 - address.offset {return false;}let offset = address.offset + inst.operand;
+                    if (address.kinds & ordinary) != 0 || offset % 4 != 0 || address.frame_kinds == 0 || !address.local.present || address.version != versions[address.local.value] {return false;}
+                    guards.ensure(code);if !guards.graph.valid || !guards.nonnull(code,constructions,at as u32,address.local.value) {return false;}
+                    for kind in 0..8 {if (address.frame_kinds & (1 as u8 << kind)) == 0 {continue;}let bytes = blot_backend_provider_origins::frameBytes(kind as u32);if !bytes.present || offset >= bytes.value || op == blot_backend_runtime_ir::OP_v128_load {return false;}if op == blot_backend_runtime_ir::OP_f32_load && (offset != 4 || (kind != 4 && kind != 5)) {return false;}}
+                    if offset == 8 {stack.push(Value {kinds: frame,constant: blot_support::none<u32>(),frame_kinds,borrowed_head: true,owned_sources: inheritedSources(next_sources,address.owned_sources),..});continue;}
+                    if offset == 20 {let outer = (address.frame_kinds & 136) != 0;let owner = (address.frame_kinds & 32) != 0;var kinds: u8 = 0;var frames: u8 = 0;var sources: u64 = 0;if outer {kinds |= frame;frames = frame_kinds;sources = inheritedSources(outer_sources,address.owned_sources);}if owner {kinds |= ordinary;}stack.push(Value {kinds,constant: blot_support::none<u32>(),frame_kinds: frames,borrowed_head: outer,owned_sources: sources,..});continue;}
+                    if offset == 12 {stack.push(Value {kinds: ordinary,constant: blot_support::none<u32>(),kind_source: address.local,kind_version: address.version,..});continue;}
+                }
+                stack.push(Value {kinds: ordinary,constant: blot_support::none<u32>(),pointer: op == blot_backend_runtime_ir::OP_i32_load,..});
+            }
+            else if op == blot_backend_runtime_ir::OP_i32_store || op == blot_backend_runtime_ir::OP_f32_store || op == blot_backend_runtime_ir::OP_v128_store {
+                let value = stack.pop();let address = stack.pop();if !address.hasFrame() {if value.hasFrame() || (address.kinds != 0 && !address.pointer) {return false;}continue;}if (address.kinds & ordinary) != 0 || inst.operand > 4294967295 - address.offset {return false;}let offset = address.offset + inst.operand;var initialized = blot_support::none<Fact>();for fact in constructions {if at > fact.allocation && at < fact.end {initialized = blot_support::some(fact);}}
+                if initialized.present {let fact = initialized.value;if offset == 8 || ((fact.kind == 3 || fact.kind == 7) && offset == 20) {if !value.head() {return false;}if tracking {var sources = address.owned_sources;while sources != 0 {let index = firstBit(sources);sources &= sources - 1;if offset == 8 {if (next_sources[index] | value.owned_sources) != next_sources[index] {changed = true;}next_sources[index] |= value.owned_sources;}else {if (outer_sources[index] | value.owned_sources) != outer_sources[index] {changed = true;}outer_sources[index] |= value.owned_sources;}}}}else if value.hasFrame() {return false;}continue;}
+                if offset != 4 || op == blot_backend_runtime_ir::OP_v128_store || value.hasFrame() || (address.frame_kinds & ~48 as u8) != 0 {return false;}
+            }
+            else if op == blot_backend_runtime_ir::OP_call || op == blot_backend_runtime_ir::OP_call_indirect || op == blot_backend_runtime_ir::OP_call_import {
+                let signature = blot_backend_runtime_ir::call(module,inst);if signature.parameters.len > stack.items.len {return false;}if op == blot_backend_runtime_ir::OP_call_indirect {let table = stack.pop();if table.hasFrame() {return false;}}if signature.parameters.len > stack.items.len {return false;}let start = stack.items.len - signature.parameters.len;let values = stack.items[start..];
+                if stack_heads && op == blot_backend_runtime_ir::OP_call {assert(module.arena.present);let arena = module.arena.value;for helper in [arena.root_open,arena.root_close,arena.root_leave,arena.root_pop,arena.root_enter,arena.root_store,arena.root_reserve] {if inst.operand == helper {return false;}}}
+                if stack_heads && !dead(controls,locals,versions,observed) {for value,index in values {if !value.hasFrame() || op != blot_backend_runtime_ir::OP_call || index != 0 {continue;}assert(module.arena.present);if inst.operand == module.arena.value.retain {return false;}if tracking && retirementCall(module,inst.operand) {retirements[at] |= value.owned_sources;}}}
+                if !dead(controls,locals,versions,observed) {if op == blot_backend_runtime_ir::OP_call_import {for value in values {if value.hasFrame() {return false;}}}else if op == blot_backend_runtime_ir::OP_call {if !arguments(module,inst.operand,values) {return false;}}else if !indirect(module,inst.operand,values) {return false;}}
+                stack.items.resize(start);if signature.result != blot_backend_runtime_ir::VT_none {var pointer = false;assert(module.arena.present);if op == blot_backend_runtime_ir::OP_call {pointer = module.functions[inst.operand].result_role == blot_backend_runtime_ir::ROLE_reference || blot_backend_wasm::isAllocation(module.arena.value,inst.operand);}if op == blot_backend_runtime_ir::OP_call_indirect {pointer = blot_backend_runtime_ir::indirectResult(code,at) == blot_backend_runtime_ir::ROLE_reference;}let constructed = constructionAt(constructions,at);var kinds = ordinary;var frames: u8 = 0;var sources: u64 = 0;if constructed.present {kinds = frame;frames = 1 as u8 << constructed.value.kind;}if tracking {sources = source_ids[at];}stack.push(Value {kinds,constant: blot_support::none<u32>(),pointer,frame_kinds: frames,owned_sources: sources,..});}
+            }
+            else if op == blot_backend_runtime_ir::OP_block || op == blot_backend_runtime_ir::OP_loop || op == blot_backend_runtime_ir::OP_if_ {var condition = blot_support::none<Condition>();if op == blot_backend_runtime_ir::OP_if_ {condition = stack.pop().condition;}controls.push(Control {height: stack.items.len,result: inst.operand != 0 && inst.operand != blot_backend_runtime_ir::VT_none,condition,conditional: op == blot_backend_runtime_ir::OP_if_,..});}
+            else if op == blot_backend_runtime_ir::OP_else_ || op == blot_backend_runtime_ir::OP_end {
+                if controls.len == 0 {return false;}let last = controls.len - 1;if op == blot_backend_runtime_ir::OP_else_ && (!controls[last].conditional || controls[last].alternate) {return false;}if controls[last].result {var value = Value {kinds: 0,constant: blot_support::none<u32>(),..};if stack.items.len != 0 {value = stack.pop();}merge(controls[last].value,value);}if stack.items.len < controls[last].height {return false;}stack.items.resize(controls[last].height);if op == blot_backend_runtime_ir::OP_else_ {controls[last].alternate = true;}if op == blot_backend_runtime_ir::OP_end {let completed = controls.pop();if completed.result {stack.push(completed.value);}}
+            }
+            else if op == blot_backend_runtime_ir::OP_br || op == blot_backend_runtime_ir::OP_br_if {if op == blot_backend_runtime_ir::OP_br_if {stack.pop();}if inst.operand > controls.len {return false;}if inst.operand == controls.len {if body.result != blot_backend_runtime_ir::VT_none && stack.items.len != 0 && stack.items[stack.items.len - 1].hasFrame() {return false;}}else {let target = controls.len - 1 - inst.operand;if controls[target].result && stack.items.len != 0 {merge(controls[target].value,stack.items[stack.items.len - 1]);}}if op == blot_backend_runtime_ir::OP_br {var height: i64 = 0;if controls.len != 0 {height = controls[controls.len - 1].height;}if height > stack.items.len {return false;}stack.items.resize(height);}}
+            else if op == blot_backend_runtime_ir::OP_return_ || op == blot_backend_runtime_ir::OP_unreachable_ {if op == blot_backend_runtime_ir::OP_return_ && body.result != blot_backend_runtime_ir::VT_none {let value = stack.pop();if value.hasFrame() {return false;}}var height: i64 = 0;if controls.len != 0 {height = controls[controls.len - 1].height;}if height > stack.items.len {return false;}stack.items.resize(height);}
+            else if op == blot_backend_runtime_ir::OP_i32_eqz || op == blot_backend_runtime_ir::OP_i32_eq || op == blot_backend_runtime_ir::OP_i32_ne || op == blot_backend_runtime_ir::OP_i32_or {
+                var right = Value {..};if op != blot_backend_runtime_ir::OP_i32_eqz {right = stack.pop();}let left = stack.pop();var condition = blot_support::none<Condition>();if op == blot_backend_runtime_ir::OP_i32_or {if left.condition.present && right.condition.present && left.condition.value.local == right.condition.value.local && left.condition.value.version == right.condition.value.version {condition = blot_support::some(Condition {local: left.condition.value.local,version: left.condition.value.version,kinds: left.condition.value.kinds | right.condition.value.kinds});}}
+                else if left.kind_source.present && right.constant.present && right.constant.value < 8 {var selected = 1 as u8 << right.constant.value;if op == blot_backend_runtime_ir::OP_i32_ne {selected = ~selected;}condition = blot_support::some(Condition {local: left.kind_source.value,version: left.kind_version,kinds: selected});}stack.push(Value {kinds: ordinary,constant: blot_support::none<u32>(),condition,..});
+            }
+            else if op == blot_backend_runtime_ir::OP_i32_add {var right = stack.pop();var left = stack.pop();if right.hasFrame() {let temporary = left;left = right;right = temporary;}if left.hasFrame() {if !left.head() || right.hasFrame() || !right.constant.present || right.constant.value != 4 {return false;}left.offset = 4;left.constant = blot_support::none<u32>();stack.push(left);}else {stack.push(Value {kinds: ordinary,constant: blot_support::none<u32>(),pointer: left.pointer != right.pointer,..});}}
+            else if op == blot_backend_runtime_ir::OP_i32_sub {let right = stack.pop();let left = stack.pop();if left.hasFrame() || right.hasFrame() {return false;}stack.push(Value {kinds: ordinary,constant: blot_support::none<u32>(),pointer: left.pointer && !right.pointer && right.constant.present,..});}
+            else if op == blot_backend_runtime_ir::OP_drop {stack.pop();}
+            else {let contract = blot_backend_runtime_ir::contract(module,body,inst);for input in 0..contract.arity {let value = stack.pop();if value.hasFrame() {return false;}}if contract.result != blot_backend_runtime_ir::VT_none {stack.push(Value {kinds: ordinary,constant: blot_support::none<u32>(),..});}}
+        }
+        if !stack.valid || controls.len != 0 || (body.result != blot_backend_runtime_ir::VT_none && stack.items.len != 0 && stack.items[stack.items.len - 1].hasFrame()) {return false;}
+        if !changed {if !stack_heads || source_count == 0 {return true;}guards.ensure(code);if !guards.graph.valid || !scopeRetirements(guards.graph,code,source_ids,retirements) {return false;}for index in 0..uses.len {uses[index] = borrowerSources(next_sources,outer_sources,uses[index]);}return protectedBorrowers(guards.graph,guards.reachable,uses,retirements);}
+    }return false;
+}
+struct ScopePosition {at: u32,depth: u8}
+fn scopeRetirements(graph: const blot_backend_wasm_control_flow::Graph&,code: const Instruction[:],sources: const u64[:],retirements: u64[:]) -> bool {
+    if graph.nodes.len > 9223372036854775807 / 65 {return false;}let states = graph.nodes.len * 65;var seen: bool[>..<] = [];for index in 0..states {seen.push(false);}var pending: ScopePosition[>..<] = [];var work: i64 = 262144;
+    for source,start in sources {
+        if source == 0 {continue;}for index in 0..seen.len {seen[index] = false;}pending.clear();for next in graph.nodes[start].next {if next != blot_backend_wasm_control_flow::absent {pending.push(ScopePosition {at: next,depth: 0});}}var cursor: i64 = 0;
+        while cursor < pending.len {if work == 0 {return false;}work--;let point = pending[cursor];cursor++;if point.at >= code.len {continue;}let key = point.at as i64 * 65 + point.depth;if seen[key] {continue;}seen[key] = true;var depth = point.depth;let inst = code[point.at];if inst.op == blot_backend_runtime_ir::OP_ownership {let marker = blot_backend_runtime_ir::ownership(inst.operand);if marker.kind == blot_backend_runtime_ir::OWN_scope {if marker.chunk == 0 {if depth == 64 {return false;}depth++;}else if marker.chunk == 1 || marker.chunk == 2 {if depth == 0 {retirements[point.at] |= source;continue;}depth--;}}}for next in graph.nodes[point.at].next {if next != blot_backend_wasm_control_flow::absent {pending.push(ScopePosition {at: next,depth});}}}
+    }return true;
+}
+fn protectedBorrowers(graph: const blot_backend_wasm_control_flow::Graph&,reachable: const bool[:],uses: const u64[:],retirements: const u64[:]) -> bool {
+    var retired: u64[>..<] = [];for node in graph.nodes {retired.push(0);}var pending: u32[>..<] = [];
+    for sources,at in retirements {if sources == 0 || !reachable[at] {continue;}for next in graph.nodes[at].next {if next == blot_backend_wasm_control_flow::absent || (retired[next] | sources) == retired[next] {continue;}retired[next] |= sources;pending.push(next);}}
+    var cursor: i64 = 0;while cursor < pending.len {let at = pending[cursor];cursor++;if at < uses.len && (retired[at] & (uses[at] | retirements[at])) != 0 {return false;}for next in graph.nodes[at].next {if next == blot_backend_wasm_control_flow::absent || (retired[next] | retired[at]) == retired[next] {continue;}retired[next] |= retired[at];pending.push(next);}}return true;
+}
+fn completeMode(module: const Module&,stack_heads: bool) -> bool,Error {
+    if !module.arena.present || module.mutable_static {return false,Error.none;}var frame_kinds: u8 = 0;
+    for body in module.functions {for inst,at in module.instructions(body) {if inst.op != blot_backend_runtime_ir::OP_ownership {continue;}let marker = blot_backend_runtime_ir::ownership(inst.operand);if marker.kind != blot_backend_runtime_ir::OWN_rest || marker.chunk != blot_backend_provider_origins::begin_chunk {continue;}let fact = blot_backend_provider_origins::constructor(module,body,at);if !fact.present {return false,Error.none;}frame_kinds |= 1 as u8 << fact.value.kind;}}
+    for body,id in module.functions {if module.runtimeHelper(id) {continue;}if !bodyFlow(module,body,frame_kinds,stack_heads) {return false,Error.none;}}return true,Error.none;
+}
+fn protectedActivations(module: const Module&) -> bool,Error {return completeMode(module,true);}
+fn complete(module: const Module&) -> bool,Error {return completeMode(module,false);}

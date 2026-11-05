@@ -4,6 +4,7 @@ import std;
 import support.error;
 import support.native;
 import .check;
+import .check_packet_owner;
 struct CheckedOwner {lease:u32=0,generation:u64=0}
 struct CheckedHeaderLease {
 value_slots:u32[:]=[],
@@ -423,5 +424,5 @@ if state.body_parameters.len!=0 {checked_body_parameters.free_slice(state.body_p
 if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.body_uses=[];}
 if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=[];}
 for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=[];}let index=self.lease-1;state.live=false;checked_owners.free(index);self=CheckedOwner{..};}
-fn deinit(self:Checked&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);if self.editor.present && self.editor.value.context.present {self.editor.value.context.value.deinit();}self.types.deinit();self.parameter_patterns.deinit();self.owner.deinit();self=default<Checked>();}
+fn deinit(self:Checked&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);if self.editor.present && self.editor.value.context.present {self.editor.value.context.value.deinit();}self.types.deinit();self.parameter_patterns.deinit();releaseCheckedPacket(self.owner);self.owner.deinit();self=default<Checked>();}
 fn deinit(self:SourceValidation&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);self.types.deinit();self.parameter_patterns.deinit();self.owner.deinit();self=default<SourceValidation>();}

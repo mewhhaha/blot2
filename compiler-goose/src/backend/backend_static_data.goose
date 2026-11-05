@@ -422,3 +422,136 @@ recursive fn serializeAggregate(self: State&,g: Generator&,id: ValueId,ty: u32,d
     }
     let address,error = build(); leaves.deinit(); word_values.deinit(); words.deinit(); return address,error;
 }
+import reuse.code_artifacts;
+recursive fn serializeClosure(self: State&,g: Generator&,id: ValueId,ty: u32,depth: i64) -> u32,Error {
+    let metadata = g.evaluator.closureInfo(id); let source .= g.unit(metadata.unit); let child_count = g.evaluator.valueInfo(id).len;
+    var child_types = Words {..}; var mappings = Mappings {..}; var rows = Rows {..}; var words = Words {..};
+    recursive fn build() -> u32,Error {
+        let loaded = g.loadSemanticRows(g.evaluator.storage.row_mappings.items[metadata.row_mappings.start..metadata.row_mappings.start + metadata.row_mappings.len],rows); if loaded != Error.none { return 0,loaded; }
+        var function_id: u32 = 0;
+        match metadata.origin {
+            blot_eval_eval_values::ClosureOrigin.anonymous => {
+                let closure = source.closures[metadata.identity];
+                for mapping in g.evaluator.storage.type_mappings.items[metadata.mappings.start..metadata.mappings.start + metadata.mappings.len] {
+                    let concrete,error = g.representations.fromEvidence(g.evaluator.evidenceStore(),mapping.evidence); if error != Error.none { if error == Error.out_of_memory { return 0,error; } return 0,g.fail(metadata.unit,closure.body,Code.unresolved_type); }
+                    let mapped = g.mapType(metadata.unit,mappings,mapping.variable,concrete,source.span(closure.body)); if mapped != Error.none { return 0,mapped; }
+                }
+                var implementation = ty; var dictionaries = false;
+                if g.representations.store.node(ty).tag == Tag.universal {
+                    if source.types.node(closure.function_type).tag != blot_check_types::Tag.forall { return 0,g.fail(metadata.unit,closure.body,Code.unresolved_type); }
+                    let mapped = g.mapTypeDepth(metadata.unit,mappings,rows,closure.function_type,ty,source.span(closure.body),0); if mapped != Error.none { return 0,mapped; }
+                    dictionaries = source.types.quantifierGoals(closure.function_type).len != 0; implementation = g.representations.store.node(ty).a;
+                }
+                let function_type = g.representations.store.node(implementation); if function_type.tag != Tag.function { return 0,g.fail(metadata.unit,closure.body,Code.unresolved_type); }
+                if taskCallbackRows(source,closure.parameter.ty,0) { let mapped = g.mapTypeDepth(metadata.unit,mappings,rows,closure.parameter.ty,function_type.a,closure.parameter.span,0); if mapped != Error.none { return 0,mapped; } }
+                else { let mapped = g.mapType(metadata.unit,mappings,closure.parameter.ty,function_type.a,closure.parameter.span); if mapped != Error.none { return 0,mapped; } }
+                if taskCallbackRows(source,source.typeOf(closure.body),0) { let mapped = g.mapFunctionResult(metadata.unit,mappings,rows,source.typeOf(closure.body),function_type.b,source.span(closure.body)); if mapped != Error.none { return 0,mapped; } }
+                else { let mapped = g.mapType(metadata.unit,mappings,source.typeOf(closure.body),function_type.b,source.span(closure.body)); if mapped != Error.none { return 0,mapped; } }
+                let captures = source.extra[closure.captures.start..closure.captures.start + closure.captures.len]; if captures.len != child_count { return 0,g.fail(metadata.unit,closure.body,Code.constant_expression); }
+                for index in 0..captures.len { let child_type,error = g.captureLayout(metadata.unit,captures[index],g.evaluator.valueChildren(id)[index],mappings,rows); if error != Error.none { return 0,error; } let added = child_types.push(child_type); if added != Error.none { return 0,added; } }
+                for capture_type in child_types.items { var budget: i64 = 1000000; if !g.retainedLayoutConcrete(capture_type,false,0,budget) { return serializeStagedClosure(self,g,id,ty); } }
+                var implementation_type = implementation;
+                if closure.function_type != 0 { let concrete,error = g.codeLayoutWithRows(metadata.unit,closure.function_type,mappings.items,rows.items,source.span(closure.body)); if error != Error.none { return 0,error; } implementation_type = concrete; }
+                if g.representations.store.node(ty).tag == Tag.universal { implementation_type = g.representations.store.node(implementation_type).a; }
+                let captures_type,captures_error = g.internLayout(Tag.product,0,0,child_types.items); if captures_error != Error.none { return 0,captures_error; }
+                let evidence,evidence_error = g.mappingEvidence(mappings.items); if evidence_error != Error.none { return 0,evidence_error; }
+                let row_evidence,row_error = g.rowMappingEvidence(rows.items); if row_error != Error.none { return 0,row_error; }
+                let function,error = g.closureFunction(blot_reuse_code_artifacts::ClosureKey {unit: metadata.unit,catalog: metadata.identity,staged: metadata.staged,ty: implementation_type,captures: captures_type,evidence,rows: row_evidence,dictionaries,..}); if error != Error.none { return 0,error; } function_id = function;
+            },
+            blot_eval_eval_values::ClosureOrigin.constructor => {
+                var implementation = ty;
+                if g.representations.store.node(ty).tag == Tag.universal {
+                    let constructor = source.constructor(metadata.identity); implementation = g.representations.store.node(ty).a;
+                    let mapped = g.mapTypeDepth(metadata.unit,mappings,rows,constructor.scheme.root,implementation,blot_check_core::Span {..},0); if mapped != Error.none { return 0,mapped; }
+                    let actual,error = g.codeLayoutWithRows(metadata.unit,constructor.scheme.root,mappings.items,rows.items,blot_check_core::Span {..}); if error != Error.none { return 0,error; } if actual != implementation { return 0,staticFailure(g,metadata.unit,Code.unresolved_type); }
+                }
+                let function,error = g.constructorFunction(blot_reuse_code_artifacts::ConstructorKey {unit: metadata.unit,catalog: metadata.identity,ty: implementation,..}); if error != Error.none { return 0,error; } function_id = function;
+            },
+            blot_eval_eval_values::ClosureOrigin.named => { return serializeNamedClosure(self,g,id,ty,depth); },
+            blot_eval_eval_values::ClosureOrigin.primitive => { return serializePrimitiveClosure(self,g,id,ty,depth); },
+            blot_eval_eval_values::ClosureOrigin.operation => {
+                if metadata.applied != 0 || child_count != 0 { return 0,staticFailure(g,metadata.unit,Code.unsupported); }
+                for mapping in g.evaluator.storage.type_mappings.items[metadata.mappings.start..metadata.mappings.start + metadata.mappings.len] {
+                    let concrete,error = representation(g,mapping.evidence,metadata.unit); if error != Error.none { return 0,error; } let mapped = g.mapType(metadata.unit,mappings,mapping.variable,concrete,blot_check_core::Span {..}); if mapped != Error.none { return 0,mapped; }
+                }
+                let label,label_error = g.operationLabel(metadata.unit,metadata.identity,mappings.items,rows.items,blot_check_core::Span {..}); if label_error != Error.none { return 0,label_error; }
+                let operation,operation_error = g.runtimeOperation(label,metadata.unit,blot_check_core::Span {..}); if operation_error != Error.none { return 0,operation_error; }
+                let function,error = g.operationFunction(blot_reuse_code_artifacts::OperationKey {operation,ty,..}); if error != Error.none { return 0,error; } function_id = function;
+            },
+        }
+        for index in 0..child_types.items.len { let bits,error = serialize(self,g,g.evaluator.valueChildren(id)[index],child_types.items[index],depth + 1); if error != Error.none { return 0,error; } let added = words.push(bits); if added != Error.none { return 0,added; } }
+        var environment: u32 = 0; if words.items.len != 0 { let address,error = g.module.dataWords(words.items); if error != Error.none { return 0,error; } environment = address; }
+        for slot in 0..words.items.len { let marked = dataValueReference(self,g,environment + (slot * 4) as u32,g.evaluator.valueChildren(id)[slot],words.items[slot]); if marked != Error.none { return 0,marked; } }
+        let address,error = closureData(self,g,function_id,environment); if error != Error.none { return 0,error; } let cached = self.cache.insert(SerializedKey {value: id,ty},address); return address,cached;
+    }
+    let address,error = build(); words.deinit(); rows.deinit(); mappings.deinit(); child_types.deinit(); return address,error;
+}
+recursive fn serializeStagedClosure(self: State&,g: Generator&,value: ValueId,ty: u32) -> u32,Error {
+    let header = g.evaluator.closureInfo(value); let source .= g.unit(header.unit); let metadata = source.closures[header.identity]; let bindings = source.extra[metadata.captures.start..metadata.captures.start + metadata.captures.len];
+    var captured = Words {..}; var mappings = Mappings {..}; var rows = Rows {..}; var hints = blot_backend_substitution_buffers::Hints {..};
+    recursive fn build() -> u32,Error {
+        let copied = captured.append(g.evaluator.valueChildren(value)); if copied != Error.none { return 0,copied; } if bindings.len != captured.items.len { return 0,g.fail(header.unit,metadata.body,Code.unsupported); }
+        for mapping in g.evaluator.storage.type_mappings.items[header.mappings.start..header.mappings.start + header.mappings.len] {
+            let concrete,error = g.representations.fromEvidence(g.evaluator.evidenceStore(),mapping.evidence); if error != Error.none { if error == Error.out_of_memory { return 0,error; } return 0,g.fail(header.unit,metadata.body,Code.unresolved_type); }
+            let mapped = g.mapType(header.unit,mappings,mapping.variable,concrete,source.span(metadata.body)); if mapped != Error.none { return 0,mapped; }
+        }
+        let loaded = g.loadSemanticRows(g.evaluator.storage.row_mappings.items[header.row_mappings.start..header.row_mappings.start + header.row_mappings.len],rows); if loaded != Error.none { return 0,loaded; }
+        let arrow = g.representations.store.node(ty);
+        if metadata.function_type != 0 { let mapped = g.mapCapturedFunction(header.unit,metadata.function_type,ty,mappings,rows,source.span(metadata.body)); if mapped != Error.none { return 0,mapped; } }
+        else { let argument = g.mapType(header.unit,mappings,metadata.parameter.ty,arrow.a,metadata.parameter.span); if argument != Error.none { return 0,argument; } let result = g.mapType(header.unit,mappings,source.typeOf(metadata.body),arrow.b,source.span(metadata.body)); if result != Error.none { return 0,result; } }
+        for index in 0..bindings.len { let added = hints.push(blot_eval_core_eval::RetainedCapture {binding: bindings[index],unit: header.unit,node: 0,value: captured.items[index],..}); if added != Error.none { return 0,added; } }
+        let refined = g.refineAccessorMappings(header.unit,header.identity,ty,mappings,rows,source.span(metadata.body),hints.items); if refined != Error.none { return 0,refined; }
+        let function,error = g.capturedClosureFunction(header,ty,captured.items,mappings.items,rows.items); if error != Error.none { return 0,error; }
+        let address,allocated = closureData(self,g,function,0); if allocated != Error.none { return 0,allocated; } let cached = self.cache.insert(SerializedKey {value,ty},address); return address,cached;
+    }
+    let address,error = build(); hints.deinit(); rows.deinit(); mappings.deinit(); captured.deinit(); return address,error;
+}
+recursive fn serializeNamedClosure(self: State&,g: Generator&,id: ValueId,ty: u32,depth: i64) -> u32,Error {
+    let metadata = g.evaluator.closureInfo(id); let target = blot_check_core::BindingRef {unit: metadata.unit,binding: metadata.identity}; let source .= g.unit(metadata.unit); let body .= source.body(metadata.identity);
+    if !body { return 0,g.decline(metadata.unit,source.binding(metadata.identity).span,Code.constant_expression); }
+    let child_count = g.evaluator.valueInfo(id).len; if child_count != metadata.applied || child_count >= body.parameters.len { return 0,g.decline(metadata.unit,body.span,Code.constant_expression); }
+    var mappings = Mappings {..}; var rows = Rows {..}; var types = Words {..}; var words = Words {..};
+    recursive fn build() -> u32,Error {
+        let loaded = g.loadSemanticRows(g.evaluator.storage.row_mappings.items[metadata.row_mappings.start..metadata.row_mappings.start + metadata.row_mappings.len],rows); if loaded != Error.none { return 0,loaded; }
+        for mapping in g.evaluator.storage.type_mappings.items[metadata.mappings.start..metadata.mappings.start + metadata.mappings.len] { let concrete,error = representation(g,mapping.evidence,metadata.unit); if error != Error.none { return 0,error; } let mapped = g.mapType(metadata.unit,mappings,mapping.variable,concrete,body.span); if mapped != Error.none { return 0,mapped; } }
+        let root,root_error = g.functionRoot(metadata.unit,source.binding(metadata.identity).ty,body.span); if root_error != Error.none { return 0,root_error; } var source_ty = root;
+        for index in 0..child_count {
+            let parameter = source.bodyParameters(body)[index]; let child = g.evaluator.valueChildren(id)[index];
+            let concrete,error = g.captureTypeLayout(metadata.unit,parameter.ty,parameter.span,child,mappings,rows); if error != Error.none { return 0,error; } let added = types.push(concrete); if added != Error.none { return 0,added; }
+            let node = source.types.node(source_ty); if node.tag != blot_check_types::Tag.function { return 0,g.decline(metadata.unit,body.span,Code.unresolved_type); } let mapped = g.mapType(metadata.unit,mappings,node.a,concrete,body.span); if mapped != Error.none { return 0,mapped; } source_ty = node.b;
+        }
+        var dictionaries = false;
+        if g.representations.store.node(ty).tag == Tag.universal {
+            if metadata.applied != 0 || source.types.node(source.binding(metadata.identity).ty).tag != blot_check_types::Tag.forall { return 0,g.decline(metadata.unit,body.span,Code.unresolved_type); }
+            let mapped = g.mapTypeDepth(metadata.unit,mappings,rows,source.binding(metadata.identity).ty,ty,body.span,0); if mapped != Error.none { return 0,mapped; } dictionaries = source.types.quantifierGoals(source.binding(metadata.identity).ty).len != 0;
+        } else if taskCallbackRows(source,source_ty,0) { let mapped = g.mapFunctionResult(metadata.unit,mappings,rows,source_ty,ty,body.span); if mapped != Error.none { return 0,mapped; } }
+        else { let mapped = g.mapType(metadata.unit,mappings,source_ty,ty,body.span); if mapped != Error.none { return 0,mapped; } }
+        let initial_type,type_error = g.codeLayoutWithRows(metadata.unit,source.binding(metadata.identity).ty,mappings.items,rows.items,body.span); if type_error != Error.none { return 0,type_error; } var full_type = initial_type; if g.representations.store.node(ty).tag == Tag.universal { full_type = g.representations.store.node(full_type).a; }
+        let function,error = g.callable(blot_reuse_code_artifacts::CallableKey {target,ty: full_type,applied: metadata.applied,dictionaries,..}); if error != Error.none { return 0,error; }
+        for index in 0..types.items.len { let bits,error = serialize(self,g,g.evaluator.valueChildren(id)[index],types.items[index],depth + 1); if error != Error.none { return 0,error; } let added = words.push(bits); if added != Error.none { return 0,added; } }
+        var environment: u32 = 0;
+        if g.directCallableEnvironment(full_type,metadata.applied) { environment = words.items[0]; }
+        else if words.items.len != 0 { let address,error = g.module.dataWords(words.items); if error != Error.none { return 0,error; } environment = address; for slot in 0..words.items.len { let marked = dataValueReference(self,g,environment + (slot * 4) as u32,g.evaluator.valueChildren(id)[slot],words.items[slot]); if marked != Error.none { return 0,marked; } } }
+        let address,allocated = closureData(self,g,function,environment); if allocated != Error.none { return 0,allocated; } let cached = self.cache.insert(SerializedKey {value: id,ty},address); return address,cached;
+    }
+    let address,error = build(); words.deinit(); types.deinit(); rows.deinit(); mappings.deinit(); return address,error;
+}
+recursive fn serializePrimitiveClosure(self: State&,g: Generator&,id: ValueId,ty: u32,depth: i64) -> u32,Error {
+    let metadata = g.evaluator.closureInfo(id); let child_count = g.evaluator.valueInfo(id).len; let primitive = g.unit(metadata.unit).primitives[metadata.identity]; if primitive.kind != blot_check_core::PrimitiveKind.scalar { return 0,staticFailure(g,metadata.unit,Code.constant_expression); }
+    var full_type = ty; var index = child_count;
+    while index != 0 {
+        index--; let value = g.evaluator.valueScalar(g.evaluator.valueChildren(id)[index]); if !value.present { return 0,staticFailure(g,metadata.unit,Code.unresolved_type); }
+        var argument: u32 = 3; if value.value.scalar == blot_backend_runtime_ir::SC_f32 { argument = 4; }
+        let next,error = g.internLayout(Tag.function,argument,full_type,[]); if error != Error.none { return 0,error; } full_type = next;
+    }
+    let function,error = g.primitiveFunction(blot_reuse_code_artifacts::PrimitiveKey {unit: metadata.unit,catalog: metadata.identity,ty: full_type,applied: metadata.applied,..}); if error != Error.none { return 0,error; }
+    var words = Words {..};
+    recursive fn build() -> u32,Error {
+        var current = full_type;
+        for child_index in 0..child_count { let child = g.evaluator.valueChildren(id)[child_index]; let node = g.representations.store.node(current); let bits,error = serialize(self,g,child,node.a,depth + 1); if error != Error.none { return 0,error; } let added = words.push(bits); if added != Error.none { return 0,added; } current = node.b; }
+        var environment: u32 = 0; if words.items.len != 0 { let address,error = g.module.dataWords(words.items); if error != Error.none { return 0,error; } environment = address; }
+        for slot in 0..words.items.len { let marked = dataValueReference(self,g,environment + (slot * 4) as u32,g.evaluator.valueChildren(id)[slot],words.items[slot]); if marked != Error.none { return 0,marked; } }
+        let address,allocated = closureData(self,g,function,environment); if allocated != Error.none { return 0,allocated; } let cached = self.cache.insert(SerializedKey {value: id,ty},address); return address,cached;
+    }
+    let address,serialized = build(); words.deinit(); return address,serialized;
+}

@@ -330,6 +330,7 @@ enum Error {
     unsupported_cohort,
     unsupported_version,
     version_mismatch,
+    missing_field,
 }
 
 fn error_name(code: Error) -> const u8[:] {
@@ -662,6 +663,7 @@ fn error_name(code: Error) -> const u8[:] {
         Error.unsupported_cohort => "UnsupportedCohort",
         Error.unsupported_version => "UnsupportedVersion",
         Error.version_mismatch => "VersionMismatch",
+        Error.missing_field => "MissingField",
     }
 }
 

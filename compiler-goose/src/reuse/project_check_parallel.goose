@@ -51,7 +51,7 @@ fn parallelBatches<E>(self:Engine&,executor:E&,deferrable:bool,remaining:i64,res
  // This static executor copies the full immutable input image, joins every
  // process/worker before returning, and imports owned replies into jobs[unit-1].
  // Preparation, charging and publication below keep dependency traversal order.
- let width=min(self.source.checking.workers as i64,min(ready.len,16));let counts,error=executor.runProjectChecks<executeProjectJob>(self,work_order[:],width,jobs);if error!=Error.none {executor.cancelProjectChecks();self.discardParallel(resolution,associated);return false,error;}
+ let width=min(self.source.checking.workers as i64,min(ready.len,16));let counts,error=executor.runProjectChecks(self,work_order[:],width,jobs);if error!=Error.none {executor.cancelProjectChecks();self.discardParallel(resolution,associated);return false,error;}
  blot_phase_profile::recordChecking(counts);blot_phase_profile::recordChecking(blot_work_counters::Frontend{parallel_batches:1, ..});var retry=false;var out_of_memory=false;
  for unit in ready {let job:ParallelJob&=jobs[unit-1];blot_phase_profile::recordChecking(job.work);if job.failure!=Error.none {out_of_memory=out_of_memory || job.failure==Error.out_of_memory;retry=true;}
  retry=retry || job.missing_name || job.diagnostics.len!=0 || !job.module.present;if job.resolution_used>self.resolution_remaining || job.associated_used>self.associated_remaining {retry=true;}else {self.resolution_remaining-=job.resolution_used;self.associated_remaining-=job.associated_used;}

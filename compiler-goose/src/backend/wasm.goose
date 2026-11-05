@@ -1136,13 +1136,17 @@ fn mutableInstruction(module: Module&,id: u32,at: i64) -> Instruction?,blot_erro
 }
 fn replaceBody(module: Module&,id: u32,body: blot_backend_runtime_ir::DetachedBody) -> blot_error::Error { return publishFunctionBody(module,id,body.locals,body.instructions); }
 struct BodyPublication { function: u32,body: blot_backend_runtime_ir::DetachedBody }
-fn publishBodies(module: Module&,bodies: const BodyPublication[:]) -> blot_error::Error {
+fn preflightBodies(module: const Module&,bodies: const BodyPublication[:]) -> blot_error::Error {
     var local_count: i64 = module.types.len; var instruction_count: i64 = module.instructions.len;
     for publication in bodies {
         if publication.function >= module.functions.len { return blot_error::Error.invalid_function_reference; }
         if publication.body.locals.len > 4294967295 - local_count || publication.body.instructions.len > 4294967295 - instruction_count { return blot_error::Error.module_too_large; }
         local_count += publication.body.locals.len; instruction_count += publication.body.instructions.len;
     }
+    return blot_error::Error.none;
+}
+fn publishBodies(module: Module&,bodies: const BodyPublication[:]) -> blot_error::Error {
+    let preflight = preflightBodies(module,bodies); if preflight != blot_error::Error.none { return preflight; }
     for publication in bodies { let error = replaceBody(module,publication.function,publication.body); if error != blot_error::Error.none { return error; } }
     return blot_error::Error.none;
 }

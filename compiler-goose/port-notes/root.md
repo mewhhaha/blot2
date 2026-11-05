@@ -454,3 +454,29 @@ Remaining required root writing: restart cache, project server, command driver,
 full runtime allocation/session-heap integration, packaging and source-harness
 entrypoints. Remaining backend and worker codec algorithms are still in progress.
 The Zig oracle/default source tree remains unchanged; no port verification ran.
+
+Restart cache now has a full first source pass: exact keys/part order/report
+semantics, bounded shared/exclusive locks, synced partial-file replacement,
+joined close and detached static Goose producers over an independent forked
+copy-on-write process image. The native layer implements only OS operations.
+Cache read/checkpoint byte owners are explicit distinct typed families. No
+filesystem operation or detached writer has been run.
+
+Public project server first writing passes now cover strict owned JSON decoding
+(duplicate/unknown/required fields and escaped keys), source/asset payload ranges,
+open validation, initial admitted dependencies/checkpoints, delayed restored
+seed loading, revision transactions, native-asset payload metadata, bounded
+pre-commit reply encoding, completion limits and ordered request dispatch.
+The pinned public project channel remains version 1/name blot-zig-project,
+independent of guest ABI/session and private worker protocol. Its byte protocol
+has not been exercised. Guest contracts have not been edited.
+
+The common copied-worker frame is now 80 bytes and carries inference budget so
+children reproduce process-local checking limits and compiler identity. Linux
+worker processes request parent-death termination; cache writers intentionally
+detach. No claim of worker throughput, RSS, fault or cancellation parity.
+
+CLI/source identity packaging is being written by the syntax owner. JSON writer
+adapters, source/runtime allocator adaptation and native benchmark/test harness
+classification still need source integration before the full write can finish.
+The port remains incomplete/unverified and normal builds continue to use Zig.

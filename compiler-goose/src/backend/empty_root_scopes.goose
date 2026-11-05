@@ -5,7 +5,7 @@ import .wasm_simd_ops;
 import .wasm_control_flow;
 
 enum Action { keep, open, close }
-fn scalar(inst: blot_backend_runtime_ir::Instruction, module: blot_backend_wasm::Module&) -> bool {
+fn scalar(inst: blot_backend_runtime_ir::Instruction, module: const blot_backend_wasm::Module&) -> bool {
     let op = inst.op;
     if op == blot_backend_runtime_ir::OP_local_get || op == blot_backend_runtime_ir::OP_local_set || op == blot_backend_runtime_ir::OP_local_tee || op == blot_backend_runtime_ir::OP_drop || op == blot_backend_runtime_ir::OP_nop || op == blot_backend_runtime_ir::OP_i32_const || op == blot_backend_runtime_ir::OP_f32_const || op == blot_backend_runtime_ir::OP_i32_load || op == blot_backend_runtime_ir::OP_f32_load ||
        op == blot_backend_runtime_ir::OP_block || op == blot_backend_runtime_ir::OP_loop || op == blot_backend_runtime_ir::OP_if_ || op == blot_backend_runtime_ir::OP_else_ || op == blot_backend_runtime_ir::OP_end || op == blot_backend_runtime_ir::OP_br || op == blot_backend_runtime_ir::OP_br_if { return true; }
@@ -20,7 +20,7 @@ fn scalar(inst: blot_backend_runtime_ir::Instruction, module: blot_backend_wasm:
 fn marker(inst: blot_backend_runtime_ir::Instruction, chunk: u8) -> bool {
     if inst.op != blot_backend_runtime_ir::OP_ownership { return false; } let fact = blot_backend_runtime_ir::ownership(inst.operand); return fact.kind == blot_backend_runtime_ir::OWN_scope && fact.chunk == chunk && fact.roles == 0;
 }
-fn neutralCall(module: blot_backend_wasm::Module&, id: u32) -> bool {
+fn neutralCall(module: const blot_backend_wasm::Module&, id: u32) -> bool {
     if id >= module.functions.len || module.runtimeHelper(id) { return false; } let callee = module.functions[id];
     if callee.entry || callee.result_role != blot_backend_runtime_ir::ROLE_scalar || (module.start.present && module.start.value == id) { return false; }
     let code = blot_backend_wasm::instructions(module, callee);
@@ -32,14 +32,14 @@ fn neutralCall(module: blot_backend_wasm::Module&, id: u32) -> bool {
     }
     return true;
 }
-fn empty(code: const blot_backend_runtime_ir::Instruction[:], at: i64, module: blot_backend_wasm::Module&, actions: const Action[:]) -> bool {
+fn empty(code: const blot_backend_runtime_ir::Instruction[:], at: i64, module: const blot_backend_wasm::Module&, actions: const Action[:]) -> bool {
     let inst = code[at]; if scalar(inst, module) || inst.op == blot_backend_runtime_ir::OP_unreachable_ { return true; }
     if inst.op == blot_backend_runtime_ir::OP_i32_store || inst.op == blot_backend_runtime_ir::OP_f32_store || inst.op == blot_backend_runtime_ir::OP_v128_store { return blot_backend_runtime_ir::hasScalarStore(code, at); }
     if inst.op == blot_backend_runtime_ir::OP_call { return neutralCall(module, inst.operand); }
     if inst.op == blot_backend_runtime_ir::OP_ownership { return actions[at] != Action.keep || blot_backend_runtime_ir::hasScalarStore(code, at + 1) || blot_backend_runtime_ir::hasNonzeroRead(code, at + 1); }
     return false;
 }
-fn prove(module: blot_backend_wasm::Module&, source: blot_backend_runtime_ir::Function, actions: Action[>..<]&) -> bool {
+fn prove(module: const blot_backend_wasm::Module&, source: blot_backend_runtime_ir::Function, actions: Action[>..<]&) -> bool {
     let drain, has_drain = module.resourceDrainImport(); if has_drain { return false; }
     let code = blot_backend_wasm::instructions(module, source); if code.len > 16384 { return false; }
     var any_open = false; for inst in code { if marker(inst, 0) { any_open = true; break; } } if !any_open { return false; }

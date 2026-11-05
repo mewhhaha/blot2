@@ -462,7 +462,7 @@ fn contract<M>(module: M&, function: Function, inst: Instruction) -> Contract {
     } else if inst.op == OP_local_get || inst.op == OP_local_set || inst.op == OP_local_tee {
         let id = local(inst); var ty: ValueType = VT_none;
         if id < function.parameters.len { ty = module.types[function.parameters.start + id]; }
-        else { ty = module.types[function.locals.start + id - function.parameters.len]; }
+        else { if function.borrowed_body { ty = function.borrowed_locals[id - function.parameters.len]; } else { ty = module.types[function.locals.start + id - function.parameters.len]; } }
         if inst.op != OP_local_get { result.inputs[0] = ty; }
         if inst.op != OP_local_set { result.result = ty; }
     } else if inst.op == OP_global_get || inst.op == OP_global_set {
