@@ -149,3 +149,12 @@ Current cleanup linkage: pooled Stack descriptors contain only numeric global
 frame keys and generation values. Child emission reads the parent key without
 retaining a reference to a recursive caller. Lexical stacks remain available
 for nonrecursive owners. No build or runtime verification has run.
+
+Principal evidence reuse, principal input image, prelude admission, public opaque
+storage validation and intermediate-module frontend cutoff now have full first
+writing passes. Principal input keys shrink translated optional publications by
+copying their exact kept prefix into a new typed run; physical copy cost is
+unmeasured. Core image comparison erases only canonical scalar literal bits.
+All public/current-owner semantic IDs are re-interned before memo replay.
+Evidence capture reads the new pooled Store Buffers through their items slices;
+this remains source alignment, with verification still deferred.

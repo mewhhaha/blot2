@@ -2685,7 +2685,7 @@
       "zig": "compiler/src/reuse/dependency_admission.zig",
       "goose": "compiler-goose/src/reuse/dependency_admission.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/dependency_bundle.zig",
@@ -2949,13 +2949,13 @@
       "zig": "compiler/src/reuse/module_abstraction_validation.zig",
       "goose": "compiler-goose/src/reuse/module_abstraction_validation.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/module_frontend_cutoff.zig",
       "goose": "compiler-goose/src/reuse/module_frontend_cutoff.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/module_frontend_tests.zig",
@@ -3063,7 +3063,7 @@
       "zig": "compiler/src/reuse/principal_evidence_reuse.zig",
       "goose": "compiler-goose/src/reuse/principal_evidence_reuse.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/principal_evidence_reuse_tests.zig",
@@ -3081,7 +3081,7 @@
       "zig": "compiler/src/reuse/principal_input_image.zig",
       "goose": "compiler-goose/src/reuse/principal_input_image.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/principal_input_tests.zig",

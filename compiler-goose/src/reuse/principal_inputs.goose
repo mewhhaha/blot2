@@ -139,7 +139,7 @@ fn matchesBase<S>(self: Key, session: const S&) -> bool {
         blot_eval_type_evidence::Tag.boolean, blot_eval_type_evidence::Tag.unsigned32,
         blot_eval_type_evidence::Tag.floating32, blot_eval_type_evidence::Tag.never];
     if session.storage.evidence.nodes.len < tags.len { return false; }
-    for tag, index in tags { if session.storage.evidence.nodes[index] != blot_eval_type_evidence::Node { tag: tag } { return false; } }
+    for tag, index in tags { if session.storage.evidence.nodes.items[index] != blot_eval_type_evidence::Node { tag: tag } { return false; } }
     for read in self.scalar_reads {
         if read.evidence > 5 || read.target.unit == 0 || read.target.unit > session.units.len { return false; }
         let module = session.units[read.target.unit - 1];
@@ -372,4 +372,17 @@ fn withRecorder<C,F>(session: const blot_eval_core_eval::Session&, context: C&) 
     recorder.empty_call_inputs = session.specializations.validated_calls.count == 0;
     recorder.serial = session.principal_recordings;
     return F(context, recorder);
+}
+// Shrinking a retained typed run releases its exact allocation extent.
+fn shrinkCallPublications(self: Key&, length: i64) {
+    assert(length >= 0 && length <= self.call_publications.len);
+    if length == self.call_publications.len { return; }
+    let replacement = copyOwned(self.call_publications[..length]);
+    releaseOwned(self.call_publications); self.call_publications = replacement;
+}
+fn shrinkSummaryPublications(self: Key&, length: i64) {
+    assert(length >= 0 && length <= self.summary_publications.len);
+    if length == self.summary_publications.len { return; }
+    let replacement = copyOwned(self.summary_publications[..length]);
+    releaseOwned(self.summary_publications); self.summary_publications = replacement;
 }
