@@ -328,7 +328,7 @@
       "zig": "compiler/src/backend/loop_targets.zig",
       "goose": "compiler-goose/src/backend/loop_targets.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/loop_targets_tests.zig",
@@ -814,7 +814,7 @@
       "zig": "compiler/src/backend/storage_deferred_join.zig",
       "goose": "compiler-goose/src/backend/storage_deferred_join.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/storage_deferred_join_tests.zig",
@@ -2715,7 +2715,7 @@
       "zig": "compiler/src/reuse/dependency_closure.zig",
       "goose": "compiler-goose/src/reuse/dependency_closure.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/reuse/dependency_closure_tests.zig",
@@ -2793,7 +2793,7 @@
       "zig": "compiler/src/reuse/dependency_relink.zig",
       "goose": "compiler-goose/src/reuse/dependency_relink.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/dependency_snapshot.zig",
@@ -2835,7 +2835,7 @@
       "zig": "compiler/src/reuse/entry_frontend_cutoff.zig",
       "goose": "compiler-goose/src/reuse/entry_frontend_cutoff.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/entry_frontend_cutoff_tests.zig",
@@ -2907,7 +2907,7 @@
       "zig": "compiler/src/reuse/frontend_reference_relocation.zig",
       "goose": "compiler-goose/src/reuse/frontend_reference_relocation.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/frozen_dependency.zig",

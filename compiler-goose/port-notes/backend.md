@@ -168,3 +168,15 @@ Additional full production leaves now written: linear_cursor, dictionary_layout,
 Detached late views now have full first production passes in cohort_candidate, region_candidate and source_origins. Their native constructor mapping is prepare/checked/extend/detached -> prepareInto/checkedInto/extendInto/detachedInto; test-only extensionForTest is deferred with all tests. cohort.init(Module&) constructs the fixed destination; origins.init(cohort Extension&) and region.init(cohort Extension&) retain compile-wide caller contexts. Each origins/region/replay view must have a distinct destination Module and cohort Extension.
 
 IR Function has derived borrowed_body/borrowed_locals/borrowed_instructions metadata. Immutable Module getters read those slices; addLocal/emitReference/own materialize before mutation, and preparedView/publishFunctionBody clear them. publishInstructions replaces only code. Direct assignments after publishBody must clearBorrowed. Portable/source views must omit these derived fields. The native detached representation copies metadata containers/type table into destination owners while borrowing untouched instruction bodies; first-write body copying and rewrite order follow source intent, with allocation behavior unverified.
+
+Projection and substitution ownership writing now uses lazy globally typed
+metadata heads for all substitution_buffers families; fixed descriptor copies
+share mutable items/storage while inert absent defaults allocate nothing.
+MappingSink/RowSink pooled variants copy those descriptors. physicalProjection
+returns (PhysicalProjection,Error), Service stores Option<CodeProjection>, and
+OwnedProjection flattens the actual physical callback to avoid recursive value
+type storage. The evaluator owner is adapting its CodeProjection variants and
+stored request fields. Cycle-local Tape/Observation borrowing is still pending.
+The complete production storage_deferred_join algorithm is also source-written,
+with real typed lane/hole runs and explicit physical deinit; scoped controls must
+release those runs during their corresponding lifetime cleanup. No checks run.

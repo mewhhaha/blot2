@@ -11,6 +11,7 @@ import parse.symbols;
 import parse.syntax_diagnostics;
 import reuse.frozen_dependency;
 import reuse.dependency_relink;
+import reuse.dependency_payload;
 import support.error;
 import support.option;
 import support.native;
@@ -319,7 +320,7 @@ fn walk<P>(self:Loader<P>&,root:UnitId)->Error {
     return Error.none;
 }
 struct LoadContext {
-    entrypath:const u8[:],result:blot_support::Option<Project>,dependency:const blot_reuse_frozen_dependency::FrozenDependency?=null,mutable:blot_reuse_frozen_dependency::FrozenDependency?=null,reuse:blot_support::Option<const bool[:]>,library:bool=false,provided:bool=false,
+    entrypath:const u8[:],result:blot_support::Option<Project>,dependency:const blot_reuse_frozen_dependency::FrozenDependency?=null,mutable:blot_reuse_frozen_dependency::FrozenDependency?=null,mutable_owner:blot_reuse_dependency_payload::Owner?=null,reuse:blot_support::Option<const bool[:]>,library:bool=false,provided:bool=false,
 }
 fn withLoader<P,F>(options:Options,inputs:P&,context:LoadContext&)->Error {
     let scope=blot_phase_profile::enter(blot_phase_profile::Phase.load);
@@ -388,8 +389,8 @@ fn freshOrder(source:const Project&)->u32[:],Error {
     }
     let result=owned_order.alloc_slice(order.len);for id,index in order {result[index]=id;}return result,Error.none;
 }
-fn loadCompiled(entrypath:const u8[:],options:Options,dependency:blot_reuse_frozen_dependency::FrozenDependency&)->Project,Error {
-    var inputs=FileInputs {};var context=LoadContext {entrypath:entrypath,dependency:dependency,mutable:dependency};
+fn loadCompiled(entrypath:const u8[:],options:Options,dependency:blot_reuse_dependency_payload::Owned<blot_reuse_frozen_dependency::FrozenDependency>&)->Project,Error {
+    var inputs=FileInputs {};var context=LoadContext {entrypath:entrypath,dependency:dependency.value,mutable:dependency.value,mutable_owner:dependency.owner};
     let error=withLoader(options,inputs,context,loadCompiledMode);if error!=Error.none {return Project {},error;}return context.result.value,Error.none;
 }
 fn loadCompiledReadOnly<P>(entrypath:const u8[:],options:Options,dependency:const blot_reuse_frozen_dependency::FrozenDependency&,inputs:P&)->Project,Error {
@@ -418,9 +419,11 @@ fn loadCompiledMode<P>(context:LoadContext&,loader:Loader<P>&)->Error {
     loader.project.compiled_modules=dependency.modules;
     if context.reuse.present {loader.project.compiled_reuse=context.reuse.value;}
     let valid,error=loader.validateAliases();if error!=Error.none {return error;}if !valid {return Error.none;}
-    if context.mutable {
+    let mutable=context.mutable;
+    if mutable {
+        let owner=context.mutable_owner;assert(owner!=null);
         var units:u32[>..<]=[];for index in 0..dependency.modules.len {units.push((index+1) as u32);}
-        { let propagated_error = blot_reuse_dependency_relink::relink(context.mutable,loader.project.symbols,units); if propagated_error != Error.none { return propagated_error; } }
+        { let propagated_error = blot_reuse_dependency_relink::relink(owner,mutable,loader.project.symbols,units); if propagated_error != Error.none { return propagated_error; } }
     } else {
         if dependency.symbols.len==0||dependency.symbols[0].text.len!=0 {return Error.invalid_artifact;}
         for name,ordinal in dependency.symbols[1..] {

@@ -541,8 +541,8 @@ fn refineMappingsCaptures<M,R>(generator: Generator&, unit_id: u32, root: blot_r
     let service, error = specializer(generator); if error != blot_error::Error.none { return error; } let mapped = service.refineMappingsCaptures(unit_id, root, expected, mappings, rows, span, captures); if mapped != blot_error::Error.none { return specializationFailure(generator, service, mapped); } return blot_error::Error.none;
 }
 fn refineAccessorMappings<M,R>(generator: Generator&, unit_id: u32, catalog: u32, expected: u32, mappings: M&, rows: R&, span: blot_check_core::Span, captures: const blot_eval_core_eval::RetainedCapture[:]) -> blot_error::Error {
-    var projection = blot_eval_specialization::physicalProjection(generator.representations.store,mappings); let service, error = specializer(generator); if error != blot_error::Error.none { return error; }
-    var selected = blot_eval_core_eval::CodeProjection.static_code { projection }; service.code_projection .= selected;
+    let projection,projection_error = blot_eval_specialization::physicalProjection(generator.representations.store,mappings); if projection_error != blot_error::Error.none { return projection_error; } let service, error = specializer(generator); if error != blot_error::Error.none { return error; }
+    let selected = blot_eval_core_eval::CodeProjection.static_code { projection }; service.code_projection = blot_support::some(selected);
     let mapped = service.refineMappingsCaptures(unit_id, blot_reuse_refinement_receipt::Root.closure { unit: unit_id, catalog: catalog }, expected, mappings, rows, span, captures);
     if mapped != blot_error::Error.none { return specializationFailure(generator, service, mapped); } return blot_error::Error.none;
 }

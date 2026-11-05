@@ -13,6 +13,7 @@ import check.numeric_proof_terms;
 import check.types;
 import parse.ast;
 import reuse.principal_interface;
+import reuse.dependency_payload;
 import support.blake3;
 import support.bytes;
 import support.error;
@@ -94,9 +95,9 @@ struct Link { value: Run, next: u32 = 0 }
 
 struct Lease { head: u32, generation: u64, live: bool = true }
 
-reusable[] var links: Link[>..] = [];
+reusable var links: Link[>..] = [];
 
-reusable[] var leases: Lease[>..] = [];
+reusable var leases: Lease[>..] = [];
 
 var next_generation: u64 = 1;
 
@@ -218,7 +219,7 @@ reusable[] var pool_blot_check_core__HandleEffects: blot_check_core::HandleEffec
 
 reusable[] var pool_blot_check_core__Diagnostic: blot_check_core::Diagnostic[>..] = [];
 
-struct Owned { module: blot_check_core::Module, lease: u32 = 0, generation: u64 = 0 }
+struct Owned { module: blot_check_core::Module, lease: u32 = 0, generation: u64 = 0,payload_owner:blot_reuse_dependency_payload::Owner=blot_reuse_dependency_payload::Owner {} }
 struct Writer { output: u8[>..<]&, start: i64, failure: Error = Error.none, remaining: i64 = element_limit }
 struct Reader { bytes: const u8[:], at: i64 = 0, remaining: i64 = element_limit, head: u32 = 0 }
 fn charge(writer: Writer&, depth: i64) -> bool { if writer.failure != Error.none { return false; } if depth > depth_limit || writer.remaining == 0 { writer.failure = Error.artifact_limit; return false; } writer.remaining--; return true; }
@@ -347,7 +348,7 @@ fn releaseRuns(head: u32) { var next = head; while next != 0 { let at = next - 1
     Run.run_blot_check_core__Diagnostic run => { pool_blot_check_core__Diagnostic.free_slice(run.values); },
 
 } links.free(at); } }
-fn deinit(self: Owned&) { if self.lease == 0 { return; } let at = self.lease - 1; assert(at < leases.len && leases[at].live && leases[at].generation == self.generation); releaseRuns(leases[at].head); leases[at].live = false; leases.free(at); self.lease = 0; self.generation = 0; self.module = default<blot_check_core::Module>(); }
+fn deinit(self: Owned&) {if self.payload_owner.lease!=0 {self.payload_owner.deinit();self.module=default<blot_check_core::Module>();return;} if self.lease == 0 { return; } let at = self.lease - 1; assert(at < leases.len && leases[at].live && leases[at].generation == self.generation); releaseRuns(leases[at].head); leases[at].live = false; leases.free(at); self.lease = 0; self.generation = 0; self.module = default<blot_check_core::Module>(); }
 
 fn write_bool(writer: Writer&, value: bool, depth: i64) { if !charge(writer, depth) { return; } var bit: u64 = 0; if value { bit = 1; } put(writer, bit, 1); }
 
@@ -5518,4 +5519,365 @@ fn decode(bytes: const u8[:]) -> Owned, Error {
     var result = module; result.owner_id = blot_native::fresh_owner_id(); result.types.owner_id = blot_native::fresh_owner_id(); if result.owner_id == 0 || result.types.owner_id == 0 { releaseRuns(reader.head); return default<Owned>(), Error.core_limit; }
     let generation = next_generation; next_generation++; let lease = leases.alloc_index(Lease { reader.head, generation });
     return Owned { result, (lease + 1) as u32, generation }, Error.none;
+}
+
+// A native owned copy uses the same typed dependency journal as principal
+// snapshots. It never encodes and decodes an intermediate packet.
+fn clone(module:const blot_check_core::Module&)->Owned,Error {
+ let copied,error=blot_reuse_dependency_payload::clone(module);if error!=Error.none {return default<Owned>(),error;}
+ return Owned {module:copied.value,payload_owner:copied.owner},Error.none;
+}
+fn mutable(self:Owned&,values:const u32[:])->u32[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u32 run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_numeric_proof_terms::Kind[:])->blot_check_numeric_proof_terms::Kind[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Kind run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_numeric_proof_terms::Term[:])->blot_check_numeric_proof_terms::Term[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Term run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_numeric_proof_contracts::Requirement[:])->blot_check_numeric_proof_contracts::Requirement[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_contracts__Requirement run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_numeric_proof_headers::Named[:])->blot_check_numeric_proof_headers::Named[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_headers__Named run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Term run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Binding run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::FieldName[:])->blot_check_core::FieldName[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__FieldName run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::RuntimeName[:])->blot_check_core::RuntimeName[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RuntimeName run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::DeclarationDependencies[:])->blot_check_core::DeclarationDependencies[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DeclarationDependencies run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::BindingRef[:])->blot_check_core::BindingRef[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__BindingRef run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::DependencyMember[:])->blot_check_core::DependencyMember[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DependencyMember run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::ErasedDeclarationReference[:])->blot_check_core::ErasedDeclarationReference[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ErasedDeclarationReference run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::RequestLoopInfo[:])->blot_check_core::RequestLoopInfo[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestLoopInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::RequestArm[:])->blot_check_core::RequestArm[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestArm run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_types::Node[:])->blot_check_types::Node[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Node run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_effects::Row[:])->blot_check_effects::Row[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_effects__Row run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_types::Operation[:])->blot_check_types::Operation[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Operation run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_types::QuantifierGoals[:])->blot_check_types::QuantifierGoals[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__QuantifierGoals run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_types::Obligation[:])->blot_check_types::Obligation[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Obligation run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Node[:])->blot_check_core::Node[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Node run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_parse_ast::Span[:])->blot_parse_ast::Span[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_parse_ast__Span run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Binding[:])->blot_check_core::Binding[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Binding run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Body[:])->blot_check_core::Body[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Body run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Parameter[:])->blot_check_core::Parameter[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Parameter run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::CallInfo[:])->blot_check_core::CallInfo[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__CallInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Merge[:])->blot_check_core::Merge[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Merge run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::List[:])->blot_check_core::List[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__List run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const u8[:])->u8[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u8 run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Obligation[:])->blot_check_core::Obligation[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Obligation run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Nominal[:])->blot_check_core::Nominal[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Nominal run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::OperationName[:])->blot_check_core::OperationName[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationName run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Constructor[:])->blot_check_core::Constructor[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Constructor run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Projection[:])->blot_check_core::Projection[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Projection run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::ProjectionVariant[:])->blot_check_core::ProjectionVariant[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ProjectionVariant run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Pattern[:])->blot_check_core::Pattern[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Pattern run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::PatternRow[:])->blot_check_core::PatternRow[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__PatternRow run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::MatchArm[:])->blot_check_core::MatchArm[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchArm run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::MatchInfo[:])->blot_check_core::MatchInfo[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::UpdateInfo[:])->blot_check_core::UpdateInfo[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::UpdateStep[:])->blot_check_core::UpdateStep[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateStep run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::ClosureInfo[:])->blot_check_core::ClosureInfo[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ClosureInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Associated[:])->blot_check_core::Associated[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Associated run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Contract[:])->blot_check_core::Contract[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Contract run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_reuse_principal_interface::ContractMember[:])->blot_reuse_principal_interface::ContractMember[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ContractMember run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_reuse_principal_interface::Implementation[:])->blot_reuse_principal_interface::Implementation[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Implementation run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_reuse_principal_interface::ImplementationMember[:])->blot_reuse_principal_interface::ImplementationMember[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ImplementationMember run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_reuse_principal_interface::MemberTemplate[:])->blot_reuse_principal_interface::MemberTemplate[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__MemberTemplate run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_reuse_principal_interface::SelectedProof[:])->blot_reuse_principal_interface::SelectedProof[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__SelectedProof run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::SelectedUse[:])->blot_check_core::SelectedUse[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__SelectedUse run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::DictionarySelection[:])->blot_check_core::DictionarySelection[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionarySelection run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::DictionaryUse[:])->blot_check_core::DictionaryUse[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionaryUse run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Primitive[:])->blot_check_core::Primitive[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Primitive run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::LoopInfo[:])->blot_check_core::LoopInfo[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::LoopCarry[:])->blot_check_core::LoopCarry[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopCarry run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::ResolverInfo[:])->blot_check_core::ResolverInfo[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ResolverInfo run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::OperationValue[:])->blot_check_core::OperationValue[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationValue run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::HandleEffects[:])->blot_check_core::HandleEffects[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__HandleEffects run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
+}
+fn mutable(self:Owned&,values:const blot_check_core::Diagnostic[:])->blot_check_core::Diagnostic[:] {
+ if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}
+ assert(self.lease!=0&&self.lease-1<leases.len&&leases[self.lease-1].live&&leases[self.lease-1].generation==self.generation);if values.len==0 {return [];}
+ var next=leases[self.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Diagnostic run=>{if run.values .== values {return run.values;}},_=>{}}}
+ abort("mutable Core view must name this private owner's exact live run");
 }

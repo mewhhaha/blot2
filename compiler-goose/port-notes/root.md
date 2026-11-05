@@ -227,3 +227,27 @@ Interfaces is a fixed typed map with explicit cleanup. Exact option-key work
 charges occur per option, including partial construction at a limit. Session
 factories and remaining consumers are being adapted. These source passes are
 unverified, and no compiler/checker/test/lint/format execution has run.
+
+Entry frontend cutoff and typed frontend reference traversal now have complete
+first production writing passes. Read-only admission uses exact reference
+classes; rewriting requires an explicit private owner with mutable(view).
+Numeric/nominal identities remain separate. Intermediate module checks retain
+whole-prefix confirmation and opaque storage rechecks.
+
+New dependency_payload provides one generation-checked typed run journal for
+Core, PI and frozen dependencies: Owner init/alloc<T>/copy/adopt/mutable,
+Owned<T> values and direct deep clone at all four roots. Published view types
+remain const. Mutable access checks exact registered run identity; no unsafe
+const cast or encoded host pointer is introduced. CorePacket.clone uses that
+same journal without serialization. Packet decoder leases retain their own
+explicit mutable lookup. Allocation behavior and lookup cost are unmeasured.
+
+Dependency relink is source-written against Owner.mutable, preserving private
+candidate symbol-pool admission and all preflight before dictionary publication.
+moduleUnits/interfaceUnits take Owner explicitly; failed fresh renumbering
+requires discarding that unpublished payload. Project.loadCompiled now takes
+Owned<FrozenDependency>&; read-only/mixed loaders still borrow const payloads.
+The dependency decoder, snapshots, archive/session/CLI integration and remaining
+engines are still required. Loop target collection now owns a separate returned
+run while recursive scope walks borrow the nonrecursive wrapper's scratch.
+No compilation, execution or other verification has run for the port.
