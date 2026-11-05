@@ -176,3 +176,11 @@ dead-set classification, lease guards and collector local zero are preserved
 in source. Nothing in this checkpoint establishes emitted-Wasm equivalence.
 Persistent lists, data stacks, session heap, remaining cache/project/server
 modules and the CLI are still required. The whole port remains incomplete.
+
+The data-stack runtime and complete persistent AVL list runtime now have first
+production writing passes: all checked/unchecked entrypoints, epoch metadata,
+rewind, growth and resizing, list edits/balancing/concat/slice, packed rows,
+directories, snapshots and static tree/descriptor serializers. Ownership-aware
+list stores/copies preserve the original allocation base in their flat recipes.
+The list functionId adapter accepts a source field spelling and returns an
+Option; data-stack modeCode preserves ordinals 0/1/2. These passes are unverified.

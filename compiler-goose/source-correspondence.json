@@ -3453,7 +3453,7 @@
       "zig": "compiler/src/runtime/data_stacks.zig",
       "goose": "compiler-goose/src/runtime/data_stacks.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/data_stacks_fixture.zig",
@@ -3477,7 +3477,7 @@
       "zig": "compiler/src/runtime/list_runtime.zig",
       "goose": "compiler-goose/src/runtime/list_runtime.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/list_runtime_fixture.zig",
