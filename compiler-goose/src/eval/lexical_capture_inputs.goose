@@ -94,10 +94,10 @@ fn buildCanonicalBudget<S>(session: S&,value: u32,limit: i64,examined: i64&) -> 
 struct Cache { owner_id: u64=blot_native::fresh_owner_id(),keys: dictionary<const u64[:],u32>&,inputs: Inputs[>..<]&,requests: i64=0,reused: i64=0,retained_words: i64=0,examined_words: i64=0,interface_visits: i64=0 }
 fn deinit(self: Cache&) { for i in 0..self.inputs.len { deinit(self.inputs[i]); } self.inputs.clear(); self.keys.clear(); }
 fn intern<S>(self: Cache&,session: S&,value: u32,selected: Interfaces&) -> u32,bool,Error {
- self.requests++; if self.examined_words>=session.options.max_children { return 0,false,Error.none; } var examined: i64=0; defer { self.examined_words+=examined; }
- var input,present,error=buildWithBudget(session,value,selected,session.options.max_children-self.examined_words,examined,false); if error!=Error.none||!present { return 0,false,error; }
- let existing=self.keys.get(input.words); if existing { let id=existing; deinit(input); self.reused++; return id,true,Error.none; }
+ self.requests++; if self.examined_words>=session.options.max_children { return 0,false,Error.none; } var examined: i64=0; 
+ var input,present,error=buildWithBudget(session,value,selected,session.options.max_children-self.examined_words,examined,false); if error!=Error.none||!present { let __cleanup_result_151_0: u32 = 0; let __cleanup_result_151_1: bool = false; let __cleanup_result_151_2: Error = error; { self.examined_words+=examined; } return __cleanup_result_151_0, __cleanup_result_151_1, __cleanup_result_151_2; }
+ let existing=self.keys.get(input.words); if existing { let id=existing; deinit(input); self.reused++; let __cleanup_result_152_0: u32 = id; let __cleanup_result_152_1: bool = true; let __cleanup_result_152_2: Error = Error.none; { self.examined_words+=examined; } return __cleanup_result_152_0, __cleanup_result_152_1, __cleanup_result_152_2; }
  var available=session.options.max_children-self.retained_words; if available<0 { available=0; }
- if self.inputs.len>=session.options.max_values||self.inputs.len>=0xffffffff||input.words.len>available { deinit(input); return 0,false,Error.none; }
- let index=(self.inputs.len+1) as u32; self.keys.insert(input.words,index); self.retained_words+=input.words.len; self.inputs.push(input); return index,true,Error.none;
-}
+ if self.inputs.len>=session.options.max_values||self.inputs.len>=0xffffffff||input.words.len>available { deinit(input); let __cleanup_result_153_0: u32 = 0; let __cleanup_result_153_1: bool = false; let __cleanup_result_153_2: Error = Error.none; { self.examined_words+=examined; } return __cleanup_result_153_0, __cleanup_result_153_1, __cleanup_result_153_2; }
+ let index=(self.inputs.len+1) as u32; self.keys.insert(input.words,index); self.retained_words+=input.words.len; self.inputs.push(input); let __cleanup_result_154_0: u32 = index; let __cleanup_result_154_1: bool = true; let __cleanup_result_154_2: Error = Error.none; { self.examined_words+=examined; } return __cleanup_result_154_0, __cleanup_result_154_1, __cleanup_result_154_2;
+ { self.examined_words+=examined; } }

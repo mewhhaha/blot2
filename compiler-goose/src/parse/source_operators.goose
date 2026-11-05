@@ -139,11 +139,11 @@ fn request_dispatch<C>(self: Validator<C>&,id: Id) -> Id,bool {
 }
 fn request_case<C>(self: Validator<C>&,id: Id,completion: bool,depth: i64) {
  if stopped(self) { return; } let saved_replies=self.replies; let saved_loops=self.loops; self.replies=!completion; self.loops++;
- defer { self.replies=saved_replies; self.loops=saved_loops; }
+ 
  let n=self.tree.node(id);
  if completion { let start=self.tree.extra[n.a]; let len=self.tree.extra[n.a+1]; for child in self.tree.list(blot_parse_ast::List {start,len}) { walk(self,child,depth+1); } }
  for child in self.tree.list(blot_parse_ast::List {n.b,n.c}) { if (self.tree.node(child).a==0)==completion { walk(self,child,depth+1); } }
-}
+ { self.replies=saved_replies; self.loops=saved_loops; } }
 fn scope<C>(self: Validator<C>&,pattern_id: Id,body: Id,depth: i64) { let saved=self.locals.len; pattern(self,pattern_id,depth); walk(self,body,depth); self.locals.resize(saved); }
 fn loop_scope<C>(self: Validator<C>&,pattern_id: Id,body: Id,depth: i64) { self.loops++; scope(self,pattern_id,body,depth); self.loops--; }
 fn operator<C>(self: Validator<C>&,symbol: Symbol,is_named: bool,id: Id) {
@@ -376,13 +376,13 @@ fn walk<C>(self: Validator<C>&,id: Id,depth: i64) {
   let saved=self.locals.len; suite(self,self.tree.children(id),depth+1); self.locals.resize(saved); walk(self,n.c,depth+1);
  } else if n.tag==a_let_stmt {
   let binding=self.tree.binding(id); let scope,err=self.context.source_binding_start(id); self.failure=err; if err!=Error.none { return; }
-  defer { self.context.source_binding_end(scope); }
-  pattern_names(self,binding.pattern,depth+1); if stopped(self) { return; }
-  self.failure=self.context.source_binding_annotation(id); if annotations_stopped(self) { return; }
-  walk(self,binding.value,depth+1); if stopped(self) { return; }
-  self.failure=self.context.source_binding_finish(id); if annotations_stopped(self) { return; }
+  
+  pattern_names(self,binding.pattern,depth+1); if stopped(self) { { self.context.source_binding_end(scope); } return; }
+  self.failure=self.context.source_binding_annotation(id); if annotations_stopped(self) { { self.context.source_binding_end(scope); } return; }
+  walk(self,binding.value,depth+1); if stopped(self) { { self.context.source_binding_end(scope); } return; }
+  self.failure=self.context.source_binding_finish(id); if annotations_stopped(self) { { self.context.source_binding_end(scope); } return; }
   walk(self,binding.fallback,depth+1); pattern(self,binding.pattern,depth+1);
- } else if n.tag==a_use_stmt||n.tag==a_iterator_bind {
+  { self.context.source_binding_end(scope); } } else if n.tag==a_use_stmt||n.tag==a_iterator_bind {
   self.failure=self.context.source_expression_annotations(id); walk(self,n.b,depth+1); bind(self,n.a);
  } else if n.tag==a_rebind_stmt {
   var root=n.a; while self.tree.node(root).tag==a_field_access||self.tree.node(root).tag==a_index_access { root=self.tree.node(root).a; } let target=self.tree.node(root);
@@ -398,18 +398,18 @@ fn walk<C>(self: Validator<C>&,id: Id,depth: i64) {
   for child in self.tree.list(blot_parse_ast::List {n.b,n.c}) { walk(self,child,depth+1); }
  } else if n.tag==a_request_case { request_case(self,id,true,depth+1); request_case(self,id,false,depth+1); }
  else if n.tag==a_case_arm {
-  let saved=self.locals.len; defer { self.locals.resize(saved); }
+  let saved=self.locals.len; 
   let rows=self.tree.list(blot_parse_ast::List {n.a,n.b}); if rows.len!=0 { pattern(self,rows[0],depth+1); }
   let canonical_end=self.locals.len; var index=0; if rows.len!=0 { index=1; }
   while index<rows.len {
-   let row=rows[index]; let previous=self.pattern_scope; self.pattern_scope=saved; pattern(self,row,depth+1); self.pattern_scope=previous; if stopped(self) { return; }
+   let row=rows[index]; let previous=self.pattern_scope; self.pattern_scope=saved; pattern(self,row,depth+1); self.pattern_scope=previous; if stopped(self) { { self.locals.resize(saved); } return; }
    var same=canonical_end-saved==self.locals.len-canonical_end;
    for name in self.locals[saved..canonical_end] { var found=false; for other in self.locals[canonical_end..] { if name==other { found=true; break; } } same=same&&found; }
    if !same { fail(self,c_alternative_bindings,row,self.tree.span(row).start,0); }
-   self.locals.resize(canonical_end); if stopped(self) { return; } index++;
+   self.locals.resize(canonical_end); if stopped(self) { { self.locals.resize(saved); } return; } index++;
   }
   let guard=self.tree.extra[n.c]; let body=self.tree.extra[n.c+1]; walk(self,body,depth+1); walk(self,guard,depth+1);
- } else if n.tag==a_request_arm { walk(self,n.a,depth+1); scope(self,n.b,n.c,depth+1); }
+  { self.locals.resize(saved); } } else if n.tag==a_request_arm { walk(self,n.a,depth+1); scope(self,n.b,n.c,depth+1); }
 }
 fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Error {
  let duplicate,has_duplicate=context.source_duplicate_name(); var collected=tree.roots.len;

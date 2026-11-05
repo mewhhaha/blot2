@@ -33,7 +33,9 @@ recursive fn add<C>(builder: Builder<C>&, id: u32, depth: i64) -> Error {
     let charged = charge(builder); if charged != Error.none { return charged; }
     if depth >= 128 || id == 0 || id >= builder.context.layouts.nodes.len { return Error.layout_limit; }
     if builder.seen.contains(id) { return Error.none; } if builder.nodes.len == 4096 { return Error.layout_limit; } builder.seen.insert(id,true);
-    let layout = builder.context.layouts.node(id); var node = Node { id, Tag.unit }; var published = false; defer { if !published { deinit(node); } }
+    let layout = builder.context.layouts.node(id); var node = Node { id, Tag.unit }; var published = false; 
+    recursive fn cleanup_continuation_2() -> Error {
+
     match layout.tag {
         unit => { node.tag = Tag.unit; }, boolean => { node.tag = Tag.boolean; }, unsigned32 => { node.tag = Tag.unsigned32; }, floating32 => { node.tag = Tag.floating32; },
         array,list => {
@@ -64,6 +66,11 @@ recursive fn add<C>(builder: Builder<C>&, id: u32, depth: i64) -> Error {
     for field in node.fields { let error = add(builder,field.child,depth + 1); if error != Error.none { return error; } }
     for variant in node.variants { let error = add(builder,variant.child,depth + 1); if error != Error.none { return error; } }
     return Error.none;
+
+    }
+    let cleanup_result_2_0 = cleanup_continuation_2();
+     if !published { deinit(node); } 
+    return cleanup_result_2_0;
 }
 fn jsonNumber(out: u8[>..<]&,value: u32) { var digits: u8[10]; var count: i64 = 0; var remaining = value; while true { digits[count] = '0' + (remaining % 10) as u8; count++; remaining /= 10; if remaining == 0 { break; } } while count > 0 { count--; out.push(digits[count]); } }
 fn jsonNode(node: Node,out: u8[>..<]&) {
@@ -75,7 +82,9 @@ fn jsonNode(node: Node,out: u8[>..<]&) {
     out.append("],\"name\":"); blot_backend_backend_timing::jsonString(out,node.name); out.push('}');
 }
 fn build<C>(context: C,roots: const u32[:],out: u8[>..<]&) -> Error {
-    var nodes: Node[>..<] = []; var seen: dictionary<u32,bool>; var builder = Builder<C> { context,nodes,seen }; defer { deinit(builder); }
+    var nodes: Node[>..<] = []; var seen: dictionary<u32,bool>; var builder = Builder<C> { context,nodes,seen }; 
+    recursive fn cleanup_continuation_1() -> Error {
+
     for root in roots { let error = add(builder,root,0); if error != Error.none { return error; } }
     // IDs are unique; bounded merge sorting gives the source O(n log n) work.
     var scratch: Node[>..<] = []; for node in nodes { scratch.push(node); } var width: i64 = 1;
@@ -90,4 +99,9 @@ fn build<C>(context: C,roots: const u32[:],out: u8[>..<]&) -> Error {
         for node,index in scratch { nodes[index] = node; } width *= 2;
     }
     out.append("{\"version\":1,\"nodes\":["); for node,index in nodes { if index != 0 { out.push(','); } jsonNode(node,out); } out.append("]}"); return Error.none;
+
+    }
+    let cleanup_result_1_0 = cleanup_continuation_1();
+     deinit(builder); 
+    return cleanup_result_1_0;
 }

@@ -34,6 +34,7 @@ import .dictionary_layout;
 import .collection_edit_call;
 import .collection_iteration;
 import .inline_body;
+import .known_call;
 import .opaque_storage;
 import .startup_emission_facts;
 import reuse.refinement_receipt;
@@ -43,6 +44,9 @@ import check.staging_origins;
 import check.record_order;
 import check.diagnostic_code;
 import check.primitive_operator;
+import check.cleanup_contracts;
+import check.task_regions;
+import check.task_types;
 import work_counters;
 import eval.core_eval;
 import eval.closed_local_value;
@@ -114,7 +118,12 @@ struct LayoutEntry { ty: u32 = 0,value: u32 = 0 }
 enum SmallKind { collection,cursor }
 struct SmallCollection { values: u32[blot_backend_function_facts::small_limit],len: i64 = 0,machine: blot_backend_runtime_ir::ValueType = blot_backend_runtime_ir::VT_i32,kind: SmallKind = SmallKind.collection }
 struct PlannedReturn { node: u32,template_result: bool }
-struct SmallResult { root: u32 = 0,value: SmallCollection? = null }
+struct SmallResult { root: u32 = 0,slot: u32 = 0 }
+struct SmallOutput { live: bool = false,value: SmallCollection }
+var small_outputs: SmallOutput[>..] = [];
+var free_small_outputs: u32[>..<] = [];
+fn allocateSmallOutput(value: SmallCollection) -> u32,Error { var id: u32 = 0; if free_small_outputs.len != 0 { id = free_small_outputs[free_small_outputs.len - 1]; free_small_outputs.resize(free_small_outputs.len - 1); } else { if small_outputs.len >= 4294967295 { return 0,Error.module_too_large; } small_outputs.push(SmallOutput {}); id = small_outputs.len as u32; } small_outputs[id - 1] = SmallOutput { true,value }; return id,Error.none; }
+fn releaseSmallOutput(id: u32) { assert(id != 0 && id <= small_outputs.len && small_outputs[id - 1].live); small_outputs[id - 1].live = false; free_small_outputs.push(id); }
 struct ExactBuild { plan: blot_backend_exact_builder::Plan,storage: u32,index: u32,row_words: u32 }
 struct SemanticContext { mappings: u32,rows: u32 }
 struct LoopInput { counter: u32,end: u32,array_local: u32,list_span: blot_support::Option<u32[3]>,small: blot_support::Option<SmallCollection>,borrowed_view: blot_support::Option<RowView>,row_view: blot_support::Option<RowView>,array_view: blot_support::Option<RowView>,list_directory: blot_support::Option<ListDirectory> }
@@ -266,13 +275,20 @@ struct Owner {
     generator: blot_backend_core_backend::Generator&,unit_id: u32,function_id: u32,semantic_node: u32 = 0,semantic_context: blot_support::Option<SemanticContext>,provider_local: blot_support::Option<u32>,dictionary_local: blot_support::Option<u32>,dictionary_owner: blot_support::Option<blot_check_dictionary_owner::Owner>,
     mappings: const Mapping[:],row_mappings: const RowMapping[:] = [],locals: LocalMap,cleanups: blot_runtime_runtime_cleanup::Stack,return_targets: ReturnTargetBuffer,loop_targets: LoopTargetBuffer,labels: u32 = 0,
     templates: TemplateMap,static_values: LocalMap,computation_values: LocalMap,result_template: blot_support::Option<u32>,factory_template: bool = false,owned_edit: blot_support::Option<u32>,inline_depth: u8 = 0,inline_loop: bool = false,
-    local_instances: const InstanceDecisions&? = null,instance_locals: InstanceMap,layout_cache: LayoutEntry[32] = [LayoutEntry {};32],
+    local_instances: blot_support::Option<InstanceDecisions>,instance_locals: InstanceMap,layout_cache: LayoutEntry[32] = [LayoutEntry {};32],
 }
 struct Config { staged: blot_support::Option<u32>,generator: blot_backend_core_backend::Generator&,unit_id: u32,function_id: u32,provider_local: blot_support::Option<u32>,mappings: const Mapping[:],row_mappings: const RowMapping[:] = [],factory_template: bool = false }
 fn withOwner<C,F>(config: Config,context: C&) -> Error {
     let cleanups,error = blot_runtime_runtime_cleanup::initPooled(); if error != Error.none { return error; }
     var owner = Owner { staged: config.staged,generator: config.generator,unit_id: config.unit_id,function_id: config.function_id,provider_local: config.provider_local,mappings: config.mappings,row_mappings: config.row_mappings,cleanups: cleanups,factory_template: config.factory_template };
-    defer { owner.deinit(); } return F(context,owner);
+    
+    recursive fn cleanup_continuation_82() -> Error {
+ return F(context,owner);
+
+    }
+    let cleanup_result_82_0 = cleanup_continuation_82();
+     owner.deinit(); 
+    return cleanup_result_82_0;
 }
 reusable[] var owned_words: u32[>..] = [];
 reusable[] var owned_roles: blot_backend_runtime_ir::Role[>..] = [];
@@ -435,7 +451,9 @@ recursive fn hasErasedType(owner: const Owner&,ty: u32,depth: i64) -> bool {
 }
 fn closeAmbiguousUse(owner: Owner&,ty: u32,mappings: const Mapping[:],rows: const RowMapping[:],span: blot_check_core::Span,ambiguous: Ambiguous&) -> bool,Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var variables = TypeVariables { source: source }; if !visit(variables,ty,0) { return false,Error.none; }
-    let known_types = ambiguous.types.items.len; let known_rows = ambiguous.rows.items.len; var closed = false; defer { if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); } }
+    let known_types = ambiguous.types.items.len; let known_rows = ambiguous.rows.items.len; var closed = false; 
+    recursive fn cleanup_continuation_81() -> bool,Error {
+
     for variable in variables.types[..variables.type_count] {
         var present = false; for mapping in mappings { if mapping.variable == variable { present = true; break; } } if present { continue; }
         let quantified,error = generator.quantifiedVariable(owner.unit_id,variable,false); if error != Error.none { return false,error; } if quantified { return false,Error.none; } let appended = ambiguous.types.push(Mapping { variable: variable,layout: blot_backend_layout::word }); if appended != Error.none { return false,appended; }
@@ -445,8 +463,27 @@ fn closeAmbiguousUse(owner: Owner&,ty: u32,mappings: const Mapping[:],rows: cons
         var present = false; for mapping in rows { if mapping.variable == variable { present = true; break; } } if present { continue; }
         let quantified,error = generator.quantifiedVariable(owner.unit_id,variable,true); if error != Error.none { return false,error; } if quantified { continue; } let appended = ambiguous.rows.push(RowMapping { variable,0 }); if appended != Error.none { return false,appended; }
     }
-    var closed_types = MappingBuffer {}; defer { closed_types.deinit(); } var closed_rows = RowBuffer {}; defer { closed_rows.deinit(); } let types = withFacts(mappings,ambiguous.types.items[known_types..],closed_types); if types != Error.none { return false,types; } let row_mappings = withFacts(rows,ambiguous.rows.items[known_rows..],closed_rows); if row_mappings != Error.none { return false,row_mappings; }
+    var closed_types = MappingBuffer {}; 
+    recursive fn cleanup_continuation_80() -> bool,Error {
+ var closed_rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_79() -> bool,Error {
+ let types = withFacts(mappings,ambiguous.types.items[known_types..],closed_types); if types != Error.none { return false,types; } let row_mappings = withFacts(rows,ambiguous.rows.items[known_rows..],closed_rows); if row_mappings != Error.none { return false,row_mappings; }
     let layout,error = generator.codeLayoutWithRows(owner.unit_id,ty,closed_types.items,closed_rows.items,span); if error != Error.none { return false,error; } closed = !hasErasedType(owner,layout,0); return closed,Error.none;
+
+    }
+    let cleanup_result_79_0,cleanup_result_79_1 = cleanup_continuation_79();
+     closed_rows.deinit(); 
+    return cleanup_result_79_0,cleanup_result_79_1;
+
+    }
+    let cleanup_result_80_0,cleanup_result_80_1 = cleanup_continuation_80();
+     closed_types.deinit(); 
+    return cleanup_result_80_0,cleanup_result_80_1;
+
+    }
+    let cleanup_result_81_0,cleanup_result_81_1 = cleanup_continuation_81();
+     if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); } 
+    return cleanup_result_81_0,cleanup_result_81_1;
 }
 struct ProducerScan { source: const blot_check_core::Module&,reads: InstanceReads&,edits: u32[32],edit_count: i64 = 0,remaining: i64 = 256 }
 fn usageNominal(source: const blot_check_core::Module&,ty: u32) -> bool { let contains,error = blot_check_usage_check::containsNominal(source.types,source.nominals,ty); return error != Error.none || contains; }
@@ -472,9 +509,19 @@ fn decideInstances(owner: Owner&,statement: u32,previous: const Mapping[:],previ
     assert(uses.len <= max_local_instances); var decision = InstanceDecision { statement,count: uses.len }; var scan = ProducerScan { source,reads: decision.reads }; if !scan.visit(n.b,0) { return Error.none; }
     for edit in scan.edits[..scan.edit_count] { let owns,error = generator.ownsArrayUpdate(owner.unit_id,edit); if error != Error.none { return error; } if owns { return Error.none; } }
     let fact_start = decisions.facts.items.len; let row_start = decisions.rows.items.len; var admitted = false;
-    defer { if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); } }
-    var next = MappingBuffer {}; defer { next.deinit(); } var next_rows = RowBuffer {}; defer { next_rows.deinit(); }
-    var closed = MappingBuffer {}; defer { closed.deinit(); } var closed_rows = RowBuffer {}; defer { closed_rows.deinit(); }
+    
+    recursive fn cleanup_continuation_78() -> Error {
+
+    var next = MappingBuffer {}; 
+    recursive fn cleanup_continuation_77() -> Error {
+ var next_rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_76() -> Error {
+
+    var closed = MappingBuffer {}; 
+    recursive fn cleanup_continuation_75() -> Error {
+ var closed_rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_74() -> Error {
+
     let variables = source.types.list(binding.scheme.variables); let row_variables = source.types.list(binding.scheme.row_variables);
     for selected,index in uses {
         next.clear(); next_rows.clear(); let a = next.append(previous); if a != Error.none { return a; } let b = next_rows.append(previous_rows); if b != Error.none { return b; }
@@ -489,11 +536,48 @@ fn decideInstances(owner: Owner&,statement: u32,previous: const Mapping[:],previ
         let representation,error = generator.codeLayoutWithRows(owner.unit_id,binding.ty,closed.items,closed_rows.items,span); if error != Error.none { return error; } if representation != selected { return Error.none; }
     }
     let appended = decisions.decisions.push(decision); if appended != Error.none { return appended; } admitted = true; return Error.none;
+
+    }
+    let cleanup_result_74_0 = cleanup_continuation_74();
+     closed_rows.deinit(); 
+    return cleanup_result_74_0;
+
+    }
+    let cleanup_result_75_0 = cleanup_continuation_75();
+     closed.deinit(); 
+    return cleanup_result_75_0;
+
+    }
+    let cleanup_result_76_0 = cleanup_continuation_76();
+     next_rows.deinit(); 
+    return cleanup_result_76_0;
+
+    }
+    let cleanup_result_77_0 = cleanup_continuation_77();
+     next.deinit(); 
+    return cleanup_result_77_0;
+
+    }
+    let cleanup_result_78_0 = cleanup_continuation_78();
+     if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); } 
+    return cleanup_result_78_0;
 }
 fn localStorageMappings(owner: Owner&,root: u32,mappings: MappingBuffer&,rows: RowBuffer&,instances: InstanceDecisions&) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var unit_uses: const blot_backend_unit_index::Uses? = null; let statements = source.children(root);
-    var dead_aliases: u32[16]; var dead_count: i64 = 0; var scratch = MappingBuffer {}; defer { scratch.deinit(); } var scratch_rows = RowBuffer {}; defer { scratch_rows.deinit(); }
-    var ambiguous = Ambiguous {}; defer { ambiguous.deinit(); } var with_ambiguous = MappingBuffer {}; defer { with_ambiguous.deinit(); } var with_ambiguous_rows = RowBuffer {}; defer { with_ambiguous_rows.deinit(); } var scratch_plain = MappingBuffer {}; defer { scratch_plain.deinit(); }
+    var dead_aliases: u32[16]; var dead_count: i64 = 0; var scratch = MappingBuffer {}; 
+    recursive fn cleanup_continuation_73() -> Error {
+ var scratch_rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_72() -> Error {
+
+    var ambiguous = Ambiguous {}; 
+    recursive fn cleanup_continuation_71() -> Error {
+ var with_ambiguous = MappingBuffer {}; 
+    recursive fn cleanup_continuation_70() -> Error {
+ var with_ambiguous_rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_69() -> Error {
+ var scratch_plain = MappingBuffer {}; 
+    recursive fn cleanup_continuation_68() -> Error {
+
     var position = statements.len;
     while position > 0 {
         position--; let statement = statements[position]; let n = source.node(statement); if n.tag != blot_check_core::Tag.bind || n.a == 0 { continue; } let producer = source.node(n.b);
@@ -539,14 +623,59 @@ fn localStorageMappings(owner: Owner&,root: u32,mappings: MappingBuffer&,rows: R
         var private = true; for mapping in next.items { if mapping.layout != mappingAt(previous,mapping.variable) && !containsValue(source.types.list(binding.scheme.variables),mapping.variable) { private = false; } } if !private { continue; }
         mappings.deinit(); mappings = next; next = MappingBuffer {};
     }
-    if ambiguous.types.items.len == 0 { return Error.none; } var merged = MappingBuffer {}; var transferred = false; defer { if !transferred { merged.deinit(); } } var base = owner.mappings; if mappings.items.len != 0 { base = mappings.items; }
+    if ambiguous.types.items.len == 0 { return Error.none; } var merged = MappingBuffer {}; var transferred = false; 
+    recursive fn cleanup_continuation_67() -> Error {
+ var base = owner.mappings; if mappings.items.len != 0 { base = mappings.items; }
     let facts = withFacts(base,ambiguous.types.items,merged); if facts != Error.none { return facts; } mappings.deinit(); mappings = merged; transferred = true;
     if ambiguous.rows.items.len == 0 { return Error.none; } rows.clear(); return withFacts(owner.row_mappings,ambiguous.rows.items,rows);
+
+    }
+    let cleanup_result_67_0 = cleanup_continuation_67();
+     if !transferred { merged.deinit(); } 
+    return cleanup_result_67_0;
+
+    }
+    let cleanup_result_68_0 = cleanup_continuation_68();
+     scratch_plain.deinit(); 
+    return cleanup_result_68_0;
+
+    }
+    let cleanup_result_69_0 = cleanup_continuation_69();
+     with_ambiguous_rows.deinit(); 
+    return cleanup_result_69_0;
+
+    }
+    let cleanup_result_70_0 = cleanup_continuation_70();
+     with_ambiguous.deinit(); 
+    return cleanup_result_70_0;
+
+    }
+    let cleanup_result_71_0 = cleanup_continuation_71();
+     ambiguous.deinit(); 
+    return cleanup_result_71_0;
+
+    }
+    let cleanup_result_72_0 = cleanup_continuation_72();
+     scratch_rows.deinit(); 
+    return cleanup_result_72_0;
+
+    }
+    let cleanup_result_73_0 = cleanup_continuation_73();
+     scratch.deinit(); 
+    return cleanup_result_73_0;
 }
 recursive fn prepareBody(owner: Owner&,root: u32,depth: i64,template: bool) -> u32,Error {
-    let generator .= owner.generator; let stage = generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.preparation); defer { stage.deinit(); }
+    let generator .= owner.generator; let stage = generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.preparation); 
+    recursive fn cleanup_continuation_66() -> u32,Error {
+
     if owner.preparation_depth >= 256 { return 0,generator.fail(owner.unit_id,root,blot_backend_core_backend::Code.complexity); }
-    var storage = MappingBuffer {}; defer { storage.deinit(); } var storage_rows = RowBuffer {}; defer { storage_rows.deinit(); } var instances = InstanceDecisions {}; defer { instances.deinit(); }
+    var storage = MappingBuffer {}; 
+    recursive fn cleanup_continuation_65() -> u32,Error {
+ var storage_rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_64() -> u32,Error {
+ var instances = InstanceDecisions {}; 
+    recursive fn cleanup_continuation_63() -> u32,Error {
+
     let selected = localStorageMappings(owner,root,storage,storage_rows,instances); if selected != Error.none { return 0,selected; }
     let source .= generator.unit(owner.unit_id);
     if blot_backend_bottom_result::proves(generator.units,owner.unit_id,root) {
@@ -556,22 +685,63 @@ recursive fn prepareBody(owner: Owner&,root: u32,depth: i64,template: bool) -> u
     var mappings = owner.mappings; if storage.items.len != 0 { mappings = storage.items; } var rows = owner.row_mappings; if storage_rows.items.len != 0 { rows = storage_rows.items; }
     var selected_instances: const InstanceDecisions? = null; if instances.decisions.items.len != 0 { selected_instances .= instances; }
     return prepareMapped(owner,root,depth,template,mappings,rows,selected_instances);
+
+    }
+    let cleanup_result_63_0,cleanup_result_63_1 = cleanup_continuation_63();
+     instances.deinit(); 
+    return cleanup_result_63_0,cleanup_result_63_1;
+
+    }
+    let cleanup_result_64_0,cleanup_result_64_1 = cleanup_continuation_64();
+     storage_rows.deinit(); 
+    return cleanup_result_64_0,cleanup_result_64_1;
+
+    }
+    let cleanup_result_65_0,cleanup_result_65_1 = cleanup_continuation_65();
+     storage.deinit(); 
+    return cleanup_result_65_0,cleanup_result_65_1;
+
+    }
+    let cleanup_result_66_0,cleanup_result_66_1 = cleanup_continuation_66();
+     stage.deinit(); 
+    return cleanup_result_66_0,cleanup_result_66_1;
 }
 recursive fn prepareMapped(owner: Owner&,root: u32,depth: i64,template: bool,mappings: const Mapping[:],rows: const RowMapping[:],instances: const InstanceDecisions?) -> u32,Error {
-    let generator .= owner.generator; let stage = generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.preparation); defer { stage.deinit(); }
+    let generator .= owner.generator; let stage = generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.preparation); 
+    recursive fn cleanup_continuation_62() -> u32,Error {
+
     if owner.preparation_depth >= 256 { return 0,generator.fail(owner.unit_id,root,blot_backend_core_backend::Code.complexity); }
-    let bodies .= generator.planning.bodies; let body,error = bodies.create(owner.unit_id,root,mappings,rows); if error != Error.none { return 0,error; } var published = false; defer { if !published { bodies.release(body); } }
+    let bodies .= generator.planning.bodies; let body,error = bodies.create(owner.unit_id,root,mappings,rows); if error != Error.none { return 0,error; } var published = false; 
+    recursive fn cleanup_continuation_61() -> u32,Error {
+
     let evidence,evidence_error = generator.rowMappingEvidence(rows); if evidence_error != Error.none { return 0,evidence_error; } bodies.headers[body - 1].rows_evidence = evidence;
     for mapping in bodies.header(body).mappings { let owns,owns_error = generator.representations.store.hasOwners(mapping.layout); if owns_error != Error.none { return 0,generator.fail(owner.unit_id,root,blot_backend_core_backend::Code.complexity); } if owns { bodies.headers[body - 1].has_owners = true; break; } }
     let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != Error.none { return 0,cleanup_error; }
     let header = bodies.header(body); var preparer = Owner { generator,unit_id: owner.unit_id,function_id: owner.function_id,mappings: header.mappings,row_mappings: header.rows,factory_template: owner.factory_template,preparation_depth: owner.preparation_depth + 1,preparing: true,staged: owner.staged,cleanups };
-    defer { preparer.deinit(); } preparer.dictionary_local = owner.dictionary_local; preparer.dictionary_owner = owner.dictionary_owner; preparer.locals = owner.locals.clone(); preparer.templates = owner.templates.clone(); preparer.static_values = owner.static_values.clone(); preparer.local_instances .= instances;
+    
+    recursive fn cleanup_continuation_60() -> u32,Error {
+ preparer.dictionary_local = owner.dictionary_local; preparer.dictionary_owner = owner.dictionary_owner; preparer.locals = owner.locals.clone(); preparer.templates = owner.templates.clone(); preparer.static_values = owner.static_values.clone(); if instances != null { preparer.local_instances = blot_support::some(instances); }
     let prepared = prepareNode(preparer,body,root,depth,template); if prepared != Error.none { return 0,prepared; }
     if preparer.has_collection_steps { let cursors = prepareCursorFamilies(preparer,body); if cursors != Error.none { return 0,cursors; } }
     let linear = prepareLinearCursors(preparer,body); if linear != Error.none { return 0,linear; } let numeric = prepareNumeric(preparer,body); if numeric != Error.none { return 0,numeric; }
     let uses,uses_error = generator.unitUses(owner.unit_id,blot_backend_unit_index::Need {}); if uses_error != Error.none { return 0,uses_error; }
     let sinks = blot_backend_safe_local_sinking::plan(generator.unit(owner.unit_id),uses,root,bodies,body); if sinks != Error.none { return 0,sinks; }
     generator.evaluator.counters.safe_local_sinks += bodies.sinkCount(body); generator.evaluator.counters.resolved_bodies++; generator.evaluator.counters.resolved_plan_entries += bodies.entryCount(body); published = true; return body,Error.none;
+
+    }
+    let cleanup_result_60_0,cleanup_result_60_1 = cleanup_continuation_60();
+     preparer.deinit(); 
+    return cleanup_result_60_0,cleanup_result_60_1;
+
+    }
+    let cleanup_result_61_0,cleanup_result_61_1 = cleanup_continuation_61();
+     if !published { bodies.release(body); } 
+    return cleanup_result_61_0,cleanup_result_61_1;
+
+    }
+    let cleanup_result_62_0,cleanup_result_62_1 = cleanup_continuation_62();
+     stage.deinit(); 
+    return cleanup_result_62_0,cleanup_result_62_1;
 }
 fn prepareCursorFamilies(owner: Owner&,body: u32) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let bodies .= generator.planning.bodies; let uses,error = generator.unitUses(owner.unit_id,blot_backend_unit_index::Need { flow: true }); if error != Error.none { return error; }
@@ -622,27 +792,83 @@ fn prepareNumeric(owner: Owner&,body: u32) -> Error {
     let source .= generator.unit(owner.unit_id); var selected: blot_check_numeric_proof_core::Selected[256]; var count: i64 = 0; var cursor = header.first;
     while cursor != 0 { let slot = bodies.slots[cursor - 1]; cursor = slot.next; if source.node(slot.node).tag != blot_check_core::Tag.associated { continue; } match bodies.get(body,slot.node) { dispatch d=>{ match d.value { selected invocation=>{ let call = invocation.call; if call.consumed == 0 || call.consumed > 2 || call.extra.len != 2 - call.consumed { continue; } if count == 256 { return Error.none; } selected[count] = blot_check_numeric_proof_core::Selected { slot.node,invocation.key.target }; count++; },_=>{}, } },_=>{}, } }
     if count == 0 { return Error.none; } var original: const blot_check_core::Body? = null; for &candidate in source.bodies[1..] { if candidate.root == header.root && candidate.is_function { original .= candidate; break; } } if original == null { return Error.none; }
-    let plan,error = blot_check_numeric_proof_core::analyzePrepared(source,generator.units,original,selected[..count],blot_check_numeric_proof_core::Options {}); if error != Error.none { return error; } var retained = false; defer { if !retained { plan.deinit(); } }
+    let plan,error = blot_check_numeric_proof_core::analyzePrepared(source,generator.units,original,selected[..count],blot_check_numeric_proof_core::Options {}); if error != Error.none { return error; } var retained = false; 
+    recursive fn cleanup_continuation_59() -> Error {
+
     var improves = false; for check,id in plan.checks { if check.seen && check.admitted { let known,known_error = generator.numericCheck(owner.unit_id,id as u32); if known_error != Error.none { return known_error; } if !known { improves = true; break; } } }
     if !improves { return Error.none; } bodies.headers[body - 1].numeric = blot_support::some(plan); retained = true; if generator.artifacts != null { generator.artifacts.requireFreshCode(); } return Error.none;
+
+    }
+    let cleanup_result_59_0 = cleanup_continuation_59();
+     if !retained { plan.deinit(); } 
+    return cleanup_result_59_0;
 }
 fn numericCheck(owner: Owner&,id: u32) -> bool,Error { if owner.body.present { let header = owner.generator.planning.bodies.header(owner.body.value); if header.numeric.present && header.numeric.value.admits(id) { return true,Error.none; } } return owner.generator.numericCheck(owner.unit_id,id); }
-recursive fn bodyExpression(owner: Owner&,root: u32,depth: i64,template: bool) -> Error { let body,error = prepareBody(owner,root,depth,template); if error != Error.none { return error; } defer { owner.generator.planning.bodies.release(body); } return preparedExpression(owner,body,root,depth,template); }
+recursive fn bodyExpression(owner: Owner&,root: u32,depth: i64,template: bool) -> Error { let body,error = prepareBody(owner,root,depth,template); if error != Error.none { return error; } 
+    recursive fn cleanup_continuation_58() -> Error {
+ return preparedExpression(owner,body,root,depth,template); 
+    }
+    let cleanup_result_58_0 = cleanup_continuation_58();
+     owner.generator.planning.bodies.release(body); 
+    return cleanup_result_58_0;
+}
 recursive fn preparedExpression(owner: Owner&,body: u32,root: u32,depth: i64,template: bool) -> Error {
-    let stage = owner.generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.lowering); defer { stage.deinit(); } let old_context = owner.semantic_context; owner.semantic_context = blot_support::none<SemanticContext>(); defer { owner.semantic_context = old_context; }
-    let previous = owner.body; owner.body = blot_support::some(body); defer { owner.body = previous; } let header = owner.generator.planning.bodies.header(body); let old_mappings = owner.mappings; let old_rows = owner.row_mappings;
+    let stage = owner.generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.lowering); 
+    recursive fn cleanup_continuation_57() -> Error {
+ let old_context = owner.semantic_context; owner.semantic_context = blot_support::none<SemanticContext>(); 
+    recursive fn cleanup_continuation_56() -> Error {
+
+    let previous = owner.body; owner.body = blot_support::some(body); 
+    recursive fn cleanup_continuation_55() -> Error {
+ let header = owner.generator.planning.bodies.header(body); let old_mappings = owner.mappings; let old_rows = owner.row_mappings;
     var changed = old_mappings.len != header.mappings.len; if !changed { for old,index in old_mappings { let current = header.mappings[index]; if old.variable != current.variable || old.layout != current.layout { changed = true; break; } } }
     var rows_changed = old_rows.len != header.rows.len; if !rows_changed { for old,index in old_rows { let current = header.rows[index]; if old.variable != current.variable || old.row != current.row { rows_changed = true; break; } } }
     if rows_changed { owner.row_mappings = header.rows; } changed = changed || rows_changed; owner.mappings = header.mappings; if changed { owner.layout_cache = [LayoutEntry {};32]; }
-    defer { owner.mappings = old_mappings; owner.row_mappings = old_rows; if changed { owner.layout_cache = [LayoutEntry {};32]; } }
+    
+    recursive fn cleanup_continuation_54() -> Error {
+
     if template { return templateExpression(owner,root,depth); } return expression(owner,root,depth);
+
+    }
+    let cleanup_result_54_0 = cleanup_continuation_54();
+     owner.mappings = old_mappings; owner.row_mappings = old_rows; if changed { owner.layout_cache = [LayoutEntry {};32]; } 
+    return cleanup_result_54_0;
+
+    }
+    let cleanup_result_55_0 = cleanup_continuation_55();
+     owner.body = previous; 
+    return cleanup_result_55_0;
+
+    }
+    let cleanup_result_56_0 = cleanup_continuation_56();
+     owner.semantic_context = old_context; 
+    return cleanup_result_56_0;
+
+    }
+    let cleanup_result_57_0 = cleanup_continuation_57();
+     stage.deinit(); 
+    return cleanup_result_57_0;
 }
 fn stagingConstant(owner: Owner&,id: u32) -> u32,Error {
-    let generator .= owner.generator; var mappings = blot_backend_substitution_buffers::EvidenceMappings {}; defer { mappings.deinit(); } var rows = blot_backend_substitution_buffers::EvidenceRows {}; defer { rows.deinit(); }
+    let generator .= owner.generator; var mappings = blot_backend_substitution_buffers::EvidenceMappings {}; 
+    recursive fn cleanup_continuation_53() -> u32,Error {
+ var rows = blot_backend_substitution_buffers::EvidenceRows {}; 
+    recursive fn cleanup_continuation_52() -> u32,Error {
+
     for mapping in owner.mappings { if mapping.instance.decl != 0 { continue; } let actual,error = generator.representations.toEvidence(generator.evaluator.evidenceStore(),mapping.layout); if error != Error.none { if error == Error.out_of_memory { return 0,error; } continue; } let appended = mappings.push(blot_eval_type_evidence::Mapping { mapping.variable,actual }); if appended != Error.none { return 0,appended; } }
     for mapping in owner.row_mappings { if mapping.row == blot_backend_layout::unknown_row { continue; } let actual,error = generator.representations.rowToEvidence(generator.evaluator.evidenceStore(),mapping.row); if error != Error.none { if error == Error.out_of_memory { return 0,error; } return 0,generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.stage_unavailable); } let appended = rows.push(blot_eval_type_evidence::RowMapping { mapping.variable,actual }); if appended != Error.none { return 0,appended; } }
     let value,error = generator.evaluator.closedNodeSlots(owner.unit_id,id,owner.static_values.table.slots,mappings.items,rows.items); if error == Error.none { return value,error; } if error == Error.out_of_memory { return 0,error; }
     if generator.evaluator.diagnostic.present { let code = generator.evaluator.diagnostic.value.code; if code == blot_check_diagnostic_code::Code.unsupported || code == blot_check_diagnostic_code::Code.const_runtime_dependency { generator.evaluator.diagnostic.value.code = blot_check_diagnostic_code::Code.stage_unavailable; } } return 0,generator.evaluationFailure();
+
+    }
+    let cleanup_result_52_0,cleanup_result_52_1 = cleanup_continuation_52();
+     rows.deinit(); 
+    return cleanup_result_52_0,cleanup_result_52_1;
+
+    }
+    let cleanup_result_53_0,cleanup_result_53_1 = cleanup_continuation_53();
+     mappings.deinit(); 
+    return cleanup_result_53_0,cleanup_result_53_1;
 }
 fn stagingOp(code: u32) -> blot_check_typed_staging::Op { match code { 0=>{ return blot_check_typed_staging::Op.quote; },1=>{ return blot_check_typed_staging::Op.splice; },2=>{ return blot_check_typed_staging::Op.lift; },3=>{ return blot_check_typed_staging::Op.emit; },4=>{ return blot_check_typed_staging::Op.run; },5=>{ return blot_check_typed_staging::Op.describe; },6=>{ return blot_check_typed_staging::Op.same; },7=>{ return blot_check_typed_staging::Op.fields; },8=>{ return blot_check_typed_staging::Op.evaluate; },_=>{ assert(false); return blot_check_typed_staging::Op.quote; }, } }
 recursive fn prepareStaging(owner: Owner&,id: u32,depth: i64) -> StagingPlan,Error {
@@ -650,14 +876,42 @@ recursive fn prepareStaging(owner: Owner&,id: u32,depth: i64) -> StagingPlan,Err
     if op == blot_check_typed_staging::Op.lift || op == blot_check_typed_staging::Op.splice { if !owner.staged.present { return StagingPlan { 0 },generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.stage_unavailable); } let replacement = generator.evaluator.stagedReplacement(owner.staged.value,id); if !replacement.present { return StagingPlan { 0 },generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.stage_unavailable); } value = replacement.value; }
     else { if op == blot_check_typed_staging::Op.quote { return StagingPlan { 0 },generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.stage_unavailable); } var target = id; if op == blot_check_typed_staging::Op.emit { target = node.a; } let evaluated,error = stagingConstant(owner,target); if error != Error.none { return StagingPlan { 0 },error; } value = evaluated; }
     if op != blot_check_typed_staging::Op.emit && op != blot_check_typed_staging::Op.splice { return StagingPlan { value },Error.none; } let staged = generator.evaluator.stagedInfo(value); if !staged.present { return StagingPlan { 0 },generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.code_shape_mismatch); } let metadata = staged.value;
-    let previous_trace = generator.staging_trace; defer { generator.staging_trace = previous_trace; }
+    let previous_trace = generator.staging_trace; 
+    recursive fn cleanup_continuation_51() -> StagingPlan,Error {
+
     let traced = blot_check_staging_origins::code(generator.staging_trace,generator.evaluator.units,metadata,blot_check_staging_origins::Source { owner.unit_id,id },blot_check_staging_origins::generator(generator.evaluator.storage.code_origins,value),op == blot_check_typed_staging::Op.splice);
     if traced != Error.none { var issue = blot_backend_core_backend::Code.staging_budget; if traced == Error.invalid_origin { issue = blot_backend_core_backend::Code.code_shape_mismatch; } return StagingPlan { 0 },generator.fail(owner.unit_id,id,issue); }
-    var mappings = MappingBuffer {}; defer { mappings.deinit(); } var rows = RowBuffer {}; defer { rows.deinit(); }
+    var mappings = MappingBuffer {}; 
+    recursive fn cleanup_continuation_50() -> StagingPlan,Error {
+ var rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_49() -> StagingPlan,Error {
+
     for mapping in generator.evaluator.storage.type_mappings[metadata.mappings.start..metadata.mappings.start + metadata.mappings.len] { let actual,error = generator.representations.fromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != Error.none { if error == Error.out_of_memory { return StagingPlan { 0 },error; } return StagingPlan { 0 },generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.stage_unavailable); } let appended = mappings.push(Mapping { mapping.variable,actual }); if appended != Error.none { return StagingPlan { 0 },appended; } }
     for mapping in generator.evaluator.storage.row_mappings[metadata.row_mappings.start..metadata.row_mappings.start + metadata.row_mappings.len] { let actual,error = generator.representations.rowFromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != Error.none { if error == Error.out_of_memory { return StagingPlan { 0 },error; } return StagingPlan { 0 },generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.stage_unavailable); } let appended = rows.push(RowMapping { mapping.variable,actual }); if appended != Error.none { return StagingPlan { 0 },appended; } }
-    let cleanups,error = blot_runtime_runtime_cleanup::initPooled(); if error != Error.none { return StagingPlan { 0 },error; } var future = Owner { generator,unit_id: metadata.unit,function_id: owner.function_id,mappings: mappings.items,row_mappings: rows.items,staged: blot_support::some(value),provider_local: owner.provider_local,labels: owner.labels,preparation_depth: owner.preparation_depth + 1,preparing: true,cleanups }; defer { future.deinit(); }
+    let cleanups,error = blot_runtime_runtime_cleanup::initPooled(); if error != Error.none { return StagingPlan { 0 },error; } var future = Owner { generator,unit_id: metadata.unit,function_id: owner.function_id,mappings: mappings.items,row_mappings: rows.items,staged: blot_support::some(value),provider_local: owner.provider_local,labels: owner.labels,preparation_depth: owner.preparation_depth + 1,preparing: true,cleanups }; 
+    recursive fn cleanup_continuation_48() -> StagingPlan,Error {
+
     let body,body_error = prepareBody(future,metadata.identity,depth + 1,false); if body_error != Error.none { return StagingPlan { 0 },body_error; } return StagingPlan { value,blot_support::some(body) },Error.none;
+
+    }
+    let cleanup_result_48_0,cleanup_result_48_1 = cleanup_continuation_48();
+     future.deinit(); 
+    return cleanup_result_48_0,cleanup_result_48_1;
+
+    }
+    let cleanup_result_49_0,cleanup_result_49_1 = cleanup_continuation_49();
+     rows.deinit(); 
+    return cleanup_result_49_0,cleanup_result_49_1;
+
+    }
+    let cleanup_result_50_0,cleanup_result_50_1 = cleanup_continuation_50();
+     mappings.deinit(); 
+    return cleanup_result_50_0,cleanup_result_50_1;
+
+    }
+    let cleanup_result_51_0,cleanup_result_51_1 = cleanup_continuation_51();
+     generator.staging_trace = previous_trace; 
+    return cleanup_result_51_0,cleanup_result_51_1;
 }
 recursive fn emitStaging(owner: Owner&,id: u32,depth: i64) -> Error {
     let generator .= owner.generator; var plan = StagingPlan { 0 }; match resolvedPlan(owner,id) { staging staged=>{ plan = staged.value; },_=>{ assert(false); }, }
@@ -669,11 +923,32 @@ recursive fn emitStaging(owner: Owner&,id: u32,depth: i64) -> Error {
     let address,address_error = generator.static_data.serialize(generator,plan.value,ty,0); if address_error != Error.none { return address_error; } return generator.emitValue(owner.function_id,blot_backend_scalar_ops::Value { blot_backend_runtime_ir::SC_pointer,address });
 }
 recursive fn prepareInstances(owner: Owner&,decisions: const InstanceDecisions&,decision: const InstanceDecision&,depth: i64) -> LocalInstance[:],Error {
-    let generator .= owner.generator; let producer = generator.unit(owner.unit_id).node(decision.statement).b; let instances = owned_instances.alloc_slice(decision.count); var prepared: i64 = 0; var published = false; defer { if !published { for instance in instances[..prepared] { generator.planning.bodies.release(instance.body); } owned_instances.free_slice(instances); } }
-    var mappings = MappingBuffer {}; defer { mappings.deinit(); } var rows = RowBuffer {}; defer { rows.deinit(); }
+    let generator .= owner.generator; let producer = generator.unit(owner.unit_id).node(decision.statement).b; let instances = owned_instances.alloc_slice(decision.count); var prepared: i64 = 0; var published = false; 
+    recursive fn cleanup_continuation_47() -> LocalInstance[:],Error {
+
+    var mappings = MappingBuffer {}; 
+    recursive fn cleanup_continuation_46() -> LocalInstance[:],Error {
+ var rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_45() -> LocalInstance[:],Error {
+
     for index in 0..decision.count { mappings.clear(); rows.clear(); let facts = withFacts(owner.mappings,decisions.factsAt(decision,index),mappings); if facts != Error.none { return [],facts; } let row_facts = withFacts(owner.row_mappings,decisions.rowsAt(decision,index),rows); if row_facts != Error.none { return [],row_facts; }
         let body,error = prepareMapped(owner,producer,depth + 1,false,mappings.items,rows.items,null); if error != Error.none { return [],error; } instances[index] = LocalInstance { decision.layouts[index],body }; prepared++;
     } published = true; return instances,Error.none;
+
+    }
+    let cleanup_result_45_0,cleanup_result_45_1 = cleanup_continuation_45();
+     rows.deinit(); 
+    return cleanup_result_45_0,cleanup_result_45_1;
+
+    }
+    let cleanup_result_46_0,cleanup_result_46_1 = cleanup_continuation_46();
+     mappings.deinit(); 
+    return cleanup_result_46_0,cleanup_result_46_1;
+
+    }
+    let cleanup_result_47_0,cleanup_result_47_1 = cleanup_continuation_47();
+     if !published { for instance in instances[..prepared] { generator.planning.bodies.release(instance.body); } owned_instances.free_slice(instances); } 
+    return cleanup_result_47_0,cleanup_result_47_1;
 }
 recursive fn bindInstances(owner: Owner&,statement: u32,instances: const LocalInstance[:],depth: i64) -> Error {
     let generator .= owner.generator; let n = generator.unit(owner.unit_id).node(statement); var held = InstanceLocals {};
@@ -713,14 +988,20 @@ fn describeCallable(owner: Owner&,body: u32,id: u32) -> blot_support::Option<Tem
     if node.tag == blot_check_core::Tag.closure { match owner.generator.planning.bodies.get(body,id) { template value=>{ return blot_support::some(value.value.metadata),Error.none; },_=>{ assert(false); }, } }
     if node.tag == blot_check_core::Tag.primitive_function || node.tag == blot_check_core::Tag.constructor_function { let instances,instances_error = scopedCallableInstances(owner,id); if instances_error != Error.none { return blot_support::none<Template>(),instances_error; } return blot_support::some(Template { unit: owner.unit_id,node: id,callable_instances: instances }),Error.none; }
     if node.tag != blot_check_core::Tag.reference { return blot_support::none<Template>(),Error.none; } let reference = source.reference(id);
-    if reference.unit == 0 || reference.unit == owner.unit_id { let metadata .= owner.templates.get(reference.binding); if metadata != null { return templateAt(owner,metadata,id); } let kind = source.binding(reference.binding).kind; if kind != blot_check_core::BindingKind.global && kind != blot_check_core::BindingKind.external { return blot_support::none<Template>(),Error.none; } }
+    if reference.unit == 0 || reference.unit == owner.unit_id { let metadata .= owner.templates.get(reference.binding); if metadata != null { let selected,error = templateAt(owner,metadata,id); if error != Error.none { return blot_support::none<Template>(),error; } return blot_support::some(selected),Error.none; } let kind = source.binding(reference.binding).kind; if kind != blot_check_core::BindingKind.global && kind != blot_check_core::BindingKind.external { return blot_support::none<Template>(),Error.none; } }
     let instances,instances_error = scopedCallableInstances(owner,id); if instances_error != Error.none { return blot_support::none<Template>(),instances_error; } return blot_support::some(Template { unit: owner.unit_id,node: id,callable_instances: instances }),Error.none;
 }
 recursive fn prepareFactory(owner: Owner&,body: u32,id: u32) -> blot_support::Option<FactoryPlan>,Error {
     assert(owner.preparing); let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); let result_type = source.types.node(node.ty);
     if result_type.tag != blot_check_types::Tag.nominal || result_type.a != 4294967295 || result_type.b != 5 { return blot_support::none<FactoryPlan>(),Error.none; } if owner.preparation_depth >= 256 { return blot_support::none<FactoryPlan>(),generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); }
-    var admitted: bool[16] = [false;16]; var callee = FactoryCallee.named { Key {} }; var unit: u32 = 0; var root: u32 = 0; var mappings = MappingBuffer {}; defer { mappings.deinit(); } var rows = RowBuffer {}; defer { rows.deinit(); }
-    let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != Error.none { return blot_support::none<FactoryPlan>(),cleanup_error; } var preparer = Owner { generator,unit_id: 0,function_id: owner.function_id,mappings: [],factory_template: true,preparation_depth: owner.preparation_depth + 1,preparing: true,cleanups }; defer { preparer.deinit(); }
+    var admitted: bool[16] = [false;16]; var callee = FactoryCallee.named { Key {} }; var unit: u32 = 0; var root: u32 = 0; var mappings = MappingBuffer {}; 
+    recursive fn cleanup_continuation_44() -> blot_support::Option<FactoryPlan>,Error {
+ var rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_43() -> blot_support::Option<FactoryPlan>,Error {
+
+    let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != Error.none { return blot_support::none<FactoryPlan>(),cleanup_error; } var preparer = Owner { generator,unit_id: 0,function_id: owner.function_id,mappings: [],factory_template: true,preparation_depth: owner.preparation_depth + 1,preparing: true,cleanups }; 
+    recursive fn cleanup_continuation_42() -> blot_support::Option<FactoryPlan>,Error {
+
     if node.tag == blot_check_core::Tag.call {
         let call = source.call(id); var key = Key {}; match generator.planning.bodies.get(body,id) { named plan=>{ key = plan.value.call.key; },_=>{ assert(false); }, }
         if key.count != call.arguments.len || !computationAction(owner,key.result).present { return blot_support::none<FactoryPlan>(),Error.none; } let producer .= generator.unit(key.target.unit); let definition .= producer.body(key.target.binding); if definition == null || !definition.is_function || definition.parameters.len != key.count { return blot_support::none<FactoryPlan>(),Error.none; }
@@ -746,9 +1027,31 @@ recursive fn prepareFactory(owner: Owner&,body: u32,id: u32) -> blot_support::Op
         for binding in producer.extra[metadata.captures.start..metadata.captures.start + metadata.captures.len] { let captured = generator.capturedTemplate(key.templates,binding); if captured.present { preparer.templates.insert(binding,blot_backend_core_backend::templateMetadata(captured.value,0)); } else { preparer.locals.insert(binding,0); } }
         callee = FactoryCallee.closure { key }; root = metadata.body;
     }
-    preparer.unit_id = unit; preparer.mappings = mappings.items; preparer.row_mappings = rows.items; let prepared,error = generator.planning.bodies.create(unit,root,mappings.items,rows.items); if error != Error.none { return blot_support::none<FactoryPlan>(),error; } defer { generator.planning.bodies.release(prepared); }
+    preparer.unit_id = unit; preparer.mappings = mappings.items; preparer.row_mappings = rows.items; let prepared,error = generator.planning.bodies.create(unit,root,mappings.items,rows.items); if error != Error.none { return blot_support::none<FactoryPlan>(),error; } 
+    recursive fn cleanup_continuation_41() -> blot_support::Option<FactoryPlan>,Error {
+
     let generated = prepareNode(preparer,prepared,root,0,true); if generated != Error.none { return blot_support::none<FactoryPlan>(),generated; } let described,described_error = describeComputation(preparer,prepared,root,0); if described_error != Error.none { return blot_support::none<FactoryPlan>(),described_error; } if !described.present { return blot_support::none<FactoryPlan>(),generator.fail(unit,root,blot_backend_core_backend::Code.unresolved_type); }
     var result = described.value; result.scalar_environment = false; return blot_support::some(FactoryPlan { callee,admitted,result }),Error.none;
+
+    }
+    let cleanup_result_41_0,cleanup_result_41_1 = cleanup_continuation_41();
+     generator.planning.bodies.release(prepared); 
+    return cleanup_result_41_0,cleanup_result_41_1;
+
+    }
+    let cleanup_result_42_0,cleanup_result_42_1 = cleanup_continuation_42();
+     preparer.deinit(); 
+    return cleanup_result_42_0,cleanup_result_42_1;
+
+    }
+    let cleanup_result_43_0,cleanup_result_43_1 = cleanup_continuation_43();
+     rows.deinit(); 
+    return cleanup_result_43_0,cleanup_result_43_1;
+
+    }
+    let cleanup_result_44_0,cleanup_result_44_1 = cleanup_continuation_44();
+     mappings.deinit(); 
+    return cleanup_result_44_0,cleanup_result_44_1;
 }
 recursive fn describeComputation(owner: Owner&,body: u32,id: u32,depth: i64) -> blot_support::Option<Template>,Error {
     if id == 0 { return blot_support::none<Template>(),Error.none; } let generator .= owner.generator; let source .= generator.unit(owner.unit_id); if depth >= 1024 { return blot_support::none<Template>(),generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); } let node = source.node(id);
@@ -808,7 +1111,7 @@ recursive fn prepareNode(owner: Owner&,body: u32,id: u32,depth: i64,template: bo
                 } }
             }
         }
-        if owner.local_instances != null { let decision .= owner.local_instances.find(id); if decision != null { let instances,error = prepareInstances(owner,owner.local_instances,decision,depth); if error != Error.none { return error; } var plan = Plan.instances { instances }; let stored = bodies.put(body,id,plan); if stored != Error.none { plan.deinit(bodies); } return stored; } }
+        if owner.local_instances.present { let decision .= owner.local_instances.value.find(id); if decision != null { let instances,error = prepareInstances(owner,owner.local_instances.value,decision,depth); if error != Error.none { return error; } var plan = Plan.instances { instances }; let stored = bodies.put(body,id,plan); if stored != Error.none { plan.deinit(bodies); } return stored; } }
     }
     var entry = blot_support::none<Plan>();
     match n.tag {
@@ -870,10 +1173,24 @@ recursive fn prepareChildren(owner: Owner&,body: u32,id: u32,depth: i64,template
     } return Error.none;
 }
 recursive fn preparePackageBody(owner: Owner&,body: u32,id: u32,depth: i64) -> Error {
-    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let n = source.node(id); let package = prepareNode(owner,body,n.a,depth + 1,false); if package != Error.none { return package; } let opening = source.packageOpening(id); var mappings = MappingBuffer {}; defer { mappings.deinit(); } let copied = mappings.append(owner.mappings); if copied != Error.none { return copied; }
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let n = source.node(id); let package = prepareNode(owner,body,n.a,depth + 1,false); if package != Error.none { return package; } let opening = source.packageOpening(id); var mappings = MappingBuffer {}; 
+    recursive fn cleanup_continuation_40() -> Error {
+ let copied = mappings.append(owner.mappings); if copied != Error.none { return copied; }
     for binder,ordinal in source.types.list(opening.binders) { let opened,error = generator.internLayout(blot_backend_layout::Tag.opened,ordinal as u32,0,[]); if error != Error.none { return error; } let appended = mappings.push(Mapping { binder,opened }); if appended != Error.none { return appended; } }
     let bound = blot_backend_dictionary_layout::bind(source,generator.representations.store,mappings,source.typeOf(n.a),n.b,opening.binders,false); if bound != Error.none { if bound == Error.out_of_memory { return bound; } return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); }
-    let previous = owner.mappings; owner.mappings = mappings.items; defer { owner.mappings = previous; } return prepareNode(owner,body,opening.body,depth + 1,false);
+    let previous = owner.mappings; owner.mappings = mappings.items; 
+    recursive fn cleanup_continuation_39() -> Error {
+ return prepareNode(owner,body,opening.body,depth + 1,false);
+
+    }
+    let cleanup_result_39_0 = cleanup_continuation_39();
+     owner.mappings = previous; 
+    return cleanup_result_39_0;
+
+    }
+    let cleanup_result_40_0 = cleanup_continuation_40();
+     mappings.deinit(); 
+    return cleanup_result_40_0;
 }
 recursive fn prepareBindingBody(owner: Owner&,body: u32,id: u32,depth: i64) -> Error {
     let source .= owner.generator.unit(owner.unit_id); let n = source.node(id); let prepared = prepareNode(owner,body,n.b,depth + 1,false); if prepared != Error.none { return prepared; } let computation,error = describeComputation(owner,body,n.b,depth + 1); if error != Error.none { return error; } if computation.present { owner.templates.insert(n.a,computation.value); return Error.none; }
@@ -910,17 +1227,17 @@ recursive fn inlineSimdCall(owner: Owner&,id: u32,key: Key,depth: i64) -> bool,E
     let source .= generator.unit(owner.unit_id); let result,error = codeLayout(owner,source.typeOf(id),source.span(id)); if error != Error.none { return false,error; } let emitted = simdLocals(owner,plan.op,operands[..count],lanes,result,result); return emitted == Error.none,emitted;
 }
 recursive fn inlineNamedCall(owner: Owner&,key: Key,arguments: const u32[:],depth: i64) -> bool,Error { if !owner.generator.inline_named { return false,Error.none; } return inlineNamedValues(owner,key,arguments,blot_support::none<const u32[:]>(),depth); }
-recursive fn inlineNamedValues(owner: Owner&,key: Key,arguments: const u32[:],captured: blot_support::Option<const u32[:]>,depth: i64) -> bool,Error { return inlineNamedValuesMode(owner,key,arguments,captured,depth,null); }
+recursive fn inlineNamedValues(owner: Owner&,key: Key,arguments: const u32[:],captured: blot_support::Option<const u32[:]>,depth: i64) -> bool,Error { return inlineNamedValuesMode(owner,key,arguments,captured,depth,blot_support::none<u32>()); }
 fn borrowedRowArgument(owner: const Owner&,id: u32) -> blot_support::Option<RowView> { let source .= owner.generator.unit(owner.unit_id); if source.node(id).tag != blot_check_core::Tag.reference { return blot_support::none<RowView>(); } let reference = source.reference(id); if reference.unit != 0 && reference.unit != owner.unit_id { return blot_support::none<RowView>(); } var index = owner.row_views.items.len; while index != 0 { index--; let view = owner.row_views.items[index]; if view.binding == reference.binding { return blot_support::some(view); } } return blot_support::none<RowView>(); }
 fn readsRow(owner: Owner&,source: const blot_check_core::Module&,root: u32,binding: u32,row: u32) -> bool,Error { let nested,error = owner.generator.nestedRow(row); if error != Error.none { return false,error; } if nested.present { return blot_reuse_row_projection_uses::checkNumeric(source,root,binding,owner.generator.representations.store,nested.value),Error.none; } return blot_reuse_row_projection_uses::check(source,root,binding,owner.generator.representations.store,row),Error.none; }
 enum InlinePreparation { declined,admitted { emitter: Owner,borrowed_collections: u16 } }
-fn prepareNamedInline(owner: Owner&,key: Key,arguments: const u32[:],captured: blot_support::Option<const u32[:]>,small_result: SmallCollection?,mappings: MappingBuffer&,rows: RowBuffer&) -> InlinePreparation,Error {
+fn prepareNamedInline(owner: Owner&,key: Key,arguments: const u32[:],captured: blot_support::Option<const u32[:]>,small_result: blot_support::Option<u32>,mappings: MappingBuffer&,rows: RowBuffer&) -> InlinePreparation,Error {
     let generator .= owner.generator; if owner.dictionary_owner.present { return InlinePreparation.declined,Error.none; }
     if owner.inline_depth >= 6 || generator.module.functions[owner.function_id].instructions.len > 4096 || key.templates != 0 || key.template_result { return InlinePreparation.declined,Error.none; }
     if captured.present { if captured.value.len != key.count { return InlinePreparation.declined,Error.none; } } else if arguments.len < key.count { return InlinePreparation.declined,Error.none; }
     let source .= generator.unit(key.target.unit); let body .= source.body(key.target.binding); if body == null || !body.is_function || body.parameters.len != key.count { return InlinePreparation.declined,Error.none; }
     let facts,error = generator.planning.facts.get(generator.units,key.target); if error != Error.none { return InlinePreparation.declined,error; } let in_loop = owner.inline_loop || owner.loop_targets.items.len != 0;
-    var expose_data = small_result != null || (in_loop && inlineDataType(owner,key.result)) || inlineOpaqueType(owner,key.result); for ty in key.parameters[..key.count] { expose_data = expose_data || inlineOpaqueType(owner,ty); }
+    var expose_data = small_result.present || (in_loop && inlineDataType(owner,key.result)) || inlineOpaqueType(owner,key.result); for ty in key.parameters[..key.count] { expose_data = expose_data || inlineOpaqueType(owner,ty); }
     if !captured.present { for ty,index in key.parameters[..key.count] { let argument = arguments[index]; expose_data = expose_data || (generator.representations.store.node(ty).tag == blot_backend_layout::Tag.function && isCallableTemplate(owner,argument)); if index < 16 && (facts.borrowed_collections & ((1 as u16) << index as u32)) != 0 && smallCollectionCandidate(owner,argument) { expose_data = true; } if in_loop { let words,word_error = generator.rowWords(ty); if word_error != Error.none { return InlinePreparation.declined,word_error; } if words != 0 { expose_data = true; } } } }
     var ordinary_limit: u16 = 4; if expose_data { ordinary_limit = 64; } var numeric_limit: u16 = 0;
     if !facts.inline_cost.present || facts.inline_cost.value > ordinary_limit { let budget,budget_error = numericInlineBudget(owner,key.result); if budget_error != Error.none { return InlinePreparation.declined,budget_error; } numeric_limit = budget; for ty in key.parameters[..key.count] { let candidate,candidate_error = numericInlineBudget(owner,ty); if candidate_error != Error.none { return InlinePreparation.declined,candidate_error; } numeric_limit = max(numeric_limit,candidate); } }
@@ -931,11 +1248,15 @@ fn prepareNamedInline(owner: Owner&,key: Key,arguments: const u32[:],captured: b
     while reverse != 0 { reverse--; let arrow,arrow_error = generator.internLayoutWithEffects(blot_backend_layout::Tag.function,key.parameters[reverse],full,key.effects[reverse],[]); if arrow_error != Error.none { return InlinePreparation.declined,arrow_error; } full = arrow; }
     let refined = generator.refineMappings(key.target.unit,blot_reuse_refinement_receipt::Root.body { key.target },full,mappings,rows,body.span); if refined != Error.none { return InlinePreparation.declined,refined; } if generator.artifacts != null { let read = generator.artifacts.readInlineBody(key.target); if read != Error.none { return InlinePreparation.declined,read; } }
     let context,context_error = inlineContext(owner); if context_error != Error.none { return InlinePreparation.declined,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != Error.none { return InlinePreparation.declined,cleanup_error; }
-    var emitter = Owner { generator,unit_id: key.target.unit,function_id: owner.function_id,provider_local: owner.provider_local,mappings: mappings.items,row_mappings: rows.items,cleanups,diagnostic_context: context,labels: owner.labels,inline_depth: owner.inline_depth + 1,inline_loop: in_loop }; if small_result != null { emitter.small_result = SmallResult { body.root,small_result }; }
+    var emitter = Owner { generator,unit_id: key.target.unit,function_id: owner.function_id,provider_local: owner.provider_local,mappings: mappings.items,row_mappings: rows.items,cleanups,diagnostic_context: context,labels: owner.labels,inline_depth: owner.inline_depth + 1,inline_loop: in_loop }; if small_result.present { emitter.small_result = SmallResult { body.root,small_result.value }; }
     return InlinePreparation.admitted { emitter,facts.borrowed_collections },Error.none;
 }
-recursive fn inlineNamedValuesMode(owner: Owner&,key: Key,arguments: const u32[:],captured: blot_support::Option<const u32[:]>,depth: i64,small_result: SmallCollection?) -> bool,Error {
-    let generator .= owner.generator; var mappings = MappingBuffer {}; defer { mappings.deinit(); } var rows = RowBuffer {}; defer { rows.deinit(); } let preparation,error = prepareNamedInline(owner,key,arguments,captured,small_result,mappings,rows); if error != Error.none { return false,error; }
+recursive fn inlineNamedValuesMode(owner: Owner&,key: Key,arguments: const u32[:],captured: blot_support::Option<const u32[:]>,depth: i64,small_result: blot_support::Option<u32>) -> bool,Error {
+    let generator .= owner.generator; var mappings = MappingBuffer {}; 
+    recursive fn cleanup_continuation_38() -> bool,Error {
+ var rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_37() -> bool,Error {
+ let preparation,error = prepareNamedInline(owner,key,arguments,captured,small_result,mappings,rows); if error != Error.none { return false,error; }
     match preparation { declined=>{ return false,Error.none; },admitted prepared=>{
         var emitter = prepared.emitter; defer { emitter.deinit(); } let source .= generator.unit(key.target.unit); let body .= source.body(key.target.binding); assert(body != null);
         for parameter,index in source.bodyParameters(body) {
@@ -948,7 +1269,7 @@ recursive fn inlineNamedValuesMode(owner: Owner&,key: Key,arguments: const u32[:
         var remaining: const u32[:] = []; if !captured.present { remaining = arguments[key.count..]; } let prepared_body,body_error = prepareBody(emitter,body.root,depth + 1,false); if body_error != Error.none { return false,body_error; } defer { generator.planning.bodies.release(prepared_body); }
         emitter.body = blot_support::some(prepared_body); let header = generator.planning.bodies.header(prepared_body); emitter.mappings = header.mappings; emitter.row_mappings = header.rows; emitter.layout_cache = [LayoutEntry {};32];
         if remaining.len != 0 { let saturated,saturated_error = saturatedAssociated(emitter,body.root,owner,remaining,depth); if saturated_error != Error.none || saturated { return saturated,saturated_error; } }
-        if remaining.len == 0 && small_result == null { let opaque,opaque_error = emitOpaqueAdapterBody(emitter,body.root,depth + 1); if opaque_error != Error.none || opaque { return opaque,opaque_error; } }
+        if remaining.len == 0 && !small_result.present { let opaque,opaque_error = emitOpaqueAdapterBody(emitter,body.root,depth + 1); if opaque_error != Error.none || opaque { return opaque,opaque_error; } }
         let emitted = expression(emitter,body.root,depth + 1); if emitted != Error.none { return false,emitted; } var ty = key.result;
         for argument in remaining {
             let arrow = generator.representations.store.node(ty); let callee,callee_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if callee_error != Error.none { return false,callee_error; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,callee); if saved != Error.none { return false,saved; } let value,value_error = capture(owner,argument,depth); if value_error != Error.none { return false,value_error; }
@@ -957,10 +1278,20 @@ recursive fn inlineNamedValuesMode(owner: Owner&,key: Key,arguments: const u32[:
             let signature,signature_error = generator.module.internType([blot_backend_runtime_ir::VT_i32,generator.representations.store.machine(arrow.a),blot_backend_runtime_ir::VT_i32],generator.representations.store.machine(arrow.b)); if signature_error != Error.none { return false,signature_error; } let called = emit(owner,blot_backend_runtime_ir::OP_call_indirect,signature); if called != Error.none { return false,called; } ty = arrow.b;
         } return true,Error.none;
     }, }
+
+    }
+    let cleanup_result_37_0,cleanup_result_37_1 = cleanup_continuation_37();
+     rows.deinit(); 
+    return cleanup_result_37_0,cleanup_result_37_1;
+
+    }
+    let cleanup_result_38_0,cleanup_result_38_1 = cleanup_continuation_38();
+     mappings.deinit(); 
+    return cleanup_result_38_0,cleanup_result_38_1;
 }
 struct Alias { binding: u32,local: u32 }
 recursive fn emitOpaqueAdapterBody(owner: Owner&,root: u32,depth: i64) -> bool,Error {
-    if owner.small_result.value != null { return false,Error.none; } let source .= owner.generator.unit(owner.unit_id); if source.node(root).tag != blot_check_core::Tag.block_ { return false,Error.none; } let statements = source.children(root); if statements.len < 2 || statements.len > 9 { return false,Error.none; } let result = source.node(statements[statements.len - 1]); if result.tag != blot_check_core::Tag.return_ || result.b != root { return false,Error.none; }
+    if owner.small_result.slot != 0 { return false,Error.none; } let source .= owner.generator.unit(owner.unit_id); if source.node(root).tag != blot_check_core::Tag.block_ { return false,Error.none; } let statements = source.children(root); if statements.len < 2 || statements.len > 9 { return false,Error.none; } let result = source.node(statements[statements.len - 1]); if result.tag != blot_check_core::Tag.return_ || result.b != root { return false,Error.none; }
     var aliases: Alias[8]; var count: i64 = 0;
     for statement in statements[..statements.len - 1] {
         let node = source.node(statement); if node.tag != blot_check_core::Tag.pattern_bind || node.c != 0 || source.node(node.b).tag != blot_check_core::Tag.reference { return false,Error.none; } let reference = source.reference(node.b); if reference.unit != 0 && reference.unit != owner.unit_id { return false,Error.none; }
@@ -1024,7 +1355,11 @@ fn prepareEvaluatedNamedInner(owner: Owner&,id: u32) -> blot_support::Option<Eva
     if generator.evaluator.valueInfo(value).kind != blot_eval_core_eval::ValueKind.closure { return blot_support::none<EvaluatedNamed>(),Error.none; } let header = generator.evaluator.closureInfo(value); if header.origin != blot_eval_core_eval::ClosureOrigin.named || header.staged != 0 { return blot_support::none<EvaluatedNamed>(),Error.none; }
     let producer .= generator.unit(header.unit); let definition .= producer.body(header.identity); if definition == null || !definition.is_function || definition.parameters.len > 16 || header.applied + count != definition.parameters.len || !blot_backend_inline_body::cost(producer,definition.root).present { return blot_support::none<EvaluatedNamed>(),Error.none; }
     let capture_count = header.applied as i64; if generator.evaluator.valueInfo(value).len != capture_count { return blot_support::none<EvaluatedNamed>(),Error.none; } var captured: u32[16]; for actual,index in generator.evaluator.valueChildren(value) { captured[index] = actual; } var capture_budget: i64 = 65536; for actual in captured[..capture_count] { if !evaluatedCaptureSupported(owner,actual,capture_budget,0) { return blot_support::none<EvaluatedNamed>(),Error.none; } }
-    var mappings = MappingBuffer {}; defer { mappings.deinit(); } var rows = RowBuffer {}; defer { rows.deinit(); }
+    var mappings = MappingBuffer {}; 
+    recursive fn cleanup_continuation_36() -> blot_support::Option<EvaluatedNamed>,Error {
+ var rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_35() -> blot_support::Option<EvaluatedNamed>,Error {
+
     for mapping in generator.evaluator.storage.type_mappings[header.mappings.start..header.mappings.start + header.mappings.len] { let concrete,error = generator.representations.fromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != Error.none { if error == Error.out_of_memory { return blot_support::none<EvaluatedNamed>(),error; } return blot_support::none<EvaluatedNamed>(),generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } let mapped = generator.mapType(header.unit,mappings,mapping.variable,concrete,definition.span); if mapped != Error.none { return blot_support::none<EvaluatedNamed>(),mapped; } }
     let loaded = generator.loadSemanticRows(generator.evaluator.storage.row_mappings[header.row_mappings.start..header.row_mappings.start + header.row_mappings.len],rows); if loaded != Error.none { return blot_support::none<EvaluatedNamed>(),loaded; } let initial,initial_error = generator.functionRoot(header.unit,producer.binding(header.identity).ty,definition.span); if initial_error != Error.none { return blot_support::none<EvaluatedNamed>(),initial_error; } var source_type = initial;
     for parameter,index in producer.bodyParameters(definition)[..capture_count] { let concrete,error = generator.captureTypeLayout(header.unit,parameter.ty,parameter.span,captured[index],mappings,rows); if error != Error.none { return blot_support::none<EvaluatedNamed>(),error; } let arrow = producer.types.node(source_type); if arrow.tag != blot_check_types::Tag.function { return blot_support::none<EvaluatedNamed>(),generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } let mapped = generator.mapType(header.unit,mappings,arrow.a,concrete,definition.span); if mapped != Error.none { return blot_support::none<EvaluatedNamed>(),mapped; } source_type = arrow.b; }
@@ -1035,16 +1370,54 @@ fn prepareEvaluatedNamedInner(owner: Owner&,id: u32) -> blot_support::Option<Eva
         if index >= capture_count { let actual,error = codeLayout(owner,source.typeOf(arguments[index - capture_count]),source.span(id)); if error != Error.none { return blot_support::none<EvaluatedNamed>(),error; } if actual != arrow.a { return blot_support::none<EvaluatedNamed>(),Error.none; } } full = arrow.b;
     }
     if hasErasedType(owner,full,0) { return blot_support::none<EvaluatedNamed>(),Error.none; } key.result = full; return blot_support::some(EvaluatedNamed { key,arguments,count,captured,capture_count }),Error.none;
+
+    }
+    let cleanup_result_35_0,cleanup_result_35_1 = cleanup_continuation_35();
+     rows.deinit(); 
+    return cleanup_result_35_0,cleanup_result_35_1;
+
+    }
+    let cleanup_result_36_0,cleanup_result_36_1 = cleanup_continuation_36();
+     mappings.deinit(); 
+    return cleanup_result_36_0,cleanup_result_36_1;
 }
 fn reverse(values: u32[:]) { var first: i64 = 0; var last = values.len; while first < last { last--; if first >= last { break; } let previous = values[first]; values[first] = values[last]; values[last] = previous; first++; } }
 recursive fn emitEvaluatedNamed(owner: Owner&,plan: const EvaluatedNamed&,depth: i64) -> bool,Error {
     let generator .= owner.generator; if owner.inline_depth >= 6 || generator.instance_depth >= 256 || generator.module.functions[owner.function_id].instructions.len > 4096 { return false,Error.none; } let source .= generator.unit(plan.key.target.unit); let definition .= source.body(plan.key.target.binding); assert(definition != null);
-    var mappings = MappingBuffer {}; defer { mappings.deinit(); } var rows = RowBuffer {}; defer { rows.deinit(); } let service,service_error = generator.specializer(); if service_error != Error.none { return false,service_error; } let resolved,error = service.named(plan.key,[],mappings,rows); if error != Error.none { return false,generator.specializationFailure(service,error); }
+    var mappings = MappingBuffer {}; 
+    recursive fn cleanup_continuation_34() -> bool,Error {
+ var rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_33() -> bool,Error {
+ let service,service_error = generator.specializer(); if service_error != Error.none { return false,service_error; } let resolved,error = service.named(plan.key,[],mappings,rows); if error != Error.none { return false,generator.specializationFailure(service,error); }
     if generator.artifacts != null { if !generator.artifacts.hasStaticValues() { generator.artifacts.requireFreshCode(); } let read = generator.artifacts.readInlineBody(plan.key.target); if read != Error.none { return false,read; } }
-    generator.instance_depth++; defer { generator.instance_depth--; } let context,context_error = inlineContext(owner); if context_error != Error.none { return false,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != Error.none { return false,cleanup_error; }
-    var emitter = Owner { generator,unit_id: plan.key.target.unit,function_id: owner.function_id,provider_local: owner.provider_local,mappings: mappings.items,row_mappings: rows.items,cleanups,diagnostic_context: context,labels: owner.labels,inline_depth: owner.inline_depth + 1,inline_loop: owner.inline_loop || owner.loop_targets.items.len != 0 }; defer { emitter.deinit(); }
+    generator.instance_depth++; 
+    recursive fn cleanup_continuation_32() -> bool,Error {
+ let context,context_error = inlineContext(owner); if context_error != Error.none { return false,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != Error.none { return false,cleanup_error; }
+    var emitter = Owner { generator,unit_id: plan.key.target.unit,function_id: owner.function_id,provider_local: owner.provider_local,mappings: mappings.items,row_mappings: rows.items,cleanups,diagnostic_context: context,labels: owner.labels,inline_depth: owner.inline_depth + 1,inline_loop: owner.inline_loop || owner.loop_targets.items.len != 0 }; 
+    recursive fn cleanup_continuation_31() -> bool,Error {
+
     let parameters = source.bodyParameters(definition); for parameter,index in parameters[..plan.capture_count] { if parameter.binding != 0 { emitter.static_values.insert(parameter.binding,plan.captured[index]); } } for parameter,index in parameters[plan.capture_count..] { let local,local_error = capture(owner,plan.arguments[index],depth); if local_error != Error.none { return false,local_error; } if parameter.binding != 0 { emitter.locals.insert(parameter.binding,local); } }
     let emitted = bodyExpression(emitter,resolved.root,depth + 1,false); return emitted == Error.none,emitted;
+
+    }
+    let cleanup_result_31_0,cleanup_result_31_1 = cleanup_continuation_31();
+     emitter.deinit(); 
+    return cleanup_result_31_0,cleanup_result_31_1;
+
+    }
+    let cleanup_result_32_0,cleanup_result_32_1 = cleanup_continuation_32();
+     generator.instance_depth--; 
+    return cleanup_result_32_0,cleanup_result_32_1;
+
+    }
+    let cleanup_result_33_0,cleanup_result_33_1 = cleanup_continuation_33();
+     rows.deinit(); 
+    return cleanup_result_33_0,cleanup_result_33_1;
+
+    }
+    let cleanup_result_34_0,cleanup_result_34_1 = cleanup_continuation_34();
+     mappings.deinit(); 
+    return cleanup_result_34_0,cleanup_result_34_1;
 }
 fn staticReference(owner: Owner&,id: u32) -> blot_support::Option<u32>,Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); if source.node(id).tag != blot_check_core::Tag.reference { return blot_support::none<u32>(),Error.none; } let reference = source.reference(id);
@@ -1055,15 +1428,43 @@ recursive fn inlineStaticCall(owner: Owner&,key: Key,arguments: const u32[:],dep
     let generator .= owner.generator; if arguments.len > key.count { return false,Error.none; } let source .= generator.unit(key.target.unit); let body .= source.body(key.target.binding); if body == null || !body.is_function || body.parameters.len != key.count { return false,Error.none; }
     var values: blot_support::Option<u32>[16] = [blot_support::none<u32>();16]; var retained = false; for argument,index in arguments { if !hasErasedType(owner,key.parameters[index],0) { continue; } let value,error = staticReference(owner,argument); if error != Error.none { return false,error; } values[index] = value; retained = retained || value.present; } if !retained { return false,Error.none; }
     if generator.artifacts != null { let read = generator.artifacts.readInlineBody(key.target); if read != Error.none { return false,read; } if !generator.artifacts.hasStaticValues() { generator.artifacts.requireFreshCode(); } }
-    if generator.instance_depth >= 256 { return false,generator.decline(key.target.unit,body.span,blot_backend_core_backend::Code.complexity); } generator.instance_depth++; defer { generator.instance_depth--; }
-    var mappings = MappingBuffer {}; defer { mappings.deinit(); } var rows = RowBuffer {}; defer { rows.deinit(); } var full = key.result; var index = key.count as i64;
+    if generator.instance_depth >= 256 { return false,generator.decline(key.target.unit,body.span,blot_backend_core_backend::Code.complexity); } generator.instance_depth++; 
+    recursive fn cleanup_continuation_30() -> bool,Error {
+
+    var mappings = MappingBuffer {}; 
+    recursive fn cleanup_continuation_29() -> bool,Error {
+ var rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_28() -> bool,Error {
+ var full = key.result; var index = key.count as i64;
     while index != 0 { index--; let arrow,error = generator.internLayoutWithEffects(blot_backend_layout::Tag.function,key.parameters[index],full,key.effects[index],[]); if error != Error.none { return false,error; } full = arrow; }
     let seeded = generator.seedNamedInstance(key,mappings); if seeded != Error.none { return false,seeded; } let initial,initial_error = generator.functionRoot(key.target.unit,source.binding(key.target.binding).ty,body.span); if initial_error != Error.none { return false,initial_error; } var source_type = initial;
     for parameter,index in key.parameters[..key.count] { let arrow = source.types.node(source_type); if arrow.tag != blot_check_types::Tag.function { return false,generator.decline(key.target.unit,body.span,blot_backend_core_backend::Code.unresolved_type); } let mapped = generator.mapTypeDepth(key.target.unit,mappings,rows,arrow.a,parameter,body.span,0); if mapped != Error.none { return false,mapped; } let row = generator.mapRow(key.target.unit,mappings,rows,arrow.c,key.effects[index],body.span,true); if row != Error.none { return false,row; } source_type = arrow.b; }
     let mapped = generator.mapTypeDepth(key.target.unit,mappings,rows,source_type,key.result,body.span,0); if mapped != Error.none { return false,mapped; } let refined = generator.refineMappings(key.target.unit,blot_reuse_refinement_receipt::Root.body { key.target },full,mappings,rows,body.span); if refined != Error.none { return false,refined; }
-    let context,context_error = inlineContext(owner); if context_error != Error.none { return false,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != Error.none { return false,cleanup_error; } var emitter = Owner { generator,unit_id: key.target.unit,function_id: owner.function_id,provider_local: owner.provider_local,mappings: mappings.items,row_mappings: rows.items,cleanups,diagnostic_context: context,labels: owner.labels }; defer { emitter.deinit(); }
+    let context,context_error = inlineContext(owner); if context_error != Error.none { return false,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != Error.none { return false,cleanup_error; } var emitter = Owner { generator,unit_id: key.target.unit,function_id: owner.function_id,provider_local: owner.provider_local,mappings: mappings.items,row_mappings: rows.items,cleanups,diagnostic_context: context,labels: owner.labels }; 
+    recursive fn cleanup_continuation_27() -> bool,Error {
+
     for argument,index in arguments { let parameter = source.bodyParameters(body)[index]; if values[index].present { if parameter.binding != 0 { emitter.static_values.insert(parameter.binding,values[index].value); } } else { let local,error = capture(owner,argument,depth); if error != Error.none { return false,error; } if parameter.binding != 0 { emitter.locals.insert(parameter.binding,local); } } }
     let emitted = finishStaticCall(emitter,key,arguments.len,depth); return emitted == Error.none,emitted;
+
+    }
+    let cleanup_result_27_0,cleanup_result_27_1 = cleanup_continuation_27();
+     emitter.deinit(); 
+    return cleanup_result_27_0,cleanup_result_27_1;
+
+    }
+    let cleanup_result_28_0,cleanup_result_28_1 = cleanup_continuation_28();
+     rows.deinit(); 
+    return cleanup_result_28_0,cleanup_result_28_1;
+
+    }
+    let cleanup_result_29_0,cleanup_result_29_1 = cleanup_continuation_29();
+     mappings.deinit(); 
+    return cleanup_result_29_0,cleanup_result_29_1;
+
+    }
+    let cleanup_result_30_0,cleanup_result_30_1 = cleanup_continuation_30();
+     generator.instance_depth--; 
+    return cleanup_result_30_0,cleanup_result_30_1;
 }
 recursive fn finishStaticCall(owner: Owner&,key: Key,supplied: i64,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(key.target.unit); let body .= source.body(key.target.binding); assert(body != null);
@@ -1071,7 +1472,9 @@ recursive fn finishStaticCall(owner: Owner&,key: Key,supplied: i64,depth: i64) -
     var machine = blot_backend_runtime_ir::VT_i32; var role = blot_backend_runtime_ir::ROLE_reference; if supplied + 1 == key.count { machine = generator.representations.store.machine(key.result); role = generator.layoutRole(key.result); }
     let function,error = generator.module.addTypedFunction([blot_backend_runtime_ir::VT_i32,generator.representations.store.machine(key.parameters[supplied]),blot_backend_runtime_ir::VT_i32],machine,role); if error != Error.none { return error; } let described = generator.setParameterRoles(function,generator.closureRoles(key.parameters[supplied]),blot_support::some(2 as u16)); if described != Error.none { return described; }
     generator.static_data.closures.push(function); generator.work.fresh_closures++; let requested = generator.planning.startup_facts.request(function,blot_backend_startup_emission_facts::Kind.named,key.target.unit,key.target.binding,false); if requested != Error.none { return requested; }
-    let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != Error.none { return cleanup_error; } var emitter = Owner { generator,unit_id: key.target.unit,function_id: function,provider_local: blot_support::some(2 as u32),mappings: owner.mappings,row_mappings: owner.row_mappings,cleanups }; defer { emitter.deinit(); }
+    let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != Error.none { return cleanup_error; } var emitter = Owner { generator,unit_id: key.target.unit,function_id: function,provider_local: blot_support::some(2 as u32),mappings: owner.mappings,row_mappings: owner.row_mappings,cleanups }; 
+    recursive fn cleanup_continuation_26() -> Error {
+
     var roles: blot_backend_runtime_ir::Role[16]; for ty,index in key.parameters[..supplied] { roles[index] = generator.layoutRole(ty); } let environment,environment_error = allocate(owner,(supplied * 4) as u32,AllocationRoles { words: roles[..supplied] }); if environment_error != Error.none { return environment_error; } let parameters = source.bodyParameters(body);
     for parameter,index in parameters[..supplied] {
         let value .= owner.static_values.get(parameter.binding); let target = emit(owner,blot_backend_runtime_ir::OP_local_get,environment); if target != Error.none { return target; }
@@ -1082,8 +1485,20 @@ recursive fn finishStaticCall(owner: Owner&,key: Key,supplied: i64,depth: i64) -
             let base = emit(emitter,blot_backend_runtime_ir::OP_local_get,0); if base != Error.none { return base; } let restored = emit(emitter,load,(index * 4) as u32); if restored != Error.none { return restored; } let saved = emit(emitter,blot_backend_runtime_ir::OP_local_set,captured); if saved != Error.none { return saved; } emitter.locals.insert(parameter.binding,captured);
         }
     }
-    if parameters[supplied].binding != 0 { emitter.locals.insert(parameters[supplied].binding,1); } let caller = generator.planning.startup_facts.active; generator.planning.startup_facts.active = function; defer { generator.planning.startup_facts.active = caller; }
+    if parameters[supplied].binding != 0 { emitter.locals.insert(parameters[supplied].binding,1); } let caller = generator.planning.startup_facts.active; generator.planning.startup_facts.active = function; 
+    recursive fn cleanup_continuation_25() -> Error {
+
     let remaining = finishStaticCall(emitter,key,supplied + 1,depth); if remaining != Error.none { return remaining; } generator.planning.startup_facts.complete(function); generator.planning.startup_facts.active = caller; return descriptor(owner,function,environment);
+
+    }
+    let cleanup_result_25_0 = cleanup_continuation_25();
+     generator.planning.startup_facts.active = caller; 
+    return cleanup_result_25_0;
+
+    }
+    let cleanup_result_26_0 = cleanup_continuation_26();
+     emitter.deinit(); 
+    return cleanup_result_26_0;
 }
 fn preparePartialStaticCall(owner: Owner&,id: u32) -> blot_support::Option<SourceCall>,Error {
     assert(owner.preparing); let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var arguments: u32[16]; var count: i64 = 0; var root = id;
@@ -1111,36 +1526,85 @@ recursive fn recordMerge(owner: Owner&,id: u32,depth: i64) -> Error {
     let left,capture_error = capture(owner,node.a,depth); if capture_error != Error.none { return capture_error; } let right,right_capture_error = capture(owner,node.b,depth); if right_capture_error != Error.none { return right_capture_error; }
     let left_fields = generator.representations.store.children(left_type); let right_fields = generator.representations.store.children(right_type); let fields = generator.representations.store.children(result_type);
     if left_fields.len == 0 || right_fields.len == 0 { var selected = left; if left_fields.len == 0 { selected = right; } return emit(owner,blot_backend_runtime_ir::OP_local_get,selected); } if fields.len / 2 > 4294967295 / 4 { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); }
-    var roles = RoleBuffer {}; defer { roles.deinit(); } for index in 0..fields.len / 2 { let appended = roles.push(generator.layoutRole(fields[index * 2 + 1])); if appended != Error.none { return appended; } } let result,error = allocate(owner,(fields.len * 2) as u32,AllocationRoles { words: roles.items }); if error != Error.none { return error; }
+    var roles = RoleBuffer {}; 
+    recursive fn cleanup_continuation_24() -> Error {
+ for index in 0..fields.len / 2 { let appended = roles.push(generator.layoutRole(fields[index * 2 + 1])); if appended != Error.none { return appended; } } let result,error = allocate(owner,(fields.len * 2) as u32,AllocationRoles { words: roles.items }); if error != Error.none { return error; }
     var a: i64 = 0; var b: i64 = 0; var out: i64 = 0;
     while out < fields.len { let from_left = a < left_fields.len && left_fields[a] == fields[out]; let from_right = b < right_fields.len && right_fields[b] == fields[out]; if !from_left && !from_right { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } var selected = left; var offset = a; if from_right { selected = right; offset = b; }
         let target = emit(owner,blot_backend_runtime_ir::OP_local_get,result); if target != Error.none { return target; } let input = emit(owner,blot_backend_runtime_ir::OP_local_get,selected); if input != Error.none { return input; } let loaded = emit(owner,blot_backend_runtime_ir::OP_i32_load,(offset * 2) as u32); if loaded != Error.none { return loaded; } let stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,(out * 2) as u32); if stored != Error.none { return stored; }
         if from_left { a += 2; } if from_right { b += 2; } out += 2;
     } return emit(owner,blot_backend_runtime_ir::OP_local_get,result);
+
+    }
+    let cleanup_result_24_0 = cleanup_continuation_24();
+     roles.deinit(); 
+    return cleanup_result_24_0;
 }
 fn physicalOrder(owner: Owner&,record: blot_check_types::Node,out: WordBuffer&) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); assert(record.tag == blot_check_types::Tag.record); if record.b < 2 { return Error.none; } var ordered = true;
     for index in 1..record.b { if !blot_check_record_order::less(generator.representations.store.record_names,source.types.recordField(record,index - 1).name,source.types.recordField(record,index).name) { ordered = false; break; } } if ordered { return Error.none; }
-    var sorted = WordBuffer {}; defer { sorted.deinit(); } for index in 0..record.b { let appended = sorted.push(index as u32); if appended != Error.none { return appended; } }
+    var sorted = WordBuffer {}; 
+    recursive fn cleanup_continuation_23() -> Error {
+ for index in 0..record.b { let appended = sorted.push(index as u32); if appended != Error.none { return appended; } }
     for index in 1..sorted.items.len { let original = sorted.items[index]; var position = index; while position > 0 && blot_check_record_order::less(generator.representations.store.record_names,source.types.recordField(record,original).name,source.types.recordField(record,sorted.items[position - 1]).name) { sorted.items[position] = sorted.items[position - 1]; position--; } sorted.items[position] = original; }
     for index in 0..record.b { let appended = out.push(0); if appended != Error.none { return appended; } } for original,index in sorted.items { out.items[original] = index as u32; } return Error.none;
+
+    }
+    let cleanup_result_23_0 = cleanup_continuation_23();
+     sorted.deinit(); 
+    return cleanup_result_23_0;
 }
 recursive fn aggregate(owner: Owner&,id: u32,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let children = source.children(id); if children.len == 0 { return emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if children.len > 4294967295 / 4 { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); }
-    var locals = WordBuffer {}; defer { locals.deinit(); } for child in children { let local,error = capture(owner,child,depth); if error != Error.none { return error; } let appended = locals.push(local); if appended != Error.none { return appended; } if source.types.node(source.typeOf(child)).tag == blot_check_types::Tag.never { return Error.none; } }
+    var locals = WordBuffer {}; 
+    recursive fn cleanup_continuation_22() -> Error {
+ for child in children { let local,error = capture(owner,child,depth); if error != Error.none { return error; } let appended = locals.push(local); if appended != Error.none { return appended; } if source.types.node(source.typeOf(child)).tag == blot_check_types::Tag.never { return Error.none; } }
     let record = source.node(id).tag == blot_check_core::Tag.record; var destinations: const u32[:] = []; if record { destinations = source.recordDestinations(id); } var aggregate_type = source.typeOf(id); if source.types.node(aggregate_type).tag == blot_check_types::Tag.usage { aggregate_type = source.types.node(aggregate_type).a; }
-    var physical = WordBuffer {}; defer { physical.deinit(); } if record { let order = physicalOrder(owner,source.types.node(aggregate_type),physical); if order != Error.none { return order; } } var roles = RoleBuffer {}; defer { roles.deinit(); } for child in children { let appended = roles.push(blot_backend_runtime_ir::ROLE_unknown); if appended != Error.none { return appended; } }
+    var physical = WordBuffer {}; 
+    recursive fn cleanup_continuation_21() -> Error {
+ if record { let order = physicalOrder(owner,source.types.node(aggregate_type),physical); if order != Error.none { return order; } } var roles = RoleBuffer {}; 
+    recursive fn cleanup_continuation_20() -> Error {
+ for child in children { let appended = roles.push(blot_backend_runtime_ir::ROLE_unknown); if appended != Error.none { return appended; } }
     for child,index in children { var declared = index as u32; if record { declared = destinations[index]; } var slot = declared; if physical.items.len != 0 { slot = physical.items[declared]; } let concrete,error = codeLayout(owner,source.typeOf(child),source.span(child)); if error != Error.none { return error; } roles.items[slot] = generator.layoutRole(concrete); }
     let address,error = allocate(owner,(children.len * 4) as u32,AllocationRoles { words: roles.items }); if error != Error.none { return error; } if containsValue(roles.items,blot_backend_runtime_ir::ROLE_reference) { let concrete,concrete_error = codeLayout(owner,source.typeOf(id),source.span(id)); if concrete_error != Error.none { return concrete_error; } let acyclic = markAcyclic(owner,address,concrete); if acyclic != Error.none { return acyclic; } }
     for child,index in children { var declared = index as u32; if record { declared = destinations[index]; } var slot = declared; if physical.items.len != 0 { slot = physical.items[declared]; } let a = emit(owner,blot_backend_runtime_ir::OP_local_get,address); if a != Error.none { return a; } let b = emit(owner,blot_backend_runtime_ir::OP_local_get,locals.items[index]); if b != Error.none { return b; } let scalar_type,scalar_error = scalar(owner,child); if scalar_error != Error.none { return scalar_error; } var store = blot_backend_runtime_ir::OP_i32_store; if scalar_type == blot_backend_runtime_ir::SC_f32 { store = blot_backend_runtime_ir::OP_f32_store; } let stored = emit(owner,store,slot * 4); if stored != Error.none { return stored; } }
     return emit(owner,blot_backend_runtime_ir::OP_local_get,address);
+
+    }
+    let cleanup_result_20_0 = cleanup_continuation_20();
+     roles.deinit(); 
+    return cleanup_result_20_0;
+
+    }
+    let cleanup_result_21_0 = cleanup_continuation_21();
+     physical.deinit(); 
+    return cleanup_result_21_0;
+
+    }
+    let cleanup_result_22_0 = cleanup_continuation_22();
+     locals.deinit(); 
+    return cleanup_result_22_0;
 }
 fn recordRepresentation(owner: Owner&,record: blot_check_types::Node,value: u32,into_record: bool) -> u32,Error {
-    let generator .= owner.generator; var order = WordBuffer {}; defer { order.deinit(); } let selected = physicalOrder(owner,record,order); if selected != Error.none { return 0,selected; } if order.items.len == 0 { return value,Error.none; } if record.b > 4294967295 / 4 { return 0,generator.decline(owner.unit_id,blot_check_core::Span { 0,0 },blot_backend_core_backend::Code.complexity); }
-    var roles = RoleBuffer {}; defer { roles.deinit(); } for index in 0..record.b { let appended = roles.push(blot_backend_runtime_ir::ROLE_unknown); if appended != Error.none { return 0,appended; } }
+    let generator .= owner.generator; var order = WordBuffer {}; 
+    recursive fn cleanup_continuation_19() -> u32,Error {
+ let selected = physicalOrder(owner,record,order); if selected != Error.none { return 0,selected; } if order.items.len == 0 { return value,Error.none; } if record.b > 4294967295 / 4 { return 0,generator.decline(owner.unit_id,blot_check_core::Span { 0,0 },blot_backend_core_backend::Code.complexity); }
+    var roles = RoleBuffer {}; 
+    recursive fn cleanup_continuation_18() -> u32,Error {
+ for index in 0..record.b { let appended = roles.push(blot_backend_runtime_ir::ROLE_unknown); if appended != Error.none { return 0,appended; } }
     for physical,declared in order.items { let field = generator.unit(owner.unit_id).types.recordField(record,declared as u32); var target = declared as u32; if into_record { target = physical; } let concrete,error = codeLayout(owner,field.ty,blot_check_core::Span { 0,0 }); if error != Error.none { return 0,error; } roles.items[target] = generator.layoutRole(concrete); }
     let address,error = allocate(owner,record.b * 4,AllocationRoles { words: roles.items }); if error != Error.none { return 0,error; }
     for physical,declared in order.items { var source = physical; var target = declared as u32; if into_record { source = declared as u32; target = physical; } let a = emit(owner,blot_backend_runtime_ir::OP_local_get,address); if a != Error.none { return 0,a; } let b = emit(owner,blot_backend_runtime_ir::OP_local_get,value); if b != Error.none { return 0,b; } let loaded = emit(owner,blot_backend_runtime_ir::OP_i32_load,source * 4); if loaded != Error.none { return 0,loaded; } let stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,target * 4); if stored != Error.none { return 0,stored; } } return address,Error.none;
+
+    }
+    let cleanup_result_18_0,cleanup_result_18_1 = cleanup_continuation_18();
+     roles.deinit(); 
+    return cleanup_result_18_0,cleanup_result_18_1;
+
+    }
+    let cleanup_result_19_0,cleanup_result_19_1 = cleanup_continuation_19();
+     order.deinit(); 
+    return cleanup_result_19_0,cleanup_result_19_1;
 }
 fn nullaryConstructor(owner: Owner&,tag: u32) -> Error {
     let address,error = owner.generator.module.dataWords([tag,0]); if error != Error.none { return error; } let low = emit(owner,blot_backend_runtime_ir::OP_ownership,blot_backend_runtime_ir::pack(blot_backend_runtime_ir::Ownership { blot_backend_runtime_ir::OWN_words,14,tag & 67108863 })); if low != Error.none { return low; }
@@ -1183,9 +1647,15 @@ fn resolveProjection(owner: Owner&,original: blot_check_core::Projection,variant
     } return projection,generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type);
 }
 fn copyWords(values: const u32[:]) -> u32[:] { if values.len == 0 { return []; } let copy = owned_words.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
+fn copyMappings(values: const Mapping[:]) -> Mapping[:] { if values.len == 0 { return []; } let copy = owned_mappings.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
+fn copyRows(values: const RowMapping[:]) -> RowMapping[:] { if values.len == 0 { return []; } let copy = owned_rows.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
 fn copyVariants(values: const blot_check_core::ProjectionVariant[:]) -> blot_check_core::ProjectionVariant[:] { if values.len == 0 { return []; } let copy = owned_variants.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
 fn prepareField(owner: Owner&,id: u32,index: u32,sizes: bool) -> FieldPlan,Error {
-    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var projection = source.projection(index); var variants = VariantBuffer {}; defer { variants.deinit(); } var slots = WordBuffer {}; defer { slots.deinit(); } let original = source.projectionVariants(index);
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var projection = source.projection(index); var variants = VariantBuffer {}; 
+    recursive fn cleanup_continuation_17() -> FieldPlan,Error {
+ var slots = WordBuffer {}; 
+    recursive fn cleanup_continuation_16() -> FieldPlan,Error {
+ let original = source.projectionVariants(index);
     if projection.field != 0 || original.len == 0 { let resolved,error = resolveProjection(owner,projection,variants,id); if error != Error.none { return FieldPlan { index,projection,[],[] },error; } projection = resolved; }
     else { let appended = variants.append(original); if appended != Error.none { return FieldPlan { index,projection,[],[] },appended; } }
     if sizes { for variant in variants.items {
@@ -1194,12 +1664,29 @@ fn prepareField(owner: Owner&,id: u32,index: u32,sizes: bool) -> FieldPlan,Error
         if count > 4294967295 / 4 { return FieldPlan { index,projection,[],[] },generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); } let appended = slots.push(count); if appended != Error.none { return FieldPlan { index,projection,[],[] },appended; }
     } }
     return FieldPlan { index,projection,copyVariants(variants.items),copyWords(slots.items) },Error.none;
+
+    }
+    let cleanup_result_16_0,cleanup_result_16_1 = cleanup_continuation_16();
+     slots.deinit(); 
+    return cleanup_result_16_0,cleanup_result_16_1;
+
+    }
+    let cleanup_result_17_0,cleanup_result_17_1 = cleanup_continuation_17();
+     variants.deinit(); 
+    return cleanup_result_17_0,cleanup_result_17_1;
 }
 fn prepareUpdateLocations(owner: Owner&,id: u32) -> FieldPlan[:],Error {
-    assert(owner.preparing); let source .= owner.generator.unit(owner.unit_id); var fields = FieldBuffer {}; var published = false; defer { if !published { for &field in fields.items { field.deinit(); } } fields.deinit(); } let selectors = source.updateSelectors(id);
+    assert(owner.preparing); let source .= owner.generator.unit(owner.unit_id); var fields = FieldBuffer {}; var published = false; 
+    recursive fn cleanup_continuation_15() -> FieldPlan[:],Error {
+ let selectors = source.updateSelectors(id);
     if selectors.len == 0 { for index in source.updatePath(id) { let field,error = prepareField(owner,id,index,true); if error != Error.none { return [],error; } let appended = fields.push(field); if appended != Error.none { field.deinit(); return [],appended; } } }
     else { for selector in selectors { if selector.kind == blot_check_core::UpdateKind.field { let field,error = prepareField(owner,id,selector.projection,true); if error != Error.none { return [],error; } let appended = fields.push(field); if appended != Error.none { field.deinit(); return [],appended; } } } }
     var output: FieldPlan[:] = []; if fields.items.len != 0 { let owned = owned_fields.alloc_slice(fields.items.len); for field,index in fields.items { owned[index] = field; } output = owned; } published = true; return output,Error.none;
+
+    }
+    let cleanup_result_15_0,cleanup_result_15_1 = cleanup_continuation_15();
+     if !published { for &field in fields.items { field.deinit(); } } fields.deinit(); 
+    return cleanup_result_15_0,cleanup_result_15_1;
 }
 fn fieldPlan(owner: Owner&,id: u32,index: u32) -> FieldPlan {
     match resolvedPlan(owner,id) { projection selected=>{ assert(selected.value.present); match selected.value.value { field value=>{ return value.value; },_=>{ assert(false); }, } },update_locations selected=>{ for place in selected.value { if place.index == index { return place; } } },_=>{ assert(false); }, }
@@ -1209,7 +1696,9 @@ recursive fn prepareProjection(owner: Owner&,body: u32,id: u32,depth: i64) -> bl
     assert(owner.preparing); let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); if source.types.node(source.typeOf(node.a)).tag == blot_check_types::Tag.never { return blot_support::none<ProjectionPlan>(),Error.none; } let metadata = source.projection(node.b);
     if source.projectionVariants(node.b).len != 0 { let field,error = prepareField(owner,id,node.b,false); if error != Error.none { return blot_support::none<ProjectionPlan>(),error; } return blot_support::some(ProjectionPlan.field { field }),Error.none; }
     let previous = generator.diagnostic; var field = blot_support::none<FieldPlan>(); let prepared,prepared_error = prepareField(owner,id,node.b,false); if prepared_error == Error.declined { generator.diagnostic = previous; } else if prepared_error != Error.none { return blot_support::none<ProjectionPlan>(),prepared_error; } else { field = blot_support::some(prepared); }
-    var transferred = false; defer { if !transferred && field.present { field.value.deinit(); } } let concrete,error = codeLayout(owner,metadata.source_type,source.span(id)); if error != Error.none { return blot_support::none<ProjectionPlan>(),error; } let method,method_error = memberTarget(owner,id,metadata.field,concrete); if method_error != Error.none { return blot_support::none<ProjectionPlan>(),method_error; }
+    var transferred = false; 
+    recursive fn cleanup_continuation_14() -> blot_support::Option<ProjectionPlan>,Error {
+ let concrete,error = codeLayout(owner,metadata.source_type,source.span(id)); if error != Error.none { return blot_support::none<ProjectionPlan>(),error; } let method,method_error = memberTarget(owner,id,metadata.field,concrete); if method_error != Error.none { return blot_support::none<ProjectionPlan>(),method_error; }
     if field.present && method.present { return blot_support::none<ProjectionPlan>(),generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.ambiguous_member); } if field.present { transferred = true; return blot_support::some(ProjectionPlan.field { field.value }),Error.none; } if !method.present { return blot_support::none<ProjectionPlan>(),generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.missing_member); } let target = method.value;
     let result,result_error = codeLayout(owner,node.ty,source.span(id)); if result_error != Error.none { return blot_support::none<ProjectionPlan>(),result_error; } let full,full_error = generator.internLayout(blot_backend_layout::Tag.function,concrete,result,[]); if full_error != Error.none { return blot_support::none<ProjectionPlan>(),full_error; } let signature,signature_error = dispatchCallableLayout(owner,id,full); if signature_error != Error.none { return blot_support::none<ProjectionPlan>(),signature_error; }
     var direct = Key { target,count: 1,result }; direct.parameters[0] = concrete; direct.effects[0] = generator.representations.store.node(signature).c;
@@ -1219,6 +1708,11 @@ recursive fn prepareProjection(owner: Owner&,body: u32,id: u32,depth: i64) -> bl
         }
     }
     return blot_support::some(ProjectionPlan.member { direct,blot_reuse_code_artifacts::CallableKey { target,ty: signature } }),Error.none;
+
+    }
+    let cleanup_result_14_0,cleanup_result_14_1 = cleanup_continuation_14();
+     if !transferred && field.present { field.value.deinit(); } 
+    return cleanup_result_14_0,cleanup_result_14_1;
 }
 fn fieldType(owner: Owner&,projection: blot_check_core::Projection,tag: u32,id: u32) -> u32,Error { if projection.nominal.decl != 0 { return payloadLayout(owner,projection,tag,id); } return codeLayout(owner,projection.source_type,owner.generator.unit(owner.unit_id).span(id)); }
 fn fieldMask(owner: Owner&,projection: blot_check_core::Projection,tag: u32,id: u32) -> blot_support::Option<u32>,Error {
@@ -1230,7 +1724,14 @@ fn fieldMask(owner: Owner&,projection: blot_check_core::Projection,tag: u32,id: 
 }
 fn fieldShape(owner: Owner&,projection: blot_check_core::Projection,tag: u32,id: u32) -> blot_support::Option<u32>,Error {
     let generator .= owner.generator; let ty,error = fieldType(owner,projection,tag,id); if error != Error.none { return blot_support::none<u32>(),error; } let node = generator.representations.store.node(ty); if node.tag != blot_backend_layout::Tag.product && node.tag != blot_backend_layout::Tag.record { return blot_support::none<u32>(),Error.none; }
-    let fields = generator.representations.store.children(ty); var roles = RoleBuffer {}; defer { roles.deinit(); } for word in 0..node.b { var index = word; if node.tag == blot_backend_layout::Tag.record { index = word * 2 + 1; } let appended = roles.push(generator.layoutRole(fields[index])); if appended != Error.none { return blot_support::none<u32>(),appended; } } return wideShape(owner,node.b * 4,AllocationRoles { words: roles.items },true);
+    let fields = generator.representations.store.children(ty); var roles = RoleBuffer {}; 
+    recursive fn cleanup_continuation_13() -> blot_support::Option<u32>,Error {
+ for word in 0..node.b { var index = word; if node.tag == blot_backend_layout::Tag.record { index = word * 2 + 1; } let appended = roles.push(generator.layoutRole(fields[index])); if appended != Error.none { return blot_support::none<u32>(),appended; } } return wideShape(owner,node.b * 4,AllocationRoles { words: roles.items },true);
+
+    }
+    let cleanup_result_13_0,cleanup_result_13_1 = cleanup_continuation_13();
+     roles.deinit(); 
+    return cleanup_result_13_0,cleanup_result_13_1;
 }
 fn emitInstructions(owner: Owner&,instructions: const blot_backend_runtime_ir::Instruction[:]) -> Error { for instruction in instructions { let error = emit(owner,instruction.op,instruction.operand); if error != Error.none { return error; } } return Error.none; }
 fn emitConstantLocal(owner: Owner&,value: u32,local: u32) -> Error { let constant = emit(owner,blot_backend_runtime_ir::OP_i32_const,value); if constant != Error.none { return constant; } return emit(owner,blot_backend_runtime_ir::OP_local_set,local); }
@@ -1248,7 +1749,9 @@ fn location(owner: Owner&,value_owner: u32,projection_index: u32,id: u32,need_si
     if need_size { let size,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return result,error; } result.size = blot_support::some(size); } result.scalar_storage = need_size;
     if need_size { for variant in variants { let bits,error = fieldMask(owner,projection,variant.tag,id); if error != Error.none { return result,error; } if !bits.present || bits.value != 0 { result.scalar_storage = false; } } }
     if need_size && !result.scalar_storage { var known = true; for variant in variants { let bits,error = fieldMask(owner,projection,variant.tag,id); if error != Error.none { return result,error; } if !bits.present { known = false; break; } } if known { let mask,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return result,error; } result.mask = blot_support::some(mask); } }
-    var shapes = WordBuffer {}; defer { shapes.deinit(); }
+    var shapes = WordBuffer {}; 
+    recursive fn cleanup_continuation_12() -> Location,Error {
+
     if need_size && !result.scalar_storage && !result.mask.present { var known = true; for variant in variants { let address,error = fieldShape(owner,projection,variant.tag,id); if error != Error.none { return result,error; } if !address.present { known = false; break; } let appended = shapes.push(address.value); if appended != Error.none { return result,appended; } } if known { let shape,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return result,error; } result.shape = blot_support::some(shape); } }
     if result.wrapped { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value_owner); if loaded != Error.none { return result,loaded; } let payload = nonzeroLoad(owner,blot_backend_runtime_ir::OP_i32_load,4); if payload != Error.none { return result,payload; } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,result.container); if stored != Error.none { return result,stored; } }
     if variants.len == 1 {
@@ -1261,6 +1764,11 @@ fn location(owner: Owner&,value_owner: u32,projection_index: u32,id: u32,need_si
         let assigned = setLocationVariant(owner,prepared,index,id,result.offset,result.size,result.mask,result.shape,shapes.items); if assigned != Error.none { return result,assigned; } if result.wrapped { owner.labels--; let end = emit(owner,blot_backend_runtime_ir::OP_end); if end != Error.none { return result,end; } }
     }
     let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,result.offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4294967295),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eq),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); return result,checked;
+
+    }
+    let cleanup_result_12_0,cleanup_result_12_1 = cleanup_continuation_12();
+     shapes.deinit(); 
+    return cleanup_result_12_0,cleanup_result_12_1;
 }
 fn nonzeroLoad(owner: Owner&,op: blot_backend_runtime_ir::Op,offset: u32) -> Error { let marker = owner.generator.module.emit(owner.function_id,blot_backend_runtime_ir::nonzeroRead()); if marker != Error.none { return marker; } return emit(owner,op,offset); }
 fn loadLocation(owner: Owner&,place: Location,scalar: blot_backend_runtime_ir::Scalar) -> Error { if place.list_index.present && place.row_words != 0 { return readListRow(owner,place.owner,place.list_index.value,place.row_words,blot_support::none<u32[2]>(),blot_support::none<u32>(),place.row_layout); } let address = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add)]); if address != Error.none { return address; } return readElement(owner,blot_backend_runtime_ir::machine(scalar),0,place.row_words,place.row_layout); }
@@ -1310,7 +1818,9 @@ fn indexLocation(owner: Owner&,array: u32,index: u32,collection: u32) -> Locatio
     result.offset = offset; result.size = blot_support::some(size); result.row_words = row_words; result.row_layout = generator.representations.store.node(collection).a; result.array_scalar = blot_support::some(row_words != 0 || generator.representations.store.scalar(result.row_layout).present); return result,Error.none;
 }
 recursive fn update(owner: Owner&,id: u32,depth: i64) -> Error {
-    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let metadata = source.updateInfo(id); let path = source.updatePath(id); let selectors = source.updateSelectors(id); var places = LocationBuffer {}; defer { places.deinit(); }
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let metadata = source.updateInfo(id); let path = source.updatePath(id); let selectors = source.updateSelectors(id); var places = LocationBuffer {}; 
+    recursive fn cleanup_continuation_11() -> Error {
+
     let initial,initial_error = capture(owner,metadata.root,depth); if initial_error != Error.none { return initial_error; } var current = initial;
     if selectors.len != 0 { for selector in selectors {
         var place = Location { owner: current,container: current,offset: 0,size: blot_support::none<u32>(),wrapped: false };
@@ -1360,6 +1870,11 @@ recursive fn update(owner: Owner&,id: u32,depth: i64) -> Error {
         } else { changed = container; } changed_scalar = blot_backend_runtime_ir::SC_pointer;
     }
     return emit(owner,blot_backend_runtime_ir::OP_local_get,changed);
+
+    }
+    let cleanup_result_11_0 = cleanup_continuation_11();
+     places.deinit(); 
+    return cleanup_result_11_0;
 }
 recursive fn prepareCollectionStep(owner: Owner&,body: u32,id: u32,depth: i64) -> blot_support::Option<Plan>,Error {
     if owner.dictionary_owner.present { return blot_support::none<Plan>(),Error.none; } let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let initializer = source.node(id).b; let tag = source.node(initializer).tag; if tag != blot_check_core::Tag.project && tag != blot_check_core::Tag.call { return blot_support::none<Plan>(),Error.none; }
@@ -1475,7 +1990,7 @@ recursive fn captureSmallCollection(owner: Owner&,id: u32,depth: i64) -> blot_su
     let concrete,error = codeLayout(owner,node.ty,source.span(id)); if error != Error.none { return blot_support::none<SmallCollection>(),error; } let ty = generator.representations.store.node(concrete); if (ty.tag != blot_backend_layout::Tag.array && ty.tag != blot_backend_layout::Tag.list) || !generator.representations.store.scalar(ty.a).present { return blot_support::none<SmallCollection>(),Error.none; } var result = SmallCollection { machine: generator.representations.store.machine(ty.a) };
     if node.tag == blot_check_core::Tag.array { let children = source.children(id); result.len = children.len; for child,index in children { let value,value_error = capture(owner,child,depth); if value_error != Error.none { return blot_support::none<SmallCollection>(),value_error; } result.values[index] = value; } generator.planning.facts.stats.small_collections++; return blot_support::some(result),Error.none; }
     let call = source.call(id); var key = Key {}; match resolvedPlan(owner,id) { named plan=>{ key = plan.value.call.key; },_=>{ assert(false); }, } let producer .= generator.unit(key.target.unit); let body .= producer.body(key.target.binding); if body == null || producer.node(body.root).tag != blot_check_core::Tag.array || producer.children(body.root).len > blot_backend_function_facts::small_limit || call.arguments.len != key.count { return blot_support::none<SmallCollection>(),Error.none; }
-    let inlined,inline_error = inlineNamedValuesMode(owner,key,call.arguments,blot_support::none<const u32[:]>(),depth,result); if inline_error != Error.none || !inlined { return blot_support::none<SmallCollection>(),inline_error; } let dropped = emit(owner,blot_backend_runtime_ir::OP_drop); if dropped != Error.none { return blot_support::none<SmallCollection>(),dropped; } return blot_support::some(result),Error.none;
+    let slot,slot_error = allocateSmallOutput(result); if slot_error != Error.none { return blot_support::none<SmallCollection>(),slot_error; } let inlined,inline_error = inlineNamedValuesMode(owner,key,call.arguments,blot_support::none<const u32[:]>(),depth,blot_support::some(slot)); result = small_outputs[slot - 1].value; releaseSmallOutput(slot); if inline_error != Error.none || !inlined { return blot_support::none<SmallCollection>(),inline_error; } let dropped = emit(owner,blot_backend_runtime_ir::OP_drop); if dropped != Error.none { return blot_support::none<SmallCollection>(),dropped; } return blot_support::some(result),Error.none;
 }
 recursive fn smallCollectionElement(owner: Owner&,values: SmallCollection,index: u32,start: i64,end: i64) -> Error { if start == end { return emit(owner,blot_backend_runtime_ir::OP_unreachable_); } if end - start == 1 { return emit(owner,blot_backend_runtime_ir::OP_local_get,values.values[start]); } let middle = start + (end - start) / 2;
     let condition = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,middle as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_lt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_,values.machine as u32)]); if condition != Error.none { return condition; } let left = smallCollectionElement(owner,values,index,start,middle); if left != Error.none { return left; } let alternate = emit(owner,blot_backend_runtime_ir::OP_else_); if alternate != Error.none { return alternate; } let right = smallCollectionElement(owner,values,index,middle,end); if right != Error.none { return right; } return emit(owner,blot_backend_runtime_ir::OP_end);
@@ -1483,8 +1998,10 @@ recursive fn smallCollectionElement(owner: Owner&,values: SmallCollection,index:
 fn listKind(owner: Owner&,scalar_words: u32,element: u32) -> u32,Error { if scalar_words != 0 { return scalar_words,Error.none; } let acyclic,error = owner.generator.acyclicLayout(element); if error != Error.none { return 0,error; } if !acyclic { return scalar_words,Error.none; } return blot_runtime_list_runtime::acyclic_kind,Error.none; }
 recursive fn array(owner: Owner&,id: u32,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); if owner.exact_build.present && owner.exact_build.value.plan.initial == id { return emit(owner,blot_backend_runtime_ir::OP_local_get,owner.exact_build.value.storage); }
-    if owner.small_result.value != null && owner.small_result.root == id { let result,error = captureSmallCollection(owner,id,depth); if error != Error.none { return error; } assert(result.present); let output .= owner.small_result.value; output = result.value; return emit(owner,blot_backend_runtime_ir::OP_i32_const,0); }
-    let children = source.children(id); if children.len > 1073741822 { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); } var locals = WordBuffer {}; defer { locals.deinit(); }
+    if owner.small_result.slot != 0 && owner.small_result.root == id { let result,error = captureSmallCollection(owner,id,depth); if error != Error.none { return error; } assert(result.present); assert(small_outputs[owner.small_result.slot - 1].live); small_outputs[owner.small_result.slot - 1].value = result.value; return emit(owner,blot_backend_runtime_ir::OP_i32_const,0); }
+    let children = source.children(id); if children.len > 1073741822 { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); } var locals = WordBuffer {}; 
+    recursive fn cleanup_continuation_10() -> Error {
+
     for child in children { let local,error = capture(owner,child,depth); if error != Error.none { return error; } let appended = locals.push(local); if appended != Error.none { return appended; } if source.types.node(source.typeOf(child)).tag == blot_check_types::Tag.never { return Error.none; } }
     let concrete,error = codeLayout(owner,source.typeOf(id),source.span(id)); if error != Error.none { return error; } var collection = generator.representations.store.node(concrete); if collection.tag == blot_backend_layout::Tag.owning { collection = generator.representations.store.node(collection.a); } let row_words,row_error = generator.rowWords(collection.a); if row_error != Error.none { return row_error; } let scalar_elements = row_words != 0 || generator.representations.store.scalar(collection.a).present;
     if collection.tag == blot_backend_layout::Tag.list {
@@ -1499,6 +2016,11 @@ recursive fn array(owner: Owner&,id: u32,depth: i64) -> Error {
     let stride = blot_backend_packed_layout::stride(row_words); if children.len > (4294967295 - 4) / stride { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); } let address,address_error = allocateStorage(owner,(children.len * stride + 4) as u32,scalar_elements || row_words != 0,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar],rest: generator.layoutRole(collection.a) }); if address_error != Error.none { return address_error; }
     if !scalar_elements && row_words == 0 && generator.layoutRole(collection.a) == blot_backend_runtime_ir::ROLE_reference { let acyclic = markAcyclic(owner,address,collection.a); if acyclic != Error.none { return acyclic; } } let length = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,children.len as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,0)]); if length != Error.none { return length; }
     for child,index in children { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals.items[index])]); if loaded != Error.none { return loaded; } let scalar_type,scalar_error = scalar(owner,child); if scalar_error != Error.none { return scalar_error; } let stored = storeElement(owner,blot_backend_runtime_ir::machine(scalar_type),(index * stride + 4) as u32,row_words,scalar_elements,collection.a); if stored != Error.none { return stored; } } return emit(owner,blot_backend_runtime_ir::OP_local_get,address);
+
+    }
+    let cleanup_result_10_0 = cleanup_continuation_10();
+     locals.deinit(); 
+    return cleanup_result_10_0;
 }
 fn arrayAddress(owner: Owner&,array: u32,index: u32,stride: u32) -> Error { return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,stride),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_mul),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add)]); }
 type NumericPlan = blot_backend_numeric_rows::Plan;
@@ -1615,13 +2137,26 @@ recursive fn packedValue(owner: Owner&,encoding: bool,id: u32,plan: const Numeri
         if encoding && plan.storage[selected.value].guard.present { let active = plan.storage[selected.value].guard.value; let guard = plan.guards[active]; if guard.owner == selected.value || (sameOptional(plan.storage[guard.owner].parent,parent) && plan.storage[guard.owner].offset == offset) { assert(tag.present); let written = emitConstantLocal(owner,tag.value,fields[guard.word]); if written != Error.none { return false,written; } } }
         return packedValue(owner,encoding,node.b,plan,selected,4,fields,depth + 1);
     }
-    let children = source.children(id); let record = node.tag == blot_check_core::Tag.record; var destinations: const u32[:] = []; if record { destinations = source.recordDestinations(id); } var physical = WordBuffer {}; defer { physical.deinit(); } if record { let ordered = physicalOrder(owner,source.types.node(source.typeOf(id)),physical); if ordered != Error.none { return false,ordered; } }
+    let children = source.children(id); let record = node.tag == blot_check_core::Tag.record; var destinations: const u32[:] = []; if record { destinations = source.recordDestinations(id); } var physical = WordBuffer {}; 
+    recursive fn cleanup_continuation_9() -> bool,Error {
+ if record { let ordered = physicalOrder(owner,source.types.node(source.typeOf(id)),physical); if ordered != Error.none { return false,ordered; } }
     for child,index in children { var declared = index as u32; if record { declared = destinations[index]; } var slot = declared; if physical.items.len != 0 { slot = physical.items[declared]; } let admitted,error = packedValue(owner,encoding,child,plan,selected,slot * 4,fields,depth + 1); if error != Error.none || !admitted { return false,error; } } return true,Error.none;
+
+    }
+    let cleanup_result_9_0,cleanup_result_9_1 = cleanup_continuation_9();
+     physical.deinit(); 
+    return cleanup_result_9_0,cleanup_result_9_1;
 }
 recursive fn generatedPackedRow(owner: Owner&,producer: PackedProducer,index: u32,destination: u32,is_list: bool,plan: const NumericPlan&) -> bool,Error {
     let generator .= owner.generator; if owner.inline_depth >= 6 || producer.template.templates != 0 || producer.template.staged != 0 || producer.template.callable_instances != 0 || owner.dictionary_owner.present { return false,Error.none; } var unit = producer.template.unit; if unit == 0 { unit = owner.unit_id; } let source .= generator.unit(unit); let node = source.node(producer.template.node); let arrow = generator.representations.store.node(producer.ty);
-    var mappings = MappingBuffer {}; defer { mappings.deinit(); } var rows = RowBuffer {}; defer { rows.deinit(); } let context,context_error = inlineContext(owner); if context_error != Error.none { return false,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != Error.none { return false,cleanup_error; }
-    var emitter = Owner { generator,unit_id: unit,function_id: owner.function_id,provider_local: owner.provider_local,mappings: [],cleanups,diagnostic_context: context,labels: owner.labels,inline_depth: owner.inline_depth + 1,inline_loop: true }; defer { emitter.deinit(); } var root: u32 = 0;
+    var mappings = MappingBuffer {}; 
+    recursive fn cleanup_continuation_8() -> bool,Error {
+ var rows = RowBuffer {}; 
+    recursive fn cleanup_continuation_7() -> bool,Error {
+ let context,context_error = inlineContext(owner); if context_error != Error.none { return false,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != Error.none { return false,cleanup_error; }
+    var emitter = Owner { generator,unit_id: unit,function_id: owner.function_id,provider_local: owner.provider_local,mappings: [],cleanups,diagnostic_context: context,labels: owner.labels,inline_depth: owner.inline_depth + 1,inline_loop: true }; 
+    recursive fn cleanup_continuation_6() -> bool,Error {
+ var root: u32 = 0;
     if node.tag == blot_check_core::Tag.reference {
         let target,error = generator.normalize(unit,source.reference(producer.template.node)); if error != Error.none { return false,error; } let target_source .= generator.unit(target.unit); let body .= target_source.body(target.binding); if body == null || body.parameters.len != 1 || !body.is_function { return false,Error.none; } let cost = blot_backend_inline_body::cost(target_source,body.root); if !cost.present || cost.value > 64 { return false,Error.none; }
         var key = Key { target,count: 1,result: arrow.b }; key.parameters[0] = arrow.a; key.effects[0] = arrow.c; let service,service_error = generator.specializer(); if service_error != Error.none { return false,service_error; } let resolved,resolved_error = service.named(key,[],mappings,rows); if resolved_error != Error.none { return false,generator.specializationFailure(service,resolved_error); }
@@ -1633,14 +2168,38 @@ recursive fn generatedPackedRow(owner: Owner&,producer: PackedProducer,index: u3
     if node.tag == blot_check_core::Tag.closure { let closure = source.closures[node.a]; for binding,position in source.extra[closure.captures.start..closure.captures.start + closure.captures.len] { let concrete = generator.representations.store.children(producer.template.captures)[position]; let machine = generator.representations.store.machine(concrete); let local,error = temporary(owner,machine); if error != Error.none { return false,error; } assert(producer.template.environment.present); let environment = emit(owner,blot_backend_runtime_ir::OP_local_get,producer.template.environment.value); if environment != Error.none { return false,environment; }
         if !producer.template.scalar_environment { var load = blot_backend_runtime_ir::OP_i32_load; if machine == blot_backend_runtime_ir::VT_f32 { load = blot_backend_runtime_ir::OP_f32_load; } let loaded = emit(owner,load,(position * 4) as u32); if loaded != Error.none { return false,loaded; } } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,local); if stored != Error.none { return false,stored; } emitter.locals.insert(binding,local);
     } }
-    let body,body_error = prepareBody(emitter,root,0,false); if body_error != Error.none { return false,body_error; } defer { generator.planning.bodies.release(body); } emitter.body = blot_support::some(body); emitter.analysis_root = root; let header = generator.planning.bodies.header(body); emitter.mappings = header.mappings; emitter.row_mappings = header.rows;
+    let body,body_error = prepareBody(emitter,root,0,false); if body_error != Error.none { return false,body_error; } 
+    recursive fn cleanup_continuation_5() -> bool,Error {
+ emitter.body = blot_support::some(body); emitter.analysis_root = root; let header = generator.planning.bodies.header(body); emitter.mappings = header.mappings; emitter.row_mappings = header.rows;
     var fields: u32[16]; for &field in fields[..plan.word_count] { let local,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return false,error; } field = local; let initialized = emitConstantLocal(owner,0,field); if initialized != Error.none { return false,initialized; } }
     let packed,packed_error = packedValue(emitter,true,root,plan,blot_support::none<u8>(),0,fields[..plan.word_count],0); if packed_error != Error.none { return false,packed_error; } assert(packed); var base: u32 = 0; if is_list { let selected,selected_error = multiplyLocal(owner,index,plan.word_count); if selected_error != Error.none { return false,selected_error; } base = selected; }
     for field,position in fields[..plan.word_count] { var address: Error; if is_list { address = listWordAddress(owner,destination,base,position as u32,false); } else { address = arrayAddress(owner,destination,index,plan.word_count as u32 * 4); } if address != Error.none { return false,address; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,field); if loaded != Error.none { return false,loaded; } var offset: u32 = 0; if !is_list { offset = 4 + position as u32 * 4; } let stored = storeScalar(owner,blot_backend_runtime_ir::OP_i32_store,offset); if stored != Error.none { return false,stored; } } return true,Error.none;
+
+    }
+    let cleanup_result_5_0,cleanup_result_5_1 = cleanup_continuation_5();
+     generator.planning.bodies.release(body); 
+    return cleanup_result_5_0,cleanup_result_5_1;
+
+    }
+    let cleanup_result_6_0,cleanup_result_6_1 = cleanup_continuation_6();
+     emitter.deinit(); 
+    return cleanup_result_6_0,cleanup_result_6_1;
+
+    }
+    let cleanup_result_7_0,cleanup_result_7_1 = cleanup_continuation_7();
+     rows.deinit(); 
+    return cleanup_result_7_0,cleanup_result_7_1;
+
+    }
+    let cleanup_result_8_0,cleanup_result_8_1 = cleanup_continuation_8();
+     mappings.deinit(); 
+    return cleanup_result_8_0,cleanup_result_8_1;
 }
 recursive fn arrayFill(owner: Owner&,count: u32,value: u32,machine: blot_backend_runtime_ir::ValueType,is_generated: bool,is_list: bool,known: blot_support::Option<u32>,element: u32,producer: blot_support::Option<PackedProducer>) -> Error {
     let generator .= owner.generator; let row_words,row_error = generator.rowWords(element); if row_error != Error.none { return row_error; } var copied_row_scope = false; if is_generated { let nested,error = generator.nestedRow(element); if error != Error.none { return error; } copied_row_scope = nested.present; }
-    let iteration_cleanup = owner.cleanups.mark(); defer { if copied_row_scope { owner.cleanups.restore(iteration_cleanup); } } let stride = blot_backend_packed_layout::stride(row_words); let scalar_elements = row_words != 0 || generator.representations.store.scalar(element).present;
+    let iteration_cleanup = owner.cleanups.mark(); 
+    recursive fn cleanup_continuation_4() -> Error {
+ let stride = blot_backend_packed_layout::stride(row_words); let scalar_elements = row_words != 0 || generator.representations.store.scalar(element).present;
     let size,size_error = arraySize(owner,count,stride); if size_error != Error.none { return size_error; } let array,array_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if array_error != Error.none { return array_error; } let index,index_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if index_error != Error.none { return index_error; } var physical = count;
     if is_list && row_words > 1 { let words,error = listWordCount(owner,count,row_words); if error != Error.none { return error; } physical = words; } var length = size; if is_list { length = physical; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,length); if loaded != Error.none { return loaded; }
     if is_list { var scalar_words: u32 = 0; if scalar_elements { scalar_words = max(1,row_words); } let kind,error = listKind(owner,scalar_words,element); if error != Error.none { return error; } let prepared = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_list_runtime::leafLimit(max(1,row_words)))]); if prepared != Error.none { return prepared; } }
@@ -1667,6 +2226,11 @@ recursive fn arrayFill(owner: Owner&,count: u32,value: u32,machine: blot_backend
     let advanced = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,1),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,index)]); if advanced != Error.none { return advanced; }
     if copied_row_scope { assert(chunk_end.present); let repeated = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,chunk_end.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_lt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_br_if,0)]); if repeated != Error.none { return repeated; } owner.labels--; let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != Error.none { return ended; } let cleaned = cleanupTo(owner,iteration_cleanup); if cleaned != Error.none { return cleaned; } owner.cleanups.restore(iteration_cleanup); }
     let repeated = emit(owner,blot_backend_runtime_ir::OP_br,0); if repeated != Error.none { return repeated; } owner.labels -= 2; return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array)]);
+
+    }
+    let cleanup_result_4_0 = cleanup_continuation_4();
+     if copied_row_scope { owner.cleanups.restore(iteration_cleanup); } 
+    return cleanup_result_4_0;
 }
 fn advancePrivateCursor(owner: Owner&,fields: SmallCollection,is_list: bool) -> SmallCollection,Error {
     let bounds = privateCursorBounds(owner,fields.values[0],fields.values[1],1); if bounds != Error.none { return SmallCollection {},bounds; } let index,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return SmallCollection {},error; } let advanced = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,fields.values[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,1),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,index)]); if advanced != Error.none { return SmallCollection {},advanced; } return cursorFields(owner,fields.values[0],index,is_list,blot_support::some(CursorPrevious.fields { [fields.values[2],fields.values[3]] }),1);
@@ -1724,7 +2288,9 @@ recursive fn exactBuilder(owner: Owner&,id: u32,plan: blot_backend_exact_builder
 }
 recursive fn fillExactBuilder(owner: Owner&,id: u32,plan: blot_backend_exact_builder::Plan,count: u32,eligible: u32,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let concrete,error = codeLayout(owner,source.typeOf(plan.initial),source.span(id)); if error != Error.none { return error; } let collection = generator.representations.store.node(concrete); let is_list = plan.conversion == 0; let row_words,row_error = generator.rowWords(collection.a); if row_error != Error.none { return row_error; } let stride = blot_backend_packed_layout::stride(row_words);
-    let previous_probe = owner.exact_probe; let previous_build = owner.exact_build; owner.exact_probe = true; defer { owner.exact_probe = previous_probe; owner.exact_build = previous_build; }
+    let previous_probe = owner.exact_probe; let previous_build = owner.exact_build; owner.exact_probe = true; 
+    recursive fn cleanup_continuation_3() -> Error {
+
     let selected = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,eligible),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_,blot_backend_runtime_ir::VT_i32 as u32)]); if selected != Error.none { return selected; } owner.labels++; let scalar_elements = row_words != 0 || generator.representations.store.scalar(collection.a).present; var size = count;
     if is_list { if row_words > 1 { let words,word_error = listWordCount(owner,count,row_words); if word_error != Error.none { return word_error; } size = words; } } else { let bytes,byte_error = arraySize(owner,count,stride); if byte_error != Error.none { return byte_error; } size = bytes; }
     let storage,storage_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if storage_error != Error.none { return storage_error; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,size); if loaded != Error.none { return loaded; }
@@ -1733,31 +2299,51 @@ recursive fn fillExactBuilder(owner: Owner&,id: u32,plan: blot_backend_exact_bui
     if !is_list { let counted = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,storage),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,0)]); if counted != Error.none { return counted; } }
     let index,index_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if index_error != Error.none { return index_error; } let initialized = emitConstantLocal(owner,0,index); if initialized != Error.none { return initialized; } owner.exact_build = blot_support::some(ExactBuild { plan,storage,index,row_words });
     let fast = expression(owner,id,depth + 1); if fast != Error.none { return fast; } let alternate = emit(owner,blot_backend_runtime_ir::OP_else_); if alternate != Error.none { return alternate; } owner.exact_build = previous_build; let ordinary = expression(owner,id,depth + 1); if ordinary != Error.none { return ordinary; } owner.labels--; return emit(owner,blot_backend_runtime_ir::OP_end);
+
+    }
+    let cleanup_result_3_0 = cleanup_continuation_3();
+     owner.exact_probe = previous_probe; owner.exact_build = previous_build; 
+    return cleanup_result_3_0;
 }
-struct RaggedFacts { emitter: const Owner& }
+struct RaggedFacts { generator: blot_backend_core_backend::Generator&,unit: u32,body: u32,templates: TemplateMap }
+fn raggedFacts(owner: const Owner&) -> RaggedFacts { assert(owner.body.present); return RaggedFacts { owner.generator,owner.unit_id,owner.body.value,owner.templates }; }
 fn primitive(facts: RaggedFacts,id: u32) -> bool {
-    let owner .= facts.emitter; assert(owner.body.present); let bodies .= owner.generator.planning.bodies; if !bodies.contains(owner.body.value,id) { return false; }
-    match bodies.get(owner.body.value,id) {
-        named plan=>{ let key = plan.value.call.key; if key.count != 2 || key.parameters[0] != key.parameters[1] { return false; } let machine = owner.generator.representations.store.scalar(key.parameters[0]); if !machine.present { return false; } let operation = blot_check_primitive_operator::analyzeTyped(owner.generator.units,key.target,machine.value); return operation.present && blot_check_primitive_operator::total(operation.value); },
-        dispatch plan=>{ match plan.value { scalar operation=>{ return true; },selected selected=>{ let operation = blot_check_primitive_operator::analyze(owner.generator.units,selected.key.target); return operation.present && blot_check_primitive_operator::total(operation.value); },_=>{ return false; }, } },_=>{ return false; },
+    let bodies .= facts.generator.planning.bodies; if !bodies.contains(facts.body,id) { return false; }
+    match bodies.get(facts.body,id) {
+        named plan=>{ let key = plan.value.call.key; if key.count != 2 || key.parameters[0] != key.parameters[1] { return false; } let machine = facts.generator.representations.store.scalar(key.parameters[0]); if !machine.present { return false; } let operation = blot_check_primitive_operator::analyzeTyped(facts.generator.units,key.target,machine.value); return operation.present && blot_check_primitive_operator::total(operation.value); },
+        dispatch plan=>{ match plan.value { scalar operation=>{ return true; },selected selected=>{ let operation = blot_check_primitive_operator::analyze(facts.generator.units,selected.key.target); return operation.present && blot_check_primitive_operator::total(operation.value); },_=>{ return false; }, } },_=>{ return false; },
     }
 }
 fn reference(facts: RaggedFacts,id: u32) -> bool {
-    let owner .= facts.emitter; let source .= owner.generator.unit(owner.unit_id); let reference = source.reference(id); if reference.unit == 0 || reference.unit == source.unit { let binding = source.binding(reference.binding); if binding.kind == blot_check_core::BindingKind.local || binding.kind == blot_check_core::BindingKind.parameter { return !owner.templates.contains(reference.binding); } }
-    assert(owner.body.present); match owner.generator.planning.bodies.get(owner.body.value,id) { reference plan=>{ if !plan.value.present { return false; } let declaration .= owner.generator.unit(plan.value.value.unit).body(plan.value.value.binding); return declaration != null && !declaration.is_function; },_=>{ assert(false); return false; }, }
+    let source .= facts.generator.unit(facts.unit); let reference = source.reference(id); if reference.unit == 0 || reference.unit == source.unit { let binding = source.binding(reference.binding); if binding.kind == blot_check_core::BindingKind.local || binding.kind == blot_check_core::BindingKind.parameter { return !facts.templates.contains(reference.binding); } }
+     match facts.generator.planning.bodies.get(facts.body,id) { reference plan=>{ if !plan.value.present { return false; } let declaration .= facts.generator.unit(plan.value.value.unit).body(plan.value.value.binding); return declaration != null && !declaration.is_function; },_=>{ assert(false); return false; }, }
 }
-fn field(facts: RaggedFacts,id: u32) -> bool { let owner .= facts.emitter; assert(owner.body.present); let bodies .= owner.generator.planning.bodies; if !bodies.contains(owner.body.value,id) { return false; } match bodies.get(owner.body.value,id) { projection plan=>{ if !plan.value.present { return false; } match plan.value.value { field value=>{ return true; },_=>{ return false; }, } },_=>{ return false; }, } }
-fn pattern(facts: RaggedFacts,id: u32) -> bool { let owner .= facts.emitter; assert(owner.body.present); let bodies .= owner.generator.planning.bodies; if !bodies.contains(owner.body.value,id) { return false; } match bodies.get(owner.body.value,id) { loop_ plan=>{ return !plan.value.refutable; },_=>{ return false; }, } }
+fn field(facts: RaggedFacts,id: u32) -> bool { let bodies .= facts.generator.planning.bodies; if !bodies.contains(facts.body,id) { return false; } match bodies.get(facts.body,id) { projection plan=>{ if !plan.value.present { return false; } match plan.value.value { field value=>{ return true; },_=>{ return false; }, } },_=>{ return false; }, } }
+fn pattern(facts: RaggedFacts,id: u32) -> bool { let bodies .= facts.generator.planning.bodies; if !bodies.contains(facts.body,id) { return false; } match bodies.get(facts.body,id) { loop_ plan=>{ return !plan.value.refutable; },_=>{ return false; }, } }
 fn declineRaggedCount(owner: Owner&) -> Error { assert(owner.ragged_count.present); let probe = owner.ragged_count.value; let branch = emit(owner,blot_backend_runtime_ir::OP_if_); if branch != Error.none { return branch; } owner.labels++; let declined = emitConstantLocal(owner,0,probe.eligible); if declined != Error.none { return declined; } let cleaned = cleanupTo(owner,probe.cleanup); if cleaned != Error.none { return cleaned; } let exited = emit(owner,blot_backend_runtime_ir::OP_br,owner.labels - 1 - probe.exit); if exited != Error.none { return exited; } owner.labels--; return emit(owner,blot_backend_runtime_ir::OP_end); }
 recursive fn raggedBuilder(owner: Owner&,id: u32,plan: blot_backend_ragged_builder::Plan,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); for expression in plan.expressions[..plan.expression_count] { let read = raggedDependencies(owner,expression); if read != Error.none { return read; } } let payload = raggedDependencies(owner,plan.storage.value); if payload != Error.none { return payload; }
     let concrete,error = codeLayout(owner,source.typeOf(plan.storage.initial),source.span(id)); if error != Error.none { return error; } let collection = generator.representations.store.node(concrete); let words,word_error = generator.rowWords(collection.a); if word_error != Error.none { return word_error; } let maximum = blot_backend_ragged_builder::maximumCount(words,plan.storage.conversion == 0); assert(maximum.present);
     let count,count_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if count_error != Error.none { return count_error; } let eligible,eligible_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if eligible_error != Error.none { return eligible_error; } let budget,budget_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if budget_error != Error.none { return budget_error; }
     let zero = emitConstantLocal(owner,0,count); if zero != Error.none { return zero; } let admitted = emitConstantLocal(owner,1,eligible); if admitted != Error.none { return admitted; } let bounded = emitConstantLocal(owner,generator.ragged_probe_limit,budget); if bounded != Error.none { return bounded; }
-    let previous_probe = owner.exact_probe; let previous_count = owner.ragged_count; owner.exact_probe = true; defer { owner.exact_probe = previous_probe; owner.ragged_count = previous_count; }
+    let previous_probe = owner.exact_probe; let previous_count = owner.ragged_count; owner.exact_probe = true; 
+    recursive fn cleanup_continuation_2() -> Error {
+
     let entered = emit(owner,blot_backend_runtime_ir::OP_block); if entered != Error.none { return entered; } owner.ragged_count = blot_support::some(RaggedCount { plan,count,eligible,budget,limit: maximum.value,exit: owner.labels,cleanup: owner.cleanups.mark() }); owner.labels++;
     let probed = expression(owner,id,depth + 1); if probed != Error.none { return probed; } let dropped = emit(owner,blot_backend_runtime_ir::OP_drop); if dropped != Error.none { return dropped; } owner.labels--; let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != Error.none { return ended; } owner.ragged_count = previous_count;
-    let previous_fill = owner.ragged_fill; owner.ragged_fill = true; defer { owner.ragged_fill = previous_fill; } let filled = fillExactBuilder(owner,id,plan.storage,count,eligible,depth); if filled != Error.none { return filled; } generator.evaluator.counters.ragged_runtime_regions++; return Error.none;
+    let previous_fill = owner.ragged_fill; owner.ragged_fill = true; 
+    recursive fn cleanup_continuation_1() -> Error {
+ let filled = fillExactBuilder(owner,id,plan.storage,count,eligible,depth); if filled != Error.none { return filled; } generator.evaluator.counters.ragged_runtime_regions++; return Error.none;
+
+    }
+    let cleanup_result_1_0 = cleanup_continuation_1();
+     owner.ragged_fill = previous_fill; 
+    return cleanup_result_1_0;
+
+    }
+    let cleanup_result_2_0 = cleanup_continuation_2();
+     owner.exact_probe = previous_probe; owner.ragged_count = previous_count; 
+    return cleanup_result_2_0;
 }
 recursive fn raggedDependencies(owner: Owner&,id: u32) -> Error {
     let generator .= owner.generator; if id == 0 || generator.artifacts == null { return Error.none; } let source .= generator.unit(owner.unit_id); let node = source.node(id); assert(owner.body.present); let bodies .= generator.planning.bodies;
@@ -1875,4 +2461,624 @@ fn readListSpanRow(owner: Owner&,source: u32,base: u32,words: u32,span: u32[3],w
     let condition = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,span[2]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ge_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_)]); if condition != Error.none { return condition; } let resolved = resolveListSpan(owner,source,base,span,walk); if resolved != Error.none { return resolved; } let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != Error.none { return ended; }
     let address,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; } let located = listSpanAddress(owner,base,span); if located != Error.none { return located; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,address); if saved != Error.none { return saved; } var fields: u32[16];
     for &field,index in fields[..words] { let local,local_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if local_error != Error.none { return local_error; } field = local; let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,(index * 4) as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,local)]); if loaded != Error.none { return loaded; } } return unpackRow(owner,fields[..words],element);
+}
+fn readListRowView(owner: Owner&,words: u32,span: u32[3],view: RowView,directory: ListDirectory) -> Error {
+    let resolved = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,directory.array),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,directory.offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Array_bytes),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,span[0]),
+        blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,directory.offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,directory.offset),
+        blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,span[0]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_list_runtime::header),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,view.address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,span[0]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ListNode_length)]); if resolved != Error.none { return resolved; }
+    let length,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; } return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,length),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,span[2]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,length),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,span[2]),
+        blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view.address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,length),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,words),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_mul),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,view.limit_address)]);
+}
+fn readListRow(owner: Owner&,source: u32,index: u32,words: u32,cache: blot_support::Option<u32[2]>,span_end: blot_support::Option<u32>,element: u32) -> Error {
+    let base,error = multiplyLocal(owner,index,words); if error != Error.none { return error; } var fields: u32[16]; for &field in fields[..words] { let local,local_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if local_error != Error.none { return local_error; } field = local; }
+    if cache.present {
+        let cached = cache.value; let relative,relative_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if relative_error != Error.none { return relative_error; } let located = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cached[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,relative)]); if located != Error.none { return located; }
+        if span_end.present { let complete = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,words),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,span_end.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_le_u)]); if complete != Error.none { return complete; } }
+        else { let complete = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cached[0]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_,blot_backend_runtime_ir::VT_i32 as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,relative),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cached[0]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ListNode_length),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_le_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cached[0]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ListNode_length),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,relative),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,words),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ge_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_and),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_else_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if complete != Error.none { return complete; } }
+        let entered = emit(owner,blot_backend_runtime_ir::OP_if_); if entered != Error.none { return entered; } let address,address_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if address_error != Error.none { return address_error; } let offset = arrayAddress(owner,cached[0],relative,4); if offset != Error.none { return offset; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,address); if saved != Error.none { return saved; }
+        for field,position in fields[..words] { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ListNode_bytes + position as u32 * 4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,field)]); if loaded != Error.none { return loaded; } } let alternate = emit(owner,blot_backend_runtime_ir::OP_else_); if alternate != Error.none { return alternate; }
+    }
+    for field,position in fields[..words] { let address = listWordAddress(owner,source,base,position as u32,true); if address != Error.none { return address; } let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,field)]); if loaded != Error.none { return loaded; } }
+    if cache.present { let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != Error.none { return ended; } } return unpackRow(owner,fields[..words],element);
+}
+fn cursorCache(owner: Owner&,cursor: u32) -> u32[2],Error {
+    var values: u32[2]; let offsets = [blot_runtime_runtime_layout::Cursor_leaf,blot_runtime_runtime_layout::Cursor_base]; for offset,index in offsets { let local,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return values,error; } values[index] = local; let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cursor),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,local)]); if loaded != Error.none { return values,loaded; } } return values,Error.none;
+}
+fn cachedListWordAddress(owner: Owner&,source: u32,base: u32,field: u32,cache: u32[2]) -> Error {
+    let leaf = cache[0]; let relative,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; }
+    let cached = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,field),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cache[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,relative),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,leaf),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_,blot_backend_runtime_ir::VT_i32 as u32),
+        blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,relative),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,leaf),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ListNode_length),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_lt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_else_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_,blot_backend_runtime_ir::VT_i32 as u32),
+        blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,leaf),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,relative),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_mul),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_runtime_layout::ListNode_bytes),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_else_)]); if cached != Error.none { return cached; } let ordinary = listWordAddress(owner,source,base,field,false); if ordinary != Error.none { return ordinary; } return emit(owner,blot_backend_runtime_ir::OP_end);
+}
+fn storeListRow(owner: Owner&,source: u32,index: u32,row: u32,words: u32,element: u32) -> Error {
+    let base,error = multiplyLocal(owner,index,words); if error != Error.none { return error; } let nested,nested_error = owner.generator.nestedRow(element); if nested_error != Error.none { return nested_error; } var fields = blot_support::none<u32[16]>(); if nested.present { let values,value_error = packRow(owner,row,words,element); if value_error != Error.none { return value_error; } fields = blot_support::some(values); }
+    for index in 0..words { let address = listWordAddress(owner,source,base,index as u32,false); if address != Error.none { return address; } if fields.present { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,fields.value[index]); if loaded != Error.none { return loaded; } }
+        else { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,row),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,index as u32 * 4)]); if loaded != Error.none { return loaded; } } let stored = storeScalar(owner,blot_backend_runtime_ir::OP_i32_store,0); if stored != Error.none { return stored; }
+    } return Error.none;
+}
+fn editListRow(owner: Owner&,source: u32,index: u32,row: u32,words: u32,front: blot_support::Option<bool>,reuse: bool,element: u32) -> Error { return editListRow(owner,source,blot_support::some(index),row,words,front,reuse,element); }
+fn editListRow(owner: Owner&,source: u32,index: blot_support::Option<u32>,row: u32,words: u32,front: blot_support::Option<bool>,reuse: bool,element: u32) -> Error {
+    let runtime,error = owner.generator.module.ensureLists(); if error != Error.none { return error; } let result,result_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if result_error != Error.none { return result_error; } var base = blot_support::none<u32>();
+    if index.present { let bounds = listRowBounds(owner,source,index.value,words); if bounds != Error.none { return bounds; } let position,position_error = multiplyLocal(owner,index.value,words); if position_error != Error.none { return position_error; } base = blot_support::some(position); }
+    let nested,nested_error = owner.generator.nestedRow(element); if nested_error != Error.none { return nested_error; } var fields = blot_support::none<u32[16]>(); if nested.present { let values,value_error = packRow(owner,row,words,element); if value_error != Error.none { return value_error; } fields = blot_support::some(values); }
+    for step in 0..words { var position = step; if front.present && front.value { position = words - 1 - step; } var current = source; if step != 0 { current = result; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,current); if loaded != Error.none { return loaded; }
+        if base.present { let selected = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,base.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,position as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add)]); if selected != Error.none { return selected; } }
+        if fields.present { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,fields.value[position]); if loaded != Error.none { return loaded; } } else { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,row),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,position as u32 * 4)]); if loaded != Error.none { return loaded; } }
+        if front.present { var prepend: u32 = 0; if front.value { prepend = 1; } let selected = emit(owner,blot_backend_runtime_ir::OP_i32_const,prepend); if selected != Error.none { return selected; } } var consuming: u32 = 0; if step != 0 || reuse { consuming = 1; } var function = runtime.push; if base.present { function = runtime.set; }
+        let edited = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,consuming),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,function),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,result)]); if edited != Error.none { return edited; }
+    } return emit(owner,blot_backend_runtime_ir::OP_local_get,result);
+}
+fn sliceListRows(owner: Owner&,locals: const u32[:],words: u32) -> Error {
+    let count,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; } let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[0]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,words),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_div_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,count),
+        blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_gt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),
+        blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[2]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_gt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if checked != Error.none { return checked; }
+    let start,start_error = multiplyLocal(owner,locals[1],words); if start_error != Error.none { return start_error; } let length,length_error = multiplyLocal(owner,locals[2],words); if length_error != Error.none { return length_error; } let loaded = emitLocals(owner,[locals[0],start,length]); if loaded != Error.none { return loaded; } let runtime,runtime_error = owner.generator.module.ensureLists(); if runtime_error != Error.none { return runtime_error; } return emit(owner,blot_backend_runtime_ir::OP_call,runtime.slice);
+}
+fn convertRows(owner: Owner&,source: u32,input_list: bool,row_words: u32) -> Error {
+    let runtime,error = owner.generator.module.ensureLists(); if error != Error.none { return error; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,source); if loaded != Error.none { return loaded; } if !input_list { let described = emit(owner,blot_backend_runtime_ir::OP_i32_const,row_words); if described != Error.none { return described; } } var function = runtime.from_array; if input_list { function = runtime.to_array; } let converted = emit(owner,blot_backend_runtime_ir::OP_call,function); if converted != Error.none { return converted; }
+    if input_list && row_words > 1 { let result,result_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if result_error != Error.none { return result_error; } let length = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,result),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,result),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,result),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,row_words),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_div_u)]); if length != Error.none { return length; } let stored = storeScalar(owner,blot_backend_runtime_ir::OP_i32_store,0); if stored != Error.none { return stored; } return emit(owner,blot_backend_runtime_ir::OP_local_get,result); } return Error.none;
+}
+fn cursorFields(owner: Owner&,source: u32,index: u32,is_list: bool,previous: blot_support::Option<CursorPrevious>,row_words: u32) -> SmallCollection,Error {
+    var fields = SmallCollection { kind: SmallKind.cursor,len: 4 }; var position = index; if is_list && row_words > 1 { let physical,error = multiplyLocal(owner,index,row_words); if error != Error.none { return fields,error; } position = physical; }
+    let leaf,leaf_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if leaf_error != Error.none { return fields,leaf_error; } let base,base_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if base_error != Error.none { return fields,base_error; } let leaf_zero = emitConstantLocal(owner,0,leaf); if leaf_zero != Error.none { return fields,leaf_zero; } let base_zero = emitConstantLocal(owner,0,base); if base_zero != Error.none { return fields,base_zero; }
+    if is_list {
+        let available = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,position),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,source),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ListDescriptor_length),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_lt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_)]); if available != Error.none { return fields,available; }
+        if previous.present {
+            var loaded: Error; match previous.value { boxed value=>{ loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Cursor_base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Cursor_leaf)]); },fields value=>{ loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value.value[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value.value[0])]); }, } if loaded != Error.none { return fields,loaded; }
+            let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_tee,leaf),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,position),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,leaf),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ListNode_length),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ge_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,leaf),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if checked != Error.none { return fields,checked; }
+        }
+        let missing = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,leaf),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eqz),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,source),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,position)]); if missing != Error.none { return fields,missing; } let runtime,error = owner.generator.module.ensureLists(); if error != Error.none { return fields,error; }
+        let resolved = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,runtime.address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_drop),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,source),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ListDescriptor_cached_leaf),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,leaf),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,source),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ListDescriptor_cached_base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,base),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if resolved != Error.none { return fields,resolved; }
+    }
+    fields.values[0] = source; fields.values[1] = index; fields.values[2] = leaf; fields.values[3] = base; return fields,Error.none;
+}
+fn cursorPosition(owner: Owner&,source: u32,index: u32,is_list: bool,previous: blot_support::Option<u32>,row_words: u32) -> Error {
+    var old = blot_support::none<CursorPrevious>(); if previous.present { old = blot_support::some(CursorPrevious.boxed { previous.value }); } let fields,error = cursorFields(owner,source,index,is_list,old,row_words); if error != Error.none { return error; }
+    let address,address_error = allocate(owner,blot_runtime_runtime_layout::Cursor_bytes,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_reference,blot_backend_runtime_ir::ROLE_scalar,blot_backend_runtime_ir::ROLE_reference,blot_backend_runtime_ir::ROLE_scalar] }); if address_error != Error.none { return address_error; }
+    let offsets = [blot_runtime_runtime_layout::Cursor_collection,blot_runtime_runtime_layout::Cursor_index,blot_runtime_runtime_layout::Cursor_leaf,blot_runtime_runtime_layout::Cursor_base]; for offset,field in offsets { let stored = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,fields.values[field]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,offset)]); if stored != Error.none { return stored; } } return emit(owner,blot_backend_runtime_ir::OP_local_get,address);
+}
+fn arrayPush(owner: Owner&,source: u32,value: u32,machine: blot_backend_runtime_ir::ValueType,front: bool,scalar_elements: bool,row_words: u32,element: u32) -> Error {
+    let count,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; } let result,result_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if result_error != Error.none { return result_error; }
+    let counted = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,source),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,1),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,count)]); if counted != Error.none { return counted; } let stride = blot_backend_packed_layout::stride(row_words); let size,size_error = arraySize(owner,count,stride); if size_error != Error.none { return size_error; } let length = emit(owner,blot_backend_runtime_ir::OP_local_get,size); if length != Error.none { return length; } let allocated = allocateArray(owner,scalar_elements,element); if allocated != Error.none { return allocated; }
+    var prefix: u32 = 4; if front { prefix = 4 + stride; }
+    let copied = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,result),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,result),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,result),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,prefix),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,source),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,size),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4 + stride),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_memory_copy)]); if copied != Error.none { return copied; }
+    if front { let target = emit(owner,blot_backend_runtime_ir::OP_local_get,result); if target != Error.none { return target; } }
+    else { let target = arrayAddress(owner,result,count,stride); if target != Error.none { return target; } if stride != 4 { let adjusted = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,stride - 4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub)]); if adjusted != Error.none { return adjusted; } } }
+    let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value); if loaded != Error.none { return loaded; } var offset: u32 = 0; if front { offset = 4; } let stored = storeElement(owner,machine,offset,row_words,scalar_elements,element); if stored != Error.none { return stored; } return emit(owner,blot_backend_runtime_ir::OP_local_get,result);
+}
+fn simdCompare(op: blot_check_core::Op,floating: bool) -> blot_backend_runtime_ir::Op {
+    match op { equal=>{ if floating { return blot_backend_runtime_ir::OP_f32x4_eq; } return blot_backend_runtime_ir::OP_i32x4_eq; },not_equal=>{ if floating { return blot_backend_runtime_ir::OP_f32x4_ne; } return blot_backend_runtime_ir::OP_i32x4_ne; },less=>{ if floating { return blot_backend_runtime_ir::OP_f32x4_lt; } return blot_backend_runtime_ir::OP_i32x4_lt_u; },less_equal=>{ if floating { return blot_backend_runtime_ir::OP_f32x4_le; } return blot_backend_runtime_ir::OP_i32x4_le_u; },greater=>{ if floating { return blot_backend_runtime_ir::OP_f32x4_gt; } return blot_backend_runtime_ir::OP_i32x4_gt_u; },greater_equal=>{ if floating { return blot_backend_runtime_ir::OP_f32x4_ge; } return blot_backend_runtime_ir::OP_i32x4_ge_u; },_=>{ abort("non-comparison SIMD operation"); }, }
+}
+fn simdLocals(owner: Owner&,op: blot_check_core::Op,operands: const u32[:],lanes: blot_support::Option<u8[4]>,input: u32,result: u32) -> Error {
+    let generator .= owner.generator; var vector_layout = input; if blot_backend_simd_intrinsics::pairs(op) || op == blot_check_core::Op.swizzle { vector_layout = result; } let fields = generator.representations.store.children(vector_layout); if fields.len != 4 { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.unsupported); } let scalar_type = generator.representations.store.scalar(fields[0]); if !scalar_type.present { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.unsupported); } for field in fields { if field != fields[0] { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.unsupported); } } let floating = scalar_type.value == blot_backend_runtime_ir::SC_f32;
+    var expected = operands.len; match op { select,relaxed_madd,relaxed_nmadd=>{ expected = 3; },shuffle,shift_left,shift_right,shift_right_signed,min,max,bit_andnot=>{ expected = 2; },swizzle,broadcast,bits,from_bits,bit_not,any_true,all_true=>{ expected = 1; },_=>{}, }
+    if operands.len != expected || operands.len == 0 { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.unsupported); } if blot_backend_simd_intrinsics::literalLanes(op) && !lanes.present { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.simd_lane_literal); }
+    if op == blot_check_core::Op.any_true || op == blot_check_core::Op.all_true { let loaded = simdLoad(owner,operands[0]); if loaded != Error.none { return loaded; } var reduction = blot_backend_runtime_ir::OP_i32x4_all_true; if op == blot_check_core::Op.any_true { reduction = blot_backend_runtime_ir::OP_v128_any_true; } return emit(owner,reduction); }
+    let address,error = allocateStorage(owner,16,true,AllocationRoles { rest: blot_backend_runtime_ir::ROLE_scalar }); if error != Error.none { return error; } let target = emit(owner,blot_backend_runtime_ir::OP_local_get,address); if target != Error.none { return target; }
+    match op {
+        shift_left,shift_right,shift_right_signed=>{ if floating { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.unsupported); } let loaded = simdLoad(owner,operands[0]); if loaded != Error.none { return loaded; } let count = emit(owner,blot_backend_runtime_ir::OP_local_get,operands[1]); if count != Error.none { return count; } var shift = blot_backend_runtime_ir::OP_i32x4_shr_s; if op == blot_check_core::Op.shift_left { shift = blot_backend_runtime_ir::OP_i32x4_shl; } else if op == blot_check_core::Op.shift_right { shift = blot_backend_runtime_ir::OP_i32x4_shr_u; } let emitted = emit(owner,shift); if emitted != Error.none { return emitted; } },
+        shuffle,swizzle,broadcast=>{ let first = simdLoad(owner,operands[0]); if first != Error.none { return first; } let last = simdLoad(owner,operands[operands.len - 1]); if last != Error.none { return last; } assert(lanes.present); var packed: u32 = 0; for lane,index in lanes.value { packed |= (lane as u32) << (index * 3) as u32; } let shuffled = emit(owner,blot_backend_runtime_ir::OP_i8x16_shuffle,packed); if shuffled != Error.none { return shuffled; } },
+        select=>{ for index in [1,2,0] { let loaded = simdLoad(owner,operands[index]); if loaded != Error.none { return loaded; } } let selected = emit(owner,blot_backend_runtime_ir::OP_v128_bitselect); if selected != Error.none { return selected; } },
+        relaxed_madd,relaxed_nmadd=>{ if !floating { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.unsupported); } for operand in operands { let loaded = simdLoad(owner,operand); if loaded != Error.none { return loaded; } } var operation = blot_backend_runtime_ir::OP_f32x4_relaxed_nmadd; if op == blot_check_core::Op.relaxed_madd { operation = blot_backend_runtime_ir::OP_f32x4_relaxed_madd; } let emitted = emit(owner,operation); if emitted != Error.none { return emitted; } },
+        convert_i32_f32,convert_f32_i32=>{ if floating != (op == blot_check_core::Op.convert_f32_i32) { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.unsupported); } let loaded = simdLoad(owner,operands[0]); if loaded != Error.none { return loaded; } var operation = blot_backend_runtime_ir::OP_i32x4_trunc_sat_f32x4_s; if op == blot_check_core::Op.convert_i32_f32 { operation = blot_backend_runtime_ir::OP_f32x4_convert_i32x4_s; } let converted = emit(owner,operation); if converted != Error.none { return converted; } },
+        min,max=>{ if floating { let right = simdLoad(owner,operands[1]); if right != Error.none { return right; } let left = simdLoad(owner,operands[0]); if left != Error.none { return left; } var operation = blot_backend_runtime_ir::OP_f32x4_pmax; if op == blot_check_core::Op.min { operation = blot_backend_runtime_ir::OP_f32x4_pmin; } let emitted = emit(owner,operation); if emitted != Error.none { return emitted; } }
+            else { let left = simdLoad(owner,operands[0]); if left != Error.none { return left; } let right = simdLoad(owner,operands[1]); if right != Error.none { return right; } var operation = blot_backend_runtime_ir::OP_i32x4_max_u; if op == blot_check_core::Op.min { operation = blot_backend_runtime_ir::OP_i32x4_min_u; } let emitted = emit(owner,operation); if emitted != Error.none { return emitted; } }
+        },bits,from_bits=>{ let loaded = simdLoad(owner,operands[0]); if loaded != Error.none { return loaded; } },bit_not=>{ let loaded = simdLoad(owner,operands[0]); if loaded != Error.none { return loaded; } let inverted = emit(owner,blot_backend_runtime_ir::OP_v128_not); if inverted != Error.none { return inverted; } },
+        bit_andnot=>{ let left = simdLoad(owner,operands[0]); if left != Error.none { return left; } let right = simdLoad(owner,operands[1]); if right != Error.none { return right; } let masked = emit(owner,blot_backend_runtime_ir::OP_v128_andnot); if masked != Error.none { return masked; } },
+        equal,not_equal,less,less_equal,greater,greater_equal=>{ let left = simdLoad(owner,operands[0]); if left != Error.none { return left; } let right = simdLoad(owner,operands[1]); if right != Error.none { return right; } let compared = emit(owner,simdCompare(op,floating)); if compared != Error.none { return compared; } },
+        _=>{ let scalar_op = blot_backend_scalar_ops::opcode(op,scalar_type.value); if !scalar_op.present { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.unsupported); } let vector_op,has_vector = blot_backend_runtime_ir::lift(scalar_op.value); if !has_vector { return generator.fail(owner.unit_id,0,blot_backend_core_backend::Code.unsupported); } for operand in operands { let loaded = simdLoad(owner,operand); if loaded != Error.none { return loaded; } } let emitted = emit(owner,vector_op); if emitted != Error.none { return emitted; } },
+    }
+    return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_v128_store,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address)]);
+}
+fn simdLoad(owner: Owner&,operand: u32) -> Error { return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,operand),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_v128_load,0)]); }
+fn simdPairLocals(owner: Owner&,pair: u32,into: u32[2]&) -> Error { for &local,index in into { let temporary_local,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; } local = temporary_local; let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,pair),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,(index * 4) as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,local)]); if loaded != Error.none { return loaded; } } return Error.none; }
+fn laneLiteral(source: const blot_check_core::Module&,id: u32,limit: u32) -> blot_support::Option<u8> { let node = source.node(id); if node.tag != blot_check_core::Tag.constant || source.types.node(source.typeOf(id)).tag != blot_check_types::Tag.unsigned32 || node.a >= limit { return blot_support::none<u8>(); } return blot_support::some(node.a as u8); }
+fn simdLaneLiterals(owner: Owner&,id: u32,op: blot_check_core::Op) -> blot_support::Option<u8[4]> {
+    let source .= owner.generator.unit(owner.unit_id); let limit = blot_backend_simd_intrinsics::laneLimit(op); if op == blot_check_core::Op.broadcast { let lane = laneLiteral(source,id,limit); if !lane.present { return blot_support::none<u8[4]>(); } return blot_support::some([lane.value;4]); } if source.node(id).tag != blot_check_core::Tag.product { return blot_support::none<u8[4]>(); } let children = source.children(id); if children.len != 4 { return blot_support::none<u8[4]>(); }
+    var lanes: u8[4]; for child,index in children { let lane = laneLiteral(source,child,limit); if !lane.present { return blot_support::none<u8[4]>(); } lanes[index] = lane.value; } return blot_support::some(lanes);
+}
+recursive fn simdExpression(owner: Owner&,id: u32,input: u32,result: u32,depth: i64) -> Error {
+    let generator .= owner.generator; let value = generator.unit(owner.unit_id).node(id); var lanes = blot_support::none<u8[4]>(); var operands: u32[3]; var count: i64 = 0;
+    if value.op == blot_check_core::Op.shuffle || value.op == blot_check_core::Op.swizzle { lanes = simdLaneLiterals(owner,value.a,value.op); if !lanes.present { return generator.fail(owner.unit_id,value.a,blot_backend_core_backend::Code.simd_lane_literal); } }
+    else { let operand,error = capture(owner,value.a,depth); if error != Error.none { return error; } operands[0] = operand; count = 1; }
+    if value.op == blot_check_core::Op.broadcast { lanes = simdLaneLiterals(owner,value.b,value.op); if !lanes.present { return generator.fail(owner.unit_id,value.b,blot_backend_core_backend::Code.simd_lane_literal); } }
+    else if value.b != 0 { var next: u32[2]; let supplied,error = simdOperand(owner,value.op,value.b,next,depth); if error != Error.none { return error; } for index in 0..supplied { operands[count + index] = next[index]; } count += supplied; } return simdLocals(owner,value.op,operands[..count],lanes,input,result);
+}
+recursive fn simdOperand(owner: Owner&,op: blot_check_core::Op,id: u32,into: u32[2]&,depth: i64) -> i64,Error {
+    let source .= owner.generator.unit(owner.unit_id); if !blot_backend_simd_intrinsics::pairs(op) { let operand,error = capture(owner,id,depth); if error != Error.none { return 0,error; } into[0] = operand; return 1,Error.none; }
+    if source.node(id).tag == blot_check_core::Tag.product && source.children(id).len == 2 { for child,index in source.children(id) { let operand,error = capture(owner,child,depth); if error != Error.none { return 0,error; } into[index] = operand; } }
+    else { let pair,error = capture(owner,id,depth); if error != Error.none { return 0,error; } let unpacked = simdPairLocals(owner,pair,into); if unpacked != Error.none { return 0,unpacked; } } return 2,Error.none;
+}
+fn arrayStructural(owner: Owner&,op: blot_backend_collection_ops::Op,locals: const u32[:],scalar_elements: bool,stride: u32,element: u32) -> Error {
+    let count,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; } let left_count,left_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if left_error != Error.none { return left_error; } let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[0]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,left_count)]); if loaded != Error.none { return loaded; }
+    if op == blot_backend_collection_ops::Op.concat { let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,left_count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_tee,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,left_count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_lt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if checked != Error.none { return checked; } }
+    else { let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,left_count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_gt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),
+        blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[2]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_tee,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,left_count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_gt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if checked != Error.none { return checked; } }
+    let bytes,byte_error = arraySize(owner,count,stride); if byte_error != Error.none { return byte_error; } let address,address_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if address_error != Error.none { return address_error; } let length = emit(owner,blot_backend_runtime_ir::OP_local_get,bytes); if length != Error.none { return length; } let allocated = allocateArray(owner,scalar_elements,element); if allocated != Error.none { return allocated; }
+    let prepared = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add)]); if prepared != Error.none { return prepared; }
+    if op == blot_backend_collection_ops::Op.slice { let source = arrayAddress(owner,locals[0],locals[1],stride); if source != Error.none { return source; } } else { let source = emit(owner,blot_backend_runtime_ir::OP_local_get,locals[0]); if source != Error.none { return source; } }
+    let source = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add)]); if source != Error.none { return source; } var copied_count = left_count; if op == blot_backend_collection_ops::Op.slice { copied_count = count; } assert(owner.generator.module.arena.present);
+    let copied = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,copied_count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,stride),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_mul),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,owner.generator.module.arena.value.copy_words)]); if copied != Error.none { return copied; }
+    if op == blot_backend_collection_ops::Op.concat { let target = emit(owner,blot_backend_runtime_ir::OP_local_get,address); if target != Error.none { return target; } let destination = arrayAddress(owner,address,left_count,stride); if destination != Error.none { return destination; }
+        let copied = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,left_count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,stride),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_mul),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,owner.generator.module.arena.value.copy_words)]); if copied != Error.none { return copied; }
+    } return emit(owner,blot_backend_runtime_ir::OP_local_get,address);
+}
+fn descriptor(owner: Owner&,function: u32,environment: u32) -> Error { return descriptor(owner,function,blot_support::some(environment)); }
+fn descriptor(owner: Owner&,function: u32,environment: blot_support::Option<u32>) -> Error {
+    let generator .= owner.generator; if !environment.present { let address,error = generator.static_data.closureData(generator,function,0); if error != Error.none { return error; } return referenceConstant(owner,address,blot_reuse_artifact_emitter::Role.static_address); }
+    let role = generator.module.functions[function].parameterRole(0); let address,error = allocate(owner,blot_runtime_runtime_layout::Closure_bytes,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar,role] }); if error != Error.none { return error; } let target = emit(owner,blot_backend_runtime_ir::OP_local_get,address); if target != Error.none { return target; } let reference = referenceConstant(owner,function,blot_reuse_artifact_emitter::Role.callable_function); if reference != Error.none { return reference; }
+    let stored = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::Closure_function),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,environment.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::Closure_environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address)]); return stored;
+}
+fn callableImplementationLayout(owner: Owner&,id: u32) -> u32,Error { let source .= owner.generator.unit(owner.unit_id); let value,error = codeLayout(owner,source.typeOf(id),source.span(id)); if error != Error.none { return 0,error; } let node = owner.generator.representations.store.node(value); if node.tag == blot_backend_layout::Tag.universal { return node.a,Error.none; } return value,Error.none; }
+fn copyRoles(values: const blot_backend_runtime_ir::Role[:]) -> blot_backend_runtime_ir::Role[:] { if values.len == 0 { return []; } let copy = owned_roles.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
+fn prepareTemplate(owner: Owner&,id: u32) -> TemplatePreparation,Error {
+    assert(owner.preparing); var capture_types = WordBuffer {}; var capture_roles = RoleBuffer {}; var templates = blot_backend_substitution_buffers::Entries {}; var values = blot_backend_substitution_buffers::Entries {}; var static_types = WordBuffer {};
+    recursive fn prepare() -> TemplatePreparation,Error {
+        let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); let captures = source.closureCaptures(id); let empty = TemplatePreparation { Template { node: id },[],[],blot_support::none<blot_reuse_code_artifacts::ClosureKey>() };
+        for binding in captures {
+            let template .= owner.templates.get(binding); if template != null { let appended = capture_types.push(1); if appended != Error.none { return empty,appended; } let key,key_error = generator.captureTemplate(template); if key_error != Error.none { return empty,key_error; } let captured = templates.push(blot_reuse_substitution_keys::Entry { binding,key }); if captured != Error.none { return empty,captured; } }
+            else { let concrete,error = codeLayout(owner,source.binding(binding).ty,source.span(id)); if error != Error.none { return empty,error; } let checked = checkComputationABI(owner,binding,concrete,id); if checked != Error.none { return empty,checked; } let appended = capture_types.push(concrete); if appended != Error.none { return empty,appended; } }
+        }
+        let capture_layout,layout_error = generator.internLayout(blot_backend_layout::Tag.product,0,0,capture_types.items); if layout_error != Error.none { return empty,layout_error; }
+        for ty in capture_types.items { let appended = capture_roles.push(generator.layoutRole(ty)); if appended != Error.none { return empty,appended; } }
+        for binding,index in captures { let template .= owner.templates.get(binding); if template != null { capture_roles.items[index] = blot_backend_runtime_ir::ROLE_reference; if template.scalar_environment { capture_roles.items[index] = blot_backend_runtime_ir::ROLE_scalar; } } }
+        let template_key,key_error = generator.representations.template_keys.intern(templates.items); if key_error != Error.none { if key_error == Error.out_of_memory { return empty,key_error; } return empty,generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); }
+        var evidence: u32 = 0; var rows: u32 = 0; if owner.factory_template { let mapped,mapped_error = generator.mappingEvidence(owner.mappings); if mapped_error != Error.none { return empty,mapped_error; } evidence = mapped; let row_mappings,row_error = generator.rowMappingEvidence(owner.row_mappings); if row_error != Error.none { return empty,row_error; } rows = row_mappings; }
+        var staged: u32 = 0; if owner.staged.present { staged = owner.staged.value; } var environment = blot_support::none<u32>(); if captures.len != 0 { environment = blot_support::some(0 as u32); }
+        var metadata = Template { unit: owner.unit_id,node: id,staged,environment,captures: capture_layout,templates: template_key,evidence,rows }; var static_key = blot_support::none<blot_reuse_code_artifacts::ClosureKey>();
+        if node.tag == blot_check_core::Tag.closure && owner.static_values.table.count != 0 {
+            for binding in captures { let value .= owner.static_values.get(binding); if value != null { let appended = values.push(blot_reuse_substitution_keys::Entry { binding,value }); if appended != Error.none { return empty,appended; } } let concrete,error = codeLayout(owner,source.binding(binding).ty,source.span(id)); if error != Error.none { return empty,error; } let appended = static_types.push(concrete); if appended != Error.none { return empty,appended; } }
+            if values.items.len != 0 { let ty,type_error = callableImplementationLayout(owner,id); if type_error != Error.none { return empty,type_error; } let captures,capture_error = generator.internLayout(blot_backend_layout::Tag.product,0,0,static_types.items); if capture_error != Error.none { return empty,capture_error; } let static_values,static_error = generator.representations.static_keys.intern(values.items); if static_error != Error.none { if static_error == Error.out_of_memory { return empty,static_error; } return empty,generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); }
+                static_key = blot_support::some(blot_reuse_code_artifacts::ClosureKey { unit: owner.unit_id,catalog: node.a,ty,captures,templates: metadata.templates,staged: metadata.staged,static_values });
+            }
+        }
+        if node.tag == blot_check_core::Tag.closure && !owner.factory_template && !static_key.present && templates.items.len == 0 && generator.representations.store.scalarEnvironment(capture_layout) { metadata.scalar_environment = true; }
+        return TemplatePreparation { metadata,copyWords(capture_types.items),copyRoles(capture_roles.items),static_key },Error.none;
+    }
+    let result,error = prepare(); static_types.deinit(); values.deinit(); templates.deinit(); capture_roles.deinit(); capture_types.deinit(); return result,error;
+}
+fn scopedCallableInstances(owner: Owner&,id: u32) -> u32,Error { return scopedCallableTargetInstances(owner,id,blot_support::none<blot_check_core::BindingRef>()); }
+fn scopedCallableTargetInstances(owner: Owner&,id: u32,supplied: blot_check_core::BindingRef) -> u32,Error { return scopedCallableTargetInstances(owner,id,blot_support::some(supplied)); }
+fn scopedCallableTargetInstances(owner: Owner&,id: u32,supplied: blot_support::Option<blot_check_core::BindingRef>) -> u32,Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); if node.tag != blot_check_core::Tag.reference && !supplied.present { return 0,Error.none; } var ty = node.ty; var scoped = false;
+    for index in 0..max_parameters { let arrow = source.types.node(ty); if arrow.tag != blot_check_types::Tag.function { break; } if source.types.node(arrow.a).tag == blot_check_types::Tag.scoped { scoped = true; } ty = arrow.b; } if !scoped { return 0,Error.none; }
+    var target = supplied; if !target.present { let normalized,error = generator.normalize(owner.unit_id,source.reference(id)); if error != Error.none { return 0,error; } target = blot_support::some(normalized); }
+    let selected,error = generator.signature(target.value,node.ty,owner.unit_id,owner.mappings,owner.row_mappings,source.span(id),false); if error != Error.none { return 0,error; } return selected.instance_arguments,Error.none;
+}
+fn templateAt(owner: Owner&,template: Template,id: u32) -> Template,Error {
+    let generator .= owner.generator; var unit = template.unit; if unit == 0 { unit = owner.unit_id; } let source .= generator.unit(unit); if source.node(template.node).tag != blot_check_core::Tag.reference { return template,Error.none; } let target,error = generator.normalize(unit,source.reference(template.node)); if error != Error.none { return template,error; } let instances,instance_error = scopedCallableTargetInstances(owner,id,target); if instance_error != Error.none { return template,instance_error; } if instances == 0 { return template,Error.none; } var selected = template; selected.callable_instances = instances; return selected,Error.none;
+}
+fn newTemplate(owner: Owner&,id: u32) -> Template,Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id);
+    if node.tag == blot_check_core::Tag.reference { let reference = source.reference(id); if reference.unit == 0 || reference.unit == owner.unit_id { let template .= owner.templates.get(reference.binding); if template != null { return templateAt(owner,template,id); } } let instances,error = scopedCallableInstances(owner,id); return Template { unit: owner.unit_id,node: id,callable_instances: instances },error; }
+    if node.tag == blot_check_core::Tag.constructor_function || node.tag == blot_check_core::Tag.primitive_function { let instances,error = scopedCallableInstances(owner,id); return Template { unit: owner.unit_id,node: id,callable_instances: instances },error; }
+    let captures = source.closureCaptures(id); var selected = TemplatePreparation { Template { node: id },[],[],blot_support::none<blot_reuse_code_artifacts::ClosureKey>() }; match resolvedPlan(owner,id) { template plan=>{ selected = plan.value; },_=>{ assert(false); }, }
+    if selected.metadata.scalar_environment { let environment,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return Template { node: id },error; } let local .= owner.locals.get(captures[0]); if local == null { return Template { node: id },generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); } let copied = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,local),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,environment)]); if copied != Error.none { return Template { node: id },copied; } var metadata = selected.metadata; metadata.environment = blot_support::some(environment); return metadata,Error.none; }
+    var environment = blot_support::none<u32>(); if captures.len != 0 { let address,error = allocate(owner,(captures.len * 4) as u32,AllocationRoles { words: selected.capture_roles }); if error != Error.none { return Template { node: id },error; } environment = blot_support::some(address); }
+    for binding,index in captures {
+        assert(environment.present); let address = emit(owner,blot_backend_runtime_ir::OP_local_get,environment.value); if address != Error.none { return Template { node: id },address; } var found = false;
+        { let local .= owner.locals.get(binding); if local != null { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,local); if loaded != Error.none { return Template { node: id },loaded; } found = true; } }
+        if !found { let template .= owner.templates.get(binding); if template == null { return Template { node: id },generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); } var loaded: Error; if template.environment.present { loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,template.environment.value); } else { loaded = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if loaded != Error.none { return Template { node: id },loaded; } }
+        var store = blot_backend_runtime_ir::OP_i32_store; if generator.representations.store.machine(selected.capture_types[index]) == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; } let stored = emit(owner,store,(index * 4) as u32); if stored != Error.none { return Template { node: id },stored; }
+    }
+    var metadata = selected.metadata; metadata.environment = environment; return metadata,Error.none;
+}
+fn computationAction(owner: Owner&,ty: u32) -> blot_support::Option<u32> { let layouts .= owner.generator.representations.store; let node = layouts.node(ty); if node.tag != blot_backend_layout::Tag.nominal || node.a != 4294967295 || node.b != 5 || layouts.children(ty).len != 1 { return blot_support::none<u32>(); } let action = layouts.children(ty)[0]; if layouts.node(action).tag != blot_backend_layout::Tag.function { return blot_support::none<u32>(); } return blot_support::some(action); }
+fn checkComputationABI(owner: Owner&,binding: u32,expected: u32,source: u32) -> Error {
+    let actual .= owner.computation_values.get(binding); if actual == null { return Error.none; } let given = computationAction(owner,actual); if !given.present { return Error.none; } let required = computationAction(owner,expected); if !required.present { return Error.none; } let layouts .= owner.generator.representations.store; if layouts.machine(layouts.node(given.value).b) != layouts.machine(layouts.node(required.value).b) { return owner.generator.fail(owner.unit_id,source,blot_backend_core_backend::Code.unresolved_type); } return Error.none;
+}
+recursive fn sourceTemplate(owner: Owner&,unit: u32,id: u32,parameters: const blot_check_core::Parameter[:],arguments: const bool[:],depth: i64) -> bool {
+    if depth >= 1024 { return false; } let source .= owner.generator.unit(unit); let node = source.node(id); if node.tag == blot_check_core::Tag.closure || node.tag == blot_check_core::Tag.primitive_function || node.tag == blot_check_core::Tag.constructor_function { return true; } if node.tag != blot_check_core::Tag.reference { return false; } let reference = source.reference(id); if reference.unit != 0 && reference.unit != unit { return true; }
+    for parameter,index in parameters { if parameter.binding == reference.binding { return arguments[index]; } } if source.types.node(node.ty).tag != blot_check_types::Tag.function { return false; } let binding = source.binding(reference.binding); if binding.kind == blot_check_core::BindingKind.global || binding.kind == blot_check_core::BindingKind.external { return true; } return binding.initializer != 0 && sourceTemplate(owner,unit,binding.initializer,parameters,arguments,depth + 1);
+}
+recursive fn factoryTemplateResult(owner: Owner&,unit: u32,id: u32,parameters: const blot_check_core::Parameter[:],arguments: const bool[:],depth: i64) -> bool {
+    if depth >= 1024 { return false; } let source .= owner.generator.unit(unit); let node = source.node(id);
+    match node.tag {
+        computation,effect_scope=>{ return sourceTemplate(owner,unit,node.a,parameters,arguments,depth + 1); },reference=>{ let reference = source.reference(id); if reference.unit != 0 && reference.unit != unit { return false; } for parameter,index in parameters { if parameter.binding == reference.binding { return arguments[index]; } } let binding = source.binding(reference.binding); return binding.initializer != 0 && factoryTemplateResult(owner,unit,binding.initializer,parameters,arguments,depth + 1); },
+        call=>{ let call = source.call(id); let target,error = owner.generator.normalize(unit,call.target); if error != Error.none { return false; } let producer .= owner.generator.unit(target.unit); let body .= producer.body(target.binding); if body == null || !body.is_function || body.parameters.len != call.arguments.len || call.arguments.len > 16 { return false; } var admitted: bool[16] = [false;16]; for argument,index in call.arguments { admitted[index] = sourceTemplate(owner,unit,argument,parameters,arguments,depth + 1); } return factoryTemplateResult(owner,target.unit,body.root,producer.bodyParameters(body),admitted[..call.arguments.len],depth + 1); },
+        block_=>{ for statement in source.children(id) { let value = source.node(statement); if value.tag == blot_check_core::Tag.return_ && value.b == id { return factoryTemplateResult(owner,unit,value.a,parameters,arguments,depth + 1); } } return false; },
+        if_value=>{ return factoryTemplateResult(owner,unit,node.b,parameters,arguments,depth + 1) && factoryTemplateResult(owner,unit,node.c,parameters,arguments,depth + 1); },_=>{ return false; },
+    }
+}
+fn isCallableTemplate(owner: Owner&,id: u32) -> bool {
+    let source .= owner.generator.unit(owner.unit_id); let node = source.node(id);
+    if owner.dictionary_owner.present && node.tag == blot_check_core::Tag.reference { let reference = source.reference(id); var unit = reference.unit; if unit == 0 { unit = owner.unit_id; } let kind = owner.generator.unit(unit).binding(reference.binding).kind; if kind == blot_check_core::BindingKind.global || kind == blot_check_core::BindingKind.external { let target,error = owner.generator.normalize(owner.unit_id,reference); if error != Error.none { return false; } if blot_check_dictionary_owner::forBinding(owner.generator.unit(target.unit),target.binding).present { return false; } } }
+    if node.tag == blot_check_core::Tag.closure || node.tag == blot_check_core::Tag.primitive_function || node.tag == blot_check_core::Tag.constructor_function { return true; } if node.tag != blot_check_core::Tag.reference { return false; } let reference = source.reference(id);
+    if reference.unit == 0 || reference.unit == owner.unit_id { if owner.templates.contains(reference.binding) { return true; } if source.types.node(node.ty).tag != blot_check_types::Tag.function { return false; } let kind = source.binding(reference.binding).kind; return kind == blot_check_core::BindingKind.global || kind == blot_check_core::BindingKind.external; } return source.types.node(node.ty).tag == blot_check_types::Tag.function;
+}
+recursive fn sourceArgumentLayout(owner: Owner&,selected: u32,actual: u32,depth: i64) -> u32,Error {
+    let generator .= owner.generator; if depth >= 1024 { return 0,generator.decline(owner.unit_id,blot_check_core::Span { 0,0 },blot_backend_core_backend::Code.complexity); } if selected == blot_backend_layout::erased { return actual,Error.none; } let wanted = generator.representations.store.node(selected); let given = generator.representations.store.node(actual); if wanted.tag != given.tag { return selected,Error.none; }
+    if wanted.tag == blot_backend_layout::Tag.function { let parameter,error = sourceArgumentLayout(owner,wanted.a,given.a,depth + 1); if error != Error.none { return 0,error; } let result,result_error = sourceArgumentLayout(owner,wanted.b,given.b,depth + 1); if result_error != Error.none { return 0,result_error; } return generator.internLayoutWithEffects(blot_backend_layout::Tag.function,parameter,result,wanted.c,[]); }
+    if wanted.tag == blot_backend_layout::Tag.array || wanted.tag == blot_backend_layout::Tag.list { let parameter,error = sourceArgumentLayout(owner,wanted.a,given.a,depth + 1); if error != Error.none { return 0,error; } return generator.internLayoutWithEffects(wanted.tag,parameter,wanted.b,wanted.c,[]); }
+    if wanted.tag != blot_backend_layout::Tag.product && wanted.tag != blot_backend_layout::Tag.nominal && wanted.tag != blot_backend_layout::Tag.record { return selected,Error.none; }
+    if wanted.tag == blot_backend_layout::Tag.nominal && (wanted.a != given.a || wanted.b != given.b) { return selected,Error.none; } let count = generator.representations.store.children(selected).len; if count != generator.representations.store.children(actual).len { return selected,Error.none; } var children = WordBuffer {};
+    recursive fn collect() -> u32,Error {
+        if wanted.tag == blot_backend_layout::Tag.record {
+            var index: i64 = 0; while index < count { let name = generator.representations.store.children(selected)[index]; let left = generator.representations.store.children(selected)[index + 1]; var right = blot_support::none<u32>(); var position: i64 = 0;
+                while position < count { if generator.representations.store.children(actual)[position] == name { right = blot_support::some(generator.representations.store.children(actual)[position + 1]); break; } position += 2; } if !right.present { return selected,Error.none; } let named = children.push(name); if named != Error.none { return 0,named; } let child,error = sourceArgumentLayout(owner,left,right.value,depth + 1); if error != Error.none { return 0,error; } let appended = children.push(child); if appended != Error.none { return 0,appended; } index += 2;
+            } return generator.internLayout(blot_backend_layout::Tag.record,0,0,children.items);
+        }
+        for index in 0..count { let left = generator.representations.store.children(selected)[index]; let right = generator.representations.store.children(actual)[index]; let child,error = sourceArgumentLayout(owner,left,right,depth + 1); if error != Error.none { return 0,error; } let appended = children.push(child); if appended != Error.none { return 0,appended; } }
+        var unit: u32 = 0; var declaration: u32 = 0; if wanted.tag == blot_backend_layout::Tag.nominal { unit = wanted.a; declaration = wanted.b; } return generator.internLayout(wanted.tag,unit,declaration,children.items);
+    }
+    let result,error = collect(); children.deinit(); return result,error;
+}
+fn callableTemplate(owner: Owner&,id: u32) -> blot_support::Option<Template>,Error {
+    let evaluated,evaluated_error = staticCallableTemplate(owner,id); if evaluated_error != Error.none || evaluated.present { return evaluated,evaluated_error; } let source .= owner.generator.unit(owner.unit_id); let node = source.node(id);
+    if node.tag == blot_check_core::Tag.closure || node.tag == blot_check_core::Tag.primitive_function || node.tag == blot_check_core::Tag.constructor_function { let template,error = newTemplate(owner,id); if error != Error.none { return blot_support::none<Template>(),error; } return blot_support::some(template),Error.none; }
+    if node.tag != blot_check_core::Tag.reference { return blot_support::none<Template>(),Error.none; } let reference = source.reference(id); if reference.unit == 0 || reference.unit == owner.unit_id { let template .= owner.templates.get(reference.binding); if template != null { if template.computation { return blot_support::none<Template>(),Error.none; } let selected,error = templateAt(owner,template,id); if error != Error.none { return blot_support::none<Template>(),error; } return blot_support::some(selected),Error.none; } let kind = source.binding(reference.binding).kind; if kind != blot_check_core::BindingKind.global && kind != blot_check_core::BindingKind.external { return blot_support::none<Template>(),Error.none; } }
+    let template,error = newTemplate(owner,id); if error != Error.none { return blot_support::none<Template>(),error; } return blot_support::some(template),Error.none;
+}
+recursive fn computationTemplate(owner: Owner&,id: u32) -> blot_support::Option<Template>,Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id);
+    if node.tag == blot_check_core::Tag.reference { let reference = source.reference(id); if reference.unit == 0 || reference.unit == owner.unit_id { let template .= owner.templates.get(reference.binding); if template != null && template.computation { return blot_support::some(template),Error.none; } } return blot_support::none<Template>(),Error.none; }
+    if node.tag == blot_check_core::Tag.computation { let callable,error = callableTemplate(owner,node.a); if error != Error.none || !callable.present { return blot_support::none<Template>(),error; } var template = callable.value; template.computation = true; return blot_support::some(template),Error.none; }
+    var selected = blot_support::none<FactoryPlan>(); match node.tag { apply=>{ match resolvedPlan(owner,id) { application plan=>{ selected = plan.value.factory; },_=>{ assert(false); }, } },call=>{ match resolvedPlan(owner,id) { named plan=>{ selected = plan.value.factory; },_=>{ assert(false); }, } },_=>{ return blot_support::none<Template>(),Error.none; }, } if !selected.present { return blot_support::none<Template>(),Error.none; } let plan = selected.value;
+    var arguments: u32[16]; var environment = blot_support::none<u32>();
+    recursive fn invoke(operands: const u32[:]) -> blot_support::Option<Template>,Error {
+        for argument,index in operands {
+            if node.tag == blot_check_core::Tag.apply { let scalar_type,scalar_error = scalar(owner,argument); if scalar_error != Error.none { return blot_support::none<Template>(),scalar_error; } let local,error = temporary(owner,blot_backend_runtime_ir::machine(scalar_type)); if error != Error.none { return blot_support::none<Template>(),error; } arguments[index] = local; }
+            if plan.admitted[index] {
+                let argument_node = source.node(argument); var retained = blot_support::none<Template>(); if argument_node.tag == blot_check_core::Tag.reference { let reference = source.reference(argument); if reference.unit == 0 || reference.unit == owner.unit_id { let known .= owner.templates.get(reference.binding); if known != null { retained = blot_support::some(known); } } }
+                if !retained.present { let callable,error = callableTemplate(owner,argument); if error != Error.none { return blot_support::none<Template>(),error; } retained = callable; } if !retained.present { return blot_support::none<Template>(),generator.fail(owner.unit_id,argument,blot_backend_core_backend::Code.unresolved_type); } let metadata = retained.value;
+                if node.tag != blot_check_core::Tag.apply { let local,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return blot_support::none<Template>(),error; } arguments[index] = local; } var loaded: Error; if metadata.environment.present { loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,metadata.environment.value); } else { loaded = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if loaded != Error.none { return blot_support::none<Template>(),loaded; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,arguments[index]); if saved != Error.none { return blot_support::none<Template>(),saved; }
+            } else if node.tag == blot_check_core::Tag.apply { let evaluated = expression(owner,argument,0); if evaluated != Error.none { return blot_support::none<Template>(),evaluated; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,arguments[index]); if saved != Error.none { return blot_support::none<Template>(),saved; } }
+            else { let value,error = capture(owner,argument,0); if error != Error.none { return blot_support::none<Template>(),error; } arguments[index] = value; }
+        }
+        var function: u32 = 0; match plan.callee { named named=>{ let selected,error = generator.function(named.key); if error != Error.none { return blot_support::none<Template>(),error; } function = selected; },closure closure=>{ let selected,error = generator.closureFunction(closure.key); if error != Error.none { return blot_support::none<Template>(),error; } function = selected; }, }
+        if node.tag == blot_check_core::Tag.apply { var loaded: Error; if environment.present { loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,environment.value); } else { loaded = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if loaded != Error.none { return blot_support::none<Template>(),loaded; } } let loaded = emitLocals(owner,arguments[..operands.len]); if loaded != Error.none { return blot_support::none<Template>(),loaded; } let provider = providerHead(owner); if provider != Error.none { return blot_support::none<Template>(),provider; } let called = emit(owner,blot_backend_runtime_ir::OP_call,function); if called != Error.none { return blot_support::none<Template>(),called; }
+        let result_environment,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return blot_support::none<Template>(),error; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,result_environment); if saved != Error.none { return blot_support::none<Template>(),saved; } var result = plan.result; if result.environment.present { result.environment = blot_support::some(result_environment); } return blot_support::some(result),Error.none;
+    }
+    if node.tag == blot_check_core::Tag.apply { let factory,error = callableTemplate(owner,node.a); if error != Error.none { return blot_support::none<Template>(),error; } if !factory.present { return blot_support::none<Template>(),generator.fail(owner.unit_id,node.a,blot_backend_core_backend::Code.unresolved_type); } environment = factory.value.environment; return invoke([node.b]); } return invoke(source.call(id).arguments);
+}
+fn boxTemplate(owner: Owner&,template: Template) -> Template,Error {
+    if !template.scalar_environment { return template,Error.none; } let environment,error = allocate(owner,4,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar] }); if error != Error.none { return template,error; } assert(template.environment.present); let stored = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,template.environment.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,0)]); if stored != Error.none { return template,stored; } var boxed = template; boxed.environment = blot_support::some(environment); boxed.scalar_environment = false; return boxed,Error.none;
+}
+fn publishTemplate(owner: Owner&,supplied: Template,source: u32) -> Error {
+    let template,error = boxTemplate(owner,supplied); if error != Error.none { return error; } let retained,retained_error = owner.generator.captureTemplate(template); if retained_error != Error.none { return retained_error; } if owner.result_template.present { if owner.result_template.value != retained { return owner.generator.fail(owner.unit_id,source,blot_backend_core_backend::Code.unresolved_type); } } else { owner.result_template = blot_support::some(retained); }
+    if template.environment.present { return emit(owner,blot_backend_runtime_ir::OP_local_get,template.environment.value); } return emit(owner,blot_backend_runtime_ir::OP_i32_const,0);
+}
+recursive fn templateExpression(owner: Owner&,id: u32,depth: i64) -> Error {
+    let previous_semantic = owner.semantic_node; owner.semantic_node = id;
+    recursive fn lower() -> Error {
+        let generator .= owner.generator; if depth >= 1024 { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); } let source .= generator.unit(owner.unit_id); let node = source.node(id);
+        match node.tag {
+            computation,reference,call,apply=>{ let template,error = computationTemplate(owner,id); if error != Error.none { return error; } if !template.present { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } return publishTemplate(owner,template.value,id); },
+            block_=>{ var join = blot_backend_resolved_flow::Join { node: id,result: blot_support::none<blot_backend_runtime_ir::ValueType>(),merges: [] }; match resolvedPlan(owner,id) { join plan=>{ join = plan.value; },_=>{ assert(false); }, } assert(join.result.present); let entered = emit(owner,blot_backend_runtime_ir::OP_block,join.result.value as u32); if entered != Error.none { return entered; }
+                let pushed = owner.return_targets.push(ReturnTarget { node: id,label: owner.labels,cleanup: owner.cleanups.mark(),template_result: true }); if pushed != Error.none { return pushed; } owner.labels++; let terminated,error = suite(owner,id,depth + 1); if error != Error.none { return error; } if terminated { let unreachable = emit(owner,blot_backend_runtime_ir::OP_unreachable_); if unreachable != Error.none { return unreachable; } } else { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); }
+                owner.labels--; owner.return_targets.resize(owner.return_targets.items.len - 1); return emit(owner,blot_backend_runtime_ir::OP_end);
+            },
+            if_value=>{ var join = blot_backend_resolved_flow::Join { node: id,result: blot_support::none<blot_backend_runtime_ir::ValueType>(),merges: [] }; match resolvedPlan(owner,id) { join plan=>{ join = plan.value; },_=>{ assert(false); }, } assert(join.result.present); let condition = expression(owner,node.a,depth + 1); if condition != Error.none { return condition; } let entered = emit(owner,blot_backend_runtime_ir::OP_if_,join.result.value as u32); if entered != Error.none { return entered; } owner.labels++;
+                let left = templateExpression(owner,node.b,depth + 1); if left != Error.none { return left; } let alternate = emit(owner,blot_backend_runtime_ir::OP_else_); if alternate != Error.none { return alternate; } let right = templateExpression(owner,node.c,depth + 1); if right != Error.none { return right; } owner.labels--; return emit(owner,blot_backend_runtime_ir::OP_end);
+            },panic=>{ return emit(owner,blot_backend_runtime_ir::OP_unreachable_); },_=>{ return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); },
+        }
+    }
+    let error = lower(); owner.semantic_node = previous_semantic; return error;
+}
+recursive fn templateValue(owner: Owner&,template: Template,requested: u32) -> Error {
+    let generator .= owner.generator; var ty = requested; var dictionaries = false;
+    if template.computation { let value = generator.representations.store.node(requested); if value.tag != blot_backend_layout::Tag.nominal || value.a != 4294967295 || value.b != 5 || generator.representations.store.children(requested).len != 1 { return generator.fail(owner.unit_id,template.node,blot_backend_core_backend::Code.unresolved_type); } ty = generator.representations.store.children(requested)[0]; }
+    if generator.representations.store.node(ty).tag == blot_backend_layout::Tag.universal { var unit = template.unit; if unit == 0 { unit = owner.unit_id; } let producer .= generator.unit(unit); let principal = producer.typeOf(template.node); dictionaries = producer.types.node(principal).tag == blot_check_types::Tag.forall && producer.types.quantifierGoals(principal).len != 0; ty = generator.representations.store.node(ty).a; }
+    let function,error = templateFunction(owner,template,ty,dictionaries); if error != Error.none { return error; } return descriptor(owner,function,template.environment);
+}
+recursive fn templateFunction(owner: Owner&,template: Template,ty: u32,dictionaries: bool) -> u32,Error {
+    let generator .= owner.generator; var unit = template.unit; if unit == 0 { unit = owner.unit_id; } let source .= generator.unit(unit); let node = source.node(template.node);
+    match node.tag {
+        closure=>{ return generator.closureFunction(blot_reuse_code_artifacts::ClosureKey { unit,catalog: node.a,ty,scalar_environment: template.scalar_environment,captures: template.captures,templates: template.templates,staged: template.staged,evidence: template.evidence,rows: template.rows,dictionaries }); },
+        constructor_function=>{ return generator.constructorFunction(blot_reuse_code_artifacts::ConstructorKey { unit,catalog: node.a,ty }); },primitive_function=>{ return generator.primitiveFunction(blot_reuse_code_artifacts::PrimitiveKey { unit,catalog: node.a,ty }); },
+        reference=>{ let target,error = generator.normalize(unit,source.reference(template.node)); if error != Error.none { return 0,error; } return generator.callable(blot_reuse_code_artifacts::CallableKey { target,ty,dictionaries,instance_arguments: template.callable_instances }); },_=>{ return 0,generator.fail(owner.unit_id,template.node,blot_backend_core_backend::Code.unsupported); },
+    }
+}
+recursive fn closure(owner: Owner&,id: u32) -> Error { let source .= owner.generator.unit(owner.unit_id); let static_captures,error = closureWithStaticCaptures(owner,id); if error != Error.none || static_captures { return error; } let template,template_error = newTemplate(owner,id); if template_error != Error.none { return template_error; } let ty,type_error = codeLayout(owner,source.typeOf(id),source.span(id)); if type_error != Error.none { return type_error; } return templateValue(owner,template,ty); }
+recursive fn closureWithStaticCaptures(owner: Owner&,id: u32) -> bool,Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var key = blot_support::none<blot_reuse_code_artifacts::ClosureKey>(); match resolvedPlan(owner,id) { template plan=>{ key = plan.value.static_key; },_=>{ assert(false); }, } if !key.present { return false,Error.none; } let captures = source.closureCaptures(id); var capture_types = WordBuffer {}; var capture_roles = RoleBuffer {};
+    recursive fn lower() -> bool,Error {
+        let copied = capture_types.append(generator.representations.store.children(key.value.captures)); if copied != Error.none { return false,copied; } let function,error = generator.closureFunction(key.value); if error != Error.none { return false,error; }
+        for ty in capture_types.items { let appended = capture_roles.push(generator.layoutRole(ty)); if appended != Error.none { return false,appended; } } for binding,index in captures { if owner.static_values.contains(binding) { capture_roles.items[index] = blot_backend_runtime_ir::ROLE_scalar; } }
+        let environment,environment_error = allocate(owner,(captures.len * 4) as u32,AllocationRoles { words: capture_roles.items }); if environment_error != Error.none { return false,environment_error; }
+        for binding,index in captures {
+            let target = emit(owner,blot_backend_runtime_ir::OP_local_get,environment); if target != Error.none { return false,target; } if owner.static_values.contains(binding) { let cleared = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,(index * 4) as u32)]); if cleared != Error.none { return false,cleared; } continue; }
+            var found = false; { let local .= owner.locals.get(binding); if local != null { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,local); if loaded != Error.none { return false,loaded; } found = true; } }
+            if !found { let template .= owner.templates.get(binding); if template == null { return false,generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); } var loaded: Error; if template.environment.present { loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,template.environment.value); } else { loaded = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if loaded != Error.none { return false,loaded; } }
+            var store = blot_backend_runtime_ir::OP_i32_store; if generator.representations.store.machine(capture_types.items[index]) == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; } let stored = emit(owner,store,(index * 4) as u32); if stored != Error.none { return false,stored; }
+        }
+        let described = descriptor(owner,function,environment); return described == Error.none,described;
+    }
+    let result,error = lower(); capture_roles.deinit(); capture_types.deinit(); return result,error;
+}
+fn invokeRequest(owner: Owner&,frame: u32,argument: u32,argument_machine: blot_backend_runtime_ir::ValueType,result_machine: blot_backend_runtime_ir::ValueType,argument_role: blot_backend_runtime_ir::Role) -> Error {
+    let generator .= owner.generator; let cell,cell_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if cell_error != Error.none { return cell_error; } let callback,callback_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if callback_error != Error.none { return callback_error; }
+    let selected = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::RequestFrame_cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::RequestFrame_target),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,callback)]); if selected != Error.none { return selected; }
+    let arena,arena_error = generator.module.ensureArena(); if arena_error != Error.none { return arena_error; } let pair,pair_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if pair_error != Error.none { return pair_error; }
+    let classified = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_get,arena.rc_enabled),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eqz),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_runtime_layout::ArenaHeader_bytes),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ArenaHeader_layout),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_and),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_or),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_)]); if classified != Error.none { return classified; } owner.labels++;
+    let references,reference_error = allocate(owner,blot_runtime_runtime_layout::Pair_bytes,AllocationRoles { words: [argument_role,blot_backend_runtime_ir::ROLE_reference] }); if reference_error != Error.none { return reference_error; } let reference_pair = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,references),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,pair),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_else_)]); if reference_pair != Error.none { return reference_pair; }
+    let scalars,scalar_error = allocate(owner,blot_runtime_runtime_layout::Pair_bytes,AllocationRoles { words: [argument_role,blot_backend_runtime_ir::ROLE_scalar] }); if scalar_error != Error.none { return scalar_error; } let scalar_pair = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,scalars),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,pair)]); if scalar_pair != Error.none { return scalar_pair; } owner.labels--; let joined = emit(owner,blot_backend_runtime_ir::OP_end); if joined != Error.none { return joined; }
+    var argument_scalar = blot_backend_runtime_ir::SC_u32; if argument_machine == blot_backend_runtime_ir::VT_f32 { argument_scalar = blot_backend_runtime_ir::SC_f32; } let stored = storeTypedWord(owner,pair,blot_runtime_runtime_layout::Pair_first,argument,argument_scalar,0); if stored != Error.none { return stored; }
+    let state,state_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if state_error != Error.none { return state_error; } let initial = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::RequestCell_state),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,state)]); if initial != Error.none { return initial; } let state_pair = storeTypedWord(owner,pair,blot_runtime_runtime_layout::Pair_second,state,blot_backend_runtime_ir::SC_u32,0); if state_pair != Error.none { return state_pair; }
+    let arguments = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callback),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,pair),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::RequestFrame_runner_outer),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callback),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_function)]); if arguments != Error.none { return arguments; }
+    let annotated = generator.module.emit(owner.function_id,blot_backend_runtime_ir::callResult(blot_backend_runtime_ir::ROLE_reference)); if annotated != Error.none { return annotated; } let signature,signature_error = generator.module.internType([blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::VT_i32],blot_backend_runtime_ir::VT_i32); if signature_error != Error.none { return signature_error; } let called = emit(owner,blot_backend_runtime_ir::OP_call_indirect,signature); if called != Error.none { return called; }
+    let decision,decision_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if decision_error != Error.none { return decision_error; } let returned = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,decision),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,decision),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Decision_state),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,state)]); if returned != Error.none { return returned; } let updated = storeTypedWord(owner,cell,blot_runtime_runtime_layout::RequestCell_state,state,blot_backend_runtime_ir::SC_u32,0); if updated != Error.none { return updated; }
+    let branch = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,decision),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Decision_kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eqz),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_,result_machine as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,decision)]); if branch != Error.none { return branch; } var load = blot_backend_runtime_ir::OP_i32_load; if result_machine == blot_backend_runtime_ir::VT_f32 { load = blot_backend_runtime_ir::OP_f32_load; } let reply = emit(owner,load,blot_runtime_runtime_layout::Decision_payload); if reply != Error.none { return reply; }
+    let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_else_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,decision),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Decision_kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_check_core::requestDecisionKindCode(blot_check_core::RequestDecisionKind.break_)),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_gt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,decision),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Decision_kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,state)]); if checked != Error.none { return checked; }
+    let status = storeTypedWord(owner,cell,blot_runtime_runtime_layout::RequestCell_status,state,blot_backend_runtime_ir::SC_u32,0); if status != Error.none { return status; } let payload = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,decision),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Decision_payload),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,state)]); if payload != Error.none { return payload; } let exited = storeTypedWord(owner,cell,blot_runtime_runtime_layout::RequestCell_exit,state,blot_backend_runtime_ir::SC_u32,0); if exited != Error.none { return exited; }
+    assert(generator.request_owner.present); let published = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_set,generator.request_owner.value)]); if published != Error.none { return published; } let dummy = blot_runtime_request_runtime::dummy(generator.module,owner.function_id,owner.cleanups); if dummy != Error.none { return dummy; } return emit(owner,blot_backend_runtime_ir::OP_end);
+}
+recursive fn requestDecision(owner: Owner&,id: u32,depth: i64) -> Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); var payload = blot_support::none<u32>(); var state = blot_support::none<u32>();
+    if node.b != 0 { let value,error = capture(owner,node.b,depth); if error != Error.none { return error; } payload = blot_support::some(value); } if node.c != 0 { let value,error = capture(owner,node.c,depth); if error != Error.none { return error; } state = blot_support::some(value); }
+    var payload_role = blot_backend_runtime_ir::ROLE_scalar; var state_role = blot_backend_runtime_ir::ROLE_scalar; if node.b != 0 { let concrete,error = codeLayout(owner,source.typeOf(node.b),source.span(id)); if error != Error.none { return error; } payload_role = generator.layoutRole(concrete); } if node.c != 0 { let concrete,error = codeLayout(owner,source.typeOf(node.c),source.span(id)); if error != Error.none { return error; } state_role = generator.layoutRole(concrete); }
+    let decision,error = allocate(owner,blot_runtime_runtime_layout::Decision_bytes,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar,payload_role,state_role] }); if error != Error.none { return error; } let kind = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,decision),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,node.a),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::Decision_kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,decision)]); if kind != Error.none { return kind; }
+    var loaded: Error; if payload.present { loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,payload.value); } else { loaded = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if loaded != Error.none { return loaded; } var payload_store = blot_backend_runtime_ir::OP_i32_store; if node.b != 0 { let scalar_type,scalar_error = scalar(owner,node.b); if scalar_error != Error.none { return scalar_error; } if scalar_type == blot_backend_runtime_ir::SC_f32 { payload_store = blot_backend_runtime_ir::OP_f32_store; } } let payload_stored = emit(owner,payload_store,blot_runtime_runtime_layout::Decision_payload); if payload_stored != Error.none { return payload_stored; }
+    let target = emit(owner,blot_backend_runtime_ir::OP_local_get,decision); if target != Error.none { return target; } if state.present { loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,state.value); } else { loaded = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if loaded != Error.none { return loaded; } var state_store = blot_backend_runtime_ir::OP_i32_store; if node.c != 0 { let scalar_type,scalar_error = scalar(owner,node.c); if scalar_error != Error.none { return scalar_error; } if scalar_type == blot_backend_runtime_ir::SC_f32 { state_store = blot_backend_runtime_ir::OP_f32_store; } } let state_stored = emit(owner,state_store,blot_runtime_runtime_layout::Decision_state); if state_stored != Error.none { return state_stored; } return emit(owner,blot_backend_runtime_ir::OP_local_get,decision);
+}
+recursive fn requestStateValue(owner: Owner&,id: u32,binding: u32,ty: u32) -> Error {
+    { let template .= owner.templates.get(binding); if template != null { return templateValue(owner,template,ty); } } { let local .= owner.locals.get(binding); if local != null { return emit(owner,blot_backend_runtime_ir::OP_local_get,local); } }
+    { let value .= owner.static_values.get(binding); if value != null { let scalar = owner.generator.evaluator.valueScalar(value); if scalar.present { var op = blot_backend_runtime_ir::OP_i32_const; if scalar.value.scalar == blot_backend_runtime_ir::SC_f32 { op = blot_backend_runtime_ir::OP_f32_const; } return emit(owner,op,scalar.value.bits); }
+        let bits,error = owner.generator.static_data.serialize(owner.generator,value,ty,0); if error != Error.none { return error; } let selected = owner.generator.representations.store.scalar(ty); var scalar_type = blot_backend_runtime_ir::SC_pointer; if selected.present { scalar_type = selected.value; } return owner.generator.emitValue(owner.function_id,blot_backend_scalar_ops::Value { scalar_type,bits });
+    } } return owner.generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported);
+}
+recursive fn requestState(owner: Owner&,id: u32,carries: const blot_check_core::LoopCarry[:],ty: u32) -> u32,Error {
+    let generator .= owner.generator; if carries.len == 1 { let state,error = temporary(owner,generator.representations.store.machine(ty)); if error != Error.none { return 0,error; } let value = requestStateValue(owner,id,carries[0].incoming,ty); if value != Error.none { return 0,value; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,state); return state,saved; }
+    if carries.len == 0 { let value,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return 0,error; } let initialized = emitConstantLocal(owner,0,value); return value,initialized; } if carries.len > 4294967295 / 4 { return 0,generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.complexity); } var child_types = WordBuffer {}; var roles = RoleBuffer {};
+    recursive fn lower() -> u32,Error {
+        let copied = child_types.append(generator.representations.store.children(ty)); if copied != Error.none { return 0,copied; } if child_types.items.len != carries.len { return 0,generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } for child in child_types.items { let appended = roles.push(generator.layoutRole(child)); if appended != Error.none { return 0,appended; } }
+        let state,error = allocate(owner,(carries.len * 4) as u32,AllocationRoles { words: roles.items }); if error != Error.none { return 0,error; } for carry,index in carries { let target = emit(owner,blot_backend_runtime_ir::OP_local_get,state); if target != Error.none { return 0,target; } let value = requestStateValue(owner,id,carry.incoming,child_types.items[index]); if value != Error.none { return 0,value; } var store = blot_backend_runtime_ir::OP_i32_store; if generator.representations.store.machine(child_types.items[index]) == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; } let stored = emit(owner,store,(index * 4) as u32); if stored != Error.none { return 0,stored; } } return state,Error.none;
+    }
+    let state,error = lower(); roles.deinit(); child_types.deinit(); return state,error;
+}
+fn requestBindState(owner: Owner&,id: u32,state: u32,bindings: const u32[:]) -> Error {
+    let generator .= owner.generator; for binding,index in bindings { let ty,error = generator.scalarWithRows(owner.unit_id,generator.unit(owner.unit_id).binding(binding).ty,owner.mappings,owner.row_mappings,generator.unit(owner.unit_id).span(id)); if error != Error.none { return error; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,state); if loaded != Error.none { return loaded; }
+        if bindings.len > 1 { var load = blot_backend_runtime_ir::OP_i32_load; if ty == blot_backend_runtime_ir::SC_f32 { load = blot_backend_runtime_ir::OP_f32_load; } let field = emit(owner,load,(index * 4) as u32); if field != Error.none { return field; } } let saved = save(owner,binding,id); if saved != Error.none { return saved; }
+    } return Error.none;
+}
+recursive fn requestLoop(owner: Owner&,id: u32,depth: i64) -> Error {
+    let checkpoint = owner.cleanups.mark();
+    recursive fn lower(plan: blot_backend_resolved_flow::RequestLoop) -> Error {
+        let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let exited,exit_error = bindExit(owner,plan.exited); if exit_error != Error.none { return exit_error; } let exit_label = owner.labels; let metadata = source.requestLoopInfo(id); let carries = plan.broken.carries;
+        let computation,computation_error = capture(owner,metadata.computation,depth); if computation_error != Error.none { return computation_error; } let state_layout,layout_error = codeLayout(owner,metadata.state_type,source.span(id)); if layout_error != Error.none { return layout_error; } let initial,initial_error = requestState(owner,id,carries,state_layout); if initial_error != Error.none { return initial_error; }
+        let state_machine = generator.representations.store.machine(state_layout); let value_scalar,value_error = generator.scalarWithRows(owner.unit_id,metadata.value_type,owner.mappings,owner.row_mappings,source.span(id)); if value_error != Error.none { return value_error; } let result_scalar,result_error = generator.scalarWithRows(owner.unit_id,metadata.result_type,owner.mappings,owner.row_mappings,source.span(id)); if result_error != Error.none { return result_error; }
+        let value_machine = blot_backend_runtime_ir::machine(value_scalar); let result_machine = blot_backend_runtime_ir::machine(result_scalar); let result_layout,result_layout_error = codeLayout(owner,metadata.result_type,source.span(id)); if result_layout_error != Error.none { return result_layout_error; }
+        let cell,cell_error = allocatePrivate(owner,blot_runtime_runtime_layout::RequestCell_bytes,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar,generator.layoutRole(result_layout),generator.layoutRole(state_layout)] }); if cell_error != Error.none { return cell_error; }
+        let initialized = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::RequestCell_status),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::RequestCell_exit),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,initial)]); if initialized != Error.none { return initialized; }
+        var state_store = blot_backend_runtime_ir::OP_i32_store; if state_machine == blot_backend_runtime_ir::VT_f32 { state_store = blot_backend_runtime_ir::OP_f32_store; } let initial_stored = emit(owner,state_store,blot_runtime_runtime_layout::RequestCell_state); if initial_stored != Error.none { return initial_stored; }
+        let outer,outer_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if outer_error != Error.none { return outer_error; } let head = providerHead(owner); if head != Error.none { return head; } let outer_saved = emit(owner,blot_backend_runtime_ir::OP_local_set,outer); if outer_saved != Error.none { return outer_saved; } let provider,provider_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if provider_error != Error.none { return provider_error; } let provider_saved = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,outer),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,provider)]); if provider_saved != Error.none { return provider_saved; }
+        for arm,index in plan.arms {
+            let operation = plan.operations[index]; let callback,callback_error = capture(owner,arm.callback,depth); if callback_error != Error.none { return callback_error; } let scoped = arm.selector != 0; var authority = blot_support::none<u32>(); if scoped { let value,error = operationOwner(owner,arm.selector,depth); if error != Error.none { return error; } authority = blot_support::some(value); }
+            var frame: u32; if scoped { let value,error = allocatePrivate(owner,blot_runtime_runtime_layout::ScopedRequestFrame_bytes,AllocationRoles { words: blot_runtime_runtime_layout::layout_roles(default<blot_runtime_runtime_layout::ScopedRequestFrame>()) }); if error != Error.none { return error; } frame = value; } else { let value,error = allocatePrivate(owner,blot_runtime_runtime_layout::RequestFrame_bytes,AllocationRoles { words: blot_runtime_runtime_layout::layout_roles(default<blot_runtime_runtime_layout::RequestFrame>()) }); if error != Error.none { return error; } frame = value; }
+            if authority.present { let stored = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,authority.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::ScopedRequestFrame_owner)]); if stored != Error.none { return stored; } }
+            let operation_target = emit(owner,blot_backend_runtime_ir::OP_local_get,frame); if operation_target != Error.none { return operation_target; } let runtime_operation,runtime_error = generator.runtimeOperation(operation,owner.unit_id,source.span(id)); if runtime_error != Error.none { return runtime_error; } let operation_value = operationConstant(owner,runtime_operation); if operation_value != Error.none { return operation_value; } let operation_stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::RequestFrame_operation); if operation_stored != Error.none { return operation_stored; }
+            var kind = blot_runtime_request_runtime::request_kind; if scoped { kind = blot_runtime_runtime_layout::ScopedRequestFrame_tag; }
+            let fields = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callback),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::RequestFrame_target),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,provider),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::RequestFrame_outer),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::RequestFrame_kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::RequestFrame_cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,outer),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::RequestFrame_runner_outer)]); if fields != Error.none { return fields; }
+            let origin_operation,origin_error = generator.runtimeOperation(operation,owner.unit_id,source.span(id)); if origin_error != Error.none { return origin_error; } let origin = providerOrigin(owner,frame,kind,blot_backend_runtime_ir::ROLE_reference,origin_operation,blot_support::none<u32>()); if origin != Error.none { return origin; } let selected = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,frame),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,provider)]); if selected != Error.none { return selected; }
+        }
+        let value,value_local_error = temporary(owner,value_machine); if value_local_error != Error.none { return value_local_error; } let arguments = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,computation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,provider),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,computation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_function)]); if arguments != Error.none { return arguments; }
+        let value_layout,value_layout_error = codeLayout(owner,metadata.value_type,source.span(id)); if value_layout_error != Error.none { return value_layout_error; } let annotated = generator.module.emit(owner.function_id,blot_backend_runtime_ir::callResult(generator.layoutRole(value_layout))); if annotated != Error.none { return annotated; } let signature,signature_error = generator.module.internType([blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::VT_i32],value_machine); if signature_error != Error.none { return signature_error; } let called = emitUnguarded(owner,blot_backend_runtime_ir::OP_call_indirect,signature); if called != Error.none { return called; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,value); if saved != Error.none { return saved; }
+        assert(generator.request_owner.present); let run = blot_runtime_request_runtime::runner(generator.module,owner.function_id,generator.request_owner.value,cell,owner.cleanups); if run != Error.none { return run; } let state,state_error = temporary(owner,state_machine); if state_error != Error.none { return state_error; } let cell_loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,cell); if cell_loaded != Error.none { return cell_loaded; } var state_load = blot_backend_runtime_ir::OP_i32_load; if state_machine == blot_backend_runtime_ir::VT_f32 { state_load = blot_backend_runtime_ir::OP_f32_load; } let state_value = emitInstructions(owner,[blot_backend_runtime_ir::instruction(state_load,blot_runtime_runtime_layout::RequestCell_state),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,state)]); if state_value != Error.none { return state_value; }
+        assert(owner.labels == exit_label); let broken = plan.broken.bind(exit_label,owner.cleanups.mark()); let entered = emit(owner,blot_backend_runtime_ir::OP_block); if entered != Error.none { return entered; } owner.labels++; let target = owner.loop_targets.push(LoopTarget { node: id,label: broken.label,cleanup: broken.cleanup,backedge: blot_support::none<ContinueTarget>() }); if target != Error.none { return target; }
+        let exit_test = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::RequestCell_status),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_runtime_layout::RequestStatus_exited),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eq),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_)]); if exit_test != Error.none { return exit_test; } owner.labels++;
+        let result_target = emit(owner,blot_backend_runtime_ir::OP_local_get,cell); if result_target != Error.none { return result_target; } var result_load = blot_backend_runtime_ir::OP_i32_load; if result_machine == blot_backend_runtime_ir::VT_f32 { result_load = blot_backend_runtime_ir::OP_f32_load; } let result_value = emit(owner,result_load,blot_runtime_runtime_layout::RequestCell_exit); if result_value != Error.none { return result_value; } let taken = takeExit(owner,exited); if taken != Error.none { return taken; } owner.labels--; let exited_end = emit(owner,blot_backend_runtime_ir::OP_end); if exited_end != Error.none { return exited_end; }
+        let break_test = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cell),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::RequestCell_status),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_runtime_layout::RequestStatus_broken),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eq),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_)]); if break_test != Error.none { return break_test; } owner.labels++;
+        for carry,index in carries { let ty,error = generator.scalarWithRows(owner.unit_id,source.binding(carry.outgoing).ty,owner.mappings,owner.row_mappings,source.span(id)); if error != Error.none { return error; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,state); if loaded != Error.none { return loaded; } if carries.len > 1 { var load = blot_backend_runtime_ir::OP_i32_load; if ty == blot_backend_runtime_ir::SC_f32 { load = blot_backend_runtime_ir::OP_f32_load; } let field = emit(owner,load,(index * 4) as u32); if field != Error.none { return field; } } let bound = save(owner,carry.outgoing,id); if bound != Error.none { return bound; } }
+        assert(owner.cleanups.since(broken.cleanup).len == 0); let broken_exit = takeExit(owner,broken); if broken_exit != Error.none { return broken_exit; } owner.labels--; let broken_end = emit(owner,blot_backend_runtime_ir::OP_end); if broken_end != Error.none { return broken_end; } let bound = requestBindState(owner,id,state,source.requestCompletionBindings(id)); if bound != Error.none { return bound; }
+        let pattern_block = emit(owner,blot_backend_runtime_ir::OP_block); if pattern_block != Error.none { return pattern_block; } let pattern_failure = owner.labels; owner.labels++; let matched = matchPattern(owner,id,plan.completion_pattern,value,pattern_failure,depth + 1); if matched != Error.none { return matched; } let terminated,suite_error = suite(owner,plan.completion_body,depth + 1); if suite_error != Error.none { return suite_error; } let unreachable = emit(owner,blot_backend_runtime_ir::OP_unreachable_); if unreachable != Error.none { return unreachable; } owner.labels--; let pattern_end = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_)]); if pattern_end != Error.none { return pattern_end; } owner.labels--; owner.loop_targets.resize(owner.loop_targets.items.len - 1); let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != Error.none { return ended; } return cleanupTo(owner,checkpoint);
+    }
+    var error: Error; match resolvedPlan(owner,id) { request plan=>{ error = lower(plan.value); },_=>{ abort("expected prepared request loop"); }, } owner.cleanups.restore(checkpoint); return error;
+}
+fn storeTypedWord(owner: Owner&,allocation: u32,offset: u32,local: blot_support::Option<u32>,scalar_type: blot_backend_runtime_ir::Scalar,literal: u32) -> Error {
+    let arena,error = owner.generator.module.ensureArena(); if error != Error.none { return error; } let address = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add)]); if address != Error.none { return address; }
+    if local.present { let value = emit(owner,blot_backend_runtime_ir::OP_local_get,local.value); if value != Error.none { return value; } if scalar_type == blot_backend_runtime_ir::SC_f32 { let bits = emit(owner,blot_backend_runtime_ir::OP_i32_reinterpret_f32); if bits != Error.none { return bits; } } } else { let value = emit(owner,blot_backend_runtime_ir::OP_i32_const,literal); if value != Error.none { return value; } } return emit(owner,blot_backend_runtime_ir::OP_call,arena.store_word);
+}
+fn storeTypedWord(owner: Owner&,allocation: u32,offset: u32,local: u32,scalar_type: blot_backend_runtime_ir::Scalar,literal: u32) -> Error { storeTypedWord(owner,allocation,offset,blot_support::some(local),scalar_type,literal) }
+recursive fn prepareStaticClosure(owner: Owner&,id: u32) -> blot_support::Option<StaticClosurePlan>,Error {
+    assert(owner.preparing); let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); if owner.static_values.table.count == 0 { return blot_support::none<StaticClosurePlan>(),Error.none; }
+    let value,value_error = staticReference(owner,node.a); if value_error != Error.none || !value.present { return blot_support::none<StaticClosurePlan>(),value_error; } if generator.evaluator.valueInfo(value.value).kind != blot_eval_core_eval::ValueKind.closure { return blot_support::none<StaticClosurePlan>(),Error.none; }
+    let header = generator.evaluator.closureInfo(value.value); if header.origin != blot_eval_core_eval::ClosureOrigin.anonymous { return blot_support::none<StaticClosurePlan>(),Error.none; } let ty,type_error = codeLayout(owner,source.typeOf(node.a),source.span(id)); if type_error != Error.none { return blot_support::none<StaticClosurePlan>(),type_error; } let arrow = generator.representations.store.node(ty);
+    if arrow.tag != blot_backend_layout::Tag.function || arrow.c == blot_backend_layout::unknown_row { return blot_support::none<StaticClosurePlan>(),Error.none; } let evidence,evidence_error = generator.representations.toEvidence(generator.evaluator.evidenceStore(),ty); if evidence_error == Error.none { return blot_support::none<StaticClosurePlan>(),Error.none; } if evidence_error == Error.out_of_memory { return blot_support::none<StaticClosurePlan>(),evidence_error; } if evidence_error != Error.unresolved_type || hasErasedType(owner,ty,0) { return blot_support::none<StaticClosurePlan>(),Error.none; }
+    let producer .= generator.unit(header.unit); let metadata = producer.closures[header.identity]; let bindings = producer.extra[metadata.captures.start..metadata.captures.start + metadata.captures.len]; let captured = copyWords(generator.evaluator.valueChildren(value.value)); var mappings = MappingBuffer {}; var rows = RowBuffer {}; var hints = blot_backend_substitution_buffers::Hints {}; var argument_rows = blot_backend_substitution_buffers::EvidenceRows {};
+    recursive fn lower() -> blot_support::Option<StaticClosurePlan>,Error {
+        if bindings.len != captured.len { return blot_support::none<StaticClosurePlan>(),generator.fail(header.unit,metadata.body,blot_backend_core_backend::Code.unsupported); } if generator.artifacts != null { generator.artifacts.requireFreshCode(); }
+        for mapping in generator.evaluator.storage.type_mappings.items[header.mappings.start..header.mappings.start + header.mappings.len] { let concrete,error = generator.representations.fromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != Error.none { if error == Error.out_of_memory { return blot_support::none<StaticClosurePlan>(),error; } return blot_support::none<StaticClosurePlan>(),generator.fail(header.unit,metadata.body,blot_backend_core_backend::Code.unresolved_type); } let mapped = generator.mapType(header.unit,mappings,mapping.variable,concrete,producer.span(metadata.body)); if mapped != Error.none { return blot_support::none<StaticClosurePlan>(),mapped; } }
+        let loaded = generator.loadSemanticRows(generator.evaluator.storage.row_mappings.items[header.row_mappings.start..header.row_mappings.start + header.row_mappings.len],rows); if loaded != Error.none { return blot_support::none<StaticClosurePlan>(),loaded; }
+        if metadata.function_type != 0 { let mapped = generator.mapCapturedFunction(header.unit,metadata.function_type,ty,mappings,rows,producer.span(metadata.body)); if mapped != Error.none { return blot_support::none<StaticClosurePlan>(),mapped; } } else { let input = generator.mapType(header.unit,mappings,metadata.parameter.ty,arrow.a,metadata.parameter.span); if input != Error.none { return blot_support::none<StaticClosurePlan>(),input; } let output = generator.mapType(header.unit,mappings,producer.typeOf(metadata.body),arrow.b,producer.span(metadata.body)); if output != Error.none { return blot_support::none<StaticClosurePlan>(),output; } }
+        if captured.len == 9223372036854775807 && metadata.parameter.binding != 0 { return blot_support::none<StaticClosurePlan>(),generator.fail(header.unit,metadata.body,blot_backend_core_backend::Code.complexity); }
+        for binding,index in bindings { let appended = hints.push(blot_eval_core_eval::RetainedCapture { binding,unit: header.unit,node: 0,value: captured[index] }); if appended != Error.none { return blot_support::none<StaticClosurePlan>(),appended; } }
+        for mapping in owner.row_mappings { if mapping.row == blot_backend_layout::unknown_row { continue; } let actual,error = generator.representations.rowToEvidence(generator.evaluator.evidenceStore(),mapping.row); if error != Error.none { if error == Error.out_of_memory { return blot_support::none<StaticClosurePlan>(),error; } return blot_support::none<StaticClosurePlan>(),generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } let appended = argument_rows.push(blot_eval_type_evidence::RowMapping { variable: mapping.variable,evidence: actual }); if appended != Error.none { return blot_support::none<StaticClosurePlan>(),appended; } }
+        if metadata.parameter.binding != 0 { let evidence,error = generator.mappingEvidence(owner.mappings); if error != Error.none { return blot_support::none<StaticClosurePlan>(),error; } let appended = hints.push(blot_eval_core_eval::RetainedCapture { binding: metadata.parameter.binding,unit: owner.unit_id,node: node.b,mappings: evidence,rows: argument_rows.items,signature_only: true }); if appended != Error.none { return blot_support::none<StaticClosurePlan>(),appended; } }
+        let refined = generator.refineAccessorMappings(header.unit,header.identity,ty,mappings,rows,producer.span(metadata.body),hints.items); if refined != Error.none { return blot_support::none<StaticClosurePlan>(),refined; } return blot_support::some(StaticClosurePlan { header,ty,captured,mappings: copyMappings(mappings.items),rows: copyRows(rows.items) }),Error.none;
+    }
+    let result,error = lower(); argument_rows.deinit(); hints.deinit(); rows.deinit(); mappings.deinit(); if error != Error.none || !result.present { freeWords(captured); } return result,error;
+}
+recursive fn staticApply(owner: Owner&,id: u32,depth: i64) -> bool,Error {
+    let generator .= owner.generator; let node = generator.unit(owner.unit_id).node(id); var prepared = blot_support::none<StaticClosurePlan>(); match resolvedPlan(owner,id) { application plan=>{ prepared = plan.value.static_closure; },_=>{ abort("expected prepared application"); }, } if !prepared.present { return false,Error.none; } let plan = prepared.value; generator.evaluator.counters.prepared_static_closures++; let header = plan.header; let producer .= generator.unit(header.unit); let metadata = producer.closures[header.identity]; let bindings = producer.extra[metadata.captures.start..metadata.captures.start + metadata.captures.len]; let argument,argument_error = capture(owner,node.b,depth); if argument_error != Error.none { return false,argument_error; }
+    let inline_body = owner.inline_depth < 6 && generator.module.functions[owner.function_id].codeLength() <= 4096 && blot_backend_inline_body::cost(producer,metadata.body).present;
+    if !inline_body { let function,error = generator.capturedClosureFunction(header,plan.ty,plan.captured,plan.mappings,plan.rows); if error != Error.none { return false,error; } let arguments = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,argument)]); if arguments != Error.none { return false,arguments; } let head = providerHead(owner); if head != Error.none { return false,head; } let called = emit(owner,blot_backend_runtime_ir::OP_call,function); return called == Error.none,called; }
+    let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != Error.none { return false,cleanup_error; } let context,context_error = inlineContext(owner); if context_error != Error.none { var unused = cleanups; unused.deinit(); return false,context_error; }
+    var emitter = Owner { generator,unit_id: header.unit,function_id: owner.function_id,provider_local: owner.provider_local,mappings: plan.mappings,row_mappings: plan.rows,cleanups,diagnostic_context: context,labels: owner.labels,inline_depth: owner.inline_depth + 1 };
+    if metadata.parameter.binding != 0 { emitter.locals.insert(metadata.parameter.binding,argument); } for binding,index in bindings { emitter.static_values.insert(binding,plan.captured[index]); } let error = bodyExpression(emitter,metadata.body,depth + 1,false); emitter.deinit(); return error == Error.none,error;
+}
+struct UniversalCallee { layout: u32,quantifier: u32 }
+recursive fn universalCallee(owner: Owner&,callee: u32,use: u32) -> blot_support::Option<UniversalCallee>,Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(callee); var ty: u32 = 0;
+    match node.tag {
+        reference=>{ let reference = source.reference(callee); if reference.unit != 0 && reference.unit != owner.unit_id { return blot_support::none<UniversalCallee>(),Error.none; } let declaration = source.binding(reference.binding); if declaration.kind != blot_check_core::BindingKind.parameter && declaration.kind != blot_check_core::BindingKind.local { return blot_support::none<UniversalCallee>(),Error.none; } ty = declaration.ty; },
+        project=>{ ty = source.projection(node.b).result_type; },call=>{ let call = source.call(callee); let value,error = source.types.withoutForall(call.callee_type); if error != Error.none { return blot_support::none<UniversalCallee>(),generator.fail(owner.unit_id,use,blot_backend_core_backend::Code.complexity); } ty = value; for argument in call.arguments { let arrow = source.types.node(ty); if arrow.tag != blot_check_types::Tag.function { return blot_support::none<UniversalCallee>(),Error.none; } ty = arrow.b; } },_=>{ return blot_support::none<UniversalCallee>(),Error.none; },
+    }
+    if source.types.node(ty).tag != blot_check_types::Tag.forall { return blot_support::none<UniversalCallee>(),Error.none; } let representation,error = codeLayout(owner,ty,source.span(use)); if error != Error.none { return blot_support::none<UniversalCallee>(),error; } if generator.representations.store.node(representation).tag != blot_backend_layout::Tag.universal { return blot_support::none<UniversalCallee>(),Error.none; } return blot_support::some(UniversalCallee { layout: representation,quantifier: ty }),Error.none;
+}
+recursive fn prepareApplication(owner: Owner&,id: u32) -> ApplyPlan,Error {
+    assert(owner.preparing); let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); let spawn,spawn_error = prepareSpawnApplication(owner,id); if spawn_error != Error.none { return ApplyPlan {},spawn_error; } if spawn.present { return ApplyPlan { spawn },Error.none; } if source.types.node(source.typeOf(node.a)).tag == blot_check_types::Tag.never { return ApplyPlan { never: true },Error.none; } var result = ApplyPlan {};
+    recursive fn lower() -> Error {
+        let stored,stored_error = universalCallee(owner,node.a,id); if stored_error != Error.none { return stored_error; } if stored.present { let arrow,error = prepareIndirect(owner,node.a,id); if error != Error.none { return error; } result.arrow = blot_support::some(arrow); result.universal = blot_support::some(generator.representations.store.node(stored.value.layout).a); result.quantifier = stored.value.quantifier; return Error.none; }
+        let evaluated,evaluated_error = prepareEvaluatedNamed(owner,id); if evaluated_error != Error.none { return evaluated_error; } result.evaluated = evaluated; if result.evaluated.present { let arrow,error = prepareIndirect(owner,node.a,id); if error != Error.none { return error; } result.arrow = blot_support::some(arrow); return Error.none; }
+        let closure,closure_error = prepareStaticClosure(owner,id); if closure_error != Error.none { return closure_error; } result.static_closure = closure; if closure.present { return Error.none; } let partial,partial_error = preparePartialStaticCall(owner,id); if partial_error != Error.none { return partial_error; } result.partial = partial;
+        let known = blot_backend_known_call::resolve(generator.units,owner.unit_id,id); if known.present && known.value.signature != 0 { let key,error = generator.signature(known.value.target,known.value.signature,owner.unit_id,owner.mappings,owner.row_mappings,source.span(id),false); if error != Error.none { return error; } if key.count == known.value.count { result.known = blot_support::some(SourceCall { key,arguments: known.value.arguments,count: known.value.count }); } }
+        let arrow,error = prepareIndirect(owner,node.a,id); if error != Error.none { return error; } result.arrow = blot_support::some(arrow); return Error.none;
+    }
+    let error = lower(); if error != Error.none { result.deinit(); } return result,error;
+}
+recursive fn apply(owner: Owner&,id: u32,depth: i64) -> Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); var prepared = ApplyPlan {}; match resolvedPlan(owner,id) { application plan=>{ prepared = plan.value; },_=>{ abort("expected prepared application"); }, }
+    if prepared.spawn.present { return emitSpawnApplication(owner,prepared.spawn.value,depth); }
+    if prepared.universal.present {
+        assert(prepared.arrow.present); let concrete = prepared.arrow.value; let abstract = generator.representations.store.node(prepared.universal.value); if abstract.tag != blot_backend_layout::Tag.function { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } let rows = carrierRows(owner,abstract.c,concrete.row,id); if rows != Error.none { return rows; }
+        let callee,callee_error = capture(owner,node.a,depth); if callee_error != Error.none { return callee_error; } let input,input_error = capture(owner,node.b,depth); if input_error != Error.none { return input_error; } let argument,argument_error = carrierValue(owner,input,concrete.parameter,abstract.a,0); if argument_error != Error.none { return argument_error; } let qualified = source.types.quantifierGoals(prepared.quantifier).len != 0; var dictionary: u32 = 0; if qualified { let selected,error = universalDictionary(owner,id,prepared.quantifier,node.a); if error != Error.none { return error; } dictionary = selected; }
+        let arguments = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callee),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,argument)]); if arguments != Error.none { return arguments; } let head = providerHead(owner); if head != Error.none { return head; } if qualified { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,dictionary); if loaded != Error.none { return loaded; } }
+        let selector = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callee),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_function)]); if selector != Error.none { return selector; } let annotated = generator.module.emit(owner.function_id,blot_backend_runtime_ir::callResult(generator.layoutRole(abstract.b))); if annotated != Error.none { return annotated; } let ordinary,ordinary_error = generator.closureSignature(abstract.a,abstract.b); if ordinary_error != Error.none { return ordinary_error; } var signature = ordinary; if qualified { let selected,error = generator.dictionaryClosureSignature(abstract.a,abstract.b); if error != Error.none { return error; } signature = selected; }
+        let called = emit(owner,blot_backend_runtime_ir::OP_call_indirect,signature); if called != Error.none { return called; } let output,output_error = temporary(owner,generator.representations.store.machine(abstract.b)); if output_error != Error.none { return output_error; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,output); if saved != Error.none { return saved; } let result,result_error = carrierValue(owner,output,abstract.b,concrete.result,0); if result_error != Error.none { return result_error; } return emit(owner,blot_backend_runtime_ir::OP_local_get,result);
+    }
+    if prepared.never { let callee = expression(owner,node.a,depth + 1); if callee != Error.none { return callee; } return emit(owner,blot_backend_runtime_ir::OP_unreachable_); }
+    if prepared.evaluated.present { let inlined,error = emitEvaluatedNamed(owner,prepared.evaluated.value,depth); if error != Error.none || inlined { return error; } } let static_applied,static_error = staticApply(owner,id,depth); if static_error != Error.none || static_applied { return static_error; }
+    if prepared.partial.present { let partial = prepared.partial.value; let inlined,error = inlineStaticCall(owner,partial.key,partial.arguments[..partial.count],depth); if error != Error.none || inlined { return error; } }
+    if prepared.known.present { let known = prepared.known.value; let edited,edit_error = inlineCollectionEdit(owner,id,known.key,depth); if edit_error != Error.none || edited { return edit_error; } let simd,simd_error = inlineSimdCall(owner,id,known.key,depth); if simd_error != Error.none || simd { return simd_error; } let inlined,inline_error = inlineNamedCall(owner,known.key,known.arguments[..known.count],depth); if inline_error != Error.none || inlined { return inline_error; } }
+    if owner.static_values.table.count == 0 && isCallableTemplate(owner,node.a) { let selected,error = callableTemplate(owner,node.a); if error != Error.none { return error; } assert(selected.present); let template = selected.value; let ty,type_error = codeLayout(owner,source.typeOf(node.a),source.span(id)); if type_error != Error.none { return type_error; } let function,function_error = templateFunction(owner,template,ty,false); if function_error != Error.none { return function_error; } let argument,argument_error = capture(owner,node.b,depth); if argument_error != Error.none { return argument_error; }
+        var environment: Error; if template.environment.present { environment = emit(owner,blot_backend_runtime_ir::OP_local_get,template.environment.value); } else { environment = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if environment != Error.none { return environment; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,argument); if loaded != Error.none { return loaded; } let head = providerHead(owner); if head != Error.none { return head; } return emit(owner,blot_backend_runtime_ir::OP_call,function);
+    }
+    if source.node(node.a).tag == blot_check_core::Tag.operation_value {
+        var operation_type: u32 = 0; var label: u32 = 0; match resolvedPlan(owner,node.a) { operation selected=>{ operation_type = selected.ty; label = selected.label; },_=>{ abort("expected prepared operation value"); }, } let operation = source.operationValue(node.a); let token,token_error = generator.runtimeOperation(label,owner.unit_id,source.span(node.a)); if token_error != Error.none { return token_error; } let function,function_error = generator.operationFunction(blot_reuse_code_artifacts::OperationKey { operation: token,ty: operation_type,scoped: operation.capability != 0 }); if function_error != Error.none { return function_error; }
+        assert(prepared.arrow.present); let arrow = prepared.arrow.value; let expected,expected_error = generator.closureSignature(arrow.parameter,arrow.result); if expected_error != Error.none { return expected_error; } let callee = generator.module.functions[function];
+        if callee.signature == expected && callee.result_role == generator.layoutRole(arrow.result) && callee.parameter_roles == generator.closureRoles(arrow.parameter) {
+            var environment = blot_support::none<u32>(); if operation.capability != 0 { let captured,error = capture(owner,operation.capability,depth); if error != Error.none { return error; } environment = blot_support::some(captured); } let argument,argument_error = capture(owner,node.b,depth); if argument_error != Error.none { return argument_error; } var loaded: Error; if environment.present { loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,environment.value); } else { loaded = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if loaded != Error.none { return loaded; }
+            if generator.representations.store.node(arrow.parameter).tag != blot_backend_layout::Tag.erased_proof { let input = emit(owner,blot_backend_runtime_ir::OP_local_get,argument); if input != Error.none { return input; } } let head = providerHead(owner); if head != Error.none { return head; } return emit(owner,blot_backend_runtime_ir::OP_call,function);
+        }
+    }
+    assert(prepared.arrow.present); let arrow = prepared.arrow.value; let numeric,numeric_error = selectedNumericCall(owner,id,arrow,depth); if numeric_error != Error.none || numeric { return numeric_error; } generator.evaluator.counters.prepared_indirect_calls++;
+    let callee,callee_error = capture(owner,node.a,depth); if callee_error != Error.none { return callee_error; } let argument,argument_error = capture(owner,node.b,depth); if argument_error != Error.none { return argument_error; } let signature,signature_error = generator.closureSignature(arrow.parameter,arrow.result); if signature_error != Error.none { return signature_error; }
+    let environment = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callee),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_environment)]); if environment != Error.none { return environment; } if generator.representations.store.node(arrow.parameter).tag != blot_backend_layout::Tag.erased_proof { let input = emit(owner,blot_backend_runtime_ir::OP_local_get,argument); if input != Error.none { return input; } } let head = providerHead(owner); if head != Error.none { return head; } let target = emit(owner,blot_backend_runtime_ir::OP_local_get,callee); if target != Error.none { return target; }
+    let logical,logical_error = generator.internLayoutWithEffects(blot_backend_layout::Tag.function,arrow.parameter,arrow.result,arrow.row,[]); if logical_error != Error.none { return logical_error; } if logical < 67108864 { let recorded = generator.module.emitReference(owner.function_id,blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_ownership,logical),blot_reuse_artifact_emitter::Role.callable_layout); if recorded != Error.none { return recorded; } }
+    let selected = emit(owner,blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_function); if selected != Error.none { return selected; } let annotated = generator.module.emit(owner.function_id,blot_backend_runtime_ir::callResult(generator.layoutRole(arrow.result))); if annotated != Error.none { return annotated; } return emit(owner,blot_backend_runtime_ir::OP_call_indirect,signature);
+}
+recursive fn numericCallTargets(owner: Owner&,id: u32,targets: u32[4]&,count: i64&,budget: i64&) -> Error {
+    if id == 0 || budget == 0 || count == 4 || !owner.body.present { return Error.none; } budget--; let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id);
+    if node.tag == blot_check_core::Tag.if_value { let left = numericCallTargets(owner,node.b,targets,count,budget); if left != Error.none { return left; } return numericCallTargets(owner,node.c,targets,count,budget); } var template = blot_support::none<Template>();
+    if node.tag == blot_check_core::Tag.closure {
+        if !generator.planning.bodies.contains(owner.body.value,id) { return Error.none; } match generator.planning.bodies.get(owner.body.value,id) { template prepared=>{ if prepared.value.static_key.present { return Error.none; } template = blot_support::some(prepared.value.metadata); },_=>{ return Error.none; }, }
+    } else if node.tag == blot_check_core::Tag.reference {
+        let reference = source.reference(id); if reference.unit == 0 || reference.unit == owner.unit_id { let binding = source.binding(reference.binding); if binding.kind != blot_check_core::BindingKind.global && binding.kind != blot_check_core::BindingKind.external { return numericCallTargets(owner,binding.initializer,targets,count,budget); } } if !isCallableTemplate(owner,id) { return Error.none; } var unit = reference.unit; if unit == 0 { unit = owner.unit_id; } let body .= generator.unit(unit).body(reference.binding); if body == null || !body.is_function { return Error.none; } let prepared,error = newTemplate(owner,id); if error != Error.none { return error; } template = blot_support::some(prepared);
+    } else { return Error.none; }
+    let ty,type_error = codeLayout(owner,source.typeOf(id),source.span(id)); if type_error != Error.none { return type_error; } if generator.representations.store.node(ty).tag != blot_backend_layout::Tag.function { return Error.none; } assert(template.present); let target,error = templateFunction(owner,template.value,ty,false); if error != Error.none { return error; } for existing in targets[..count] { if existing == target { return Error.none; } } targets[count] = target; count++; return Error.none;
+}
+recursive fn selectedNumericCall(owner: Owner&,id: u32,arrow: blot_backend_resolved_call::Arrow,depth: i64) -> bool,Error {
+    let generator .= owner.generator; if !generator.inline_named || owner.static_values.table.count != 0 || generator.layoutRole(arrow.result) != blot_backend_runtime_ir::ROLE_scalar { return false,Error.none; } let node = generator.unit(owner.unit_id).node(id); let view = borrowedRowArgument(owner,node.b); if !view.present || view.value.row != arrow.parameter { return false,Error.none; } var targets: u32[4] = [0;4]; var count: i64 = 0; var budget: i64 = 32;
+    let collected = numericCallTargets(owner,node.a,targets,count,budget); if collected != Error.none { return false,collected; } if count == 0 { return false,Error.none; } let signature,signature_error = generator.closureSignature(arrow.parameter,arrow.result); if signature_error != Error.none { return false,signature_error; } for target in targets[..count] { if generator.module.functions[target].signature != signature { return false,Error.none; } }
+    let callee,callee_error = capture(owner,node.a,depth); if callee_error != Error.none { return false,callee_error; } let selector,selector_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if selector_error != Error.none { return false,selector_error; } let selected = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callee),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_function),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,selector)]); if selected != Error.none { return false,selected; }
+    for target in targets[..count] {
+        let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,selector); if loaded != Error.none { return false,loaded; } let constant = referenceConstant(owner,target,blot_reuse_artifact_emitter::Role.callable_function); if constant != Error.none { return false,constant; } let branch = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eq),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_,generator.representations.store.machine(arrow.result) as u32)]); if branch != Error.none { return false,branch; } owner.labels++;
+        let argument,error = capture(owner,node.b,depth); if error != Error.none { return false,error; } let arguments = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callee),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,argument)]); if arguments != Error.none { return false,arguments; } let head = providerHead(owner); if head != Error.none { return false,head; } let called = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,target),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_else_)]); if called != Error.none { return false,called; }
+    }
+    let argument,argument_error = capture(owner,node.b,depth); if argument_error != Error.none { return false,argument_error; } let arguments = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callee),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,argument)]); if arguments != Error.none { return false,arguments; } let head = providerHead(owner); if head != Error.none { return false,head; } let selector_loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,selector); if selector_loaded != Error.none { return false,selector_loaded; } let annotated = generator.module.emit(owner.function_id,blot_backend_runtime_ir::callResult(generator.layoutRole(arrow.result))); if annotated != Error.none { return false,annotated; } let called = emit(owner,blot_backend_runtime_ir::OP_call_indirect,signature); if called != Error.none { return false,called; }
+    for index in 0..count { owner.labels--; let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != Error.none { return false,ended; } } return true,Error.none;
+}
+struct ResourceScopePlan { acquire: u32 = 0,release: u32 = 0,callback: u32 = 0 }
+fn resourceScopePlan(owner: Owner&,id: u32) -> ResourceScopePlan { match resolvedPlan(owner,id) { resource_scope plan=>{ return ResourceScopePlan { plan.acquire,plan.release,plan.callback }; },_=>{ abort("expected prepared resource scope"); }, } }
+recursive fn prepareResourceScope(owner: Owner&,id: u32) -> ResourceScopePlan,Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); let transferred = node.tag == blot_check_core::Tag.resource_acquire; var count: i64 = 3; if transferred { count = 2; } let callables: u32[3] = [node.a,node.b,node.c]; let kinds: u32[3] = [4,6,4];
+    if !source.has_usage_contracts || (transferred && node.c != 0) { return ResourceScopePlan {},generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); }
+    for callable,index in callables[..count] { let kind = kinds[index]; if source.node(callable).tag != blot_check_core::Tag.closure && !(kind == 6 && blot_check_cleanup_contracts::immutableHost(source,callable)) { return ResourceScopePlan {},generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); } let wrapper = source.types.node(source.typeOf(callable)); if wrapper.tag != blot_check_types::Tag.usage || wrapper.b != kind || wrapper.c != 0 { return ResourceScopePlan {},generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); } }
+    var safe: Error; if transferred { safe = blot_check_cleanup_contracts::immutableTransferred(source,node.b); } else { safe = blot_check_cleanup_contracts::immutable(source,node.b); } if safe != Error.none { return ResourceScopePlan {},generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); }
+    let acquire,acquire_error = codeLayout(owner,source.typeOf(node.a),source.span(id)); if acquire_error != Error.none { return ResourceScopePlan {},acquire_error; } let release,release_error = codeLayout(owner,source.typeOf(node.b),source.span(id)); if release_error != Error.none { return ResourceScopePlan {},release_error; } let acquired = generator.representations.store.node(acquire); let released = generator.representations.store.node(release);
+    if acquired.tag != blot_backend_layout::Tag.function || released.tag != blot_backend_layout::Tag.function { return ResourceScopePlan {},generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } let acquire_wrapper = source.types.node(source.typeOf(node.a)); let acquired_owner = source.types.node(source.types.node(acquire_wrapper.a).b);
+    if acquired_owner.tag != blot_check_types::Tag.usage || acquired_owner.b != 0 || acquired_owner.c != 0 || !blot_check_cleanup_contracts::payloadNominal(source.types,source.nominals,acquired_owner.a) { return ResourceScopePlan {},generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); }
+    if generator.representations.store.node(acquired.a).tag != blot_backend_layout::Tag.unit || generator.representations.store.node(released.b).tag != blot_backend_layout::Tag.unit || acquired.b != released.a || generator.representations.store.node(acquired.b).tag != blot_backend_layout::Tag.owning { return ResourceScopePlan {},generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); }
+    var callback: u32 = 0; if transferred { let imports,error = generator.module.resourceTransferImports(); if error != Error.none { return ResourceScopePlan {},error; } let expected,type_error = codeLayout(owner,node.ty,source.span(id)); if type_error != Error.none { return ResourceScopePlan {},type_error; } if acquired.b != expected { return ResourceScopePlan {},generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } }
+    else { let selected,error = codeLayout(owner,source.typeOf(node.c),source.span(id)); if error != Error.none { return ResourceScopePlan {},error; } callback = selected; let called = generator.representations.store.node(callback); let expected,type_error = codeLayout(owner,node.ty,source.span(id)); if type_error != Error.none { return ResourceScopePlan {},type_error; } if called.tag != blot_backend_layout::Tag.function || generator.representations.store.node(acquired.b).a != called.a || called.b != expected { return ResourceScopePlan {},generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unresolved_type); } }
+    return ResourceScopePlan { acquire,release,callback },Error.none;
+}
+fn invokeUsageClosure(owner: Owner&,callable: u32,argument: blot_support::Option<u32>,arrow: blot_backend_layout::Node) -> Error {
+    let generator .= owner.generator; let environment = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callable),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_environment)]); if environment != Error.none { return environment; } var input: Error; if argument.present { input = emit(owner,blot_backend_runtime_ir::OP_local_get,argument.value); } else { input = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if input != Error.none { return input; } let head = providerHead(owner); if head != Error.none { return head; }
+    let selector = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,callable),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_function)]); if selector != Error.none { return selector; } let annotated = generator.module.emit(owner.function_id,blot_backend_runtime_ir::callResult(generator.layoutRole(arrow.b))); if annotated != Error.none { return annotated; } let signature,error = generator.closureSignature(arrow.a,arrow.b); if error != Error.none { return error; } return emit(owner,blot_backend_runtime_ir::OP_call_indirect,signature);
+}
+fn invokeUsageClosure(owner: Owner&,callable: u32,argument: u32,arrow: blot_backend_layout::Node) -> Error { invokeUsageClosure(owner,callable,blot_support::some(argument),arrow) }
+recursive fn resourceAcquire(owner: Owner&,id: u32,depth: i64) -> Error {
+    let generator .= owner.generator; let node = generator.unit(owner.unit_id).node(id); let plan = resourceScopePlan(owner,id); let acquire_arrow = generator.representations.store.node(plan.acquire); let payload = generator.representations.store.node(acquire_arrow.b).a; let imports,imports_error = generator.module.resourceTransferImports(); if imports_error != Error.none { return imports_error; } let adapter,adapter_error = generator.resourceAdapter(payload); if adapter_error != Error.none { return adapter_error; }
+    let acquire,acquire_error = capture(owner,node.a,depth); if acquire_error != Error.none { return acquire_error; } let cleanup,cleanup_error = capture(owner,node.b,depth); if cleanup_error != Error.none { return cleanup_error; } let token,token_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if token_error != Error.none { return token_error; } let reserved = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,imports.reserve),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,token)]); if reserved != Error.none { return reserved; }
+    var zero = blot_backend_runtime_ir::OP_i32_const; if generator.representations.store.machine(payload) == blot_backend_runtime_ir::VT_f32 { zero = blot_backend_runtime_ir::OP_f32_const; } let initialized = emit(owner,zero); if initialized != Error.none { return initialized; } let boxed = boxOwner(owner,payload); if boxed != Error.none { return boxed; } let allocation,allocation_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if allocation_error != Error.none { return allocation_error; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,allocation); if saved != Error.none { return saved; }
+    let acquired,acquired_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if acquired_error != Error.none { return acquired_error; } let invoked = invokeUsageClosure(owner,acquire,blot_support::none<u32>(),acquire_arrow); if invoked != Error.none { return invoked; } let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,acquired),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,acquired),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Owning_token),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if checked != Error.none { return checked; }
+    let raw,raw_error = temporary(owner,generator.representations.store.machine(payload)); if raw_error != Error.none { return raw_error; } var load = blot_backend_runtime_ir::OP_i32_load; if generator.representations.store.machine(payload) == blot_backend_runtime_ir::VT_f32 { load = blot_backend_runtime_ir::OP_f32_load; } let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,acquired),blot_backend_runtime_ir::instruction(load,blot_runtime_runtime_layout::Owning_payload),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,raw)]); if loaded != Error.none { return loaded; }
+    let selected = generator.representations.store.scalar(payload); var scalar_type = blot_backend_runtime_ir::SC_pointer; if selected.present { scalar_type = selected.value; } let stored = storeTypedWord(owner,allocation,blot_runtime_runtime_layout::Owning_payload,raw,scalar_type,0); if stored != Error.none { return stored; } assert(generator.module.arena.present); let arena = generator.module.arena.value; if generator.layoutRole(payload) == blot_backend_runtime_ir::ROLE_reference { let retained = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,raw),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,arena.retain)]); if retained != Error.none { return retained; } }
+    let arguments = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cleanup),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,arena.retain),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,token),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,adapter),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,raw)]); if arguments != Error.none { return arguments; } if generator.representations.store.machine(payload) == blot_backend_runtime_ir::VT_f32 { let bits = emit(owner,blot_backend_runtime_ir::OP_i32_reinterpret_f32); if bits != Error.none { return bits; } }
+    return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,cleanup),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,imports.register),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation)]);
+}
+recursive fn resourceRelease(owner: Owner&,id: u32,depth: i64) -> Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); let wrapper = source.types.node(source.typeOf(node.a)); if node.b != 0 || node.c != 0 || node.ty != blot_check_types::unit || wrapper.tag != blot_check_types::Tag.usage || wrapper.b != 0 || wrapper.c != 0 || !blot_check_cleanup_contracts::payloadNominal(source.types,source.nominals,wrapper.a) { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); }
+    let imports,imports_error = generator.module.resourceTransferImports(); if imports_error != Error.none { return imports_error; } let ty,type_error = codeLayout(owner,source.typeOf(node.a),source.span(id)); if type_error != Error.none { return type_error; } let adapter,adapter_error = generator.resourceAdapter(generator.representations.store.node(ty).a); if adapter_error != Error.none { return adapter_error; } let captured,capture_error = capture(owner,node.a,depth); if capture_error != Error.none { return capture_error; } let allocation,allocation_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if allocation_error != Error.none { return allocation_error; }
+    let initialized = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,captured),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_block),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_loop)]); if initialized != Error.none { return initialized; } owner.labels += 2;
+    let unwrapped = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_runtime_layout::ArenaHeader_bytes),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::ArenaHeader_requested),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_runtime_layout::OwningView_bytes),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ne),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_br_if,1),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::OwningView_owner),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_br),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if unwrapped != Error.none { return unwrapped; } owner.labels -= 2;
+    let token,token_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if token_error != Error.none { return token_error; } return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Owning_token),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_tee,token),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,token),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,imports.release),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0)]);
+}
+recursive fn taskMove(owner: Owner&,ty: u32,value: u32,depth: i64) -> Error { if depth >= 128 { return Error.declined; } if owner.generator.layoutRole(ty) != blot_backend_runtime_ir::ROLE_reference { return Error.none; } let function,error = owner.generator.taskMover(ty); if error != Error.none { return error; } return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,function)]); }
+recursive fn taskMoveBody(owner: Owner&,ty: u32,value: u32,depth: i64) -> Error {
+    let generator .= owner.generator; if depth >= 128 { return Error.declined; } let node = generator.representations.store.node(ty); if generator.layoutRole(ty) != blot_backend_runtime_ir::ROLE_reference { return Error.none; }
+    match node.tag {
+        owning=>{ if node.b != 0 { return Error.none; } let payload = generator.representations.store.node(node.a); if payload.tag == blot_backend_layout::Tag.nominal && payload.a == 4294967295 && payload.b == blot_backend_layout::capability_layout_decl { return Error.none; } let token,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; } let transfer,present = generator.module.taskImportNamed("transfer"); assert(present);
+            let moved = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Owning_token),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_tee,token),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,token),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,transfer),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if moved != Error.none { return moved; } if generator.layoutRole(node.a) == blot_backend_runtime_ir::ROLE_reference { let child,child_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if child_error != Error.none { return child_error; } let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Owning_payload),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,child)]); if loaded != Error.none { return loaded; } return taskMove(owner,node.a,child,depth + 1); }
+        },product,record=>{ let children = generator.representations.store.children(ty); var count = children.len; if node.tag == blot_backend_layout::Tag.record { count /= 2; } for index in 0..count { var child_type = children[index]; if node.tag == blot_backend_layout::Tag.record { child_type = children[index * 2 + 1]; } if generator.layoutRole(child_type) != blot_backend_runtime_ir::ROLE_reference { continue; } let child,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; } let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,(index * 4) as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,child)]); if loaded != Error.none { return loaded; } let moved = taskMove(owner,child_type,child,depth + 1); if moved != Error.none { return moved; } } },
+        array,list=>{ let words,words_error = generator.rowWords(node.a); if words_error != Error.none { return words_error; } if generator.layoutRole(node.a) != blot_backend_runtime_ir::ROLE_reference || words != 0 { return Error.none; } let index,index_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if index_error != Error.none { return index_error; } let child,child_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if child_error != Error.none { return child_error; }
+            let entered = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_block),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_loop),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ge_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_br_if,1)]); if entered != Error.none { return entered; }
+            if node.tag == blot_backend_layout::Tag.list { let lists,error = generator.module.ensureLists(); if error != Error.none { return error; } let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,lists.address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load)]); if loaded != Error.none { return loaded; } } else { let address = arrayAddress(owner,value,index,4); if address != Error.none { return address; } let loaded = emit(owner,blot_backend_runtime_ir::OP_i32_load,4); if loaded != Error.none { return loaded; } }
+            let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,child); if saved != Error.none { return saved; } let moved = taskMove(owner,node.a,child,depth + 1); if moved != Error.none { return moved; } return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,1),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_br),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]);
+        },function=>{ return Error.declined; },nominal=>{
+            if node.a == 4294967295 && node.b == blot_backend_layout::capability_layout_decl { return Error.none; } if generator.representations.store.scalar(ty).present { return Error.none; } if node.a == 0 || node.a > generator.units.len { return Error.declined; } let source .= generator.unit(node.a); var found = false;
+            for constructor in source.constructors { let nominal = source.nominal(constructor.nominal); if nominal.identity.unit != node.a || nominal.identity.decl != node.b { continue; } found = true; if constructor.payload == 0 { continue; } let payload,error = generator.nominalPayload((node.a as u64 << 32) | node.b as u64,constructor.tag,ty); if error != Error.none { return error; } if generator.layoutRole(payload) != blot_backend_runtime_ir::ROLE_reference { continue; } if nominal.is_opaque { let moved = taskMove(owner,payload,value,depth + 1); if moved != Error.none { return moved; } } else {
+                    let entered = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,constructor.tag),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eq),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_)]); if entered != Error.none { return entered; } let child,child_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if child_error != Error.none { return child_error; } let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,child)]); if loaded != Error.none { return loaded; } let moved = taskMove(owner,payload,child,depth + 1); if moved != Error.none { return moved; } let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != Error.none { return ended; }
+                } } if !found { return Error.declined; }
+        },_=>{},
+    } return Error.none;
+}
+recursive fn taskMoveTemplate<M>(owner: Owner&,metadata: M,environment: u32,depth: i64) -> Error {
+    let generator .= owner.generator; if depth >= 128 { return Error.declined; } let source .= generator.unit(metadata.unit); if source.node(metadata.node).tag != blot_check_core::Tag.closure || metadata.scalar_environment { return Error.none; } let captures = source.closureCaptures(metadata.node); let types = generator.representations.store.children(metadata.captures);
+    for binding,index in captures { let ty = types[index]; let child,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != Error.none { return error; } let nested = generator.capturedTemplate(metadata.templates,binding);
+        if nested.present { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,(index * 4) as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,child)]); if loaded != Error.none { return loaded; } let moved = taskMoveTemplate(owner,nested.value,child,depth + 1); if moved != Error.none { return moved; } }
+        else if generator.layoutRole(ty) == blot_backend_runtime_ir::ROLE_reference { let semantic = source.types.node(source.binding(binding).ty); if semantic.tag == blot_check_types::Tag.usage && (semantic.b == 7 || semantic.b == 2) { continue; } let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,(index * 4) as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,child)]); if loaded != Error.none { return loaded; } let moved = taskMove(owner,ty,child,depth + 1); if moved != Error.none { return moved; } }
+    } return Error.none;
+}
+struct TaskExportName { bytes: u8[64] = [0;64],len: i64 = 0 }
+fn taskExportName(prefix: const u8[:],id: u32) -> TaskExportName {
+    var result = TaskExportName {}; assert(prefix.len <= 54); for byte in prefix { result.bytes[result.len] = byte; result.len++; } var digits: u8[10] = [0;10]; var count: i64 = 0; var value = id; loop { digits[count] = ('0' as u32 + value % 10) as u8; count++; value /= 10; if value == 0 { break; } } while count != 0 { count--; result.bytes[result.len] = digits[count]; result.len++; } return result;
+}
+recursive fn taskDescriptor(owner: Owner&,thunk: u32) -> u32,Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var selected = blot_support::none<Template>(); if source.node(thunk).tag == blot_check_core::Tag.reference { let metadata .= owner.templates.get(source.reference(thunk).binding); if metadata != null { selected = blot_support::some(metadata); } }
+    if !selected.present { let actual,error = blot_check_task_core::callable(source,thunk); if error != Error.none { return 0,Error.declined; } match resolvedPlan(owner,actual) { template prepared=>{ var metadata = prepared.value.metadata; if prepared.value.static_key.present { metadata.captures = prepared.value.static_key.value.captures; } selected = blot_support::some(metadata); },_=>{ abort("expected prepared task closure"); }, } }
+    let metadata = selected.value; var unit = metadata.unit; if unit == 0 { unit = owner.unit_id; } let producer .= generator.unit(unit); if producer.node(metadata.node).tag != blot_check_core::Tag.closure { return 0,Error.declined; } let ty,type_error = codeLayout(owner,source.typeOf(thunk),source.span(thunk)); if type_error != Error.none { return 0,type_error; } let arrow = generator.representations.store.node(ty); let descriptor = generator.module.taskCount(); let run,run_error = generator.module.addTypedFunction([blot_backend_runtime_ir::VT_i32],blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::ROLE_reference); if run_error != Error.none { return 0,run_error; }
+    let described = generator.setParameterRoles(run,blot_backend_runtime_ir::packParameterRoles([blot_backend_runtime_ir::ROLE_reference]),blot_support::none<u16>()); if described != Error.none { return 0,described; } let cleanup,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != Error.none { return 0,cleanup_error; } var adapter = Owner { generator,unit_id: owner.unit_id,function_id: run,mappings: owner.mappings,row_mappings: owner.row_mappings,cleanups: cleanup };
+    recursive fn emitAdapter() -> blot_backend_runtime_ir::Role,Error {
+        let callable,callable_error = temporary(adapter,blot_backend_runtime_ir::VT_i32); if callable_error != Error.none { return blot_backend_runtime_ir::ROLE_unknown,callable_error; } let provider,provider_error = temporary(adapter,blot_backend_runtime_ir::VT_i32); if provider_error != Error.none { return blot_backend_runtime_ir::ROLE_unknown,provider_error; }
+        let loaded = emitInstructions(adapter,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,callable),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,provider)]); if loaded != Error.none { return blot_backend_runtime_ir::ROLE_unknown,loaded; } adapter.provider_local = blot_support::some(provider); let invoked = invokeUsageClosure(adapter,callable,blot_support::none<u32>(),arrow); if invoked != Error.none { return blot_backend_runtime_ir::ROLE_unknown,invoked; }
+        let role = generator.bodyResultRole(arrow.b,unit,producer.closure(metadata.node).body); let boxed = boxOwnerStorage(adapter,generator.representations.store.machine(arrow.b),role); if boxed != Error.none { return blot_backend_runtime_ir::ROLE_unknown,boxed; } let result,result_error = temporary(adapter,blot_backend_runtime_ir::VT_i32); if result_error != Error.none { return blot_backend_runtime_ir::ROLE_unknown,result_error; } assert(generator.module.arena.present); let retained = emitInstructions(adapter,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_tee,result),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,generator.module.arena.value.retain),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,result)]); if retained != Error.none { return blot_backend_runtime_ir::ROLE_unknown,retained; }
+        let name = taskExportName("blot:task_start/",descriptor); let exported = generator.module.exportTaskAdapter(run,name.bytes[..name.len],false); return role,exported;
+    }
+    let result_role,adapter_error = emitAdapter(); adapter.deinit(); if adapter_error != Error.none { return 0,adapter_error; }
+    recursive fn emitMover(result_move: bool) -> Error {
+        let function,error = generator.module.addTypedFunction([blot_backend_runtime_ir::VT_i32],blot_backend_runtime_ir::VT_none,blot_backend_runtime_ir::ROLE_scalar); if error != Error.none { return error; } let described = generator.setParameterRoles(function,blot_backend_runtime_ir::packParameterRoles([blot_backend_runtime_ir::ROLE_reference]),blot_support::none<u16>()); if described != Error.none { return described; } let cleanup,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != Error.none { return cleanup_error; } var mover = Owner { generator,unit_id: owner.unit_id,function_id: function,mappings: owner.mappings,row_mappings: owner.row_mappings,cleanups: cleanup };
+        recursive fn lower() -> Error {
+            let value,value_error = temporary(mover,blot_backend_runtime_ir::VT_i32); if value_error != Error.none { return value_error; } let loaded = emitInstructions(mover,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,value)]); if loaded != Error.none { return loaded; }
+            if result_move { if result_role == blot_backend_runtime_ir::ROLE_reference { let moved = taskMove(mover,arrow.b,value,0); if moved != Error.none { return moved; } } } else { let environment,environment_error = temporary(mover,blot_backend_runtime_ir::VT_i32); if environment_error != Error.none { return environment_error; } let loaded = emitInstructions(mover,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,environment)]); if loaded != Error.none { return loaded; } let moved = taskMoveTemplate(mover,metadata,environment,0); if moved != Error.none { return moved; } }
+            var prefix: const u8[:] = "blot:task_move_captures/"; if result_move { prefix = "blot:task_move_result/"; } let name = taskExportName(prefix,descriptor); return generator.module.exportTaskAdapter(function,name.bytes[..name.len],false);
+        }
+        let emitted = lower(); mover.deinit(); return emitted;
+    }
+    let captures_moved = emitMover(false); if captures_moved != Error.none { return 0,captures_moved; } let result_moved = emitMover(true); if result_moved != Error.none { return 0,result_moved; } return descriptor,Error.none;
+}
+recursive fn taskSplit(owner: Owner&,id: u32,depth: i64) -> Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let args = source.children(id); let plan,plan_error = blot_check_task_regions::partition(source,id); if plan_error != Error.none { return generator.fail(owner.unit_id,id,blot_backend_core_backend::Code.unsupported); } let allocation,allocation_error = capture(owner,args[0],depth); if allocation_error != Error.none { return allocation_error; } let partition = expression(owner,args[1],depth + 1); if partition != Error.none { return partition; } let dropped = emit(owner,blot_backend_runtime_ir::OP_drop); if dropped != Error.none { return dropped; } let callback,callback_error = capture(owner,args[2],depth); if callback_error != Error.none { return callback_error; }
+    let array,array_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if array_error != Error.none { return array_error; } let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Owning_payload),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,array),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,plan.limit),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_lt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if checked != Error.none { return checked; } let checkpoint = owner.cleanups.mark();
+    recursive fn lower() -> Error {
+        var views: u32[16] = [0;16]; for range,index in plan.ranges[..plan.len] {
+            let view,error = allocate(owner,16,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar,blot_backend_runtime_ir::ROLE_reference,blot_backend_runtime_ir::ROLE_scalar,blot_backend_runtime_ir::ROLE_scalar] }); if error != Error.none { return error; } let offsets: u32[3] = [0,8,12]; let literals: u32[3] = [1,range.first,range.end]; for offset,field in offsets { let stored = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,literals[field]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,offset)]); if stored != Error.none { return stored; } }
+            let stored = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,4)]); if stored != Error.none { return stored; } let appended = owner.cleanups.append(blot_runtime_runtime_cleanup::Action.revoke_effect { local: view }); if appended != Error.none { return appended; } assert(generator.module.arena.present); let rooted = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,generator.module.arena.value.root_authority),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view)]); if rooted != Error.none { return rooted; } let boxed = boxOwnerStorage(owner,blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::ROLE_reference); if boxed != Error.none { return boxed; } let local,local_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if local_error != Error.none { return local_error; } views[index] = local; let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,local); if saved != Error.none { return saved; }
+        }
+        let roles: blot_backend_runtime_ir::Role[16] = [blot_backend_runtime_ir::ROLE_reference;16]; let product,error = allocate(owner,(plan.len * 4) as u32,AllocationRoles { words: roles[..plan.len] }); if error != Error.none { return error; } for view,index in views[..plan.len] { let stored = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,product),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,(index * 4) as u32)]); if stored != Error.none { return stored; } }
+        let callback_type,type_error = codeLayout(owner,source.typeOf(args[2]),source.span(id)); if type_error != Error.none { return type_error; } let arrow = generator.representations.store.node(callback_type); let invoked = invokeUsageClosure(owner,callback,product,arrow); if invoked != Error.none { return invoked; } let result,result_error = temporary(owner,generator.representations.store.machine(arrow.b)); if result_error != Error.none { return result_error; } let drain,present = generator.module.taskImportNamed("drain"); assert(present); let drained = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,result),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,drain)]); if drained != Error.none { return drained; } let cleaned = cleanupTo(owner,checkpoint); if cleaned != Error.none { return cleaned; }
+        let pair,pair_error = allocate(owner,8,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_reference,generator.layoutRole(arrow.b)] }); if pair_error != Error.none { return pair_error; } let first = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,pair),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,allocation),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,pair),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,result)]); if first != Error.none { return first; } var store = blot_backend_runtime_ir::OP_i32_store; if generator.representations.store.machine(arrow.b) == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; } return emitInstructions(owner,[blot_backend_runtime_ir::instruction(store,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,pair)]);
+    }
+    let error = lower(); owner.cleanups.restore(checkpoint); return error;
+}
+recursive fn taskView(owner: Owner&,id: u32,depth: i64,write: bool) -> Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let args = source.children(id); let boxed,boxed_error = capture(owner,args[0],depth); if boxed_error != Error.none { return boxed_error; } let index,index_error = capture(owner,args[1],depth); if index_error != Error.none { return index_error; } var value: u32 = 0; if write { let captured,error = capture(owner,args[2],depth); if error != Error.none { return error; } value = captured; }
+    let view,view_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if view_error != Error.none { return view_error; } let array,array_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if array_error != Error.none { return array_error; } let absolute,absolute_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if absolute_error != Error.none { return absolute_error; }
+    let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,boxed),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eqz),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,12),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,8),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_sub),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ge_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,8),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,absolute),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,view),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,array)]); if checked != Error.none { return checked; }
+    let info = blot_check_task_types::viewInfo(source.types,source.typeOf(args[0])); assert(info.present); let element,element_error = codeLayout(owner,source.types.node(info.value.payload).a,source.span(id)); if element_error != Error.none { return element_error; } let machine = generator.representations.store.machine(element); let row_words,words_error = generator.rowWords(element); if words_error != Error.none { return words_error; } let stride = blot_backend_packed_layout::stride(row_words);
+    if row_words != 0 { let address = arrayAddress(owner,array,absolute,stride); if address != Error.none { return address; } if write { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value); if loaded != Error.none { return loaded; } let stored = storeElement(owner,machine,4,row_words,true,element); if stored != Error.none { return stored; } return emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } return readElement(owner,machine,4,row_words,element); }
+    if write && generator.layoutRole(element) == blot_backend_runtime_ir::ROLE_reference { let allocation = emit(owner,blot_backend_runtime_ir::OP_local_get,array); if allocation != Error.none { return allocation; } let address = arrayAddress(owner,array,absolute,stride); if address != Error.none { return address; } assert(generator.module.arena.present); let stored = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,generator.module.arena.value.store_word)]); if stored != Error.none { return stored; } }
+    else { let address = arrayAddress(owner,array,absolute,stride); if address != Error.none { return address; } if write { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value); if loaded != Error.none { return loaded; } var store = blot_backend_runtime_ir::OP_i32_store; if machine == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; } let stored = storeScalar(owner,store,4); if stored != Error.none { return stored; } } else { var load = blot_backend_runtime_ir::OP_i32_load; if machine == blot_backend_runtime_ir::VT_f32 { load = blot_backend_runtime_ir::OP_f32_load; } let loaded = emit(owner,load,4); if loaded != Error.none { return loaded; } } }
+    if write { return emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } return Error.none;
 }

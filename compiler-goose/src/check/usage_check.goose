@@ -390,3 +390,49 @@ fn blot_structural::hash<S>(sink: S&, value: blot_check_usage_check::Mode) { blo
 
 
 
+
+import support.pooled_buffer;
+import support.pooled_map;
+import dictionary;
+struct PooledMemo {safe:blot_support_pooled_map::Map<Id,bool> = blot_support_pooled_map::Map<Id,bool>{},epoch:blot_support::Option<u64> = blot_support::none<u64>(),row_epoch:blot_support::Option<u64> = blot_support::none<u64>(),nominals:blot_support_pooled_buffer::Buffer<NominalFact> = blot_support_pooled_buffer::Buffer<NominalFact>{}}
+reusable[] var pooled_safe_slots:dictionary_slot<Id,bool>[>..];
+reusable[] var pooled_nominal_facts:NominalFact[>..];
+fn deinit(self:PooledMemo&) {blot_support_pooled_map::deinit(self.safe,pooled_safe_slots);blot_support_pooled_buffer::deinit(self.nominals,pooled_nominal_facts);}
+fn containsNominalMemoWork(store: const blot_check_types::Store&, nominals, root: Id, work: Work&, memo: PooledMemo&) -> bool, Error {
+    let epoch = store.mutation_epoch; var same_catalog = memo.nominals.items.len == nominals.len;
+    if same_catalog { for prior, index in memo.nominals.items { let error = work.charge(1); if error != Error.none { return false, error; } let nominal = nominals[index]; if prior.identity != nominal.identity || prior.has_usage != nominal.has_usage { same_catalog = false; break; } } }
+    if !memo.epoch.present || memo.epoch.value != epoch || !memo.row_epoch.present || memo.row_epoch.value != store.effects.mutation_epoch || !same_catalog || epoch == 0xffffffffffffffff { memo.safe.clear(); }
+    memo.epoch = blot_support::some(epoch); memo.row_epoch = blot_support::some(store.effects.mutation_epoch);
+    if !same_catalog { memo.nominals.clear(); for nominal in nominals { let error = work.charge(1); if error != Error.none { return false, error; } let append_error=blot_support_pooled_buffer::push(memo.nominals,NominalFact { nominal.identity, nominal.has_usage },pooled_nominal_facts); if append_error!=Error.none {return false,append_error;} } }
+    let context = NominalStore { store, nominals, work }; if epoch == 0xffffffffffffffff || store.effects.mutation_epoch == 0xffffffffffffffff { return inspectWithPooledMemo(context, root, Mode.any, work, null); } return inspectWithPooledMemo(context, root, Mode.any, work, memo);
+}
+fn addPooled(self: Pending&, source, raw: Id, budget: Work&, known: PooledMemo?) -> Error {
+    if !source.valid(raw) { return Error.type_limit; } let id = source.head(raw, 0); if !source.valid(id) { return Error.type_limit; }
+    { let optional_binding_72 .= known; if optional_binding_72 { let cache .= optional_binding_72; let error = budget.charge(1); if error != Error.none { return error; } if cache.safe.contains(id) { return Error.none; }  } }
+    var slot = ((id as u64 *% 0x9e3779b1) & (self.slots.len as u64 - 1)) as i64;
+    while true { let error = budget.charge(1); if error != Error.none { return error; } let prior = self.slots[slot]; if prior == 0 { break; } if self.ids[prior - 1] == id { return Error.none; } slot = (slot + 1) & (self.slots.len - 1); }
+    if self.count == self.ids.len { return Error.type_limit; } self.ids[self.count] = id; self.count += 1; self.slots[slot] = self.count as u16; return Error.none;
+}
+fn inspectWithPooledMemo(store, root: Id, mode: Mode, work: Work&, memo: PooledMemo?) -> bool, Error {
+    var pending = Pending {}; let error = pending.addPooled(store, root, work, memo); if error != Error.none { return false, error; } var next: i64 = 0;
+    while next != pending.count { let error = work.charge(1); if error != Error.none { return false, error; } let id = pending.ids[next]; next += 1; let node = store.node(id);
+        let error = store.shape(node); if error != Error.none { return false, error; }
+        if mode != Mode.borrow && node.tag == Tag.nominal { let property, error = store.nominalProperty(node, mode); if error != Error.none { return false, error; } if property { return true, Error.none; } }
+        if mode == Mode.any && (node.tag == Tag.scoped || node.tag == Tag.instance_version) { return true, Error.none; }
+        if node.tag == Tag.usage { if mode == Mode.any { return true, Error.none; } let kind = node.b;
+            if mode == Mode.borrow { if kind == blot_parse_ast::usagekind_borrow || kind == blot_parse_ast::usagekind_borrow_mut { return true, Error.none; } }
+            else if kind == blot_parse_ast::usagekind_unique || kind == blot_parse_ast::usagekind_borrow_mut || kind == blot_parse_ast::usagekind_once { return true, Error.none; }
+        }
+        var child: Id[1] = [node.a]; var edges: const Id[:] = [];
+        match node.tag {
+            Tag.usage, Tag.array, Tag.list, Tag.cursor, Tag.forall, Tag.existential => { edges = child; },
+            Tag.product => { edges = store.list(blot_check_types::List { node.a, node.b }); },
+            Tag.nominal, Tag.projection => { edges = store.nominalArguments(node); },
+            Tag.function => { if mode == Mode.any { let error = pending.addPooled(store, node.a, work, memo); if error != Error.none { return false, error; } let error = pending.addPooled(store, node.b, work, memo); if error != Error.none { return false, error; } } },
+            Tag.record => { for index in 0..node.b { let error = work.charge(1); if error != Error.none { return false, error; } let error = pending.addPooled(store, store.recordField(node, index).ty, work, memo); if error != Error.none { return false, error; } } },
+            _ => {},
+        }
+        let error = work.charge(edges.len); if error != Error.none { return false, error; } for edge in edges { let error = pending.addPooled(store, edge, work, memo); if error != Error.none { return false, error; } }
+    }
+    { let optional_binding_71 .= memo; if optional_binding_71 { let cache .= optional_binding_71; for index in 0..pending.count { let error = work.charge(1); if error != Error.none { return false, error; } blot_support_pooled_map::insert(cache.safe,pending.ids[index],true,pooled_safe_slots); }  } } return false, Error.none;
+}

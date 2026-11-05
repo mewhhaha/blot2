@@ -16,6 +16,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 namespace blot_check_source_sort;
+import std;
 enum Hint {increasing,decreasing,unknown}
 struct Range {a:i64,b:i64,limit:i64,leftmost:bool,balanced:bool,partitioned:bool}
 fn insertionContext(a:i64,b:i64,context) {assert(a<=b);var i=a+1;while i<b {var j=i;while j>a && context.lessThan(j,j-1) {context.swap(j,j-1);j-=1;}i+=1;}}

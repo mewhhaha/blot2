@@ -167,3 +167,12 @@ by region/cohort checks. Successful instruction order is intended to match the
 Zig oracle; this has not been verified. Arena, root, cycle, list and data-stack
 runtimes remain unwritten. Capability reconstruction in frozen bounds now uses
 the checker-owned pooled Store and releases it on every exit.
+
+Arena allocation/free-list emission, root journals and cycle trial deletion now
+have full first production writing passes too. The arena source copies the
+pinned explicit instruction tables; the root/cycle recipes use the same flat
+emitter without a temporary expression heap. Private journal ordering, complete
+dead-set classification, lease guards and collector local zero are preserved
+in source. Nothing in this checkpoint establishes emitted-Wasm equivalence.
+Persistent lists, data stacks, session heap, remaining cache/project/server
+modules and the CLI are still required. The whole port remains incomplete.

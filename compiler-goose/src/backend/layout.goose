@@ -49,11 +49,10 @@ struct Store {
 // returns before any of this physical store's backing storage is released.
 fn withStore<C,F>(context: C&) -> blot_error::Error {
     var closed_units: ClosedUnit[>..<] = []; var closed_kind_bytes: u8[>..<] = []; var closed_layouts: dictionary<u64,Id>; var names: dictionary<u32,const u8[:]>;
-    var operations: blot_check_effect_evidence::Operation[>..<] = []; var arguments: u32[>..<] = []; var rows: blot_check_effect_evidence::Row[>..<] = []; var labels: u32[>..<] = []; var operation_next: u32[>..<] = []; var row_next: u32[>..<] = []; var operation_buckets: dictionary<u64,u32>; var row_buckets: dictionary<u64,u32>;
     var nodes: Node[>..<] = []; var extra: u32[>..<] = []; var universal_dictionaries: UniversalDictionaries[>..<] = []; var next: u32[>..<] = []; var buckets: dictionary<u64,u32>; var solver_owners: blot_backend_runtime_ir::Range[>..<] = []; var solver_binders: u32[>..<] = []; var type_owners: u32[>..<] = [];
-    let effects,error = blot_check_effect_evidence::init(blot_check_effect_evidence::Tables { operations,arguments,rows,labels,operation_next,row_next,operation_buckets,row_buckets }); if error != blot_error::Error.none { return error; }
+    let effects,error = blot_check_effect_evidence::init(); if error != blot_error::Error.none { return error; }
     var store = Store { closed: ClosedLayouts { units: [],kinds: closed_units,kind_bytes: closed_kind_bytes,layouts: closed_layouts },opaque_sources: [],record_names: blot_check_record_order::init(names),effects,nodes,extra,universal_dictionaries,next,buckets,solver_owners,solver_binders,type_owners };
-    let initialized = init(store); if initialized != blot_error::Error.none { store.deinit(); return initialized; } defer { store.deinit(); } return F(context,store);
+    let initialized = init(store); if initialized != blot_error::Error.none { store.deinit(); return initialized; } let result = F(context,store); store.deinit(); return result;
 }
 fn init(store: Store&) -> blot_error::Error {
     store.nodes.clear(); store.next.clear(); store.extra.clear(); store.universal_dictionaries.clear(); store.buckets.clear(); store.solver_owners.clear(); store.solver_binders.clear(); store.type_owners.clear();
@@ -61,8 +60,8 @@ fn init(store: Store&) -> blot_error::Error {
     for tag in [Tag.invalid, Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32, Tag.never, Tag.erased] { store.nodes.push(Node { tag: tag }); store.next.push(0); }
     return blot_error::Error.none;
 }
-fn node(store: Store&, id: Id) -> Node { store.nodes[id] }
-fn children(store: Store&, id: Id) -> const Id[:] {
+fn node(store: const Store&, id: Id) -> Node { store.nodes[id] }
+fn children(store: const Store&, id: Id) -> const Id[:] {
     let n = node(store, id);
     if n.tag == Tag.product { return store.extra[n.a..n.a + n.b]; }
     if n.tag == Tag.record { return store.extra[n.a..n.a + n.b * 2]; }
@@ -70,14 +69,14 @@ fn children(store: Store&, id: Id) -> const Id[:] {
     if n.tag == Tag.universal || n.tag == Tag.existential { return store.extra[n.c..n.c + n.b]; }
     return store.extra[..0];
 }
-fn dictionaryRecord(store: Store&, owner: Id) -> blot_support::Option<UniversalDictionaries> {
+fn dictionaryRecord(store: const Store&, owner: Id) -> blot_support::Option<UniversalDictionaries> {
     var low = 0; var high = store.universal_dictionaries.len;
     while low < high { let middle = low + (high - low) / 2; let record = store.universal_dictionaries[middle]; if record.owner < owner { low = middle + 1; } else { high = middle; } }
     if low == store.universal_dictionaries.len || store.universal_dictionaries[low].owner != owner { return blot_support::none<UniversalDictionaries>(); }
     return blot_support::some(store.universal_dictionaries[low]);
 }
-fn hasDictionaryABI(store: Store&, owner: Id) -> bool { dictionaryRecord(store, owner).present }
-fn dictionarySlots(store: Store&, owner: Id) -> const Id[:] { let record = dictionaryRecord(store, owner); if !record.present { return store.extra[..0]; } return store.extra[record.value.start..record.value.start + record.value.len]; }
+fn hasDictionaryABI(store: const Store&, owner: Id) -> bool { dictionaryRecord(store, owner).present }
+fn dictionarySlots(store: const Store&, owner: Id) -> const Id[:] { let record = dictionaryRecord(store, owner); if !record.present { return store.extra[..0]; } return store.extra[record.value.start..record.value.start + record.value.len]; }
 fn internAssociated(store: Store&, goal: u32, member: u32, scope: u32) -> Id, blot_error::Error {
     if goal >= 4096 || member == 0 || scope >= 128 { return 0, blot_error::Error.type_mismatch; }
     return internFields(store, Tag.associated, goal, member, scope, []);
@@ -88,7 +87,7 @@ fn internUniversalWithDictionaries(store: Store&, body: Id, binders: const Id[:]
     for slot in slots { if slot == 0 { continue; } if slot >= store.nodes.len || node(store, slot).tag != Tag.function { return 0, blot_error::Error.type_mismatch; } }
     return internFieldsWithDictionaries(store, Tag.universal, body, binders.len as u32, 0, binders, slots, true);
 }
-fn hasOwners(store: Store&, root: Id) -> bool, blot_error::Error {
+fn hasOwners(store: const Store&, root: Id) -> bool, blot_error::Error {
     var nodes: Id[4096] = [0; 4096]; nodes[0] = root; var count = 1; var cursor = 0;
     while cursor < count {
         let id = nodes[cursor]; cursor++;
@@ -108,14 +107,14 @@ fn hasOwners(store: Store&, root: Id) -> bool, blot_error::Error {
     return false, blot_error::Error.none;
 }
 fn equal<T>(left: const T[:], right: const T[:]) -> bool { if left.len != right.len { return false; } for value, index in left { if value != right[index] { return false; } } return true; }
-fn machine(store: Store&, id: Id) -> blot_backend_runtime_ir::ValueType { let selected = scalar(store, id); if selected.present { return blot_backend_runtime_ir::machine(selected.value); } return blot_backend_runtime_ir::VT_i32; }
-fn listInput(store: Store&, id: Id) -> bool { let n = node(store, id); return n.tag == Tag.list || (n.tag == Tag.cursor && node(store, n.a).tag == Tag.list); }
-fn scalarEnvironment(store: Store&, captures: Id) -> bool {
+fn machine(store: const Store&, id: Id) -> blot_backend_runtime_ir::ValueType { let selected = scalar(store, id); if selected.present { return blot_backend_runtime_ir::machine(selected.value); } return blot_backend_runtime_ir::VT_i32; }
+fn listInput(store: const Store&, id: Id) -> bool { let n = node(store, id); return n.tag == Tag.list || (n.tag == Tag.cursor && node(store, n.a).tag == Tag.list); }
+fn scalarEnvironment(store: const Store&, captures: Id) -> bool {
     if node(store, captures).tag != Tag.product { return false; } let fields = children(store, captures); if fields.len != 1 { return false; }
     let selected = scalar(store, fields[0]); return selected.present && selected.value != blot_backend_runtime_ir::SC_f32;
 }
-fn scalar(store: Store&, id: Id) -> blot_support::Option<blot_backend_runtime_ir::Scalar> { scalarDepth(store, id, 0) }
-recursive fn scalarDepth(store: Store&, id: Id, depth: i64) -> blot_support::Option<blot_backend_runtime_ir::Scalar> {
+fn scalar(store: const Store&, id: Id) -> blot_support::Option<blot_backend_runtime_ir::Scalar> { scalarDepth(store, id, 0) }
+recursive fn scalarDepth(store: const Store&, id: Id, depth: i64) -> blot_support::Option<blot_backend_runtime_ir::Scalar> {
     if depth >= 128 { return blot_support::none<blot_backend_runtime_ir::Scalar>(); }
     let tag = node(store, id).tag; if tag == Tag.nominal { return opaqueScalar(store, id, depth + 1); }
     if tag == Tag.unit { return blot_support::some(blot_backend_runtime_ir::SC_unit); }
@@ -124,7 +123,7 @@ recursive fn scalarDepth(store: Store&, id: Id, depth: i64) -> blot_support::Opt
     if tag == Tag.floating32 { return blot_support::some(blot_backend_runtime_ir::SC_f32); }
     return blot_support::none<blot_backend_runtime_ir::Scalar>();
 }
-recursive fn opaqueScalar(store: Store&, id: Id, depth: i64) -> blot_support::Option<blot_backend_runtime_ir::Scalar> {
+recursive fn opaqueScalar(store: const Store&, id: Id, depth: i64) -> blot_support::Option<blot_backend_runtime_ir::Scalar> {
     let n = node(store, id); if n.a == 0 || n.a > store.opaque_sources.len { return blot_support::none<blot_backend_runtime_ir::Scalar>(); }
     let source .= store.opaque_sources[n.a - 1];
     for nominal in source.nominals {
@@ -143,7 +142,7 @@ recursive fn opaqueScalar(store: Store&, id: Id, depth: i64) -> blot_support::Op
     }
     return blot_support::none<blot_backend_runtime_ir::Scalar>();
 }
-recursive fn opaqueParameter(store: Store&, module: const blot_check_core::Module&, parameter: blot_check_types::Id, actual: Id, target: u32, ordinal: u32&, depth: i64, remaining: i64&) -> blot_support::Option<Id> {
+recursive fn opaqueParameter(store: const Store&, module: const blot_check_core::Module&, parameter: blot_check_types::Id, actual: Id, target: u32, ordinal: u32&, depth: i64, remaining: i64&) -> blot_support::Option<Id> {
     if depth >= 128 || remaining == 0 { return blot_support::none<Id>(); } remaining--;
     let n = module.types.node(parameter);
     if n.tag == blot_check_types::Tag.variable { let selected = ordinal; ordinal++; if selected == target { return blot_support::some(actual); } return blot_support::none<Id>(); }
@@ -156,7 +155,7 @@ recursive fn opaqueParameter(store: Store&, module: const blot_check_core::Modul
     }
     return blot_support::none<Id>();
 }
-fn abi(store: Store&, id: Id) -> blot_support::Option<blot_backend_runtime_ir::Scalar> {
+fn abi(store: const Store&, id: Id) -> blot_support::Option<blot_backend_runtime_ir::Scalar> {
     let selected = scalar(store, id); if selected.present { return selected; }
     let n = node(store, id); if n.tag != Tag.array { return blot_support::none<blot_backend_runtime_ir::Scalar>(); }
     if node(store, n.a).tag == Tag.unsigned32 { return blot_support::some(blot_backend_runtime_ir::SC_array_u32); }
@@ -444,7 +443,7 @@ recursive fn fromTypeRow(store: Store&, module: const blot_check_core::Module&, 
         let operation = module.types.operation(label); let instance = blot_check_types::selectionAtom(module.types, mappedInstance(operation.instance, mappings));
         let mapped, error = store.effects.internOperationInstance(operation.identity, arguments, instance); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);
     }
-    labels.append(store.effects.view().rowLabels(suffix)); if suffix != 0 { formal = store.effects.rows[suffix].formal; }
+    labels.append(store.effects.view().rowLabels(suffix)); if suffix != 0 { formal = store.effects.rows.items[suffix].formal; }
     let result, error = store.effects.internRowWithFormal(labels, formal); if error != blot_error::Error.none { return 0, effectError(error); } return result, blot_error::Error.none;
 }
 fn fromEvidence(store: Store&, view: blot_eval_type_evidence::View, id: u32) -> Id, blot_error::Error { var budget: i64 = 1000000; return fromEvidenceDepth(store, view, id, 0, budget); }
@@ -564,7 +563,7 @@ recursive fn toEvidenceRow(store: Store&, target: blot_eval_type_evidence::Store
         for argument in source.operationArguments(label) { let selected, error = toEvidenceDepth(store, target, argument, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } arguments.push(selected); }
         let operation = source.operation(label); let mapped, error = target.effects.internOperationInstance(operation.identity, arguments, operation.instance); if error != blot_error::Error.none { return 0, error; } labels.push(mapped);
     }
-    let old_formal = store.effects.rows[row].formal; var formal: u32 = 0;
+    let old_formal = store.effects.rows.items[row].formal; var formal: u32 = 0;
     if old_formal != 0 { let selected, error = toEvidenceDepth(store, target, old_formal, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } formal = selected; }
     return target.effects.internRowWithFormal(labels, formal);
 }
@@ -715,6 +714,6 @@ fn deinit(store: Store&) {
 }
 fn reset(store: Store&) -> blot_error::Error {
     deinit(store);
-    let effects,error = blot_check_effect_evidence::init(blot_check_effect_evidence::Tables { operations: store.effects.operations,arguments: store.effects.arguments,rows: store.effects.rows,labels: store.effects.labels,operation_next: store.effects.operation_next,row_next: store.effects.row_next,operation_buckets: store.effects.operation_buckets,row_buckets: store.effects.row_buckets });
+    let effects,error = blot_check_effect_evidence::init();
     if error != blot_error::Error.none { return error; } store.effects = effects; return init(store);
 }

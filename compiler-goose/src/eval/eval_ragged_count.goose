@@ -59,9 +59,9 @@ fn program<A>(self: Counter<A>&,id: u32) {
   let loop=m.loopInfo(id); let source=expression(self,loop.first); var first: u32=0; var end: u32=0;
   if loop.kind==blot_check_core::LoopKind.range { first=number(self,source).bits; let value=expression(self,loop.end); end=number(self,value).bits; }
   else { if !source.is_borrowed { self.failure=true; return; } let length=self.adapter.length(source.borrowed); if !length.present { self.failure=true; return; } end=length.value; }
-  if self.failure { return; } let before=self.local_count; defer { self.local_count=before; }
-  while first<end { if !step(self) { return; } var element=Value {scalar:Scalar {blot_backend_runtime_ir::SC_u32,first}}; if loop.kind==blot_check_core::LoopKind.array { element=Value {is_borrowed:true,borrowed:self.adapter.children(source.borrowed)[first]}; } pattern(self,loop.pattern,element); program(self,loop.body); if self.failure { return; } first++; } return;
- }
+  if self.failure { return; } let before=self.local_count; 
+  while first<end { if !step(self) { { self.local_count=before; } return; } var element=Value {scalar:Scalar {blot_backend_runtime_ir::SC_u32,first}}; if loop.kind==blot_check_core::LoopKind.array { element=Value {is_borrowed:true,borrowed:self.adapter.children(source.borrowed)[first]}; } pattern(self,loop.pattern,element); program(self,loop.body); if self.failure { { self.local_count=before; } return; } first++; } { self.local_count=before; } return;
+  { self.local_count=before; } }
  self.failure=true;
 }
 fn run<A>(self: Counter<A>&) -> u32,bool { program(self,self.plan.root); return self.count,!self.failure; }

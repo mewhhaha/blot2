@@ -48,7 +48,7 @@ fn rowInner<I>(self: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {
  let err=charge(self); if err!=Error.none { return 0,err; } 
  for old in self.source.effects.rowLabels(id) { let value,e=label(self,old,depth+1); if e!=Error.none { return 0,e; } copied.push(value); }
  if copied.failure!=Error.none { return 0,copied.failure; } let old_formal=self.source.effects.rows[id].formal; var formal: u32=0; if old_formal!=0 { let value,e=ty(self,old_formal,depth+1); if e!=Error.none { return 0,e; } formal=value; }
- let result,error=destination.effects.internRowWithFormal(copied,formal); if error!=Error.none { return 0,error; } self.rows.insert(id,result); return result,Error.none;
+ let result,error=destination.effects.internRowWithFormal(copied.items,formal); if error!=Error.none { return 0,error; } self.rows.insert(id,result); return result,Error.none;
 }
 fn label<I>(self: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; let value,error=labelInner(self,id,depth,copied); deinit(copied); return value,error; }
 fn labelInner<I>(self: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {

@@ -82,7 +82,9 @@ fn named(self: Service&,key: blot_reuse_code_artifacts::Key,instances: const blo
 fn named(self: Service&,key: blot_reuse_code_artifacts::Key,instances: const blot_check_types::NominalIdentity[:],mappings: blot_backend_substitution_buffers::Mappings&,rows: blot_backend_substitution_buffers::Rows&) -> ResolvedBody,Error { return namedSink(self,key,instances,MappingSink.pooled { mappings },RowSink.pooled { rows }); }
 fn namedSink(self: Service&, key: blot_reuse_code_artifacts::Key, instances: const blot_check_types::NominalIdentity[:], mappings: MappingSink, rows: RowSink) -> ResolvedBody, Error {
     clearSink(mappings); clearSink(rows); let unit_id = key.target.unit; let source .= unit(self, unit_id); let body .= source.body(key.target.binding); assert(body);
-    let previous = self.dictionary_unit; self.dictionary_unit = 0; defer { self.dictionary_unit = previous; }
+    let previous = self.dictionary_unit; self.dictionary_unit = 0; 
+    recursive fn cleanup_continuation_13() -> ResolvedBody, Error {
+
     if key.dictionaries {
         let owner = blot_check_dictionary_owner::forBinding(source, key.target.binding); if !owner.present { return ResolvedBody { source: key.target,root: 0,mappings: mappings,rows: rows }, decline(self, unit_id, body.span, FailureCode.unresolved_type); }
         var remaining: i64 = 65536; let valid = blot_check_package_core::parametricBodyModules(source,key.target.binding,self.units,remaining);
@@ -111,6 +113,11 @@ fn namedSink(self: Service&, key: blot_reuse_code_artifacts::Key, instances: con
         let e = refineMappingsSink(self, unit_id, EvidenceRoot.body { key.target }, full, mappings, rows, body.span); if e != Error.none { return ResolvedBody { source: key.target,root: 0,mappings: mappings,rows: rows }, e; }
     }
     return ResolvedBody { source: key.target, root: body.root, mappings: mappings, rows: rows }, Error.none;
+
+    }
+    let cleanup_result_13_0,cleanup_result_13_1 = cleanup_continuation_13();
+     self.dictionary_unit = previous; 
+    return cleanup_result_13_0,cleanup_result_13_1;
 }
 enum MappingSink { lexical { value: Mapping[>..<]& },pooled { value: blot_backend_substitution_buffers::Mappings& } }
 enum RowSink { empty,lexical { value: RowMapping[>..<]& },pooled { value: blot_backend_substitution_buffers::Rows& } }
@@ -272,9 +279,15 @@ fn mapRowSink(self: Service&, unit_id: u32, mappings: MappingSink, rows: RowSink
     if actual_row == blot_backend_layout::unknown_row { return Error.none; }
     let source = unit(self, unit_id).types; let expected = source.row(source_row);
     // Mapping may extend both effect stores. Keep IDs, and reload every view.
-    var actuals = blot_backend_substitution_buffers::Words {}; defer { actuals.deinit(); } let copied = actuals.append(self.layouts.effects.view().rowLabels(actual_row)); if copied != Error.none { return copied; }
-    var used = blot_backend_substitution_buffers::Flags {}; defer { used.deinit(); } for actual in actuals.items { let appended = used.push(false); if appended != Error.none { return appended; } }
-    var argument_ids = blot_backend_substitution_buffers::Words {}; defer { argument_ids.deinit(); }
+    var actuals = blot_backend_substitution_buffers::Words {}; 
+    recursive fn cleanup_continuation_12() -> Error {
+ let copied = actuals.append(self.layouts.effects.view().rowLabels(actual_row)); if copied != Error.none { return copied; }
+    var used = blot_backend_substitution_buffers::Flags {}; 
+    recursive fn cleanup_continuation_11() -> Error {
+ for actual in actuals.items { let appended = used.push(false); if appended != Error.none { return appended; } }
+    var argument_ids = blot_backend_substitution_buffers::Words {}; 
+    recursive fn cleanup_continuation_10() -> Error {
+
     for label in source.rowLabels(source_row) {
         let source_operation = source.operation(label); let bound_instance = blot_backend_layout::mappedInstance(source_operation.instance, mappingItems(mappings));
         if source_operation.instance.unit == 0 && source_operation.instance.decl != 0 && bound_instance.unit != 0 {
@@ -327,7 +340,9 @@ fn mapRowSink(self: Service&, unit_id: u32, mappings: MappingSink, rows: RowSink
         let index = selected.value; used.items[index] = true;
         if unbound_instance { let error = appendSink(mappings, Mapping { variable: source_instance.decl, layout: blot_backend_layout::erased, instance: self.layouts.effects.view().operation(actuals.items[index]).instance }); if error != Error.none { return error; } }
     }
-    var suffix = blot_backend_substitution_buffers::Words {}; defer { suffix.deinit(); } for label,index in actuals.items { if !used.items[index] { let appended = suffix.push(label); if appended != Error.none { return appended; } } }
+    var suffix = blot_backend_substitution_buffers::Words {}; 
+    recursive fn cleanup_continuation_9() -> Error {
+ for label,index in actuals.items { if !used.items[index] { let appended = suffix.push(label); if appended != Error.none { return appended; } } }
     var variable: u32 = 0;
     match expected.tail {
         closed => { if !covariant && suffix.items.len != 0 { return decline(self, unit_id, span, FailureCode.unresolved_type); } return Error.none; },
@@ -339,7 +354,7 @@ fn mapRowSink(self: Service&, unit_id: u32, mappings: MappingSink, rows: RowSink
             let key, error = blot_check_types::formalRowKey(binder); if error != Error.none { return decline(self, unit_id, span, FailureCode.complexity); } variable = key;
         },
     }
-    let remaining, row_error = self.layouts.effects.internRowWithFormal(suffix.items, self.layouts.effects.rows[actual_row].formal);
+    let remaining, row_error = self.layouts.effects.internRowWithFormal(suffix.items, self.layouts.effects.rows.items[actual_row].formal);
     if row_error != Error.none { return representationError(self, row_error, unit_id, span, FailureCode.complexity); }
     for entry in rowItems(rows) {
         if entry.variable != variable { continue; } if entry.row == remaining { return Error.none; }
@@ -348,6 +363,26 @@ fn mapRowSink(self: Service&, unit_id: u32, mappings: MappingSink, rows: RowSink
         if prior != current { return decline(self, unit_id, span, FailureCode.unresolved_type); } return Error.none;
     }
     return appendSink(rows,RowMapping { variable,remaining });
+
+    }
+    let cleanup_result_9_0 = cleanup_continuation_9();
+     suffix.deinit(); 
+    return cleanup_result_9_0;
+
+    }
+    let cleanup_result_10_0 = cleanup_continuation_10();
+     argument_ids.deinit(); 
+    return cleanup_result_10_0;
+
+    }
+    let cleanup_result_11_0 = cleanup_continuation_11();
+     used.deinit(); 
+    return cleanup_result_11_0;
+
+    }
+    let cleanup_result_12_0 = cleanup_continuation_12();
+     actuals.deinit(); 
+    return cleanup_result_12_0;
 }
 fn refineMappings(self: Service&,unit_id: u32,root: EvidenceRoot,expected: u32,mappings: Mapping[>..<]&,rows: RowMapping[>..<]&,span: blot_check_core::Span) -> Error { return refineMappingsSink(self,unit_id,root,expected,MappingSink.lexical { mappings },RowSink.lexical { rows },span); }
 fn refineMappings(self: Service&,unit_id: u32,root: EvidenceRoot,expected: u32,mappings: blot_backend_substitution_buffers::Mappings&,rows: blot_backend_substitution_buffers::Rows&,span: blot_check_core::Span) -> Error { return refineMappingsSink(self,unit_id,root,expected,MappingSink.pooled { mappings },RowSink.pooled { rows },span); }
@@ -360,11 +395,15 @@ struct RefinementCall {
 fn refineFresh(self: Service&, call: RefinementCall) -> blot_eval_core_eval::SolvedEvidence, Error {
     let before_nodes = self.evaluator.counters.inference_specialization_nodes; let before_recorded = self.refinement_stats.recorded; let before_record_declines = self.refinement_stats.record_declines;
     self.refinement_regions++;
-    let tape,tape_error = blot_reuse_specialization_receipt::initPooled(); if tape_error != Error.none { return default<blot_eval_core_eval::SolvedEvidence>(),tape_error; } defer { tape.deinit(); }
+    let tape,tape_error = blot_reuse_specialization_receipt::initPooled(); if tape_error != Error.none { return default<blot_eval_core_eval::SolvedEvidence>(),tape_error; } 
+    recursive fn cleanup_continuation_8() -> blot_eval_core_eval::SolvedEvidence, Error {
+
     var observation = blot_reuse_refinement_receipt::Observation {};
     let old_tape .= self.evaluator.receipt_tape; let old_observation .= self.evaluator.refinement_observation;
     if call.enabled { self.evaluator.receipt_tape .= tape; self.evaluator.refinement_observation .= observation; }
-    defer { self.evaluator.receipt_tape .= old_tape; self.evaluator.refinement_observation .= old_observation; }
+    
+    recursive fn cleanup_continuation_7() -> blot_eval_core_eval::SolvedEvidence, Error {
+
     let before_values = self.evaluator.storage.values.len; let before_children = self.evaluator.storage.children.len; let before_steps = self.evaluator.steps;
     var output: blot_eval_core_eval::SolvedEvidence; var error: Error = Error.none;
     match call.root {
@@ -395,17 +434,37 @@ fn refineFresh(self: Service&, call: RefinementCall) -> blot_eval_core_eval::Sol
         });
     }
     return output, Error.none;
+
+    }
+    let cleanup_result_7_0,cleanup_result_7_1 = cleanup_continuation_7();
+     self.evaluator.receipt_tape .= old_tape; self.evaluator.refinement_observation .= old_observation; 
+    return cleanup_result_7_0,cleanup_result_7_1;
+
+    }
+    let cleanup_result_8_0,cleanup_result_8_1 = cleanup_continuation_8();
+     tape.deinit(); 
+    return cleanup_result_8_0,cleanup_result_8_1;
 }
 fn refineMappingsCaptures(self: Service&,unit_id: u32,root: EvidenceRoot,expected: u32,mappings: Mapping[>..<]&,rows: RowMapping[>..<]&,span: blot_check_core::Span,captures: const blot_eval_core_eval::RetainedCapture[:]) -> Error { return refineMappingsCapturesSink(self,unit_id,root,expected,MappingSink.lexical { mappings },RowSink.lexical { rows },span,captures); }
 fn refineMappingsCaptures(self: Service&,unit_id: u32,root: EvidenceRoot,expected: u32,mappings: blot_backend_substitution_buffers::Mappings&,rows: blot_backend_substitution_buffers::Rows&,span: blot_check_core::Span,captures: const blot_eval_core_eval::RetainedCapture[:]) -> Error { return refineMappingsCapturesSink(self,unit_id,root,expected,MappingSink.pooled { mappings },RowSink.pooled { rows },span,captures); }
 fn refineMappingsCapturesSink(self: Service&, unit_id: u32, root: EvidenceRoot, expected: u32, mappings: MappingSink, rows: RowSink, span: blot_check_core::Span, captures: const blot_eval_core_eval::RetainedCapture[:]) -> Error {
-    let inference_stage = self.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.specialization); defer { inference_stage.deinit(); }
-    var shapes = blot_backend_substitution_buffers::Mappings {}; defer { shapes.deinit(); } var partial = physicalProjection(self.layouts,shapes);
+    let inference_stage = self.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.specialization); 
+    recursive fn cleanup_continuation_6() -> Error {
+
+    var shapes = blot_backend_substitution_buffers::Mappings {}; 
+    recursive fn cleanup_continuation_5() -> Error {
+ var partial = physicalProjection(self.layouts,shapes);
     var physical = blot_eval_core_eval::CodeProjection.physical { partial }; if self.code_projection != null { physical = self.code_projection; }
     var owned_projection = OwnedProjection { unit: unit_id, mappings: mappingItems(mappings), physical: physical }; let projection = blot_eval_core_eval::CodeProjection.owned { owned_projection };
-    var timing = blot_support::none<blot_backend_backend_timing::Scope>(); if self.timing != null { timing = blot_support::some(self.timing.enter(blot_backend_backend_timing::Phase.specialization)); } defer { if timing.present { timing.value.deinit(); } }
+    var timing = blot_support::none<blot_backend_backend_timing::Scope>(); if self.timing != null { timing = blot_support::some(self.timing.enter(blot_backend_backend_timing::Phase.specialization)); } 
+    recursive fn cleanup_continuation_4() -> Error {
+
     self.refinement_stats.requests++;
-    var seeds = blot_backend_substitution_buffers::EvidenceMappings {}; defer { seeds.deinit(); } var row_seeds = blot_backend_substitution_buffers::EvidenceRows {}; defer { row_seeds.deinit(); }
+    var seeds = blot_backend_substitution_buffers::EvidenceMappings {}; 
+    recursive fn cleanup_continuation_3() -> Error {
+ var row_seeds = blot_backend_substitution_buffers::EvidenceRows {}; 
+    recursive fn cleanup_continuation_2() -> Error {
+
     for entry in mappingItems(mappings) {
         if entry.instance.decl != 0 { continue; } let evidence, error = toEvidence(self, entry.layout);
         if error != Error.none { if error == Error.unresolved_type { continue; } return representationError(self, error, unit_id, span, FailureCode.unresolved_type); }
@@ -430,7 +489,9 @@ fn refineMappingsCapturesSink(self: Service&, unit_id: u32, root: EvidenceRoot, 
         let value, error = refineFresh(self, RefinementCall { unit: unit_id, root: root, expected: result, span: span, seeds: seeds.items, rows: row_seeds.items, captures: captures, shapes: MappingSink.pooled { shapes }, projection: projection, enabled: enabled, profiling: profiling, has_instances: has_instances, rejected_candidates: rejected_candidates });
         if error != Error.none { return error; } solved = value;
     }
-    defer { solved.deinit(); }
+    
+    recursive fn cleanup_continuation_1() -> Error {
+
     for entry in solved.types {
         var retained = false; for seed in seeds.items { if seed.variable == entry.variable && seed.evidence == entry.evidence { retained = true; break; } } if retained { continue; }
         let concrete, error = fromEvidence(self, entry.evidence); if error != Error.none { return representationError(self, error, unit_id, span, FailureCode.unresolved_type); }
@@ -447,4 +508,34 @@ fn refineMappingsCapturesSink(self: Service&, unit_id: u32, root: EvidenceRoot, 
     }
     for shape in shapes.items { let error = mapTypeDepthSink(self, unit_id, mappings, rows, shape.variable, shape.layout, span, 0); if error != Error.none { return error; } }
     return Error.none;
+
+    }
+    let cleanup_result_1_0 = cleanup_continuation_1();
+     solved.deinit(); 
+    return cleanup_result_1_0;
+
+    }
+    let cleanup_result_2_0 = cleanup_continuation_2();
+     row_seeds.deinit(); 
+    return cleanup_result_2_0;
+
+    }
+    let cleanup_result_3_0 = cleanup_continuation_3();
+     seeds.deinit(); 
+    return cleanup_result_3_0;
+
+    }
+    let cleanup_result_4_0 = cleanup_continuation_4();
+     if timing.present { timing.value.deinit(); } 
+    return cleanup_result_4_0;
+
+    }
+    let cleanup_result_5_0 = cleanup_continuation_5();
+     shapes.deinit(); 
+    return cleanup_result_5_0;
+
+    }
+    let cleanup_result_6_0 = cleanup_continuation_6();
+     inference_stage.deinit(); 
+    return cleanup_result_6_0;
 }

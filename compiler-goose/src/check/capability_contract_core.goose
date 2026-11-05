@@ -290,7 +290,7 @@ fn inputBodyCheck(context: InputBodyCheck&, store: Store&) -> Error {
         if parameter.binding >= context.module.bindings.len || context.module.bindings[parameter.binding].kind != blot_check_check::Kind.parameter { return Error.none; }
         let formal, error = store.append(blot_check_capability_contracts::Term { Tag.parameter, index as u32 }); if error != Error.none { return Error.none; } if environment.bind(parameter.binding, formal) != Error.none { return Error.none; }
     }
-    let root, error = expression(builder, context.body.root, environment, 0); if error != Error.none || store.view().validate(root, context.summary.arity(), true) != Error.none { return Error.none; } for node in store.nodes { if node.tag == Tag.unknown { return Error.none; } }
+    let root, error = expression(builder, context.body.root, environment, 0); if error != Error.none || store.view().validate(root, context.summary.arity(), true) != Error.none { return Error.none; } for node in store.nodes.items { if node.tag == Tag.unknown { return Error.none; } }
     let mask, error = store.view().parameterMask(root); context.result = error == Error.none && mask == context.summary.result(); return Error.none;
 }
 fn deriveInputFunctionClosure(store: Store&, module: const Module&, initial: blot_check_core::ClosureInfo, arity: u8) -> blot_support::Option<Id>, Error { return deriveInputFunctionClosureWithOwners(store, module, initial, arity, []); }

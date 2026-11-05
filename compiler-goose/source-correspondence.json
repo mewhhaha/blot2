@@ -3423,7 +3423,7 @@
       "zig": "compiler/src/runtime/arena_runtime.zig",
       "goose": "compiler-goose/src/runtime/arena_runtime.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/cohort_fixture.zig",
@@ -3447,7 +3447,7 @@
       "zig": "compiler/src/runtime/cycles_runtime.zig",
       "goose": "compiler-goose/src/runtime/cycles_runtime.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/data_stacks.zig",
@@ -3537,7 +3537,7 @@
       "zig": "compiler/src/runtime/root_runtime.zig",
       "goose": "compiler-goose/src/runtime/root_runtime.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/runtime_cleanup.zig",

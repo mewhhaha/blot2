@@ -1,15 +1,16 @@
 // Bounded scope-aware walks retain lexical binder handles.
 namespace blot_check_rank_walk;
 import support.error;
-struct Walker {
+import support.pooled_buffer;
+struct Walker<C> {
     store: blot_check_types::Store&, rigid_scope: u32, free_bound: bool,
-    collected: blot_check_types::Id[>..]&, remaining: i64&,
+    collected: C&, remaining: i64&,
     collecting: bool = false, budgeted: bool = false, quantifier: bool = false,
     scopes: blot_check_types::List[128] = [blot_check_types::List {}; 128],
     scope_depth: i64 = 0, steps: i64 = 0,
     excluded: const blot_check_types::Id[:] = [],
 }
-recursive fn visit(self: Walker&, root: blot_check_types::Id, depth: i64) -> bool, blot_error::Error {
+recursive fn visit<C>(self: Walker<C>&, root: blot_check_types::Id, depth: i64) -> bool, blot_error::Error {
     if root == 0 { return false, blot_error::Error.none; }
     if depth >= 128 || self.steps >= 4096 { return false, blot_error::Error.type_limit; }
     self.steps += 1;
@@ -25,8 +26,8 @@ recursive fn visit(self: Walker&, root: blot_check_types::Id, depth: i64) -> boo
             if self.free_bound || (self.rigid_scope != 0 && node.a != self.rigid_scope) { return false, blot_error::Error.none; }
             for excluded in self.excluded { if excluded == id { return false, blot_error::Error.none; } }
             if self.collecting {
-                for previous in self.collected { if previous == id { return false, blot_error::Error.none; } }
-                self.collected.push(id);
+                for previous in self.collected.values() { if previous == id { return false, blot_error::Error.none; } }
+                let append_error=self.collected.push(id);if append_error!=blot_error::Error.none {return false,append_error;}
                 return false, blot_error::Error.none;
             }
             return true, blot_error::Error.none;
@@ -93,24 +94,9 @@ recursive fn visit(self: Walker&, root: blot_check_types::Id, depth: i64) -> boo
     }
     return false, blot_error::Error.none;
 }
-recursive fn visitQuantifier(self: Walker&, id: blot_check_types::Id, body: blot_check_types::Id, depth: i64) -> bool, blot_error::Error {
-    let found, error = visit(self, body, depth + 1);
-    if error != blot_error::Error.none || found { return found, error; }
-    var goals: blot_check_types::Obligation[>..] = [];
-    goals.append(self.store.quantifierGoals(id));
-    for goal in goals {
-        for endpoint in [goal.ty, goal.other, goal.result, goal.signature] {
-            let found, error = visit(self, endpoint, depth + 1);
-            if error != blot_error::Error.none || found { return found, error; }
-        }
-        if goal.identity.unit == 0 && goal.identity.decl != 0 {
-            let found, error = visit(self, goal.identity.decl, depth + 1);
-            if error != blot_error::Error.none || found { return found, error; }
-        }
-    }
-    return false, blot_error::Error.none;
-}
-recursive fn row(self: Walker&, root: blot_check_effects::Id, depth: i64) -> bool, blot_error::Error {
+recursive fn visitQuantifier<C>(self: Walker<C>&,id:u32,body:u32,depth:i64)->bool,blot_error::Error {let found,error=visit(self,body,depth+1);if error!=blot_error::Error.none || found {return found,error;}let goals=goal_runs.alloc_slice(self.store.quantifierGoals(id).len);for goal,index in self.store.quantifierGoals(id) {goals[index]=goal;}let result,failure=visitGoals(self,goals,depth);goal_runs.free_slice(goals);return result,failure;}
+fn visitGoals<C>(self:Walker<C>&,goals:const blot_check_types::Obligation[:],depth:i64)->bool,blot_error::Error {for goal in goals {for endpoint in [goal.ty,goal.other,goal.result,goal.signature] {let found,error=visit(self,endpoint,depth+1);if error!=blot_error::Error.none || found {return found,error;}}if goal.identity.unit==0 && goal.identity.decl!=0 {let found,error=visit(self,goal.identity.decl,depth+1);if error!=blot_error::Error.none || found {return found,error;}}}return false,blot_error::Error.none;}
+recursive fn row<C>(self: Walker<C>&, root: blot_check_effects::Id, depth: i64) -> bool, blot_error::Error {
     let id, resolution = self.store.resolveEffects(root, 0);
     if resolution != blot_error::Error.none { return false, resolution; }
     let row_ = self.store.row(id);
@@ -133,29 +119,39 @@ recursive fn row(self: Walker&, root: blot_check_effects::Id, depth: i64) -> boo
     return false, blot_error::Error.none;
 }
 fn contains(store: blot_check_types::Store&, root: blot_check_types::Id, rigid_scope: u32, free_bound: bool) -> bool, blot_error::Error {
-    var collected: blot_check_types::Id[>..] = []; var remaining: i64 = 0;
+    var backing=blot_support_pooled_buffer::Buffer<u32>{};var collected=PooledCollector{backing,rigid_runs}; var remaining: i64 = 0;
     var walker = Walker { store, rigid_scope, free_bound, collected, remaining };
-    return visit(walker, root, 0);
+    let result,error=visit(walker,root,0);backing.deinit(rigid_runs);return result,error;
 }
 fn quantified(store: blot_check_types::Store&, root: blot_check_types::Id) -> bool, blot_error::Error {
-    var collected: blot_check_types::Id[>..] = []; var remaining: i64 = 0;
+    var backing=blot_support_pooled_buffer::Buffer<u32>{};var collected=PooledCollector{backing,rigid_runs}; var remaining: i64 = 0;
     var walker = Walker { store, 0, false, collected, remaining, quantifier: true };
-    return visit(walker, root, 0);
+    let result,error=visit(walker,root,0);backing.deinit(rigid_runs);return result,error;
 }
 fn containsRow(store: blot_check_types::Store&, root: blot_check_effects::Id, rigid_scope: u32) -> bool, blot_error::Error {
-    var collected: blot_check_types::Id[>..] = []; var remaining: i64 = 0;
+    var backing=blot_support_pooled_buffer::Buffer<u32>{};var collected=PooledCollector{backing,rigid_runs}; var remaining: i64 = 0;
     var walker = Walker { store, rigid_scope, false, collected, remaining };
-    return row(walker, root, 0);
+    let result,error=row(walker,root,0);backing.deinit(rigid_runs);return result,error;
 }
 fn containsExcept(store: blot_check_types::Store&, root: blot_check_types::Id, scope: u32,
                   excluded: const blot_check_types::Id[:], remaining: i64&) -> bool, blot_error::Error {
-    var collected: blot_check_types::Id[>..] = [];
+    var backing=blot_support_pooled_buffer::Buffer<u32>{};var collected=PooledCollector{backing,rigid_runs};
     var walker = Walker { store, scope, false, collected, remaining, excluded: excluded, budgeted: true };
-    return visit(walker, root, 0);
+    let result,error=visit(walker,root,0);backing.deinit(rigid_runs);return result,error;
 }
 fn collectRigids(store: blot_check_types::Store&, root: blot_check_types::Id, scope: u32,
-                 collected: blot_check_types::Id[>..]&, remaining: i64&) -> blot_error::Error {
-    var walker = Walker { store, scope, false, collected, remaining, collecting: true, budgeted: true };
+                 collected: C&, remaining: i64&) -> blot_error::Error {
+    var destination=NativeCollector{collected};var walker = Walker { store, scope, false, destination, remaining, collecting: true, budgeted: true };
     let found, error = visit(walker, root, 0);
     return error;
 }
+
+reusable[] var rigid_runs:u32[>..];
+reusable[] var goal_runs:blot_check_types::Obligation[>..];
+struct NativeCollector {items:u32[>..]&}
+fn values(self:NativeCollector&)->const u32[:] {return self.items;}
+fn push(self:NativeCollector&,id:u32)->blot_error::Error {self.items.push(id);return blot_error::Error.none;}
+struct PooledCollector {items:blot_support_pooled_buffer::Buffer<u32>&,pool:u32[>..]&}
+fn values(self:PooledCollector&)->const u32[:] {return self.items.items;}
+fn push(self:PooledCollector&,id:u32)->blot_error::Error {return blot_support_pooled_buffer::push(self.items,id,self.pool);}
+fn collectRigids(store:blot_check_types::Store&,root:u32,scope:u32,collected:blot_support_pooled_buffer::Buffer<u32>&,pool:u32[>..]&,remaining:i64&)->blot_error::Error {var destination=PooledCollector{collected,pool};var walker=Walker{store,scope,false,destination,remaining,collecting:true,budgeted:true};let found,error=visit(walker,root,0);return error;}

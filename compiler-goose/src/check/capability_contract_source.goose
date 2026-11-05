@@ -204,7 +204,7 @@ fn deriveInputFunctionWithFunctions(store: Store&, tree: const blot_parse_ast::T
 struct InputCheck { tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, source: AstId, operations: const u32[:], types: const blot_check_types::Store&, expr_types: const u32[:], arity: u8, result: bool = false }
 fn inputCheck(context: InputCheck&, store: Store&) -> Error {
     let root, error = deriveInputFunction(store, context.tree, context.pool, context.source, context.operations, context.types, context.expr_types, context.arity); if error != Error.none || !root.present { return Error.none; }
-    if store.view().validate(root.value, context.arity, true) != Error.none { return Error.none; } for node in store.nodes { if node.tag == Tag.unknown { return Error.none; } } context.result = true; return Error.none;
+    if store.view().validate(root.value, context.arity, true) != Error.none { return Error.none; } for node in store.nodes.items { if node.tag == Tag.unknown { return Error.none; } } context.result = true; return Error.none;
 }
 fn inputFunction(tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, source: AstId, operations: const u32[:], types: const blot_check_types::Store&, expr_types: const u32[:], arity: u8) -> bool {
     var context = InputCheck { tree, pool, source, operations, types, expr_types, arity }; let error = blot_check_capability_contracts::withStore<InputCheck,inputCheck>(context); return error == Error.none && context.result;
