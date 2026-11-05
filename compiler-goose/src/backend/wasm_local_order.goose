@@ -1,5 +1,8 @@
 namespace blot_backend_wasm_local_order;
 import .runtime_ir;
+import .wasm;
+import support.option;
+import support.error;
 
 fn local(op: blot_backend_runtime_ir::Op) -> bool { op == blot_backend_runtime_ir::OP_local_get || op == blot_backend_runtime_ir::OP_local_set || op == blot_backend_runtime_ir::OP_local_tee }
 fn uleb(value: i64) -> u64 { var rest = value; var bytes: u64 = 1; while rest >= 128 { rest >>= 7; bytes++; } return bytes; }
@@ -51,4 +54,8 @@ fn run(parameters: i64, types: const blot_backend_runtime_ir::ValueType[:], inst
     for original, next in order { mapping[original] = (parameters + next) as u32; output_locals.push(types[original]); }
     for inst in instructions { var output = inst; if local(inst.op) && inst.operand >= parameters { output.operand = mapping[inst.operand - parameters]; } output_code.push(output); }
     return true;
+}
+
+fn run(module: const blot_backend_wasm::Module&,function: blot_backend_runtime_ir::Function) -> blot_support::Option<blot_backend_runtime_ir::DetachedBody>,blot_error::Error {
+    var locals: blot_backend_runtime_ir::ValueType[>..<] = []; var instructions: blot_backend_runtime_ir::Instruction[>..<] = []; if !run(function.parameters.len,module.locals(function),module.instructions(function),locals,instructions) { return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),blot_error::Error.none; } let body,error = blot_backend_runtime_ir::cloneBody(locals,instructions); if error != blot_error::Error.none { return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error; } return blot_support::some(body),blot_error::Error.none;
 }

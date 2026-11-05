@@ -5,6 +5,7 @@ import .runtime_identity;
 import .wasm;
 import .backend_timing;
 import support.option;
+import support.error;
 
 let max_sites: i64 = 16384;
 enum Kind { closure_storage, constructor_storage, aggregate_storage, boxed_constant, call_materialization, array_storage, other_materialization }
@@ -12,9 +13,10 @@ struct Site {
     filename: u8[160] = [0; 160], filename_len: u8 = 0, filename_truncated: bool = false, unit: u32 = 0,
     span: blot_check_core::Span, kind: Kind = Kind.other_materialization, requested_bytes: blot_support::Option<u32>, emissions: u32 = 1,
 }
-struct Snapshot { sites: Site[>..<]&, omitted: i64 = 0 }
-fn clone(source: Snapshot&, sites: Site[>..<]&) -> Snapshot { sites.clear(); sites.append(source.sites[..]); return Snapshot { sites: sites, omitted: source.omitted , ..}; }
-fn deinit(snapshot: Snapshot&) { snapshot.sites.clear(); snapshot.omitted = 0; }
+struct Snapshot { sites: Site[:] = [],omitted: i64 = 0 }
+reusable[] var owned_sites: Site[>..] = [];
+fn clone(source: const Snapshot&) -> Snapshot,blot_error::Error { let sites = owned_sites.alloc_slice(source.sites.len); for value,index in source.sites { sites[index] = value; } return Snapshot { sites,omitted: source.omitted,..},blot_error::Error.none; }
+fn deinit(snapshot: Snapshot&) { if snapshot.sites.len != 0 { owned_sites.free_slice(snapshot.sites); } snapshot = Snapshot {..}; }
 fn category(tag: blot_check_core::Tag) -> Kind {
     if tag == blot_check_core::Tag.closure { return Kind.closure_storage; }
     if tag == blot_check_core::Tag.construct { return Kind.constructor_storage; }
@@ -24,7 +26,7 @@ fn category(tag: blot_check_core::Tag) -> Kind {
     if tag == blot_check_core::Tag.array || tag == blot_check_core::Tag.array_op || tag == blot_check_core::Tag.update { return Kind.array_storage; }
     return Kind.other_materialization;
 }
-fn capture(sites: Site[>..<]&, units: const blot_check_core::Module[:], names: blot_support::Option<blot_backend_runtime_identity::View>, module: blot_backend_wasm::Module&, entry: u32, prelude: u32) -> Snapshot {
+fn capture(sites: Site[>..<]&, units: const blot_check_core::Module[:], names: blot_support::Option<blot_backend_runtime_identity::View>, module: const blot_backend_wasm::Module&, entry: u32, prelude: u32) -> Snapshot,blot_error::Error {
     sites.clear(); var omitted = 0;
     for pass in 0..2 {
         for record in module.semantic_sites {
@@ -32,9 +34,9 @@ fn capture(sites: Site[>..<]&, units: const blot_check_core::Module[:], names: b
             let source .= units[record.unit - 1];
             if record.node == 0 || record.node >= source.nodes.len || record.function >= module.functions.len { continue; }
             let span = source.span(record.node); if span.end <= span.start { continue; }
-            let function = module.functions[record.function]; if record.place >= function.instructions.len { continue; }
+            let function = module.functions[record.function]; let instructions = module.instructions(function); if record.place >= instructions.len { continue; }
             var bytes = blot_support::none<u32>();
-            if record.place != 0 { let previous = module.instructions[function.instructions.start + record.place - 1]; if previous.op == blot_backend_runtime_ir::OP_i32_const && previous.operand != 0 { bytes = blot_support::some(previous.operand); } }
+            if record.place != 0 { let previous = instructions[record.place - 1]; if previous.op == blot_backend_runtime_ir::OP_i32_const && previous.operand != 0 { bytes = blot_support::some(previous.operand); } }
             let kind = category(source.node(record.node).tag); var found = false; let count = sites.len;
             for index in 0..count {
                 let site = sites[index];
@@ -50,7 +52,7 @@ fn capture(sites: Site[>..<]&, units: const blot_check_core::Module[:], names: b
             for index in 0..length { site.filename[index] = path[index]; } site.filename_len = length as u8; site.filename_truncated = length != path.len; sites.push(site);
         }
     }
-    return Snapshot { sites: sites, omitted: omitted , ..};
+    let owned = owned_sites.alloc_slice(sites.len); for site,index in sites { owned[index] = site; } return Snapshot { sites: owned,omitted,..},blot_error::Error.none;
 }
 fn kindName(kind: Kind) -> const u8[:] {
     if kind == Kind.closure_storage { return "closure_storage"; } if kind == Kind.constructor_storage { return "constructor_storage"; }
@@ -65,3 +67,5 @@ fn jsonStringify(site: Site, out: u8[>..]&) {
     if site.requested_bytes.present { format(out, site.requested_bytes.value); } else { out.append("null"); }
     blot_backend_backend_timing::jsonField(out, "emissions", site.emissions); out.push('}');
 }
+
+fn capture(units: const blot_check_core::Module[:],names: blot_support::Option<blot_backend_runtime_identity::View>,module: const blot_backend_wasm::Module&,entry: u32,prelude: u32) -> Snapshot,blot_error::Error { var sites: Site[>..<] = []; return capture(sites,units,names,module,entry,prelude); }

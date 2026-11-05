@@ -26,7 +26,7 @@ reusable[] var word_pool: u64[>..]=[];
 reusable[] var value_pool: u32[>..]=[];
 fn interface<V>(view: V,selected: const Interfaces&,value: u32) -> u32 { let known=selected.get(value); if known { return known; } return view.value_evidence[value]; }
 fn deinit(self: Inputs&) {if self.mappings.len!=0 {mapping_pool.free_slice(self.mappings);}if self.rows.len!=0 {row_pool.free_slice(self.rows);}if self.slots.len!=0 {slot_pool.free_slice(self.slots);}if self.words.len!=0 {word_pool.free_slice(self.words);}if self.values.len!=0 {value_pool.free_slice(self.values);} self.mappings=[]; self.rows=[]; self.slots=[]; self.words=[]; self.values=[]; }
-fn copyTyping(self: Inputs,importer: blot_eval_semantic_evidence_import::Importer&) -> Inputs,Error {
+fn copyTyping<I>(self: Inputs,importer: I&) -> Inputs,Error {
  var result=self; result.mappings=[]; result.rows=[]; result.slots=[]; result.words=[]; result.values=[];
  result.mappings=mapping_pool.alloc_slice(self.mappings.len); for mapping,index in self.mappings { let evidence,error=importer.ty(mapping.evidence,0); if error!=Error.none { deinit(result); return default<Inputs>(),error; } result.mappings[index]=Mapping {mapping.variable,evidence}; }
  result.rows=row_pool.alloc_slice(self.rows.len); for mapping,index in self.rows { let evidence,error=importer.row(mapping.evidence,0); if error!=Error.none { deinit(result); return default<Inputs>(),error; } result.rows[index]=RowMapping {mapping.variable,evidence}; }

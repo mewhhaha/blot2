@@ -245,3 +245,10 @@ fn findRelocations(self:Matcher&)->Error {
  {let relocation_work=budget-walk.remaining;let position_work=0x7fffffffffffffff-positions.remaining;if position_work>0x7fffffffffffffff-relocation_work {self.work=0x7fffffffffffffff;}else {self.work=relocation_work+position_work;}self.budget_exhausted=0;if walk.remaining==0 {self.budget_exhausted=1;}} }
 fn cloneBody(source:Body)->Body,Error {return blot_backend_runtime_ir::cloneBody(source);}
 fn cloneFunction(source:SourceFunction)->SourceFunction,Error {return blot_backend_runtime_ir::cloneFunction(source);}
+
+// Caller-owned canonical headers may be reused across compiler attempts. The
+// header itself outlives every borrowed run and is not a reusable pool lease.
+fn initInto(self:Capture&)->Error {
+ if self.valid() {return self.reset();}
+ let value,error=initPooled();if error!=Error.none {return error;}self=value;return Error.none;
+}

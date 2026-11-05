@@ -6,6 +6,8 @@ import support.blake3;
 import support.native;
 import .dependency_format_codecs;
 import .dependency_format_owners;
+import reuse.dependency_payload;
+import reuse.frozen_dependency;
 type Error=blot_error::Error;
 type Digest=u8[32];
 let magic:const u8[:]="BLOTDEP1";
@@ -46,9 +48,9 @@ fn encodeWithLimits<T>(key:Key,value:T,limits:Limits)->u8[:],Error {
  {if !published {release(output);}} }
 fn decode<T>(bytes:const u8[:],expected:Key)->Owned<T>,Error {return decodeWithLimits<T>(bytes,expected,Limits{});}
 fn decodeWithLimits<T>(bytes:const u8[:],expected:Key,limits:Limits)->Owned<T>,Error {
- let opened,error=initOwner();if error!=Error.none {return default<Owned<T>>(),error;}var owner=opened;let value,error=decodeWithOwner<T,Owner>(owner,bytes,expected,limits);if error!=Error.none {owner.deinit();return default<Owned<T>>(),error;}return Owned<T>{value,owner},Error.none;
+ let opened,error=initOwner();if error!=Error.none {return default<Owned<T>>(),error;}var owner=opened;let value,error=decodeInto<T,Owner>(owner,bytes,expected,limits);if error!=Error.none {owner.deinit();return default<Owned<T>>(),error;}return Owned<T>{value,owner},Error.none;
 }
-fn decodeWithOwner<T,O>(owner:O&,bytes:const u8[:],expected:Key,limits:Limits=Limits{})->T,Error {
+fn decodeInto<T,O>(owner:O&,bytes:const u8[:],expected:Key,limits:Limits=Limits{})->T,Error {
  if bytes.len<header_size || bytes[..8]!=magic {return default<T>(),Error.invalid_artifact;}let mark=owner.mark();var committed=false;
  var reader=Decoder<O>{owner:owner,bytes:bytes,limits:limits,remaining:limits.elements,at:8};let stored_version,error=reader.integer(4);if error!=Error.none {let __cleanup_result_9_0: T = default<T>(); let __cleanup_result_9_1: Error = error; {if !committed {owner.rollback(mark);}} return __cleanup_result_9_0, __cleanup_result_9_1;}if stored_version!=version {let __cleanup_result_10_0: T = default<T>(); let __cleanup_result_10_1: Error = Error.unsupported_version; {if !committed {owner.rollback(mark);}} return __cleanup_result_10_0, __cleanup_result_10_1;}
  let stored_schema,error=readValue(reader,default<Digest>(),0);if error!=Error.none {let __cleanup_result_11_0: T = default<T>(); let __cleanup_result_11_1: Error = error; {if !committed {owner.rollback(mark);}} return __cleanup_result_11_0, __cleanup_result_11_1;}if stored_schema!=schema(default<T>()) {let __cleanup_result_12_0: T = default<T>(); let __cleanup_result_12_1: Error = Error.schema_mismatch; {if !committed {owner.rollback(mark);}} return __cleanup_result_12_0, __cleanup_result_12_1;}
@@ -60,3 +62,8 @@ fn decodeWithOwner<T,O>(owner:O&,bytes:const u8[:],expected:Key,limits:Limits=Li
 // Source-authored concrete metadata preserves the native type spellings, enum
 // values and wire fields. Runtime reflection never hashes Goose owner metadata.
 fn schema<T>(value:T)->Digest {var hasher=blot_support_blake3::init();describe(hasher,value);return blot_support_blake3::final(hasher);}
+
+fn decodeWithOwner<T>(owner:Owner&,bytes:const u8[:],expected:Key,limits:Limits=Limits{})->T,Error {return decodeInto<T,Owner>(owner,bytes,expected,limits);}
+fn decodeWithOwner<T>(owner:blot_reuse_dependency_payload::Owner&,bytes:const u8[:],expected:Key,limits:Limits=Limits{})->T,Error {return decodeInto<T,blot_reuse_dependency_payload::Owner>(owner,bytes,expected,limits);}
+fn decodeWithOwner<T,O>(owner:O&,bytes:const u8[:],expected:Key,limits:Limits=Limits{})->T,Error {return decodeInto<T,O>(owner,bytes,expected,limits);}
+fn encodeFrozen(key:Key,value:blot_reuse_frozen_dependency::FrozenDependency)->u8[:],Error {return encode(key,value);}

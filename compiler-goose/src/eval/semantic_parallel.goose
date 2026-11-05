@@ -1,5 +1,6 @@
 namespace blot_eval_semantic_parallel;
 import .semantic_job_batch;
+import support.process_pool;
 import reuse.independent_call_proof;
 import reuse.specialization_receipt;
 import support.error;
@@ -32,10 +33,10 @@ fn take<S>(self: Batch&,index: i64,stats: S&) -> Record,bool,Error {
 // PacketContext encodes all source.old/gate/completed_worker_proofs/generator
 // inputs. Execute reconstructs a private Session, calls independent.acquire,
 // clones its complete result into the reply and carries all Counts back.
-fn run<C,F>(requests: const Request[:],requested: u8,context: C&,owned_requests: Request[>..<]&,owned_slots: Slot[>..<]&,outcomes: blot_eval_semantic_job_batch::Outcome<Result>[>..<]&) -> Batch,Error {
+fn run<C>(requests: const Request[:],requested: u8,context: C&,owned_requests: Request[>..<]&,owned_slots: Slot[>..<]&,outcomes: blot_eval_semantic_job_batch::Outcome<Result>[>..<]&) -> Batch,Error {
  let request_start=owned_requests.len; owned_requests.append(requests); let slot_start=owned_slots.len; for request in requests { owned_slots.push(Slot {}); }
  var batch=Batch {owned_requests[request_start..],owned_slots[slot_start..],1,null}; var cancellation=blot_eval_semantic_job_batch::Cancellation {};
- let joined,error=blot_eval_semantic_job_batch::run<Result,Request,C,F>(batch.requests,requested,cancellation,context,outcomes); if error!=Error.none { return batch,error; } batch.workers=joined.workers;
+ let joined,error=blot_eval_semantic_job_batch::run<Result,Request,C>(blot_process_pool::Kind.independent,batch.requests,requested,cancellation,context,outcomes); if error!=Error.none { return batch,error; } batch.workers=joined.workers;
  for outcome,index in joined.outcomes { match outcome {
   complete result=>{ batch.slots[index].record=result.value.record; batch.slots[index].counts=result.value.counts; },
   out_of_memory=>{ batch.slots[index].failed=true; },

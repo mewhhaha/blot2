@@ -109,3 +109,22 @@ struct CountingAllocator {profile:Key=Key{..}}
 fn attach(self:CountingAllocator&,profile:Profile&,complete:bool=false) {assert(validProfile(profile.key));self.profile=profile.key;profile.state().allocation_coverage=complete;}
 fn detach(self:CountingAllocator&) {self.profile=Key{..};}
 fn charge(self:CountingAllocator&,bytes:u64,allocations:u64) {if self.profile.slot==0 {return;}assert(validProfile(self.profile));let data:ProfileState&=profiles[self.profile.slot-1];let index=phaseIndex(data.active);blot_native::atomic_add(data.requested_bytes[index],bytes);if allocations!=0 {blot_native::atomic_add(data.allocations[index],allocations);}}
+
+// Process workers stream source/detail regions to the inherited stderr. Their
+// IDs occupy a coordinator-reserved disjoint range and clocks use the same
+// host monotonic origin; pass sums return as copied scalar telemetry.
+struct WorkerContext {enabled:bool=false,build:u32=0,started_ns:u64=0,id_base:u64=0,space:Space=Space.source}
+struct WorkerSnapshot {passes:PassTotals[7]=[PassTotals{..};7]}
+struct WorkerInstallation {trace:Trace=Trace{..},previous:TraceInstallation=TraceInstallation{..},space:SpaceScope=SpaceScope{..}}
+fn captureWorker()->WorkerContext {
+    let owner .= currentTrace();if !owner {return WorkerContext{..};}let state .= owner.state();if state.next>0xfffffffeffffffff {return WorkerContext{..};}let base=blot_native::atomic_add(state.next,4294967296);return WorkerContext{enabled:true,build:state.build,started_ns:state.started,id_base:base,space:trace_space,..};
+}
+fn beginWorker(context:WorkerContext)->WorkerInstallation {
+    if !context.enabled {return WorkerInstallation{..};}var trace=initTrace(context.build);let state .= trace.state();state.started=context.started_ns;state.next=context.id_base;let previous=installTrace(trace);let space=enterSpace(context.space);return WorkerInstallation{trace,previous,space};
+}
+fn finish(self:WorkerInstallation&)->WorkerSnapshot {
+    if self.trace.key.slot==0 {return WorkerSnapshot{..};}let result=WorkerSnapshot{self.trace.state().passes};self.space.restore();self.previous.restore();self.trace.deinit();self=WorkerInstallation{..};return result;
+}
+fn mergeWorker(snapshot:WorkerSnapshot) {
+    let owner .= currentTrace();if !owner {return;}for entry,index in snapshot.passes {let totals:PassTotals&=owner.state().passes[index];blot_native::atomic_add(totals.us,entry.us);blot_native::atomic_add(totals.cpu_us,entry.cpu_us);blot_native::atomic_add(totals.input,entry.input);blot_native::atomic_add(totals.output,entry.output);blot_native::atomic_add(totals.calls,entry.calls);}
+}

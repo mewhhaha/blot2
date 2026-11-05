@@ -176,3 +176,11 @@ copy, all reusable-pool costs and OS acquisition timing remain unmeasured.
   source algorithm inventory alone does not prove that boundary.
 
 Verification is still explicitly deferred until all source writing is complete.
+
+### Portable archive and process-worker source checkpoint
+
+The complete first production writing passes now include dependency_format (with concrete finite typed decode owners and codecs), portable_query, principal_archive, semantic_archive, optimized_archive, alias_project_pipeline, and backend/optimized_bodies. Detached optimizer functions and bodies own actual typed runs; ranges are never reinterpreted as slices. The Format registry includes BackendCheckpoint.Wire. Native `@typeName` identities for anonymous/generic schema roots remain an explicit oracle frontier: source-authored spellings have not been compared with a pinned native executable. No archive interoperability claim follows from these source passes.
+
+Semantic SCC jobs and independent proof jobs now use support.process_pool bounded copied-process waves. Public process handlers are component_worker.executePacket and independent_call_proof.executePacket (the latter declared in independent_worker.goose). They decode full Core/evidence/source contexts, validate them, reconstruct private Sessions, preserve per-slot decline/OOM outcomes, and return owned results before coordinator publication. Nested component pools are disabled inside workers. Common packet envelopes carry phase-profile worker context and copied pass totals; process stderr inherits trace output. The old thread_fn/queue design was removed because reachable pooled mutable metadata is not flat under Goose §11.2. Process cancellation/OS failures, exact allocation-fault parity, framing limits, schema spelling, and execution/measurement remain unqualified until the deferred verification phase.
+
+Canonical driver CompileWorkspace ownership is being written next, using one checked active compiler backing set per process and independently retained captures/results. This boundary is not yet complete.

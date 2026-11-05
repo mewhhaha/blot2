@@ -1,6 +1,7 @@
 // Named code instances and constants share the checked immutable Core graph.
 namespace blot_backend_core_backend;
 import .result_publication;
+import .result_owner;
 import reuse.dependency_payload;
 import .substitution_buffers;
 import std;
@@ -114,17 +115,17 @@ struct QueryTables {
     canonical: blot_reuse_semantic_query_table::Storage, source_description: blot_reuse_semantic_query_table::Storage, open_residual: blot_reuse_semantic_query_table::Storage,
     executable_fragment: blot_reuse_semantic_query_table::Storage, executable_optimizer: blot_reuse_semantic_query_table::Storage,
 }
-var inactive_result_bytes: u8[>..<] = [];
-var inactive_result_message: u8[>..<] = [];
+var inactive_result_bytes = blot_backend_result_owner::ByteBuffer {..};
+var inactive_result_message = blot_backend_result_owner::ByteBuffer {..};
 struct Result {
-    active: bool = false,publication_owner: blot_backend_result_publication::Owner,publication_epoch: u64 = 0,publication_pinned: bool = false,publication_units: const blot_check_core::Module[:] = [],
+    active: bool = false,output_owner: blot_backend_result_owner::Owner,detached: bool = false,message_source: const u8[:] = [],publication_owner: blot_backend_result_publication::Owner,publication_epoch: u64 = 0,publication_pinned: bool = false,publication_units: const blot_check_core::Module[:] = [],
     allocation_emission: blot_backend_allocation_emission::Snapshot&? = null, timing: blot_backend_backend_timing::Stats,
     counters: blot_work_counters::Counters, optimization: blot_backend_function_facts::Stats, runtime_optimization: blot_backend_optimized_bodies::Stats,
     module_stamps: ModuleStamps, refinements: blot_reuse_refinement_receipt::Stats, completed_queries: blot_eval_completed_specialization_query::Stats, query_tables: QueryTables,
     artifacts: blot_support::Option<ArtifactSummary>, capture: blot_reuse_artifact_capture::Capture&? = null, whole_module_only: bool = false,
     reuse: blot_reuse_artifact_fragment::Stats, principal: blot_reuse_principal_evidence_reuse::Stats, source_validation: blot_reuse_dependency_certificate::Stats,
-    bytes: u8[>..<]& = inactive_result_bytes, diagnostic: blot_support::Option<Diagnostic>, code_instances: i64 = 0, callable_wrappers: i64 = 0, emitted_functions: i64 = 0, constant_steps: i64 = 0,
-    constant_receipts: blot_reuse_constant_receipt::Stats, owned_message: u8[>..<]& = inactive_result_message, explanation: blot_reuse_dispatch_explanation::Explanation&? = null,
+    bytes: blot_backend_result_owner::ByteBuffer& = inactive_result_bytes, diagnostic: blot_support::Option<Diagnostic>, code_instances: i64 = 0, callable_wrappers: i64 = 0, emitted_functions: i64 = 0, constant_steps: i64 = 0,
+    constant_receipts: blot_reuse_constant_receipt::Stats, owned_message: blot_backend_result_owner::ByteBuffer& = inactive_result_message, explanation: blot_reuse_dispatch_explanation::Explanation&? = null,
     startup_observation: blot_backend_startup_emission_facts::Snapshot&? = null,
 }
 struct Generator {
@@ -496,7 +497,7 @@ fn publishRetained(generator: Generator&, request: blot_reuse_code_artifacts::Re
     match request { named value => generator.planning.instances.insert(value.key, function_id), closure value => generator.planning.closures.insert(value.key, function_id), _ => return blot_error::Error.invalid_function_reference }
     return blot_error::Error.none;
 }
-fn publishRetainedStatic(generator: Generator&, function_id: u32) -> blot_error::Error { generator.static_data.closures.push(function_id); return blot_error::Error.none; }
+fn publishRetainedStatic(generator: Generator&, function_id: u32) -> blot_error::Error { return generator.static_data.closures.push(function_id); }
 fn publishRetainedResult(generator: Generator&, request: blot_reuse_code_artifacts::Request, template: blot_support::Option<u32>) -> blot_error::Error {
     if !template.present { return blot_error::Error.none; }
     match request { named value => generator.planning.template_results.insert(value.key, template.value), closure value => generator.planning.closure_template_results.insert(value.key, template.value), _ => return blot_error::Error.invalid_function_reference }
@@ -1725,7 +1726,7 @@ fn declineEntryInterface(generator: Generator&,entry: u32,body: const blot_check
     generator.evaluator.owned_diagnostic_message.clear(); generator.evaluator.owned_diagnostic_message.append(message); if generator.diagnostic.present { generator.diagnostic.value.detail = generator.evaluator.owned_diagnostic_message; } return failure;
 }
 fn deinit(generator: Generator&) {
-    generator.diagnostic_contexts.deinit(); generator.spawn_units = []; generator.numeric_rows.deinit(); generator.planning.deinit(); generator.module.deinit(); generator.representations.deinit(); generator.evaluator.deinit(); generator.static_data.deinit();
+    generator.diagnostic_contexts.deinit(); generator.spawn_units = []; generator.numeric_rows.deinit(); generator.planning.deinit(); generator.module.deinit(); generator.representations.deinit(); generator.static_data.deinit();
 }
 fn quantifiedVariable(generator: Generator&,unit_id: u32,variable: u32,row: bool) -> bool,blot_error::Error {
     block { let known = generator.planning.quantified.get(unit_id); if known { return known.has(variable,row),blot_error::Error.none; } }
@@ -1773,13 +1774,14 @@ struct CompileRun {
     retained: blot_reuse_artifact_fragment::State&? = null,principal_state: blot_reuse_principal_evidence_reuse::State&? = null,persisted_principals: blot_reuse_principal_archive::Reader&? = null,query_state: blot_eval_completed_specialization_query::State&? = null,constant_state: blot_reuse_constant_receipt_reuse::State&? = null,
     origins: blot_backend_source_origins::View&? = null,candidate: blot_backend_region_candidate::Extension&? = null,vectors: blot_backend_simd_abi::View&? = null,optimized: blot_backend_optimized_bodies::Capture&? = null,
 }
-fn emptyResult(workspace: CompileWorkspace&) -> Result { assert(blot_backend_result_publication::canMutate(workspace.publication_owner)); workspace.bytes.clear(); workspace.message.clear(); return Result { bytes: workspace.bytes,owned_message: workspace.message , ..}; }
+fn emptyResult(workspace: CompileWorkspace&) -> Result { assert(blot_backend_result_publication::canMutate(workspace.publication_owner)); workspace.bytes.clear(); workspace.message.clear(); return Result {..}; }
 fn deinit(result: Result&) {
     if result.publication_owner.slot != 0 { assert(blot_backend_result_publication::resultValid(result.publication_owner,result.publication_epoch,result.publication_pinned)); }
-    if result.allocation_emission != null { result.allocation_emission.deinit(); result.allocation_emission .= null; }
-    if result.capture != null { result.capture.deinit(); result.capture .= null; } if result.explanation != null { result.explanation.deinit(); result.explanation .= null; }
-    if result.startup_observation != null { result.startup_observation.deinit(); result.startup_observation .= null; } result.bytes.clear(); result.owned_message.clear(); result.diagnostic = blot_support::none<Diagnostic>();
-    if result.publication_owner.slot != 0 { blot_backend_result_publication::releaseResult(result.publication_owner,result.publication_epoch,result.publication_pinned); } result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = []; result.active = false; result.bytes .= inactive_result_bytes; result.owned_message .= inactive_result_message;
+    if !result.detached { if result.allocation_emission { result.allocation_emission.deinit(); } if result.explanation { result.explanation.deinit(); } if result.startup_observation { result.startup_observation.deinit(); } }
+    if result.capture { result.capture.deinit(); } result.capture .= null; result.allocation_emission .= null; result.explanation .= null; result.startup_observation .= null;
+    if result.output_owner.slot != 0 { result.output_owner.deinit(); }
+    if result.publication_owner.slot != 0 { blot_backend_result_publication::releaseResult(result.publication_owner,result.publication_epoch,result.publication_pinned); }
+    result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = []; result.active = false; result.detached = false; result.message_source = []; result.diagnostic = blot_support::none<Diagnostic>(); result.bytes .= inactive_result_bytes; result.owned_message .= inactive_result_message;
 }
 fn deinit(run: CompileRun&) {
     if run.optimized != null { run.optimized.deinit(); } if run.vectors != null { run.vectors.deinit(); } if run.candidate != null { run.candidate.deinit(); } if run.origins != null { run.origins.deinit(); }
@@ -1948,7 +1950,7 @@ fn assemble(run: CompileRun&) -> Result,blot_error::Error {
         }
         if emitted == blot_error::Error.out_of_memory || emitted == blot_error::Error.module_too_large || emitted == blot_error::Error.invalid_global_reference { return emptyResult(workspace),emitted; } return emptyResult(workspace),blot_error::Error.invalid_function_reference;
     }
-    workspace.message.clear(); return Result { runtime_optimization: runtime_optimization,bytes: workspace.bytes,code_instances: generator.planning.codeCount(generator.static_data.closures.len),callable_wrappers: generator.planning.wrapperCount(),emitted_functions: assembled_module.functions.len,constant_steps: generator.evaluator.steps,constant_receipts: generator.evaluator.constant_stats,owned_message: workspace.message , ..},blot_error::Error.none;
+    workspace.message.clear(); var result,result_error = ownedResult(workspace.bytes[:],blot_support::none<blot_backend_allocation_emission::Snapshot>()); if result_error != blot_error::Error.none { return result,result_error; } result.detached = false; result.runtime_optimization = runtime_optimization; result.code_instances = generator.planning.codeCount(generator.static_data.closures.items.len); result.callable_wrappers = generator.planning.wrapperCount(); result.emitted_functions = assembled_module.functions.len; result.constant_steps = generator.evaluator.steps; result.constant_receipts = generator.evaluator.constant_stats; return result,blot_error::Error.none;
 }
 fn addFields<T>(destination: T&,source: T) { const for <N,A> in fields<T> { destination.A += source.A; } }
 fn observe(run: CompileRun&,result: Result&) -> blot_error::Error {
@@ -1958,7 +1960,7 @@ fn observe(run: CompileRun&,result: Result&) -> blot_error::Error {
     result.emitted_functions -= result.runtime_optimization.shared; run.timing.assemble_us = run.clock.lap(); run.timing.profiled = run.options.profile_backend; if run.options.profile_backend { run.timing.work = generator.work_timing.snapshot(); }
     result.optimization = generator.planning.facts.stats; result.optimization.region_requests = generator.evaluator.regions.region_arena_pool.stats.requested; result.optimization.region_reused = generator.evaluator.regions.region_arena_pool.stats.reused; result.optimization.region_retained_bytes = generator.evaluator.regions.region_arena_pool.stats.retained_bytes; result.optimization.region_arena = generator.evaluator.regions.region_arena_pool.stats;
     result.optimization.evidence_import_requests = generator.evaluator.evidence_import_requests; result.optimization.evidence_import_reused = generator.evaluator.evidence_import_reused; result.optimization.closed_source_imports = generator.evaluator.closed_source_imports; result.optimization.closed_source_reused = generator.evaluator.closed_source_reused; result.optimization.split_attempts = generator.evaluator.split_attempts; result.optimization.split_accepted = generator.evaluator.split_accepted; result.optimization.split_declined = generator.evaluator.split_declined; result.counters = generator.evaluator.counters;
-    if run.options.explain_allocations { workspace.allocation_snapshot = blot_backend_allocation_emission::capture(workspace.allocation_snapshot.sites,run.units,run.options.identity,generator.module,run.entry,run.options.diagnostic_prelude_unit); result.allocation_emission .= workspace.allocation_snapshot; }
+    if run.options.explain_allocations { let snapshot,error = blot_backend_allocation_emission::capture(run.units,run.options.identity,generator.module,run.entry,run.options.diagnostic_prelude_unit); if error != blot_error::Error.none { return error; } workspace.allocation_snapshot.deinit(); workspace.allocation_snapshot = snapshot; result.allocation_emission .= workspace.allocation_snapshot; }
     if run.options.observe_startup { let snapshot,error = generator.planning.startup_facts.capture(generator.module); if error != blot_error::Error.none { return error; } workspace.startup_snapshot = snapshot; result.startup_observation .= workspace.startup_snapshot; }
     result.principal = principalStats(generator); if run.query_state != null { result.completed_queries = run.query_state.stats; } result.completed_queries.recorded = generator.evaluator.retained.specialization_receipts.len;
     for record in generator.evaluator.retained.specialization_receipts.items { if record.complete { result.completed_queries.complete_records++; if record.member.present { result.completed_queries.member_recorded++; } } }
@@ -2042,7 +2044,7 @@ fn replayArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
     let assembled = module.assembleCheckedWithOptions(blot_backend_wasm::AssembleOptions { compiler_identity: run.options.compiler_identity,source_digests: run.options.diagnostic_source_digests,source_names: run.options.identity,require_collector_free: run.options.policy.require_collector_free,memory_profile: memory_profile,tier: run.options.policy.codegen_tier,share_machine_code: run.options.policy.share_machine_code },workspace.replay_bytes);
     if assembled != blot_error::Error.none { if assembled == blot_error::Error.out_of_memory || assembled == blot_error::Error.module_too_large || assembled == blot_error::Error.invalid_global_reference { return assembled; } return blot_error::Error.invalid_function_reference; }
     if !blot_backend_wasm::equal(result.bytes,workspace.replay_bytes) { return blot_error::Error.invalid_function_reference; }
-    result.bytes.clear(); result.bytes.append(workspace.replay_bytes); return blot_error::Error.none;
+    result.bytes.clear(); return result.bytes.append(workspace.replay_bytes[:]);
 
     }
     let cleanup_result_7_0 = cleanup_continuation_7();
@@ -2125,7 +2127,7 @@ fn compileWithOptions(workspace: CompileWorkspace&,source_units: const blot_chec
     }
     var cleanup_result_5_0,cleanup_result_5_1 = cleanup_continuation_5();
      trace_space.restore();
-    blot_backend_result_publication::finishCompile(workspace.publication_owner,publication_epoch); cleanup_result_5_0.active = true; cleanup_result_5_0.publication_owner = workspace.publication_owner; cleanup_result_5_0.publication_epoch = publication_epoch; cleanup_result_5_0.publication_units = units;
+    blot_backend_result_publication::finishCompile(workspace.publication_owner,publication_epoch); cleanup_result_5_0.active = true; cleanup_result_5_0.publication_owner = workspace.publication_owner; cleanup_result_5_0.publication_epoch = publication_epoch; cleanup_result_5_0.publication_units = units; cleanup_result_5_0.message_source = workspace.message[:];
     return cleanup_result_5_0,cleanup_result_5_1;
 }
 fn compile(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32) -> Result,blot_error::Error { compileWithOptions(workspace,units,entry,CompileOptions { artifact_replay: default_artifact_replay,artifact_dump: default_artifact_replay , ..}) }
@@ -2430,4 +2432,22 @@ fn pinResult(result: Result&,catalog_owner: blot_reuse_dependency_payload::Owner
     var pins,error = blot_backend_result_publication::prepare(result.publication_owner,result.publication_epoch,result.publication_units,catalog_owner,unit_owners,seed_owners,modules); if error != blot_error::Error.none { return error; }
     if result.capture != null && result.capture.metadata.pools.present { let rebound = blot_reuse_code_artifacts::rebindModuleHeaders(result.capture.metadata.pools.value,pins.headers); if rebound != blot_error::Error.none { pins.deinit(); return rebound; } }
     blot_backend_result_publication::commit(result.publication_owner,result.publication_epoch,pins); result.publication_pinned = true; result.publication_units = blot_backend_result_publication::units(result.publication_owner,result.publication_epoch); return blot_error::Error.none;
+}
+
+fn ownedResult(bytes: const u8[:],allocation: blot_support::Option<blot_backend_allocation_emission::Snapshot>) -> Result,blot_error::Error {
+    var owner,error = blot_backend_result_owner::init(); if error != blot_error::Error.none { return Result {..},error; } let entry .= blot_backend_result_owner::get(owner); let copied = entry.bytes.append(bytes); if copied != blot_error::Error.none { owner.deinit(); return Result {..},copied; } var result = Result { active: true,output_owner: owner,detached: true,bytes: entry.bytes,owned_message: entry.message,..};
+    if allocation.present { let snapshot,snapshot_error = allocation.value.clone(); if snapshot_error != blot_error::Error.none { owner.deinit(); return Result {..},snapshot_error; } entry.allocation = snapshot; result.allocation_emission .= entry.allocation; } return result,blot_error::Error.none;
+}
+// Capture transfer is explicit and precedes this hook. The factory can then
+// tear down the workspace and compile another revision while this result lives.
+fn detachResult(result: Result&) -> blot_error::Error {
+    if result.capture != null { return blot_error::Error.invalid_artifact; } if result.detached && result.publication_owner.slot == 0 { return blot_error::Error.none; } if !result.active { return blot_error::Error.none; }
+    if result.output_owner.slot == 0 { let owner,error = blot_backend_result_owner::init(); if error != blot_error::Error.none { return error; } result.output_owner = owner; } let entry .= blot_backend_result_owner::get(result.output_owner);
+    if !(result.bytes .== entry.bytes) { let copied = entry.bytes.append(result.bytes.items); if copied != blot_error::Error.none { return copied; } }
+    entry.message.clear(); let copied = entry.message.append(result.message_source); if copied != blot_error::Error.none { return copied; } entry.diagnostic_text.clear(); if result.diagnostic.present { let detail = entry.diagnostic_text.append(result.diagnostic.value.detail); if detail != blot_error::Error.none { return detail; } }
+    if result.allocation_emission { entry.allocation = result.allocation_emission; result.allocation_emission = blot_backend_allocation_emission::Snapshot {..}; result.allocation_emission .= entry.allocation; }
+    if result.startup_observation { entry.startup = result.startup_observation; result.startup_observation = blot_backend_startup_emission_facts::Snapshot {..}; result.startup_observation .= entry.startup; }
+    if result.explanation { entry.explanation = result.explanation; result.explanation = blot_reuse_dispatch_explanation::Explanation {..}; result.explanation .= entry.explanation; }
+    result.bytes .= entry.bytes; result.owned_message .= entry.message; if result.diagnostic.present { result.diagnostic.value.detail = entry.diagnostic_text.items; } result.message_source = []; result.detached = true;
+    if result.publication_owner.slot != 0 { blot_backend_result_publication::releaseResult(result.publication_owner,result.publication_epoch,result.publication_pinned); } result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = []; return blot_error::Error.none;
 }

@@ -82,7 +82,7 @@
       "zig": "compiler/src/backend/backend_checkpoint.zig",
       "goose": "compiler-goose/src/backend/backend_checkpoint.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/backend_emission.zig",
@@ -106,7 +106,7 @@
       "zig": "compiler/src/backend/backend_static_data.zig",
       "goose": "compiler-goose/src/backend/backend_static_data.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/backend_timing.zig",
@@ -616,7 +616,7 @@
       "zig": "compiler/src/backend/runtime_parallel.zig",
       "goose": "compiler-goose/src/backend/runtime_parallel.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/runtime_parallel_tests.zig",
@@ -628,7 +628,7 @@
       "zig": "compiler/src/backend/runtime_pipeline.zig",
       "goose": "compiler-goose/src/backend/runtime_pipeline.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/runtime_pipeline_tests.zig",
@@ -682,7 +682,7 @@
       "zig": "compiler/src/backend/simd_abi.zig",
       "goose": "compiler-goose/src/backend/simd_abi.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/simd_call.zig",
@@ -934,7 +934,7 @@
       "zig": "compiler/src/backend/storage_plan.zig",
       "goose": "compiler-goose/src/backend/storage_plan.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/storage_plan_tests.zig",
@@ -1048,13 +1048,13 @@
       "zig": "compiler/src/backend/wasm_bit_recurrence.zig",
       "goose": "compiler-goose/src/backend/wasm_bit_recurrence.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_bulk_loop.zig",
       "goose": "compiler-goose/src/backend/wasm_bulk_loop.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_bulk_loop_tests.zig",
@@ -1072,7 +1072,7 @@
       "zig": "compiler/src/backend/wasm_copy_coalesce.zig",
       "goose": "compiler-goose/src/backend/wasm_copy_coalesce.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_copy_coalesce_tests.zig",
@@ -1084,13 +1084,13 @@
       "zig": "compiler/src/backend/wasm_inline.zig",
       "goose": "compiler-goose/src/backend/wasm_inline.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_lane_loop.zig",
       "goose": "compiler-goose/src/backend/wasm_lane_loop.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_lane_loop_tests.zig",
@@ -1102,13 +1102,13 @@
       "zig": "compiler/src/backend/wasm_lifetimes.zig",
       "goose": "compiler-goose/src/backend/wasm_lifetimes.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_local_compact.zig",
       "goose": "compiler-goose/src/backend/wasm_local_compact.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_local_compact_tests.zig",
@@ -1132,7 +1132,7 @@
       "zig": "compiler/src/backend/wasm_merge_loop.zig",
       "goose": "compiler-goose/src/backend/wasm_merge_loop.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_merge_loop_tests.zig",
@@ -1144,19 +1144,19 @@
       "zig": "compiler/src/backend/wasm_row_products.zig",
       "goose": "compiler-goose/src/backend/wasm_row_products.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_row_reduce.zig",
       "goose": "compiler-goose/src/backend/wasm_row_reduce.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_scope_outline.zig",
       "goose": "compiler-goose/src/backend/wasm_scope_outline.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/wasm_scope_outline_tests.zig",
@@ -1180,7 +1180,7 @@
       "zig": "compiler/src/backend/wasm_stackify.zig",
       "goose": "compiler-goose/src/backend/wasm_stackify.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_stackify_tests.zig",
@@ -1192,7 +1192,7 @@
       "zig": "compiler/src/backend/wasm_stride_reduce.zig",
       "goose": "compiler-goose/src/backend/wasm_stride_reduce.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_stride_reduce_tests.zig",
@@ -1210,7 +1210,7 @@
       "zig": "compiler/src/backend/wasm_transport_cleanup.zig",
       "goose": "compiler-goose/src/backend/wasm_transport_cleanup.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/wasm_transport_cleanup_tests.zig",
@@ -1222,7 +1222,7 @@
       "zig": "compiler/src/backend/wasm_vectorize.zig",
       "goose": "compiler-goose/src/backend/wasm_vectorize.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend_suite.zig",
@@ -3249,7 +3249,7 @@
       "zig": "compiler/src/reuse/retained_revision.zig",
       "goose": "compiler-goose/src/reuse/retained_revision.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/revision_input_tests.zig",

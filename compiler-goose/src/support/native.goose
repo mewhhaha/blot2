@@ -38,3 +38,11 @@ extern fn debug_write_raw(first: const u8&, count: u64) = "blot_debug_write";
 fn debug_write(bytes: const u8[:]) {
     if bytes.len != 0 { debug_write_raw(bytes[0], bytes.len as u64); }
 }
+extern fn argument_count()->i64="blot_argument_count";
+extern fn argument_size(index:i64)->i64="blot_argument_size";
+extern fn argument_copy(index:i64,out:u8&,capacity:u64)->i64="blot_argument_copy";
+extern fn environment_size(name:const u8&)->i64="blot_environment_size";
+extern fn environment_copy(name:const u8&,out:u8&,capacity:u64)->i64="blot_environment_copy";
+extern fn worker_spawn(slot:u32)->i64="blot_worker_spawn";
+extern fn worker_descriptor(slot:u32,writing:bool)->i32="blot_worker_descriptor";
+extern fn worker_stop(slot:u32)->i32="blot_worker_stop";

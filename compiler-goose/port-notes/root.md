@@ -422,3 +422,35 @@ owner IDs plus complete header scalar/nested-storage equality. Header-copy
 equality alone never substitutes for source/graph admission. Checker, archives
 and both backend first passes remain unverified. Retained sessions, process
 worker driver, CLI and remaining backend/helper writing keep the port incomplete.
+
+Copied worker orchestration now uses independent ordinary OS processes, because
+Goose thread_fn cannot reach non-flat mutable metadata pools. The private
+process_pool protocol owns framed BLAKE3-checked payloads, explicit failure replies,
+bounded ordered waves and persistent same-executable children. C adapters are
+only spawn/fd/kill/wait/argument/environment services. Child algorithms are Goose.
+Runtime, semantic and independent worker source handlers are written; complete
+project checking/lowering packet codecs remain in progress. Worker pass totals
+return copied scalars; region trace IDs reserve disjoint coordinator ranges and
+use the same monotonic origin. No worker or packet has been executed.
+
+backend_checkpoint now has its full first source pass, with three archive
+sections, digest sharing, omissions/reporting and independent canonical owners.
+retained_revision has full first production passes across its main, frontend and
+prepare modules: epoch/candidate transactions, unchanged/trivia/restored outputs,
+strict mixed/library/deferred/ordinary frontend lanes, body offers, independent
+capture leases, complete backend preparation and synchronous revise. Successful
+commit remains allocation/IO free; discard and late result ownership use numeric
+generation-checked metadata. Source does not establish transaction/parity laws.
+
+The compiler workspace uses one active backing set per process. Captures transfer
+into their own canonical metadata/optimized headers and retained input journals.
+Results now own pooled byte buffers and report headers; detachResult releases
+the workspace publication lease after capture transfer. Old committed output is
+intended to remain readable across subsequent builds/session teardown. Root
+CachedOutput uses ownedResult and explicit snapshot clones. This remains
+unverified ownership source, not a measured memory or performance result.
+
+Remaining required root writing: restart cache, project server, command driver,
+full runtime allocation/session-heap integration, packaging and source-harness
+entrypoints. Remaining backend and worker codec algorithms are still in progress.
+The Zig oracle/default source tree remains unchanged; no port verification ran.

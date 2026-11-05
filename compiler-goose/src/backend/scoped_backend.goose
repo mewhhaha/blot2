@@ -36,6 +36,7 @@ import .storage_type_key;
 import .storage_global_footprint;
 import .storage_globals;
 import .optimized_bodies;
+import .allocation_emission;
 import .runtime_identity;
 import compilation_tier;
 import reuse.completed_core_validation;
@@ -772,7 +773,7 @@ fn toWire(self: Generator&,module: const blot_check_core::Module&,id: u32,value:
     let count,count_error = length(self,module,id,value); if count_error != Error.none { return Local {..},count_error; } var out = blot_emitter::Emitter<blot_backend_wasm::Module> { code: self.c , ..}; let pointer = out.temp(); out.value(count); out.value(1073741822); out.op(blot_backend_runtime_ir::OP_i32_gt_u); out.trap(); out.value(4); out.value(count); out.value(4); out.op(blot_backend_runtime_ir::OP_i32_mul); out.op(blot_backend_runtime_ir::OP_i32_add); out.call(transport.allocate); out.set(pointer); out.value(pointer); out.value(count); out.store(); out.value(pointer); out.value(4); out.op(blot_backend_runtime_ir::OP_i32_add); out.value(value.word); out.value(blot_runtime_data_stacks::header_bytes); out.op(blot_backend_runtime_ir::OP_i32_add); out.value(count); out.value(4); out.op(blot_backend_runtime_ir::OP_i32_mul); out.copy(); if out.failure != Error.none { return Local {..},out.failure; } return pointer,Error.none;
 }
 fn resetPackets(self: Generator&) -> Error { if self.transport.present { var out = blot_emitter::Emitter<blot_backend_wasm::Module> { code: self.c , ..}; out.value(0); out.call(self.transport.value.reset); out.op(blot_backend_runtime_ir::OP_drop); return out.failure; } return Error.none; }
-fn arrayAbi(kind: blot_backend_runtime_ir::Scalar) -> bool { kind == blot_backend_runtime_ir::SC_array_u32 || kind == blot_backend_runtime_ir::SC_array_f32 || kind == blot_backend_runtime_ir::SC_array_bool }
+fn arrayAbi(kind: blot_backend_runtime_ir::Scalar) -> bool { kind == blot_backend_runtime_ir::SC_array_u32 || kind == blot_backend_runtime_ir::SC_array_f32 }
 fn hostCall(self: Generator&,module: const blot_check_core::Module&,id: u32,function: Value,argument: Value) -> Value,Error {
     if self.writer_trace.present { return Value {..},Error.declined; } assert(function.host.present); let signature = function.host.value; let imported,import_error = self.module.importHostCallback(signature); if import_error != Error.none { if import_error == Error.out_of_memory { return Value {..},import_error; } return Value {..},unsupported(self,module,id); } let reset = resetPackets(self); if reset != Error.none { return Value {..},reset; }
     var input: Local; var error: Error; if arrayAbi(signature.parameter) { input,error = toWire(self,module,id,argument,signature.parameter); } else { input,error = scalar(self,module,id,argument); } if error != Error.none { return Value {..},error; }
@@ -2494,7 +2495,7 @@ fn compileScoped(workspace: blot_backend_core_backend::CompileWorkspace&,units: 
         work.scoped_outlined_regions = outlined.regions; work.scoped_outlined_globals = outlined.globals; work.scoped_copy_pairs_removed = outlined.copies_removed; work.scoped_bank_operand_bytes_saved = outlined.bank_operand_bytes_saved; work.scoped_copy_reads_forwarded = outlined.reads_forwarded;
         var optimization = blot_backend_optimized_bodies::Stats { tier: options.tier,..}; workspace.bytes.clear(); let assemble_trace = blot_phase_profile::region("owned.assemble",entry,0,0); let assembled = generator.module.assembleWithOptions(blot_backend_wasm::AssembleOptions { tier: options.tier,workers: options.workers,share_machine_code: options.share_machine_code,io: options.io,profile: options.profile,stats: optimization,..},workspace.bytes); assemble_trace.exit();
         if assembled != Error.none { if assembled == Error.out_of_memory { return blot_backend_core_backend::emptyResult(workspace),assembled; } var result = scopedFailure(workspace,entry,"Scoped storage emission failed Wasm validation",work); result.runtime_optimization = optimization; return result,Error.none; }
-        return blot_backend_core_backend::Result { bytes: workspace.bytes,owned_message: workspace.message,runtime_optimization: optimization,emitted_functions: generator.module.functions.len - optimization.shared,whole_module_only: true,counters: work,..},Error.none;
+        var result,result_error = blot_backend_core_backend::ownedResult(workspace.bytes[:],blot_support::none<blot_backend_allocation_emission::Snapshot>()); if result_error != Error.none { return result,result_error; } result.detached = false; result.runtime_optimization = optimization; result.emitted_functions = generator.module.functions.len - optimization.shared; result.whole_module_only = true; result.counters = work; return result,Error.none;
     }
     let result,error = run(); generator.deinit(); methods.deinit(); outlining.deinit(); shared_calls.deinit(); descriptor_calls.deinit(); field_recipes.deinit(); scalar_admission.deinit(); active_calls.deinit(); capacity_requests.deinit(); dispatches.deinit(); metadata.deinit(); proof_cache.work .= null; return result,error;
 }

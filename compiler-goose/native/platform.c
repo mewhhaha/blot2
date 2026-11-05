@@ -15,6 +15,9 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <math.h>
+#include <spawn.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 _Static_assert(sizeof(void *) == 8, "the native port uses the Goose C.2 64-bit host layout");
 _Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24,
@@ -87,9 +90,9 @@ static uint64_t read_clock(clockid_t clock) {
 uint64_t blot_clock_ns(void) { return read_clock(CLOCK_MONOTONIC); }
 uint64_t blot_thread_cpu_ns(void) { return read_clock(CLOCK_THREAD_CPUTIME_ID); }
 uint64_t blot_thread_id(void) {
-    static _Thread_local uint64_t identity;
-    if (!identity) identity = blot_owner_id();
-    return identity;
+    /* Goose workers are ordinary single-threaded process programs. Their
+     * initial-thread Linux TID is their PID and stays unique across workers. */
+    return (uint64_t)getpid();
 }
 uint64_t blot_peak_rss_kib(void) {
 #ifdef __linux__
@@ -208,4 +211,99 @@ void blot_debug_write(const unsigned char *bytes, uint64_t count) {
         count -= (uint64_t)written;
     }
     pthread_mutex_unlock(&debug_print_lock);
+}
+
+/* The C host retains only process arguments and operating-system handles. */
+static int blot_argc;
+static char **blot_argv;
+void blot_platform_entry_init(int argc, char **argv) {
+    blot_argc = argc;
+    blot_argv = argv;
+    signal(SIGPIPE, SIG_IGN);
+}
+int64_t blot_argument_count(void) { return blot_argc; }
+int64_t blot_argument_size(int64_t index) {
+    if (index < 0 || index >= blot_argc) return -EINVAL;
+    return (int64_t)strlen(blot_argv[index]);
+}
+int64_t blot_argument_copy(int64_t index, uint8_t *out, uint64_t capacity) {
+    int64_t size = blot_argument_size(index);
+    if (size < 0) return size;
+    if ((uint64_t)size > capacity) return -ENAMETOOLONG;
+    memcpy(out, blot_argv[index], (size_t)size);
+    return size;
+}
+int64_t blot_environment_size(const uint8_t *name) {
+    const char *value = getenv((const char *)name);
+    if (!value) return -ENOENT;
+    return (int64_t)strlen(value);
+}
+int64_t blot_environment_copy(const uint8_t *name, uint8_t *out, uint64_t capacity) {
+    const char *value = getenv((const char *)name);
+    if (!value) return -ENOENT;
+    size_t size = strlen(value);
+    if (size > capacity) return -ENAMETOOLONG;
+    memcpy(out, value, size);
+    return (int64_t)size;
+}
+struct blot_worker_process { pid_t pid; int input; int output; };
+static struct blot_worker_process blot_workers[16];
+extern char **environ;
+int64_t blot_worker_spawn(uint32_t slot) {
+    if (slot >= 16 || blot_workers[slot].pid) return -EINVAL;
+    char executable[PATH_MAX];
+    ssize_t size = readlink("/proc/self/exe", executable, sizeof executable - 1);
+    if (size < 0) return -errno;
+    if ((size_t)size >= sizeof executable - 1) return -ENAMETOOLONG;
+    executable[size] = 0;
+    int request[2], response[2];
+    if (pipe(request) < 0) return -errno;
+    if (pipe(response) < 0) { int saved = errno; close(request[0]); close(request[1]); return -saved; }
+    int all[4] = { request[0], request[1], response[0], response[1] };
+    for (size_t i = 0; i < 4; ++i) {
+        if (fcntl(all[i], F_SETFD, FD_CLOEXEC) < 0) {
+            int saved = errno;
+            for (size_t j = 0; j < 4; ++j) close(all[j]);
+            return -saved;
+        }
+    }
+    posix_spawn_file_actions_t actions;
+    int error = posix_spawn_file_actions_init(&actions);
+    if (!error) {
+        error = posix_spawn_file_actions_adddup2(&actions, request[0], STDIN_FILENO);
+        if (!error) error = posix_spawn_file_actions_adddup2(&actions, response[1], STDOUT_FILENO);
+        for (size_t i = 0; !error && i < 4; ++i) {
+            if (all[i] != STDIN_FILENO && all[i] != STDOUT_FILENO)
+                error = posix_spawn_file_actions_addclose(&actions, all[i]);
+        }
+        char *arguments[] = { executable, "--worker", NULL };
+        pid_t pid = 0;
+        if (!error) error = posix_spawn(&pid, executable, &actions, NULL, arguments, environ);
+        posix_spawn_file_actions_destroy(&actions);
+        if (!error) {
+            close(request[0]); close(response[1]);
+            blot_workers[slot] = (struct blot_worker_process){ pid, request[1], response[0] };
+            return pid;
+        }
+    }
+    for (size_t i = 0; i < 4; ++i) close(all[i]);
+    return -error;
+}
+int32_t blot_worker_descriptor(uint32_t slot, _Bool writing) {
+    if (slot >= 16 || !blot_workers[slot].pid) return -EBADF;
+    if (writing) return blot_workers[slot].input;
+    return blot_workers[slot].output;
+}
+int32_t blot_worker_stop(uint32_t slot) {
+    if (slot >= 16) return -EINVAL;
+    struct blot_worker_process worker = blot_workers[slot];
+    if (!worker.pid) return 0;
+    blot_workers[slot] = (struct blot_worker_process){0};
+    close(worker.input); close(worker.output);
+    if (kill(worker.pid, SIGKILL) < 0 && errno != ESRCH) return -errno;
+    int status;
+    pid_t waited;
+    do { waited = waitpid(worker.pid, &status, 0); } while (waited < 0 && errno == EINTR);
+    if (waited < 0 && errno != ECHILD) return -errno;
+    return 0;
 }

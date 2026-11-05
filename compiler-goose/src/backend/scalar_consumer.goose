@@ -2,10 +2,11 @@ namespace blot_backend_scalar_consumer;
 import .runtime_ir;
 import .wasm;
 
-fn check(module: blot_backend_wasm::Module&, body: blot_backend_runtime_ir::Function) -> bool {
-    let length = blot_backend_runtime_ir::codeLength(body);
-    if body.result_role != blot_backend_runtime_ir::ROLE_scalar || length == 0 || length > 96 || body.parameters.len > 4 || body.locals.len > 64 - body.parameters.len { return false; }
-    let count = body.parameters.len + body.locals.len;
+fn check(module: const blot_backend_wasm::Module&, body: blot_backend_runtime_ir::Function) -> bool {
+    let length = blot_backend_wasm::instructions(module, body).len;
+    let locals = blot_backend_wasm::locals(module, body).len;
+    if body.result_role != blot_backend_runtime_ir::ROLE_scalar || length == 0 || length > 96 || body.parameters.len > 4 || locals > 64 - body.parameters.len { return false; }
+    let count = body.parameters.len + locals;
     for parameter in 0..body.parameters.len { if blot_backend_runtime_ir::parameterRole(body, parameter) == blot_backend_runtime_ir::ROLE_unknown { return false; } }
     for ty in blot_backend_wasm::locals(module, body) { if ty != blot_backend_runtime_ir::VT_i32 && ty != blot_backend_runtime_ir::VT_f32 { return false; } }
     var depth = 0;
@@ -23,7 +24,7 @@ fn check(module: blot_backend_wasm::Module&, body: blot_backend_runtime_ir::Func
     return depth == 0;
 }
 struct Frame { entry: u64 = 0, conditional: bool = false, alternate: u64 = 0, has_alternate: bool = false }
-fn zeroes(module: blot_backend_wasm::Module&, body: blot_backend_runtime_ir::Function) -> u64 {
+fn zeroes(module: const blot_backend_wasm::Module&, body: blot_backend_runtime_ir::Function) -> u64 {
     var frames: Frame[96] = [Frame {..}; 96]; var depth = 0; var defined: u64 = 0;
     for index in 0..body.parameters.len { defined |= 1 as u64 << index; }
     let parameters = defined; var required: u64 = 0;

@@ -22,21 +22,20 @@ fn after(module: const Module&, inst: IR) -> bool {
         inst.operand == arena.release_lease || inst.operand == arena.cycle_collect ||
         inst.operand == arena.root_pop || inst.operand == arena.root_close || inst.operand == arena.root_leave;
 }
-fn run(module: Module&, function: Function) -> blot_support::Option<blot_backend_runtime_ir::Body>, Error {
+fn run(module: const Module&, function: Function) -> blot_support::Option<blot_backend_runtime_ir::DetachedBody>, Error {
     let drain, has_drain = module.resourceDrainImport();
-    if !has_drain { return blot_support::none<blot_backend_runtime_ir::Body>(), Error.none; }
-    // Snapshot the source before publishing grows Module's instruction table.
+    if !has_drain { return blot_support::none<blot_backend_runtime_ir::DetachedBody>(), Error.none; }
     var locals: blot_backend_runtime_ir::ValueType[>..<] = [];
     var code: IR[>..<] = [];
     locals.append(module.locals(function));
     let source = module.instructions(function);
     for inst in source {
-        if before(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain , ..}); }
+        if before(module, inst) { code.push(IR { op:blot_backend_runtime_ir::OP_call_import,operand:drain,..}); }
         code.push(inst);
-        if after(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain , ..}); }
+        if after(module, inst) { code.push(IR { op:blot_backend_runtime_ir::OP_call_import,operand:drain,..}); }
     }
     if source.len == 0 || source[source.len - 1].op != blot_backend_runtime_ir::OP_return_ {
-        code.push(IR { blot_backend_runtime_ir::OP_call_import, drain , ..});
+        code.push(IR { op:blot_backend_runtime_ir::OP_call_import,operand:drain,..});
     }
-    return blot_support::some(module.publishBody(locals, code)), Error.none;
+    let result,error=blot_backend_runtime_ir::cloneBody(locals[:],code[:]);if error!=Error.none {return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}return blot_support::some(result),Error.none;
 }

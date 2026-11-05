@@ -16,9 +16,9 @@ fn suspends(module: const Module&, inst: Instruction) -> bool {
     let name = module.importName(inst.operand);
     return name == "close" || name == "join" || name == "cancel" || name == "drop" || name == "drain";
 }
-fn run(module: Module&, function: Function) -> blot_support::Option<blot_backend_runtime_ir::Body>, Error {
+fn run(module: const Module&, function: Function) -> blot_support::Option<blot_backend_runtime_ir::DetachedBody>, Error {
     let current, has_current = module.taskImportNamed("current");
-    if !has_current { return blot_support::none<blot_backend_runtime_ir::Body>(), Error.none; }
+    if !has_current { return blot_support::none<blot_backend_runtime_ir::DetachedBody>(), Error.none; }
     let resume_, has_resume = module.taskImportNamed("resume");
     let checkpoint, has_checkpoint = module.taskImportNamed("checkpoint");
     assert(has_resume && has_checkpoint);
@@ -41,22 +41,22 @@ fn run(module: Module&, function: Function) -> blot_support::Option<blot_backend
             let name = module.importName(inst.operand);
             publication = name == "open" || name == "spawn";
         }
-        if source_call || publication { code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint , ..}); }
+        if source_call || publication { code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:checkpoint,..}); }
         let suspend = suspends(module, inst);
         if suspend {
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint , ..});
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, current , ..});
-            code.push(Instruction { blot_backend_runtime_ir::OP_local_set, context as u32 , ..});
+            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:checkpoint,..});
+            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:current,..});
+            code.push(Instruction { op:blot_backend_runtime_ir::OP_local_set,operand:context as u32,..});
         }
         if inst.op == blot_backend_runtime_ir::OP_br || inst.op == blot_backend_runtime_ir::OP_br_if {
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint , ..});
+            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:checkpoint,..});
         }
         code.push(inst);
         if suspend {
-            code.push(Instruction { blot_backend_runtime_ir::OP_local_get, context as u32 , ..});
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, resume_ , ..});
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint , ..});
+            code.push(Instruction { op:blot_backend_runtime_ir::OP_local_get,operand:context as u32,..});
+            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:resume_,..});
+            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:checkpoint,..});
         }
     }
-    return blot_support::some(module.publishBody(locals, code)), Error.none;
+    let result,error=blot_backend_runtime_ir::cloneBody(locals[:],code[:]);if error!=Error.none {return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}return blot_support::some(result),Error.none;
 }

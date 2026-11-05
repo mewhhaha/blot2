@@ -374,3 +374,26 @@ remain excluded from semantic/wire data. Parent owns memory_profile,
 provider_modes and runtime_identity; syntax owns optimized_bodies/archive;
 checker owns wasm_lifetimes next. Runtime pipeline/parallel and remaining
 optimization/storage leaves still require writing. No checks have run.
+
+Runtime pipeline and runtime_parallel now have full production first writing
+passes. Pipeline uses numeric source function IDs and preserves provider,
+inline/scalar/vector/product/lifetime/reduction/RC order, shared-scan invalidation,
+root lowering, resource/task safepoints and data-stack cleanup order. Every
+replacement releases the previous DetachedBody immediately.
+
+The agreed native worker boundary is separate OS processes running the same
+Goose executable, because Goose thread_fn cannot reach mutable non-flat global
+metadata pools (§11.2). `runtime_job` captures every readonly Wasm table and
+runtime descriptor into owned, flat DTO arrays; no slice or address is encoded.
+The runtime worker reconstructs private typed Module backing and runs the actual
+Goose optimizer and lifetime proof. The coordinator keeps heavy-first requests,
+thresholds, source-order publication, joined failure cleanup, cached-body RC
+jobs, per-worker timing and returned phase telemetry. Parent's process_pool owns
+framing, child lifecycle and ordered wave transport. These process-copy costs,
+allocation behavior and worker execution remain unmeasured/unverified; no serial
+replacement or compiler-stage C callback was added.
+
+backend_static_data now has its concrete State/SerializedKey/cache/closure owner
+header for canonical driver construction. Its semantic serialization functions
+are still unwritten and the module must not be counted complete. Remaining
+backend leaves continue in the source-writing phase.
