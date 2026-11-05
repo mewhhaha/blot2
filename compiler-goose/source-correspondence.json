@@ -2541,7 +2541,7 @@
       "zig": "compiler/src/reuse/body_check_cache.zig",
       "goose": "compiler-goose/src/reuse/body_check_cache.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/body_check_cache_tests.zig",
@@ -2799,7 +2799,7 @@
       "zig": "compiler/src/reuse/dependency_snapshot.zig",
       "goose": "compiler-goose/src/reuse/dependency_snapshot.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/reuse/dependency_symbol_slots.zig",

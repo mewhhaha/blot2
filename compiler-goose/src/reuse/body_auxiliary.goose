@@ -255,23 +255,27 @@ result+=self.numeric_body.introductions.len*25;
 result+=self.numeric_body.parameters.len*17;
 result+=self.numeric_body.uses.len*21;
 return result;}
-fn mapRecord<M>(value:blot_check_numeric_proof_bodies::Introduction,mapper:M&)->blot_check_numeric_proof_bodies::Introduction,Error {var result=value;
+fn registeredField(value:blot_check_numeric_proof_bodies::Introduction,name:const u8[:])->bool {return name=="source" || name=="owner" || name=="arguments" || name=="proposition";}
+fn mapRecord<M>(value:blot_check_numeric_proof_bodies::Introduction,mapper:M&)->blot_check_numeric_proof_bodies::Introduction,Error {const for <N,A> in fields<blot_check_numeric_proof_bodies::Introduction> {if !registeredField(value,N) {return default<blot_check_numeric_proof_bodies::Introduction>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.source);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Introduction>(),error;}result.source=mapped;}
 {let mapped,error=mapper.map_node(value.owner);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Introduction>(),error;}result.owner=mapped;}
 {let mapped,error=mapper.map_nodes_pair(value.arguments);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Introduction>(),error;}result.arguments=mapped;}
 {let mapped,error=mapper.map_proposition(value.proposition);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Introduction>(),error;}result.proposition=mapped;}
 return result,Error.none;}
-fn mapRecord<M>(value:blot_check_numeric_proof_bodies::Parameter,mapper:M&)->blot_check_numeric_proof_bodies::Parameter,Error {var result=value;
+fn registeredField(value:blot_check_numeric_proof_bodies::Parameter,name:const u8[:])->bool {return name=="binding" || name=="contract" || name=="proposition";}
+fn mapRecord<M>(value:blot_check_numeric_proof_bodies::Parameter,mapper:M&)->blot_check_numeric_proof_bodies::Parameter,Error {const for <N,A> in fields<blot_check_numeric_proof_bodies::Parameter> {if !registeredField(value,N) {return default<blot_check_numeric_proof_bodies::Parameter>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_binding(value.binding);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Parameter>(),error;}result.binding=mapped;}
 {let mapped,error=mapper.map_proposition(value.proposition);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Parameter>(),error;}result.proposition=mapped;}
 return result,Error.none;}
-fn mapRecord<M>(value:blot_check_numeric_proof_bodies::Use,mapper:M&)->blot_check_numeric_proof_bodies::Use,Error {var result=value;
+fn registeredField(value:blot_check_numeric_proof_bodies::Use,name:const u8[:])->bool {return name=="source" || name=="callee" || name=="witness" || name=="proposition";}
+fn mapRecord<M>(value:blot_check_numeric_proof_bodies::Use,mapper:M&)->blot_check_numeric_proof_bodies::Use,Error {const for <N,A> in fields<blot_check_numeric_proof_bodies::Use> {if !registeredField(value,N) {return default<blot_check_numeric_proof_bodies::Use>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.source);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Use>(),error;}result.source=mapped;}
 {let mapped,error=mapper.map_binding(value.callee);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Use>(),error;}result.callee=mapped;}
 {let mapped,error=mapper.map_node(value.witness);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Use>(),error;}result.witness=mapped;}
 {let mapped,error=mapper.map_proposition(value.proposition);if error!=Error.none {return default<blot_check_numeric_proof_bodies::Use>(),error;}result.proposition=mapped;}
 return result,Error.none;}
-fn mapRecord<M>(value:blot_check_check::UsageLoan,mapper:M&)->blot_check_check::UsageLoan,Error {var result=value;
+fn registeredField(value:blot_check_check::UsageLoan,name:const u8[:])->bool {return name=="source" || name=="callback" || name=="parameter" || name=="region" || name=="mutable" || name=="acquire" || name=="release";}
+fn mapRecord<M>(value:blot_check_check::UsageLoan,mapper:M&)->blot_check_check::UsageLoan,Error {const for <N,A> in fields<blot_check_check::UsageLoan> {if !registeredField(value,N) {return default<blot_check_check::UsageLoan>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.source);if error!=Error.none {return default<blot_check_check::UsageLoan>(),error;}result.source=mapped;}
 {let mapped,error=mapper.map_node(value.callback);if error!=Error.none {return default<blot_check_check::UsageLoan>(),error;}result.callback=mapped;}
 {let mapped,error=mapper.map_node(value.parameter);if error!=Error.none {return default<blot_check_check::UsageLoan>(),error;}result.parameter=mapped;}
@@ -280,27 +284,31 @@ fn mapRecord<M>(value:blot_check_check::UsageLoan,mapper:M&)->blot_check_check::
 {let mapped,error=mapper.map_node(value.release);if error!=Error.none {return default<blot_check_check::UsageLoan>(),error;}result.release=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::UsageLoan)->u32 {return value.source;}
-fn mapRecord<M>(value:blot_check_generative_schemes::Binder,mapper:M&)->blot_check_generative_schemes::Binder,Error {var result=value;
+fn registeredField(value:blot_check_generative_schemes::Binder,name:const u8[:])->bool {return name=="owner" || name=="origin" || name=="arrow" || name=="selection";}
+fn mapRecord<M>(value:blot_check_generative_schemes::Binder,mapper:M&)->blot_check_generative_schemes::Binder,Error {const for <N,A> in fields<blot_check_generative_schemes::Binder> {if !registeredField(value,N) {return default<blot_check_generative_schemes::Binder>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.owner);if error!=Error.none {return default<blot_check_generative_schemes::Binder>(),error;}result.owner=mapped;}
 {let mapped,error=mapper.map_node(value.origin);if error!=Error.none {return default<blot_check_generative_schemes::Binder>(),error;}result.origin=mapped;}
 {let mapped,error=mapper.map_ty(value.arrow);if error!=Error.none {return default<blot_check_generative_schemes::Binder>(),error;}result.arrow=mapped;}
 {let mapped,error=mapper.map_ty(value.selection);if error!=Error.none {return default<blot_check_generative_schemes::Binder>(),error;}result.selection=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_generative_schemes::Binder)->u32 {return value.owner;}
-fn mapRecord<M>(value:blot_check_check::RankImplementation,mapper:M&)->blot_check_check::RankImplementation,Error {var result=value;
+fn registeredField(value:blot_check_check::RankImplementation,name:const u8[:])->bool {return name=="scope" || name=="quantified" || name=="node";}
+fn mapRecord<M>(value:blot_check_check::RankImplementation,mapper:M&)->blot_check_check::RankImplementation,Error {const for <N,A> in fields<blot_check_check::RankImplementation> {if !registeredField(value,N) {return default<blot_check_check::RankImplementation>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_scope(value.scope);if error!=Error.none {return default<blot_check_check::RankImplementation>(),error;}result.scope=mapped;}
 {let mapped,error=mapper.map_ty(value.quantified);if error!=Error.none {return default<blot_check_check::RankImplementation>(),error;}result.quantified=mapped;}
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::RankImplementation>(),error;}result.node=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::RankImplementation)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::DictionarySelection,mapper:M&)->blot_check_check::DictionarySelection,Error {var result=value;
+fn registeredField(value:blot_check_check::DictionarySelection,name:const u8[:])->bool {return name=="source" || name=="quantifier" || name=="goal" || name=="proof";}
+fn mapRecord<M>(value:blot_check_check::DictionarySelection,mapper:M&)->blot_check_check::DictionarySelection,Error {const for <N,A> in fields<blot_check_check::DictionarySelection> {if !registeredField(value,N) {return default<blot_check_check::DictionarySelection>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.source);if error!=Error.none {return default<blot_check_check::DictionarySelection>(),error;}result.source=mapped;}
 {let mapped,error=mapper.map_ty(value.quantifier);if error!=Error.none {return default<blot_check_check::DictionarySelection>(),error;}result.quantifier=mapped;}
 {let mapped,error=mapper.map_goal(value.goal);if error!=Error.none {return default<blot_check_check::DictionarySelection>(),error;}result.goal=mapped;}
 {let mapped,error=mapper.map_proof(value.proof);if error!=Error.none {return default<blot_check_check::DictionarySelection>(),error;}result.proof=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::DictionarySelection)->u32 {return value.source;}
-fn mapRecord<M>(value:blot_check_check::DictionaryUse,mapper:M&)->blot_check_check::DictionaryUse,Error {var result=value;
+fn registeredField(value:blot_check_check::DictionaryUse,name:const u8[:])->bool {return name=="source" || name=="opening" || name=="introduction" || name=="quantifier" || name=="goal" || name=="member";}
+fn mapRecord<M>(value:blot_check_check::DictionaryUse,mapper:M&)->blot_check_check::DictionaryUse,Error {const for <N,A> in fields<blot_check_check::DictionaryUse> {if !registeredField(value,N) {return default<blot_check_check::DictionaryUse>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.source);if error!=Error.none {return default<blot_check_check::DictionaryUse>(),error;}result.source=mapped;}
 {let mapped,error=mapper.map_binding(value.opening);if error!=Error.none {return default<blot_check_check::DictionaryUse>(),error;}result.opening=mapped;}
 {let mapped,error=mapper.map_node(value.introduction);if error!=Error.none {return default<blot_check_check::DictionaryUse>(),error;}result.introduction=mapped;}
@@ -308,7 +316,8 @@ fn mapRecord<M>(value:blot_check_check::DictionaryUse,mapper:M&)->blot_check_che
 {let mapped,error=mapper.map_goal(value.goal);if error!=Error.none {return default<blot_check_check::DictionaryUse>(),error;}result.goal=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::DictionaryUse)->u32 {return value.source;}
-fn mapRecord<M>(value:blot_check_check::DictionaryGiven,mapper:M&)->blot_check_check::DictionaryGiven,Error {var result=value;
+fn registeredField(value:blot_check_check::DictionaryGiven,name:const u8[:])->bool {return name=="opening" || name=="introduction" || name=="quantifier" || name=="goal" || name=="arguments" || name=="member_types";}
+fn mapRecord<M>(value:blot_check_check::DictionaryGiven,mapper:M&)->blot_check_check::DictionaryGiven,Error {const for <N,A> in fields<blot_check_check::DictionaryGiven> {if !registeredField(value,N) {return default<blot_check_check::DictionaryGiven>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_binding(value.opening);if error!=Error.none {return default<blot_check_check::DictionaryGiven>(),error;}result.opening=mapped;}
 {let mapped,error=mapper.map_node(value.introduction);if error!=Error.none {return default<blot_check_check::DictionaryGiven>(),error;}result.introduction=mapped;}
 {let mapped,error=mapper.map_ty(value.quantifier);if error!=Error.none {return default<blot_check_check::DictionaryGiven>(),error;}result.quantifier=mapped;}
@@ -316,14 +325,16 @@ fn mapRecord<M>(value:blot_check_check::DictionaryGiven,mapper:M&)->blot_check_c
 {let mapped,error=mapper.map_types(value.arguments);if error!=Error.none {return default<blot_check_check::DictionaryGiven>(),error;}result.arguments=mapped;}
 {let mapped,error=mapper.map_types(value.member_types);if error!=Error.none {return default<blot_check_check::DictionaryGiven>(),error;}result.member_types=mapped;}
 return result,Error.none;}
-fn mapRecord<M>(value:blot_check_check::Computation,mapper:M&)->blot_check_check::Computation,Error {var result=value;
+fn registeredField(value:blot_check_check::Computation,name:const u8[:])->bool {return name=="node" || name=="action" || name=="ty" || name=="action_type";}
+fn mapRecord<M>(value:blot_check_check::Computation,mapper:M&)->blot_check_check::Computation,Error {const for <N,A> in fields<blot_check_check::Computation> {if !registeredField(value,N) {return default<blot_check_check::Computation>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::Computation>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_node(value.action);if error!=Error.none {return default<blot_check_check::Computation>(),error;}result.action=mapped;}
 {let mapped,error=mapper.map_ty(value.ty);if error!=Error.none {return default<blot_check_check::Computation>(),error;}result.ty=mapped;}
 {let mapped,error=mapper.map_ty(value.action_type);if error!=Error.none {return default<blot_check_check::Computation>(),error;}result.action_type=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::Computation)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::RequestLoop,mapper:M&)->blot_check_check::RequestLoop,Error {var result=value;
+fn registeredField(value:blot_check_check::RequestLoop,name:const u8[:])->bool {return name=="node" || name=="computation" || name=="value_type" || name=="result_type" || name=="state_type" || name=="action_type" || name=="arms" || name=="completion" || name=="complete_pattern" || name=="complete_suite" || name=="complete_state_bindings" || name=="carried" || name=="return_scope";}
+fn mapRecord<M>(value:blot_check_check::RequestLoop,mapper:M&)->blot_check_check::RequestLoop,Error {const for <N,A> in fields<blot_check_check::RequestLoop> {if !registeredField(value,N) {return default<blot_check_check::RequestLoop>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::RequestLoop>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_node(value.computation);if error!=Error.none {return default<blot_check_check::RequestLoop>(),error;}result.computation=mapped;}
 {let mapped,error=mapper.map_ty(value.value_type);if error!=Error.none {return default<blot_check_check::RequestLoop>(),error;}result.value_type=mapped;}
@@ -339,7 +350,8 @@ fn mapRecord<M>(value:blot_check_check::RequestLoop,mapper:M&)->blot_check_check
 {let mapped,error=mapper.map_node(value.return_scope);if error!=Error.none {return default<blot_check_check::RequestLoop>(),error;}result.return_scope=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::RequestLoop)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::RequestArm,mapper:M&)->blot_check_check::RequestArm,Error {var result=value;
+fn registeredField(value:blot_check_check::RequestArm,name:const u8[:])->bool {return name=="node" || name=="loop" || name=="operation_source" || name=="operation" || name=="parameter_type" || name=="reply_type" || name=="signature" || name=="pattern" || name=="suite" || name=="state_bindings";}
+fn mapRecord<M>(value:blot_check_check::RequestArm,mapper:M&)->blot_check_check::RequestArm,Error {const for <N,A> in fields<blot_check_check::RequestArm> {if !registeredField(value,N) {return default<blot_check_check::RequestArm>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::RequestArm>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_node(value.loop);if error!=Error.none {return default<blot_check_check::RequestArm>(),error;}result.loop=mapped;}
 {let mapped,error=mapper.map_node(value.operation_source);if error!=Error.none {return default<blot_check_check::RequestArm>(),error;}result.operation_source=mapped;}
@@ -352,7 +364,8 @@ fn mapRecord<M>(value:blot_check_check::RequestArm,mapper:M&)->blot_check_check:
 {let mapped,error=mapper.map_bindings(value.state_bindings);if error!=Error.none {return default<blot_check_check::RequestArm>(),error;}result.state_bindings=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::RequestArm)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::RequestControl,mapper:M&)->blot_check_check::RequestControl,Error {var result=value;
+fn registeredField(value:blot_check_check::RequestControl,name:const u8[:])->bool {return name=="node" || name=="loop" || name=="kind" || name=="value_type" || name=="bindings" || name=="target_scope";}
+fn mapRecord<M>(value:blot_check_check::RequestControl,mapper:M&)->blot_check_check::RequestControl,Error {const for <N,A> in fields<blot_check_check::RequestControl> {if !registeredField(value,N) {return default<blot_check_check::RequestControl>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::RequestControl>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_node(value.loop);if error!=Error.none {return default<blot_check_check::RequestControl>(),error;}result.loop=mapped;}
 {let mapped,error=mapper.map_ty(value.value_type);if error!=Error.none {return default<blot_check_check::RequestControl>(),error;}result.value_type=mapped;}
@@ -360,7 +373,8 @@ fn mapRecord<M>(value:blot_check_check::RequestControl,mapper:M&)->blot_check_ch
 {let mapped,error=mapper.map_node(value.target_scope);if error!=Error.none {return default<blot_check_check::RequestControl>(),error;}result.target_scope=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::RequestControl)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::Reflection,mapper:M&)->blot_check_check::Reflection,Error {var result=value;
+fn registeredField(value:blot_check_check::Reflection,name:const u8[:])->bool {return name=="node" || name=="kind" || name=="left" || name=="right" || name=="binding" || name=="row" || name=="label";}
+fn mapRecord<M>(value:blot_check_check::Reflection,mapper:M&)->blot_check_check::Reflection,Error {const for <N,A> in fields<blot_check_check::Reflection> {if !registeredField(value,N) {return default<blot_check_check::Reflection>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::Reflection>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_node(value.left);if error!=Error.none {return default<blot_check_check::Reflection>(),error;}result.left=mapped;}
 {let mapped,error=mapper.map_node(value.right);if error!=Error.none {return default<blot_check_check::Reflection>(),error;}result.right=mapped;}
@@ -369,7 +383,8 @@ fn mapRecord<M>(value:blot_check_check::Reflection,mapper:M&)->blot_check_check:
 {let mapped,error=mapper.map_label(value.label);if error!=Error.none {return default<blot_check_check::Reflection>(),error;}result.label=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::Reflection)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::EffectScope,mapper:M&)->blot_check_check::EffectScope,Error {var result=value;
+fn registeredField(value:blot_check_check::EffectScope,name:const u8[:])->bool {return name=="node" || name=="callback" || name=="parameter" || name=="capability" || name=="result" || name=="body_effects";}
+fn mapRecord<M>(value:blot_check_check::EffectScope,mapper:M&)->blot_check_check::EffectScope,Error {const for <N,A> in fields<blot_check_check::EffectScope> {if !registeredField(value,N) {return default<blot_check_check::EffectScope>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::EffectScope>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_node(value.callback);if error!=Error.none {return default<blot_check_check::EffectScope>(),error;}result.callback=mapped;}
 {let mapped,error=mapper.map_node(value.parameter);if error!=Error.none {return default<blot_check_check::EffectScope>(),error;}result.parameter=mapped;}
@@ -378,7 +393,8 @@ fn mapRecord<M>(value:blot_check_check::EffectScope,mapper:M&)->blot_check_check
 {let mapped,error=mapper.map_row(value.body_effects);if error!=Error.none {return default<blot_check_check::EffectScope>(),error;}result.body_effects=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::EffectScope)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::EffectRunner,mapper:M&)->blot_check_check::EffectRunner,Error {var result=value;
+fn registeredField(value:blot_check_check::EffectRunner,name:const u8[:])->bool {return name=="node" || name=="kind" || name=="read_token" || name=="write_token" || name=="initial" || name=="witness" || name=="implementation" || name=="action" || name=="state_type" || name=="body_result" || name=="result" || name=="implementation_type" || name=="action_type" || name=="body_effects" || name=="outer_effects";}
+fn mapRecord<M>(value:blot_check_check::EffectRunner,mapper:M&)->blot_check_check::EffectRunner,Error {const for <N,A> in fields<blot_check_check::EffectRunner> {if !registeredField(value,N) {return default<blot_check_check::EffectRunner>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::EffectRunner>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_ty(value.read_token);if error!=Error.none {return default<blot_check_check::EffectRunner>(),error;}result.read_token=mapped;}
 {let mapped,error=mapper.map_ty(value.write_token);if error!=Error.none {return default<blot_check_check::EffectRunner>(),error;}result.write_token=mapped;}
@@ -395,7 +411,8 @@ fn mapRecord<M>(value:blot_check_check::EffectRunner,mapper:M&)->blot_check_chec
 {let mapped,error=mapper.map_row(value.outer_effects);if error!=Error.none {return default<blot_check_check::EffectRunner>(),error;}result.outer_effects=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::EffectRunner)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::ProviderBlock,mapper:M&)->blot_check_check::ProviderBlock,Error {var result=value;
+fn registeredField(value:blot_check_check::ProviderBlock,name:const u8[:])->bool {return name=="node" || name=="provider" || name=="body_result" || name=="result" || name=="body_effects" || name=="outer_effects";}
+fn mapRecord<M>(value:blot_check_check::ProviderBlock,mapper:M&)->blot_check_check::ProviderBlock,Error {const for <N,A> in fields<blot_check_check::ProviderBlock> {if !registeredField(value,N) {return default<blot_check_check::ProviderBlock>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::ProviderBlock>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_node(value.provider);if error!=Error.none {return default<blot_check_check::ProviderBlock>(),error;}result.provider=mapped;}
 {let mapped,error=mapper.map_ty(value.body_result);if error!=Error.none {return default<blot_check_check::ProviderBlock>(),error;}result.body_result=mapped;}
@@ -404,7 +421,8 @@ fn mapRecord<M>(value:blot_check_check::ProviderBlock,mapper:M&)->blot_check_che
 {let mapped,error=mapper.map_row(value.outer_effects);if error!=Error.none {return default<blot_check_check::ProviderBlock>(),error;}result.outer_effects=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::ProviderBlock)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::ResolverBlock,mapper:M&)->blot_check_check::ResolverBlock,Error {var result=value;
+fn registeredField(value:blot_check_check::ResolverBlock,name:const u8[:])->bool {return name=="node" || name=="resolver" || name=="result" || name=="body_effects" || name=="fallthrough";}
+fn mapRecord<M>(value:blot_check_check::ResolverBlock,mapper:M&)->blot_check_check::ResolverBlock,Error {const for <N,A> in fields<blot_check_check::ResolverBlock> {if !registeredField(value,N) {return default<blot_check_check::ResolverBlock>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::ResolverBlock>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_binding(value.resolver);if error!=Error.none {return default<blot_check_check::ResolverBlock>(),error;}result.resolver=mapped;}
 {let mapped,error=mapper.map_ty(value.result);if error!=Error.none {return default<blot_check_check::ResolverBlock>(),error;}result.result=mapped;}
@@ -412,7 +430,8 @@ fn mapRecord<M>(value:blot_check_check::ResolverBlock,mapper:M&)->blot_check_che
 {let mapped,error=mapper.map_resolver_completions(value.fallthrough);if error!=Error.none {return default<blot_check_check::ResolverBlock>(),error;}result.fallthrough=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::ResolverBlock)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::ResolverOp,mapper:M&)->blot_check_check::ResolverOp,Error {var result=value;
+fn registeredField(value:blot_check_check::ResolverOp,name:const u8[:])->bool {return name=="node" || name=="kind" || name=="member" || name=="resolver" || name=="method" || name=="method_type" || name=="payload" || name=="result" || name=="continuation_parameter" || name=="completed_types" || name=="done_constructor" || name=="completion";}
+fn mapRecord<M>(value:blot_check_check::ResolverOp,mapper:M&)->blot_check_check::ResolverOp,Error {const for <N,A> in fields<blot_check_check::ResolverOp> {if !registeredField(value,N) {return default<blot_check_check::ResolverOp>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::ResolverOp>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_name(value.member);if error!=Error.none {return default<blot_check_check::ResolverOp>(),error;}result.member=mapped;}
 {let mapped,error=mapper.map_binding(value.resolver);if error!=Error.none {return default<blot_check_check::ResolverOp>(),error;}result.resolver=mapped;}
@@ -426,14 +445,16 @@ fn mapRecord<M>(value:blot_check_check::ResolverOp,mapper:M&)->blot_check_check:
 {let mapped,error=mapper.map_resolver_completions(value.completion);if error!=Error.none {return default<blot_check_check::ResolverOp>(),error;}result.completion=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::ResolverOp)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::ResolverJoin,mapper:M&)->blot_check_check::ResolverJoin,Error {var result=value;
+fn registeredField(value:blot_check_check::ResolverJoin,name:const u8[:])->bool {return name=="node" || name=="parameter" || name=="ty" || name=="result";}
+fn mapRecord<M>(value:blot_check_check::ResolverJoin,mapper:M&)->blot_check_check::ResolverJoin,Error {const for <N,A> in fields<blot_check_check::ResolverJoin> {if !registeredField(value,N) {return default<blot_check_check::ResolverJoin>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::ResolverJoin>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_binding(value.parameter);if error!=Error.none {return default<blot_check_check::ResolverJoin>(),error;}result.parameter=mapped;}
 {let mapped,error=mapper.map_ty(value.ty);if error!=Error.none {return default<blot_check_check::ResolverJoin>(),error;}result.ty=mapped;}
 {let mapped,error=mapper.map_ty(value.result);if error!=Error.none {return default<blot_check_check::ResolverJoin>(),error;}result.result=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::ResolverJoin)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::ResolverCompletion,mapper:M&)->blot_check_check::ResolverCompletion,Error {var result=value;
+fn registeredField(value:blot_check_check::ResolverCompletion,name:const u8[:])->bool {return name=="node" || name=="bind" || name=="pure" || name=="completed_types" || name=="done_constructor";}
+fn mapRecord<M>(value:blot_check_check::ResolverCompletion,mapper:M&)->blot_check_check::ResolverCompletion,Error {const for <N,A> in fields<blot_check_check::ResolverCompletion> {if !registeredField(value,N) {return default<blot_check_check::ResolverCompletion>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::ResolverCompletion>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_resolver_ops(value.bind);if error!=Error.none {return default<blot_check_check::ResolverCompletion>(),error;}result.bind=mapped;}
 {let mapped,error=mapper.map_resolver_ops(value.pure);if error!=Error.none {return default<blot_check_check::ResolverCompletion>(),error;}result.pure=mapped;}
@@ -441,7 +462,8 @@ fn mapRecord<M>(value:blot_check_check::ResolverCompletion,mapper:M&)->blot_chec
 {let mapped,error=mapper.map_constructor(value.done_constructor);if error!=Error.none {return default<blot_check_check::ResolverCompletion>(),error;}result.done_constructor=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::ResolverCompletion)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::ResolverLoop,mapper:M&)->blot_check_check::ResolverLoop,Error {var result=value;
+fn registeredField(value:blot_check_check::ResolverLoop,name:const u8[:])->bool {return name=="node" || name=="cursor_parameter" || name=="first_binding" || name=="end_binding" || name=="cursor" || name=="step_result" || name=="suffix_result" || name=="iterate" || name=="continued" || name=="finish" || name=="continue_constructor" || name=="done_constructor";}
+fn mapRecord<M>(value:blot_check_check::ResolverLoop,mapper:M&)->blot_check_check::ResolverLoop,Error {const for <N,A> in fields<blot_check_check::ResolverLoop> {if !registeredField(value,N) {return default<blot_check_check::ResolverLoop>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::ResolverLoop>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_binding(value.cursor_parameter);if error!=Error.none {return default<blot_check_check::ResolverLoop>(),error;}result.cursor_parameter=mapped;}
 {let mapped,error=mapper.map_binding(value.first_binding);if error!=Error.none {return default<blot_check_check::ResolverLoop>(),error;}result.first_binding=mapped;}
@@ -456,11 +478,13 @@ fn mapRecord<M>(value:blot_check_check::ResolverLoop,mapper:M&)->blot_check_chec
 {let mapped,error=mapper.map_constructor(value.done_constructor);if error!=Error.none {return default<blot_check_check::ResolverLoop>(),error;}result.done_constructor=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::ResolverLoop)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::StatementArm,mapper:M&)->blot_check_check::StatementArm,Error {var result=value;
+fn registeredField(value:blot_check_check::StatementArm,name:const u8[:])->bool {return name=="node";}
+fn mapRecord<M>(value:blot_check_check::StatementArm,mapper:M&)->blot_check_check::StatementArm,Error {const for <N,A> in fields<blot_check_check::StatementArm> {if !registeredField(value,N) {return default<blot_check_check::StatementArm>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::StatementArm>(),error;}result.node=mapped;}
 return result,Error.none;}
 fn source(value:blot_check_check::StatementArm)->u32 {return value.node;}
-fn mapRecord<M>(value:blot_check_check::OperationUse,mapper:M&)->blot_check_check::OperationUse,Error {var result=value;
+fn registeredField(value:blot_check_check::OperationUse,name:const u8[:])->bool {return name=="node" || name=="template" || name=="arguments" || name=="signature" || name=="instance" || name=="capability" || name=="capability_binding" || name=="call" || name=="operand";}
+fn mapRecord<M>(value:blot_check_check::OperationUse,mapper:M&)->blot_check_check::OperationUse,Error {const for <N,A> in fields<blot_check_check::OperationUse> {if !registeredField(value,N) {return default<blot_check_check::OperationUse>(),Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.node);if error!=Error.none {return default<blot_check_check::OperationUse>(),error;}result.node=mapped;}
 {let mapped,error=mapper.map_template(value.template);if error!=Error.none {return default<blot_check_check::OperationUse>(),error;}result.template=mapped;}
 {let mapped,error=mapper.map_types(value.arguments);if error!=Error.none {return default<blot_check_check::OperationUse>(),error;}result.arguments=mapped;}

@@ -258,3 +258,20 @@ shared-evidence rollback and retained descriptor schemas now reach source around
 4185. Metadata also owns copied spelling bytes used by compile-local schemas.
 Next source section is optionalWriterEvidence / writer owner-graph key encoding.
 The engine's later reusable-call emission and top-level compile are unfinished.
+Scoped writer/owner-graph evidence and graph input/result/caller remapping now
+reach source around 4385. storage_owner_graph has its full production pass:
+canonical breadth-first owner numbering, bounded typed edge visits, fresh-owner
+result donor checks, all-payload provenance and exact ordinal edge encoding.
+Graph<Value> takes the immutable metadata accessor context at traversal/encoding
+calls; it never stores a reference to a recursive-local descriptor. Production
+result donor checks call the same context's plainInlineValue method. Its typed owner
+and ordinal runs are physically released by deinit. No verification has run.
+Scoped projected-argument field footprints, bounded diagnostic word counts and
+publication counter snapshots/rollback now reach FunctionMark (source roughly
+4545). PreparedArguments.values is a Metadata Range, read with preparedValues;
+its input vector is published into compile-wide typed storage before it can
+escape a recursive caller. This preserves selected fields/words and diagnostics
+while making native allocation timing a pending qualification item. FunctionMark
+restores the exact source publication field set and counts discarded projection
+calls before resetting the module tail. tryFunctionPlan and following emission
+sections are still pending. No verification has run.

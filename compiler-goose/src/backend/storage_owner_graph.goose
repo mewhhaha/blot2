@@ -20,7 +20,7 @@ fn init<V,C,R>(context: const C&,roots: const R[:],arguments: const V[:]) -> Gra
 fn result<V,C,R>(context: const C&,roots: const R[:],inputs: i64,output: V,fixed_region: u32) -> Graph<V>,Error {
     var graph = Graph<V> {}; var donors = Owners {};
     recursive fn build() -> Error { for index in 0..inputs { let error = add(graph,index,roots.len); if error != Error.none { return error; } } let visited = resultValue(graph,context,output,roots.len,inputs,false,donors,0); if visited != Error.none { return visited; }
-        for index in graph.owners.items[inputs..] { let owner = roots[index]; if !owner.live || owner.persistent || owner.dedicated || owner.stack != fixed_region || !context.plainShape(owner.element) { return Error.declined; } if !contains(donors.items,index) { return Error.declined; } } return Error.none;
+        for index in graph.owners.items[inputs..] { let owner = roots[index]; if !owner.live || owner.persistent || owner.dedicated || owner.stack != fixed_region || !context.plainInlineValue(owner.element) { return Error.declined; } if !contains(donors.items,index) { return Error.declined; } } return Error.none;
     } let error = build(); blot_support_pooled_buffer::deinit(donors,owner_runs); if error != Error.none { graph.deinit(); return Graph<V> {},error; } return graph,Error.none;
 }
 fn contains(values: const i64[:],value: i64) -> bool { for item in values { if item == value { return true; } } return false; }

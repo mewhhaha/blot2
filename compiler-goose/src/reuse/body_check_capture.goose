@@ -120,6 +120,7 @@ recursive fn appendSchemeMembers(members:Scratch_u8___&,scheme:blot_check_types:
  return true,Error.none;
 }
 fn captureBody(tree:const Tree&,pool:const Pool&,text:const u8[:],checked:const blot_check_check::Checked&,root:u32,shape:Syntax,names:blot_support::Option<ExternalNames>,annotations:blot_support::Option<AnnotationLookup>)->blot_support::Option<Body>,Error {
+ if unretainedFacts() {return blot_support::none<Body>(),Error.none;}
  for id in shape.ids {if tree.node(id).tag==blot_parse_ast::tag_function_return_stmt {return blot_support::none<Body>(),Error.none;}}
  let auxiliary,error=blot_reuse_body_auxiliary::capture(checked,shape.ids);if error!=Error.none {if error==Error.out_of_memory {return blot_support::none<Body>(),error;}return blot_support::none<Body>(),Error.none;}
  let value,error=initMemoOwner();if error!=Error.none {let owner .= auxiliary;if owner {owner.deinit();}return blot_support::none<Body>(),error;}var memo=value;

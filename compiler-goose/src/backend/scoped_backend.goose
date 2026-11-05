@@ -19,6 +19,7 @@ import .storage_transport;
 import .storage_deferred_join;
 import .storage_collections;
 import .storage_layout;
+import .storage_owner_graph;
 import .storage_parameter_fields;
 import .simd_intrinsics;
 import .storage_type_arguments;
@@ -1328,3 +1329,247 @@ recursive fn retainDescriptorShape(self: Generator&,source: Value) -> Value,Erro
     if !plainShape(self.metadata,source) { return Value {},Error.declined; } var result = source; result.word = Local {}; result.literal = blot_support::none<u32>(); result.constant_bits = blot_support::none<u32>(); result.type_evidence = blot_support::none<u32>(); let name = Range { start: self.metadata.bytes.len,len: source.name.len }; self.metadata.bytes.append(source.name); result.name = self.metadata.bytes[name.start..name.start + name.len]; let destination = allocateFields(self.metadata,result,source.fields.len); result.variant_tags = publishWords(self.metadata,variantTags(self.metadata,source)); result.variant_possible = publishFlags(self.metadata,variantPossible(self.metadata,source)); for index in 0..source.fields.len { let original = self.metadata.values[source.fields.start + index]; let field,error = retainDescriptorShape(self,original); if error != Error.none { return Value {},error; } self.metadata.values[destination.start + index] = field; } return result,Error.none;
 }
 recursive fn plainReaderResultABI(metadata: const Metadata&,value: Value,expected: Value) -> bool { if !plainInlineValue(metadata,value) || !stableDescriptorShape(metadata,value) { return false; } if value.tag != expected.tag || value.floating != expected.floating || !sameNominal(value.nominal,expected.nominal) || value.fields.len != expected.fields.len { return false; } if expected.name.len != 0 && value.name != expected.name { return false; } for index in 0..value.fields.len { if !plainReaderResultABI(metadata,metadata.values[value.fields.start + index],metadata.values[expected.fields.start + index]) { return false; } } return true; }
+type OwnerGraph = blot_backend_storage_owner_graph::Graph<Value>;
+fn optionalWriterEvidence(self: Generator&,module: const blot_check_core::Module&,body: const blot_check_core::Body&,arguments: const Value[:],descriptors: const Value[:],owners: const i64[:],evidence: blot_backend_storage_type_key::Words&) -> bool,Error { let diagnostic = self.diagnostic; let error = writerCallEvidence(self,module,body,arguments,descriptors,owners,evidence); if error == Error.none { return true,Error.none; } if error == Error.out_of_memory { return false,error; } self.diagnostic = diagnostic; saturate(self.emission_work.scoped_outline_key_declines,1); return false,Error.none; }
+fn writerCallEvidence(self: Generator&,module: const blot_check_core::Module&,body: const blot_check_core::Body&,arguments: const Value[:],descriptors: const Value[:],owners: const i64[:],evidence: blot_backend_storage_type_key::Words&) -> Error {
+    let marker = evidence.append([4294967293,owners.len as u32]); if marker != Error.none { return marker; } var keys = blot_backend_storage_type_key::init(4096);
+    recursive fn encode() -> Error { for argument in arguments { let error = readerLayoutEvidence(self,module,body.root,argument,evidence,keys); if error != Error.none { return error; } } for parameter in module.bodyParameters(body) { let error = selectedType(self,module,body.root,TypeRef { unit: module.unit,ty: parameter.ty },evidence,keys,0); if error != Error.none { return error; } }
+        for value in descriptors { assert(value.root.present); let first,error = writerOrdinal(owners,value.root.value); if error != Error.none { return error; } let header = evidence.append([first as u32,value.other_roots.len as u32]); if header != Error.none { return header; } for other in otherRoots(self.metadata,value) { let ordinal,error = writerOrdinal(owners,other); if error != Error.none { return error; } let appended = evidence.push(ordinal as u32); if appended != Error.none { return appended; } } }
+        for owner_id in owners { let owner = self.roots.items[owner_id]; var frozen: u32 = 0; if owner.frozen { frozen = 1; } var initialized: u32 = 0; if owner.element_initialized { initialized = 1; } let flags = evidence.append([frozen,initialized]); if flags != Error.none { return flags; } let layout = readerLayoutEvidence(self,module,body.root,owner.element,evidence,keys); if layout != Error.none { return layout; } } return finishSelectedTypes(self,module,body.root,evidence,keys);
+    } let error = encode(); keys.deinit(); return error;
+}
+fn writerOrdinal(owners: const i64[:],owner: i64) -> i64,Error { for value,index in owners { if value == owner { return index,Error.none; } } return 0,Error.declined; }
+recursive fn writerInput(self: Generator&,value: Value&,owners: const i64[:],assigned: bool[:]) -> Error {
+    value.literal = blot_support::none<u32>(); value.constant_bits = blot_support::none<u32>(); value.depth = 0; let destination,error = writableFields(self,value); if error != Error.none { return error; } for index in 0..destination.len { let error = writerInput(self,self.metadata.values[destination.start + index],owners,assigned); if error != Error.none { return error; } } if value.tag == ValueTag.scalar || value.tag == ValueTag.aggregate || value.tag == ValueTag.callable { return Error.none; } if !value.root.present { return Error.declined; } let root,root_error = writerOrdinal(owners,value.root.value); if root_error != Error.none { return root_error; } value.root = blot_support::some(root); let previous = value.other_roots; let others = Range { start: self.metadata.indexes.len,len: previous.len };
+    for index in 0..previous.len { let original = self.metadata.indexes[previous.start + index]; let ordinal,error = writerOrdinal(owners,original); if error != Error.none { return error; } self.metadata.indexes.push(ordinal); } value.other_roots = others;
+    for &owner,index in self.roots.items { if !hasRoot(self.metadata,value,index) || assigned[index] { continue; } if owner.imported_global { continue; } owner.word = value.word; owner.token = value.token; assert(self.writer_trace.present && index < self.metadata.traces[self.writer_trace.value].inputs); owner.epoch_low = value.epoch_low; owner.epoch_high = value.epoch_high; assigned[index] = true; } return Error.none;
+}
+recursive fn clearWriterLiterals(self: Generator&,value: Value&) -> Error { value.literal = blot_support::none<u32>(); value.constant_bits = blot_support::none<u32>(); let destination,error = writableFields(self,value); if error != Error.none { return error; } for index in 0..destination.len { let error = clearWriterLiterals(self,self.metadata.values[destination.start + index]); if error != Error.none { return error; } } return Error.none; }
+recursive fn graphValueEvidence(self: Generator&,module: const blot_check_core::Module&,id: u32,value: Value,evidence: blot_backend_storage_type_key::Words&,keys: blot_backend_storage_type_key::Builder&,remaining: i64&,depth: i64) -> Error {
+    if value.callable.present { saturate(self.emission_work.scoped_function_plan_callback_evidence_nodes,1); } if depth > 128 { return Error.declined; } var metadata = value; metadata.fields = Range {}; if metadata.tag != ValueTag.scalar && metadata.tag != ValueTag.aggregate && metadata.tag != ValueTag.callable { metadata.tag = ValueTag.scalar; } let typed = descriptorValueEvidence(self,module,id,metadata,evidence,keys,remaining,depth); if typed != Error.none { return typed; } var borrowed: u32 = 0; if value.pool_borrow { borrowed = 1; } var terminated: u32 = 0; if value.terminated { terminated = 1; } let flags = evidence.append([borrowed,terminated]); if flags != Error.none { return flags; } for index in 0..value.fields.len { let field = self.metadata.values[value.fields.start + index]; let error = graphValueEvidence(self,module,id,field,evidence,keys,remaining,depth + 1); if error != Error.none { return error; } } return Error.none;
+}
+fn graphWriterEvidence(self: Generator&,module: const blot_check_core::Module&,body: const blot_check_core::Body&,actual_binding: u32,arguments: const Value[:],graph: const OwnerGraph&,evidence: blot_backend_storage_type_key::Words&) -> Error {
+    var remaining: i64 = 100000; var keys = blot_backend_storage_type_key::init(100000);
+    recursive fn encode() -> Error { let marker = evidence.append([4294967287,graph.owners.items.len as u32]); if marker != Error.none { return marker; } for parameter in module.bodyParameters(body) { let error = descriptorTypeEvidence(self,module,body.root,TypeRef { unit: module.unit,ty: parameter.ty },evidence,keys,remaining); if error != Error.none { return error; } } let output = descriptorTypeEvidence(self,module,body.root,TypeRef { unit: module.unit,ty: module.typeOf(body.root) },evidence,keys,remaining); if output != Error.none { return output; } let source = descriptorBodyEvidence(self,module,body,blot_support::none<Range>(),evidence,keys,remaining); if source != Error.none { return source; }
+        if actual_binding != body.binding { let checked = module.binding(actual_binding); if checked.scheme.generative.len != 0 { return Error.declined; } let variables: blot_check_types::List[2] = [checked.scheme.variables,checked.public_variables]; for frontier in variables { let count = evidence.push(frontier.len); if count != Error.none { return count; } for variable in module.types.list(frontier) { let error = descriptorTypeEvidence(self,module,body.root,TypeRef { unit: module.unit,ty: variable },evidence,keys,remaining); if error != Error.none { return error; } } } let rows: blot_check_types::List[2] = [checked.scheme.row_variables,checked.public_rows]; for frontier in rows { if frontier.len > remaining { return Error.declined; } remaining -= frontier.len; let count = evidence.push(frontier.len); if count != Error.none { return count; } let names = evidence.append(module.types.list(frontier)); if names != Error.none { return names; } } }
+        for argument in arguments { let typed = graphValueEvidence(self,module,body.root,argument,evidence,keys,remaining,0); if typed != Error.none { return typed; } let layout = readerLayoutEvidence(self,module,body.root,argument,evidence,keys); if layout != Error.none { return layout; } let edges = graph.edges(self.metadata,argument,evidence); if edges != Error.none { return edges; } }
+        for owner_id in graph.owners.items { let owner = self.roots.items[owner_id]; var frozen: u32 = 0; if owner.frozen { frozen = 1; } var initialized: u32 = 0; if owner.element_initialized { initialized = 1; } var empty: u32 = 0; if owner.known_empty { empty = 1; } var live: u32 = 0; if owner.live { live = 1; } var persistent: u32 = 0; if owner.persistent { persistent = 1; } let flags = evidence.append([frozen,initialized,empty,live,persistent]); if flags != Error.none { return flags; } if owner.persistent { let region = evidence.push(owner.stack); if region != Error.none { return region; } } let typed = graphValueEvidence(self,module,body.root,owner.element,evidence,keys,remaining,0); if typed != Error.none { return typed; } let layout = readerLayoutEvidence(self,module,body.root,owner.element,evidence,keys); if layout != Error.none { return layout; } let edges = graph.edges(self.metadata,owner.element,evidence); if edges != Error.none { return edges; } } return finishSelectedTypes(self,module,body.root,evidence,keys);
+    } let error = encode(); keys.deinit(); return error;
+}
+fn optionalGraphWriterEvidence(self: Generator&,module: const blot_check_core::Module&,body: const blot_check_core::Body&,actual_binding: u32,arguments: const Value[:],graph: const OwnerGraph&,evidence: blot_backend_storage_type_key::Words&) -> bool,Error { let diagnostic = self.diagnostic; let error = graphWriterEvidence(self,module,body,actual_binding,arguments,graph,evidence); if error == Error.none { return true,Error.none; } if error == Error.out_of_memory { return false,error; } self.diagnostic = diagnostic; return false,Error.none; }
+recursive fn graphInputShape(self: Generator&,value: Value&,graph: const OwnerGraph&) -> Error { value.literal = blot_support::none<u32>(); value.constant_bits = blot_support::none<u32>(); value.depth = 0; if value.root.present { let ordinal,error = graph.ordinal(value.root.value); if error != Error.none { return error; } value.root = blot_support::some(ordinal); } let original = value.other_roots; let others = Range { start: self.metadata.indexes.len,len: original.len }; for index in 0..original.len { let ordinal,error = graph.ordinal(self.metadata.indexes[original.start + index]); if error != Error.none { return error; } self.metadata.indexes.push(ordinal); } value.other_roots = others; let destination,error = writableFields(self,value); if error != Error.none { return error; } for index in 0..destination.len { let error = graphInputShape(self,self.metadata.values[destination.start + index],graph); if error != Error.none { return error; } } return Error.none; }
+recursive fn graphResultLayout(metadata: const Metadata&,value: Value) -> bool { if value.host.present || value.tag == ValueTag.callable { return false; } for field in fields(metadata,value) { if !graphResultLayout(metadata,field) { return false; } } return true; }
+recursive fn retainGraphShape(self: Generator&,source: Value,inputs: i64,copies: EnvironmentCopies&,depth: i64) -> Value,Error {
+    if depth > 128 || source.host.present || source.tag == ValueTag.callable { return Value {},Error.declined; } if (source.tag == ValueTag.array && !source.root.present) || (source.root.present && source.root.value >= inputs) { saturate(self.emission_work.scoped_fresh_owner_summary_declines,1); return Value {},Error.declined; } for owner in otherRoots(self.metadata,source) { if owner >= inputs { saturate(self.emission_work.scoped_fresh_owner_summary_declines,1); return Value {},Error.declined; } }
+    var result = source; result.word = Local {}; result.literal = blot_support::none<u32>(); result.constant_bits = blot_support::none<u32>(); if source.type_evidence.present { let known = evidenceAt(self.metadata,source.type_evidence.value); var root = known.root; if root.environment.present { let environment,error = retainEnvironmentIn(self,self.metadata,root.environment.value,copies,0); if error != Error.none { return Value {},error; } root.environment = blot_support::some(environment); } let arguments,error = retainEnvironmentIn(self,self.metadata,known.arguments,copies,0); if error != Error.none { return Value {},error; } if self.metadata.evidence.len >= 4294967295 { return Value {},Error.out_of_memory; } result.type_evidence = blot_support::some(boxTypeEvidenceIn(self.metadata.evidence,TypeEvidence { root,arguments })); }
+    let name = Range { start: self.metadata.bytes.len,len: source.name.len }; self.metadata.bytes.append(source.name); result.name = self.metadata.bytes[name.start..name.start + name.len]; let roots = Range { start: self.metadata.indexes.len,len: source.other_roots.len }; for index in 0..source.other_roots.len { self.metadata.indexes.push(self.metadata.indexes[source.other_roots.start + index]); } result.other_roots = roots; result.variant_tags = publishWords(self.metadata,variantTags(self.metadata,source)); result.variant_possible = publishFlags(self.metadata,variantPossible(self.metadata,source)); let destination = allocateFields(self.metadata,result,source.fields.len); for index in 0..source.fields.len { let original = self.metadata.values[source.fields.start + index]; let field,error = retainGraphShape(self,original,inputs,copies,depth + 1); if error != Error.none { return Value {},error; } self.metadata.values[destination.start + index] = field; } return result,Error.none;
+}
+fn graphCallerShape(self: Generator&,source: Value,owners: const i64[:]) -> Value,Error { var result = source; let error = graphCallerRoots(self,result,owners); if error != Error.none { return Value {},error; } return result,Error.none; }
+recursive fn graphCallerRoots(self: Generator&,value: Value&,owners: const i64[:]) -> Error {
+    value.depth = 0; if value.root.present { let ordinal = value.root.value; if ordinal >= owners.len { return Error.declined; } value.root = blot_support::some(owners[ordinal]); value.depth = self.roots.items[owners[ordinal]].depth; } let original = value.other_roots; let others = Range { start: self.metadata.indexes.len,len: original.len }; for index in 0..original.len { let ordinal = self.metadata.indexes[original.start + index]; if ordinal >= owners.len { return Error.declined; } let owner = owners[ordinal]; self.metadata.indexes.push(owner); value.depth = max(value.depth,self.roots.items[owner].depth); } value.other_roots = others;
+    let destination,error = writableFields(self,value); if error != Error.none { return error; } for index in 0..destination.len { let error = graphCallerRoots(self,self.metadata.values[destination.start + index],owners); if error != Error.none { return error; } } return Error.none;
+}
+struct PreparedArguments { values: Range,fields_omitted: i64 = 0,words_omitted: i64 = 0,words_complete: bool = true }
+fn preparedValues(self: Generator&,prepared: PreparedArguments) -> const Value[:] { self.metadata.values[prepared.values.start..prepared.values.start + prepared.values.len] }
+fn saturateSize(value: i64&,amount: i64) { if amount > 9223372036854775807 - value { value = 9223372036854775807; } else { value += amount; } }
+fn projectedArguments(self: Generator&,module: const blot_check_core::Module&,body: const blot_check_core::Body&,original: const Value[:]) -> PreparedArguments,Error {
+    saturate(self.emission_work.scoped_argument_preparations,1); var prepared = PreparedArguments { values: publishValues(self.metadata,original) }; var word_work: i64 = 4096;
+    for parameter,index in module.bodyParameters(body) { let argument = original[index]; if argument.tag != ValueTag.aggregate || argument.variant_tags.len != 0 || argument.host.present || argument.root.present { continue; } var nominal = blot_support::none<blot_backend_storage_parameter_fields::NominalRecord>(); var record = argument;
+        if argument.nominal.present { if argument.fields.len != 1 || argument.other_roots.len != 0 || argument.callable.present || argument.pool_borrow || argument.sequence { continue; } record = self.metadata.values[argument.fields.start]; if record.tag != ValueTag.aggregate || record.nominal.present || record.variant_tags.len != 0 || record.host.present || record.root.present || record.other_roots.len != 0 || record.callable.present || record.pool_borrow || record.sequence { continue; } }
+        var callback_work: i64 = 4096; if !containsCallback(self.metadata,record,callback_work,0) && record.fields.len < 8 { continue; } let actual,error = resolveType(self,TypeRef { unit: module.unit,ty: parameter.ty },0); if error != Error.none { return PreparedArguments {},error; } let owner,owner_error = unit(self,actual.unit); if owner_error != Error.none { return PreparedArguments {},owner_error; } assert(owner);
+        if argument.nominal.present { var policy_work: i64 = 100000; nominal = blot_backend_storage_parameter_fields::nominalRecord(owner,actual.ty,policy_work); if !nominal.present || nominal.value.identity != argument.nominal.value { continue; } } else if owner.types.node(actual.ty).tag != blot_check_types::Tag.record { continue; }
+        var footprint,footprint_error = blot_backend_storage_parameter_fields::collect(module,body.root,parameter.binding,nominal); if footprint_error != Error.none { return PreparedArguments {},footprint_error; } var selected = Values {};
+        recursive fn project() -> Error {
+            if footprint.whole || footprint.names.items.len >= record.fields.len { return Error.none; } var omitted_words: i64 = 0; var complete = true;
+            for field in fields(self.metadata,record) { var retained = false; for name in footprint.names.items { let spelling = module.fieldSpelling(name); if !spelling.present { break; } if field.name == spelling.value { let added = selected.push(field); if added != Error.none { return added; } retained = true; break; } } if !retained && complete { let count = boundedReaderWords(self.metadata,field,word_work,0); if !count.present { complete = false; continue; } saturateSize(omitted_words,count.value); } }
+            if selected.items.len != footprint.names.items.len { return Error.none; } let selected_range = publishValues(self.metadata,selected.items);
+            if nominal.present { let wrapper = publishValues(self.metadata,fields(self.metadata,argument)); self.metadata.values[wrapper.start].fields = selected_range; self.metadata.values[prepared.values.start + index].fields = wrapper; }
+            else { self.metadata.values[prepared.values.start + index].fields = selected_range; } self.metadata.values[prepared.values.start + index].projected_parameter_fields = true; let omitted = record.fields.len - selected.items.len; saturateSize(prepared.fields_omitted,omitted); saturateSize(prepared.words_omitted,omitted_words); prepared.words_complete = prepared.words_complete && complete; saturate(self.emission_work.scoped_projected_parameter_fields,omitted as u64); let span = module.span(body.root); blot_phase_profile::detail("descriptor.parameter.projected",module.unit,span.start,span.end,omitted as u64); return Error.none;
+        }
+        let projection_error = project(); selected.deinit(); footprint.deinit(); if projection_error != Error.none { return PreparedArguments {},projection_error; }
+    }
+    if prepared.fields_omitted != 0 { saturate(self.emission_work.scoped_argument_projection_preparations,1); } saturate(self.emission_work.scoped_projection_word_count_nodes,(4096 - word_work) as u64); return prepared,Error.none;
+}
+recursive fn boundedReaderWords(metadata: const Metadata&,value: Value,remaining: i64&,depth: i64) -> blot_support::Option<i64> {
+    if remaining == 0 || depth > 128 { return blot_support::none<i64>(); } remaining--; if value.tag == ValueTag.aggregate || value.tag == ValueTag.callable { var count: i64 = 0; if value.variant_tags.len != 0 { count = 1; } for field in fields(metadata,value) { let child = boundedReaderWords(metadata,field,remaining,depth + 1); if !child.present || child.value > 9223372036854775807 - count { return blot_support::none<i64>(); } count += child.value; } return blot_support::some(count); }
+    match value.tag { scalar=>{ return blot_support::some<i64>(1); },array=>{ return blot_support::some<i64>(4); },ref,link=>{ return blot_support::some<i64>(5); },view=>{ return blot_support::some<i64>(6); },_=>{ abort("invalid descriptor in bounded word count"); }, }
+}
+enum PreparedKind { reader,owned }
+fn commitPreparedArguments(self: Generator&,prepared: PreparedArguments,kind: PreparedKind) {
+    if prepared.fields_omitted == 0 { return; } if kind == PreparedKind.reader { saturate(self.emission_work.scoped_reader_projection_calls,1); saturate(self.emission_work.scoped_reader_argument_fields_omitted,prepared.fields_omitted as u64); if prepared.words_complete { saturate(self.emission_work.scoped_reader_argument_words_omitted,prepared.words_omitted as u64); } }
+    else { saturate(self.emission_work.scoped_owned_projection_calls,1); saturate(self.emission_work.scoped_owned_argument_fields_omitted,prepared.fields_omitted as u64); if prepared.words_complete { saturate(self.emission_work.scoped_owned_argument_words_omitted,prepared.words_omitted as u64); } } if !prepared.words_complete { saturate(self.emission_work.scoped_projection_word_counts_limited,1); }
+}
+recursive fn containsCallback(metadata: const Metadata&,value: Value,remaining: i64&,depth: i64) -> bool {
+    if remaining == 0 || depth > 128 { return false; } remaining--; if value.tag == ValueTag.callable { return true; } if value.tag != ValueTag.aggregate || depth == 128 || value.fields.len > remaining { return false; } remaining -= value.fields.len; for field in fields(metadata,value) { if field.tag == ValueTag.callable { return true; } } for field in fields(metadata,value) { if field.tag == ValueTag.aggregate && containsCallback(metadata,field,remaining,depth + 1) { return true; } } return false;
+}
+
+let published_count: i64 = 69;
+fn publishedCounter(g: const Generator&,index: i64) -> u64 { match index {
+    0=>{ return g.emission_work.scoped_recursive_definitions; },
+    1=>{ return g.emission_work.scoped_recursive_calls; },
+    2=>{ return g.emission_work.scoped_recursive_backedges; },
+    3=>{ return g.emission_work.scoped_addressed_definitions; },
+    4=>{ return g.emission_work.scoped_addressed_calls; },
+    5=>{ return g.emission_work.scoped_addressed_input_loads; },
+    6=>{ return g.emission_work.scoped_addressed_forwarded_words; },
+    7=>{ return g.emission_work.scoped_addressed_cached_words; },
+    8=>{ return g.emission_work.scoped_addressed_snapshot_words; },
+    9=>{ return g.emission_work.scoped_addressed_retained_bytes_max; },
+    10=>{ return g.emission_work.scoped_addressed_retained_slots_max; },
+    11=>{ return g.emission_work.scoped_global_plan_definitions; },
+    12=>{ return g.emission_work.scoped_global_plan_loads; },
+    13=>{ return g.emission_work.scoped_packed_plans_promoted; },
+    14=>{ return g.emission_work.scoped_input_alias_words_avoided; },
+    15=>{ return g.emission_work.scoped_result_owner_transfer_definitions; },
+    16=>{ return g.emission_work.scoped_transferred_result_owners; },
+    17=>{ return g.emission_work.scoped_primitive_applications; },
+    18=>{ return g.emission_work.scoped_scalar_constants_folded; },
+    19=>{ return g.emission_work.scoped_bit_recurrences; },
+    20=>{ return g.emission_work.scoped_bit_rounds_removed; },
+    21=>{ return g.emission_work.scoped_fixed_spans; },
+    22=>{ return g.emission_work.scoped_fixed_span_accesses; },
+    23=>{ return g.emission_work.scoped_bulk_copies; },
+    24=>{ return g.emission_work.scoped_bulk_fills; },
+    25=>{ return g.emission_work.scoped_merge_loops; },
+    26=>{ return g.emission_work.scoped_lane_loops; },
+    27=>{ return g.emission_work.scoped_lane_simd_loops; },
+    28=>{ return g.emission_work.scoped_stride_reductions; },
+    29=>{ return g.emission_work.scoped_created_span_validations_avoided; },
+    30=>{ return g.emission_work.scoped_scalar_old_loads_avoided; },
+    31=>{ return g.emission_work.scoped_result_slots_avoided; },
+    32=>{ return g.emission_work.scoped_zero_values_shared; },
+    33=>{ return g.emission_work.scoped_join_words_shared; },
+    34=>{ return g.emission_work.scoped_result_store_words_avoided; },
+    35=>{ return g.emission_work.scoped_result_load_words_avoided; },
+    36=>{ return g.emission_work.scoped_packed_input_words_avoided; },
+    37=>{ return g.emission_work.scoped_packed_argument_words_avoided; },
+    38=>{ return g.emission_work.scoped_direct_input_words_avoided; },
+    39=>{ return g.emission_work.scoped_direct_argument_words_avoided; },
+    40=>{ return g.emission_work.scoped_immutable_survivor_bindings; },
+    41=>{ return g.emission_work.scoped_function_plan_read_events; },
+    42=>{ return g.emission_work.scoped_function_plan_write_events; },
+    43=>{ return g.emission_work.scoped_function_plan_empty_owner_contracts; },
+    44=>{ return g.emission_work.scoped_function_plan_definitions; },
+    45=>{ return g.emission_work.scoped_function_plan_emissions; },
+    46=>{ return g.emission_work.scoped_function_plan_register_calls; },
+    47=>{ return g.emission_work.scoped_inline_register_calls; },
+    48=>{ return g.emission_work.scoped_inline_result_owners_avoided; },
+    49=>{ return g.emission_work.scoped_inline_result_roots_avoided; },
+    50=>{ return g.emission_work.scoped_inline_result_bytes_avoided; },
+    51=>{ return g.emission_work.scoped_scalar_definitions; },
+    52=>{ return g.emission_work.scoped_inline_definitions; },
+    53=>{ return g.emission_work.scoped_closure_definitions; },
+    54=>{ return g.emission_work.scoped_reader_definitions; },
+    55=>{ return g.emission_work.scoped_writer_definitions; },
+    56=>{ return g.emission_work.scoped_owner_graph_definitions; },
+    57=>{ return g.emission_work.scoped_owner_graph_inputs; },
+    58=>{ return g.emission_work.scoped_completed_plan_definitions; },
+    59=>{ return g.emission_work.scoped_plain_plan_definitions; },
+    60=>{ return g.emission_work.scoped_context_free_definitions; },
+    61=>{ return g.emission_work.scoped_context_sensitive_definitions; },
+    62=>{ return g.emission_work.scoped_reader_projection_calls; },
+    63=>{ return g.emission_work.scoped_reader_argument_fields_omitted; },
+    64=>{ return g.emission_work.scoped_reader_argument_words_omitted; },
+    65=>{ return g.emission_work.scoped_owned_projection_calls; },
+    66=>{ return g.emission_work.scoped_owned_argument_fields_omitted; },
+    67=>{ return g.emission_work.scoped_owned_argument_words_omitted; },
+    68=>{ return g.emission_work.scoped_projection_word_counts_limited; },
+    _=>{ abort("invalid publication counter index"); },
+} }
+fn restorePublishedCounter(g: Generator&,index: i64,value: u64) { match index {
+    0=>{ g.emission_work.scoped_recursive_definitions = value; },
+    1=>{ g.emission_work.scoped_recursive_calls = value; },
+    2=>{ g.emission_work.scoped_recursive_backedges = value; },
+    3=>{ g.emission_work.scoped_addressed_definitions = value; },
+    4=>{ g.emission_work.scoped_addressed_calls = value; },
+    5=>{ g.emission_work.scoped_addressed_input_loads = value; },
+    6=>{ g.emission_work.scoped_addressed_forwarded_words = value; },
+    7=>{ g.emission_work.scoped_addressed_cached_words = value; },
+    8=>{ g.emission_work.scoped_addressed_snapshot_words = value; },
+    9=>{ g.emission_work.scoped_addressed_retained_bytes_max = value; },
+    10=>{ g.emission_work.scoped_addressed_retained_slots_max = value; },
+    11=>{ g.emission_work.scoped_global_plan_definitions = value; },
+    12=>{ g.emission_work.scoped_global_plan_loads = value; },
+    13=>{ g.emission_work.scoped_packed_plans_promoted = value; },
+    14=>{ g.emission_work.scoped_input_alias_words_avoided = value; },
+    15=>{ g.emission_work.scoped_result_owner_transfer_definitions = value; },
+    16=>{ g.emission_work.scoped_transferred_result_owners = value; },
+    17=>{ g.emission_work.scoped_primitive_applications = value; },
+    18=>{ g.emission_work.scoped_scalar_constants_folded = value; },
+    19=>{ g.emission_work.scoped_bit_recurrences = value; },
+    20=>{ g.emission_work.scoped_bit_rounds_removed = value; },
+    21=>{ g.emission_work.scoped_fixed_spans = value; },
+    22=>{ g.emission_work.scoped_fixed_span_accesses = value; },
+    23=>{ g.emission_work.scoped_bulk_copies = value; },
+    24=>{ g.emission_work.scoped_bulk_fills = value; },
+    25=>{ g.emission_work.scoped_merge_loops = value; },
+    26=>{ g.emission_work.scoped_lane_loops = value; },
+    27=>{ g.emission_work.scoped_lane_simd_loops = value; },
+    28=>{ g.emission_work.scoped_stride_reductions = value; },
+    29=>{ g.emission_work.scoped_created_span_validations_avoided = value; },
+    30=>{ g.emission_work.scoped_scalar_old_loads_avoided = value; },
+    31=>{ g.emission_work.scoped_result_slots_avoided = value; },
+    32=>{ g.emission_work.scoped_zero_values_shared = value; },
+    33=>{ g.emission_work.scoped_join_words_shared = value; },
+    34=>{ g.emission_work.scoped_result_store_words_avoided = value; },
+    35=>{ g.emission_work.scoped_result_load_words_avoided = value; },
+    36=>{ g.emission_work.scoped_packed_input_words_avoided = value; },
+    37=>{ g.emission_work.scoped_packed_argument_words_avoided = value; },
+    38=>{ g.emission_work.scoped_direct_input_words_avoided = value; },
+    39=>{ g.emission_work.scoped_direct_argument_words_avoided = value; },
+    40=>{ g.emission_work.scoped_immutable_survivor_bindings = value; },
+    41=>{ g.emission_work.scoped_function_plan_read_events = value; },
+    42=>{ g.emission_work.scoped_function_plan_write_events = value; },
+    43=>{ g.emission_work.scoped_function_plan_empty_owner_contracts = value; },
+    44=>{ g.emission_work.scoped_function_plan_definitions = value; },
+    45=>{ g.emission_work.scoped_function_plan_emissions = value; },
+    46=>{ g.emission_work.scoped_function_plan_register_calls = value; },
+    47=>{ g.emission_work.scoped_inline_register_calls = value; },
+    48=>{ g.emission_work.scoped_inline_result_owners_avoided = value; },
+    49=>{ g.emission_work.scoped_inline_result_roots_avoided = value; },
+    50=>{ g.emission_work.scoped_inline_result_bytes_avoided = value; },
+    51=>{ g.emission_work.scoped_scalar_definitions = value; },
+    52=>{ g.emission_work.scoped_inline_definitions = value; },
+    53=>{ g.emission_work.scoped_closure_definitions = value; },
+    54=>{ g.emission_work.scoped_reader_definitions = value; },
+    55=>{ g.emission_work.scoped_writer_definitions = value; },
+    56=>{ g.emission_work.scoped_owner_graph_definitions = value; },
+    57=>{ g.emission_work.scoped_owner_graph_inputs = value; },
+    58=>{ g.emission_work.scoped_completed_plan_definitions = value; },
+    59=>{ g.emission_work.scoped_plain_plan_definitions = value; },
+    60=>{ g.emission_work.scoped_context_free_definitions = value; },
+    61=>{ g.emission_work.scoped_context_sensitive_definitions = value; },
+    62=>{ let current = g.emission_work.scoped_reader_projection_calls; var discarded: u64 = 0; if current > value { discarded = current - value; } saturate(g.emission_work.scoped_argument_projection_discards,discarded); g.emission_work.scoped_reader_projection_calls = value; },
+    63=>{ g.emission_work.scoped_reader_argument_fields_omitted = value; },
+    64=>{ g.emission_work.scoped_reader_argument_words_omitted = value; },
+    65=>{ let current = g.emission_work.scoped_owned_projection_calls; var discarded: u64 = 0; if current > value { discarded = current - value; } saturate(g.emission_work.scoped_argument_projection_discards,discarded); g.emission_work.scoped_owned_projection_calls = value; },
+    66=>{ g.emission_work.scoped_owned_argument_fields_omitted = value; },
+    67=>{ g.emission_work.scoped_owned_argument_words_omitted = value; },
+    68=>{ g.emission_work.scoped_projection_word_counts_limited = value; },
+    _=>{ abort("invalid publication counter index"); },
+} }
+struct FunctionMark { module: blot_backend_wasm::TailCheckpoint,local_calls: i64,shared_calls: i64,descriptor_calls: i64,capacities: i64,validation_budget: i64,max_stacks: u32,active_calls: i64,types: i64,diagnostic: blot_support::Option<blot_backend_core_backend::Diagnostic>,context_sensitive: bool,zero_source: ZeroSource,publications: u64[69] }
+fn begin(g: Generator&) -> blot_support::Option<FunctionMark> { let module = g.module.tailCheckpoint(); if !module.present { return blot_support::none<FunctionMark>(); } var publications: u64[69]; for index in 0..published_count { publications[index] = publishedCounter(g,index); } return blot_support::some(FunctionMark { module: module.value,local_calls: g.calls.checkpoint(),shared_calls: g.shared_calls.checkpoint(),descriptor_calls: g.descriptor_calls.calls.checkpoint(),capacities: g.capacity_requests.items.items.len,validation_budget: g.validation_budget,max_stacks: g.max_stacks,active_calls: g.active_calls.frames.items.len,types: g.type_arguments.items.len,diagnostic: g.diagnostic,context_sensitive: g.context_sensitive,zero_source: g.zero_source,publications }); }
+fn rollback(mark: FunctionMark,g: Generator&) { let last = g.module.functions.len; for index in mark.module.functions..last { blot_support_pooled_map::remove(g.descriptor_calls.plans,index as u32); } g.calls.rollbackEntries(mark.local_calls); g.shared_calls.rollbackEntries(mark.shared_calls); g.descriptor_calls.calls.rollbackEntries(mark.descriptor_calls); g.capacity_requests.items.resize(mark.capacities); g.validation_budget = mark.validation_budget; g.max_stacks = mark.max_stacks; assert(g.active_calls.frames.items.len == mark.active_calls); g.type_arguments.shrinkRetainingCapacity(mark.types); g.diagnostic = mark.diagnostic; g.context_sensitive = mark.context_sensitive; g.zero_source = mark.zero_source; g.bundle_snapshots.clear(); g.bundle_sources.clear(); g.bundle_scan = 0; g.span_scopes.reset(); for index in 0..published_count { restorePublishedCounter(g,index,mark.publications[index]); } g.module.rollbackTail(mark.module); }
+fn ownedWordAbi(words: i64,result: Value) -> bool { var result_pointer: i64 = 0; if result.tag != ValueTag.scalar { result_pointer = 1; } return words <= 512 - result_pointer; }
+struct FunctionPlanInput {
+    module: const blot_check_core::Module&,target: blot_check_core::BindingRef,arguments: Range,owners: Range,graph: blot_support::Option<OwnerGraph>,words: i64,input_aliases: Range,
+    alias_rejected: bool? = null,addressed: bool = true,addressed_rejected: bool? = null,borrowed_inputs: bool = false,recursive: blot_support::Option<blot_backend_storage_recursive_admission::Contract>,created_receipts: Range,capture_globals: bool,unit_result: bool,result_shape: Value,shared: bool,key: blot_backend_storage_calls::Key,
+}
+struct Rejections { alias: bool = false,addressed: bool = false }
+reusable var rejections: Rejections[>..] = [];
+fn tryFunctionPlan(self: Generator&,input: FunctionPlanInput) -> blot_support::Option<i64>,Error {
+    if self.descriptor_calls.declined.contains(input.key) { return blot_support::none<i64>(),Error.none; } let saved = begin(self); if !saved.present { return blot_support::none<i64>(),Error.none; } let mark = saved.value; let prefix = self.capacity_prefix; self.capacity_prefix = blot_support::some(mark.capacities); let expressions = self.emission_work.scoped_emission_expressions; let discarded = self.emission_work.scoped_completed_plan_discarded_expressions; saturate(self.emission_work.scoped_completed_plan_attempts,1); let result,error = buildFunctionPlan(self,input);
+    if error != Error.none { if error == Error.out_of_memory { self.capacity_prefix = prefix; mark.rollback(self); return blot_support::none<i64>(),error; } saturate(self.emission_work.scoped_completed_plan_rollbacks,1); let nested = self.emission_work.scoped_completed_plan_discarded_expressions - discarded; saturate(self.emission_work.scoped_completed_plan_discarded_expressions,self.emission_work.scoped_emission_expressions - expressions - nested); let declined = self.descriptor_calls.decline(input.key); self.capacity_prefix = prefix; mark.rollback(self); if declined != Error.none { return blot_support::none<i64>(),declined; } return blot_support::none<i64>(),Error.none; }
+    saturate(self.emission_work.scoped_completed_plan_definitions,1); self.capacity_prefix = prefix; return blot_support::some(result),Error.none;
+}
+fn buildFunctionPlan(self: Generator&,request: FunctionPlanInput) -> i64,Error {
+    var candidate = request; candidate.addressed = candidate.addressed && request.words >= 64 && !request.recursive.present && !self.recursive_scope; if candidate.addressed { candidate.addressed = !self.descriptor_calls.addressed_declined.contains(request.key); }
+    loop {
+        let saved = begin(self); if !saved.present { return 0,Error.declined; } let mark = saved.value; let slot = rejections.alloc_index(Rejections {}); let flags: Rejections& = rejections[slot]; candidate.alias_rejected .= flags.alias; candidate.addressed_rejected .= flags.addressed; let expressions = self.emission_work.scoped_emission_expressions; let discarded = self.emission_work.scoped_completed_plan_discarded_expressions;
+        let result,error = constructFunctionPlan(self,candidate); let alias_rejected = flags.alias; let addressed_rejected = flags.addressed; candidate.alias_rejected .= null; candidate.addressed_rejected .= null; rejections.free(slot);
+        if error == Error.none { return result,Error.none; } if error == Error.out_of_memory || (!alias_rejected && !addressed_rejected) { return 0,error; } mark.rollback(self);
+        if addressed_rejected { candidate.addressed = false; let declined = self.descriptor_calls.declineAddressed(request.key); if declined != Error.none { return 0,declined; } saturate(self.emission_work.scoped_addressed_retries,1); }
+        else { candidate.input_aliases = Range {}; saturate(self.emission_work.scoped_input_alias_retries,1); } saturate(self.emission_work.scoped_completed_plan_rollbacks,1); let nested = self.emission_work.scoped_completed_plan_discarded_expressions - discarded; saturate(self.emission_work.scoped_completed_plan_discarded_expressions,self.emission_work.scoped_emission_expressions - expressions - nested);
+    }
+}

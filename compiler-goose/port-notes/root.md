@@ -293,3 +293,21 @@ program flatness: spec11.2 prohibits reference-bearing mutable globals in thread
 programs. The driver must preserve copied packets using explicit flat worker
 contexts or independent Goose worker processes. That driver is not yet written.
 No port build, execution, checker, test, lint or formatter has run.
+
+
+Body checking cache now has a full first production source writing pass, split
+across shared records/owners, syntax, digests, capture, binding helpers, graph
+freeze, auxiliary maps, per-body reachable reads and schema registration.
+Payload counts use explicit Goose C.2 packed footprints. Memo/implementation
+flags own generation-checked global scratch. Body/Chunk leases own independent
+immutable typed runs and a projected graph Owner; failed publication releases
+the temporary chunk reference. Unregistered future Checked/auxiliary fields
+decline reuse. Static reflection checks the field names without an erased type
+visitor. Project ExternalNames uses a future typed BodyNameContext service.
+
+The dependency_snapshot projector is still being written against the agreed
+Owned<Interface>/Owned<FrozenGraph> API. freezeCheckedRoots remaps caller-owned
+root/row/scheme/effect arrays and dispatches physical/rigid/version requests to
+a statically typed private context. BodyCache source completeness does not
+establish that import closure or worker/CLI/compiler qualification. No port
+compiler, test, checker, lint, formatter or execution has run.
