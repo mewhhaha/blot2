@@ -44,7 +44,7 @@ recursive fn contains(self: Builder&, id: blot_parse_ast::Id, depth: i64) -> boo
     let charged = visit(self); if charged != Error.none { return false, charged; }
     let node = self.tree.node(id);
     match node.tag {
-        blot_parse_ast::tag_type_forall, blot_parse_ast::tag_type_exists => { return contains(self, self.tree.extra[node.c], depth + 1); },
+        blot_parse_ast::tag_type_forall, blot_parse_ast::tag_type_exists => { return contains(self, self.tree.extra.items[node.c], depth + 1); },
         blot_parse_ast::tag_type_usage => { return contains(self, node.c, depth + 1); },
         blot_parse_ast::tag_type_name => { let relation, found = blot_check_numeric_proof_terms::typeName(self.pool.get(node.a)); return found, Error.none; },
         blot_parse_ast::tag_type_apply, blot_parse_ast::tag_type_effect => {
@@ -120,7 +120,7 @@ fn lower(tree: const blot_parse_ast::Tree&, pool: const blot_parse_symbols::Pool
     var builder = Builder { tree, pool, store, bindings, kinds, values, proofs, requirements };
     let present, error = contains(builder, annotation, 0); if error != Error.none || !present { return blot_support::Option<Owned> { false, default<Owned>() }, error; }
     var at = annotation;
-    while tree.node(at).tag == blot_parse_ast::tag_type_forall { let charged = visit(builder); if charged != Error.none { return blot_support::Option<Owned> { false, default<Owned>() }, charged; } at = tree.extra[tree.node(at).c]; }
+    while tree.node(at).tag == blot_parse_ast::tag_type_forall { let charged = visit(builder); if charged != Error.none { return blot_support::Option<Owned> { false, default<Owned>() }, charged; } at = tree.extra.items[tree.node(at).c]; }
     var arity: u32 = 0;
     while tree.node(at).tag == blot_parse_ast::tag_type_function {
         if arity >= input_kinds.len || arity >= limits.terms { return blot_support::Option<Owned> { false, default<Owned>() }, Error.proof_scope_escape; }

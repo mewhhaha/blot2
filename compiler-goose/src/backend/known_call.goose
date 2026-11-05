@@ -42,12 +42,12 @@ fn wrapper(units: const blot_check_core::Module[:], owner: u32, call: Call) -> b
         let source .= units[target.unit - 1]; if target.binding == 0 || target.binding >= source.bindings.len { return blot_support::none<Wrapper>(); }
         let binding = source.binding(target.binding);
         if binding.kind == blot_check_core::BindingKind.external { let previous = target.unit; target = binding.target; if target.unit == 0 { target.unit = previous; } continue; }
-        let body = source.body(target.binding); if !body.present { return blot_support::none<Wrapper>(); }
-        if source.types.node(binding.ty).tag == blot_check_types::Tag.function && body.value.parameters.len == 0 && source.node(body.value.root).tag == blot_check_core::Tag.reference {
-            let previous = target.unit; target = source.reference(body.value.root); if target.unit == 0 { target.unit = previous; } continue;
+        let body .= source.body(target.binding); if body == null { return blot_support::none<Wrapper>(); }
+        if source.types.node(binding.ty).tag == blot_check_types::Tag.function && body.parameters.len == 0 && source.node(body.root).tag == blot_check_core::Tag.reference {
+            let previous = target.unit; target = source.reference(body.root); if target.unit == 0 { target.unit = previous; } continue;
         }
-        if !body.value.is_function || body.value.parameters.len != call.count { return blot_support::none<Wrapper>(); }
-        return blot_support::some(Wrapper { target: target, body: body.value });
+        if !body.is_function || body.parameters.len != call.count { return blot_support::none<Wrapper>(); }
+        return blot_support::some(Wrapper { target: target, body: body });
     }
     return blot_support::none<Wrapper>();
 }

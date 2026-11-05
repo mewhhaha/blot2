@@ -160,15 +160,15 @@ fn captureChildren<E>(self: Walker<E>&, source: AstId, output: AstId[>..]&) {
         blot_parse_ast::tag_use_stmt, blot_parse_ast::tag_iterator_bind => { output += node.b; },
         blot_parse_ast::tag_infix_chain => { output += node.a; output += self.engine.tree.list(blot_parse_ast::List { node.b, node.c }); },
         blot_parse_ast::tag_case_expr => {
-            let inputs = self.engine.tree.extra[node.a..node.a + 2]; output += self.engine.tree.list(blot_parse_ast::List { inputs[0], inputs[1] });
-            for arm in self.engine.tree.list(blot_parse_ast::List { node.b, node.c }) { let start = self.engine.tree.node(arm).c; let details = self.engine.tree.extra[start..start + 2]; if details[0] != 0 { output += details[0]; } output += details[1]; }
+            let inputs = self.engine.tree.extra.items[node.a..node.a + 2]; output += self.engine.tree.list(blot_parse_ast::List { inputs[0], inputs[1] });
+            for arm in self.engine.tree.list(blot_parse_ast::List { node.b, node.c }) { let start = self.engine.tree.node(arm).c; let details = self.engine.tree.extra.items[start..start + 2]; if details[0] != 0 { output += details[0]; } output += details[1]; }
         },
-        blot_parse_ast::tag_if_let_stmt => { output += node.b; for body in self.engine.tree.extra[node.c..node.c + 2] { if body != 0 { output += body; } } },
-        blot_parse_ast::tag_for_stmt => { output += node.b; let end = self.engine.tree.extra[node.c]; if end != 0 { output += end; } output += self.engine.tree.extra[node.c + 1]; },
+        blot_parse_ast::tag_if_let_stmt => { output += node.b; for body in self.engine.tree.extra.items[node.c..node.c + 2] { if body != 0 { output += body; } } },
+        blot_parse_ast::tag_for_stmt => { output += node.b; let end = self.engine.tree.extra.items[node.c]; if end != 0 { output += end; } output += self.engine.tree.extra.items[node.c + 1]; },
         blot_parse_ast::tag_range_stmt => { output += node.a; output += node.b; output += node.c; },
         blot_parse_ast::tag_forever_stmt => { output += node.a; },
-        blot_parse_ast::tag_package_pack => { output += self.engine.tree.extra[node.c]; },
-        blot_parse_ast::tag_package_unpack => { output += node.a; output += self.engine.tree.extra[node.c + 2]; },
+        blot_parse_ast::tag_package_pack => { output += self.engine.tree.extra.items[node.c]; },
+        blot_parse_ast::tag_package_unpack => { output += node.a; output += self.engine.tree.extra.items[node.c + 2]; },
         _ => {},
     }
 }
@@ -194,11 +194,11 @@ fn branches<E>(self: Walker<E>&, left: AstId, right: AstId, suites: bool, depth:
     if left_flow == Outcome.exit && right_flow == Outcome.exit { return Outcome.exit, Error.none; } return Outcome.live, Error.none;
 }
 fn cases<E>(self: Walker<E>&, node: blot_parse_ast::Node, depth: i64) -> Outcome, Error {
-    let inputs = self.engine.tree.extra[node.a..node.a + 2]; for input in self.engine.tree.list(blot_parse_ast::List { inputs[0], inputs[1] }) { let flow, error = expression(self, input, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } }
+    let inputs = self.engine.tree.extra.items[node.a..node.a + 2]; for input in self.engine.tree.list(blot_parse_ast::List { inputs[0], inputs[1] }) { let flow, error = expression(self, input, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } }
     var before: State[>..] = []; let error = snapshot(self, before); if error != Error.none { return Outcome.live, error; } var joined: State[>..] = []; let error = snapshot(self, joined); if error != Error.none { return Outcome.live, error; } var live = false;
     for arm_id in self.engine.tree.list(blot_parse_ast::List { node.b, node.c }) { restore(self, before); let arm = self.engine.tree.node(arm_id);
         for row in self.engine.tree.list(blot_parse_ast::List { arm.a, arm.b }) { for pattern_id in self.engine.tree.children(row) { let error = pattern(self, pattern_id, depth + 1); if error != Error.none { return Outcome.live, error; } } }
-        let details = self.engine.tree.extra[arm.c..arm.c + 2];
+        let details = self.engine.tree.extra.items[arm.c..arm.c + 2];
         if details[0] != 0 { let flow, error = expression(self, details[0], depth + 1); if error != Error.none { return flow, error; } if flow == Outcome.exit { self.states.resize(before.len); continue; }
             for &entry, index in before { if entry.first == 0 { entry.first = self.states[index].first; } }
             for entry in self.states[before.len..] { if entry.first != 0 { let error = self.engine.usageDiagnostic(blot_check_check::Code.duplicate_owner, details[0]); if error != Error.none { return Outcome.live, error; } } }
@@ -218,7 +218,7 @@ fn admitsAffine<E>(self: Walker<E>&, callee_source: AstId) -> bool, Error {
     if declaration.capability_flow == blot_check_check::CapabilityFlow.consume_task || declaration.capability_flow == blot_check_check::CapabilityFlow.spawn_task { return true, Error.none; }
     if declaration.kind == blot_check_check::Kind.parameter { let parameter = self.engine.tree.parameter(declaration.declaration); var annotation = parameter.annotation; if annotation == 0 { return false, Error.none; }
         while self.engine.tree.node(annotation).tag == blot_parse_ast::tag_group || self.engine.tree.node(annotation).tag == blot_parse_ast::tag_type_usage || self.engine.tree.node(annotation).tag == blot_parse_ast::tag_type_forall {
-            let wrapper = self.engine.tree.node(annotation); if wrapper.tag == blot_parse_ast::tag_group { annotation = wrapper.a; } else if wrapper.tag == blot_parse_ast::tag_type_forall { annotation = self.engine.tree.extra[wrapper.c]; } else { annotation = wrapper.b; }
+            let wrapper = self.engine.tree.node(annotation); if wrapper.tag == blot_parse_ast::tag_group { annotation = wrapper.a; } else if wrapper.tag == blot_parse_ast::tag_type_forall { annotation = self.engine.tree.extra.items[wrapper.c]; } else { annotation = wrapper.b; }
         } let arrow = self.engine.tree.node(annotation); if arrow.tag != blot_parse_ast::tag_type_function { return false, Error.none; } var input = arrow.a; while self.engine.tree.node(input).tag == blot_parse_ast::tag_group { input = self.engine.tree.node(input).a; } return self.engine.tree.node(input).tag == blot_parse_ast::tag_type_usage, Error.none;
     }
     var header = self.engine.types.node(self.engine.types.head(declaration.ty, 0)); while header.tag == Tag.usage || header.tag == Tag.forall { header = self.engine.types.node(self.engine.types.head(header.a, 0)); }
@@ -280,7 +280,7 @@ recursive fn expression<E>(self: Walker<E>&, source: AstId, depth: i64) -> Outco
         blot_parse_ast::tag_infix_chain => { let flow, error = expression(self, node.a, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } for tail in self.engine.tree.list(blot_parse_ast::List { node.b, node.c }) { let flow, error = expression(self, tail, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } } },
         blot_parse_ast::tag_if_let_stmt => {
             let flow, error = expression(self, node.b, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } let before = self.states.len;
-            let error = pattern(self, node.a, depth + 1); if error != Error.none { return Outcome.live, error; } let bodies = self.engine.tree.extra[node.c..node.c + 2];
+            let error = pattern(self, node.a, depth + 1); if error != Error.none { return Outcome.live, error; } let bodies = self.engine.tree.extra.items[node.c..node.c + 2];
             let result, error = branches(self, bodies[0], bodies[1], true, depth + 1); self.states.resize(before); return result, error;
         },
         blot_parse_ast::tag_request_case => {
@@ -304,8 +304,8 @@ recursive fn expression<E>(self: Walker<E>&, source: AstId, depth: i64) -> Outco
         blot_parse_ast::tag_block => { if node.c != 0 && self.states.len != 0 { let error = self.engine.usageDiagnostic(blot_check_check::Code.multiplicity_unknown, source); if error != Error.none { return Outcome.live, error; } } return block(self, source, depth + 1); },
         blot_parse_ast::tag_product, blot_parse_ast::tag_array, blot_parse_ast::tag_record => { for child in self.engine.tree.children(source) { let flow, error = expression(self, child, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } } },
         blot_parse_ast::tag_for_stmt, blot_parse_ast::tag_range_stmt, blot_parse_ast::tag_forever_stmt => { return loopExpression(self, source, depth); },
-        blot_parse_ast::tag_package_pack => { let flow, error = expression(self, self.engine.tree.extra[node.c], depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } },
-        blot_parse_ast::tag_package_unpack => { let flow, error = expression(self, node.a, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } let error = introduce(self, self.engine.resolved[source]); if error != Error.none { return Outcome.live, error; } return expression(self, self.engine.tree.extra[node.c + 2], depth + 1); },
+        blot_parse_ast::tag_package_pack => { let flow, error = expression(self, self.engine.tree.extra.items[node.c], depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } },
+        blot_parse_ast::tag_package_unpack => { let flow, error = expression(self, node.a, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } let error = introduce(self, self.engine.resolved[source]); if error != Error.none { return Outcome.live, error; } return expression(self, self.engine.tree.extra.items[node.c + 2], depth + 1); },
         _ => {},
     } return Outcome.live, Error.none;
 }
@@ -333,22 +333,22 @@ fn loopExpression<E>(self: Walker<E>&, source: AstId, depth: i64) -> Outcome, Er
     let node = self.engine.tree.node(source);
     if node.tag == blot_parse_ast::tag_range_stmt { let flow, error = expression(self, node.a, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } }
     if node.tag != blot_parse_ast::tag_forever_stmt { let flow, error = expression(self, node.b, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } }
-    if node.tag == blot_parse_ast::tag_for_stmt { let end = self.engine.tree.extra[node.c]; if end != 0 { let flow, error = expression(self, end, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } } }
-    var single = false; if node.tag == blot_parse_ast::tag_range_stmt { single = singleIteration(self, node.a, node.b); } if node.tag == blot_parse_ast::tag_for_stmt { single = singleIteration(self, node.b, self.engine.tree.extra[node.c]); }
+    if node.tag == blot_parse_ast::tag_for_stmt { let end = self.engine.tree.extra.items[node.c]; if end != 0 { let flow, error = expression(self, end, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } } }
+    var single = false; if node.tag == blot_parse_ast::tag_range_stmt { single = singleIteration(self, node.a, node.b); } if node.tag == blot_parse_ast::tag_for_stmt { single = singleIteration(self, node.b, self.engine.tree.extra.items[node.c]); }
     var prior: State[>..] = []; let error = snapshot(self, prior); if error != Error.none { return Outcome.live, error; } var exits: State[>..] = []; let error = snapshot(self, exits); if error != Error.none { return Outcome.live, error; }
     var frame = ExitFrame { exits }; let outer = self.breaks; self.breaks .= frame; let flow, error = loopBody(self, source, node, prior, frame, single, depth); self.breaks .= outer; if error != Error.none { return flow, error; } restore(self, exits);
     if (node.tag == blot_parse_ast::tag_forever_stmt || single) && !frame.seen { return Outcome.exit, Error.none; } return Outcome.live, Error.none;
 }
 fn loopBody<E>(self: Walker<E>&, source: AstId, node: blot_parse_ast::Node, prior: const State[:], frame: ExitFrame&, single: bool, depth: i64) -> Outcome, Error {
     if node.tag == blot_parse_ast::tag_for_stmt { let error = pattern(self, node.a, depth + 1); if error != Error.none { return Outcome.live, error; } }
-    var body = node.a; if node.tag == blot_parse_ast::tag_range_stmt { body = node.c; } if node.tag == blot_parse_ast::tag_for_stmt { body = self.engine.tree.extra[node.c + 1]; }
+    var body = node.a; if node.tag == blot_parse_ast::tag_range_stmt { body = node.c; } if node.tag == blot_parse_ast::tag_for_stmt { body = self.engine.tree.extra.items[node.c + 1]; }
     let flow, error = suite(self, body, depth + 1); if error != Error.none { return flow, error; } self.states.resize(prior.len);
     if flow == Outcome.live && !single { for entry, index in self.states { if entry.first != prior[index].first { let error = self.engine.usageDiagnostic(blot_check_check::Code.once_reused, source); if error != Error.none { return flow, error; } break; } } }
     if flow == Outcome.live && single { record(self, frame); } return flow, Error.none;
 }
 fn validate<E>(engine: E) -> Error {
     var states: State[>..<] = []; var walker = Walker<E> { engine, states: states, task_views: engine.pool.lookup("@task.read").present || engine.pool.lookup("@task.write").present };
-    for root in engine.tree.roots { if engine.tree.node(root).tag != blot_parse_ast::tag_value_decl { continue; } walker.states.clear(); walker.remaining = 65536; let binding = engine.resolved[root]; let body = engine.tree.value_decl(root).body;
+    for root in engine.tree.roots.items { if engine.tree.node(root).tag != blot_parse_ast::tag_value_decl { continue; } walker.states.clear(); walker.remaining = 65536; let binding = engine.resolved[root]; let body = engine.tree.value_decl(root).body;
         if binding != 0 && blot_check_cleanup_contracts::pureNominal(engine.types, engine.nominals, engine.bindings[binding].ty) && !blot_check_cleanup_contracts::source(engine, body) { let error = engine.usageDiagnostic(blot_check_check::Code.cleanup_not_safe, body); if error != Error.none { return error; } }
         let flow, error = expression(walker, body, 0); if error == Error.type_limit { let error = engine.usageDiagnostic(blot_check_check::Code.usage_analysis_limit, root); if error != Error.none { return error; } continue; } if error != Error.none { return error; }
     } return Error.none;

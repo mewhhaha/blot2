@@ -138,7 +138,7 @@ recursive fn expression<E>(self: SourceWalker<E>&, id: blot_parse_ast::Id, depth
         blot_parse_ast::tag_let_stmt => { let binding = self.engine.tree.binding(id); if binding.fallback != 0 { return Error.unsafe_cleanup; } return expression(self, binding.value, depth + 1); },
         blot_parse_ast::tag_if_expr, blot_parse_ast::tag_if_stmt => { let error = expression(self, node.a, depth + 1); if error != Error.none { return error; } let error = expression(self, node.b, depth + 1); if error != Error.none { return error; } return expression(self, node.c, depth + 1); },
         blot_parse_ast::tag_range_stmt => { return range(self, node.a, node.b, node.c, depth + 1); },
-        blot_parse_ast::tag_for_stmt => { let details = self.engine.tree.extra[node.c..node.c + 3]; if details[0] == 0 { return Error.unsafe_cleanup; } return range(self, node.b, details[0], details[1], depth + 1); },
+        blot_parse_ast::tag_for_stmt => { let details = self.engine.tree.extra.items[node.c..node.c + 3]; if details[0] == 0 { return Error.unsafe_cleanup; } return range(self, node.b, details[0], details[1], depth + 1); },
         _ => { return Error.unsafe_cleanup; },
     } return Error.none;
 }

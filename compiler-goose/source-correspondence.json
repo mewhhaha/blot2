@@ -262,7 +262,7 @@
       "zig": "compiler/src/backend/identity_array.zig",
       "goose": "compiler-goose/src/backend/identity_array.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/inline_body.zig",
@@ -436,7 +436,7 @@
       "zig": "compiler/src/backend/pipeline_builder.zig",
       "goose": "compiler-goose/src/backend/pipeline_builder.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/pipeline_tests.zig",
@@ -3135,7 +3135,7 @@
       "zig": "compiler/src/reuse/project.zig",
       "goose": "compiler-goose/src/reuse/project.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/project_check.zig",

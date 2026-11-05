@@ -76,7 +76,7 @@ fn pairMemberSource(tree: const Tree&, pool: Pool&, initial: AstId) -> blot_supp
 }
 fn parameterArity(tree: const Tree&, initial: AstId, annotation: AstId) -> u8 {
     var source = initial; var count: u8 = 0; var signature = annotation; var transparent = annotation == 0;
-    for attempt in 0..128 { if signature == 0 { break; } let written = tree.node(signature); if written.tag == blot_parse_ast::tag_type_usage { signature = written.b; } else if written.tag == blot_parse_ast::tag_type_forall { signature = tree.extra[written.c]; } else if written.tag == blot_parse_ast::tag_type_effect { signature = written.a; } else { break; } }
+    for attempt in 0..128 { if signature == 0 { break; } let written = tree.node(signature); if written.tag == blot_parse_ast::tag_type_usage { signature = written.b; } else if written.tag == blot_parse_ast::tag_type_forall { signature = tree.extra.items[written.c]; } else if written.tag == blot_parse_ast::tag_type_effect { signature = written.a; } else { break; } }
     while true { if !transparent && tree.node(source).tag == blot_parse_ast::tag_group { break; } source = unwrap(tree, source); if source == 0 { return 0; } let lambda = tree.node(source); if lambda.tag != blot_parse_ast::tag_lambda { break; } let parameter = tree.parameter(lambda.a);
         if parameter.is_unit && count != 0 { return 0; } if count == 16 || (parameter.name == 0 && !parameter.is_unit) { return 0; } count += 1; source = lambda.b; var result = lambda.c;
         if signature != 0 && tree.node(signature).tag == blot_parse_ast::tag_type_function { signature = tree.node(signature).b; } if result == 0 { result = signature; } if result != 0 && tree.node(result).tag == blot_parse_ast::tag_type_effect { result = tree.node(result).a; }
@@ -93,7 +93,7 @@ fn lookup(self: const SourceContracts&, source: AstId) -> blot_support::Option<P
 fn parameterSource(tree: const Tree&, pool: Pool&, initial: AstId, annotation: AstId) -> Parameters { return parameterSourceWithContracts(tree, pool, initial, annotation, null); }
 fn parameterSourceWithContracts(tree: const Tree&, pool: Pool&, initial: AstId, annotation: AstId, contracts: const SourceContracts?) -> Parameters {
     var names: u32[16]; var count: i64 = 0; var expression = unwrap(tree, initial); if expression == 0 { return Parameters {}; } var transparent = annotation == 0; var signature = annotation;
-    for attempt in 0..128 { if signature == 0 { break; } let written = tree.node(signature); if written.tag == blot_parse_ast::tag_type_usage { signature = written.b; } else if written.tag == blot_parse_ast::tag_type_forall { signature = tree.extra[written.c]; } else if written.tag == blot_parse_ast::tag_type_effect { signature = written.a; } else { break; } }
+    for attempt in 0..128 { if signature == 0 { break; } let written = tree.node(signature); if written.tag == blot_parse_ast::tag_type_usage { signature = written.b; } else if written.tag == blot_parse_ast::tag_type_forall { signature = tree.extra.items[written.c]; } else if written.tag == blot_parse_ast::tag_type_effect { signature = written.a; } else { break; } }
     while true { if !transparent && tree.node(expression).tag == blot_parse_ast::tag_group { break; } expression = unwrap(tree, expression); if expression == 0 { return Parameters {}; } let lambda = tree.node(expression); if lambda.tag != blot_parse_ast::tag_lambda { break; } let parameter = tree.parameter(lambda.a);
         if parameter.is_unit && count != 0 { return unitSourceResult(tree, pool, expression, lambda, names[..count]); }
         if count == names.len || parameter.name == 0 || parameter.is_unit { return Parameters {}; } names[count] = parameter.name; count += 1; expression = lambda.b; var result = lambda.c;
@@ -152,7 +152,7 @@ fn localSourceCall(tree: const Tree&, initial: AstId) -> blot_support::Option<Lo
     var result = LocalSourceCall { body: 0, len: 0 }; var callee = unwrap(tree, initial); if callee == 0 { return blot_support::none<LocalSourceCall>(); }
     while tree.node(callee).tag == blot_parse_ast::tag_apply { if result.len == result.arguments.len { return blot_support::none<LocalSourceCall>(); } result.arguments[result.len] = tree.node(callee).b; result.len += 1; callee = unwrap(tree, tree.node(callee).a); if callee == 0 { return blot_support::none<LocalSourceCall>(); } }
     if result.len == 0 || tree.node(callee).tag != blot_parse_ast::tag_name { return blot_support::none<LocalSourceCall>(); } result.name = tree.node(callee).a; var body: AstId = 0; var found = false;
-    for root in tree.roots { if tree.node(root).tag == blot_parse_ast::tag_value_decl && tree.value_decl(root).name == tree.node(callee).a { body = tree.value_decl(root).body; found = true; break; } } if !found { return blot_support::none<LocalSourceCall>(); }
+    for root in tree.roots.items { if tree.node(root).tag == blot_parse_ast::tag_value_decl && tree.value_decl(root).name == tree.node(callee).a { body = tree.value_decl(root).body; found = true; break; } } if !found { return blot_support::none<LocalSourceCall>(); }
     for index in 0..result.len { body = unwrap(tree, body); if body == 0 { return blot_support::none<LocalSourceCall>(); } let lambda = tree.node(body); if lambda.tag != blot_parse_ast::tag_lambda { return blot_support::none<LocalSourceCall>(); } let parameter = tree.parameter(lambda.a); if parameter.name == 0 || parameter.is_unit { return blot_support::none<LocalSourceCall>(); } result.parameters[index] = parameter.name; body = lambda.b; }
     result.body = unwrap(tree, body); if result.body == 0 || tree.node(result.body).tag == blot_parse_ast::tag_lambda { return blot_support::none<LocalSourceCall>(); }
     for index in 0..result.len / 2 { let saved = result.arguments[index]; result.arguments[index] = result.arguments[result.len - index - 1]; result.arguments[result.len - index - 1] = saved; } return blot_support::some(result);
@@ -232,12 +232,12 @@ recursive fn sourceParameters(tree: const Tree&, pool: Pool&, initial: AstId, bi
     }
 }
 fn sourceCaseParameters(tree: const Tree&, pool: Pool&, value: blot_parse_ast::Node, bindings: const SourceBindings&, remaining: i64&, depth: i64) -> Mask {
-    let inputs = tree.extra[value.a..value.a + 2]; if inputs[1] > 16 { return blot_support::none<u16>(); } var retained: u16[16];
+    let inputs = tree.extra.items[value.a..value.a + 2]; if inputs[1] > 16 { return blot_support::none<u16>(); } var retained: u16[16];
     for input, index in tree.list(blot_parse_ast::List { inputs[0], inputs[1] }) { let mask = sourceParameters(tree, pool, input, bindings, remaining, depth + 1); if !mask.present { return mask; } retained[index] = mask.value; }
     var result: u16 = 0;
     for arm_id in tree.list(blot_parse_ast::List { value.b, value.c }) { let arm = tree.node(arm_id); var environment = bindings; let start = environment.len;
         for row in tree.list(blot_parse_ast::List { arm.a, arm.b }) { let patterns = tree.children(row); if patterns.len != inputs[1] { return blot_support::none<u16>(); } for pattern, index in patterns { if !sourcePattern(tree, pattern, retained[index], environment, start, remaining, depth + 1) { return blot_support::none<u16>(); } } }
-        let details = tree.extra[arm.c..arm.c + 2]; if details[0] != 0 { let guard = sourceParameters(tree, pool, details[0], environment, remaining, depth + 1); if !guard.present { return guard; } }
+        let details = tree.extra.items[arm.c..arm.c + 2]; if details[0] != 0 { let guard = sourceParameters(tree, pool, details[0], environment, remaining, depth + 1); if !guard.present { return guard; } }
         let mask = sourceParameters(tree, pool, details[1], environment, remaining, depth + 1); if !mask.present { return mask; } result |= mask.value;
     } return blot_support::some(result);
 }
@@ -277,11 +277,11 @@ recursive fn sourceCaptures(tree: const Tree&, pool: Pool&, initial: AstId, bind
     }
 }
 fn sourceCaseCaptures(tree: const Tree&, pool: Pool&, value: blot_parse_ast::Node, bindings: const SourceBindings&, locals: const u32[:], remaining: i64&, depth: i64) -> Mask {
-    let inputs = tree.extra[value.a..value.a + 2]; if inputs[1] > 16 { return blot_support::none<u16>(); } var result: u16 = 0;
+    let inputs = tree.extra.items[value.a..value.a + 2]; if inputs[1] > 16 { return blot_support::none<u16>(); } var result: u16 = 0;
     for input in tree.list(blot_parse_ast::List { inputs[0], inputs[1] }) { let mask = sourceCaptures(tree, pool, input, bindings, locals, remaining, depth + 1); if !mask.present { return mask; } result |= mask.value; }
     for arm_id in tree.list(blot_parse_ast::List { value.b, value.c }) { let arm = tree.node(arm_id); var nested = bindings; let start = nested.len;
         for row in tree.list(blot_parse_ast::List { arm.a, arm.b }) { let patterns = tree.children(row); if patterns.len != inputs[1] { return blot_support::none<u16>(); } for pattern in patterns { if !sourcePattern(tree, pattern, 0, nested, start, remaining, depth + 1) { return blot_support::none<u16>(); } } }
-        let details = tree.extra[arm.c..arm.c + 2]; if details[0] != 0 { let mask = sourceCaptures(tree, pool, details[0], nested, locals, remaining, depth + 1); if !mask.present { return mask; } result |= mask.value; }
+        let details = tree.extra.items[arm.c..arm.c + 2]; if details[0] != 0 { let mask = sourceCaptures(tree, pool, details[0], nested, locals, remaining, depth + 1); if !mask.present { return mask; } result |= mask.value; }
         let mask = sourceCaptures(tree, pool, details[1], nested, locals, remaining, depth + 1); if !mask.present { return mask; } result |= mask.value;
     } return blot_support::some(result);
 }

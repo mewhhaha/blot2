@@ -41,13 +41,13 @@ fn resize(self: LinkBuffer&,length: i64) { blot_support_pooled_buffer::resize(se
 fn resize(self: LinkBuffer&,length: i64,value: Link) { if length<=self.len { resize(self,length); return; } let error=ensure(self,length); if error!=Error.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
 fn clear(self: LinkBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
 fn deinit(self: LinkBuffer&) { blot_support_pooled_buffer::deinit(self,pool_LinkBuffer); self.len=0; self.failure=Error.none; }
-type Heads=blot_support_pooled_map::Map<u64,u32>;
+struct Heads { count: i64=0,slots: dictionary_slot<u64,u32>[:]=[] }
 reusable[] var head_slots: dictionary_slot<u64,u32>[>..]=[];
-fn get(self: const Heads&,key: u64) -> u32? { return blot_support_pooled_map::get(self,key); }
-fn insert(self: Heads&,key: u64,value: u32) { blot_support_pooled_map::insert(self,key,value,head_slots); }
-fn remove(self: Heads&,key: u64) -> bool { return blot_support_pooled_map::remove(self,key); }
-fn clear(self: Heads&) { blot_support_pooled_map::clear(self); }
-fn release(self: Heads&) { blot_support_pooled_map::deinit(self,head_slots); }
+fn get(self: const Heads&,key: u64) -> u32? { let view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn insert(self: Heads&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,head_slots); self.count=view.count; self.slots=view.slots; }
+fn remove(self: Heads&,key: u64) -> bool { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; let removed=blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; return removed; }
+fn clear(self: Heads&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
+fn release(self: Heads&) { if self.slots.len!=0 { head_slots.free_slice(self.slots); } self.slots=[]; self.count=0; }
 fn restore(self: Heads&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self); self.count=count; if slots.len!=0 { self.slots=head_slots.alloc_slice(slots.len); for slot,index in slots { self.slots[index]=slot; } } }
 struct State { entries: EntryBuffer=EntryBuffer {},ready: WordBuffer=WordBuffer {},pending: WordBuffer=WordBuffer {},links: LinkBuffer=LinkBuffer {},heads: Heads=Heads {},free: u32=none,remaining: i64=0,required: i64=0,waiting: i64=0,type_versions: i64=0,row_versions: i64=0,type_generation: u16=0,row_generation: u64=0,clock: blot_check_types::Cursor=0,subscriber_visits: u64=0,retained_watches: u64=0,refreshed_watches: u64=0,ready_word_scans: u64=0,lease_generation: u64=0,live: bool=false }
 reusable var states: State[>..]=[];

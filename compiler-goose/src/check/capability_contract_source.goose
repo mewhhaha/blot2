@@ -115,13 +115,13 @@ fn blockValue(self: Builder&, source: AstId, value: blot_parse_ast::Node, enviro
     } return 0, Error.unavailable;
 }
 fn caseValue(self: Builder&, value: blot_parse_ast::Node, environment: const Environment&, depth: i64) -> Id, Error {
-    let inputs = self.tree.extra[value.a..value.a + 2]; if inputs[1] > 16 || value.c > 4096 { return 0, Error.capability_analysis_limit; } var retained: Id[16];
+    let inputs = self.tree.extra.items[value.a..value.a + 2]; if inputs[1] > 16 || value.c > 4096 { return 0, Error.capability_analysis_limit; } var retained: Id[16];
     for input, index in self.tree.list(blot_parse_ast::List { inputs[0], inputs[1] }) { let id, error = expression(self, input, environment, depth + 1); if error != Error.none { return 0, error; } retained[index] = id; }
     var arms: Id[4096]; for arm_id, index in self.tree.list(blot_parse_ast::List { value.b, value.c }) { let arm = self.tree.node(arm_id); var nested = environment; let start = nested.len;
         for row in self.tree.list(blot_parse_ast::List { arm.a, arm.b }) { let patterns = self.tree.children(row); if patterns.len != inputs[1] { return 0, Error.unavailable; }
             for pattern, ordinal in patterns { let error = bindShapePattern(self, pattern, retained[ordinal], nested, start, depth + 1); if error != Error.none { return 0, error; } }
         }
-        let details = self.tree.extra[arm.c..arm.c + 2]; if self.lexical_captures && details[0] != 0 { let ignored, error = expression(self, details[0], nested, depth + 1); if error != Error.none { return 0, error; } }
+        let details = self.tree.extra.items[arm.c..arm.c + 2]; if self.lexical_captures && details[0] != 0 { let ignored, error = expression(self, details[0], nested, depth + 1); if error != Error.none { return 0, error; } }
         let id, error = expression(self, details[1], nested, depth + 1); if error != Error.none { return 0, error; } arms[index] = id;
     } return self.store.aggregate(Tag.join, arms[..value.c]);
 }
@@ -129,9 +129,9 @@ fn bindPattern(self: Builder&, environment: Environment&, start: i64, name: u32,
     for index in start..environment.len { let entry .= environment.entries[index]; if entry.name == name { if entry.value != value { let children: Id[2] = [entry.value, value]; let id, error = self.store.aggregate(Tag.join, children); if error != Error.none { return error; } entry.value = id; } return Error.none; } } return environment.bind(name, value);
 }
 fn directPayload(self: Builder&, name: u32) -> bool {
-    for root in self.tree.roots { let declaration = self.tree.node(root); if declaration.tag != blot_parse_ast::tag_data_decl { continue; }
+    for root in self.tree.roots.items { let declaration = self.tree.node(root); if declaration.tag != blot_parse_ast::tag_data_decl { continue; }
         for constructor in self.tree.children(declaration.b) { let node = self.tree.node(constructor); if node.a != name { continue; }
-            for traits in self.tree.declaration_traits { if traits.declaration == root && traits.is_opaque { return true; } } return node.b == 0 || self.tree.node(node.b).tag != blot_parse_ast::tag_type_record;
+            for traits in self.tree.declaration_traits.items { if traits.declaration == root && traits.is_opaque { return true; } } return node.b == 0 || self.tree.node(node.b).tag != blot_parse_ast::tag_type_record;
         }
     } return false;
 }
@@ -166,11 +166,11 @@ recursive fn capture(self: Builder&, source: AstId, environment: const Environme
                 else { let error = capture(self, child, nested, captures, count, depth + 1); if error != Error.none { return error; } }
             }
         },
-        blot_parse_ast::tag_case_expr => { let inputs = self.tree.extra[value.a..value.a + 2]; if inputs[1] > 16 { return Error.unavailable; }
+        blot_parse_ast::tag_case_expr => { let inputs = self.tree.extra.items[value.a..value.a + 2]; if inputs[1] > 16 { return Error.unavailable; }
             for input in self.tree.list(blot_parse_ast::List { inputs[0], inputs[1] }) { let error = capture(self, input, environment, captures, count, depth + 1); if error != Error.none { return error; } }
             for arm_id in self.tree.list(blot_parse_ast::List { value.b, value.c }) { let arm = self.tree.node(arm_id); var nested = environment; let start = nested.len;
                 for row in self.tree.list(blot_parse_ast::List { arm.a, arm.b }) { let patterns = self.tree.children(row); if patterns.len != inputs[1] { return Error.unavailable; } for pattern in patterns { let error = bindShapePattern(self, pattern, 0, nested, start, depth + 1); if error != Error.none { return error; } } }
-                let details = self.tree.extra[arm.c..arm.c + 2]; if details[0] != 0 { let error = capture(self, details[0], nested, captures, count, depth + 1); if error != Error.none { return error; } } let error = capture(self, details[1], nested, captures, count, depth + 1); if error != Error.none { return error; }
+                let details = self.tree.extra.items[arm.c..arm.c + 2]; if details[0] != 0 { let error = capture(self, details[0], nested, captures, count, depth + 1); if error != Error.none { return error; } } let error = capture(self, details[1], nested, captures, count, depth + 1); if error != Error.none { return error; }
             }
         },
         blot_parse_ast::tag_if_expr => { let error = capture(self, value.a, environment, captures, count, depth + 1); if error != Error.none { return error; } let error = capture(self, value.b, environment, captures, count, depth + 1); if error != Error.none { return error; } return capture(self, value.c, environment, captures, count, depth + 1); },

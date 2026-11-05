@@ -50,13 +50,13 @@ fn resize(self: WordBuffer&,length: i64) { blot_support_pooled_buffer::resize(se
 fn resize(self: WordBuffer&,length: i64,value: u32) { if length<=self.len { resize(self,length); return; } let error=ensure(self,length); if error!=Error.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
 fn clear(self: WordBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
 fn deinit(self: WordBuffer&) { blot_support_pooled_buffer::deinit(self,pool_WordBuffer); self.len=0; self.failure=Error.none; }
-type Buckets=blot_support_pooled_map::Map<u64,u32>;
+struct Buckets { count: i64=0,slots: dictionary_slot<u64,u32>[:]=[] }
 reusable[] var bucket_slots: dictionary_slot<u64,u32>[>..]=[];
-fn get(self: const Buckets&,key: u64) -> u32? { return blot_support_pooled_map::get(self,key); }
-fn insert(self: Buckets&,key: u64,value: u32) { blot_support_pooled_map::insert(self,key,value,bucket_slots); }
-fn clear(self: Buckets&) { blot_support_pooled_map::clear(self); }
-fn deinit(self: Buckets&) { blot_support_pooled_map::deinit(self,bucket_slots); }
-fn reserve(self: Buckets&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return Error.out_of_memory; } var capacity=max(8,self.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self.slots.len { blot_support_pooled_map::grow(self,capacity,bucket_slots); } return Error.none; }
+fn get(self: const Buckets&,key: u64) -> u32? { let view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn insert(self: Buckets&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,bucket_slots); self.count=view.count; self.slots=view.slots; }
+fn clear(self: Buckets&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
+fn deinit(self: Buckets&) { if self.slots.len!=0 { bucket_slots.free_slice(self.slots); } self.slots=[]; self.count=0; }
+fn reserve(self: Buckets&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return Error.out_of_memory; } var capacity=max(8,self.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self.slots.len { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::grow(view,capacity,bucket_slots); self.count=view.count; self.slots=view.slots; } return Error.none; }
 fn copyBuckets(destination: Buckets&,source: const Buckets&) { if destination.slots.len!=0 { bucket_slots.free_slice(destination.slots); } destination.slots=[]; destination.count=source.count; if source.slots.len!=0 { destination.slots=bucket_slots.alloc_slice(source.slots.len); for slot,index in source.slots { destination.slots[index]=slot; } } }
 reusable[] var scratch_words: u32[>..]=[];
 struct State { owner_id: u64=0,generation: u64=0,operations: OperationBuffer=OperationBuffer {},arguments: WordBuffer=WordBuffer {},rows: RowBuffer=RowBuffer {},labels: WordBuffer=WordBuffer {},operation_next: WordBuffer=WordBuffer {},row_next: WordBuffer=WordBuffer {},operation_buckets: Buckets=Buckets {},row_buckets: Buckets=Buckets {} }

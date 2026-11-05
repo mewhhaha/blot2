@@ -7,7 +7,7 @@ struct Graph {
     quantifier_goals: const blot_check_types::QuantifierGoals[:],
     quantifier_obligations: const blot_check_types::Obligation[:],
 }
-enum Source { inactive, store { value: const blot_check_types::Store& }, frozen { value: const Graph& } }
+enum Source { inactive, store { value: const blot_check_types::Store& }, frozen { value: Graph } }
 fn quantifierGoals(self: Source, owner: blot_check_types::Id) -> const blot_check_types::Obligation[:] {
     match self { inactive => { abort("inactive frozen source descriptor"); },
         store s => { return s.value.quantifierGoals(owner); },
@@ -51,7 +51,7 @@ fn rowLabels(self: Source, span: blot_check_effects::List) -> const blot_check_e
     match self { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.effects.list(span); }, frozen s => { return s.value.labels[span.start..span.start + span.len]; }, }
 }
 struct PatternGraph { nodes: const blot_check_parameter_patterns::Node[:], extra: const u32[:] }
-enum Patterns { inactive, store { value: const blot_check_parameter_patterns::Store& }, frozen { value: const PatternGraph& } }
+enum Patterns { inactive, store { value: const blot_check_parameter_patterns::Store& }, frozen { value: PatternGraph } }
 fn node(self: Patterns, id: blot_check_parameter_patterns::Id) -> blot_check_parameter_patterns::Node {
     match self { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.node(id); }, frozen s => { return s.value.nodes[id]; }, }
 }
@@ -66,3 +66,6 @@ fn field(self: Patterns, value: blot_check_parameter_patterns::Node, index: i64)
 }
 
 fn rowLabels(self: Source, id: blot_check_effects::Id) -> const blot_check_effects::Label[:] { return self.rowLabels(self.row(id).labels); }
+
+fn sameStorage(left:Graph,right:Graph)->bool {if left.nodes.len==0 || right.nodes.len==0 {return false;}return left.nodes .== right.nodes && left.extra .== right.extra && left.rows .== right.rows && left.labels .== right.labels && left.operations .== right.operations && left.row_variable_count==right.row_variable_count && left.quantifier_goals .== right.quantifier_goals && left.quantifier_obligations .== right.quantifier_obligations;}
+fn sameStorage(left:PatternGraph,right:PatternGraph)->bool {if left.nodes.len==0 || right.nodes.len==0 {return false;}return left.nodes .== right.nodes && left.extra .== right.extra;}

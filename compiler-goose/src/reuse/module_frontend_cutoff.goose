@@ -8,7 +8,7 @@ import support.error;
 type Error = blot_error::Error;
 fn confirm<P,C>(source: const P&, checked: C&, previous: blot_reuse_entry_frontend_cutoff::Previous, unit: u32, stats: blot_reuse_entry_frontend_cutoff::Stats&) -> bool, Error {
     stats.offered++;
-    if source.input_mode != blot_reuse_project::InputMode.project || source.entry == 0 || source.entry != source.units.len || source.compiled_modules.len + 1 != source.units.len || source.compiled_reuse.len != source.compiled_modules.len || source.order.len == 0 || source.order[source.order.len - 1] != source.entry { return false, Error.none; }
+    if source.input_mode != blot_reuse_project::InputMode.project || source.entry == 0 || source.entry != source.units.len || source.compiled_modules.len + 1 != source.units.len || source.compiled_reuse.len != source.compiled_modules.len || source.order.len == 0 || source.order.items[source.order.len - 1] != source.entry { return false, Error.none; }
     if unit == 0 || unit > source.compiled_modules.len || previous.entry != source.entry || previous.prelude != source.prelude_unit || checked.compiledModule(source, unit) != null { return false, Error.none; }
     let old .= source.compiled_modules[unit - 1]; let current .= source.unit(unit);
     if current.source.len != old.identity.source_bytes || blot_reuse_dependency_format::digest(current.source) != old.identity.source_digest || current.implicit_prelude != old.implicit_prelude { return false, Error.none; }
@@ -19,7 +19,7 @@ fn confirm<P,C>(source: const P&, checked: C&, previous: blot_reuse_entry_fronte
     if !blot_reuse_entry_frontend_cutoff::namespaceMatches(source, previous.names) { return false, Error.none; }
     stats.namespace_matches++;
     var found = false;
-    for prior in source.order {
+    for prior in source.order.items {
         if prior == unit { found = true; break; }
         if prior == source.entry || prior == 0 || prior > source.compiled_modules.len { return false, Error.none; }
         if checked.compiledModule(source, prior) != null { continue; }

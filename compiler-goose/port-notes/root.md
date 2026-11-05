@@ -184,3 +184,15 @@ directories, snapshots and static tree/descriptor serializers. Ownership-aware
 list stores/copies preserve the original allocation base in their flat recipes.
 The list functionId adapter accepts a source field spelling and returns an
 Option; data-stack modeCode preserves ordinals 0/1/2. These passes are unverified.
+
+Project loading now has its first complete production writing pass, including
+source/compiled/mixed/library loads, path decoding, aliases, diagnostics, DFS
+order, prelude fixities, source budgets and freshOrder. Projects and syntax
+Trees own concrete global typed table states; loader scratch stays lexical
+outside its iterative traversal. Input providers are compile-time contexts
+with canonical/read/resolve output-buffer methods and cause(Error)->bytes.
+Diagnostic causes retain source error-name bytes; they do not serialize a
+provider address. Lowering/checking io fields record IO presence as a bool.
+Phase profiling and dependency relink remain forward dependencies not yet
+written, and OS error/stream behavior and source/API parity remain unverified.
+The whole port is still incomplete, and normal builds still select Zig.

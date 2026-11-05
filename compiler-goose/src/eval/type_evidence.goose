@@ -31,7 +31,7 @@ struct Goal { ty: Id,kind: blot_check_types::ObligationKind,name: u32=0,result: 
 struct QuantifierGoals { owner: Id,goals: blot_check_types::List }
 struct Projection { member: u32,scope: u32,goal: u32 }
 struct ScopeFrame { binders: const Id[:],goals: const Goal[:]=[] }
-struct ProjectionResolver<R> { context: R&,remaining: i64&,enabled: bool=true }
+struct ProjectionResolver<R> { context: R,remaining: i64&,enabled: bool=true }
 struct NoResolver {}
 fn resolve(self: NoResolver&,identity: Identity,member: u32,arguments: const Id[:]) -> Id,Error { return 0,Error.unresolved_type; }
 struct View { owner_id: u64=0,nodes: const Node[:],extra: const Id[:],effects: blot_check_effect_evidence::View,quantifier_goals: const QuantifierGoals[:]=[],quantifier_obligations: const Goal[:]=[] }
@@ -186,13 +186,13 @@ fn resize(self: GoalBuffer&,length: i64) { blot_support_pooled_buffer::resize(se
 fn resize(self: GoalBuffer&,length: i64,value: Goal) { if length<=self.len { resize(self,length); return; } let error=ensure(self,length); if error!=Error.none { return; } for index in self.len..length { self.storage[index]=value; } self.items=self.storage[..length]; self.len=length; }
 fn clear(self: GoalBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
 fn deinit(self: GoalBuffer&) { blot_support_pooled_buffer::deinit(self,pool_GoalBuffer); self.len=0; self.failure=Error.none; }
-type Buckets=blot_support_pooled_map::Map<u64,u32>;
+struct Buckets { count: i64=0,slots: dictionary_slot<u64,u32>[:]=[] }
 reusable[] var bucket_slots: dictionary_slot<u64,u32>[>..]=[];
-fn get(self: const Buckets&,key: u64) -> u32? { return blot_support_pooled_map::get(self,key); }
-fn insert(self: Buckets&,key: u64,value: u32) { blot_support_pooled_map::insert(self,key,value,bucket_slots); }
-fn clear(self: Buckets&) { blot_support_pooled_map::clear(self); }
-fn deinit(self: Buckets&) { blot_support_pooled_map::deinit(self,bucket_slots); }
-fn reserve(self: Buckets&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return Error.out_of_memory; } var capacity=max(8,self.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self.slots.len { blot_support_pooled_map::grow(self,capacity,bucket_slots); } return Error.none; }
+fn get(self: const Buckets&,key: u64) -> u32? { let view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn insert(self: Buckets&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,bucket_slots); self.count=view.count; self.slots=view.slots; }
+fn clear(self: Buckets&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
+fn deinit(self: Buckets&) { if self.slots.len!=0 { bucket_slots.free_slice(self.slots); } self.slots=[]; self.count=0; }
+fn reserve(self: Buckets&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return Error.out_of_memory; } var capacity=max(8,self.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self.slots.len { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::grow(view,capacity,bucket_slots); self.count=view.count; self.slots=view.slots; } return Error.none; }
 fn copyBuckets(destination: Buckets&,source: const Buckets&) { if destination.slots.len!=0 { bucket_slots.free_slice(destination.slots); } destination.slots=[]; destination.count=source.count; if source.slots.len!=0 { destination.slots=bucket_slots.alloc_slice(source.slots.len); for slot,index in source.slots { destination.slots[index]=slot; } } }
 struct State { owner_id: u64=0,generation: u64=0,effects: blot_check_effect_evidence::Store=blot_check_effect_evidence::Store {},nodes: NodeBuffer=NodeBuffer {},extra: WordBuffer=WordBuffer {},next: WordBuffer=WordBuffer {},buckets: Buckets=Buckets {},projection_owners: OwnersBuffer=OwnersBuffer {},projection_quantifiers: WordBuffer=WordBuffer {},quantifier_goals: QuantifierBuffer=QuantifierBuffer {},quantifier_obligations: GoalBuffer=GoalBuffer {} }
 reusable var states: State[>..]=[];
@@ -311,7 +311,7 @@ fn abstractDepth(self: const Store&,id: Id,depth: i64,remaining: i64&) -> bool,E
  else if n.tag==Tag.product||n.tag==Tag.record||n.tag==Tag.nominal { for child,index in children(self,id) { if n.tag==Tag.record&&index%2==0 { continue; } let found,err=abstractDepth(self,child,depth+1,remaining); if err!=Error.none||found { return found,err; } } }
  return false,Error.none;
 }
-struct ProjectionWork<S,R> { destination: Store,source: const S&,mappings: const Mapping[:],rows: const RowMapping[:],resolver: ProjectionResolver<R>&,failure: Error=Error.none }
+struct ProjectionWork<S,R> { destination: Store,source: S,mappings: const Mapping[:],rows: const RowMapping[:],resolver: ProjectionResolver<R>,failure: Error=Error.none }
 fn accept<S,R>(work: ProjectionWork<S,R>&,id: Id,error: Error) -> Id { if work.failure==Error.none { work.failure=error; } return id; }
 fn reject<S,R>(work: ProjectionWork<S,R>&,error: Error) -> Id { if work.failure==Error.none { work.failure=error; } return 0; }
 fn projectDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,parent_height: u16?) -> Id {
@@ -437,23 +437,23 @@ fn projectRowBody<S,R>(work: ProjectionWork<S,R>&,row: u32,depth: i64,budget: i6
 fn project<S>(self: Store,source: const S&,ty: u32,mappings: const Mapping[:]) -> Id,Error { return projectWithRows(self,source,ty,mappings,[]); }
 fn projectWithRows<S>(self: Store,source: const S&,ty: u32,mappings: const Mapping[:],rows: const RowMapping[:]) -> Id,Error { var budget: i64=1000000; return projectWithBudget(self,source,ty,mappings,rows,budget); }
 fn projectWithBudget<S>(self: Store,source: const S&,ty: u32,mappings: const Mapping[:],rows: const RowMapping[:],budget: i64&) -> Id,Error {
- var no=NoResolver {}; var remaining: i64=0; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=ProjectionWork<S,NoResolver> {self,source,mappings,rows,resolver}; let id=projectDepth(work,ty,0,budget,false,null,null); return id,work.failure;
+ var no=NoResolver {}; let remaining: i64&=no_projection_remaining; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=ProjectionWork<S,NoResolver> {self,source,mappings,rows,resolver}; let id=projectDepth(work,ty,0,budget,false,null,null); return id,work.failure;
 }
 fn projectSelected<S,R>(self: Store,source: const S&,ty: u32,mappings: const Mapping[:],rows: const RowMapping[:],resolver: ProjectionResolver<R>&) -> Id,Error {
  var budget: i64=1000000; let initialized,cache_error=blot_reuse_projection_cache::initPooled(); if cache_error!=Error.none { return 0,cache_error; } var memo=initialized;  var work=ProjectionWork<S,R> {self,source,mappings,rows,resolver}; let id=projectDepth(work,ty,0,budget,false,memo,null); let __cleanup_result_1_0: Id = id; let __cleanup_result_1_1: Error = work.failure; memo.deinit(); return __cleanup_result_1_0, __cleanup_result_1_1;
  memo.deinit(); }
 fn projectEffects<S>(self: Store,source: const S&,row: u32,mappings: const Mapping[:],rows: const RowMapping[:]) -> u32,Error {
- var no=NoResolver {}; var remaining: i64=0; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=ProjectionWork<S,NoResolver> {self,source,mappings,rows,resolver}; var budget: i64=1000000; let id=projectRowDepth(work,row,0,budget,false,null,null); return id,work.failure;
+ var no=NoResolver {}; let remaining: i64&=no_projection_remaining; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=ProjectionWork<S,NoResolver> {self,source,mappings,rows,resolver}; var budget: i64=1000000; let id=projectRowDepth(work,row,0,budget,false,null,null); return id,work.failure;
 }
 fn projectOwned(self: Store,source: const blot_check_types::Store&,ty: u32,memo: blot_reuse_projection_cache::Cache&) -> Id,Error {
  if !memo.activate(source.owner_id,self.owner_id,source.closed_generation,source.effects.physical_epoch) { return project(self,source,ty,[]); }
- var no=NoResolver {}; var remaining: i64=0; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=ProjectionWork<blot_check_types::Store,NoResolver> {self,source,[],[],resolver}; var budget: i64=1000000; let id=projectDepth(work,ty,0,budget,true,memo,null); return id,work.failure;
+ var no=NoResolver {}; let remaining: i64&=no_projection_remaining; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=ProjectionWork<blot_check_types::Store,NoResolver> {self,source,[],[],resolver}; var budget: i64=1000000; let id=projectDepth(work,ty,0,budget,true,memo,null); return id,work.failure;
 }
 fn projectAssociatedOwned(self: Store,source: const blot_check_types::Store&,ty: u32,memo: blot_reuse_projection_cache::Cache&,remaining: i64&) -> Id,Error {
  var no=NoResolver {}; var resolver=ProjectionResolver<NoResolver> {no,remaining,true}; if !memo.activate(source.owner_id,self.owner_id,source.closed_generation,source.effects.physical_epoch) { return projectSelected(self,source,ty,[],[],resolver); }
  var work=ProjectionWork<blot_check_types::Store,NoResolver> {self,source,[],[],resolver}; var budget: i64=1000000; let id=projectDepth(work,ty,0,budget,false,memo,null); return id,work.failure;
 }
-struct MatchWork<S,R,M,B> { destination: Store,source: const S&,mappings: M,rows: B,has_rows: bool,resolver: ProjectionResolver<R>&,memo: MatchMemo,use_memo: bool,failure: Error=Error.none }
+struct MatchWork<S,R,M,B> { destination: Store,source: S,mappings: M,rows: B,has_rows: bool,resolver: ProjectionResolver<R>,memo: MatchMemo,use_memo: bool,failure: Error=Error.none }
 fn matchFail<S,R,M,B>(work: MatchWork<S,R,M,B>&,error: Error) -> bool { if work.failure==Error.none { work.failure=error; } return false; }
 fn matchDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: Id,depth: i64,budget: i64&) -> bool {
  if work.failure!=Error.none { return false; } if depth>=1024||(work.use_memo&&depth>=256)||budget==0 { return matchFail(work,Error.evidence_limit); } budget--;
@@ -552,15 +552,15 @@ fn matchOperations<S,R,M,B>(work: MatchWork<S,R,M,B>&,expected: const u32[:],act
  return false;
 }
 fn matchWithRowsBudgetInner<S,M,B>(self: Store,source: const S&,pattern: u32,actual: Id,mappings: M,rows: B,budget: i64&) -> bool,Error {
- var no=NoResolver {}; var remaining: i64=0; var resolver=ProjectionResolver<NoResolver> {no,remaining,false};  var work=MatchWork<S,NoResolver,M,B> {self,source,mappings,rows,true,resolver,MatchMemo {},true};  let frontier=mappings.len; let row_frontier=rows.len;
+ var no=NoResolver {}; let remaining: i64&=no_projection_remaining; var resolver=ProjectionResolver<NoResolver> {no,remaining,false};  var work=MatchWork<S,NoResolver,M,B> {self,source,mappings,rows,true,resolver,MatchMemo {},true};  let frontier=mappings.len; let row_frontier=rows.len;
  let accepted=matchDepth(work,pattern,actual,0,budget); if !accepted||work.failure!=Error.none { mappings.resize(frontier); rows.resize(row_frontier); } let __cleanup_result_38_0: bool = accepted; let __cleanup_result_38_1: Error = work.failure; work.memo.deinit(); return __cleanup_result_38_0, __cleanup_result_38_1;
  work.memo.deinit(); }
 fn matchWithRowsInner<S,M,B>(self: Store,source: const S&,pattern: u32,actual: Id,mappings: M,rows: B) -> bool,Error {
- var no=NoResolver {}; var remaining: i64=0; var resolver=ProjectionResolver<NoResolver> {no,remaining,false};  var work=MatchWork<S,NoResolver,M,B> {self,source,mappings,rows,true,resolver,MatchMemo {},false};  var budget: i64=1000000; let frontier=mappings.len; let row_frontier=rows.len;
+ var no=NoResolver {}; let remaining: i64&=no_projection_remaining; var resolver=ProjectionResolver<NoResolver> {no,remaining,false};  var work=MatchWork<S,NoResolver,M,B> {self,source,mappings,rows,true,resolver,MatchMemo {},false};  var budget: i64=1000000; let frontier=mappings.len; let row_frontier=rows.len;
  let accepted=matchDepth(work,pattern,actual,0,budget); if !accepted||work.failure!=Error.none { mappings.resize(frontier); rows.resize(row_frontier); } let __cleanup_result_39_0: bool = accepted; let __cleanup_result_39_1: Error = work.failure; work.memo.deinit(); return __cleanup_result_39_0, __cleanup_result_39_1;
  work.memo.deinit(); }
 fn match_<S>(self: Store,source: const S&,pattern: u32,actual: Id,mappings: Mapping[>..<]&) -> bool,Error {
- var rows=PooledRows {};  let activated=activate(rows); if activated!=Error.none { let __cleanup_result_40_0: bool = false; let __cleanup_result_40_1: Error = activated; rows.deinit(); return __cleanup_result_40_0, __cleanup_result_40_1; } var no=NoResolver {}; var remaining: i64=0; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=MatchWork<S,NoResolver,Mapping[>..<]&,PooledRows> {self,source,mappings,rows,false,resolver,MatchMemo {},false};  var budget: i64=1000000; let frontier=mappings.len;
+ var rows=PooledRows {};  let activated=activate(rows); if activated!=Error.none { let __cleanup_result_40_0: bool = false; let __cleanup_result_40_1: Error = activated; rows.deinit(); return __cleanup_result_40_0, __cleanup_result_40_1; } var no=NoResolver {}; let remaining: i64&=no_projection_remaining; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=MatchWork<S,NoResolver,Mapping[>..<]&,PooledRows> {self,source,mappings,rows,false,resolver,MatchMemo {},false};  var budget: i64=1000000; let frontier=mappings.len;
  let accepted=matchDepth(work,pattern,actual,0,budget); if !accepted||work.failure!=Error.none { mappings.resize(frontier); } let __cleanup_result_41_0: bool = accepted; let __cleanup_result_41_1: Error = work.failure; work.memo.deinit(); rows.deinit(); return __cleanup_result_41_0, __cleanup_result_41_1;
  work.memo.deinit(); rows.deinit(); }
 fn matchSelectedInner<S,R,M,B>(self: Store,source: const S&,pattern: u32,actual: Id,mappings: M,rows: B,resolver: ProjectionResolver<R>&) -> bool,Error {
@@ -757,3 +757,5 @@ fn mappingFailure(self: Mapping[>..<]&) -> Error { return Error.none; }
 fn mappingFailure(self: RowMapping[>..<]&) -> Error { return Error.none; }
 fn mappingFailure(self: PooledMappings) -> Error { return self.failure; }
 fn mappingFailure(self: PooledRows) -> Error { return self.failure; }
+
+var no_projection_remaining: i64=0;

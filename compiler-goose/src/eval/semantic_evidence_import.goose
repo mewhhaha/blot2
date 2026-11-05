@@ -8,11 +8,11 @@ import support.pooled_map;
 import support.pooled_buffer;
 type Error=blot_error::Error;
 type Tag=blot_eval_type_evidence::Tag;
-struct Importer { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View,destination: blot_eval_type_evidence::Store&,max_depth: i64,allow_scoped: bool=true,remaining: i64?=null,nodes: dictionary<u32,u32>&,rows: dictionary<u32,u32>&,labels: dictionary<u32,u32>& }
+struct Importer { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View,destination: blot_eval_type_evidence::Store,max_depth: i64,allow_scoped: bool=true,remaining: i64?=null,nodes: dictionary<u32,u32>&,rows: dictionary<u32,u32>&,labels: dictionary<u32,u32>& }
 fn charge<I>(self: I&) -> Error { if self.remaining!=null { if self.remaining==0 { return Error.evidence_limit; } self.remaining--; } return Error.none; }
 fn ty<I>(self: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; var goals=GoalBuffer {}; let value,error=tyInner(self,id,depth,copied,goals); deinit(copied); deinit(goals); return value,error; }
 fn tyInner<I>(self: I&,id: u32,depth: i64,copied: WordBuffer&,goals: GoalBuffer&) -> u32,Error {
- let destination: blot_eval_type_evidence::Store&=target(self);
+ let destination=target(self);
  if id==0 { return 0,Error.none; } if depth>=self.max_depth||id>=self.source.nodes.len { return 0,Error.evidence_limit; } if id<=5 { return id,Error.none; } let known=self.nodes.get(id); if known { return known,Error.none; }
  let error=charge(self); if error!=Error.none { return 0,error; } let n=self.source.node(id); let tag=n.tag;
  if !self.allow_scoped&&(tag==Tag.scoped||(tag==Tag.usage&&n.c!=0)) { return 0,Error.type_mismatch; }
@@ -43,7 +43,7 @@ fn tyInner<I>(self: I&,id: u32,depth: i64,copied: WordBuffer&,goals: GoalBuffer&
 }
 fn row<I>(self: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; let value,error=rowInner(self,id,depth,copied); deinit(copied); return value,error; }
 fn rowInner<I>(self: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {
- let destination: blot_eval_type_evidence::Store&=target(self);
+ let destination=target(self);
  if id==0 { return 0,Error.none; } if depth>=self.max_depth||id>=self.source.effects.rows.len { return 0,Error.evidence_limit; } let known=self.rows.get(id); if known { return known,Error.none; }
  let err=charge(self); if err!=Error.none { return 0,err; } 
  for old in self.source.effects.rowLabels(id) { let value,e=label(self,old,depth+1); if e!=Error.none { return 0,e; } copied.push(value); }
@@ -52,7 +52,7 @@ fn rowInner<I>(self: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {
 }
 fn label<I>(self: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; let value,error=labelInner(self,id,depth,copied); deinit(copied); return value,error; }
 fn labelInner<I>(self: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {
- let destination: blot_eval_type_evidence::Store&=target(self);
+ let destination=target(self);
  if depth>=self.max_depth||id==0||id>=self.source.effects.operations.len { return 0,Error.evidence_limit; } let known=self.labels.get(id); if known { return known,Error.none; }
  let err=charge(self); if err!=Error.none { return 0,err; } let operation=self.source.effects.operation(id);
  if !self.allow_scoped&&(operation.instance.unit!=0||operation.instance.decl!=0) { return 0,Error.type_mismatch; }
@@ -66,11 +66,11 @@ fn get(self: WordMap&,key: u32) -> u32? { return blot_support_pooled_map::get(se
 fn insert(self: WordMap&,key: u32,value: u32) { blot_support_pooled_map::insert(self.table,key,value,word_map_slots); }
 fn clear(self: WordMap&) { blot_support_pooled_map::clear(self.table); }
 fn deinit(self: WordMap&) { blot_support_pooled_map::deinit(self.table,word_map_slots); }
-struct PooledImporter { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View=blot_eval_type_evidence::View {nodes:[],extra:[],effects:blot_check_effect_evidence::View {}},destination: blot_eval_type_evidence::Store?=null,max_depth: i64=0,allow_scoped: bool=true,remaining: i64?=null,nodes: WordMap=WordMap {},rows: WordMap=WordMap {},labels: WordMap=WordMap {} }
-fn initPooled(source: blot_eval_type_evidence::View,destination: blot_eval_type_evidence::Store&,max_depth: i64,allow_scoped: bool) -> PooledImporter { return PooledImporter {source:source,destination:destination,max_depth:max_depth,allow_scoped:allow_scoped}; }
-fn deinit(self: PooledImporter&) { self.nodes.deinit(); self.rows.deinit(); self.labels.deinit(); self.destination .= null; self.remaining .= null; self.owner_id=0; }
-fn target(self: Importer&) -> blot_eval_type_evidence::Store& { return self.destination; }
-fn target(self: PooledImporter&) -> blot_eval_type_evidence::Store& { if self.destination==null { abort("inactive semantic evidence importer"); } return self.destination; }
+struct PooledImporter { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View=blot_eval_type_evidence::View {nodes:[],extra:[],effects:blot_check_effect_evidence::View {}},destination: blot_eval_type_evidence::Store=blot_eval_type_evidence::Store {},max_depth: i64=0,allow_scoped: bool=true,remaining: i64?=null,nodes: WordMap=WordMap {},rows: WordMap=WordMap {},labels: WordMap=WordMap {} }
+fn initPooled(source: blot_eval_type_evidence::View,destination: blot_eval_type_evidence::Store,max_depth: i64,allow_scoped: bool) -> PooledImporter { return PooledImporter {source:source,destination:destination,max_depth:max_depth,allow_scoped:allow_scoped}; }
+fn deinit(self: PooledImporter&) { self.nodes.deinit(); self.rows.deinit(); self.labels.deinit(); self.destination=blot_eval_type_evidence::Store {}; self.remaining .= null; self.owner_id=0; }
+fn target(self: Importer&) -> blot_eval_type_evidence::Store { return self.destination; }
+fn target(self: PooledImporter&) -> blot_eval_type_evidence::Store { if self.destination.owner_id==0 { abort("inactive semantic evidence importer"); } return self.destination; }
 struct WordBuffer { storage: u32[:]=[],items: u32[:]=[],failure: Error=Error.none }
 struct GoalBuffer { storage: blot_eval_type_evidence::Goal[:]=[],items: blot_eval_type_evidence::Goal[:]=[],failure: Error=Error.none }
 reusable[] var copied_words: u32[>..]=[];
