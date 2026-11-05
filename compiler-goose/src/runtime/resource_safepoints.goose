@@ -23,20 +23,20 @@ fn after(module: const Module&, inst: IR) -> bool {
         inst.operand == arena.root_pop || inst.operand == arena.root_close || inst.operand == arena.root_leave;
 }
 fn run(module: Module&, function: Function) -> blot_support::Option<blot_backend_runtime_ir::Body>, Error {
-    let drain = module.resourceDrainImport();
-    if !drain.present { return blot_support::none<blot_backend_runtime_ir::Body>(), Error.none; }
+    let drain, has_drain = module.resourceDrainImport();
+    if !has_drain { return blot_support::none<blot_backend_runtime_ir::Body>(), Error.none; }
     // Snapshot the source before publishing grows Module's instruction table.
     var locals: blot_backend_runtime_ir::ValueType[>..<] = [];
     var code: IR[>..<] = [];
     locals.append(module.locals(function));
     let source = module.instructions(function);
     for inst in source {
-        if before(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain.value }); }
+        if before(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain }); }
         code.push(inst);
-        if after(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain.value }); }
+        if after(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain }); }
     }
     if source.len == 0 || source[source.len - 1].op != blot_backend_runtime_ir::OP_return_ {
-        code.push(IR { blot_backend_runtime_ir::OP_call_import, drain.value });
+        code.push(IR { blot_backend_runtime_ir::OP_call_import, drain });
     }
     return blot_support::some(module.publishBody(locals, code)), Error.none;
 }

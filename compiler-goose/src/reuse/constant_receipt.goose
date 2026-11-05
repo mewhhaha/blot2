@@ -129,6 +129,9 @@ fn releaseOwned(source: const BindingRef[:]) {
 reusable var queries: Query[>..] = [];
 reusable var judgments: Judgment[>..] = [];
 reusable var output_inputs: Inputs[>..] = [];
+fn cloneMutable(self: Inputs) -> blot_eval_type_evidence::Mapping[:], blot_eval_type_evidence::RowMapping[:], Error {
+    return copyOwned(self.types), copyOwned(self.rows), Error.none;
+}
 fn clone(self: Inputs) -> Inputs, Error { return Inputs { copyOwned(self.types), copyOwned(self.rows) }, Error.none; }
 fn deinit(self: Inputs&) { releaseOwned(self.types); releaseOwned(self.rows); self = Inputs {}; }
 fn clone(self: Judgment) -> Judgment&?, Error {
@@ -148,18 +151,18 @@ fn ownedBytes(self: Judgment) -> i64 {
 }
 fn clone(self: Query) -> Query&?, Error {
     var value = self;
-    if let judgment = self.judgment {
+    { let optional_source_53 .= self.judgment; if optional_source_53 { let judgment .= optional_source_53;
         let cloned, error = judgment.clone(); if error != Error.none { return null, error; }
         assert(cloned != null); value.judgment = cloned;
-    }
+     } }
     let index = queries.alloc_index(value); return queries[index], Error.none;
 }
 fn destroy(self: Query&) {
-    if let judgment = self.judgment { judgment.destroy(); }
+    { let optional_source_52 .= self.judgment; if optional_source_52 { let judgment .= optional_source_52; judgment.destroy();  } }
     let index = queries.index_of(self); assert(index >= 0); queries.free(index);
 }
 fn ownedBytes(self: Query) -> i64 {
-    var bytes = blot_host_layout::constant_query; if let judgment = self.judgment { bytes += judgment.ownedBytes(); } return bytes;
+    var bytes = blot_host_layout::constant_query; { let optional_source_51 .= self.judgment; if optional_source_51 { let judgment .= optional_source_51; bytes += judgment.ownedBytes();  } } return bytes;
 }
 fn clone(self: Event) -> Event, Error {
     match self {
@@ -182,13 +185,13 @@ fn ownedBytes(self: Record) -> i64 {
     var total = blot_host_layout::constant_record + bytes_of(self.buffers).len + self.events.len * blot_host_layout::constant_event + bytes_of(self.sources).len +
         bytes_of(self.inputs.types).len + bytes_of(self.inputs.rows).len;
     for event in self.events { match event { Event.query query => { total += query.value.ownedBytes(); }, _ => {} } }
-    if let outputs = self.outputs { total += blot_host_layout::constant_inputs + bytes_of(outputs.types).len + bytes_of(outputs.rows).len; }
+    { let optional_source_50 .= self.outputs; if optional_source_50 { let outputs .= optional_source_50; total += blot_host_layout::constant_inputs + bytes_of(outputs.types).len + bytes_of(outputs.rows).len;  } }
     return total;
 }
 fn deinit(self: Record&) {
     releaseOwned(self.buffers); for &event in self.events { event.deinit(); } releaseOwned(self.events); releaseOwned(self.sources);
     self.inputs.deinit();
-    if let outputs = self.outputs { outputs.deinit(); let index = output_inputs.index_of(outputs); assert(index >= 0); output_inputs.free(index); }
+    { let optional_source_49 .= self.outputs; if optional_source_49 { let outputs .= optional_source_49; outputs.deinit(); let index = output_inputs.index_of(outputs); assert(index >= 0); output_inputs.free(index);  } }
     self = default<Record>();
 }
 fn clone(self: Record) -> Record, Error {
@@ -202,10 +205,10 @@ fn clone(self: Record) -> Record, Error {
     }
     result.sources = copyOwned(self.sources);
     let inputs, error = self.inputs.clone(); if error != Error.none { result.deinit(); return default<Record>(), error; } result.inputs = inputs;
-    if let outputs = self.outputs {
+    { let optional_source_48 .= self.outputs; if optional_source_48 { let outputs .= optional_source_48;
         let inputs, error = outputs.clone(); if error != Error.none { result.deinit(); return default<Record>(), error; }
         let index = output_inputs.alloc_index(inputs); result.outputs = output_inputs[index];
-    }
+     } }
     return result, Error.none;
 }
 enum Reason { mode, source, resource, ready, graph, read, imported }
@@ -332,11 +335,11 @@ fn cacheView(self: Recorder&, session: const Session&, effect: ViewEffect) -> Er
     if !self.eligible { return Error.none; }
     if self.cached_views.count >= 16384 { self.eligible = false; return Error.none; }
     let key = ViewKey { effect.value, effect.evidence };
-    if let known = self.cached_views.get(key) {
+    { let optional_source_47 .= self.cached_views.get(key); if optional_source_47 { let known = optional_source_47;
         if !effect.existed || known != effect.selected { self.eligible = false; }
-    } else { self.cached_views.insert(key, effect.selected); self.events.push(Event.view { effect }); }
-    if let complete = self.view_inputs.get(effect.value) { complete = true; }
-    else { assert(false); }
+     } else { self.cached_views.insert(key, effect.selected); self.events.push(Event.view { effect }); } }
+    { let optional_source_46 .= self.view_inputs.get(effect.value); if optional_source_46 { let complete .= optional_source_46; complete = true;  }
+    else { assert(false); } }
     return Error.none;
 }
 fn ownsChildren(self: const Recorder&, session: const Session&, span: Span) -> bool {
@@ -358,17 +361,17 @@ fn viewsEscape(self: Recorder&, session: const Session&, result: u32) -> bool, E
     while pending.len != 0 {
         let id = pending[pending.len - 1]; pending.resize(pending.len - 1);
         if seen.contains(id) { continue; }
-        if let complete = self.view_inputs.get(id) { if !complete { return true, Error.none; } }
+        { let optional_source_45 .= self.view_inputs.get(id); if optional_source_45 { let complete .= optional_source_45; if !complete { return true, Error.none; }  } }
         if seen.count >= 65536 { return true, Error.none; } seen.insert(id, true);
         let info = session.valueInfo(id);
         if info.kind == blot_eval_core_eval::ValueKind.array || info.kind == blot_eval_core_eval::ValueKind.list {
-            if let buffer = session.storage.collection_buffers.buffers.get(Span { info.start, info.len }) {
+            { let optional_source_44 .= session.storage.collection_buffers.buffers.get(Span { info.start, info.len }); if optional_source_44 { let buffer = optional_source_44;
                 if self.ownsChildren(session, buffer) {
                     var duplicate = false;
                     for effect in self.buffers { let prior = session.valueInfo(effect.value); if prior.start == info.start && prior.len == info.len { duplicate = true; } }
                     if !duplicate { self.buffers.push(BufferEffect { id, Frontier { info.start - buffer.start, buffer.len } }); }
                 }
-            }
+             } }
         }
         let children = session.valueChildren(id);
         if pending.len > 65536 || children.len > 65536 - pending.len { return true, Error.none; }
@@ -389,7 +392,7 @@ fn observe(self: Recorder&, session: const Session&) {
 fn canGrow(self: const Recorder&, session: const Session&, before: Span) -> bool {
     if !self.eligible || self.collection_serial == 0xffffffffffffffff || self.collection_serial != session.storage.collection_buffers.mutation_serial { return false; }
     if before.len != 0 && !self.ownsChildren(session, before) { return false; }
-    if let buffer = session.storage.collection_buffers.buffers.get(before) { if !self.ownsChildren(session, buffer) { return false; } }
+    { let optional_source_43 .= session.storage.collection_buffers.buffers.get(before); if optional_source_43 { let buffer = optional_source_43; if !self.ownsChildren(session, buffer) { return false; }  } }
     return true;
 }
 fn grew(self: Recorder&, session: const Session&) {
@@ -438,11 +441,11 @@ fn beforeRead(self: Recorder&, session: const Session&) -> Error { if !self.stab
 fn read(self: Recorder&, session: const Session&, target: BindingRef, value: ValueId) -> Error {
     if self.ready_reads.count >= 4096 { self.eligible = false; }
     if self.eligible {
-        if let known = self.ready_reads.get(target) { if known != value { self.eligible = false; } }
+        { let optional_source_42 .= self.ready_reads.get(target); if optional_source_42 { let known = optional_source_42; if known != value { self.eligible = false; }  }
         else {
             self.ready_reads.insert(target, value);
             self.events.push(Event.read { Read { target, value, session.depth - self.base_depth, session.call_depth - self.base_calls } });
-        }
+        } }
     }
     self.inference_serial = session.constant_inference_serial; self.summary_transitions = session.summary_transitions;
     self.summary_work = session.summary_graph_work; self.summary_exhausted = session.summary_exhausted;

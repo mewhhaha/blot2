@@ -53,8 +53,8 @@ fn matches(source: const Store&, principal: Id, caller: const Store&, actual: Id
         let from = source.node(original); let to = caller.node(live);
         if from.tag == Tag.variable {
             if to.tag != Tag.variable || exact_binders && original != live { return false, Error.none; }
-            if let known = variables.get(from.a) { if known != live { return false, Error.none; } }
-            else { variables.insert(from.a, live); }
+            { let optional_source_25 .= variables.get(from.a); if optional_source_25 { let known = optional_source_25; if known != live { return false, Error.none; }  }
+            else { variables.insert(from.a, live); } }
             continue;
         }
         if from.tag != to.tag { return false, Error.none; }
@@ -98,8 +98,8 @@ fn matches(source: const Store&, principal: Id, caller: const Store&, actual: Id
                     Tail.variable variable => {
                         var row = MatchedRow { cursor: after.cursor };
                         match after.tail { Tail.variable value => { row.variable = blot_support::some(value.value); }, _ => {} }
-                        if let known = rows.get(variable.value) { if known != row { return false, Error.none; } }
-                        else { rows.insert(variable.value, row); }
+                        { let optional_source_24 .= rows.get(variable.value); if optional_source_24 { let known = optional_source_24; if known != row { return false, Error.none; }  }
+                        else { rows.insert(variable.value, row); } }
                     },
                     _ => {},
                 }
@@ -143,18 +143,18 @@ type NormalizedCopy = Copier;
 type FrozenCopy = Copier;
 fn deinit(self: Copier&) { self.types.clear(); self.variables.clear(); self.rows.clear(); self.row_variables.clear(); self.labels.clear(); }
 fn charge(self: Copier&) -> Error {
-    if let remaining = self.remaining {
-        if let observed = self.projection_observed {
+    { let optional_source_23 .= self.remaining; if optional_source_23 { let remaining .= optional_source_23;
+        { let optional_source_22 .= self.projection_observed; if optional_source_22 { let observed .= optional_source_22;
             let spent = self.destination.projection_steps - observed;
             if spent > remaining { return Error.type_limit; }
             remaining -= spent; observed = self.destination.projection_steps;
-        }
+         } }
         if remaining == 0 { return Error.type_limit; } remaining--;
         if self.projection_observed != null { self.destination.projection_limit = self.destination.projection_steps + remaining; }
-    }
+     } }
     return Error.none;
 }
-fn ty(self: Copier&, original: Id, depth: i64) -> Id, Error {
+recursive fn ty(self: Copier&, original: Id, depth: i64) -> Id, Error {
     if self.frozen {
         match self.source {
             Source.store store => { assert(store.value.versions.len == 0 && store.value.effects.versions.len == 0); },
@@ -163,7 +163,7 @@ fn ty(self: Copier&, original: Id, depth: i64) -> Id, Error {
     }
     if original <= 5 { return original, Error.none; }
     if depth >= self.max_depth || self.types.count >= self.max_nodes { return 0, Error.type_limit; }
-    if let known = self.types.get(original) { return known, Error.none; }
+    { let optional_source_21 .= self.types.get(original); if optional_source_21 { let known = optional_source_21; return known, Error.none;  } }
     let charged = self.charge(); if charged != Error.none { return 0, charged; }
     let root = self.source.head(original, 0);
     if root != original {
@@ -196,8 +196,8 @@ fn ty(self: Copier&, original: Id, depth: i64) -> Id, Error {
         },
         Tag.instance_version => { let value, error = self.destination.instanceVersion(blot_check_types::NominalIdentity { node.a, node.b }, node.c); result = value; failure = error; },
         Tag.variable => {
-            if let known = self.variables.get(node.a) { result = known; }
-            else { let value, error = self.destination.fresh(); if error != Error.none { return 0, error; } self.variables.insert(node.a, value); result = value; }
+            { let optional_source_20 .= self.variables.get(node.a); if optional_source_20 { let known = optional_source_20; result = known;  }
+            else { let value, error = self.destination.fresh(); if error != Error.none { return 0, error; } self.variables.insert(node.a, value); result = value; } }
         },
         Tag.usage => {
             let payload, error = self.ty(node.a, depth + 1); if error != Error.none { return 0, error; }
@@ -262,7 +262,7 @@ fn ty(self: Copier&, original: Id, depth: i64) -> Id, Error {
     if failure != Error.none { return 0, failure; } self.types.insert(original, result); return result, Error.none;
 }
 fn rowVariable(self: Copier&, variable: u32) -> Id, Error {
-    if let known = self.row_variables.get(variable) { return known, Error.none; }
+    { let optional_source_19 .= self.row_variables.get(variable); if optional_source_19 { let known = optional_source_19; return known, Error.none;  } }
     if self.row_variables.count >= self.max_nodes { return 0, Error.type_limit; }
     let charged = self.charge(); if charged != Error.none { return 0, charged; }
     let fresh, error = self.destination.freshEffects(); if error != Error.none { return 0, error; }
@@ -271,7 +271,7 @@ fn rowVariable(self: Copier&, variable: u32) -> Id, Error {
 fn row(self: Copier&, original: Id, depth: i64) -> Id, Error {
     if original == 0 { return 0, Error.none; }
     if depth >= self.max_depth || self.rows.count >= self.max_nodes { return 0, Error.type_limit; }
-    if let known = self.rows.get(original) { return known, Error.none; }
+    { let optional_source_18 .= self.rows.get(original); if optional_source_18 { let known = optional_source_18; return known, Error.none;  } }
     let charged = self.charge(); if charged != Error.none { return 0, charged; }
     let source = self.source.row(original); var copied: Id[>..<] = [];
     for operation in self.source.rowLabels(source.labels) {
@@ -299,7 +299,7 @@ fn row(self: Copier&, original: Id, depth: i64) -> Id, Error {
 }
 fn label(self: Copier&, original: Id, depth: i64) -> Id, Error {
     if depth >= self.max_depth || self.labels.count >= self.max_nodes { return 0, Error.type_limit; }
-    if let known = self.labels.get(original) { return known, Error.none; }
+    { let optional_source_17 .= self.labels.get(original); if optional_source_17 { let known = optional_source_17; return known, Error.none;  } }
     let charged = self.charge(); if charged != Error.none { return 0, charged; }
     let operation = self.source.operation(original); var arguments: Id[>..<] = [];
     for old in self.source.list(operation.arguments) {

@@ -956,5 +956,6 @@
     "unsupported_cohort": "UnsupportedCohort",
     "unsupported_version": "UnsupportedVersion",
     "version_mismatch": "VersionMismatch"
-  }
+  },
+  "oracle_git_tag": "goose-port-oracle-156f84b"
 }

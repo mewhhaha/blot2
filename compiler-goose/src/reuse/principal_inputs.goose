@@ -147,14 +147,14 @@ fn matchesBase<S>(self: Key, session: const S&) -> bool {
         let body = module.body(read.target.binding); if body == null { return false; }
         let slot = session.slots[session.binding_offsets[read.target.unit - 1] + read.target.binding];
         var actual: u32 = 0;
-        if !body.runtime && slot.state == blot_eval_core_eval::SlotState.complete && session.valueInfo(slot.value).kind == blot_eval_core_eval::ValueKind.scalar {
+        if !body.runtime && slot.state == blot_eval_core_eval::State.complete && session.valueInfo(slot.value).kind == blot_eval_core_eval::ValueKind.scalar {
             actual = session.valueEvidence(slot.value);
         }
         if actual != read.evidence { return false; }
     }
     for read in self.plain_reads {
         let actual = session.specializations.plain_nominals.get(read.key);
-        if read.value.present { if let found = actual { if found != read.value.value { return false; } } else { return false; } }
+        if read.value.present { { let optional_source_41 .= actual; if optional_source_41 { let found .= optional_source_41; if found != read.value.value { return false; }  } else { return false; } } }
         else if actual != null { return false; }
     }
     return true;
@@ -271,32 +271,32 @@ fn scalar(self: Recorder&, target: BindingRef, actual: u32) -> Error {
     let error = self.source(target); if error != Error.none { return error; }
     if actual > 5 || target.unit == 0 || target.binding == 0 { self.invalidate(Reason.scalar_domain); return Error.none; }
     let id = (target.unit as u64 << 32) | target.binding;
-    if let previous = self.seen.get(id) { if previous != actual { self.invalidate(Reason.changed_input); } return Error.none; }
+    { let optional_source_40 .= self.seen.get(id); if optional_source_40 { let previous = optional_source_40; if previous != actual { self.invalidate(Reason.changed_input); } return Error.none;  } }
     if self.plain_reads.len >= self.max_reads || self.reads.len >= self.max_reads - self.plain_reads.len { self.invalidate(Reason.read_limit); return Error.none; }
     self.seen.insert(id, actual); self.reads.push(ScalarRead { target, actual }); return Error.none;
 }
 fn plainRead(self: Recorder&, key: u64, actual: blot_support::Option<bool>) -> Error {
     if !self.eligible { return Error.none; }
-    if let previous = self.plain_seen.get(key) {
+    { let optional_source_39 .= self.plain_seen.get(key); if optional_source_39 { let previous .= optional_source_39;
         var expected = previous.initial;
         if previous.publication.present { expected = blot_support::some(self.plain_publications[previous.publication.value].value); }
         if expected != actual { self.invalidate(Reason.changed_input); } return Error.none;
-    }
+     } }
     if self.plain_reads.len >= self.max_reads || self.reads.len >= self.max_reads - self.plain_reads.len { self.invalidate(Reason.read_limit); return Error.none; }
     self.plain_seen.insert(key, PlainSeen { initial: actual }); self.plain_reads.push(PlainRead { key, actual }); return Error.none;
 }
 fn plainRead(self: Recorder&, key: u64, actual: const bool?) -> Error {
-    if let value = actual { return self.plainRead(key, blot_support::some(value)); } return self.plainRead(key, blot_support::none<bool>());
+    { let optional_source_38 .= actual; if optional_source_38 { let value .= optional_source_38; return self.plainRead(key, blot_support::some(value));  } } return self.plainRead(key, blot_support::none<bool>());
 }
 fn plainPublish(self: Recorder&, key: u64, value: bool) -> Error {
     if !self.eligible { return Error.none; }
-    if let observed = self.plain_seen.get(key) {
+    { let optional_source_37 .= self.plain_seen.get(key); if optional_source_37 { let observed .= optional_source_37;
         if observed.publication.present { self.plain_publications[observed.publication.value].value = value; }
         else {
             let at = self.plain_publications.len; self.plain_publications.push(PlainPublication { key, value });
             observed.publication = blot_support::some(at);
         }
-    } else { self.invalidate(Reason.changed_input); }
+     } else { self.invalidate(Reason.changed_input); } }
     return Error.none;
 }
 fn callPublish(self: Recorder&, target: BindingRef, actual: u32) -> Error {
@@ -309,20 +309,20 @@ fn callRead(self: Recorder&, target: BindingRef, actual: u32, present: bool) -> 
     if !self.eligible { return Error.none; } let call = CallPublication { target, actual };
     if self.calls_seen.contains(call) { if !present { self.invalidate(Reason.changed_input); } return Error.none; }
     if self.empty_call_inputs { if present { self.invalidate(Reason.call_read); } return Error.none; }
-    if let previous = self.call_reads_seen.get(call) { if previous != present { self.invalidate(Reason.changed_input); } return Error.none; }
+    { let optional_source_36 .= self.call_reads_seen.get(call); if optional_source_36 { let previous = optional_source_36; if previous != present { self.invalidate(Reason.changed_input); } return Error.none;  } }
     if self.call_reads.len >= self.max_reads { self.invalidate(Reason.read_limit); return Error.none; }
     self.call_reads_seen.insert(call, present); self.call_reads.push(CallRead { target, actual, present }); return Error.none;
 }
 fn summaryRead(self: Recorder&, value: Summary) -> Error {
     if !self.eligible { return Error.none; }
-    if let previous = self.summaries_seen.get(value.key) { if previous != value.result { self.invalidate(Reason.changed_input); } return Error.none; }
-    if let previous = self.summary_reads_seen.get(value.key) { if previous != value.result { self.invalidate(Reason.changed_input); } return Error.none; }
+    { let optional_source_35 .= self.summaries_seen.get(value.key); if optional_source_35 { let previous = optional_source_35; if previous != value.result { self.invalidate(Reason.changed_input); } return Error.none;  } }
+    { let optional_source_34 .= self.summary_reads_seen.get(value.key); if optional_source_34 { let previous = optional_source_34; if previous != value.result { self.invalidate(Reason.changed_input); } return Error.none;  } }
     if self.summary_reads.len >= self.max_reads { self.invalidate(Reason.read_limit); return Error.none; }
     self.summary_reads_seen.insert(value.key, value.result); self.summary_reads.push(value); return Error.none;
 }
 fn summaryPublish(self: Recorder&, value: Summary) -> Error {
     if !self.eligible { return Error.none; }
-    if let previous = self.summaries_seen.get(value.key) { if previous != value.result { self.invalidate(Reason.changed_input); } return Error.none; }
+    { let optional_source_33 .= self.summaries_seen.get(value.key); if optional_source_33 { let previous = optional_source_33; if previous != value.result { self.invalidate(Reason.changed_input); } return Error.none;  } }
     if self.summary_publications.len >= self.max_reads { self.invalidate(Reason.read_limit); return Error.none; }
     self.summaries_seen.insert(value.key, value.result); self.summary_publications.push(value); return Error.none;
 }

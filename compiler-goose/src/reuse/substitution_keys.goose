@@ -37,7 +37,7 @@ fn intern(store: Store&, values: const Entry[:]) -> Id, Error {
     return internHashed(store, owned, hash.final());
 }
 fn internHashed(store: Store&, values: const Entry[:], fingerprint: u64) -> Id, Error {
-    var head: Id = 0; if let found = store.buckets.get(fingerprint) { head = found; }
+    var head: Id = 0; { let optional_source_3 .= store.buckets.get(fingerprint); if optional_source_3 { let found = optional_source_3; head = found;  } }
     var candidate = head;
     while candidate != 0 {
         if get(store, candidate) == values { return candidate, Error.none; }

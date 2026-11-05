@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <math.h>
 
 _Static_assert(sizeof(void *) == 8, "the native port uses the Goose C.2 64-bit host layout");
 _Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24,
@@ -170,4 +171,41 @@ void blot_atomic_store(uint64_t *value, uint64_t next) {
     pthread_mutex_lock(&scalar_atomic_lock);
     scalar_store(value, next);
     pthread_mutex_unlock(&scalar_atomic_lock);
+}
+
+uint32_t blot_platform_is_linux(void) {
+#if defined(__linux__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+uint32_t blot_i32_bits(int32_t value) {
+    uint32_t result;
+    memcpy(&result, &value, sizeof(result));
+    return result;
+}
+int32_t blot_i32_from_bits(uint32_t value) {
+    int32_t result;
+    memcpy(&result, &value, sizeof(result));
+    return result;
+}
+float blot_f32_mul_add(float left, float right, float addend) {
+    return fmaf(left, right, addend);
+}
+
+static pthread_mutex_t debug_print_lock = PTHREAD_MUTEX_INITIALIZER;
+void blot_debug_write(const unsigned char *bytes, uint64_t count) {
+    pthread_mutex_lock(&debug_print_lock);
+    while (count != 0) {
+        size_t chunk = (size_t)count;
+        if (chunk > (size_t)SSIZE_MAX) chunk = (size_t)SSIZE_MAX;
+        ssize_t written = write(STDERR_FILENO, bytes, chunk);
+        if (written < 0 && errno == EINTR) continue;
+        if (written <= 0) break;
+        bytes += (size_t)written;
+        count -= (uint64_t)written;
+    }
+    pthread_mutex_unlock(&debug_print_lock);
 }

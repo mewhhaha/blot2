@@ -2488,13 +2488,13 @@
       "zig": "compiler/src/reuse/artifact_capture.zig",
       "goose": "compiler-goose/src/reuse/artifact_capture.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/artifact_emitter.zig",
       "goose": "compiler-goose/src/reuse/artifact_emitter.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/artifact_emitter_tests.zig",
@@ -2806,7 +2806,7 @@
       "zig": "compiler/src/reuse/dispatch_explanation.zig",
       "goose": "compiler-goose/src/reuse/dispatch_explanation.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/dispatch_explanation_tests.zig",
@@ -2866,7 +2866,7 @@
       "zig": "compiler/src/reuse/executable_query.zig",
       "goose": "compiler-goose/src/reuse/executable_query.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/fallback_check_sharing_tests.zig",
@@ -3298,7 +3298,7 @@
       "zig": "compiler/src/reuse/shared_query_gate.zig",
       "goose": "compiler-goose/src/reuse/shared_query_gate.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/source_completion.zig",
@@ -3496,7 +3496,7 @@
       "zig": "compiler/src/runtime/public_owners.zig",
       "goose": "compiler-goose/src/runtime/public_owners.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/region_fixture.zig",
@@ -3586,7 +3586,7 @@
       "zig": "compiler/src/runtime/task_context.zig",
       "goose": "compiler-goose/src/runtime/task_context.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/task_context_fixture.zig",

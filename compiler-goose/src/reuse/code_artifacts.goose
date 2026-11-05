@@ -67,7 +67,7 @@ struct StaticRead { target: blot_check_core::BindingRef, value: u32 }
 struct Span { start: u32 = 0, len: u32 = 0 }
 struct Job {
     parent: u32, request: Request, reusable: bool = true,
-    inline_bodies: Span, static_reads: Span, state: State = State.pending,
+    inline_bodies: Span, static_reads: Span, inline_capacity: u32 = 0, static_capacity: u32 = 0, state: State = State.pending,
     function: blot_support::Option<u32>, target_job: u32 = 0,
     mappings: Span, rows: Span, templates: Span, solved: bool = false,
     result_template: blot_support::Option<u32>, value: blot_support::Option<ValueResult>,
@@ -104,9 +104,9 @@ struct DiscardProof { unit: u32, unused: const bool[:] }
 type Token = u64;
 fn freshToken() -> Token { blot_native::fresh_owner_id() }
 
-// Per-job slices are ranges into caller-owned journal tables. A nested job may
-// append between two parent writes; extending a nonterminal run first copies
-// that run, preserving each job's contiguous immutable view.
+// Per-job slices are ranges into caller-owned journal tables. Inline/static
+// reads reserve a private run, so nested jobs do not invalidate their ranges.
+// A range moves only when its own capacity grows.
 struct Context {
     allocation_owner: u64 = 0,
     active_job: u32 = 0, clock: u64 = 0,
@@ -147,23 +147,27 @@ fn materializeStaticValue(self: Context&) {
     let job = self.jobs[self.active_job - 1];
     match job.request { Request.constant => {}, _ => { if !job.hasStaticValues() { self.requireFreshCode(); } } }
 }
-fn appendSpan<T>(items: T[>..<]&, span: Span, value: T) -> Span {
+fn appendSpan<T>(items: T[>..<]&, span: Span, value: T, capacity: u32&) -> Span {
     var start = span.start;
-    if span.len == 0 { start = items.len as u32; }
-    else if span.start as i64 + span.len != items.len {
-        let old_start = span.start; let old_len = span.len;
+    if span.len == capacity {
+        // Zig 0.17 ArrayList grows from the requested minimum, with one cache
+        // line of initial slots. These are real reserved slots in our owner,
+        // so interleaved jobs keep their ranges until the range itself grows.
+        let width = bytes_of([default<T>()]).len as u32;
+        var initial = 64 / width; if initial == 0 { initial = 1; }
+        let minimum = span.len + 1; let grown = minimum + minimum / 2 + initial;
         start = items.len as u32;
-        // Index the owner anew after each push, rather than borrowing a slice
-        // across growth. Relocation does not invalidate the source indices.
-        for index in old_len { items.push(items[old_start + index]); }
+        for index in grown { items.push(default<T>()); }
+        for index in span.len { items[start + index] = items[span.start + index]; }
+        capacity = grown;
     }
-    items.push(value); return Span { start, span.len + 1 };
+    items[start + span.len] = value; return Span { start, span.len + 1 };
 }
 fn readInlineBody(self: Context&, target: blot_check_core::BindingRef) -> Error {
     if self.active_job == 0 { return Error.none; }
     let index = self.active_job - 1; let span = self.jobs[index].inline_bodies;
     for at in span.len { if self.inline_bodies[span.start + at] == target { return Error.none; } }
-    self.jobs[index].inline_bodies = appendSpan(self.inline_bodies, span, target);
+    self.jobs[index].inline_bodies = appendSpan(self.inline_bodies, span, target, self.jobs[index].inline_capacity);
     return Error.none;
 }
 fn readStaticValue(self: Context&, target: blot_check_core::BindingRef, value: u32) -> Error {
@@ -173,7 +177,7 @@ fn readStaticValue(self: Context&, target: blot_check_core::BindingRef, value: u
         let read = self.static_reads[span.start + at];
         if read.target == target && read.value == value { return Error.none; }
     }
-    self.jobs[index].static_reads = appendSpan(self.static_reads, span, StaticRead { target, value });
+    self.jobs[index].static_reads = appendSpan(self.static_reads, span, StaticRead { target, value }, self.jobs[index].static_capacity);
     return Error.none;
 }
 fn hasStaticValues(self: const Context&) -> bool {
@@ -300,11 +304,11 @@ fn stamp<T>(options: Stamping, value: T) -> u8[32] {
     var hash = StampHash { hash: blot_support_blake3::init(), buffered: options.algorithm == StampAlgorithm.buffered };
     hash.update("BLOT-PINNED-ARTIFACT-1"); blot_structural::hash(hash, value); hash.flush();
     hash.counts.stamps = 1;
-    if let counts = options.counts {
+    { let optional_source_16 .= options.counts; if optional_source_16 { let counts .= optional_source_16;
         counts.stamps += hash.counts.stamps; counts.bytes += hash.counts.bytes;
         counts.input_updates += hash.counts.input_updates; counts.hash_updates += hash.counts.hash_updates;
         counts.buffer_flushes += hash.counts.buffer_flushes; counts.direct_chunks += hash.counts.direct_chunks;
-    }
+     } }
     return hash.hash.final();
 }
 fn stamp<T>(value: T) -> u8[32] { stamp(Stamping {}, value) }
@@ -358,10 +362,10 @@ struct ModuleStamps {
 fn deinit(self: ModuleStamps&) { self.entries.clear(); }
 fn owns(self: const ModuleStamps&, module: const blot_check_core::Module&) -> bool {
     for &candidate in self.current { if candidate .== module { return true; } }
-    if let old = self.previous {
+    { let optional_source_15 .= self.previous; if optional_source_15 { let old .= optional_source_15;
         if module.unit != 0 && module.unit <= old.modules.len && old.modules[module.unit - 1].module .== module { return true; }
         for pin in old.modules { if pin.module .== module { return true; } }
-    }
+     } }
     return false;
 }
 fn find(self: const ModuleStamps&, module: blot_check_core::Module) -> blot_support::Option<i64> {
@@ -388,13 +392,13 @@ fn proveSame(self: ModuleStamps&, left: const blot_check_core::Module&, right: c
 fn tokenEntry(self: ModuleStamps&, module: const blot_check_core::Module&) -> blot_support::Option<i64>, Error {
     if !self.owns(module) { return blot_support::none<i64>(), Error.none; }
     let found = self.find(module); if found.present { self.reused++; return found, Error.none; }
-    if let old = self.previous {
+    { let optional_source_14 .= self.previous; if optional_source_14 { let old .= optional_source_14;
         for pin in old.modules {
             if pin.module.unit != module.unit || !sameStorage(pin.module, module) || headerPrint(pin.module) != pin.header { continue; }
             self.reused++; let index, error = self.record(module, pin.token, blot_support::none<u8[32]>());
             return blot_support::some(index), error;
         }
-    }
+     } }
     if self.compare_contents {
         let count = self.entries.len;
         for index in count {
@@ -429,8 +433,8 @@ fn digestOf(self: ModuleStamps&, module: const blot_check_core::Module&) -> blot
     if !known.present { return blot_support::some(stamp(module)), Error.none; }
     return self.entries[known.value].digest, Error.none;
 }
-fn pinIntact(pin: const ModulePin&, memo: ModuleStamps? = null) -> bool, Error {
-    if let tokens = memo { if tokens.owns(pin.module) { return tokens.intact(pin); } }
+recursive fn pinIntact(pin: const ModulePin&, memo: ModuleStamps? = null) -> bool, Error {
+    { let optional_source_13 .= memo; if optional_source_13 { let tokens .= optional_source_13; if tokens.owns(pin.module) { return tokens.intact(pin); }  } }
     if headerPrint(pin.module) != pin.header { return false, Error.none; }
     if !pin.stamp.present { return true, Error.none; }
     return pin.stamp.value == stamp(pin.module), Error.none;
@@ -992,14 +996,14 @@ fn deinit(self: Pools&) {
 
 fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps? = null) -> Pools, Error {
     var previous: const Pools? = null;
-    if let cache = memo { previous = cache.previous; }
+    { let optional_source_12 .= memo; if optional_source_12 { let cache .= optional_source_12; previous = cache.previous;  } }
     var candidate = default<Pools>();
     var copying = CaptureState { shared: blot_eval_pool_leases::Builder {} };
-    if let old = previous { copying.shared.previous = old.leases; }
+    { let optional_source_11 .= previous; if optional_source_11 { let old .= optional_source_11; copying.shared.previous = old.leases;  } }
     candidate.project_identity = identity.present;
     if identity.present {
         var old = default<IdentityMetadata>();
-        if let prior = previous { if prior.identity.present { old = prior.identity.value; } }
+        { let optional_source_10 .= previous; if optional_source_10 { let prior .= optional_source_10; if prior.identity.present { old = prior.identity.value; }  } }
         candidate.identity = blot_support::some(IdentityMetadata {
             copying.capture_identity_bytes(identity.value.bytes, old.bytes),
             copying.capture_identity_symbols(identity.value.symbols, old.symbols),
@@ -1016,7 +1020,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
         modules[index] = init(unit, module, copyOwned(path));
     }
     candidate.modules = modules;
-    if let tokens = memo {
+    { let optional_source_9 .= memo; if optional_source_9 { let tokens .= optional_source_9;
         for index in modules.len {
             let token, token_error = tokens.get(modules[index].module);
             if token_error != Error.none { candidate.leases = copying.shared.leases; candidate.deinit(); return default<Pools>(), token_error; }
@@ -1025,11 +1029,11 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
             if digest_error != Error.none { candidate.leases = copying.shared.leases; candidate.deinit(); return default<Pools>(), digest_error; }
             modules[index].stamp = digest;
         }
-    }
+     } }
     var old_layouts = default<Layouts>();
     var old_evaluator = default<blot_eval_core_eval::Snapshot>();
     var old = default<Pools>();
-    if let prior = previous { old = prior; old_layouts = prior.layouts; old_evaluator = prior.evaluator; }
+    { let optional_source_8 .= previous; if optional_source_8 { let prior .= optional_source_8; old = prior; old_layouts = prior.layouts; old_evaluator = prior.evaluator;  } }
     let layout_store = generator.representations.store;
     candidate.layouts.nodes = copying.capture_layout_nodes(layout_store.nodes, old_layouts.nodes);
     candidate.layouts.extra = copying.capture_layout_extra(layout_store.extra, old_layouts.extra);
@@ -1040,7 +1044,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     candidate.layouts.effects.labels = copying.capture_layout_labels(layout_store.effects.labels, old_layouts.effects.labels);
     candidate.layouts.effects.owner_id = blot_native::fresh_owner_id();
     let before_evaluator = copying.shared.stats;
-    let session = generator.evaluator;
+    let session .= generator.evaluator;
     candidate.evaluator.code_origins = copying.capture_code_origins(session.storage.code_origins, old_evaluator.code_origins);
     candidate.evaluator.values = copying.capture_values(session.storage.values, old_evaluator.values);
     candidate.evaluator.children = copying.capture_children(session.storage.children, old_evaluator.children);
@@ -1086,7 +1090,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
         spans: copyOwned(generator.representations.instance_arguments.spans),
     };
     candidate.captures = copying.capture_captures(generator.planning.template_catalog, old.captures);
-    if let connection = generator.representations.connection { candidate.bridge = blot_support::some(captureBridge(connection)); }
+    { let optional_source_7 .= generator.representations.connection; if optional_source_7 { let connection .= optional_source_7; candidate.bridge = blot_support::some(captureBridge(connection));  } }
     var locations: FieldLocation[>..<] = [];
     for slot in session.field_locations.slots {
         if slot.tag != 0 { locations.push(FieldLocation { slot.key.family, slot.key.tag, slot.key.name, slot.val.field, slot.val.len }); }
@@ -1122,14 +1126,14 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     for entry in generator.planning.instances.slots {
         if entry.tag != 0 {
             var result_template = blot_support::none<u32>();
-            if let found = generator.planning.template_results.get(entry.key) { result_template = blot_support::some(found); }
+            { let optional_source_6 .= generator.planning.template_results.get(entry.key); if optional_source_6 { let found = optional_source_6; result_template = blot_support::some(found);  } }
             functions.push(Function { Request.named { entry.key }, entry.val, result_template });
         }
     }
     for entry in generator.planning.closures.slots {
         if entry.tag != 0 {
             var result_template = blot_support::none<u32>();
-            if let found = generator.planning.closure_template_results.get(entry.key) { result_template = blot_support::some(found); }
+            { let optional_source_5 .= generator.planning.closure_template_results.get(entry.key); if optional_source_5 { let found = optional_source_5; result_template = blot_support::some(found);  } }
             functions.push(Function { Request.closure { entry.key }, entry.val, result_template });
         }
     }
@@ -1242,11 +1246,11 @@ fn recordPrincipal(self: Context&, target: blot_check_core::BindingRef, options:
     let mappings = blot_eval_core_eval::copySolvedTypes(solved.types);
     let rows = blot_eval_core_eval::copySolvedRows(solved.rows);
     var input_key = blot_support::none<blot_reuse_principal_inputs::Key>();
-    if let observed = inputs {
+    { let optional_source_4 .= inputs; if optional_source_4 { let observed .= optional_source_4;
         let owned, error = observed.clone();
         if error != Error.none { blot_eval_core_eval::releaseSolvedTypes(mappings); blot_eval_core_eval::releaseSolvedRows(rows); return error; }
         input_key = blot_support::some(owned);
-    }
+     } }
     var builder = self.principal_queries.begin(blot_reuse_principal_query::Key { target, options });
     builder.read(blot_reuse_principal_query::Dependencies { input_key });
     builder.stage(blot_eval_core_eval::SolvedEvidence { types: mappings, rows: rows });
@@ -1265,4 +1269,11 @@ fn deinit(self: Context&) {
     self.jobs.clear(); self.events.clear(); self.function_jobs.clear(); self.global_jobs.clear();
     self.inline_bodies.clear(); self.static_reads.clear(); self.mappings.clear(); self.rows.clear(); self.templates.clear();
     if self.pools.present { self.pools.value.deinit(); self.pools.present = false; }
+}
+
+fn requestCode(request: Request) -> u8 {
+    match request {
+        Request.named => 0, Request.closure => 1, Request.callable => 2, Request.constructor => 3,
+        Request.primitive => 4, Request.operation => 5, Request.host => 6, Request.constant => 7, Request.runtime_global => 8,
+    }
 }

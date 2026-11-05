@@ -47,7 +47,7 @@ fn internBound(store: Store&, ordinal: u32, sort: u32, depth: u32) -> Id, Error 
 fn internStateProvider(store: Store&, read: Id, write: Id, state: Id) -> Id, Error {
     return internFields(store, Tag.state_provider, read, write, state, []);
 }
-fn internFields(store: Store&, tag: Tag, a: u32, b: u32, c: u32, values: const Id[:]) -> Id, Error {
+recursive fn internFields(store: Store&, tag: Tag, a: u32, b: u32, c: u32, values: const Id[:]) -> Id, Error {
     if (tag == Tag.forall || tag == Tag.existential) && values.len == 0 {
         if b == 0 || b > 128 { return 0, Error.type_mismatch; }
         var binders: Id[128] = default<Id[128]>();
@@ -113,7 +113,7 @@ fn internFields(store: Store&, tag: Tag, a: u32, b: u32, c: u32, values: const I
     for value in values { hash.value(value); }
     let fingerprint = hash.final();
     var head: Id = 0;
-    if let found = store.buckets.get(fingerprint) { head = found; }
+    { let optional_source_2 .= store.buckets.get(fingerprint); if optional_source_2 { let found = optional_source_2; head = found;  } }
     var candidate = head;
     while candidate != 0 {
         let n = store.nodes[candidate];

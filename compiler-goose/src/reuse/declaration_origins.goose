@@ -19,7 +19,7 @@ fn collect(entries: dictionary<const u8[:], Pair>&, module: blot_check_core::Mod
         if body.binding == 0 { continue; }
         let spelling = name(module, body); if !spelling.present { continue; }
         var pair = Pair {};
-        if let prior = entries.get(spelling.value) { pair = prior; }
+        { let optional_source_1 .= entries.get(spelling.value); if optional_source_1 { let prior = optional_source_1; pair = prior;  } }
         if before {
             if pair.before != 0 { pair.ambiguous = true; }
             pair.before = body.binding;

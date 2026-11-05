@@ -21,3 +21,4 @@ let constant_query: i64 = 1 + 3 * 4 + binding_ref + source_interface + pointer +
 let constant_judgment: i64 = 1 + 4 * 4 + type_scheme + 8 + 2 + 2 * constant_inputs + slice;
 let constant_event: i64 = 1 + 5 * 8;
 let constant_record: i64 = slice + 1 + 8 + binding_ref + 4 + evaluator_options + 2 * slice + constant_inputs + pointer;
+let selected_query_record: i64 = 4 + 4 + 1 + 4 + 1 + 2 * 4 + evaluator_options + 8 + specialization_record + 4;

@@ -7,12 +7,14 @@ Production writing passes completed, all unverified:
 
 - Root execution_policy, compilation_tier, inference_limits, work_counters.
 - Runtime runtime_layout, storage_packets, task_abi, resource_safepoints,
-  task_safepoints, runtime_cleanup, request_runtime.
+  task_safepoints, runtime_cleanup, request_runtime, public_owners, task_context.
 - Reuse resolution_cache, epoch_resolution_cache, composite_resolution_cache,
   projection_cache, declaration_origins, source_overlays, zig_project_frames,
   code_expectation, substitution_keys, purity_diagnostics, principal_interface,
   semantic_query_table, principal_query, principal_type_graph, code_artifacts,
-  specialization_receipt, refinement_receipt, principal_inputs, constant_receipt.
+  specialization_receipt, refinement_receipt, principal_inputs, constant_receipt,
+  artifact_emitter, artifact_capture, executable_query, shared_query_gate,
+  dispatch_explanation.
 - Support explicit error labels, fixed Option, byte codecs, exact Wyhash,
   portable Blake3, structural field streams, finite postfix recipe emitter,
   native scalar/OS services, file IO and explicit packed host footprints.
@@ -23,8 +25,8 @@ integration, source parity, runtime qualification or acceptable performance.
 
 Representation contracts:
 
-- Artifacts use fixed ranges into caller-owned journal tables. Parent run
-  extension after nested writes copies the parent's run to the tail.
+- Artifacts use fixed ranges into caller-owned journal tables. Inline/static read sets reserve real typed spans with their own capacity;
+  nested writes keep these spans stable until the span itself grows.
 - Pinned Core retains an exact fixed header view. Composite slice-field
   identity replaces Zig's pointer-address hash; no pointer integer is exposed.
   Full structural stream equality retains float bits and excludes padding.
@@ -56,7 +58,7 @@ Representation contracts:
   of wire schemas. No metadata pointer is serialized to measure its size.
 - Native scalar atomics use memcpy under a mutex because C.2 packs fields;
   taking a u64 reference does not imply native atomic alignment. Native builds
-  must link platform.c with pthread support and target a 64-bit host.
+  must link platform.c with pthread and libm support and target a 64-bit host.
 
 Pending target-language qualification:
 
@@ -71,3 +73,23 @@ Pending target-language qualification:
   need complete integration. Their cost is unmeasured.
 - The source-pointer-free host footprints need qualification alongside the
   final record schemas, and every external archive needs exact typed codecs.
+
+Artifact emission constructs its Recorder from five typed caller arrays. freeze
+returns complete owned FunctionArtifact/Local/SymbolicInstruction runs. Exact
+replay and relocated replay take a driver-owned destination Module; materialize
+uses that same explicit destination. Runtime operation capture receives the
+whole Store to resolve key ranges. Native resource IDs remain symbolic until
+replay maps them; unsupported arena composition fails before mutation.
+
+Lexical withRecorder/withCopy callbacks use named functions and return locally.
+They must return their Error through the helper so explicit retained-pool
+cleanup executes; do not use a block's nonlocal return to leave that helper.
+
+Job inline_capacity/static_capacity record real reserved range lengths. Growth
+uses the pinned Zig 0.17 ArrayList minimum + minimum/2 + max(1,64/sizeof(T))
+policy for these address-free element types. Artifact job views emit the
+original {items,capacity} fields, excluding the private range/capacity fields.
+
+Native scalar helpers include memcpy signed/unsigned i32 representation and
+C fmaf for explicitly fused binary32 multiplication/addition. A separate multiply
+and add must not replace that one-rounding operation.

@@ -51,9 +51,9 @@ fn emitToResult(self: const Stack&, module: Module&, function: u32, checkpoint: 
     }
     return Error.none;
 }
-fn emitAll(self: const Stack&, module: Module&, function: u32) -> Error {
+recursive fn emitAll(self: const Stack&, module: Module&, function: u32) -> Error {
     let error = emitTo(self, module, function, 0); if error != Error.none { return error; }
-    if let parent = self.parent { return parent.emitAll(module, function); }
+    { let optional_source_59 .= self.parent; if optional_source_59 { let parent .= optional_source_59; return parent.emitAll(module, function);  } }
     return Error.none;
 }
 fn emit(action: Action, module: Module&, function: u32, result: blot_support::Option<u32>) -> Error {
@@ -65,8 +65,8 @@ fn emit(action: Action, module: Module&, function: u32, result: blot_support::Op
             code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, group.close });
         },
         Action.resource journal => {
-            let drain = module.taskImportNamed("drain");
-            if drain.present { code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, drain.value }); }
+            let drain, has_drain = module.taskImportNamed("drain");
+            if has_drain { code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, drain }); }
             code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, journal.token });
             code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, journal.release });
         },

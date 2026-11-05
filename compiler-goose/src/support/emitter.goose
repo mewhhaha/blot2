@@ -13,7 +13,7 @@ struct Emitter<M> { code: blot_backend_runtime_code::Code<M>, failure: Error = E
 fn init<M>(module: M&, function: u32) -> Emitter<M> {
     Emitter<M> { blot_backend_runtime_code::Code<M> { module, function } }
 }
-fn op<M>(emitter: Emitter<M>&, opcode: u32, operand: u32 = 0) {
+fn op<M>(emitter: Emitter<M>&, opcode: blot_backend_runtime_ir::Op, operand: u32 = 0) {
     if emitter.failure != Error.none { return; }
     emitter.failure = blot_backend_runtime_code::op(emitter.code, opcode, operand);
 }

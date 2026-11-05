@@ -137,7 +137,7 @@ fn storageStats<G>(g: G&, table: const Table&) {
 fn scalarEvidence<S>(session: const S&, target: blot_check_core::BindingRef) -> u32 {
     let module = session.units[target.unit - 1]; let body = module.body(target.binding); assert(body != null);
     let slot = session.slots[session.binding_offsets[target.unit - 1] + target.binding];
-    if !body.runtime && slot.state == blot_eval_core_eval::SlotState.complete &&
+    if !body.runtime && slot.state == blot_eval_core_eval::State.complete &&
         session.valueInfo(slot.value).kind == blot_eval_core_eval::ValueKind.scalar { return session.valueEvidence(slot.value); }
     return 0;
 }
@@ -146,7 +146,7 @@ fn callKey(read: blot_reuse_specialization_receipt::CallRead, evidence: u32) -> 
 }
 fn lookupLocal<G>(g: G&, root: Root, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:],
     rows: const blot_eval_type_evidence::RowMapping[:]) -> blot_support::Option<Value>, Error {
-    if let owner = g.refinement_owner {
+    { let optional_source_32 .= g.refinement_owner; if optional_source_32 { let owner .= optional_source_32;
         let session = g.evaluator;
         if session.receipt_tape != null || session.principal_reads != null { return blot_support::none<Value>(), Error.none; }
         g.refinement_stats.local_requests++;
@@ -173,23 +173,23 @@ fn lookupLocal<G>(g: G&, root: Root, expected: u32, seeds: const blot_eval_type_
             for fact in facts.plain_facts {
                 let actual = session.specializations.plain_nominals.get(fact.key);
                 if fact.read && !fact.present || actual == null { same = false; break; }
-                if let current = actual { if current != fact.plain { same = false; break; } }
+                { let optional_source_31 .= actual; if optional_source_31 { let current .= optional_source_31; if current != fact.plain { same = false; break; }  } }
             }
             if !same { continue; }
             let result, error = copyResult(record.value); if error != Error.none { return blot_support::none<Value>(), error; }
             g.refinement_stats.local_hits++; g.refinement_stats.collected_removed += facts.collected;
             g.refinement_stats.nodes_removed += facts.solver_nodes; return blot_support::some(result), Error.none;
         }
-    }
+     } }
     return blot_support::none<Value>(), Error.none;
 }
 fn record<G>(g: G&, root: Root, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:],
     rows: const blot_eval_type_evidence::RowMapping[:], result: Value, tape: blot_reuse_specialization_receipt::Tape&,
     observed: Observation, before_values: i64, before_children: i64, before_steps: i64) -> Error {
-    if let owner = g.refinement_owner {
+    { let optional_source_30 .= g.refinement_owner; if optional_source_30 { let owner .= optional_source_30;
         let error = recordOwned(g, owner.refinement_queries, root, expected, seeds, rows, result, tape, observed, before_values, before_children, before_steps);
         storageStats(g, owner.refinement_queries); return error;
-    }
+     } }
     g.refinement_stats.record_declines[0]++; return Error.none;
 }
 fn recordOwned<G>(g: G&, table: Table&, root: Root, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:],
@@ -224,7 +224,7 @@ fn recordOwned<G>(g: G&, table: Table&, root: Root, expected: u32, seeds: const 
     let handle = table.publish(prepared.value, candidate.value); candidate.value.abort();
     g.refinement_stats.recorded++; g.refinement_stats.complete++; return Error.none;
 }
-fn sameShape(left: blot_reuse_code_expectation::View, l: u32, right: blot_reuse_code_expectation::View, r: u32,
+recursive fn sameShape(left: blot_reuse_code_expectation::View, l: u32, right: blot_reuse_code_expectation::View, r: u32,
     depth: i64, budget: i64&) -> bool {
     if depth >= 1024 || budget == 0 || l >= left.nodes.len || r >= right.nodes.len { return false; }
     budget--; if l == 0 || r == 0 { return l == 0 && r == 0; }
@@ -259,12 +259,12 @@ fn sameShape(left: blot_reuse_code_expectation::View, l: u32, right: blot_reuse_
 // candidate. Imports and all destinations are prepared before publications.
 fn lookup<G>(g: G&, root: Root, shape: blot_reuse_code_expectation::View, expected: u32,
     seeds: const blot_eval_type_evidence::Mapping[:], rows: const blot_eval_type_evidence::RowMapping[:]) -> blot_support::Option<Value>, Error {
-    if let state = g.query_state {
-        if let owner = g.artifacts {
+    { let optional_source_29 .= g.query_state; if optional_source_29 { let state .= optional_source_29;
+        { let optional_source_28 .= g.artifacts; if optional_source_28 { let owner .= optional_source_28;
             let result, error = lookupOwned(g, state, owner.refinement_queries, root, shape, expected, seeds, rows);
             storageStats(g, owner.refinement_queries); return result, error;
-        }
-    }
+         } }
+     } }
     return blot_support::none<Value>(), Error.none;
 }
 fn lookupOwned<G,S>(g: G&, state: S&, destination: Table&, root: Root, shape: blot_reuse_code_expectation::View,
@@ -357,8 +357,8 @@ fn lookupOwned<G,S>(g: G&, state: S&, destination: Table&, root: Root, shape: bl
             if unit == 0 || unit > gate.units.len || !gate.structural_units[unit - 1] { valid = false; break; }
             if fact.read {
                 var present = false; var current = false;
-                if let found = plain.get(fact.key) { present = true; current = found; }
-                else if let found = g.evaluator.specializations.plain_nominals.get(fact.key) { present = true; current = found; }
+                { let optional_source_27 .= plain.get(fact.key); if optional_source_27 { let found = optional_source_27; present = true; current = found;  }
+                else { let optional_source_26 .= g.evaluator.specializations.plain_nominals.get(fact.key); if optional_source_26 { let found = optional_source_26; present = true; current = found;  } } }
                 if fact.present && (!present || current != fact.plain) || !fact.present && present { valid = false; break; }
             } else { plain.insert(fact.key, fact.plain); }
         }

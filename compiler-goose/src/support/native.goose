@@ -29,3 +29,12 @@ extern fn atomic_sub(value: u64&, amount: u64) -> u64 = "blot_atomic_sub";
 extern fn atomic_max(value: u64&, candidate: u64) -> u64 = "blot_atomic_max";
 extern fn atomic_load(value: const u64&) -> u64 = "blot_atomic_load";
 extern fn atomic_store(value: u64&, next: u64) = "blot_atomic_store";
+extern fn platform_is_linux() -> u32 = "blot_platform_is_linux";
+fn thread_cpu_available() -> bool { platform_is_linux() != 0 }
+extern fn i32_bits(value: i32) -> u32 = "blot_i32_bits";
+extern fn i32_from_bits(value: u32) -> i32 = "blot_i32_from_bits";
+extern fn f32_mul_add(left: f32, right: f32, addend: f32) -> f32 = "blot_f32_mul_add";
+extern fn debug_write_raw(first: const u8&, count: u64) = "blot_debug_write";
+fn debug_write(bytes: const u8[:]) {
+    if bytes.len != 0 { debug_write_raw(bytes[0], bytes.len as u64); }
+}
