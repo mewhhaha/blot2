@@ -2,6 +2,10 @@
 
 No builds, tests, compiler invocations, formatting or verification have run.
 
+Current coordinated source-writing status (supersedes chronological frontiers below): both high-level engines, Wasm assembly/runtime pipeline/process DTOs, static serialization/SIMD ABI, all storage admission/control/call/owner proofs, root/provider/lifetime transforms, native readers/assets, and adjacent specialization have complete first production writing reports. Other owners supplied the optimizer, activation/startup, retained archive, driver, and runtime passes. WGSL is mapping-agent owned and now reported complete. These reports are not declaration-coverage or execution evidence.
+
+Required work remains: complete source construction/API/ownership alignment across contexts, the actual target-runtime implementation of recoverable OOM/retention guarantees, and the separate test-only source port. Whole-production completion is therefore not claimed. Numeric conversion, process transport, independent Result publication/capture/input pinning and pool release paths remain unqualified. No compiler, build, test, formatter, oracle or verifier has run.
+
 Written production ports:
 - runtime_ir: all production declarations/functions, including packed instruction/ownership encodings, all opcode contracts, ownership facts, call contracts and SIMD lifting. Unit-test blocks are reserved for the separate test-port phase.
 
@@ -418,3 +422,11 @@ backend leaves continue in the source-writing phase.
 - `native_asset_numbers.goose` is a new target helper for exact decimal-to-binary64 conversion, using bounded fixed bigint rationals and ties-to-even rounding, signed zero/overflow/subnormals, and target float spelling normalization. It avoids the installed std.parse_flt documented long-decimal ULP gap. This proof/source design is unverified; numeric boundary tests belong to the deferred test writing/qualification phase.
 - `native_asset_readers.goose` now has the full production first writing pass: bounded JSON scanner with last duplicate-member replacement, repaired unpaired UTF-16 halves/deferred Unicode admission, record/tuple/array shape interning and source emission, catalog UTF-16 name conversion, font coverage/codepoint output, tunable bounds/names/stable IDs/declaration spans and all native diagnostics. Results own exact typed byte runs.
 - `native_asset_wgsl.goose` and transactional `native_assets.goose` algorithms remain unwritten (native_assets has public headers only). No verification has run.
+- `native_assets.goose` now has the full production first writing pass: validated owned options, canonical pooled Candidate lifetimes, captured overlays/files, per-root catalog/text/tunable/WGSL discovery, deterministic UTF-16 module/resource/dependency ordering, SHA256/content handles, exact parse reuse/stats, generated source/resource transactions and commit-only previous-candidate replacement. File-error names are mapped from the installed Zig0.17 Linux source; only scalar errno/directory/read primitives execute in C. Rejected candidates preserve the previous committed generation.
+- NativeAsset WGSL is now exclusively assigned by root to the mapping agent; their full production writing pass is still in progress. No builds/tests/compiler/fmt/oracle calls or verification have run.
+
+### Omitted earlier author reports reconciled
+
+The following five are earlier backend-owned full production first writing passes, omitted from the consolidated report: `empty_root_scopes`, `function_facts`, `inline_body`, `private_cursor`, and `safe_local_sinking`.
+
+They include, respectively, scalar/neutral-call classification and bounded whole-CFG empty-scope proof; cached behavior/length/borrowed-collection facts and bounded source behavior analysis; separate ordinary/numeric inline-cost admission and complete source traversal; closed cursor-family propagation through binds/carries/exits with bounded escape/pattern/body proof; and scalar sink placement with stable-input/movability/single-read proofs. Empty-root scope inputs were later aligned to const Module getters. Tests and test-only helpers remain deferred. This is author-report reconciliation, with no compiler, test, run, format or qualification step.

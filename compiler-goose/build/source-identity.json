@@ -19,18 +19,19 @@
     "inference_budget": 1000000,
     "machine": "x86_64",
     "runtime_sha256": null,
-    "schema": 1
+    "schema": 1,
+    "stdlib": null
   },
-  "digest": "47e85b009c7cbe350cbe8282486142ea5455598b74c31513b7d6138fcc09daa8",
+  "digest": "425f89e2eb5a7f368faaab0eee1c211615f86629f5b3382a86dd1f2a842d2fc1",
   "goose": null,
   "qualification": "unverified source and build inputs",
   "resource_roots": [],
   "resources": [],
   "sources": [
     {
-      "bytes": 11410,
+      "bytes": 12263,
       "path": "build.py",
-      "sha256": "398d614d4cf98d27b1703ab17e7d893395e57cadeacce633a06b8d67d1db7fac"
+      "sha256": "83d62bc6523ff3126cfd93857e644364ee68c31395ad55a84e144a62d14750cc"
     },
     {
       "bytes": 1170,
@@ -38,9 +39,9 @@
       "sha256": "c5afbbff51280d8d44cad6b342ef937030ace7afbebcbf07d630a2e1b3a140b8"
     },
     {
-      "bytes": 16310,
+      "bytes": 16358,
       "path": "native/platform.c",
-      "sha256": "e97b0410a721dbf6d98d3018bd99e999fb1c667438b8baab62c31ebff5513073"
+      "sha256": "154973753b6fe5ad39d40ce62b4f84bf0d1e4dde449f8ef6f0b1bf2b99b1f398"
     },
     {
       "bytes": 41869,
@@ -253,14 +254,14 @@
       "sha256": "425df5a192dcd17e11740b3dea8b3aef877ce55ea54565a6cab4e13678e9f6b7"
     },
     {
-      "bytes": 10270,
+      "bytes": 40285,
       "path": "src/backend/native_asset_wgsl.goose",
-      "sha256": "a26efee1fde84fff58df484d95aa0d714c0430a7206a1ea9e34bcaaa3bf2311d"
+      "sha256": "36a73d07c72ef063bcc7c9a417e8266b8dd62cb19015a1c836ce13bcc05f0e57"
     },
     {
-      "bytes": 2393,
+      "bytes": 27788,
       "path": "src/backend/native_assets.goose",
-      "sha256": "7315bff148fc972eb99b58a1ca68afac0137534274c18ac364a71ed60a135fdc"
+      "sha256": "6f42f6d124c2c5a5500a407a5e27fe43ea5d5358dc8fb01357a79c0e7cc09756"
     },
     {
       "bytes": 7224,
@@ -2123,14 +2124,14 @@
       "sha256": "38a29830289ee04e9c7e72a81654581f8772b2c082f3d4afc450095387809976"
     },
     {
-      "bytes": 97635,
+      "bytes": 127146,
       "path": "src/support/json_adapters.goose",
-      "sha256": "fb9018e675a7cd52dc867b3cacf43ae7912291a3b4455c09254e73d0a35753bc"
+      "sha256": "c84b095716cba01e81185688783917832c761e0d57fe45465a9bc5d68c8284f0"
     },
     {
-      "bytes": 3813,
+      "bytes": 3860,
       "path": "src/support/native.goose",
-      "sha256": "527304b5dcab6f43a49141166b4cb9b4e923f497a31473027383103dc6af561c"
+      "sha256": "521c0584db7270195ac15e498f4796abf24fb15b9e7400c36c334cac93b19916"
     },
     {
       "bytes": 1358,

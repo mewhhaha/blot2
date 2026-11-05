@@ -23,6 +23,7 @@ import backend.layout;
 import backend.memory_profile;
 import backend.native_asset_numbers;
 import backend.native_asset_readers;
+import backend.native_asset_wgsl;
 import backend.native_assets;
 import backend.numeric_rows;
 import backend.opaque_storage;
@@ -179,32 +180,79 @@ import work_counters;
 fn write(writer:Writer&,value:blot_backend_activation_graph::Blocker)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_activation_graph::Kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_allocation_emission::Kind)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_backend_emission::CursorPrevious)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_backend_emission::DispatchPlan)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_backend_emission::CursorPrevious)->blot_error::Error {match value {
+blot_backend_backend_emission::CursorPrevious.boxed payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("boxed"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_backend_backend_emission::DispatchPlan)->blot_error::Error {match value {
+blot_backend_backend_emission::DispatchPlan.scalar payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("scalar"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_backend_emission::FactoryCallee)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_backend_emission::InlinePreparation)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_backend_emission::JoinKind)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_backend_emission::Plan)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_backend_emission::ProjectionPlan)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_backend_emission::ResolverPlan)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_backend_emission::Plan)->blot_error::Error {match value {
+blot_backend_backend_emission::Plan.staging payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("staging"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.instances payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("instances"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.provider payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("provider"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.projection payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("projection"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.update_locations payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("update_locations"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.pattern payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("pattern"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.template payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("template"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.reference payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("reference"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.named payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("named"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.application payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("application"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.resolver payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("resolver"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.dispatch payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("dispatch"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.comparison payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("comparison"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.result_member payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("result_member"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.join payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("join"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.match_ payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("match_"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.loop_ payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("loop_"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.exit payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("exit"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::Plan.request payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("request"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_backend_backend_emission::ProjectionPlan)->blot_error::Error {match value {
+blot_backend_backend_emission::ProjectionPlan.field payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("field"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::ProjectionPlan.empty_cursor payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("empty_cursor"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_backend_backend_emission::ResolverPlan)->blot_error::Error {match value {
+blot_backend_backend_emission::ResolverPlan.run payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("run"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_backend_emission::ResolverPlan.call payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("call"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_backend_emission::SmallKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_backend_timing::Phase)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_callable_origins::Environment)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_callable_origins::Environment)->blot_error::Error {match value {
+blot_backend_callable_origins::Environment.local payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("local"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_callable_origins::Environment.data_word payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("data_word"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_collection_ops::Op)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_collector_contract::Reason)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_core_backend::EmissionResult)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_empty_root_scopes::Action)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_function_facts::Length)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_function_facts::Length)->blot_error::Error {match value {
+blot_backend_function_facts::Length.constant payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("constant"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_function_facts::Length.parameter payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("parameter"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_host_cleanup_shapes::Tag)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_host_entry::Value)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_layout::Tag)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_memory_profile::Category)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_memory_profile::Metric)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_memory_profile::Value)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_memory_profile::Value)->blot_error::Error {match value {
+blot_backend_memory_profile::Value.constant payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("constant"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_memory_profile::Value.local payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("local"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_native_asset_readers::Kind)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_native_asset_readers::Result)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_native_asset_readers::Result)->blot_error::Error {match value {
+blot_backend_native_asset_readers::Result.source payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("source"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.bytes);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_native_asset_readers::Result.issue payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("issue"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_native_asset_readers::ShapeTag)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_native_asset_readers::Tag)->blot_error::Error {return enumValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_native_asset_wgsl::Kind)->blot_error::Error {return enumValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_native_asset_wgsl::Result)->blot_error::Error {match value {
+blot_backend_native_asset_wgsl::Result.source payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("source"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.bytes);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_native_asset_wgsl::Result.issue payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("issue"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_native_assets::Kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_opaque_storage::Kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_owned_arrays::Callee)->blot_error::Error {return unionValue(writer,value);}
@@ -230,18 +278,25 @@ fn write(writer:Writer&,value:blot_backend_startup_occurrence_flow::FactKind)->b
 fn write(writer:Writer&,value:blot_backend_startup_occurrence_flow::Kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_startup_occurrence_flow::Match)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_startup_occurrence_flow::Provenance)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_startup_runtime_reach::Work)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_startup_runtime_reach::Work)->blot_error::Error {match value {
+blot_backend_startup_runtime_reach::Work.value payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("value"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.id);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_storage_calls::TargetKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_storage_plan::ExitKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_storage_plan::LayoutKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_storage_plan::RegionRole)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_storage_transport::State)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_storage_type_key::Memo)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_storage_type_key::Memo)->blot_error::Error {match value {
+blot_backend_storage_type_key::Memo.active payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("active"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.depth);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_backend_storage_type_key::Memo.complete payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("complete"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.result);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_wasm::MemoryModel)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_wasm::OwnershipFallback)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_wasm::SemanticKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_wasm_bit_recurrence::Flow)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_wasm_bit_recurrence::Term)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_wasm_bit_recurrence::Term)->blot_error::Error {match value {
+blot_backend_wasm_bit_recurrence::Term.literal payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("literal"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.bits);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_wasm_bulk_loop::Replacement)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_wasm_bulk_loop::SourceReplacement)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_wasm_lifetimes::AccessKind)->blot_error::Error {return enumValue(writer,value);}
@@ -250,7 +305,9 @@ fn write(writer:Writer&,value:blot_backend_wasm_lifetimes::Edge)->blot_error::Er
 fn write(writer:Writer&,value:blot_backend_wasm_lifetimes::RcWriteKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_wasm_lifetimes::SummaryPhase)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_wasm_scope_outline::Contract)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_backend_wasm_scope_outline::GlobalMap)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_backend_wasm_scope_outline::GlobalMap)->blot_error::Error {match value {
+blot_backend_wasm_scope_outline::GlobalMap.dense payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("dense"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.values);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_backend_wasm_sroa::ReferenceProof)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_backend_wasm_transport_cleanup::Pair)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_capability_contract_core::FunctionUse)->blot_error::Error {return enumValue(writer,value);}
@@ -263,11 +320,16 @@ fn write(writer:Writer&,value:blot_check_capability_lifetimes::EdgeKind)->blot_e
 fn write(writer:Writer&,value:blot_check_capability_lifetimes::Kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_capability_lifetimes::Parameters)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_check::AssociatedChoice)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_check_check::Callees)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_check_check::Callees)->blot_error::Error {match value {
+blot_check_check::Callees.frozen payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("frozen"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_check_check::Code)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_check::ComponentProgress)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_check::DiagnosticContextKind)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_check_check::DictionaryProof)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_check_check::DictionaryProof)->blot_error::Error {match value {
+blot_check_check::DictionaryProof.selected payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("selected"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_check_check::DictionaryProof.given payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("given"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_check_check::EditorName_kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_check::EffectRunnerKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_check::Engine_contract_states_state)->blot_error::Error {return enumValue(writer,value);}
@@ -282,7 +344,10 @@ fn write(writer:Writer&,value:blot_check_check::ResolverKind)->blot_error::Error
 fn write(writer:Writer&,value:blot_check_check::State)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_check::TypeApplication)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_core::Code)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_check_core::DictionaryProof)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_check_core::DictionaryProof)->blot_error::Error {match value {
+blot_check_core::DictionaryProof.selected payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("selected"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_check_core::DictionaryProof.given payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("given"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_check_core::LoopKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_core::Op)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_core::PatternTag)->blot_error::Error {return enumValue(writer,value);}
@@ -292,13 +357,29 @@ fn write(writer:Writer&,value:blot_check_core::ResolverOperation)->blot_error::E
 fn write(writer:Writer&,value:blot_check_core::Tag)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_core::UpdateKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_diagnostic_code::Code)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_check_dictionary_owner::Owner)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_check_effects::Tail)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_check_dictionary_owner::Owner)->blot_error::Error {match value {
+blot_check_dictionary_owner::Owner.quantified payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("quantified"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_check_dictionary_owner::Owner.scheme payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("scheme"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_check_effects::Tail)->blot_error::Error {match value {
+blot_check_effects::Tail.variable payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("variable"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_check_effects::Tail.parameter payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("parameter"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_check_effects::Tail.formal payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("formal"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_check_frozen_core_validation::Kind)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_check_frozen_types::Patterns)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_check_frozen_types::Source)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_check_numeric_proof_core::Fact)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_check_numeric_proof_core::SummaryInputs)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_check_frozen_types::Patterns)->blot_error::Error {match value {
+blot_check_frozen_types::Patterns.store payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("store"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_check_frozen_types::Source)->blot_error::Error {match value {
+blot_check_frozen_types::Source.store payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("store"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_check_numeric_proof_core::Fact)->blot_error::Error {match value {
+blot_check_numeric_proof_core::Fact.order payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("order"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_check_numeric_proof_core::Fact.unequal payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("unequal"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_check_numeric_proof_core::SummaryInputs)->blot_error::Error {match value {
+blot_check_numeric_proof_core::SummaryInputs.captures payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("captures"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.entries);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_check_numeric_proof_terms::Kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_numeric_proof_terms::Relation)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_check_numeric_proof_terms::Tag)->blot_error::Error {return enumValue(writer,value);}
@@ -326,15 +407,21 @@ fn write(writer:Writer&,value:blot_eval_core_eval::CodeProjection)->blot_error::
 fn write(writer:Writer&,value:blot_eval_core_eval::ConstraintKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_eval_core_eval::DispatchContextKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_eval_core_eval::Expected)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_eval_core_eval::Flow)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_eval_core_eval::Flow)->blot_error::Error {match value {
+blot_eval_core_eval::Flow.value payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("value"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_eval_core_eval::PrincipalAction)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_eval_core_eval::PrincipalClaim)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_eval_core_eval::RequirementPart)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_eval_core_eval::SchemeImport)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_eval_core_eval::SchemeImport)->blot_error::Error {match value {
+blot_eval_core_eval::SchemeImport.frame payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("frame"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_eval_core_eval::State)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_eval_core_eval::SummaryJobState)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_eval_core_eval::SummaryProgress)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_eval_core_eval::Work)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_eval_core_eval::Work)->blot_error::Error {match value {
+blot_eval_core_eval::Work.binding payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("binding"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_eval_eval_values::ClosureOrigin)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_eval_eval_values::ValueKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_eval_implementation_evidence::Code)->blot_error::Error {return enumValue(writer,value);}
@@ -353,7 +440,13 @@ fn write(writer:Writer&,value:blot_phase_profile::Phase)->blot_error::Error {ret
 fn write(writer:Writer&,value:blot_phase_profile::Space)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_process_pool::Kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_project_packet::Run)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_artifact_emitter::Event)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_artifact_emitter::Event)->blot_error::Error {match value {
+blot_reuse_artifact_emitter::Event.semantic_site payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("semantic_site"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_artifact_emitter::Event.host_references payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("host_references"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_artifact_emitter::Event.public_owners payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("public_owners"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_artifact_emitter::Event.cleanup_data payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("cleanup_data"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.span);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_artifact_emitter::Event.start payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("start"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.id);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_artifact_emitter::FunctionRole)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_artifact_emitter::ResourceKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_artifact_emitter::Role)->blot_error::Error {return enumValue(writer,value);}
@@ -362,24 +455,53 @@ fn write(writer:Writer&,value:blot_reuse_artifact_import::OperationScope)->blot_
 fn write(writer:Writer&,value:blot_reuse_body_auxiliary::Route)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_body_check_cache::NominalKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_body_check_cache::PrivateVersionKind)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_code_artifacts::Event)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_code_artifacts::OperationLocation)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_code_artifacts::Request)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_code_artifacts::Event)->blot_error::Error {match value {
+blot_reuse_code_artifacts::Event.enter payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("enter"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.job);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_code_artifacts::Event.solved payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("solved"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.job);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_reuse_code_artifacts::OperationLocation)->blot_error::Error {match value {
+blot_reuse_code_artifacts::OperationLocation.word payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("word"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.address);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_reuse_code_artifacts::Request)->blot_error::Error {match value {
+blot_reuse_code_artifacts::Request.named payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("named"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.key);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_code_artifacts::Request.closure payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("closure"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.key);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_code_artifacts::Request.callable payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("callable"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.key);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_code_artifacts::Request.constructor payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("constructor"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.key);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_code_artifacts::Request.primitive payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("primitive"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.key);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_code_artifacts::Request.operation payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("operation"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.key);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_code_artifacts::Request.host payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("host"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.key);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_code_artifacts::Request.constant payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("constant"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.key);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_code_artifacts::Request.runtime_global payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("runtime_global"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.target);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_code_artifacts::StampAlgorithm)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_code_artifacts::State)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_completion_fit::Match)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_completion_probe::Kind)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_constant_receipt::Event)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_constant_receipt::Event)->blot_error::Error {match value {
+blot_reuse_constant_receipt::Event.work payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("work"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_constant_receipt::Event.read payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("read"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_constant_receipt::Event.growth payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("growth"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_constant_receipt::Event.view payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("view"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_constant_receipt::JudgmentKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_constant_receipt::QueryKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_constant_receipt::Reason)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_constant_receipt::Source)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_constant_receipt::Source)->blot_error::Error {match value {
+blot_reuse_constant_receipt::Source.named payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("named"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.target);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_declaration_dependencies::Work)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_declaration_projection::Work)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_declaration_projection::Work)->blot_error::Error {match value {
+blot_reuse_declaration_projection::Work.node payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("node"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.id);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_declaration_projection::Work.binding payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("binding"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.id);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_declaration_projection::Work.pattern payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("pattern"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.id);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_declaration_projection::Work.projection payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("projection"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.id);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_dependency_cli::Creation)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_dependency_format::Run)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_dependency_payload::Run)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_dependency_project_consumer::Lowered)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_dependency_project_consumer::Lowered)->blot_error::Error {match value {
+blot_reuse_dependency_project_consumer::Lowered.rejected payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("rejected"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_dispatch_explanation::ContextKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_dispatch_explanation::Outcome)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_dispatch_explanation::Side)->blot_error::Error {return enumValue(writer,value);}
@@ -388,13 +510,23 @@ fn write(writer:Writer&,value:blot_reuse_entry_frontend_cutoff::Color)->blot_err
 fn write(writer:Writer&,value:blot_reuse_frontend_binding_relocation::Stage)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_frontend_graph_correspondence::Reason)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_frozen_dependency::ExportKind)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_global_references::Event)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_global_references::Event)->blot_error::Error {match value {
+blot_reuse_global_references::Event.visit payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("visit"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.id);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_global_references::Event.restore payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("restore"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.count);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_global_references::Event.pattern_bind payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("pattern_bind"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.id);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_global_references::Event.pattern_read payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("pattern_read"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.id);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_global_references::Kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_hole_diagnostics::Kind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_independent_call_proof::DeclineReason)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_partial_dependency::Preparation)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_partial_dependency::Preparation)->blot_error::Error {match value {
+blot_reuse_partial_dependency::Preparation.ready payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("ready"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+blot_reuse_partial_dependency::Preparation.rejected payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("rejected"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_portable_query::Claim)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_principal_evidence_reuse::PrimitiveResult)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_principal_evidence_reuse::PrimitiveResult)->blot_error::Error {match value {
+blot_reuse_principal_evidence_reuse::PrimitiveResult.solved payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("solved"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_principal_evidence_reuse::SourceReason)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_principal_inputs::Reason)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_principal_interface::ContractMemberKind)->blot_error::Error {return enumValue(writer,value);}
@@ -410,14 +542,22 @@ fn write(writer:Writer&,value:blot_reuse_project_check::Code)->blot_error::Error
 fn write(writer:Writer&,value:blot_reuse_project_check::Editor)->blot_error::Error {return unionValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_refinement_receipt::Reason)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_refinement_receipt::RecordDecline)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_refinement_receipt::Root)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_refinement_receipt::Root)->blot_error::Error {match value {
+blot_reuse_refinement_receipt::Root.body payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("body"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.target);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_restart_cache::Part)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_restart_cache::Persisted)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_retained_revision::CandidateKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_retained_revision::CandidateStatus)->blot_error::Error {return enumValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_retained_revision::LibraryUpdate)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_retained_revision::Preparation)->blot_error::Error {return unionValue(writer,value);}
-fn write(writer:Writer&,value:blot_reuse_revision_inputs::Outcome)->blot_error::Error {return unionValue(writer,value);}
+fn write(writer:Writer&,value:blot_reuse_retained_revision::LibraryUpdate)->blot_error::Error {match value {
+blot_reuse_retained_revision::LibraryUpdate.replace payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("replace"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.owner);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_reuse_retained_revision::Preparation)->blot_error::Error {match value {
+blot_reuse_retained_revision::Preparation.rejected payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("rejected"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
+fn write(writer:Writer&,value:blot_reuse_revision_inputs::Outcome)->blot_error::Error {match value {
+blot_reuse_revision_inputs::Outcome.bytes payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("bytes"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.value);if written!=blot_error::Error.none {return written;}return endObject(writer);},
+_=>{return unionValue(writer,value);},}}
 fn write(writer:Writer&,value:blot_reuse_row_projection_uses::OriginKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_row_projection_uses::PositionKind)->blot_error::Error {return enumValue(writer,value);}
 fn write(writer:Writer&,value:blot_reuse_semantic_query_table::Kind)->blot_error::Error {return enumValue(writer,value);}
@@ -488,7 +628,7 @@ fn write(writer:Writer&,value:blot_backend_core_backend::WireValues)->blot_error
 fn write(writer:Writer&,value:blot_backend_memory_profile::Digest)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_backend_memory_profile::jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write(writer:Writer&,value:blot_backend_memory_profile::Sites)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_backend_memory_profile::jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write(writer:Writer&,value:blot_backend_memory_profile::Source)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_backend_memory_profile::jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
-fn write(writer:Writer&,value:blot_backend_native_assets::Definition)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}blot_backend_native_assets::jsonStringify(value,writer);return writer.failure;}
+fn write(writer:Writer&,value:blot_backend_native_assets::Definition)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_backend_native_assets::jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write(writer:Writer&,value:blot_backend_wasm::BoundaryJson)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_backend_wasm::jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write(writer:Writer&,value:blot_backend_wasm::CallbackJson)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_backend_wasm::jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write(writer:Writer&,value:blot_backend_wasm::CertificateJson)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_backend_wasm::jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
@@ -538,53 +678,41 @@ fn write(writer:Writer&,values:blot_backend_optimized_bodies::WorkerTiming[16])-
 fn write(writer:Writer&,values:blot_backend_packed_layout::Leaf[32])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_backend_private_append_region::Frame[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_backend_runtime_ir::Instruction[18])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_backend_runtime_ir::ValueType[3])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_backend_runtime_parallel::WorkerTiming[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
+fn write(writer:Writer&,values:u8[3])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_backend_source_origins::Frame[4])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_backend_storage_calls::InlineScope[256])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_backend_storage_calls::Ref[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_backend_storage_recursive_admission::Ref[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
+fn write(writer:Writer&,values:blot_check_core::BindingRef[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_capability_contract_core::Alias[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_capability_contract_source::Entry[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_capability_flow::AstId[3])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_capability_flow::AstId[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
+fn write(writer:Writer&,values:u32[3])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
+fn write(writer:Writer&,values:u32[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_capability_flow::CoreInvocationBinding[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_capability_flow::SourceBinding[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_capability_lifetimes::Entry[256])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_capability_lifetimes::Id[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_capability_lifetimes::Mapping[64])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_closed_nominal_storage::Id[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
+fn write(writer:Writer&,values:blot_eval_type_evidence::Mapping[64])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
+fn write(writer:Writer&,values:u32[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_core::BindingRef[8])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_core::BindingRef[12])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_core::BindingRef[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_core::Id[3])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_core::Id[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_core::Id[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_effects::Id[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_generative_relocation::Instance[32])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_generative_relocation::Pair[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_generative_relocation::Pair[4096])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_generative_relocation::RowInstance[32])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_lifetime_report_pool::Range[13])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_package_contracts::FormalPair[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_package_contracts::Id[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_package_contracts::Id[256])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_package_contracts::Id[4096])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
+fn write(writer:Writer&,values:u32[256])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
+fn write(writer:Writer&,values:u32[4096])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_package_contracts::Opening[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_package_contracts::Scheme[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
+fn write(writer:Writer&,values:blot_check_types::Scheme[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_package_row_facts::Page[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_scheme_equations::Id[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_staging_origins::Origin[8])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_storage_core::Pair[4])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_task_regions::Range[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_types::ClosedRow[4])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_types::OperationRow[64])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_types::Scheme[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_check_usage_check::Id[4096])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_usage_core::State[4096])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_check_usage_core::State[65536])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_eval_closed_evidence_import::Frame[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:blot_eval_closed_local_value::BindingRef[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_eval_core_eval::DispatchCandidate[3])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_eval_core_eval::DispatchContext[2])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:blot_eval_core_eval::RaggedOperation[256])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
@@ -617,16 +745,11 @@ fn write(writer:Writer&,values:i64[64])->blot_error::Error {let opened=beginArra
 fn write(writer:Writer&,values:i64[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u16[8192])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u32[2])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:u32[3])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u32[4])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u32[8])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:u32[16])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u32[18])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u32[32])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u32[64])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:u32[128])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:u32[256])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
-fn write(writer:Writer&,values:u32[4096])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u64[3])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u64[4])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}
 fn write(writer:Writer&,values:u64[21])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}

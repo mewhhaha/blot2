@@ -18,7 +18,9 @@ with explicit coverage. No zero-work or successful fault sweep is fabricated.
 
 The retained oracle keeps the full size-class implementation, deterministic
 allocation-fault sweeps, profile helpers and benchmark/fixture executables.
-These remain requirements and evidence for later runtime qualification. If
+Recoverable OOM and the corresponding retention/failure guarantees remain
+missing runtime implementation work, beyond merely unrun tests. The oracle
+keeps the requirements and evidence for that work. If
 Goose pool retention or physical OOM differs materially, fix the selected Goose
 runtime or explicit pool policy before claiming corresponding parity. Source
 inventory completion alone cannot close this requirement.

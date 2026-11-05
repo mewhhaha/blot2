@@ -86,6 +86,7 @@ def fingerprint(args: argparse.Namespace, goose: Path | None,
         "schema": 1, "host": sys.platform, "machine": os.uname().machine,
         "entry": "src/main.goose", "host_entry": "blot_goose_main",
         "goose_inline": args.inline, "c_flags": args.cflag,
+        "stdlib": args.stdlib,
         "inference_budget": args.inference_budget,
         "artifact_replay": args.artifact_replay,
         "goose_sha256": goose_sha,
@@ -150,11 +151,14 @@ def call(stage: str, command: list[str], timeout: float) -> None:
         try:
             process.wait(timeout=0.5)
         except subprocess.TimeoutExpired:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait()
+            pass
+        # The leader may exit on TERM while descendants ignore it. Always
+        # finish the group, including when the direct child has already exited.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
         elapsed = time.monotonic() - started
         if isinstance(failure, KeyboardInterrupt):
             raise RuntimeError(f"{stage} interrupted after {elapsed:.3f}s") from failure
@@ -196,6 +200,9 @@ def main() -> None:
     parser.add_argument("--cflag", action="append", default=[])
     parser.add_argument("--stage-timeout", type=float, default=30,
                         help="maximum seconds per subprocess stage (default: 30)")
+    parser.add_argument("--stdlib", type=Path,
+                        default=os.environ.get("GOOSE_STDLIB"),
+                        help="selected Goose standard library; required for actual builds")
     parser.add_argument("--resource-root", action="append", default=[],
                         help="selected Goose stdlib/package resource tree to fingerprint")
     parser.add_argument("--inference-budget", type=int, default=1_000_000)
@@ -203,6 +210,14 @@ def main() -> None:
     parser.add_argument("--identity-only", action="store_true",
                         help="write a source-only identity without executing toolchains")
     args = parser.parse_args()
+    if args.stdlib is not None:
+        selected_stdlib = Path(args.stdlib).resolve(strict=True)
+        if not selected_stdlib.is_dir():
+            parser.error("--stdlib must name a directory")
+        args.stdlib = str(selected_stdlib)
+        args.resource_root.append(str(selected_stdlib))
+    elif not args.identity_only:
+        parser.error("--stdlib (or GOOSE_STDLIB) must select the library fingerprinted and loaded by this build")
     if args.inference_budget < 1 or args.inference_budget > (1 << 64) - 1:
         parser.error("inference budget must be 1..18446744073709551615")
     if not math.isfinite(args.stage_timeout) or args.stage_timeout <= 0:
@@ -233,7 +248,7 @@ def main() -> None:
     program = build / "blot_goose.c"
     header = build / "blot_goose.h"
     call("emit program", [str(goose), "-o", str(program), "--header", str(header),
-          args.inline, str(ROOT / "src/main.goose")], args.stage_timeout)
+          args.inline, "--stdlib", args.stdlib, str(ROOT / "src/main.goose")], args.stage_timeout)
     compiler = [str(cc)] + cc_words[1:]
     runtime_object = cached_object("compile runtime", runtime, build, compiler,
         args.cflag, record["configuration"]["cc_sha256"], args.stage_timeout)

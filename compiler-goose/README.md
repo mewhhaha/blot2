@@ -5,9 +5,12 @@ installed compiler remain the oracle; the ordinary Blot toolchain still uses
 them. `oracle.json` pins the source and executable used for later comparisons.
 The remote tag `goose-port-oracle-156f84b` preserves that Zig source baseline.
 
-The current phase is **writing**. The complete production port comes before
-compilation, execution or differential verification. Files present here are
-unverified source, not evidence of compiler parity.
+Every compiler-algorithm module now has an author-reported **first source
+pass**. The
+complete production port is still pending: recoverable allocation failure and
+runtime retention/observation need implementation work. Verification remains
+deferred under the all-code-first instruction. Files here are unverified source,
+not evidence of compiler parity.
 
 The module map follows the Zig implementation. Goose contexts borrow typed
 tables owned by their callers; numeric identities survive growth. Errors travel
@@ -28,13 +31,14 @@ The native entry is now source-written in `src/main.goose`, with concrete CLI
 pipelines and process worker dispatch under `src/driver/`. `build.py` regenerates
 `src/source_identity.goose` from the actual Goose sources, native host support,
 build options, selected Goose/C compiler binaries and emitted Goose runtime.
-External stdlib/package trees can be pinned with `--resource-root`. It emits C
+Actual builds require `--stdlib` and fingerprint that selected tree. Additional
+package trees can be pinned with `--resource-root`. It emits C
 with a C-host header and links the ordinary Goose runtime plus the scalar/OS
 adapter; it never invokes the Zig oracle. Reusable runtime and platform objects
 are keyed by their actual source text, C compiler and flags.
 
-The build has not been run during the source-writing phase. Once that phase is
-complete, the build entry is `python3 build.py --goose /path/to/goose --cc clang`.
+The build has not been run. Once that phase is
+complete, the build entry is `python3 build.py --goose /path/to/goose --cc clang --stdlib /path/to/stdlib`.
 Development defaults to Goose `-O0` and C `-O0`; `--release` selects `-O2` for
 both. Each subprocess stage reports its elapsed time and has a 30-second limit,
 adjustable with `--stage-timeout SECONDS`. A timeout terminates the stage's

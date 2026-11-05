@@ -61,6 +61,8 @@ def fields(body):
 
 SKIP = {'support/json_adapters.goose'}
 models = {}
+scalar_projections = {}
+aliases = {}
 custom = {}
 arrays = set()
 imports = set()
@@ -74,9 +76,56 @@ for path in sorted(ROOT.rglob('*.goose')):
         continue
     ns = match[1]
     module = path.relative_to(ROOT).with_suffix('').as_posix().replace('/','.')
+    native_path = ROOT.parents[1] / 'compiler/src' / path.relative_to(ROOT).with_suffix('.zig')
+    native_unions = {}
+    if native_path.is_file():
+        native = clean(native_path.read_text())
+        for union in re.finditer(r'\bconst\s+(\w+)\s*=\s*union\s*\([^;{}]+\)\s*\{', native):
+            union_end = balanced(native, union.end()-1)
+            variants = {}
+            for item in split(native[union.end():union_end]):
+                variant = re.fullmatch(r'(?:@"([^"\n]+)"|(\w+))\s*:\s*(.+)', item, re.S)
+                if variant:
+                    variants[variant[1] or variant[2]] = variant[3].strip()
+            native_unions[union[1]] = variants
+    for alias in re.finditer(r'\btype\s+(\w+)\s*=\s*([^;]+);', text):
+        aliases[ns+'::'+alias[1]] = (alias[2].strip(), ns)
     for match in re.finditer(r'\benum\s+(\w+)\s*\{', text):
         end = balanced(text, match.end()-1)
         models[ns+'::'+match[1]] = ('{' in text[match.end():end], module)
+        # Flatten only a wrapper whose payload corresponds to the native
+        # union's value type. A native anonymous struct keeps its field object.
+        original = native_unions.get(match[1], {})
+        projections = []
+        for item in split(text[match.end():end]):
+            variant = re.fullmatch(r'(\w+)\s*\{(.*)\}', item.strip(), re.S)
+            if not variant:
+                continue
+            payload_fields = fields(variant[2])
+            if len(payload_fields) != 1:
+                continue
+            member, element = payload_fields[0]
+            source_name = variant[1]
+            renamed = {'block_':'block','loop_':'loop','match_':'match','opaque_':'opaque','unsigned32':'u32','floating32':'f32'}
+            native_type = original.get(renamed.get(source_name, source_name))
+            if native_type is None or re.match(r'(?:packed\s+|extern\s+)?(?:struct|union|enum)\b', native_type):
+                continue
+            def shape(raw):
+                raw = re.sub(r'\bconst\s+', '', raw).strip().rstrip('&').strip()
+                raw = raw.replace('usize','i64').replace('isize','i64')
+                option = re.fullmatch(r'(?:blot_support::)?Option<(.+)>',raw)
+                if option:
+                    return ('optional', shape(option[1]))
+                if raw.startswith('?'):
+                    return ('optional', shape(raw[1:]))
+                if raw.startswith('[]'):
+                    return ('slice', shape(raw[2:]))
+                if raw.endswith('[:]'):
+                    return ('slice', shape(raw[:-3]))
+                return raw.replace('::','.').split('.')[-1].replace(' ','')
+            if shape(element) == shape(native_type):
+                projections.append((source_name,member))
+        scalar_projections[ns+'::'+match[1]] = projections
     for match in re.finditer(r'\bfn\s+jsonStringify\s*(?:<([^>]+)>)?\s*\(', text):
         if ns == 'blot_json':
             continue
@@ -120,7 +169,14 @@ for name, (payload, _) in sorted(models.items()):
     if name in custom:
         continue
     implementation = 'unionValue' if payload else 'enumValue'
-    out.append('fn write(writer:Writer&,value:'+name+')->blot_error::Error {return '+implementation+'(writer,value);}')
+    projections = scalar_projections.get(name, [])
+    if not projections:
+        out.append('fn write(writer:Writer&,value:'+name+')->blot_error::Error {return '+implementation+'(writer,value);}')
+        continue
+    out.append('fn write(writer:Writer&,value:'+name+')->blot_error::Error {match value {')
+    for variant, member in projections:
+        out.append(name+'.'+variant+' payload=>{let opened=beginObject(writer);if opened!=blot_error::Error.none {return opened;}let named=key(writer,sourceName("'+variant+'"));if named!=blot_error::Error.none {return named;}let written=write(writer,payload.'+member+');if written!=blot_error::Error.none {return written;}return endObject(writer);},')
+    out.append('_=>{return '+implementation+'(writer,value);},}}')
 for name, (ns, generic, _, returns_error, output_bytes) in sorted(custom.items()):
     type_parameters = ''
     if generic:
@@ -134,8 +190,23 @@ for name, (ns, generic, _, returns_error, output_bytes) in sorted(custom.items()
     else:
         body = ns+'::jsonStringify(value,writer);return writer.failure;'
     out.append(prefix+body+'}')
+def resolve_alias(name):
+    seen = set()
+    while name in aliases and name not in seen:
+        seen.add(name)
+        replacement, namespace = aliases[name]
+        if replacement in primitives or '::' in replacement:
+            name = replacement
+        elif re.fullmatch(r'\w+', replacement):
+            name = namespace+'::'+replacement
+        else:
+            # Preserve composite aliases as one concrete, named element type.
+            break
+    return name
+
 seen = set()
 for inner, width, _ in sorted(arrays):
+    inner = resolve_alias(inner)
     key = (inner,width)
     if key in seen:
         continue

@@ -41,7 +41,9 @@ Representation contracts:
 
 Remaining qualification:
 
-- Finish the other owners' production writing reports before any verification.
+- All algorithm owners have reported first passes. Verification stays deferred
+  pending clarification of whether runtime recovery must precede acceptance.
+  The five earlier backend leaves also have explicit reconciled writing reports.
 - Select the Goose toolchain, then bound source acceptance/build iterations.
   Verify imports, constructors, references, schema codecs and ownership rules.
 - Qualify CLI/session behavior and differential source/output/diagnostics against

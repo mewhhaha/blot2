@@ -1,5 +1,10 @@
 # Owned-storage rewrite: active task index
 
+Current experiment: write the Zig compiler's production behavior in idiomatic
+Goose under `compiler-goose/`, then verify against the preserved Zig oracle.
+Keep the ordinary toolchain and pinned native qualification intact; source
+writing status is not compiler, runtime or performance qualification.
+
 The current priorities are shared-kernel runtime, Gdev Wasm size and short
 iterations. Subsecond compilation, sub-five-second Main and 1–2MB remain unmet.
 The
