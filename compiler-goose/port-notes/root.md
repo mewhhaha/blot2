@@ -158,3 +158,12 @@ unmeasured. Core image comparison erases only canonical scalar literal bits.
 All public/current-owner semantic IDs are re-interned before memo replay.
 Evidence capture reads the new pooled Store Buffers through their items slices;
 this remains source alignment, with verification still deferred.
+
+Cohort, region and shared_rc runtime emitters now have first production writing
+passes. Finite source tuple recipes are expanded into ordinary postfix calls
+without an expression heap. Shared RC helpers consume the fixed Emitter and
+report its first Error; checkedHead also exposes the RuntimeCode adapter used
+by region/cohort checks. Successful instruction order is intended to match the
+Zig oracle; this has not been verified. Arena, root, cycle, list and data-stack
+runtimes remain unwritten. Capability reconstruction in frozen bounds now uses
+the checker-owned pooled Store and releases it on every exit.

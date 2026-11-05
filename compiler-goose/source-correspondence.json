@@ -3435,7 +3435,7 @@
       "zig": "compiler/src/runtime/cohort_runtime.zig",
       "goose": "compiler-goose/src/runtime/cohort_runtime.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/cohort_runtime_tests.zig",
@@ -3513,7 +3513,7 @@
       "zig": "compiler/src/runtime/region_runtime.zig",
       "goose": "compiler-goose/src/runtime/region_runtime.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/request_runtime.zig",
@@ -3561,7 +3561,7 @@
       "zig": "compiler/src/runtime/shared_rc.zig",
       "goose": "compiler-goose/src/runtime/shared_rc.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/shared_rc_fixture.zig",

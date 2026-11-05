@@ -61,3 +61,7 @@ fn annotation<M>(emitter: Emitter<M>&, item: blot_backend_runtime_ir::Instructio
     if emitter.failure != Error.none { return; }
     emitter.failure = blot_backend_wasm::emit(emitter.code.module, emitter.code.function, item);
 }
+fn value<M>(emitter: Emitter<M>&, instructions: const blot_backend_runtime_ir::Instruction[:]) {
+    if emitter.failure != Error.none { return; }
+    emitter.failure = blot_backend_runtime_code::value(emitter.code, instructions);
+}

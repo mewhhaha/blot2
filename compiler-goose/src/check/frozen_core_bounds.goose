@@ -156,10 +156,14 @@ fn catalogs(self: Bounds) -> Error {
         let binding=m.bindings[entry.binding]; { let propagated_error = require(binding.capability_parameters.present() && binding.body_id != 0 && binding.body_id < m.bodies.len); if propagated_error != Error.none { return propagated_error; } }
         let claimed=m.capability_contracts.header(entry.binding,binding.capability_parameters.arity()); { let propagated_error = require(claimed.present); if propagated_error != Error.none { return propagated_error; } }
         if claimed.value.view().validate(claimed.value.root,claimed.value.arity,true) != Error.none { return Error.invalid_artifact; }
-        var terms: blot_check_capability_contracts::Term[>..<]=[]; var words: u32[>..<]=[]; var reconstructed=blot_check_capability_contracts::init(terms,words);
+        let initialized, initialization_error = blot_check_capability_contracts::initPooled();
+        if initialization_error != Error.none { return Error.invalid_artifact; }
+        var reconstructed = initialized;
         let root,error=blot_check_capability_contract_core::deriveWithOwnersBudget(reconstructed,m,m.bodies[binding.body_id],binding.capability_parameters,self.context.units,1048576);
-        if error != Error.none || !root.present { return Error.invalid_artifact; }
-        let same,failure=blot_check_capability_contracts::equivalent(claimed.value.view(),claimed.value.root,reconstructed.view(),root.value); { let propagated_error = require(failure == Error.none && same); if propagated_error != Error.none { return propagated_error; } }
+        if error != Error.none || !root.present { reconstructed.deinit(); return Error.invalid_artifact; }
+        let same,failure=blot_check_capability_contracts::equivalent(claimed.value.view(),claimed.value.root,reconstructed.view(),root.value);
+        reconstructed.deinit();
+        if failure != Error.none || !same { return Error.invalid_artifact; }
     }
     for value,id in m.bindings {
         { let propagated_error = require(value.capability_parameters.valid()); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = self.ty(value.ty); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = self.scheme(value.scheme); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = self.publicSlots(value.public_variables,value.scheme.variables,false); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = self.publicSlots(value.public_rows,value.scheme.row_variables,true); if propagated_error != Error.none { return propagated_error; } }
