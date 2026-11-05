@@ -3,6 +3,7 @@
 This is a source port of the compiler in `../compiler/`. The Zig source and
 installed compiler remain the oracle; the ordinary Blot toolchain still uses
 them. `oracle.json` pins the source and executable used for later comparisons.
+The remote tag `goose-port-oracle-156f84b` preserves that Zig source baseline.
 
 The current phase is **writing**. The complete production port comes before
 compilation, execution or differential verification. Files present here are

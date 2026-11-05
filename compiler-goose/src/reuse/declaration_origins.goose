@@ -7,14 +7,14 @@ import support.option;
 
 type Error = blot_error::Error;
 struct Pair { before: u32 = 0, after: u32 = 0, ambiguous: bool = false }
-fn name(module: blot_check_core::Module&, body: blot_check_core::Body) -> blot_support::Option<const u8[:]> {
+fn name(module: const blot_check_core::Module&, body: blot_check_core::Body) -> blot_support::Option<const u8[:]> {
     let span = body.declaration_name;
     if span.len == 0 || span.start > module.names.len || span.len > module.names.len - span.start {
         return blot_support::none<const u8[:]>();
     }
     return blot_support::some(module.names[span.start..span.start + span.len]);
 }
-fn collect(entries: dictionary<const u8[:], Pair>&, module: blot_check_core::Module&, before: bool) -> Error {
+fn collect(entries: dictionary<const u8[:], Pair>&, module: const blot_check_core::Module&, before: bool) -> Error {
     for body in module.bodies {
         if body.binding == 0 { continue; }
         let spelling = name(module, body); if !spelling.present { continue; }
@@ -31,7 +31,7 @@ fn collect(entries: dictionary<const u8[:], Pair>&, module: blot_check_core::Mod
     }
     return Error.none;
 }
-fn mark(old: blot_check_core::Module&, current: blot_check_core::Module&, admitted: bool[:]) -> Error {
+fn mark(old: const blot_check_core::Module&, current: const blot_check_core::Module&, admitted: bool[:]) -> Error {
     if admitted.len != current.bindings.len { abort("declaration origin admission shape"); }
     for &item in admitted { item = false; }
     var entries: dictionary<const u8[:], Pair> = default<dictionary<const u8[:], Pair>>();

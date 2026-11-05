@@ -159,34 +159,117 @@ fn ownedBytes(record: Record) -> i64 {
     addBytes(total, bytes_of(record.views).len); addBytes(total, bytes_of(record.plain_facts).len);
     addBytes(total, bytes_of(record.completed_closures).len); return total;
 }
+struct SourceBuffer { storage: blot_check_core::BindingRef[:] = [], items: blot_check_core::BindingRef[:] = [], len: i64 = 0, failure: Error = Error.none }
+reusable[] var tape_sources: blot_check_core::BindingRef[>..] = [];
+fn push(self: SourceBuffer&, value: blot_check_core::BindingRef) -> Error {
+    if self.failure != Error.none { return self.failure; }
+    if self.len == self.storage.len {
+        if self.len > 0x5555555555555540 { self.failure = Error.out_of_memory; return self.failure; }
+        let minimum = self.len + 1; let capacity = max(8, minimum + minimum / 2);
+        let run = tape_sources.alloc_slice(capacity); for item, index in self.items { run[index] = item; }
+        if self.storage.len != 0 { tape_sources.free_slice(self.storage); } self.storage = run;
+    }
+    self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
+}
+fn clear(self: SourceBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
+fn deinit(self: SourceBuffer&) { if self.storage.len != 0 { tape_sources.free_slice(self.storage); } self = SourceBuffer {}; }
+struct ScalarBuffer { storage: ScalarRead[:] = [], items: ScalarRead[:] = [], len: i64 = 0, failure: Error = Error.none }
+reusable[] var tape_scalars: ScalarRead[>..] = [];
+fn push(self: ScalarBuffer&, value: ScalarRead) -> Error {
+    if self.failure != Error.none { return self.failure; }
+    if self.len == self.storage.len {
+        if self.len > 0x5555555555555540 { self.failure = Error.out_of_memory; return self.failure; }
+        let minimum = self.len + 1; let capacity = max(8, minimum + minimum / 2);
+        let run = tape_scalars.alloc_slice(capacity); for item, index in self.items { run[index] = item; }
+        if self.storage.len != 0 { tape_scalars.free_slice(self.storage); } self.storage = run;
+    }
+    self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
+}
+fn clear(self: ScalarBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
+fn deinit(self: ScalarBuffer&) { if self.storage.len != 0 { tape_scalars.free_slice(self.storage); } self = ScalarBuffer {}; }
+struct CallBuffer { storage: CallRead[:] = [], items: CallRead[:] = [], len: i64 = 0, failure: Error = Error.none }
+reusable[] var tape_calls: CallRead[>..] = [];
+fn push(self: CallBuffer&, value: CallRead) -> Error {
+    if self.failure != Error.none { return self.failure; }
+    if self.len == self.storage.len {
+        if self.len > 0x5555555555555540 { self.failure = Error.out_of_memory; return self.failure; }
+        let minimum = self.len + 1; let capacity = max(8, minimum + minimum / 2);
+        let run = tape_calls.alloc_slice(capacity); for item, index in self.items { run[index] = item; }
+        if self.storage.len != 0 { tape_calls.free_slice(self.storage); } self.storage = run;
+    }
+    self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
+}
+fn clear(self: CallBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
+fn deinit(self: CallBuffer&) { if self.storage.len != 0 { tape_calls.free_slice(self.storage); } self = CallBuffer {}; }
+struct ViewBuffer { storage: ViewEffect[:] = [], items: ViewEffect[:] = [], len: i64 = 0, failure: Error = Error.none }
+reusable[] var tape_views: ViewEffect[>..] = [];
+fn push(self: ViewBuffer&, value: ViewEffect) -> Error {
+    if self.failure != Error.none { return self.failure; }
+    if self.len == self.storage.len {
+        if self.len > 0x5555555555555540 { self.failure = Error.out_of_memory; return self.failure; }
+        let minimum = self.len + 1; let capacity = max(8, minimum + minimum / 2);
+        let run = tape_views.alloc_slice(capacity); for item, index in self.items { run[index] = item; }
+        if self.storage.len != 0 { tape_views.free_slice(self.storage); } self.storage = run;
+    }
+    self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
+}
+fn clear(self: ViewBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
+fn deinit(self: ViewBuffer&) { if self.storage.len != 0 { tape_views.free_slice(self.storage); } self = ViewBuffer {}; }
+struct PlainBuffer { storage: PlainFact[:] = [], items: PlainFact[:] = [], len: i64 = 0, failure: Error = Error.none }
+reusable[] var tape_plains: PlainFact[>..] = [];
+fn push(self: PlainBuffer&, value: PlainFact) -> Error {
+    if self.failure != Error.none { return self.failure; }
+    if self.len == self.storage.len {
+        if self.len > 0x5555555555555540 { self.failure = Error.out_of_memory; return self.failure; }
+        let minimum = self.len + 1; let capacity = max(8, minimum + minimum / 2);
+        let run = tape_plains.alloc_slice(capacity); for item, index in self.items { run[index] = item; }
+        if self.storage.len != 0 { tape_plains.free_slice(self.storage); } self.storage = run;
+    }
+    self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
+}
+fn clear(self: PlainBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
+fn deinit(self: PlainBuffer&) { if self.storage.len != 0 { tape_plains.free_slice(self.storage); } self = PlainBuffer {}; }
 struct Tape {
-    sources: blot_check_core::BindingRef[>..<]&, scalar_reads: ScalarRead[>..<]&,
-    call_reads: CallRead[>..<]&, call_publications: CallRead[>..<]&,
-    views: ViewEffect[>..<]&, plain_facts: PlainFact[>..<]&,
+    sources: SourceBuffer = SourceBuffer {}, scalar_reads: ScalarBuffer = ScalarBuffer {},
+    call_reads: CallBuffer = CallBuffer {}, call_publications: CallBuffer = CallBuffer {},
+    views: ViewBuffer = ViewBuffer {}, plain_facts: PlainBuffer = PlainBuffer {},
     nested: bool = false, unknown: bool = false, collected: i64 = 0,
 }
-fn init(sources: blot_check_core::BindingRef[>..<]&, scalars: ScalarRead[>..<]&,
-    calls: CallRead[>..<]&, publications: CallRead[>..<]&, views: ViewEffect[>..<]&,
-    plains: PlainFact[>..<]&) -> Tape { Tape { sources, scalars, calls, publications, views, plains } }
+fn initPooled() -> Tape, Error { return Tape {}, Error.none; }
 fn deinit(self: Tape&) {
-    self.sources.clear(); self.scalar_reads.clear(); self.call_reads.clear(); self.call_publications.clear();
-    self.views.clear(); self.plain_facts.clear();
+    self.sources.deinit(); self.scalar_reads.deinit(); self.call_reads.deinit();
+    self.call_publications.deinit(); self.views.deinit(); self.plain_facts.deinit();
 }
 fn finish(self: Tape&, base: Record) -> Record, Error {
+    let failures = [self.sources.failure, self.scalar_reads.failure, self.call_reads.failure,
+        self.call_publications.failure, self.views.failure, self.plain_facts.failure];
+    for failure in failures { if failure != Error.none { self.deinit(); return default<Record>(), failure; } }
     var result = base;
-    result.sources = copyOwned(self.sources); result.scalar_reads = copyOwned(self.scalar_reads);
-    result.call_reads = copyOwned(self.call_reads); result.call_publications = copyOwned(self.call_publications);
-    result.views = copyOwned(self.views); result.plain_facts = copyOwned(self.plain_facts);
+    result.sources = copyOwned(self.sources.items); result.scalar_reads = copyOwned(self.scalar_reads.items);
+    result.call_reads = copyOwned(self.call_reads.items); result.call_publications = copyOwned(self.call_publications.items);
+    result.views = copyOwned(self.views.items); result.plain_facts = copyOwned(self.plain_facts.items);
     result.complete = result.complete && !self.nested && !self.unknown;
     self.deinit(); return result, Error.none;
 }
 fn withTape<C,F>(context: C&) -> Error {
-    var sources: blot_check_core::BindingRef[>..<] = []; var scalars: ScalarRead[>..<] = [];
-    var calls: CallRead[>..<] = []; var publications: CallRead[>..<] = [];
-    var views: ViewEffect[>..<] = []; var plains: PlainFact[>..<] = [];
-    var tape = init(sources, scalars, calls, publications, views, plains);
-    return F(context, tape);
+    var tape, error = initPooled(); if error != Error.none { return error; }
+    let failure = F(context, tape); tape.deinit(); return failure;
 }
 fn principalOutcomeCode(value: PrincipalOutcome) -> u8 {
     match value { PrincipalOutcome.missing => 0, PrincipalOutcome.declined => 1, PrincipalOutcome.graph => 2 }
 }
+
+fn append(self: SourceBuffer&, values: const blot_check_core::BindingRef[:]) -> Error { for value in values { let error = self.push(value); if error != Error.none { return error; } } return self.failure; }
+fn resize(self: SourceBuffer&, length: i64) { assert(length >= 0 && length <= self.len); self.len = length; self.items = self.storage[..length]; }
+
+fn append(self: ScalarBuffer&, values: const ScalarRead[:]) -> Error { for value in values { let error = self.push(value); if error != Error.none { return error; } } return self.failure; }
+fn resize(self: ScalarBuffer&, length: i64) { assert(length >= 0 && length <= self.len); self.len = length; self.items = self.storage[..length]; }
+
+fn append(self: CallBuffer&, values: const CallRead[:]) -> Error { for value in values { let error = self.push(value); if error != Error.none { return error; } } return self.failure; }
+fn resize(self: CallBuffer&, length: i64) { assert(length >= 0 && length <= self.len); self.len = length; self.items = self.storage[..length]; }
+
+fn append(self: ViewBuffer&, values: const ViewEffect[:]) -> Error { for value in values { let error = self.push(value); if error != Error.none { return error; } } return self.failure; }
+fn resize(self: ViewBuffer&, length: i64) { assert(length >= 0 && length <= self.len); self.len = length; self.items = self.storage[..length]; }
+
+fn append(self: PlainBuffer&, values: const PlainFact[:]) -> Error { for value in values { let error = self.push(value); if error != Error.none { return error; } } return self.failure; }
+fn resize(self: PlainBuffer&, length: i64) { assert(length >= 0 && length <= self.len); self.len = length; self.items = self.storage[..length]; }

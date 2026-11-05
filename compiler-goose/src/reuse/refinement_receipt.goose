@@ -195,9 +195,9 @@ fn record<G>(g: G&, root: Root, expected: u32, seeds: const blot_eval_type_evide
 fn recordOwned<G>(g: G&, table: Table&, root: Root, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:],
     rows: const blot_eval_type_evidence::RowMapping[:], result: Value, tape: blot_reuse_specialization_receipt::Tape&,
     observed: Observation, before_values: i64, before_children: i64, before_steps: i64) -> Error {
-    if !queryOwners(g.evaluator.units, root, tape.sources) { g.refinement_stats.record_declines[1]++; return Error.none; }
+    if !queryOwners(g.evaluator.units, root, tape.sources.items) { g.refinement_stats.record_declines[1]++; return Error.none; }
     if g.evaluator.has_generative_sources {
-        let generative, error = generativeQuery(g.evaluator.units, root, tape.sources); if error != Error.none { return error; }
+        let generative, error = generativeQuery(g.evaluator.units, root, tape.sources.items); if error != Error.none { return error; }
         if generative { g.refinement_stats.record_declines[2]++; return Error.none; }
     }
     match root { Root.body body => { tape.sources.push(body.target); }, _ => {} }

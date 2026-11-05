@@ -1570,7 +1570,12 @@
       "zig": "compiler/src/check/frozen_core_validation.zig",
       "goose": "compiler-goose/src/check/frozen_core_validation.goose",
       "role": "source_module",
-      "write_state": "written_unverified"
+      "write_state": "written_unverified",
+      "goose_helpers": [
+        "compiler-goose/src/check/frozen_core_bounds.goose",
+        "compiler-goose/src/check/frozen_core_graph.goose",
+        "compiler-goose/src/check/frozen_core_scopes.goose"
+      ]
     },
     {
       "zig": "compiler/src/check/frozen_core_validation_tests.zig",
@@ -2656,7 +2661,7 @@
       "zig": "compiler/src/reuse/declaration_dependencies.zig",
       "goose": "compiler-goose/src/reuse/declaration_dependencies.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/declaration_origins.zig",
@@ -2668,7 +2673,7 @@
       "zig": "compiler/src/reuse/declaration_projection.zig",
       "goose": "compiler-goose/src/reuse/declaration_projection.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/demanded_mismatch_tests.zig",
@@ -2692,7 +2697,7 @@
       "zig": "compiler/src/reuse/dependency_certificate.zig",
       "goose": "compiler-goose/src/reuse/dependency_certificate.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/dependency_cli.zig",
@@ -2938,7 +2943,7 @@
       "zig": "compiler/src/reuse/mismatch_display.zig",
       "goose": "compiler-goose/src/reuse/mismatch_display.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/module_abstraction_validation.zig",
@@ -3106,7 +3111,7 @@
       "zig": "compiler/src/reuse/principal_reuse_gate.zig",
       "goose": "compiler-goose/src/reuse/principal_reuse_gate.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/principal_reuse_gate_tests.zig",
@@ -3382,7 +3387,7 @@
       "zig": "compiler/src/reuse/validation_image.zig",
       "goose": "compiler-goose/src/reuse/validation_image.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/value_pattern_scope_tests.zig",

@@ -14,39 +14,66 @@ enum Action {
     release { local: Local }, release_if_nonzero { local: Local }, root_scope,
     revoke_effect { local: Local },
 }
-struct Stack { parent: const Stack? = null, actions: Action[>..<]& }
-fn init(actions: Action[>..<]&, parent: const Stack? = null) -> Stack { Stack { parent, actions } }
-fn deinit(self: Stack&) { self.actions.clear(); }
-fn mark(self: const Stack&) -> Mark { self.actions.len }
-fn restore(self: Stack&, checkpoint: Mark) { self.actions.resize(checkpoint); }
-fn since(self: const Stack&, checkpoint: Mark) -> const Action[:] { self.actions[checkpoint..] }
-fn append(self: Stack&, action: Action) -> Error { self.actions.push(action); return Error.none; }
+enum Backing { empty, lexical { value: Action[>..<]& }, pooled { run: Action[:], len: i64 } }
+struct Stack { parent: const Stack? = null, actions: Backing = Backing.empty }
+reusable[] var action_runs: Action[>..] = [];
+fn init(actions: Action[>..<]&, parent: const Stack? = null) -> Stack { Stack { parent, Backing.lexical { actions } } }
+// Recursive emitters carry only fixed descriptors. The run is an actual typed
+// allocation, released when this lexical owner leaves, including error paths.
+fn initPooled(parent: const Stack? = null) -> Stack, Error { return Stack { parent, Backing.pooled { [], 0 } }, Error.none; }
+fn release(run: const Action[:]) { if run.len != 0 { let first: const Action& = run[0]; let at = action_runs.index_of(first); assert(at >= 0); action_runs.free_slice(action_runs[at..at + run.len]); } }
+fn items(self: const Stack&) -> const Action[:] {
+    match self.actions { Backing.empty => { return []; }, Backing.lexical backing => { return backing.value[..]; }, Backing.pooled backing => { return backing.run[..backing.len]; } }
+}
+fn deinit(self: Stack&) { match self.actions { Backing.empty => {}, Backing.lexical backing => { backing.value.clear(); }, Backing.pooled backing => { release(backing.run); } } self.actions = Backing.empty; self.parent .= null; }
+fn mark(self: const Stack&) -> Mark { return self.items().len; }
+fn restore(self: Stack&, checkpoint: Mark) {
+    assert(checkpoint >= 0 && checkpoint <= self.mark());
+    match self.actions { Backing.empty => {}, Backing.lexical backing => { backing.value.resize(checkpoint); }, Backing.pooled backing => { self.actions = Backing.pooled { backing.run, checkpoint }; } }
+}
+fn since(self: const Stack&, checkpoint: Mark) -> const Action[:] { return self.items()[checkpoint..]; }
+fn append(self: Stack&, action: Action) -> Error {
+    match self.actions {
+        Backing.empty => { return Error.invalid_artifact; },
+        Backing.lexical backing => { backing.value.push(action); },
+        Backing.pooled backing => {
+            var run = backing.run;
+            if backing.len == run.len {
+                if backing.len > 0x5555555555555540 { return Error.out_of_memory; }
+                let minimum = backing.len + 1; let next = minimum + minimum / 2 + 7;
+                let replacement = action_runs.alloc_slice(next); for index in backing.len { replacement[index] = run[index]; }
+                release(run); run = replacement;
+            }
+            run[backing.len] = action; self.actions = Backing.pooled { run, backing.len + 1 };
+        },
+    } return Error.none;
+}
 fn emitTo(self: const Stack&, module: Module&, function: u32, checkpoint: Mark) -> Error {
     return emitToResult(self, module, function, checkpoint, blot_support::none<u32>());
 }
 fn emitToResult(self: const Stack&, module: Module&, function: u32, checkpoint: Mark,
     result: blot_support::Option<u32>) -> Error {
-    assert(checkpoint >= 0 && checkpoint <= self.actions.len);
-    var index = self.actions.len;
+    let actions = self.items(); assert(checkpoint >= 0 && checkpoint <= actions.len);
+    var index = actions.len;
     while index > checkpoint {
         index--;
-        match self.actions[index] {
-            Action.task_group => { let error = emit(self.actions[index], module, function, result); if error != Error.none { return error; } },
+        match actions[index] {
+            Action.task_group => { let error = emit(actions[index], module, function, result); if error != Error.none { return error; } },
             _ => {},
         }
     }
-    for action in self.actions[checkpoint..] {
+    for action in actions[checkpoint..] {
         match action {
             Action.revoke_effect => { let error = emit(action, module, function, result); if error != Error.none { return error; } },
             _ => {},
         }
     }
-    index = self.actions.len;
+    index = actions.len;
     while index > checkpoint {
         index--;
-        match self.actions[index] {
+        match actions[index] {
             Action.revoke_effect, Action.task_group => {},
-            _ => { let error = emit(self.actions[index], module, function, result); if error != Error.none { return error; } },
+            _ => { let error = emit(actions[index], module, function, result); if error != Error.none { return error; } },
         }
     }
     return Error.none;

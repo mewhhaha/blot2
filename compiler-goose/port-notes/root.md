@@ -14,10 +14,15 @@ Production writing passes completed, all unverified:
   semantic_query_table, principal_query, principal_type_graph, code_artifacts,
   specialization_receipt, refinement_receipt, principal_inputs, constant_receipt,
   artifact_emitter, artifact_capture, executable_query, shared_query_gate,
-  dispatch_explanation.
+  dispatch_explanation, principal_reuse_gate, declaration_dependencies,
+  declaration_projection, dependency_certificate, validation_image,
+  mismatch_display.
+- Check frozen_core_validation, with bounds, mixed graph and staging/scope
+  helpers in frozen_core_bounds, frozen_core_graph and frozen_core_scopes.
 - Support explicit error labels, fixed Option, byte codecs, exact Wyhash,
   portable Blake3, structural field streams, finite postfix recipe emitter,
-  native scalar/OS services, file IO and explicit packed host footprints.
+  native scalar/OS services, file IO, explicit packed host footprints and
+  complete typed Core worker packet codecs.
 
 All other runtime/reuse modules and the main CLI/session driver remain required
 and unwritten. An implementation's presence does not establish import/API
@@ -50,9 +55,11 @@ Representation contracts:
 - Constant Query/Judgment clone returns nullable typed reference plus Error;
   successful callers assert presence. Query/Event/Record ownership transfers
   to typed reusable pools before a lexical recorder ends.
-- Tape init takes six typed owners. Constant/principal recorders expose typed
-  RecorderTables and lexical withRecorder helpers. Static callbacks cannot
-  retain the scratch context.
+- Tape owns six fixed pooled buffers; initPooled supplies their descriptors.
+  push/append and len remain buffer APIs, while slice users read items. finish
+  checks every sticky buffer failure before publishing retained observations.
+  Constant/principal recorders still expose typed RecorderTables and lexical
+  withRecorder helpers; recursive callers need pooled ownership conversion.
 - bytes_of is used only on serializable arrays of address-free elements.
   support.host_layout records C.2 packed 64-bit host footprints independently
   of wire schemas. No metadata pointer is serialized to measure its size.
@@ -73,6 +80,13 @@ Pending target-language qualification:
   need complete integration. Their cost is unmeasured.
 - The source-pointer-free host footprints need qualification alongside the
   final record schemas, and every external archive needs exact typed codecs.
+- Goose section 7.8 forbids local growing owners on a recursive call cycle.
+  Cleanup Stack and specialization Tape now have fixed pooled ownership.
+  Recursive generator, layout, checker and evaluator owners are still being
+  converted; first writing passes do not establish this qualification.
+- Capability reconstruction's native 1 MiB allocation policy needs its typed
+  private budget adapter aligned. Frozen validation calls deriveWithOwnersBudget;
+  neither source acceptance parity nor allocator-fault parity is established.
 
 Artifact emission constructs its Recorder from five typed caller arrays. freeze
 returns complete owned FunctionArtifact/Local/SymbolicInstruction runs. Exact
@@ -93,3 +107,17 @@ original {items,capacity} fields, excluding the private range/capacity fields.
 Native scalar helpers include memcpy signed/unsigned i32 representation and
 C fmaf for explicitly fused binary32 multiplication/addition. A separate multiply
 and add must not replace that one-rounding operation.
+
+Frozen validation uses ModuleRef {value:const Core.Module&} for borrowed foreign
+owner catalogs, keeping Session.units as its original contiguous Module slice.
+Graph vertex/item operations have validated-bounds preconditions; edge returns
+an optional vertex. Typed reusable linear scratch is released on every return.
+
+Core worker packets encode all source Core data, including type certificate
+bytes, through 96 concrete record/enum codecs and 59 typed allocation families.
+The private packet header includes version, schema, payload length and content
+digest. Size/value/depth limits bound decoding; failure releases the allocation
+journal. Module and Types owner IDs and package_payloads are derived locally,
+never sent as thread identities. Decoding checks data shape and enum ordinals;
+the complete foreign Context must still pass frozen validation before evaluation.
+Worker transport integration and packet costs remain unmeasured.
