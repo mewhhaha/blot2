@@ -10,7 +10,7 @@ type Pool=blot_parse_symbols::Pool;
 type Symbol=u32;
 struct Collector {tree:const Tree&,pool:const Pool&,shadowed:dictionary<Symbol,u32>&,seen:dictionary<Symbol,bool>&,trail:Symbol[>..<]&,targets:Symbol[>..<]&}
 fn shadow(self_:Collector&,name:Symbol)->Error {
- if name==0||self_.pool.get(name)=="_" {return blot_error::Error.none;}let count=self_.shadowed.get_or_insert(name,0);if count==0xffffffff {return blot_error::Error.target_limit;}count++;self_.trail.push(name);return blot_error::Error.none;
+ if name==0||self_.pool.get(name)=="_" {return blot_error::Error.none;}let count .= ::get_or_insert(self_.shadowed,name,0);if count==0xffffffff {return blot_error::Error.target_limit;}count++;self_.trail.push(name);return blot_error::Error.none;
 }
 fn restore(self_:Collector&,mark:i64) {
  var index=self_.trail.len;while index>mark {index--;let name=self_.trail[index];var remove=false;{let found=self_.shadowed.get(name);assert(found!=null);let count=copy(found);if count==1 {remove=true;}else {found=count-1;}}if remove {self_.shadowed.remove(name);}}self_.trail.resize(mark);

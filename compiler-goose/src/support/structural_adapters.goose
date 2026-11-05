@@ -2974,12 +2974,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_rank_equal::Frame)
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_rank_equal::Frame) {hashFields(sink,value);}
 fn equal<StructuralLeft,S>(left:StructuralLeft,right:blot_check_rank_equal::Walker<S>)->bool {return equalFields(left,right);}
 fn hash<StructuralSink,S>(sink:StructuralSink&,value:blot_check_rank_equal::Walker<S>) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_rank_walk::NativeCollector)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_rank_walk::NativeCollector) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_rank_walk::PooledCollector)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_rank_walk::PooledCollector) {hashFields(sink,value);}
-fn equal<StructuralLeft,C>(left:StructuralLeft,right:blot_check_rank_walk::Walker<C>)->bool {return equalFields(left,right);}
-fn hash<StructuralSink,C>(sink:StructuralSink&,value:blot_check_rank_walk::Walker<C>) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_rank_walk::Walker)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_rank_walk::Walker) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_record_order::Names)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_record_order::Names) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_resolver_core::Judgments)->bool {return equalFields(left,right);}

@@ -4,8 +4,8 @@ The user explicitly requested fixing and recompiling the port. Verification is
 active; there is no remaining approval or source-writing barrier. Keep the Zig
 compiler, normal toolchain, saved oracle and siblings unchanged.
 
-Checkpoint `36c733f3b5ae4ea23fa93166c37ca38b43faf6e9` is pushed to main. It preserves
-recursive checker repairs and executable engine laws; it is not a full compiler build.
+Checkpoint `fff04fc8155f92e65893c609650967d85ec7a09e` is pushed to main. It preserves
+validation frames and recursive scratch repairs; it is not a full compiler build.
 Upstream Goose parses roughly 35,700 declarations across 435 files in about
 1.1 seconds. Whole-program type checking has not completed successfully.
 
@@ -14,16 +14,19 @@ The runner caps and kills the process group and saves full diagnostics under
 `build/goose-port/verification/`. Check mode uses streaming text diagnostics;
 JSON diagnostics buffer until completion and hid errors in capped runs.
 Check mode stops the process group after the first error; recent failed
-iterations take roughly eight to sixteen seconds. One coordinator runs
-whole-program checks at a time; backend currently owns the substitution-family
-frontier in `check/types.goose`.
+iterations take roughly thirteen to thirty-one seconds. The default cap is
+30 seconds; a bounded longer check exposed the next error at 30.825 seconds,
+so the current repair loop permits 45 seconds. A no-error timeout is not a pass.
+One coordinator runs whole-program checks at a time; checker currently owns
+the scheme-equation workspace lifetime frontier after rank traversal.
 
 The actual build entry remains `compiler-goose/build.py`, with explicit Goose
 binary, standard-library directory and 30-second stage caps. Do not claim a
 working compiler until C emission, linking and execution have succeeded.
 
 The official repair loop has advanced through capability, usage and task
-validation into substitution scratch ownership (check99). Opaque inference
+validation and substitution/unification scratch ownership into scheme-equation
+workspace lifetimes (check112). Opaque inference
 frames hold numeric ranges, while borrowed instruction/type inputs pass directly
 down helpers. Usage exit/staging frames use numeric indices; direct child
 visitors avoid storing recursive borrows. Named scope frames contain only scalar
@@ -31,6 +34,10 @@ identity/view/parent data in a reusable pool. Astra reviewed identity, scope,
 16-view ordering, work charging, depth bounds and all cleanup paths without
 finding an introduced regression. This is static review, not runtime parity.
 Whole-program parsing continues to pass at about one second.
+Unification and resolution now use fixed pooled scratch with original lazy
+prefix snapshots, LIFO order, counters and rollback. Astra reviewed these against
+the native implementation; one missing reporter type annotation was corrected.
+Rank traversal passes the original mutable Store directly instead of copying it.
 Scoped tests pass for lexer, interning, graph
 SCCs, arena ownership, byte/hash/JSON helpers, maps and buffers, wire/IR emission,
 native JSON and WGSL fixtures. A fresh exact C-host startup probe passes with

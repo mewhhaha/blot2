@@ -13,6 +13,7 @@ import support.error;
 import support.native;
 import support.option;
 import support.pooled_buffer;
+import support.pooled_map;
 import support.structural_adapters;
 import work_counters;
 
@@ -486,8 +487,8 @@ fn mergeRecords(self_: Store&, left: Id, right: Id) -> blot_support::Option<Id>,
     var fields: Field[>..] = []; var slots = dictionary<u32, i64> {};
     for shape in [a, b] { for index in shape.b {
         let field = recordField(self_, shape, index); var found = false; var slot: i64 = 0;
-        block { let previous = slots.get(field.name); if previous { found = true; slot = previous; } }
-        if found { fields[slot] = field; } else { slots.insert(field.name, fields.len); fields.push(field); }
+        block { let previous = ::get(slots,field.name); if previous { found = true; slot = previous; } }
+        if found { fields[slot] = field; } else { ::insert(slots,field.name, fields.len); fields.push(field); }
     } }
     let result, error = record(self_, fields); return blot_support::Option<Id> { error == blot_error::Error.none, result , ..}, error;
 }
@@ -748,7 +749,7 @@ fn saveComposite(self_: Store&, root: Id, at: Cursor, result: Id) -> Error {
 fn validResolution(self_: Store&, certificate: blot_reuse_composite_resolution_cache::Record) -> bool {
     if certificate.future_clock.present && certificate.future_clock.value != cursor(self_) { self_.normalization.composite_future_clock_misses += 1; return false; }
     for dependency in certificate.dependencies[..certificate.count] {
-        var last: u32 = 0; if dependency.effect { last = self_.effects.variables[dependency.variable].last; } else { last = self_.variables.items[dependency.variable].last; }
+        var last: u32 = 0; if dependency.effect { last = self_.effects.variables.items[dependency.variable].last; } else { last = self_.variables.items[dependency.variable].last; }
         if last != dependency.last { self_.normalization.composite_stale_dependencies += 1; return false; }
     }
     return true;
@@ -776,18 +777,16 @@ fn resolutionDependencies(self_: const Store&, result: Id) -> blot_support::Opti
                 if instance.unit == 0 && instance.decl != 0 { if count == pending.len { return blot_support::Option<blot_reuse_composite_resolution_cache::Record> { false, certificate , ..}; } pending[count] = instance.decl; count += 1; }
             }
             match row_.tail { variable v => {
-                if !certificate.add(blot_reuse_composite_resolution_cache::Dependency { v.value, self_.effects.variables[v.value].last, true , ..}) { return blot_support::Option<blot_reuse_composite_resolution_cache::Record> { false, certificate , ..}; }
+                if !certificate.add(blot_reuse_composite_resolution_cache::Dependency { v.value, self_.effects.variables.items[v.value].last, true , ..}) { return blot_support::Option<blot_reuse_composite_resolution_cache::Record> { false, certificate , ..}; }
             }, _ => {}, }
         }
-        var children: Id[3] = [0; 3]; var length: i64 = 0; var tail: const Id[:] = default<const Id[:]>();
+        var children: Id[3] = [0; 3]; var length: i64 = 0; let tail:const Id[:] = if value.tag==Tag.product {list(self_,List{value.a,value.b,..})}else if value.tag==Tag.nominal || value.tag==Tag.projection || value.tag==Tag.instance_selection {nominalArguments(self_,value)}else {default<const Id[:]>()};
         match value.tag {
             function => { children = [value.a, value.b, 0]; length = 2; },
             usage => { children = [value.a, value.c, 0]; length = 1; if value.c != 0 { length = 2; } },
             scoped => { children = [value.a, value.c, 0]; length = 1; if value.b == 0 { length = 2; } },
             array, list, cursor, resolver, provider => { children[0] = value.a; length = 1; },
             state_provider => { children = [value.a, value.b, value.c]; length = 3; },
-            product => { tail = list(self_, List { value.a, value.b , ..}); },
-            nominal, projection, instance_selection => { tail = nominalArguments(self_, value); },
             record => {
                 if value.b > pending.len - count { return blot_support::Option<blot_reuse_composite_resolution_cache::Record> { false, certificate , ..}; }
                 for i in value.b { pending[count + i] = recordField(self_, value, i).ty; } count += value.b;
@@ -901,13 +900,7 @@ recursive fn resolveSelected(self_: Store&, id: Id, value: Node, position: Curso
             return functionWithEffects(self_, parameter, result, effect_row);
         },
         product => {
-            var fields: Id[>..] = []; var changed = false;
-            for i in value.b {
-                let old = self_.extra.items[value.a + i]; let child, error = resolveDepth(self_, old, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
-                if !changed && child != old { fields.append(self_.extra.items[value.a..value.a + i]); changed = true; }
-                if changed { fields.push(child); }
-            }
-            if changed { return product(self_, fields); } return id, blot_error::Error.none;
+            let fields=resolution_arguments.alloc_slice(value.b);let result,error=resolveProductFields(self_,id,value,position,depth,fields);resolution_arguments.free_slice(fields);return result,error;
         },
         array, list, cursor, resolver => {
             let child, error = resolveDepth(self_, value.a, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
@@ -925,27 +918,44 @@ recursive fn resolveSelected(self_: Store&, id: Id, value: Node, position: Curso
             if read == value.a && write == value.b && state_type == value.c { return id, blot_error::Error.none; } return stateProvider(self_, read, write, state_type);
         },
         record => {
-            var fields: Field[>..] = []; var changed = false;
-            for i in value.b {
-                let field = recordField(self_, value, i); let child, error = resolveDepth(self_, field.ty, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
-                if !changed && child != field.ty { for prefix in i { fields.push(recordField(self_, value, prefix)); } changed = true; }
-                if changed { fields.push(Field { field.name, child , ..}); }
-            }
-            if changed { return record(self_, fields); } return id, blot_error::Error.none;
+            let fields=resolution_fields.alloc_slice(value.b);let result,error=resolveRecordFields(self_,id,value,position,depth,fields);resolution_fields.free_slice(fields);return result,error;
         },
         nominal, projection, instance_selection => {
-            var args: Id[>..] = []; var changed = false; let count = self_.extra.items[value.c];
+            let count=self_.extra.items[value.c];let args=resolution_arguments.alloc_slice(count);let result,error=resolveNominalArguments(self_,id,value,position,depth,count,args);resolution_arguments.free_slice(args);return result,error;
+        },
+        _ => { return id, blot_error::Error.none; },
+    }
+}
+reusable[] var resolution_fields:Field[>..];
+// Copy prefixes only after the first changed child, as in the original traversal.
+recursive fn resolveProductFields(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64,fields:Id[:])->Id,Error {
+            var changed=false;
+            for i in value.b {
+                let old = self_.extra.items[value.a + i]; let child, error = resolveDepth(self_, old, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
+                if !changed && child != old { for previous,offset in self_.extra.items[value.a..value.a+i] {fields[offset]=previous;} changed=true; }
+                if changed { fields[i]=child; }
+            }
+            if changed { return product(self_, fields); } return id, blot_error::Error.none;
+}
+recursive fn resolveRecordFields(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64,fields:Field[:])->Id,Error {
+            var changed=false;
+            for i in value.b {
+                let field = recordField(self_, value, i); let child, error = resolveDepth(self_, field.ty, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
+                if !changed && child != field.ty { for prefix in i {fields[prefix]=recordField(self_,value,prefix);} changed=true; }
+                if changed { fields[i]=Field{field.name,child,..}; }
+            }
+            if changed { return record(self_, fields); } return id, blot_error::Error.none;
+}
+recursive fn resolveNominalArguments(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64,count:u32,args:Id[:])->Id,Error {
+            var changed=false;
             for i in count {
                 let child = self_.extra.items[value.c + 1 + i]; let next, error = resolveDepth(self_, child, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
-                if !changed && child != next { args.append(self_.extra.items[value.c + 1..value.c + 1 + i]); changed = true; } if changed { args.push(next); }
+                if !changed && child != next { for previous,offset in self_.extra.items[value.c+1..value.c+1+i] {args[offset]=previous;} changed=true; } if changed { args[i]=next; }
             }
             if !changed { return id, blot_error::Error.none; }
             if value.tag == Tag.projection { return projection(self_, NominalIdentity { value.a, value.b , ..}, projectionMember(self_, value), args); }
             if value.tag == Tag.instance_selection { return instanceSelection(self_, NominalIdentity { value.a, value.b , ..}, args); }
             return nominal(self_, NominalIdentity { value.a, value.b , ..}, args);
-        },
-        _ => { return id, blot_error::Error.none; },
-    }
 }
 fn occurs(self_: Store&, variable: u32, root: Id) -> bool, Error {
     let resolved_root, error = resolve(self_, root, 0); if error != blot_error::Error.none { return false, error; }
@@ -978,18 +988,22 @@ fn occurs(self_: Store&, variable: u32, root: Id) -> bool, Error {
     }
     return false, blot_error::Error.none;
 }
-fn unifyEffects(self_: Store&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {
+fn snapshotResolutionIds(values:const Id[:])->Id[:] {let result=resolution_arguments.alloc_slice(values.len);for value,index in values {result[index]=value;}return result;}
+fn snapshotResolutionGoals(values:const Obligation[:])->Obligation[:] {let result=resolution_goals.alloc_slice(values.len);for value,index in values {result[index]=value;}return result;}
+recursive fn unifyEffects(self_: Store&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {
     let point = mark(self_); let error = unifyEffectsInner(self_, left, right); if error != blot_error::Error.none { rollback(self_, point); } return error;
 }
-fn unifyEffectsInner(self_: Store&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {
+recursive fn unifyEffectsInner(self_: Store&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {
     let a, ae = resolveEffects(self_, left, 0); if ae != blot_error::Error.none { return ae; }
     let b, be = resolveEffects(self_, right, 0); if be != blot_error::Error.none { return be; }
     var symbolic = false;
     for label in rowLabels(self_, a) { if symbolic { break; } let result, error = symbolicOperation(self_, label); if error != blot_error::Error.none { return error; } symbolic = result; }
     for label in rowLabels(self_, b) { if symbolic { break; } let result, error = symbolicOperation(self_, label); if error != blot_error::Error.none { return error; } symbolic = result; }
     if !symbolic { return effectError(self_.effects.unify(a, b)); }
-    var labels: blot_check_effects::Label[>..] = []; labels.append(rowLabels(self_, a));
-    var candidates: blot_check_effects::Label[>..] = []; candidates.append(rowLabels(self_, b));
+    let labels=snapshotResolutionIds(rowLabels(self_,a));let candidates=snapshotResolutionIds(rowLabels(self_,b));
+    let error=unifySymbolicEffects(self_,a,b,labels,candidates);resolution_arguments.free_slice(candidates);resolution_arguments.free_slice(labels);return error;
+}
+recursive fn unifySymbolicEffects(self_:Store&,a:blot_check_effects::Id,b:blot_check_effects::Id,labels:const blot_check_effects::Label[:],candidates:const blot_check_effects::Label[:])->Error {
     for label in labels {
         var exact = false; for candidate in candidates { exact = exact || candidate == label; } if exact { continue; }
         let operation_ = operation(self_, label); var selected: blot_support::Option<blot_check_effects::Label>   = blot_support::Option<blot_check_effects::Label> { false, 0 , ..};
@@ -1012,10 +1026,13 @@ fn symbolicOperation(self_: Store&, label: blot_check_effects::Label) -> bool, E
     for argument in operationArguments(self_, label) { if closedHeight(self_, argument) != 0 { continue; } let same, error = equalClosed(self_, argument, argument); if error != blot_error::Error.none { return false, error; } if !same { return true, blot_error::Error.none; } }
     return false, blot_error::Error.none;
 }
-fn unifyOperationArguments(self_: Store&, left: blot_check_effects::Label, right: blot_check_effects::Label) -> bool, Error {
+recursive fn unifyOperationArguments(self_: Store&, left: blot_check_effects::Label, right: blot_check_effects::Label) -> bool, Error {
     let ls, le = symbolicOperation(self_, left); if le != blot_error::Error.none { return false, le; }
     if !ls { let rs, re = symbolicOperation(self_, right); if re != blot_error::Error.none { return false, re; } if !rs { return false, blot_error::Error.none; } }
-    var a: Id[>..] = []; a.append(operationArguments(self_, left)); var b: Id[>..] = []; b.append(operationArguments(self_, right));
+    let a=snapshotResolutionIds(operationArguments(self_,left));let b=snapshotResolutionIds(operationArguments(self_,right));
+    let result,error=unifyOperationArgumentSnapshots(self_,a,b);resolution_arguments.free_slice(b);resolution_arguments.free_slice(a);return result,error;
+}
+recursive fn unifyOperationArgumentSnapshots(self_:Store&,a:const Id[:],b:const Id[:])->bool,Error {
     for first, i in a { let error = unify(self_, first, b[i]); if error != blot_error::Error.none { return false, error; } }
     return true, blot_error::Error.none;
 }
@@ -1050,8 +1067,12 @@ recursive fn resolveOperationRow(self_: Store&, root: blot_check_effects::Id, at
 recursive fn resolveOperationArguments(self_: Store&, id: blot_check_effects::Id, at: Cursor, depth: i64) -> blot_check_effects::Id, Error {
     self_.normalization.argument_rows += 1;
     if self_.use_closed_rows && self_.use_closed_graphs && self_.closed_operation_index.len < self_.operations.len { self_.closed_operation_index.resize(self_.operations.len, RowCertificate {..});if self_.closed_operation_index.failure!=blot_error::Error.none {return default<blot_check_effects::Id>(),self_.closed_operation_index.failure;} }
-    let row_ = row(self_, id); var all_closed = true; var argument_height: u8 = 0; var has_arguments = false;
-    var labels: blot_check_effects::Label[>..] = []; var changed = false;
+    let row_=row(self_,id);let labels=resolution_arguments.alloc_slice(row_.labels.len);
+    let result,error=resolveOperationLabels(self_,id,at,depth,row_,labels);resolution_arguments.free_slice(labels);return result,error;
+}
+reusable[] var resolution_arguments:Id[>..];
+recursive fn resolveOperationLabels(self_:Store&,id:blot_check_effects::Id,at:Cursor,depth:i64,row_:blot_check_effects::Row,labels:blot_check_effects::Label[:])->blot_check_effects::Id,Error {
+    var all_closed=true;var argument_height:u8=0;var has_arguments=false;var changed=false;
     for index in row_.labels.len {
         let label = self_.effects.list(row_.labels)[index]; let operation_ = operation(self_, label);
         self_.normalization.labels += 1; self_.normalization.arguments += operation_.arguments.len;
@@ -1059,7 +1080,7 @@ recursive fn resolveOperationArguments(self_: Store&, id: blot_check_effects::Id
         if proof.present {
             self_.normalization.closed_operation_hits += 1; has_arguments = has_arguments || proof.value.has_arguments; argument_height = max(argument_height, proof.value.argument_height);
             if proof.value.has_arguments && depth + 1 + proof.value.argument_height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
-            if changed { labels.push(label); } continue;
+            if changed { labels[index]=label; } continue;
         }
         var closed = operation_.instance.unit != 0 || operation_.instance.decl == 0; var operation_height: u8 = 0;
         for argument in list(self_, operation_.arguments) {
@@ -1068,24 +1089,29 @@ recursive fn resolveOperationArguments(self_: Store&, id: blot_check_effects::Id
             if height == 0 { closed = false; } if height != 0 && depth + 1 + height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
         }
         all_closed = all_closed && closed;
-        if closed { saveClosedOperation(self_, label, operation_height, operation_.arguments.len != 0); if changed { labels.push(label); } continue; }
-        var arguments: Id[>..] = []; var argument_changed = false;
+        if closed { saveClosedOperation(self_, label, operation_height, operation_.arguments.len != 0); if changed { labels[index]=label; } continue; }
+        let arguments=resolution_arguments.alloc_slice(operation_.arguments.len);
+        let next,error=resolveOperationLabel(self_,label,operation_,at,depth,arguments);resolution_arguments.free_slice(arguments);if error!=blot_error::Error.none {return 0,error;}
+        if !changed && next != label { for previous,offset in self_.effects.list(row_.labels)[..index] {labels[offset]=previous;} changed=true; }
+        if changed { labels[index]=next; }
+    }
+    if !changed { if all_closed { saveClosedRow(self_, id, argument_height, has_arguments); } return id, blot_error::Error.none; }
+    self_.normalization.changed_rows += 1; let result, error = self_.effects.rowAt(labels, row_.tail, row_.cursor); return result, effectError(error);
+}
+recursive fn resolveOperationLabel(self_:Store&,label:blot_check_effects::Label,operation_:Operation,at:Cursor,depth:i64,arguments:Id[:])->blot_check_effects::Label,Error {
+ var argument_changed=false;
         for offset in operation_.arguments.len {
             let argument = list(self_, operation_.arguments)[offset]; let resolved, error = resolveDepth(self_, argument, at, depth + 1); if error != blot_error::Error.none { return 0, error; }
-            if !argument_changed && resolved != argument { arguments.append(list(self_, operation_.arguments)[..offset]); argument_changed = true; }
-            if argument_changed { arguments.push(resolved); }
+            if !argument_changed && resolved != argument { for previous,index in list(self_,operation_.arguments)[..offset] {arguments[index]=previous;} argument_changed=true; }
+            if argument_changed { arguments[offset]=resolved; }
         }
         let instance, ie = resolveInstance(self_, operation_.instance, at, depth + 1); if ie != blot_error::Error.none { return 0, ie; }
         var next = label;
         if argument_changed || instance != operation_.instance {
-            var selected_arguments = list(self_, operation_.arguments); if argument_changed { selected_arguments = arguments; }
+            let selected_arguments:const Id[:] = if argument_changed {arguments}else {list(self_,operation_.arguments)};
             let result, error = internResolvedOperation(self_, operation_.identity, instance, selected_arguments, true); if error != blot_error::Error.none { return 0, error; } next = result;
         }
-        if !changed && next != label { labels.append(self_.effects.list(row_.labels)[..index]); changed = true; }
-        if changed { labels.push(next); }
-    }
-    if !changed { if all_closed { saveClosedRow(self_, id, argument_height, has_arguments); } return id, blot_error::Error.none; }
-    self_.normalization.changed_rows += 1; let result, error = self_.effects.rowAt(labels, row_.tail, row_.cursor); return result, effectError(error);
+ return next,blot_error::Error.none;
 }
 fn row(self_: const Store&, id: blot_check_effects::Id) -> blot_check_effects::Row { return self_.effects.node(id); }
 fn rowLabels(self_: const Store&, id: blot_check_effects::Id) -> const blot_check_effects::Label[:] { return self_.effects.list(row(self_, id).labels); }
@@ -1159,7 +1185,7 @@ fn linkOperations(self_: Store&) -> Error {
         self_.normalization.interner_linked += 1; let index = self_.operation_links.len as u32; let operation_ = self_.operations.items[index];
         let shape = operationShape(self_, list(self_, operation_.arguments)); let key = OperationKey { operation_.identity, operation_.instance, operation_.arguments.len, shape , ..};
         var found = false; var last = none;
-        block { let entry = self_.operation_chains.get(key); if entry { found = true; last = entry.last; entry.last = index; } }
+        block { let entry .= self_.operation_chains.get(key); if entry { found = true; last = entry.last; entry.last = index; } }
         if found { self_.operation_links.items[last].next = index; self_.operation_links.push(OperationLink { previous: last, shape: shape , ..});if self_.operation_links.failure!=blot_error::Error.none {return self_.operation_links.failure;} }
         else { self_.operation_links.push(OperationLink { shape: shape , ..});if self_.operation_links.failure!=blot_error::Error.none {return self_.operation_links.failure;} self_.operation_chains.insert(key, OperationChain { index, index , ..});if self_.operation_chains.failure!=blot_error::Error.none {return self_.operation_chains.failure;} }
     }
@@ -1172,7 +1198,7 @@ fn unlinkOperations(self_: Store&, length: i64) {
         let key = OperationKey { operation_.identity, operation_.instance, operation_.arguments.len, self_.operation_links.items[index].shape , ..};
         let previous = self_.operation_links.pop().previous;
         if previous == none { self_.operation_chains.remove(key); }
-        else { self_.operation_links.items[previous].next = none; let chain = self_.operation_chains.get(key); assert(chain); chain.last = previous; }
+        else { self_.operation_links.items[previous].next = none; let chain .= self_.operation_chains.get(key); assert(chain); chain.last = previous; }
     }
 }
 struct Pair { a: Id, b: Id, effect_row: bool = false }
@@ -1201,8 +1227,8 @@ fn equalLabelMultisets(left: const blot_check_effects::Label[:], right: const bl
         return true, blot_error::Error.none;
     }
     var counts = dictionary<blot_check_effects::Label, i64> {};
-    for label in left { let count = counts.get_or_insert(label, 0); count += 1; }
-    for label in right { let count = counts.get(label); if !count { return false, blot_error::Error.none; } if count == 0 { return false, blot_error::Error.none; } count -= 1; }
+    for label in left { let count .= ::get_or_insert(counts,label,0); count += 1; }
+    for label in right { let count .= ::get(counts,label); if !count { return false, blot_error::Error.none; } if count == 0 { return false, blot_error::Error.none; } count -= 1; }
     return true, blot_error::Error.none;
 }
 fn equalGraphWalk(self_: Store&, left: Id, right: Id, symbolic: bool) -> bool, Error {
@@ -1254,10 +1280,10 @@ fn equalGraphWalk(self_: Store&, left: Id, right: Id, symbolic: bool) -> bool, E
             },
             record => {
                 if a.b != b.b { return false, blot_error::Error.none; } var fields = dictionary<u32, Id> {};
-                if b.b > 16 { for j in b.b { let other = recordField(self_, b, j); if !fields.contains(other.name) { fields.insert(other.name, other.ty); } } }
+                if b.b > 16 { for j in b.b { let other = recordField(self_, b, j); if !::contains(fields,other.name) { ::insert(fields,other.name, other.ty); } } }
                 for i in a.b {
                     let field = recordField(self_, a, i); var found = false; var ty: Id = 0;
-                    if b.b > 16 { let saved = fields.get(field.name); if saved { found = true; ty = saved; } }
+                    if b.b > 16 { let saved = ::get(fields,field.name); if saved { found = true; ty = saved; } }
                     else { for j in b.b { let other = recordField(self_, b, j); if field.name == other.name { ty = other.ty; found = true; break; } } }
                     if !found { return false, blot_error::Error.none; } pending.push(Pair { field.ty, ty , ..});
                 }
@@ -1270,21 +1296,32 @@ fn equalGraphWalk(self_: Store&, left: Id, right: Id, symbolic: bool) -> bool, E
 struct SilentReporter {}
 fn report(self_: SilentReporter, store: const Store&, left: Id, right: Id) -> Error { return blot_error::Error.none; }
 fn mismatch(self_: const Store&, reporter, left: Id, right: Id) -> Error { let error = reporter.report(self_, left, right); if error != blot_error::Error.none { return blot_error::Error.out_of_memory; } return blot_error::Error.type_mismatch; }
-fn unify(self_: Store&, left: Id, right: Id) -> Error { return unifyMode(self_, left, right, SilentReporter {..}, false); }
-fn unifyWithReporter(self_: Store&, left: Id, right: Id, reporter) -> Error { return unifyMode(self_, left, right, reporter, false); }
+recursive fn unify(self_: Store&, left: Id, right: Id) -> Error { return unifyMode(self_, left, right, SilentReporter {..}, false); }
+fn unifyWithReporter<R>(self_: Store&, left: Id, right: Id, reporter:R) -> Error { return unifyMode(self_, left, right, reporter, false); }
 fn unifyPattern(self_: Store&, left: Id, right: Id) -> Error { return unifyMode(self_, left, right, SilentReporter {..}, true); }
 fn resolveUnification(self_: Store&, root: Id) -> Id, Error {
     let entries = self_.normalization.resolve_depth_entries; let nodes = self_.nodes.len; increment(self_.normalization.unify_resolve_calls);
     let result, error = resolve(self_, root, 0); saturatedAdd(self_.normalization.unify_resolve_entries, self_.normalization.resolve_depth_entries - entries); saturatedAdd(self_.normalization.unify_resolve_nodes, (self_.nodes.len - nodes) as u64); return result, error;
 }
-fn unifyMode(self_: Store&, left: Id, right: Id, reporter, associated: bool) -> Error {
+recursive fn unifyMode<R>(self_: Store&, left: Id, right: Id, reporter:R, associated: bool) -> Error {
     let point = mark(self_); let error = unifyInner(self_, left, right, reporter, associated); if error != blot_error::Error.none { rollback(self_, point); } return error;
 }
-fn unifyInner(self_: Store&, left: Id, right: Id, reporter, associated: bool) -> Error {
-    var seen = dictionary<Pair, bool> {}; var pending: Pair[>..<] = []; pending.push(Pair { left, right , ..});
+type UnificationSeen=blot_support_pooled_map::Map<Pair,bool>;
+type UnificationPending=blot_support_pooled_buffer::Buffer<Pair>;
+reusable[] var unification_seen:dictionary_slot<Pair,bool>[>..];
+reusable[] var unification_pairs:Pair[>..];
+fn pushUnification(pending:UnificationPending&,value:Pair)->Error {return blot_support_pooled_buffer::push(pending,value,unification_pairs);}
+fn appendUnification(pending:UnificationPending&,values:const Pair[:])->Error {return blot_support_pooled_buffer::append(pending,values,unification_pairs);}
+fn popUnification(pending:UnificationPending&)->Pair {let length=pending.items.len;assert(length!=0);let result=pending.items[length-1];blot_support_pooled_buffer::resize(pending,length-1);return result;}
+recursive fn unifyInner<R>(self_:Store&,left:Id,right:Id,reporter:R,associated:bool)->Error {
+ var seen=UnificationSeen{..};var pending=UnificationPending{..};let error=unifyWalk(self_,left,right,reporter,associated,seen,pending);
+ blot_support_pooled_buffer::deinit(pending,unification_pairs);blot_support_pooled_map::deinit(seen,unification_seen);return error;
+}
+recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associated: bool,seen:UnificationSeen&,pending:UnificationPending&) -> Error {
+    let initial=pushUnification(pending,Pair{left,right,..});if initial!=blot_error::Error.none {return initial;}
     let bounded = associated || self_.has_projections; var rank_active = false; var rank_remaining: i64 = 4096;
-    while pending.len > 0 {
-        let pair = pending.pop();
+    while pending.items.len > 0 {
+        let pair = popUnification(pending);
         if rank_active { if rank_remaining == 0 { return blot_error::Error.type_limit; } rank_remaining -= 1; }
         if bounded { let error = chargeProjection(self_); if error != blot_error::Error.none { return error; } }
         if pair.effect_row {
@@ -1304,7 +1341,7 @@ fn unifyInner(self_: Store&, left: Id, right: Id, reporter, associated: bool) ->
         if bn.tag == Tag.variable && self_.variables.items[bn.a].region && !regionIdentity(self_, a) { return mismatch(self_, reporter, a, b); }
         if a == b || a == never || b == never { continue; }
         if self_.has_rank_types && (isRank(an.tag) || isRank(bn.tag)) { rank_active = true; }
-        if bounded || rank_active { let key = Pair { a, b , ..}; if ::contains(seen,key) { continue; } ::insert(seen,key, true); }
+        if bounded || rank_active { let key = Pair { a, b , ..}; if blot_support_pooled_map::contains(seen,key) { continue; } blot_support_pooled_map::insert(seen,key,true,unification_seen); }
         if an.tag == Tag.variable && bn.tag == Tag.variable && an.a == bn.a { continue; }
         if an.tag == Tag.variable {
             if bn.tag == Tag.forall { return mismatch(self_, reporter, a, b); }
@@ -1320,57 +1357,68 @@ fn unifyInner(self_: Store&, left: Id, right: Id, reporter, associated: bool) ->
         }
         if an.tag != bn.tag { return mismatch(self_, reporter, a, b); }
         match an.tag {
-            usage => { if an.b != bn.b || (an.c == 0) != (bn.c == 0) { return mismatch(self_, reporter, a, b); } pending.push(Pair { an.a, bn.a , ..}); if an.c != 0 { pending.push(Pair { an.c, bn.c , ..}); } },
+            usage => { if an.b != bn.b || (an.c == 0) != (bn.c == 0) { return mismatch(self_, reporter, a, b); } let pending_failure_0=pushUnification(pending,Pair { an.a, bn.a , ..});if pending_failure_0!=blot_error::Error.none {return pending_failure_0;} if an.c != 0 { let pending_failure_1=pushUnification(pending,Pair { an.c, bn.c , ..});if pending_failure_1!=blot_error::Error.none {return pending_failure_1;} } },
             bound => { return mismatch(self_, reporter, a, b); },
             rigid, instance_version => { if an.a != bn.a || an.b != bn.b || an.c != bn.c { return mismatch(self_, reporter, a, b); } },
             forall, existential => {
                 if an.c != bn.c { return mismatch(self_, reporter, a, b); }
-                var old: Id[>..] = []; old.append(list(self_, List { bn.b, bn.c , ..})); var fresh_ids: Id[>..] = []; fresh_ids.append(list(self_, List { an.b, an.c , ..}));
-                for left_, i in old { if node(self_, left_).b != node(self_, fresh_ids[i]).b { return mismatch(self_, reporter, a, b); } }
-                var left_goals: Obligation[>..] = []; left_goals.append(quantifierGoals(self_, a)); var right_goals: Obligation[>..] = []; right_goals.append(quantifierGoals(self_, b));
-                if left_goals.len != right_goals.len { return mismatch(self_, reporter, a, b); }
-                for left_goal, i in left_goals {
-                    let right_goal = right_goals[i]; if !blot_check_quantifier_goals::sameHead(left_goal, right_goal) { return mismatch(self_, reporter, a, b); }
-                    let replaced, error = substituteGoal(self_, right_goal, old, fresh_ids); if error != blot_error::Error.none { return error; }
-                    let first = [left_goal.ty, left_goal.other, left_goal.result, left_goal.signature]; let second = [replaced.ty, replaced.other, replaced.result, replaced.signature];
-                    for left_child, j in first { let right_child = second[j]; if (left_child == 0) != (right_child == 0) { return mismatch(self_, reporter, a, b); } if left_child != 0 { pending.push(Pair { left_child, right_child , ..}); } }
-                }
-                let body, error = substitute(self_, bn.a, old, fresh_ids); if error != blot_error::Error.none { return error; } pending.push(Pair { an.a, body , ..});
+                let old=snapshotResolutionIds(list(self_,List{bn.b,bn.c,..}));let fresh_ids=snapshotResolutionIds(list(self_,List{an.b,an.c,..}));
+                let error=unifyQuantifiedBinders(self_,a,b,an,bn,reporter,pending,old,fresh_ids);resolution_arguments.free_slice(fresh_ids);resolution_arguments.free_slice(old);if error!=blot_error::Error.none {return error;}
             },
-            function => { pending.append([Pair { an.c, bn.c, true , ..}, Pair { an.b, bn.b , ..}, Pair { an.a, bn.a , ..}]); },
-            product => { if an.b != bn.b { return mismatch(self_, reporter, a, b); } var i = an.b; while i != 0 { i -= 1; pending.push(Pair { self_.extra.items[an.a + i], self_.extra.items[bn.a + i] , ..}); } },
-            array, list, cursor, resolver => { pending.push(Pair { an.a, bn.a , ..}); },
-            provider => { pending.append([Pair { an.c, bn.c, true , ..}, Pair { an.a, bn.a , ..}]); },
-            state_provider => { pending.append([Pair { an.c, bn.c , ..}, Pair { an.b, bn.b , ..}, Pair { an.a, bn.a , ..}]); },
+            function => { let pending_failure_2=appendUnification(pending,[Pair { an.c, bn.c, true , ..}, Pair { an.b, bn.b , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_2!=blot_error::Error.none {return pending_failure_2;} },
+            product => { if an.b != bn.b { return mismatch(self_, reporter, a, b); } var i = an.b; while i != 0 { i -= 1; let pending_failure_3=pushUnification(pending,Pair { self_.extra.items[an.a + i], self_.extra.items[bn.a + i] , ..});if pending_failure_3!=blot_error::Error.none {return pending_failure_3;} } },
+            array, list, cursor, resolver => { let pending_failure_4=pushUnification(pending,Pair { an.a, bn.a , ..});if pending_failure_4!=blot_error::Error.none {return pending_failure_4;} },
+            provider => { let pending_failure_5=appendUnification(pending,[Pair { an.c, bn.c, true , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_5!=blot_error::Error.none {return pending_failure_5;} },
+            state_provider => { let pending_failure_6=appendUnification(pending,[Pair { an.c, bn.c , ..}, Pair { an.b, bn.b , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_6!=blot_error::Error.none {return pending_failure_6;} },
             scoped => {
-                if an.b == 0 && node(self_, an.c).tag == Tag.variable && !regionIdentity(self_, an.c) { if bn.b != 0 || an.c != bn.c { pending.push(Pair { an.c, b , ..}); } }
-                else if bn.b == 0 && node(self_, bn.c).tag == Tag.variable && !regionIdentity(self_, bn.c) { pending.push(Pair { bn.c, a , ..}); }
-                else if an.b == 0 && bn.b == 0 { pending.push(Pair { an.c, bn.c , ..}); }
+                if an.b == 0 && node(self_, an.c).tag == Tag.variable && !regionIdentity(self_, an.c) { if bn.b != 0 || an.c != bn.c { let pending_failure_7=pushUnification(pending,Pair { an.c, b , ..});if pending_failure_7!=blot_error::Error.none {return pending_failure_7;} } }
+                else if bn.b == 0 && node(self_, bn.c).tag == Tag.variable && !regionIdentity(self_, bn.c) { let pending_failure_8=pushUnification(pending,Pair { bn.c, a , ..});if pending_failure_8!=blot_error::Error.none {return pending_failure_8;} }
+                else if an.b == 0 && bn.b == 0 { let pending_failure_9=pushUnification(pending,Pair { an.c, bn.c , ..});if pending_failure_9!=blot_error::Error.none {return pending_failure_9;} }
                 else if an.b != bn.b || an.c != bn.c { return mismatch(self_, reporter, a, b); }
-                pending.push(Pair { an.a, bn.a , ..});
+                let pending_failure_10=pushUnification(pending,Pair { an.a, bn.a , ..});if pending_failure_10!=blot_error::Error.none {return pending_failure_10;}
             },
             type_constructor => { if an.a != bn.a || an.b != bn.b { return mismatch(self_, reporter, a, b); } },
             projection => {
                 if an.a != bn.a || an.b != bn.b || projectionMember(self_, an) != projectionMember(self_, bn) { return mismatch(self_, reporter, a, b); }
-                var aa: Id[>..] = []; aa.append(nominalArguments(self_, an)); var bb: Id[>..] = []; bb.append(nominalArguments(self_, bn));
-                if aa.len != bb.len { return mismatch(self_, reporter, a, b); }
-                for left_arg, i in aa {
-                    let al, ae = resolve(self_, left_arg, 0); if ae != blot_error::Error.none { return ae; } let bl, be = resolve(self_, bb[i], 0); if be != blot_error::Error.none { return be; }
-                    if al == bl { continue; } let same, error = equalSymbolic(self_, al, bl); if error != blot_error::Error.none { return error; } if !same { return mismatch(self_, reporter, a, b); }
-                }
+                let aa=snapshotResolutionIds(nominalArguments(self_,an));let bb=snapshotResolutionIds(nominalArguments(self_,bn));
+                let error=unifyProjectionArguments(self_,a,b,reporter,aa,bb);resolution_arguments.free_slice(bb);resolution_arguments.free_slice(aa);if error!=blot_error::Error.none {return error;}
             },
             nominal, instance_selection => {
                 if an.a != bn.a || an.b != bn.b { return mismatch(self_, reporter, a, b); } let aa = nominalArguments(self_, an); let bb = nominalArguments(self_, bn);
-                if aa.len != bb.len { return mismatch(self_, reporter, a, b); } var i = aa.len; while i != 0 { i -= 1; pending.push(Pair { aa[i], bb[i] , ..}); }
+                if aa.len != bb.len { return mismatch(self_, reporter, a, b); } var i = aa.len; while i != 0 { i -= 1; let pending_failure_11=pushUnification(pending,Pair { aa[i], bb[i] , ..});if pending_failure_11!=blot_error::Error.none {return pending_failure_11;} }
             },
             record => {
                 if an.b != bn.b { return mismatch(self_, reporter, a, b); }
-                for i in an.b { let af = recordField(self_, an, i); var found = false; var ty: Id = 0; for j in bn.b { let bf = recordField(self_, bn, j); if af.name == bf.name { ty = bf.ty; found = true; break; } } if !found { return mismatch(self_, reporter, a, b); } pending.push(Pair { af.ty, ty , ..}); }
+                for i in an.b { let af = recordField(self_, an, i); var found = false; var ty: Id = 0; for j in bn.b { let bf = recordField(self_, bn, j); if af.name == bf.name { ty = bf.ty; found = true; break; } } if !found { return mismatch(self_, reporter, a, b); } let pending_failure_12=pushUnification(pending,Pair { af.ty, ty , ..});if pending_failure_12!=blot_error::Error.none {return pending_failure_12;} }
             },
             _ => {},
         }
     }
     return blot_error::Error.none;
+}
+recursive fn unifyQuantifiedBinders<R>(self_:Store&,a:Id,b:Id,an:Node,bn:Node,reporter:R,pending:UnificationPending&,old:const Id[:],fresh_ids:const Id[:])->Error {
+                for left_, i in old { if node(self_, left_).b != node(self_, fresh_ids[i]).b { return mismatch(self_, reporter, a, b); } }
+ let left_goals=snapshotResolutionGoals(quantifierGoals(self_,a));let right_goals=snapshotResolutionGoals(quantifierGoals(self_,b));
+ let error=unifyQuantifiedGoals(self_,a,b,an,bn,reporter,pending,old,fresh_ids,left_goals,right_goals);resolution_goals.free_slice(right_goals);resolution_goals.free_slice(left_goals);return error;
+}
+recursive fn unifyQuantifiedGoals<R>(self_:Store&,a:Id,b:Id,an:Node,bn:Node,reporter:R,pending:UnificationPending&,old:const Id[:],fresh_ids:const Id[:],left_goals:const Obligation[:],right_goals:const Obligation[:])->Error {
+                if left_goals.len != right_goals.len { return mismatch(self_, reporter, a, b); }
+                for left_goal, i in left_goals {
+                    let right_goal = right_goals[i]; if !blot_check_quantifier_goals::sameHead(left_goal, right_goal) { return mismatch(self_, reporter, a, b); }
+                    let replaced, error = substituteGoal(self_, right_goal, old, fresh_ids); if error != blot_error::Error.none { return error; }
+                    let first = [left_goal.ty, left_goal.other, left_goal.result, left_goal.signature]; let second = [replaced.ty, replaced.other, replaced.result, replaced.signature];
+                    for left_child, j in first { let right_child = second[j]; if (left_child == 0) != (right_child == 0) { return mismatch(self_, reporter, a, b); } if left_child != 0 { let pending_failure_0=pushUnification(pending,Pair { left_child, right_child , ..});if pending_failure_0!=blot_error::Error.none {return pending_failure_0;} } }
+                }
+                let body, error = substitute(self_, bn.a, old, fresh_ids); if error != blot_error::Error.none { return error; } let pending_failure_1=pushUnification(pending,Pair { an.a, body , ..});if pending_failure_1!=blot_error::Error.none {return pending_failure_1;}
+ return blot_error::Error.none;
+}
+recursive fn unifyProjectionArguments<R>(self_:Store&,a:Id,b:Id,reporter:R,aa:const Id[:],bb:const Id[:])->Error {
+                if aa.len != bb.len { return mismatch(self_, reporter, a, b); }
+                for left_arg, i in aa {
+                    let al, ae = resolve(self_, left_arg, 0); if ae != blot_error::Error.none { return ae; } let bl, be = resolve(self_, bb[i], 0); if be != blot_error::Error.none { return be; }
+                    if al == bl { continue; } let same, error = equalSymbolic(self_, al, bl); if error != blot_error::Error.none { return error; } if !same { return mismatch(self_, reporter, a, b); }
+                }
+ return blot_error::Error.none;
 }
 fn isRank(tag: Tag) -> bool { match tag { forall, existential, bound, rigid => { return true; }, _ => { return false; }, } }
 fn usageCode(kind: UsageKind) -> u32 { return kind; }
@@ -1509,21 +1557,18 @@ fn checkReplacementKinds(self_: Store&, old:const Id[:],fresh_ids:const Id[:],ch
     }
     checked = blot_support::Option<KindStamp> { true, stamp , ..}; return blot_error::Error.none;
 }
-recursive fn substitutedRow<L,R>(self_: Store&, root: blot_check_effects::Id, old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&, copied:Map_associated_equations&, depth: i64) -> blot_check_effects::Id, Error {
-    if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
-    let row_ = row(self_, root); var labels: blot_check_effects::Label[>..] = []; var changed = false;
+recursive fn substitutedRow<L,R>(self_:Store&,root:blot_check_effects::Id,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64)->blot_check_effects::Id,Error {
+ if self_.has_projections {let error=chargeProjection(self_);if error!=blot_error::Error.none {return 0,error;}}
+ let row_=row(self_,root);let labels=substitution_ids.alloc_slice(row_.labels.len);
+ let result,error=substitutedRowLabels(self_,root,row_,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,labels);substitution_ids.free_slice(labels);return result,error;
+}
+recursive fn substitutedRowLabels<L,R>(self_:Store&,root:blot_check_effects::Id,row_:blot_check_effects::Row,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,labels:blot_check_effects::Label[:])->blot_check_effects::Id,Error {
+ var changed=false;
     for index in row_.labels.len {
         let label = self_.effects.list(row_.labels)[index]; if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
-        let operation_ = operation(self_, label); var arguments: Id[>..] = []; var argument_changed = false;
-        for offset in operation_.arguments.len {
-            let argument = list(self_, operation_.arguments)[offset]; let next, error = substituteDepth(self_, argument, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; }
-            argument_changed = argument_changed || next != argument; arguments.push(next);
-        }
-        var instance = operation_.instance;
-        if instance.unit == 0 && instance.decl != 0 { let next, error = substituteDepth(self_, instance.decl, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } instance.decl = next; }
-        var next = label;
-        if argument_changed || instance != operation_.instance { let result, error = internResolvedOperation(self_, operation_.identity, instance, arguments, true); if error != blot_error::Error.none { return 0, error; } next = result; }
-        changed = changed || next != label; labels.push(next);
+        let operation_=operation(self_,label);let arguments=substitution_ids.alloc_slice(operation_.arguments.len);
+        let next,error=substituteOperationArguments(self_,label,operation_,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,arguments);substitution_ids.free_slice(arguments);if error!=blot_error::Error.none {return 0,error;}
+        changed=changed || next!=label;labels[index]=next;
     }
     var result = root;
     match row_.tail { formal v => {
@@ -1532,8 +1577,7 @@ recursive fn substitutedRow<L,R>(self_: Store&, root: blot_check_effects::Id, ol
             let next, error = self_.effects.substituteFormal(root, old[index], replacement_row); if error != blot_error::Error.none { return 0, effectError(error); } result = next; }
     }, _ => {}, }
     if changed {
-        let replaced = row(self_, result); if result != root { labels.append(self_.effects.list(replaced.labels)[row_.labels.len..]); }
-        let next, error = self_.effects.rowAt(labels, replaced.tail, max(row_.cursor, replaced.cursor)); if error != blot_error::Error.none { return 0, effectError(error); } result = next;
+        let next,error=rebuildSubstitutedRow(self_,root,row_,result,labels);if error!=blot_error::Error.none {return 0,error;}result=next;
     }
     var from: i64 = 0;
     while from < old_rows.len {
@@ -1542,6 +1586,26 @@ recursive fn substitutedRow<L,R>(self_: Store&, root: blot_check_effects::Id, ol
         let next, error = self_.effects.substitute(result, old_rows[index], fresh_rows[index]); if error != blot_error::Error.none { return 0, effectError(error); } result = next; from = index + 1;
     }
     return result, blot_error::Error.none;
+}
+recursive fn substituteOperationArguments<L,R>(self_:Store&,label:blot_check_effects::Label,operation_:Operation,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,arguments:Id[:])->blot_check_effects::Label,Error {
+ var argument_changed=false;
+        for offset in operation_.arguments.len {
+            let argument = list(self_, operation_.arguments)[offset]; let next, error = substituteDepth(self_, argument, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; }
+            argument_changed = argument_changed || next != argument; arguments[offset]=next;
+        }
+        var instance = operation_.instance;
+        if instance.unit == 0 && instance.decl != 0 { let next, error = substituteDepth(self_, instance.decl, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } instance.decl = next; }
+        var next = label;
+        if argument_changed || instance != operation_.instance { let result, error = internResolvedOperation(self_, operation_.identity, instance, arguments, true); if error != blot_error::Error.none { return 0, error; } next = result; }
+ return next,blot_error::Error.none;
+}
+fn rebuildSubstitutedRow(self_:Store&,root:blot_check_effects::Id,original:blot_check_effects::Row,result:blot_check_effects::Id,labels:const blot_check_effects::Label[:])->blot_check_effects::Id,Error {
+ let replaced=row(self_,result);let cursor=max(original.cursor,replaced.cursor);
+ if result==root {let next,error=self_.effects.rowAt(labels,replaced.tail,cursor);return next,effectError(error);}
+ let extra=self_.effects.list(replaced.labels)[original.labels.len..];
+ if extra.len==0 {let next,error=self_.effects.rowAt(labels,replaced.tail,cursor);return next,effectError(error);}
+ let combined=substitution_ids.alloc_slice(labels.len+extra.len);for label,index in labels {combined[index]=label;}for label,index in extra {combined[labels.len+index]=label;}
+ let next,error=self_.effects.rowAt(combined,replaced.tail,cursor);substitution_ids.free_slice(combined);return next,effectError(error);
 }
 recursive fn substituteDepth<L,R>(self_: Store&, root: Id, old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&, copied:Map_associated_equations&, depth: i64) -> Id, Error {
     increment(self_.normalization.substitute_depth_entries); if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }

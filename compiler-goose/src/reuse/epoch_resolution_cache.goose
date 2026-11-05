@@ -84,6 +84,6 @@ fn put(cache: Cache&, root: u32, result: u32) -> Error {
         while cache.entries.items[slot].generation == cache.generation { slot = (slot + 1) & (cache.entries.len - 1); }
     }
     cache.entries.items[slot] = Entry { cache.generation, root, result , ..};
-    cache.count++; cache.high_water = max(cache.high_water, root as i64 + 1);
+    cache.count++; let high_water:i64=cache.high_water; cache.high_water = max(high_water, root as i64 + 1);
     return blot_error::Error.none;
 }
