@@ -67,6 +67,6 @@ fn clear(self_:Flags&) {self_.resize(0);}
 fn deinit(self_:Flags&) {blot_support_pooled_buffer::deinit(self_,pool_Flags);self_.len=0;}
 fn finish(locals:Types&,code:Code&)->blot_backend_runtime_ir::DetachedBody,Error {let output,error=blot_backend_runtime_ir::cloneBody(locals.items,code.items);code.deinit();locals.deinit();return output,error;}
 fn finishOptional(locals:Types&,code:Code&,changed:bool,error:Error)->blot_support::Option<blot_backend_runtime_ir::DetachedBody>,Error {if error!=blot_error::Error.none || !changed {code.deinit();locals.deinit();return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}let output,error=finish(locals,code);if error!=blot_error::Error.none {return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}return blot_support::some(output),blot_error::Error.none;}
-fn I(op:blot_backend_runtime_ir::Op,operand:u32=0)->blot_backend_runtime_ir::Instruction {return blot_backend_runtime_ir::Instruction{op:op,operand:operand,..};}
+fn I(op:blot_backend_runtime_ir::Op,operand:u32=0)->blot_backend_runtime_ir::Instruction {return blot_backend_runtime_ir::Instruction{operand:operand,op:op,..};}
 struct Builder {locals:Types=Types{..},code:Code=Code{..},next_local:u32}
 fn temp(self_:Builder&)->u32,Error {let local=self_.next_local;self_.next_local+=1;let error=self_.locals.push(blot_backend_runtime_ir::VT_i32);return local,error;}

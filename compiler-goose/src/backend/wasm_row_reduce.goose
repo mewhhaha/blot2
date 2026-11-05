@@ -14,7 +14,7 @@ type Types=blot_backend_optimizer_buffers::Types;
 struct Uses {reads:u8=0,writes:u8=0}
 struct Plan {end:i64,accumulator:u32,base:u32,result:u32,offset:u32,words:u32}
 reusable[] var use_runs:Uses[>..]=[];
-fn I(op:Op,operand:u32=0)->Instruction {return Instruction{op:op,operand:operand,..};}
+fn I(op:Op,operand:u32=0)->Instruction {return Instruction{operand:operand,op:op,..};}
 fn isInst(inst:Instruction,op:Op,operand:u32)->bool {return inst.op==op && inst.operand==operand;}
 fn privateLocal(uses:const Uses[:],id:u32)->bool {return id<uses.len && uses[id].reads==1 && uses[id].writes==1;}
 fn contiguous(offsets:const u32[:])->blot_support::Option<u32> {var first=offsets[0];for offset in offsets {first=min(first,offset);}var seen:u16=0;for offset in offsets {let difference=offset-first;if difference%4!=0 || difference/4>=offsets.len {return blot_support::none<u32>();}let bit=1 as u16<<(difference/4);if seen&bit!=0 {return blot_support::none<u32>();}seen|=bit;}return blot_support::some(first);}

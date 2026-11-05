@@ -60,9 +60,12 @@ B+=['''fn clonePacketBody(source:const Body&,owner:Chunk&)->Body,Error {var valu
 for f,t in D['blot_reuse_body_check_cache::Body'][2]:
  if f=='owner':continue
  if f in ('loops','auxiliary'):continue
- if t.endswith('[:]'):B.append('value.'+f+'=copyOwned(source.'+f+');')
+ if f=='bindings':B.append('value.bindings=cloneBindings(source.bindings);')
+ elif f=='predicates':B.append('value.predicates=clonePredicates(source.predicates);')
+ elif f=='members':B.append('value.members=cloneNames(source.members);')
+ elif t.endswith('[:]'):B.append('value.'+f+'=copyOwned(source.'+f+');')
  else:B.append('value.'+f+'=source.'+f+';')
-B+=['for &binding in value.bindings {binding.name=copyOwned(binding.name);}','for &predicate in value.predicates {predicate.name=copyOwned(predicate.name);}','for &member in value.members {member=copyOwned(member);}',
+B+=[
 '''let loops .= source.loops;if loops {let index=loop_owners.alloc_index(Loops{carries:copyOwned(loops.carries),exits:copyOwned(loops.exits),bindings:copyOwned(loops.bindings),live:true,..});loop_owners[index].slot=(index+1) as u32;value.loops .= loop_owners[index];}
 let auxiliary .= source.auxiliary;if auxiliary {var readable=copy(auxiliary);readable.live=true;let copied,error=blot_reuse_body_auxiliary::clone(readable);if error!=Error.none {value.deinit();return Body{..},error;}value.auxiliary .= copied;}return value,Error.none;
 }''']
@@ -74,7 +77,7 @@ for f,t in graph[2]:
  if t.endswith('[:]'):
   B.append('let '+f+',error=value.graph_owner.copy(source.graph.'+f+');if error!=Error.none {value.release();return null,error;}value.graph.'+f+'='+f+';')
  else:B.append('value.graph.'+f+'=source.graph.'+f+';')
-B+=['value.nominals=cloneIdentityReads(source.nominals);','value.field_names=copyOwned(source.field_names);for &field in value.field_names {field=copyOwned(field);}','value.qualifications=copyOwned(source.qualifications);value.body_bytes=source.body_bytes;value.type_work=source.type_work;','value.bodies=owned_Body.alloc_slice(source.bodies.len);for &body in value.bodies {body=Body{owner:value,..};}','for body,index in source.bodies {let copied,error=clonePacketBody(body,value);if error!=Error.none {value.release();return null,error;}value.bodies[index]=copied;}return value,Error.none;}']
+B+=['value.nominals=cloneIdentityReads(source.nominals);','value.field_names=cloneNames(source.field_names);','value.qualifications=copyOwned(source.qualifications);value.body_bytes=source.body_bytes;value.type_work=source.type_work;','value.bodies=owned_Body.alloc_slice(source.bodies.len);for &body in value.bodies {body=Body{owner:value,..};}','for body,index in source.bodies {let copied,error=clonePacketBody(body,value);if error!=Error.none {value.release();return null,error;}value.bodies[index]=copied;}return value,Error.none;}']
 B+=['''fn restorePacketIndex(cache:Cache&,slots:const dictionary_slot<const u8[:],i64>[:],count:i64)->Error {
  if count<0||count>slots.len {return Error.invalid_artifact;}if slots.len!=0&&(slots.len&(slots.len-1))!=0 {return Error.invalid_artifact;}var occupied:i64=0;
  for slot in slots {if slot.tag==0 {continue;}occupied++;if slot.val<0||slot.val>=cache.bodies.len||slot.key!=cache.bodies.items[slot.val].body().name {return Error.invalid_artifact;}}if occupied!=count {return Error.invalid_artifact;}

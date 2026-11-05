@@ -5,12 +5,11 @@ installed compiler remain the oracle; the ordinary Blot toolchain still uses
 them. `oracle.json` pins the source and executable used for later comparisons.
 The remote tag `goose-port-oracle-156f84b` preserves that Zig source baseline.
 
-Every compiler-algorithm module now has an author-reported **first source
-pass**. The
-complete production port is still pending: recoverable allocation failure and
-runtime retention/observation need implementation work. The user has requested compilation repair. The complete import graph now
-parses under upstream Goose; type/lifetime checking is being repaired. No
-successful full compiler executable or parity result exists yet.
+Every compiler-algorithm module has a first source pass. The complete import
+graph parses under upstream Goose; type and lifetime checking are being
+repaired. No successful full compiler executable or parity result exists yet.
+Recoverable allocation failure and runtime retention/observation also remain
+unfinished production requirements.
 
 The module map follows the Zig implementation. Goose contexts borrow typed
 tables owned by their callers; numeric identities survive growth. Errors travel
@@ -24,8 +23,8 @@ Guest ABI 8 and existing storage budgets remain the owned backend contract.
 
 `source-correspondence.json` inventories the pinned native source and records
 writing status. `port-notes/` contains the owners' exact remaining scope and
-shared constructor contracts. The current checkpoint is source-only; remaining
-production modules and shared integration adapters are still being written.
+shared constructor contracts. See [the compilation frontier](port-notes/compilation.md)
+for current checks and remaining build work.
 
 The native entry is now source-written in `src/main.goose`, with concrete CLI
 pipelines and process worker dispatch under `src/driver/`. `build.py` regenerates

@@ -28,7 +28,7 @@ fn run(module: const Module&, function: Function) -> blot_support::Option<blot_b
     var locals: blot_backend_runtime_ir::ValueType[>..<] = [];
     var code: IR[>..<] = [];
     locals.append(module.locals(function));
-    let source = module.instructions(function);
+    let source = blot_backend_wasm::instructions(module,function);
     for inst in source {
         if before(module, inst) { code.push(IR { op:blot_backend_runtime_ir::OP_call_import,operand:drain,..}); }
         code.push(inst);

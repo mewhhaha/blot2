@@ -60,13 +60,13 @@ fn opening(instructions: const blot_backend_runtime_ir::Instruction[:], alternat
     return 0, false;
 }
 struct Iterator {
-    facts: Facts, instructions: const blot_backend_runtime_ir::Instruction[:], at: i64 = 0,
+    facts: Facts, at: i64 = 0,
     pending: blot_backend_runtime_ir::Instruction[18] = [blot_backend_runtime_ir::Instruction {..}; 18], pending_at: i64 = 18,
 }
-fn next(iterator: Iterator&) -> blot_backend_runtime_ir::Instruction, bool {
+fn next(iterator: Iterator&,instructions:const blot_backend_runtime_ir::Instruction[:]) -> blot_backend_runtime_ir::Instruction, bool {
     if iterator.pending_at < 18 { let inst = iterator.pending[iterator.pending_at]; iterator.pending_at++; return inst, true; }
-    while iterator.at < iterator.instructions.len {
-        let at = iterator.at; var inst = iterator.instructions[at]; iterator.at++;
+    while iterator.at < instructions.len {
+        let at = iterator.at; var inst = instructions[at]; iterator.at++;
         if inst.op == blot_backend_runtime_ir::OP_resource_retire {
             let enqueue, found = iterator.facts.module.resourceRetireImport(); if !found { continue; }
             let local = inst.operand;
@@ -92,23 +92,23 @@ fn next(iterator: Iterator&) -> blot_backend_runtime_ir::Instruction, bool {
             ];
             iterator.pending_at = 1; return iterator.pending[0], true;
         }
-        let known, is_known = condition(iterator.facts, iterator.instructions, at);
+        let known, is_known = condition(iterator.facts, instructions, at);
         if is_known {
-            let end, has_end = boundary(iterator.instructions, known.after, !known.value);
+            let end, has_end = boundary(instructions, known.after, !known.value);
             if has_end {
                 iterator.at = known.after;
-                if !known.value { iterator.at = end; if iterator.instructions[end].op == blot_backend_runtime_ir::OP_else_ { iterator.at++; } }
+                if !known.value { iterator.at = end; if instructions[end].op == blot_backend_runtime_ir::OP_else_ { iterator.at++; } }
                 return blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_block, known.result), true;
             }
         }
         if inst.op == blot_backend_runtime_ir::OP_else_ {
-            let begin, has_begin = opening(iterator.instructions, at);
+            let begin, has_begin = opening(instructions, at);
             if has_begin {
                 var start = begin - 4; if start < 0 { start = 0; }
                 while start < begin {
-                    let prior, prior_known = condition(iterator.facts, iterator.instructions, start); start++;
+                    let prior, prior_known = condition(iterator.facts, instructions, start); start++;
                     if !prior_known || prior.after != begin + 1 || !prior.value { continue; }
-                    let end, has_end = boundary(iterator.instructions, at + 1, false);
+                    let end, has_end = boundary(instructions, at + 1, false);
                     if has_end { iterator.at = end; break; }
                 }
                 if iterator.at != at + 1 { continue; }

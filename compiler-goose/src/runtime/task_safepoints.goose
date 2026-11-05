@@ -41,21 +41,21 @@ fn run(module: const Module&, function: Function) -> blot_support::Option<blot_b
             let name = module.importName(inst.operand);
             publication = name == "open" || name == "spawn";
         }
-        if source_call || publication { code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:checkpoint,..}); }
+        if source_call || publication { code.push(blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,checkpoint)); }
         let suspend = suspends(module, inst);
         if suspend {
-            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:checkpoint,..});
-            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:current,..});
-            code.push(Instruction { op:blot_backend_runtime_ir::OP_local_set,operand:context as u32,..});
+            code.push(blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,checkpoint));
+            code.push(blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,current));
+            code.push(blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,context as u32));
         }
         if inst.op == blot_backend_runtime_ir::OP_br || inst.op == blot_backend_runtime_ir::OP_br_if {
-            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:checkpoint,..});
+            code.push(blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,checkpoint));
         }
         code.push(inst);
         if suspend {
-            code.push(Instruction { op:blot_backend_runtime_ir::OP_local_get,operand:context as u32,..});
-            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:resume_,..});
-            code.push(Instruction { op:blot_backend_runtime_ir::OP_call_import,operand:checkpoint,..});
+            code.push(blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,context as u32));
+            code.push(blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,resume_));
+            code.push(blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_import,checkpoint));
         }
     }
     let result,error=blot_backend_runtime_ir::cloneBody(locals[..],code[..]);if error!=blot_error::Error.none {return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}return blot_support::some(result),blot_error::Error.none;

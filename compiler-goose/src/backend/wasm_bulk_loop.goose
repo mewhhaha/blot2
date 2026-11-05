@@ -24,7 +24,7 @@ struct Descriptor {word:u32,token:u32,epoch_low:u32,epoch_high:u32}
 enum Replacement {copy {input:Descriptor},fill {bits:u32}}
 struct Plan {target:Descriptor,replacement:Replacement,iterator:u32,end:u32,length_function:u32,next_local:u32}
 struct Builder {locals:blot_backend_optimizer_buffers::Types=blot_backend_optimizer_buffers::Types{..},code:blot_backend_optimizer_buffers::Code=blot_backend_optimizer_buffers::Code{..},next_local:u32}
-fn I(op:Op,operand:u32=0)->Instruction {return Instruction{op:op,operand:operand,..};}
+fn I(op:Op,operand:u32=0)->Instruction {return Instruction{operand:operand,op:op,..};}
 fn L(local:u32)->Instruction {return I(blot_backend_runtime_ir::OP_local_get,local);}
 fn C(bits:u32)->Instruction {return I(blot_backend_runtime_ir::OP_i32_const,bits);}
 fn temp(self_:Builder&)->u32,Error {let local=self_.next_local;self_.next_local+=1;let error=self_.locals.push(blot_backend_runtime_ir::VT_i32);return local,error;}

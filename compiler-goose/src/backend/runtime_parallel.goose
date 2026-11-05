@@ -31,8 +31,8 @@ struct Response {
     version: u32 = 1,id: u32,failure: Error,unproven: bool,has_output: bool,timing: WorkerTiming,trace: blot_phase_profile::WorkerSnapshot,
     locals: u8[],instructions: blot_backend_runtime_ir::Instruction[],
 }
-fn cachedLocals(body: blot_support::Option<Body>) -> u8[] { if body.present { return copy(body.value.locals); } return []; }
-fn cachedCode(body: blot_support::Option<Body>) -> blot_backend_runtime_ir::Instruction[] { if body.present { return copy(body.value.instructions); } return []; }
+fn cachedLocals(body: blot_support::Option<Body>) -> u8[] { if body.present { return body.value.locals; } return []; }
+fn cachedCode(body: blot_support::Option<Body>) -> blot_backend_runtime_ir::Instruction[] { if body.present { return body.value.instructions; } return []; }
 fn elapsed(started: u64) -> u64 { let now = blot_native::clock_ns(); if now <= started { return 0; } return (now - started) / 1000; }
 struct Execution {
     id: u32,needed: bool,rc: bool,roots: bool,needs_roots: bool,tier: blot_compilation_tier::Tier,cached: blot_support::Option<Body>,output: blot_support::Option<Body>,unproven: bool = false,

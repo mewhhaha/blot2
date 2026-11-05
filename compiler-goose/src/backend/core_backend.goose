@@ -2436,9 +2436,9 @@ fn publicationCanReclaim(workspace: const CompileWorkspace&) -> bool { return bl
 fn pinResult(result: Result&,catalog_owner: blot_reuse_dependency_payload::Owner,unit_owners: const blot_reuse_dependency_payload::Owner[:],seed_owners: const blot_reuse_dependency_payload::Owner[:]) -> blot_error::Error {
     if !result.active { assert(result.publication_owner.slot == 0 && !result.publication_pinned && result.capture == null && result.allocation_emission == null && result.explanation == null && result.startup_observation == null && !result.diagnostic.present && result.bytes.len == 0 && result.owned_message.len == 0); return blot_error::Error.none; }
     if result.publication_owner.slot == 0 || result.publication_pinned { return blot_error::Error.invalid_artifact; }
-    var modules: const blot_reuse_code_artifacts::ModulePin[:] = default<const blot_reuse_code_artifacts::ModulePin[:]>(); if result.capture != null && result.capture.metadata.pools.present { modules = result.capture.metadata.pools.value.modules; }
+    let captured .=result.capture;let modules=if captured {if captured.metadata.pools.present {captured.metadata.pools.value.modules}else {default<const blot_reuse_code_artifacts::ModulePin[:]>()}}else {default<const blot_reuse_code_artifacts::ModulePin[:]>()};
     var pins,error = blot_backend_result_publication::prepare(result.publication_owner,result.publication_epoch,result.publication_units,catalog_owner,unit_owners,seed_owners,modules); if error != blot_error::Error.none { return error; }
-    if result.capture != null && result.capture.metadata.pools.present { let rebound = blot_reuse_code_artifacts::rebindModuleHeaders(result.capture.metadata.pools.value,pins.headers); if rebound != blot_error::Error.none { pins.deinit(); return rebound; } }
+    if captured && captured.metadata.pools.present { let rebound = blot_reuse_code_artifacts::rebindModuleHeaders(captured.metadata.pools.value,pins.headers); if rebound != blot_error::Error.none { pins.deinit(); return rebound; } }
     blot_backend_result_publication::commit(result.publication_owner,result.publication_epoch,pins); result.publication_pinned = true; result.publication_units = blot_backend_result_publication::units(result.publication_owner,result.publication_epoch); return blot_error::Error.none;
 }
 

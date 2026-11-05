@@ -3,16 +3,18 @@
 ## Current frontier
 
 The active experiment ports the compiler to idiomatic Goose in
-[`compiler-goose/`](compiler-goose/README.md). The user now explicitly requests fixing and recompiling the written port.
+[`compiler-goose/`](compiler-goose/README.md). The user requests fixing and
+recompiling the written port.
 Whole-program parsing passes; type/lifetime repairs and full compilation are
 still pending. Source-only checkpoints are unverified;
 follow `compiler-goose/source-correspondence.json` and its port notes for exact
 writing status and runtime gaps. Keep `compiler/` and the default toolchain
 unchanged as the oracle. The remote tag `goose-port-oracle-156f84b` pins source
 `156f84b4810f630dff7e5efb7014b2194e3160f7`; its saved compiler is
-`build/goose-port/oracle/bin/blotc` with the release SHA256 below. Once writing
-finishes, use bounded upstream Goose acceptance checks and differential
-comparisons. The port currently establishes no performance or parity result.
+`build/goose-port/oracle/bin/blotc` with the release SHA256 below. Use bounded
+upstream Goose acceptance checks and differential comparisons. The
+[compilation frontier](compiler-goose/port-notes/compilation.md) records the
+current repair loop. The port establishes no performance or parity result.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
 Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.

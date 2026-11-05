@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Build the Goose compiler itself; no Zig compiler/oracle is invoked.
 
-The active source-writing phase does not run this build. --identity-only is a
-source authoring operation and never starts a compiler. Every actual build
+--identity-only writes source metadata without starting a compiler. Every build
 regenerates its identity after writing the selected Goose runtime, then emits
 C through a C-host header and links only the ordinary Goose runtime/OS shim.
 """
