@@ -85,7 +85,7 @@ fn validate(self_: View, boundary: Boundary, limits: Limits) -> blot_error::Erro
 }
 struct Owned { terms: const Term[:], owner_id: u64 }
 fn view(self_: Owned) -> View { return View { self_.terms, self_.owner_id , ..}; }
-fn deinit(self_: Owned&) { self_.terms = []; self_.owner_id = 0; }
+fn deinit(self_: Owned&) { self_.terms = default<const blot_check_numeric_proof_terms::Term[:]>(); self_.owner_id = 0; }
 struct Substitution { formals: const Id[:] = default<const Id[:]>(), captures: const Id[:] = default<const Id[:]>(), versions: const Id[:] = default<const Id[:]>() }
 struct Store {
     terms: Term[>..]&, index: dictionary<Term, Id>&,

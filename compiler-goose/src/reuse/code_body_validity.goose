@@ -26,7 +26,7 @@ fn init(allocation_owner: u64, old: const blot_reuse_code_artifacts::Pools&, uni
 }
 fn deinit(self_: Gate&) {
     if self_.exact.len != 0 { exact_flags.free_slice(self_.exact); }
-    self_.exact = []; self_.semantic.deinit();
+    self_.exact = default<bool[:]>(); self_.semantic.deinit();
 }
 fn body(self_: const Gate&, target: blot_check_core::BindingRef) -> bool { return self_.semantic.admitsPrincipal(target) && self_.exact[self_.semantic.offsets[target.unit - 1] + target.binding]; }
 fn catalog(self_: const Gate&, unit: u32) -> bool { return self_.semantic.enabled && unit != 0 && unit <= self_.semantic.units.len; }

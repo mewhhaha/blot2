@@ -36,9 +36,9 @@ fn initEngine(source:const Project&,execution:blot_check_check::PrivateExecution
 }
 fn deinitSourceModules(self_:Engine&) {
  for &item in self_.source_modules {if item.present {item.value.validation.deinit();releaseOwned(item.value.exports);}}
- if self_.source_modules.len!=0 {source_module_runs.free_slice(self_.source_modules);}self_.source_modules=[];
+ if self_.source_modules.len!=0 {source_module_runs.free_slice(self_.source_modules);}self_.source_modules=default<blot_support::Option<SourceModule>[:]>();
  for catalog in self_.compiled_catalogs {releaseOwned(catalog.exports);if catalog.declarations.len!=0 {source_declaration_runs.free_slice(catalog.declarations);}}
- if self_.compiled_catalogs.len!=0 {compiled_catalog_runs.free_slice(self_.compiled_catalogs);}self_.compiled_catalogs=[];
+ if self_.compiled_catalogs.len!=0 {compiled_catalog_runs.free_slice(self_.compiled_catalogs);}self_.compiled_catalogs=default<CompiledCatalog[:]>();
 }
 fn deinitDiagnostics(self_:Engine&) {for &item in self_.diagnostics.items {item.deinit();}blot_support_pooled_buffer::deinit(self_.diagnostics,owned_Diagnostic);}
 fn deinit(self_:Engine&) {assert(self_.live);self_.deinitDiagnostics();self_.deinitSourceModules();blot_support_pooled_map::deinit(self_.previous_bodies,offer_slots);self_.result.deinit();let at=self_.slot-1;self_=Engine{..};engines.free(at);}

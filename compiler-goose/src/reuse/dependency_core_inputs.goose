@@ -69,7 +69,7 @@ fn invocationActive(value: const blot_reuse_frozen_dependency::FrozenDependency&
 struct Owners { stable: bool[:]=default<bool[:]>() }
 reusable[] var stable_pool: bool[>..]=[];
 reusable[] var words_pool: u64[>..]=[];
-fn deinit(self_: Owners&) { stable_pool.free_slice(self_.stable); self_.stable=[]; }
+fn deinit(self_: Owners&) { stable_pool.free_slice(self_.stable); self_.stable=default<bool[:]>(); }
 fn init(current: const blot_reuse_retained_dependency::Snapshot&,previous: const blot_reuse_retained_dependency::Snapshot&) -> blot_support::Option<Owners>,Error {
  let count=current.initialized; if !previous.validated||count!=previous.initialized||count==0||count>1024 { return blot_support::none<Owners>(),blot_error::Error.none; } let activation_changed=invocationActive(current.value)!=invocationActive(previous.value); let width=(count+63)/64; if count>0x7fffffffffffffff/width { return blot_support::none<Owners>(),blot_error::Error.none; } let edge_words=count*width; if count>0x7fffffffffffffff-edge_words { return blot_support::none<Owners>(),blot_error::Error.none; } let words=edge_words+count; let stable=stable_pool.alloc_slice(count); let storage=words_pool.alloc_slice(words); let edges=storage[..edge_words]; let queue=storage[edge_words..]; for &word in edges { word=0; } var remaining: i64=1000000;
  for &same,id in stable { same=current.shares(previous,id); if same&&activation_changed { for node in current.value.modules[id].core.types.nodes { if node.tag==blot_check_types::Tag.scoped { same=false; break; } } } if !same { continue; } var inputs=Inputs {edges[id*width..id*width+width],count,remaining}; inputs.module(current.value.modules[id].core); same=inputs.complete; }

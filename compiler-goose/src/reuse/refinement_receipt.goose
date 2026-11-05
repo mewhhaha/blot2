@@ -65,7 +65,7 @@ fn copyRows(source: const blot_eval_type_evidence::RowMapping[:]) -> const blot_
 fn deinit(self_: Key&) {
     if self_.seeds.len != 0 { key_seeds.free_slice(self_.seeds); }
     if self_.rows.len != 0 { key_rows.free_slice(self_.rows); }
-    self_.seeds = []; self_.rows = [];
+    self_.seeds = default<const blot_eval_type_evidence::Mapping[:]>(); self_.rows = default<const blot_eval_type_evidence::RowMapping[:]>();
 }
 struct Adapter {}
 type Dependencies = blot_reuse_specialization_receipt::Record;

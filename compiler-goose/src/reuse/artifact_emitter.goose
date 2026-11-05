@@ -117,7 +117,7 @@ fn releaseOwned(source: const SymbolicInstruction[:]) {
 fn deinit(self_: Recorder&) {
     self_.records.clear(); self_.bytes.clear(); self_.parameters.clear(); self_.operations.clear();
     releaseOwned(self_.functions); releaseOwned(self_.locals); releaseOwned(self_.instructions);
-    self_.functions = []; self_.locals = []; self_.instructions = []; self_.pending_instructions.clear();
+    self_.functions = default<FunctionArtifact[:]>(); self_.locals = default<ValueType[:]>(); self_.instructions = default<SymbolicInstruction[:]>(); self_.pending_instructions.clear();
 }
 fn reset(self_:Recorder&) {
     let lease=self_.recorder_lease;let generation=self_.recorder_generation;

@@ -32,7 +32,7 @@ fn scopeCallback(store, raw: blot_check_types::Id) -> blot_support::Option<blot_
     if mentionsRegion(store, arrow.b, binder, remaining, 0) || rowMentionsRegion(store, arrow.c, binder, remaining, 0) { return blot_support::Option<blot_check_types::Node> { false, default<blot_check_types::Node>() , ..}; }
     return blot_support::Option<blot_check_types::Node> { true, arrow , ..};
 }
-recursive fn rowMentionsRegion(store, row: blot_check_effects::Id, binder: blot_check_types::Id, remaining: i64&, depth: i64) -> bool {
+recursive fn rowMentionsRegion<S>(store:S, row: blot_check_effects::Id, binder: blot_check_types::Id, remaining: i64&, depth: i64) -> bool {
     if remaining == 0 || depth >= 128 { return true; } remaining -= 1;
     for label in store.rowLabels(row) {
         let operation = store.operation(label);
@@ -41,7 +41,7 @@ recursive fn rowMentionsRegion(store, row: blot_check_effects::Id, binder: blot_
     }
     return false;
 }
-recursive fn mentionsRegion(store, raw: blot_check_types::Id, binder: blot_check_types::Id, remaining: i64&, depth: i64) -> bool {
+recursive fn mentionsRegion<S>(store:S, raw: blot_check_types::Id, binder: blot_check_types::Id, remaining: i64&, depth: i64) -> bool {
     if raw == 0 { return false; } if raw == binder || remaining == 0 || depth >= 128 { return true; } remaining -= 1;
     let node = store.node(store.head(raw, 0));
     match node.tag {

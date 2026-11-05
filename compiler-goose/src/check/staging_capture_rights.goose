@@ -1,5 +1,6 @@
 // Future-local captures require complete executable lifetime edges.
 namespace blot_check_staging_capture_rights;
+import parse.ast;
 import check.capability_lifetimes;
 import check.core;
 import check.frozen_core_scopes;
@@ -30,7 +31,7 @@ fn report(self_: Checker&, root: u32) -> const Report?, Error {
     var result, err = blot_check_capability_lifetimes::analyzeScope(self_.module, self_.units, root, self_.remaining);
     if err != blot_error::Error.none { if err != blot_error::Error.out_of_memory { err = blot_error::Error.invalid_artifact; } return null, err; }
     if !result.complete { blot_check_capability_lifetimes::deinit(result); return null, blot_error::Error.invalid_artifact; }
-    self_.reports.append(Entry { root, result , ..}); return self_.reports[self_.reports.len - 1].report, blot_error::Error.none;
+    self_.reports.push(Entry { root, result , ..}); return self_.reports[self_.reports.len - 1].report, blot_error::Error.none;
 }
 fn confined(self_: Checker&, image: const Report&, value: u32, scopes: const u32[:]) -> Error {
     if !self_.allocating { return blot_error::Error.invalid_artifact; } var work: u32[>..<]; var seen: dictionary<u32,bool>;
@@ -52,7 +53,7 @@ fn confined(self_: Checker&, image: const Report&, value: u32, scopes: const u32
 }
 fn loanCapture(self_: Checker&, closure: u32, binding: u32, loans: const u32[:]) -> bool, Error {
     let borrowed = self_.module.types.node(self_.module.bindings[binding].ty);
-    if borrowed.tag != blot_check_types::Tag.usage || (borrowed.b != blot_check_types::usageCode(blot_check_types::UsageKind.borrow) && borrowed.b != blot_check_types::usageCode(blot_check_types::UsageKind.borrow_mut)) || borrowed.c == 0 { return false, blot_error::Error.none; }
+    if borrowed.tag != blot_check_types::Tag.usage || (borrowed.b != blot_check_types::usageCode(blot_parse_ast::usagekind_borrow) && borrowed.b != blot_check_types::usageCode(blot_parse_ast::usagekind_borrow_mut)) || borrowed.c == 0 { return false, blot_error::Error.none; }
     let region = self_.module.types.node(borrowed.c); if region.tag != blot_check_types::Tag.bound || region.a != 0 || region.b != 2 || region.c != binding { return false, blot_error::Error.none; }
     for site in loans { let err = self_.step(); if err != blot_error::Error.none { return false, err; } let node = self_.module.node(site); var callback_id: u32 = 0; if node.tag == blot_check_core::Tag.usage_borrow { callback_id = node.b; } if node.tag == blot_check_core::Tag.resource_scope { callback_id = node.c; }
         if callback_id == 0 || self_.module.node(callback_id).tag != blot_check_core::Tag.closure { return false, blot_error::Error.invalid_artifact; } let callback = self_.module.closure(callback_id);

@@ -21,7 +21,7 @@ fn deinit(self_: Key&) { self_.input.deinit(); }
 struct Replay { selected: u32,values: ValueInfo[:]=default<ValueInfo[:]>(),evidence: u32[:]=default<u32[:]>(),records: u32[:]=default<u32[:]>(),children: u32[:]=default<u32[:]>(),fixed: u32[:]=default<u32[:]>() }
 reusable[] var values_pool: ValueInfo[>..]=[];
 reusable[] var words_pool: u32[>..]=[];
-fn deinit(self_: Replay&) { values_pool.free_slice(self_.values); words_pool.free_slice(self_.evidence); words_pool.free_slice(self_.records); words_pool.free_slice(self_.children); words_pool.free_slice(self_.fixed); self_.values=[]; self_.evidence=[]; self_.records=[]; self_.children=[]; self_.fixed=[]; }
+fn deinit(self_: Replay&) { values_pool.free_slice(self_.values); words_pool.free_slice(self_.evidence); words_pool.free_slice(self_.records); words_pool.free_slice(self_.children); words_pool.free_slice(self_.fixed); self_.values=default<blot_eval_canonical_specialization::ValueInfo[:]>(); self_.evidence=default<u32[:]>(); self_.records=default<u32[:]>(); self_.children=default<u32[:]>(); self_.fixed=default<u32[:]>(); }
 fn copyWords(input: const u32[:]) -> u32[:] { let output=words_pool.alloc_slice(input.len); for word,index in input { output[index]=word; } return output; }
 fn copyValues(input: const ValueInfo[:]) -> ValueInfo[:] { let output=values_pool.alloc_slice(input.len); for value,index in input { output[index]=value; } return output; }
 struct Adapter {}

@@ -15,7 +15,7 @@ type Tag = blot_check_types::Tag;
 type Work = blot_check_usage_check::Work;
 fn bounded(store, id: Id) -> bool { return id < store.nodes.len; }
 fn validList(store, list: blot_check_types::List) -> bool { return list.start <= store.extra.len && list.len <= store.extra.len - list.start; }
-recursive fn expression(store, nominals, owner: i64, root: Id, work: Work&, depth: i64) -> bool, Error {
+recursive fn expression<S,N>(store:S, nominals:const N[:], owner: i64, root: Id, work: Work&, depth: i64) -> bool, Error {
     let error = work.charge(1); if error != blot_error::Error.none { return false, error; } if depth >= 128 || !bounded(store, root) { return false, blot_error::Error.type_limit; } let id = store.head(root, 0); if !bounded(store, id) { return false, blot_error::Error.type_limit; }
     let n = store.node(id); let error = blot_check_usage_check::nominalShape(store, nominals, n, work); if error != blot_error::Error.none { return false, error; }
     match n.tag {
@@ -48,7 +48,7 @@ fn facts(store, nominals, constructors, unit: u32, work: Work&) -> Error {
 fn validate(module: const blot_check_core::Module&) -> Error {
     var claimed = false; for nominal, index in module.nominals { if nominal.closed_storage && (index == 0 || nominal.identity.unit == 0 || nominal.identity.decl == 0 || nominal.has_usage) { return blot_error::Error.invalid_artifact; } claimed = claimed || nominal.closed_storage; }
     if !claimed { return blot_error::Error.none; } if module.nominals.len > 4096 { return blot_error::Error.invalid_artifact; }
-    var storage: blot_check_core::Nominal[4096]; let proved = storage[..module.nominals.len]; for nominal, index in module.nominals { proved[index] = nominal; } var work = Work {..};
+    var storage: blot_check_core::Nominal[4096] = [default<blot_check_core::Nominal>();4096]; let proved = storage[..module.nominals.len]; for nominal, index in module.nominals { proved[index] = nominal; } var work = Work {..};
     for nominal, owner in proved { let error = work.charge(1); if error != blot_error::Error.none { return blot_error::Error.invalid_artifact; } if !nominal.closed_storage { continue; }
         if !validList(module.types, nominal.variables) || !validList(module.types, nominal.parameters) { return blot_error::Error.invalid_artifact; }
         for variable in module.types.list(nominal.variables) { let error = work.charge(1); if error != blot_error::Error.none || !bounded(module.types, variable) { return blot_error::Error.invalid_artifact; } }

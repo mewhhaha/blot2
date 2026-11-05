@@ -145,7 +145,7 @@ fn storage<K,D,V,A>(self_: const Table<K,D,V,A>&) -> Storage {
 fn deinit<K,D,V,A>(self_: Table<K,D,V,A>&) {
     for index in self_.records.len { self_.records[index].deinit(); }
     self_.adapter.releaseRecords(self_.backing); self_.index.deinit();
-    self_.backing = []; self_.records = []; self_.owned_bytes = 0; self_.capacity_bytes = 0;
+    self_.backing = default<OwnedRecord<K,D,V,A>[:]>(); self_.records = default<OwnedRecord<K,D,V,A>[:]>(); self_.owned_bytes = 0; self_.capacity_bytes = 0;
     self_.owner = 0;
 }
 fn begin<K,D,V,A>(self_: const Table<K,D,V,A>&, owned_key: K) -> Builder<K,D,V,A> {

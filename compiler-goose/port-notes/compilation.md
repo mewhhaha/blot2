@@ -4,8 +4,8 @@ The user explicitly requested fixing and recompiling the port. Verification is
 active; there is no remaining approval or source-writing barrier. Keep the Zig
 compiler, normal toolchain, saved oracle and siblings unchanged.
 
-Checkpoint `7e0864f9c3ec39eab189056d0d8fe6dff339c2f1` is pushed to main. It repairs
-optimizer ownership and bounds failed checks; it is not a full compiler build.
+Checkpoint `ec5f0a96e201262f95bf44686c996ace437fa538` is pushed to main. It preserves
+the engine dependency cuts and pooled-view repairs; it is not a full compiler build.
 Upstream Goose parses roughly 35,700 declarations across 435 files in about
 1.1 seconds. Whole-program type checking has not completed successfully.
 
@@ -13,25 +13,32 @@ Use `python3 compiler-goose/tools/check_source.py --phase check --log NAME`.
 The runner caps and kills the process group and saves full diagnostics under
 `build/goose-port/verification/`. Check mode uses streaming text diagnostics;
 JSON diagnostics buffer until completion and hid errors in capped runs.
-Check mode stops the process group after the first error, keeping failed
-iterations near two seconds. One coordinator runs whole-program checks at a
-time; checker currently owns this loop while errors remain in its files.
+Check mode stops the process group after the first error; recent failed
+iterations take four to eight seconds. One coordinator runs whole-program
+checks at a time; backend currently owns this loop while errors remain in its files.
 
 The actual build entry remains `compiler-goose/build.py`, with explicit Goose
 binary, standard-library directory and 30-second stage caps. Do not claim a
 working compiler until C emission, linking and execution have succeeded.
 
 The official repair loop has advanced through semantic worker packet handling
-into capability validation (check40). Optimizer growing instruction views pass
+and capability validation into scoped-backend type shapes (check60). Optimizer growing instruction views pass
 through helpers rather than being stored in analysis records; module
 copy-coalescing inputs use numeric tape ranges. Whole-program parsing passes
-after the dependency cuts (35,797 declarations, 436 files, 0.952 seconds).
+after recursive-checker repairs (35,798 declarations, 436 files, 1.002 seconds).
 Scoped tests pass for lexer, interning, graph
 SCCs, arena ownership, byte/hash/JSON helpers, maps and buffers, wire/IR emission,
 native JSON and WGSL fixtures. A fresh exact C-host startup probe passes with
 the unchanged native shim and official runtime.
 Saved probe sources/commands/logs are under
 ignored `build/goose-port/`; these do not qualify the whole compiler.
+
+Recursive capability analysis now keeps scalar Builder state and passes its
+borrowed module/store/owner inputs directly. Nested readers own separate pooled
+callable buffers. Astra's source comparison found preserved module selection,
+owner identity, traversal counters and cleanup. The input-body path restores
+the native 1 MiB logical scratch limit. Integrated runtime parity remains
+pending; reaching a later type error is not execution evidence.
 
 Focused iteration no longer loads the entire compiler for two engine laws.
 Copy coalescing accepts its actual type/tape inputs: the import closure falls
@@ -42,7 +49,9 @@ declarations, cutting interning laws from 431 files to seven: checking takes
 0.064 seconds and native growth/interning/quantifier/reuse laws pass. A separate
 global Store.view execution passes in 0.047 seconds. Evidence is in
 `coalesce-leaf-*-03.log` and `expectation-schema-check/` under the ignored build
-directory. These are measured leaf improvements, not whole-build timings.
+directory. Tracked laws and the bounded native runner are now in `tests/` and
+`tools/test_engines.py`; a fresh root run with clang-23 passes both below one
+second total. These are measured leaf improvements, not whole-build timings.
 
 Canonical ownership repairs include explicit typed empty slices, finite lazy
 JSON/packet adapters, enum aliases qualified to original definitions, safe
@@ -56,7 +65,10 @@ Astra's private toolchain experiment is isolated under
 Readiness hash traversal plus successful-graph descendant caching passes 12
 actual-header laws, 37 differential frontend fixtures and eight runtime laws.
 Neither this candidate nor a second private global-narrowing experiment
-demonstrated a whole-Blot timing win within matched 30-second caps. Neither
+demonstrated a whole-Blot timing win within matched 30-second caps. A newer
+frozen-prefix comparison reaches an official diagnostic in 7.296 seconds while
+the second private candidate hits its 12.244-second cap without a diagnostic;
+this also supplies no performance or acceptance result. Neither
 experiment is accepted into the toolchain. Keep the installed compiler and
 upstream checkout intact.
 

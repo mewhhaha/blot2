@@ -109,7 +109,7 @@ struct Owned { arity: u32, root: Id, nodes: const Term[:] = default<const Term[:
 fn view(self_: Recipe) -> View { return View { self_.nodes, self_.words , ..}; }
 fn view(self_: Owned) -> View { return View { self_.nodes, self_.words , ..}; }
 fn clone(self_: Owned, nodes: Term[>..]&, words: u32[>..]&) -> Owned, Error { let first = nodes.len; let second = words.len; nodes += self_.nodes; words += self_.words; return Owned { self_.arity, self_.root, nodes[first..], words[second..] , ..}, blot_error::Error.none; }
-fn deinit(self_: Owned&) { self_.nodes = []; self_.words = []; }
+fn deinit(self_: Owned&) { self_.nodes = default<const blot_check_capability_contracts::Term[:]>(); self_.words = default<const u32[:]>(); }
 struct Mark { nodes: i64, words: i64, visits: i64 }
 struct Store {
  nodes: TermBuffer&  = inactive_terms, words: WordBuffer&  = inactive_words, limits: Limits = Limits {..}, visits: i64 = 0,
@@ -136,7 +136,7 @@ fn project(self_: Store&, base: Id, selector: u32, kind: Projection) -> Id, Erro
 recursive fn projectDepth(self_: Store&, base: Id, selector: u32, kind: Projection, depth: i64) -> Id, Error {
     let error = visit(self_, depth); if error != blot_error::Error.none { return 0, error; } if base >= self_.nodes.len { return 0, blot_error::Error.invalid_capability_contract; } let term = self_.nodes.items[base];
     if term.tag == Tag.empty || term.tag == Tag.unknown { return base, blot_error::Error.none; }
-    if term.tag == Tag.join { var projected: Id[4096]; if term.b > projected.len { return 0, blot_error::Error.capability_analysis_limit; } for index in 0..term.b { let id, error = projectDepth(self_, self_.words.items[term.a + index], selector, kind, depth + 1); if error != blot_error::Error.none { return 0, error; } projected[index] = id; } return aggregate(self_, Tag.join, projected[..term.b]); }
+    if term.tag == Tag.join { var projected: Id[4096] = [0;4096]; if term.b > projected.len { return 0, blot_error::Error.capability_analysis_limit; } for index in 0..term.b { let id, error = projectDepth(self_, self_.words.items[term.a + index], selector, kind, depth + 1); if error != blot_error::Error.none { return 0, error; } projected[index] = id; } return aggregate(self_, Tag.join, projected[..term.b]); }
     if kind == Projection.payload && term.tag == Tag.wrapped { return term.a, blot_error::Error.none; }
     if kind == Projection.index && term.tag == Tag.product { if selector >= term.b { return 0, blot_error::Error.invalid_capability_contract; } return self_.words.items[term.a + selector], blot_error::Error.none; }
     if kind == Projection.field && term.tag == Tag.record { for field in 0..term.b / 2 { if self_.words.items[term.a + field * 2] == selector { return self_.words.items[term.a + field * 2 + 1], blot_error::Error.none; } } return 0, blot_error::Error.invalid_capability_contract; }
@@ -145,7 +145,7 @@ recursive fn projectDepth(self_: Store&, base: Id, selector: u32, kind: Projecti
 fn elements(self_: Store&, base: Id) -> Id, Error { let before = mark(self_); let id, error = elementsDepth(self_, base, 0); if error != blot_error::Error.none { rollback(self_, before); } return id, error; }
 recursive fn elementsDepth(self_: Store&, base: Id, depth: i64) -> Id, Error {
     let error = visit(self_, depth); if error != blot_error::Error.none { return 0, error; } if base >= self_.nodes.len { return 0, blot_error::Error.invalid_capability_contract; } let term = self_.nodes.items[base]; if term.tag == Tag.empty || term.tag == Tag.unknown { return base, blot_error::Error.none; }
-    if term.tag == Tag.product || term.tag == Tag.join { var children: Id[4096]; if term.b > children.len { return 0, blot_error::Error.capability_analysis_limit; } for index in 0..term.b { let child = self_.words.items[term.a + index]; children[index] = child; if term.tag == Tag.join { let id, error = elementsDepth(self_, child, depth + 1); if error != blot_error::Error.none { return 0, error; } children[index] = id; } } return aggregate(self_, Tag.join, children[..term.b]); }
+    if term.tag == Tag.product || term.tag == Tag.join { var children: Id[4096] = [0;4096]; if term.b > children.len { return 0, blot_error::Error.capability_analysis_limit; } for index in 0..term.b { let child = self_.words.items[term.a + index]; children[index] = child; if term.tag == Tag.join { let id, error = elementsDepth(self_, child, depth + 1); if error != blot_error::Error.none { return 0, error; } children[index] = id; } } return aggregate(self_, Tag.join, children[..term.b]); }
     return append(self_, Term { Tag.elements, base , ..});
 }
 fn own(self_: const Store&, arity: u32, root: Id, nodes: Term[>..]&, words: u32[>..]&) -> Owned, Error { let error = self_.view().validate(root, arity, true); if error != blot_error::Error.none { return default<Owned>(), error; } return clone(Owned { arity, root, self_.nodes.items[..], self_.words.items[..] , ..}, nodes, words); }
@@ -160,7 +160,7 @@ fn instantiateBody<H>(self_: Store&, header: H, arguments: const Id[:]) -> Id, E
         if term.tag == Tag.wrapped || term.tag == Tag.project || term.tag == Tag.elements { needed[term.a] = true; }
         else if term.tag == Tag.captures || term.tag == Tag.product || term.tag == Tag.record || term.tag == Tag.join { for child, index in header.view().children(term) { if term.tag == Tag.record && index % 2 == 0 { continue; } needed[child] = true; } }
     }
-    var map: Id[4096]; map[0] = 0; for index in 1..header.nodes.len { if !needed[index] { continue; } let error = visit(self_, 0); if error != blot_error::Error.none { return 0, error; } let id, error = copy(self_, header.view(), header.nodes[index], map, arguments); if error != blot_error::Error.none { return 0, error; } map[index] = id; }
+    var map: Id[4096] = [0;4096]; for index in 1..header.nodes.len { if !needed[index] { continue; } let error = visit(self_, 0); if error != blot_error::Error.none { return 0, error; } let id, error = copy(self_, header.view(), header.nodes[index], map, arguments); if error != blot_error::Error.none { return 0, error; } map[index] = id; }
     return map[header.root], blot_error::Error.none;
 }
 struct Frame { node: Id, next: u32 = 0 }
@@ -190,7 +190,7 @@ fn copy(self_: Store&, source: View, term: Term, map: const Id[4096]&, arguments
         wrapped => { return append(self_, Term { Tag.wrapped, map[term.a] , ..}); },
         elements => { return elements(self_, map[term.a]); },
         project => { let kind, error = projectionFromCode(term.c); if error != blot_error::Error.none { return 0, error; } return project(self_, map[term.a], term.b, kind); },
-        captures, product, record, join => { let children = source.children(term); var mapped: u32[4096]; if children.len > mapped.len { return 0, blot_error::Error.capability_analysis_limit; }
+        captures, product, record, join => { let children = source.children(term); var mapped: u32[4096] = [0;4096]; if children.len > mapped.len { return 0, blot_error::Error.capability_analysis_limit; }
             for child, index in children { if term.tag == Tag.record && index % 2 == 0 { mapped[index] = child; } else { mapped[index] = map[child]; } } return aggregate(self_, term.tag, mapped[..children.len]);
         },
     }
@@ -198,7 +198,7 @@ fn copy(self_: Store&, source: View, term: Term, map: const Id[4096]&, arguments
 fn callable(self_: Store&, header: Recipe, captures: Id) -> Id, Error { let before = mark(self_); let id, error = callableBody(self_, header, captures); if error != blot_error::Error.none { rollback(self_, before); } return id, error; }
 fn callableBody(self_: Store&, header: Recipe, captures: Id) -> Id, Error {
     if self_.nodes.len == 0 { let id, error = append(self_, Term { Tag.empty , ..}); if error != blot_error::Error.none { return 0, error; } } if header.arity == 0 || header.arity > 16 || captures >= self_.nodes.len { return 0, blot_error::Error.invalid_capability_contract; }
-    var arguments: Id[16]; for index in 0..header.arity { let id, error = append(self_, Term { Tag.argument, index as u32 , ..}); if error != blot_error::Error.none { return 0, error; } arguments[index] = id; }
+    var arguments: Id[16] = [0;16]; for index in 0..header.arity { let id, error = append(self_, Term { Tag.argument, index as u32 , ..}); if error != blot_error::Error.none { return 0, error; } arguments[index] = id; }
     let result, error = instantiate(self_, header, arguments[..header.arity]); if error != blot_error::Error.none { return 0, error; } return append(self_, Term { Tag.callable, header.arity, captures, result , ..});
 }
 recursive fn callableArity(self_: const Store&, root: Id, arity: i64, remaining: i64&, depth: i64) -> bool, Error {
@@ -210,7 +210,7 @@ recursive fn callableArity(self_: const Store&, root: Id, arity: i64, remaining:
 fn invoke(self_: Store&, root: Id, arguments: const Id[:]) -> Id, Error { let before = mark(self_); let id, error = invokeDepth(self_, root, arguments, 0); if error != blot_error::Error.none { rollback(self_, before); } return id, error; }
 recursive fn invokeDepth(self_: Store&, root: Id, arguments: const Id[:], depth: i64) -> Id, Error {
     let error = visit(self_, depth); if error != blot_error::Error.none { return 0, error; } if root >= self_.nodes.len || arguments.len == 0 || arguments.len > 16 { return 0, blot_error::Error.invalid_capability_contract; } let callable = self_.nodes.items[root];
-    if callable.tag == Tag.join { if callable.b == 0 || callable.b > 4096 || callable.a > self_.words.len || callable.b > self_.words.len - callable.a { return 0, blot_error::Error.invalid_capability_contract; } var results: Id[4096];
+    if callable.tag == Tag.join { if callable.b == 0 || callable.b > 4096 || callable.a > self_.words.len || callable.b > self_.words.len - callable.a { return 0, blot_error::Error.invalid_capability_contract; } var results: Id[4096] = [0;4096];
         for index in 0..callable.b { let child = self_.words.items[callable.a + index]; if child >= root { return 0, blot_error::Error.invalid_capability_contract; } let id, error = invokeDepth(self_, child, arguments, depth + 1); if error != blot_error::Error.none { return 0, error; } results[index] = id; } return aggregate(self_, Tag.join, results[..callable.b]);
     }
     if callable.tag != Tag.callable || callable.a != arguments.len || callable.b >= root || callable.c >= root { return 0, blot_error::Error.invalid_capability_contract; } for argument in arguments { if argument >= self_.nodes.len { return 0, blot_error::Error.invalid_capability_contract; } }
@@ -226,7 +226,7 @@ recursive fn invokeDepth(self_: Store&, root: Id, arguments: const Id[:], depth:
             _ => {},
         }
     }
-    var map: Id[4096]; map[0] = 0;
+    var map: Id[4096] = [0;4096];
     for index in 1..count { let error = visit(self_, depth); if error != blot_error::Error.none { return 0, error; } if !needed[index] { continue; } let node = self_.nodes.items[index]; var result: Id = 0;
         match node.tag {
             empty, unknown => { result = index as u32; },

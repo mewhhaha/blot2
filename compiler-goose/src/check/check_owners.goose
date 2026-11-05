@@ -274,12 +274,12 @@ fn ownChecked_body_parameters(owner:CheckedOwner,values:const blot_check_numeric
 fn ownChecked_body_uses(owner:CheckedOwner,values:const blot_check_numeric_proof_bodies::Use[:])->blot_check_numeric_proof_bodies::Use[:] {let state .= checkedOwnerState(owner);assert(state.body_uses.len==0);let result=checked_body_uses.alloc_slice(values.len);for value,index in values {result[index]=value;}state.body_uses=result;return result;}
 fn ownChecked_editor_names(owner:CheckedOwner,values:const EditorName[:])->EditorName[:] {let state .= checkedOwnerState(owner);assert(state.editor_names.len==0);let result=checked_editor_names.alloc_slice(values.len);for value,index in values {result[index]=value;}state.editor_names=result;return result;}
 fn releaseCheckedHeader(header:CheckedHeaderLease&) {
-if header.value_slots.len!=0 {checked_header_value_slots.free_slice(header.value_slots);header.value_slots=[];}
-if header.proof_slots.len!=0 {checked_header_proof_slots.free_slice(header.proof_slots);header.proof_slots=[];}
-if header.values.len!=0 {checked_header_values.free_slice(header.values);header.values=[];}
-if header.operands.len!=0 {checked_header_operands.free_slice(header.operands);header.operands=[];}
-if header.requirements.len!=0 {checked_header_requirements.free_slice(header.requirements);header.requirements=[];}
-if header.parameters.len!=0 {checked_header_parameters.free_slice(header.parameters);header.parameters=[];}
+if header.value_slots.len!=0 {checked_header_value_slots.free_slice(header.value_slots);header.value_slots=default<u32[:]>();}
+if header.proof_slots.len!=0 {checked_header_proof_slots.free_slice(header.proof_slots);header.proof_slots=default<u32[:]>();}
+if header.values.len!=0 {checked_header_values.free_slice(header.values);header.values=default<blot_check_numeric_proof_terms::Kind[:]>();}
+if header.operands.len!=0 {checked_header_operands.free_slice(header.operands);header.operands=default<blot_check_numeric_proof_terms::Term[:]>();}
+if header.requirements.len!=0 {checked_header_requirements.free_slice(header.requirements);header.requirements=default<blot_check_numeric_proof_contracts::Requirement[:]>();}
+if header.parameters.len!=0 {checked_header_parameters.free_slice(header.parameters);header.parameters=default<u32[:]>();}
 }
 fn ownCheckedHeaders(owner:CheckedOwner,contracts:ProofContract[:]) {let state .= checkedOwnerState(owner);state.headers=checked_headers.alloc_slice(contracts.len);for &contract,index in contracts {var lease=CheckedHeaderLease{..};
 lease.value_slots=checked_header_value_slots.alloc_slice(contract.header.value_slots.len);for value,slot in contract.header.value_slots {lease.value_slots[slot]=value;}contract.header.value_slots=lease.value_slots;

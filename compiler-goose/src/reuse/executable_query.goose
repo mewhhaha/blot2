@@ -37,7 +37,7 @@ fn copyStaticReads(source: const blot_reuse_code_artifacts::StaticRead[:]) -> bl
 fn deinit(self_: FragmentDependencies&) {
     if self_.inline_bodies.len != 0 { body_reads.free_slice(self_.inline_bodies); }
     if self_.static_reads.len != 0 { static_reads.free_slice(self_.static_reads); }
-    self_.inline_bodies = []; self_.static_reads = [];
+    self_.inline_bodies = default<blot_check_core::BindingRef[:]>(); self_.static_reads = default<blot_reuse_code_artifacts::StaticRead[:]>();
 }
 fn fragmentFingerprint(request: blot_reuse_code_artifacts::Request) -> u64 {
     var hash = blot_support_wyhash::init(0); hash.value(blot_reuse_code_artifacts::requestCode(request));
@@ -90,7 +90,7 @@ fn copyParameters(source: const blot_backend_wasm_lifetimes::Parameter[:]) -> bl
 fn deinit(self_: OptimizerDependencies&) {
     if self_.callees.len != 0 { callees.free_slice(self_.callees); }
     if self_.parameters.len != 0 { parameters.free_slice(self_.parameters); }
-    self_.callees = []; self_.parameters = [];
+    self_.callees = default<u32[:]>(); self_.parameters = default<blot_backend_wasm_lifetimes::Parameter[:]>();
 }
 fn fingerprint(self_: OptimizerAdapter, key: OptimizerKey) -> u64 { key.local_fingerprint }
 fn complete(self_: OptimizerAdapter, record: OptimizerRecord) -> bool { record.value.ready && record.dependencies.context_complete }

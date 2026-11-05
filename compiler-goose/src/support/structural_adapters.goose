@@ -225,6 +225,7 @@ import eval.semantic_parallel;
 import eval.source_owners;
 import eval.specialization;
 import eval.type_evidence;
+import eval.type_evidence_schema;
 import eval.worker_packet;
 import execution_policy;
 import parse.ast;
@@ -2093,10 +2094,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_contrac
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_capability_contract_core::Builder) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_contract_core::CallableOrigin)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_capability_contract_core::CallableOrigin) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_contract_core::Callables)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_capability_contract_core::Callables) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_contract_core::Environment)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_capability_contract_core::Environment) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_contract_core::InputBodyCheck)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_capability_contract_core::InputBodyCheck) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_contract_source::Builder)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_capability_contract_source::Builder) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_contract_source::Entry)->bool {return equalFields(left,right);}

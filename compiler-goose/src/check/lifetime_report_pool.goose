@@ -85,30 +85,30 @@ fn deinit(report: Report&) -> Error {
     if report.lease_index == 0 { return blot_error::Error.none; } if report.lease_index > leases.len { return blot_error::Error.invalid_artifact; }
     let index = report.lease_index - 1; let lease = leases[index]; if !lease.live || lease.generation != report.generation { return blot_error::Error.invalid_artifact; } leases[index].live = false;
     if lease.ranges[0].len != 0 { let range = lease.ranges[0]; pool_nodes.free_slice(pool_nodes[range.start..range.start + range.len]); }
-    report.nodes = [];
+    report.nodes = default<const Node[:]>();
     if lease.ranges[1].len != 0 { let range = lease.ranges[1]; pool_edges.free_slice(pool_edges[range.start..range.start + range.len]); }
-    report.edges = [];
+    report.edges = default<const Edge[:]>();
     if lease.ranges[2].len != 0 { let range = lease.ranges[2]; pool_mappings.free_slice(pool_mappings[range.start..range.start + range.len]); }
-    report.mappings = [];
+    report.mappings = default<const Mapping[:]>();
     if lease.ranges[3].len != 0 { let range = lease.ranges[3]; pool_boundaries.free_slice(pool_boundaries[range.start..range.start + range.len]); }
-    report.boundaries = [];
+    report.boundaries = default<const Boundary[:]>();
     if lease.ranges[4].len != 0 { let range = lease.ranges[4]; pool_invocations.free_slice(pool_invocations[range.start..range.start + range.len]); }
-    report.invocations = [];
+    report.invocations = default<const Invocation[:]>();
     if lease.ranges[5].len != 0 { let range = lease.ranges[5]; pool_evidence_nodes.free_slice(pool_evidence_nodes[range.start..range.start + range.len]); }
-    report.evidence.nodes = [];
+    report.evidence.nodes = default<const Node[:]>();
     if lease.ranges[6].len != 0 { let range = lease.ranges[6]; pool_evidence_extra.free_slice(pool_evidence_extra[range.start..range.start + range.len]); }
-    report.evidence.extra = [];
+    report.evidence.extra = default<const Id[:]>();
     if lease.ranges[7].len != 0 { let range = lease.ranges[7]; pool_evidence_goals.free_slice(pool_evidence_goals[range.start..range.start + range.len]); }
-    report.evidence.quantifier_goals = [];
+    report.evidence.quantifier_goals = default<const QuantifierGoals[:]>();
     if lease.ranges[8].len != 0 { let range = lease.ranges[8]; pool_evidence_obligations.free_slice(pool_evidence_obligations[range.start..range.start + range.len]); }
-    report.evidence.quantifier_obligations = [];
+    report.evidence.quantifier_obligations = default<const Goal[:]>();
     if lease.ranges[9].len != 0 { let range = lease.ranges[9]; pool_effect_operations.free_slice(pool_effect_operations[range.start..range.start + range.len]); }
-    report.evidence.effects.operations = [];
+    report.evidence.effects.operations = default<const Operation[:]>();
     if lease.ranges[10].len != 0 { let range = lease.ranges[10]; pool_effect_arguments.free_slice(pool_effect_arguments[range.start..range.start + range.len]); }
-    report.evidence.effects.arguments = [];
+    report.evidence.effects.arguments = default<const u32[:]>();
     if lease.ranges[11].len != 0 { let range = lease.ranges[11]; pool_effect_rows.free_slice(pool_effect_rows[range.start..range.start + range.len]); }
-    report.evidence.effects.rows = [];
+    report.evidence.effects.rows = default<const Row[:]>();
     if lease.ranges[12].len != 0 { let range = lease.ranges[12]; pool_effect_labels.free_slice(pool_effect_labels[range.start..range.start + range.len]); }
-    report.evidence.effects.labels = [];
+    report.evidence.effects.labels = default<const Label[:]>();
     leases.free(index); report.lease_index = 0; report.generation = 0; report.evidence.owner_id = 0; report.evidence.effects.owner_id = 0; report.complete = false; return blot_error::Error.none;
 }

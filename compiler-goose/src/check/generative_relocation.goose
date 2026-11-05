@@ -14,12 +14,12 @@ type Types = blot_check_core::Types;
 type Module = blot_check_core::Module;
 type Tag = blot_check_types::Tag;
 type Tail = blot_check_effects::Tail;
-fn list(types: const Types&, span: blot_check_types::List) -> const u32[:], Error { if span.start > types.extra.len || span.len > types.extra.len - span.start { return [], blot_error::Error.invalid_artifact; } return types.list(span), blot_error::Error.none; }
-fn arguments(types: const Types&, node: blot_check_types::Node) -> const u32[:], Error { if node.c >= types.extra.len { return [], blot_error::Error.invalid_artifact; } let count = types.extra[node.c]; if count > types.extra.len - node.c - 1 || (node.tag == blot_check_types::Tag.projection && count >= types.extra.len - node.c - 1) { return [], blot_error::Error.invalid_artifact; } return types.nominalArguments(node), blot_error::Error.none; }
-fn labels(types: const Types&, row: u32) -> const u32[:], Error { if row >= types.effects.rows.len { return [], blot_error::Error.invalid_artifact; } let span = types.row(row).labels; if span.start > types.effects.labels.len || span.len > types.effects.labels.len - span.start { return [], blot_error::Error.invalid_artifact; } return types.rowLabels(row), blot_error::Error.none; }
+recursive fn list(types: const Types&, span: blot_check_types::List) -> const u32[:], Error { if span.start > types.extra.len || span.len > types.extra.len - span.start { return default<const u32[:]>(), blot_error::Error.invalid_artifact; } return types.list(span), blot_error::Error.none; }
+fn arguments(types: const Types&, node: blot_check_types::Node) -> const u32[:], Error { if node.c >= types.extra.len { return default<const u32[:]>(), blot_error::Error.invalid_artifact; } let count = types.extra[node.c]; if count > types.extra.len - node.c - 1 || (node.tag == blot_check_types::Tag.projection && count >= types.extra.len - node.c - 1) { return default<const u32[:]>(), blot_error::Error.invalid_artifact; } return types.nominalArguments(node), blot_error::Error.none; }
+recursive fn labels(types: const Types&, row: u32) -> const u32[:], Error { if row >= types.effects.rows.len { return default<const u32[:]>(), blot_error::Error.invalid_artifact; } let span = types.row(row).labels; if span.start > types.effects.labels.len || span.len > types.effects.labels.len - span.start { return default<const u32[:]>(), blot_error::Error.invalid_artifact; } return types.rowLabels(row), blot_error::Error.none; }
 fn sameVersion(left: blot_check_types::Node, right: blot_check_types::Node) -> bool { return left.a == right.a && left.b == right.b && left.c == right.c; }
 fn sameOwner(left: const Module&, right: const Module&) -> bool { return left .== right; }
-fn equal(types: const Types&, left: u32, right: u32) -> bool { let value, err = blot_check_rank_equal::equal(types, left, right, true); return err == blot_error::Error.none && value; }
+recursive fn equal(types: const Types&, left: u32, right: u32) -> bool { let value, err = blot_check_rank_equal::equal(types, left, right, true); return err == blot_error::Error.none && value; }
 struct Pair { before: u32, after: u32, opened: bool = false }
 struct Instance { variable: u32, owner: blot_check_types::NominalIdentity }
 struct RowInstance { variable: u32, labels: blot_check_effects::List, tail: Tail }
@@ -43,7 +43,7 @@ fn init(source: const Module&, target: const Module&, scheme: blot_check_types::
     result.len = kept; result.strict_versions = true; let err = result.tyOpened(arrow, output, 0, true); return result, err;
 }
 fn applications(self_: Relocation&, id: u32) -> Error {
-    if id == 0 || id >= self_.target.nodes.len { return blot_error::Error.invalid_artifact; } var chain: u32[16]; var count: i64 = 0; var callee = id;
+    if id == 0 || id >= self_.target.nodes.len { return blot_error::Error.invalid_artifact; } var chain: u32[16] = [0;16]; var count: i64 = 0; var callee = id;
     while self_.target.node(callee).tag == blot_check_core::Tag.apply { if count == chain.len { return blot_error::Error.invalid_artifact; } chain[count] = callee; count += 1; callee = self_.target.node(callee).a; if callee == 0 || callee >= self_.target.nodes.len { return blot_error::Error.invalid_artifact; } }
     var arrow = self_.scheme.root; for index in 0..count { let function = self_.source.types.node(arrow); if function.tag != blot_check_types::Tag.function { return blot_error::Error.invalid_artifact; } arrow = function.b; let err = self_.tyOpened(arrow, self_.target.node(chain[count - index - 1]).ty, 0, true); if err != blot_error::Error.none { return err; } } return blot_error::Error.none;
 }
@@ -55,7 +55,7 @@ fn generalized(module: const Module&, scheme: blot_check_types::Scheme, raw: u32
     var relation = Relocation { source: module, target: module, scheme: scheme, endpoint: 0, strict_versions: true, closing: true , ..}; let closed, err = list(module.types, scheme.closed_rows); if err != blot_error::Error.none { return err; }
     for variable in closed { let safe, err = relation.safeClosing(raw, variable, 0); if err != blot_error::Error.none { return err; } if !safe { return blot_error::Error.invalid_artifact; } } return relation.tyOpened(raw, scheme.root, 0, true);
 }
-fn hasRow(self_: Relocation&, root: u32, variable: u32, depth: i64) -> bool, Error {
+recursive fn hasRow(self_: Relocation&, root: u32, variable: u32, depth: i64) -> bool, Error {
     if depth >= 128 || self_.remaining == 0 || root >= self_.source.types.nodes.len { return false, blot_error::Error.invalid_artifact; } self_.remaining -= 1; let node = self_.source.types.node(root);
     match node.tag {
         function, provider => { if node.c >= self_.source.types.effects.rows.len { return false, blot_error::Error.invalid_artifact; } let row = self_.source.types.row(node.c); match row.tail { variable payload => { if payload.value == variable { return true, blot_error::Error.none; } }, _ => {}, }
@@ -73,7 +73,7 @@ fn hasRow(self_: Relocation&, root: u32, variable: u32, depth: i64) -> bool, Err
         _ => {},
     } return false, blot_error::Error.none;
 }
-fn safeClosing(self_: Relocation&, root: u32, variable: u32, depth: i64) -> bool, Error {
+recursive fn safeClosing(self_: Relocation&, root: u32, variable: u32, depth: i64) -> bool, Error {
     if depth >= 128 || self_.remaining == 0 || root >= self_.source.types.nodes.len { return false, blot_error::Error.invalid_artifact; } self_.remaining -= 1; let node = self_.source.types.node(root);
     match node.tag {
         function => { let found, err = self_.hasRow(node.a, variable, depth + 1); if err != blot_error::Error.none { return false, err; } if found { return false, blot_error::Error.none; } if node.c >= self_.source.types.effects.rows.len { return false, blot_error::Error.invalid_artifact; } let tail = self_.source.types.row(node.c).tail;
@@ -96,8 +96,8 @@ fn instance(self_: Relocation&, variable: u32, actual: blot_check_types::Nominal
     if self_.instance_len == self_.instances.len { return blot_error::Error.invalid_artifact; } self_.instances[self_.instance_len] = Instance { variable, actual , ..}; self_.instance_len += 1; return blot_error::Error.none;
 }
 fn freshVersion(self_: Relocation&, before: u32, after: u32) -> Error { let source = self_.source.types.node(before); let target = self_.target.types.node(after); for pair in self_.fresh_pairs[..self_.fresh_pair_len] { let same_source = sameVersion(source, self_.source.types.node(pair.before)); let same_target = sameVersion(target, self_.target.types.node(pair.after)); if same_source { if !same_target { return blot_error::Error.invalid_artifact; } return blot_error::Error.none; } if same_target { return blot_error::Error.invalid_artifact; } } if self_.fresh_pair_len == self_.fresh_pairs.len { return blot_error::Error.invalid_artifact; } self_.fresh_pairs[self_.fresh_pair_len] = Pair { before, after , ..}; self_.fresh_pair_len += 1; return blot_error::Error.none; }
-fn ty(self_: Relocation&, before: u32, after: u32, depth: i64) -> Error { return self_.tyOpened(before, after, depth, false); }
-fn tyOpened(self_: Relocation&, before: u32, after: u32, depth: i64, opened: bool) -> Error {
+recursive fn ty(self_: Relocation&, before: u32, after: u32, depth: i64) -> Error { return self_.tyOpened(before, after, depth, false); }
+recursive fn tyOpened(self_: Relocation&, before: u32, after: u32, depth: i64, opened: bool) -> Error {
     if depth >= 128 || self_.remaining == 0 || before >= self_.source.types.nodes.len || after >= self_.target.types.nodes.len { return blot_error::Error.invalid_artifact; } self_.remaining -= 1; let a = self_.source.types.node(before); let b = self_.target.types.node(after);
     for pair in self_.pairs[..self_.len] { if pair.before == before && (a.tag == blot_check_types::Tag.variable || pair.opened == opened) { if !equal(self_.target.types, pair.after, after) { return blot_error::Error.invalid_artifact; } return blot_error::Error.none; } }
     if self_.len == self_.pairs.len { return blot_error::Error.invalid_artifact; } self_.pairs[self_.len] = Pair { before, after, opened , ..}; self_.len += 1;
@@ -120,8 +120,8 @@ fn tyOpened(self_: Relocation&, before: u32, after: u32, depth: i64, opened: boo
         _ => { if a.a != b.a || a.b != b.b || a.c != b.c { return blot_error::Error.invalid_artifact; } },
     } return blot_error::Error.none;
 }
-fn row(self_: Relocation&, before: u32, after: u32, depth: i64) -> Error { return self_.rowOpened(before, after, depth, false); }
-fn rowOpened(self_: Relocation&, before: u32, after: u32, depth: i64, opened: bool) -> Error {
+recursive fn row(self_: Relocation&, before: u32, after: u32, depth: i64) -> Error { return self_.rowOpened(before, after, depth, false); }
+recursive fn rowOpened(self_: Relocation&, before: u32, after: u32, depth: i64, opened: bool) -> Error {
     let left, err = labels(self_.source.types, before); if err != blot_error::Error.none { return err; } let right, err = labels(self_.target.types, after); if err != blot_error::Error.none { return err; } let source = self_.source.types.row(before); var variable = blot_support::none<u32>(); var source_variable = blot_support::none<u32>();
     match source.tail { variable payload => { source_variable = blot_support::some(payload.value); let variables, err = list(self_.source.types, self_.scheme.row_variables); if err != blot_error::Error.none { return err; } for owned in variables { if owned == payload.value { variable = blot_support::some(owned); break; } } }, _ => {}, }
     let target = self_.target.types.row(after);

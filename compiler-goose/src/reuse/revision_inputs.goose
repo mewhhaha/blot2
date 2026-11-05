@@ -77,7 +77,7 @@ fn publish(self_:Snapshot&,entries:blot_support_pooled_buffer::Buffer<Entry>&,in
  if index.slots.len==0 {index.grow(8,index_pool);}else if (index.count+1)*3>index.slots.len*2 {index.grow(index.slots.len*2,index_pool);}
  let owned=own(key);let position=entries.items.len as u32;let error=entries.push(Entry{owned,result},entry_pool);if error!=blot_error::Error.none {free(owned);result.deinit();return Outcome.inactive,error;}index.insert(owned,position,index_pool);return result,blot_error::Error.none;
 }
-fn observedValue(self_:Snapshot&,result:Outcome)->const u8[:],Error {match result {failure payload=>{self_.last_cause=payload.cause;},_=>{self_.last_cause=[];}}return value(result);}
+fn observedValue(self_:Snapshot&,result:Outcome)->const u8[:],Error {match result {failure payload=>{self_.last_cause=payload.cause;},_=>{self_.last_cause=default<const u8[:]>();}}return value(result);}
 fn canonical(self_:Snapshot&,path:const u8[:])->const u8[:],Error {
  if !self_.valid() {return default<const u8[:]>(),blot_error::Error.invalid_artifact;}let old=lookup(self_.paths.items,self_.path_index,path);if old.present {return self_.observedValue(old.value);}self_.counts.canonical_reads++;
  var result=Outcome.inactive;var name:u8[>..<];

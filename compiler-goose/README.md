@@ -46,3 +46,9 @@ previous executable intact.
 `--identity-only` writes a source-only fingerprint without starting a compiler;
 that is not a qualified build identity. Allocation metrics stay null with
 `coverage: "unavailable"` until real runtime allocation observations exist.
+
+Run the checked engine laws with
+`python3 compiler-goose/tools/test_engines.py`. They compile live coalescing and
+interning sources to C and execute them using cached runtime/platform objects.
+Commands, source hashes and timings are saved under
+`build/goose-port/engine-tests/`; these laws do not qualify the whole compiler.

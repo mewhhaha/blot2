@@ -486,7 +486,7 @@ struct Material<G> {
     root_buffer: blot_support::Option<blot_eval_eval_collection_growth::Frontier>, transported: Transport[:]=default<Transport[:]>(),
     packages: blot_support_pooled_map::Map<u32,Package> = blot_support_pooled_map::Map<u32,Package>{..}, count: i64=0, added_children: i64=0, children_prepared: bool=false,
 }
-fn deinit<G>(self_: Material<G>&) { if self_.transported.len != 0 {transport_runs.free_slice(self_.transported);} self_.transported=[]; blot_support_pooled_map::deinit(self_.packages,package_slots); }
+fn deinit<G>(self_: Material<G>&) { if self_.transported.len != 0 {transport_runs.free_slice(self_.transported);} self_.transported=default<Transport[:]>(); blot_support_pooled_map::deinit(self_.packages,package_slots); }
 fn materialize<G>(self_: const Plan&,g: G&) -> u32,Error { return self_.materializeWithGlobalAnchors(g,blot_support::none<u32>()); }
 fn materializeWithGlobalAnchors<G>(self_: const Plan&,g: G&,entry: blot_support::Option<u32>) -> u32,Error { let mapped,error=self_.materializeMapped(g,entry,blot_support::none<const u32[:]>()); if error!=blot_error::Error.none {return 0,error;} let result=mapped[self_.root]; releaseMapped(mapped); return result,blot_error::Error.none; }
 fn releaseMapped(mapped: u32[:]) { if mapped.len!=0 {scratch_wordbuffer.free_slice(mapped);} }

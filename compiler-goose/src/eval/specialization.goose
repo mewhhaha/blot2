@@ -127,7 +127,7 @@ enum RowSink { empty,lexical { value: RowMapping[>..<]& },pooled { value: blot_b
 fn mappingSink(buffer: blot_backend_substitution_buffers::Mappings&) -> MappingSink,Error { let error = buffer.prepare(); if error != blot_error::Error.none { return MappingSink.inactive,error; } return MappingSink.pooled { buffer , ..},blot_error::Error.none; }
 fn rowSink(rows: blot_backend_substitution_buffers::Rows?) -> RowSink,Error { if rows == null { return RowSink.empty,blot_error::Error.none; } let error = rows.prepare(); if error != blot_error::Error.none { return RowSink.empty,error; } return RowSink.pooled { rows , ..},blot_error::Error.none; }
 fn mappingItems(sink: MappingSink) -> Mapping[:] { match sink { inactive=>{ abort("inactive mapping sink"); },lexical s=>{ return s.value[..]; },pooled s=>{ return s.value.items; }, } }
-fn rowItems(sink: RowSink) -> RowMapping[:] { match sink { empty=>{ return []; },lexical s=>{ return s.value[..]; },pooled s=>{ return s.value.items; }, } }
+fn rowItems(sink: RowSink) -> RowMapping[:] { match sink { empty=>{ return default<RowMapping[:]>(); },lexical s=>{ return s.value[..]; },pooled s=>{ return s.value.items; }, } }
 fn hasRows(sink: RowSink) -> bool { match sink { empty=>{ return false; },_=>{ return true; }, } }
 fn clearSink(sink: MappingSink) { match sink { inactive=>{ abort("inactive mapping sink"); },lexical s=>{ s.value.clear(); },pooled s=>{ var buffer = s.value; buffer.clear(); }, } }
 fn clearSink(sink: RowSink) { match sink { empty=>{},lexical s=>{ s.value.clear(); },pooled s=>{ var buffer = s.value; buffer.clear(); }, } }

@@ -47,8 +47,8 @@ fn allocateReuse(self_:CheckedProject&,count:i64)->Error {
  self_.relocated_modules=owned_blot_support__Option_FrozenModule_.alloc_slice(count);for &value in self_.relocated_modules {value=blot_support::none<FrozenModule>();}
  let owners=owned_blot_reuse_dependency_payload__Owner.alloc_slice(count);for &value in owners {value=blot_reuse_dependency_payload::Owner{..};}result_states[self_.owner.slot-1].relocated=owners;return blot_error::Error.none;
 }
-fn deinit(self_:Module&) {self_.checked.deinit();releaseOwned(self_.exports);self_.exports=[];self_.valid=false;}
-fn takeBodyCaches(self_:CheckedProject&)->blot_reuse_body_check_cache::Cache[:],Error {assert(self_.owner.valid());let value=self_.body_caches;self_.body_caches=[];return value,blot_error::Error.none;}
+fn deinit(self_:Module&) {self_.checked.deinit();releaseOwned(self_.exports);self_.exports=default<blot_reuse_project_check::Export[:]>();self_.valid=false;}
+fn takeBodyCaches(self_:CheckedProject&)->blot_reuse_body_check_cache::Cache[:],Error {assert(self_.owner.valid());let value=self_.body_caches;self_.body_caches=default<blot_reuse_body_check_cache::Cache[:]>();return value,blot_error::Error.none;}
 fn releaseBodyCaches(values:blot_reuse_body_check_cache::Cache[:]) {for &cache in values {cache.deinit();}releaseOwned(values);}
 fn deinit(self_:Diagnostic&) {if self_.purity.present && self_.purity.value.operation_name.present {releaseOwned(self_.purity.value.operation_name.value);}if self_.detail.present {releaseOwned(self_.detail.value);}if self_.hole.present {self_.hole.value.deinit();}if self_.explanation.present {self_.explanation.value.deinit();}self_.purity=blot_support::none<blot_check_check::PurityWitness>();self_.detail=blot_support::none<const u8[:]>();self_.hole=blot_support::none<blot_reuse_hole_diagnostics::Snapshot>();self_.explanation=blot_support::none<blot_reuse_dispatch_explanation::Explanation>();}
 fn deinit(self_:CheckedProject&) {

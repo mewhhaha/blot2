@@ -25,7 +25,7 @@ fn copySources(source: const BindingRef[:]) -> BindingRef[:] { if source.len == 
 fn copyScalars(source: const ScalarInput[:]) -> ScalarInput[:] { if source.len == 0 { return default<ScalarInput[:]>(); } let out = proof_scalars.alloc_slice(source.len); for value, index in source { out[index] = value; } return out; }
 fn releaseSources(source: const BindingRef[:]) { if source.len != 0 { proof_sources.free_slice(source); } }
 fn releaseScalars(source: const ScalarInput[:]) { if source.len != 0 { proof_scalars.free_slice(source); } }
-fn deinit(self_: Record&) { releaseSources(self_.sources); releaseScalars(self_.scalar_reads); self_.sources = []; self_.scalar_reads = []; }
+fn deinit(self_: Record&) { releaseSources(self_.sources); releaseScalars(self_.scalar_reads); self_.sources = default<BindingRef[:]>(); self_.scalar_reads = default<ScalarInput[:]>(); }
 fn clone(self_: Record) -> Record, Error { var result = self_; result.sources = copySources(self_.sources); result.scalar_reads = copyScalars(self_.scalar_reads); return result, blot_error::Error.none; }
 fn reject<S>(state: S&, reason: DeclineReason) -> blot_support::Option<Record> { state.stats.independent_rejections[reasonCode(reason)]++; return blot_support::none<Record>(); }
 fn scalarInput<G>(g: const G&, target: BindingRef) -> blot_support::Option<ScalarInput> {

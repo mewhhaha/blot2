@@ -76,9 +76,9 @@ fn source(self_: Shapes&, producer: const Module&, closure: Closure, ty: u32) ->
     var mappings: blot_eval_type_evidence::Mapping[>..<]; var rows: blot_eval_type_evidence::RowMapping[>..<];
     for mapping in self_.snapshot.type_mappings[closure.mappings.start..closure.mappings.start + closure.mappings.len] { if mapping.variable >= producer.types.nodes.len { return 0, blot_error::Error.invalid_artifact; } let node = producer.types.node(mapping.variable);
         if node.tag != blot_check_types::Tag.variable && !(node.tag == blot_check_types::Tag.bound && node.b == 0 && node.c == 0) { continue; } for prior in mappings { if prior.variable == mapping.variable { return 0, blot_error::Error.invalid_artifact; } }
-        let value, err = self_.evidence(mapping.evidence, 0); if err != blot_error::Error.none { return 0, err; } mappings.append(blot_eval_type_evidence::Mapping { mapping.variable, value , ..});
+        let value, err = self_.evidence(mapping.evidence, 0); if err != blot_error::Error.none { return 0, err; } mappings.push(blot_eval_type_evidence::Mapping { mapping.variable, value , ..});
     }
-    for mapping in self_.snapshot.row_mappings[closure.row_mappings.start..closure.row_mappings.start + closure.row_mappings.len] { for prior in rows { if prior.variable == mapping.variable { return 0, blot_error::Error.invalid_artifact; } } let value, err = self_.row(mapping.evidence, 0); if err != blot_error::Error.none { return 0, err; } rows.append(blot_eval_type_evidence::RowMapping { mapping.variable, value , ..}); }
+    for mapping in self_.snapshot.row_mappings[closure.row_mappings.start..closure.row_mappings.start + closure.row_mappings.len] { for prior in rows { if prior.variable == mapping.variable { return 0, blot_error::Error.invalid_artifact; } } let value, err = self_.row(mapping.evidence, 0); if err != blot_error::Error.none { return 0, err; } rows.push(blot_eval_type_evidence::RowMapping { mapping.variable, value , ..}); }
     let result, err = self_.store.projectWithBudget(producer.types, ty, mappings, rows, self_.remaining); if err != blot_error::Error.none { return 0, failure(err); } let err = self_.admitted(result, 0); return result, err;
 }
 fn value(self_: Shapes&, id: u32, expected: u32, depth: i64) -> Error {

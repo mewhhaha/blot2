@@ -66,7 +66,7 @@ fn copySource(bytes: const u8[:]) -> const u8[:] { let result=owned_source.alloc
 fn releaseSource(bytes: const u8[:]) { if bytes.len==0 {return;} owned_source.free_slice(bytes); }
 fn copyLexical(values: const blot_parse_lexer::Diagnostic[:]) -> const blot_parse_lexer::Diagnostic[:] {let result=owned_lexical.alloc_slice(values.len);for value,index in values {result[index]=value;}return result;}
 fn releaseLexical(values: const blot_parse_lexer::Diagnostic[:]) {if values.len==0 {return;}owned_lexical.free_slice(values);}
-fn deinit(self_: Unit&) {self_.tree.deinit();releaseSource(self_.source);self_.source=[];}
+fn deinit(self_: Unit&) {self_.tree.deinit();releaseSource(self_.source);self_.source=default<const u8[:]>();}
 struct UnitBuffer {storage:Unit[:]=default<Unit[:]>(),items:Unit[:]=default<Unit[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var project_UnitBuffer_runs:Unit[>..]=[];
 var inactive_UnitBuffer:UnitBuffer=UnitBuffer {..};
@@ -188,14 +188,14 @@ fn osCause(code:i64)->const u8[:] {
 fn ioFailure(self_:FileInputs&,negative:i64)->Error {self_.last_cause=osCause(-negative);if negative == -2 {return blot_error::Error.file_not_found;}return blot_error::Error.io;}
 fn cause(self_:const FileInputs&,error:Error)->const u8[:] {if self_.last_cause.len!=0 {return self_.last_cause;}return blot_error::error_name(error);}
 fn canonical(self_:FileInputs&,path:const u8[:],output:u8[>..<]&)->Error {
-    self_.last_cause=[];if contains(path,0) {self_.last_cause="BadPathName";return blot_error::Error.io;}
+    self_.last_cause=default<const u8[:]>();if contains(path,0) {self_.last_cause="BadPathName";return blot_error::Error.io;}
     var terminated:u8[>..<]=[];terminated.append(path);terminated.push(0);
     var buffer:u8[4096];let length=blot_native::real_path(terminated[0],buffer[0],4096);
     if length<0 {return self_.ioFailure(length);}if length>=4096 {self_.last_cause="NameTooLong";return blot_error::Error.io;}
     output.append(buffer[..length]);return blot_error::Error.none;
 }
 fn read(self_:FileInputs&,path:const u8[:],maximum:i64,output:u8[>..<]&)->Error {
-    self_.last_cause=[];if contains(path,0) {self_.last_cause="BadPathName";return blot_error::Error.io;}
+    self_.last_cause=default<const u8[:]>();if contains(path,0) {self_.last_cause="BadPathName";return blot_error::Error.io;}
     var terminated:u8[>..<]=[];terminated.append(path);terminated.push(0);
     let fd=blot_native::open_read(terminated[0]);if fd<0 {return self_.ioFailure(fd);}
     let before=output.len;var chunk:u8[65536];var failure=blot_error::Error.none;
@@ -209,7 +209,7 @@ fn read(self_:FileInputs&,path:const u8[:],maximum:i64,output:u8[>..<]&)->Error 
     let closed=blot_native::close(fd);
     if failure!=blot_error::Error.none {output.resize(before);}return failure;
 }
-fn resolve(self_:FileInputs&,source_filename:const u8[:],raw:const u8[:],options:Options,output:u8[>..<]&)->Error {self_.last_cause=[];return resolveImportPath(source_filename,raw,options,output);}
+fn resolve(self_:FileInputs&,source_filename:const u8[:],raw:const u8[:],options:Options,output:u8[>..<]&)->Error {self_.last_cause=default<const u8[:]>();return resolveImportPath(source_filename,raw,options,output);}
 fn deinitScratch<P>(self_:Loader<P>&) {self_.files.clear();self_.visits.clear();self_.stack.clear();self_.inherited_fixities.clear();}
 fn report<P>(self_:Loader<P>&,origin:Origin,code:Code,target:const u8[:],cause:blot_support::Option<const u8[:]>)->Error {
     var name:Symbol=0;let interned,error=self_.project.symbols.intern(target);

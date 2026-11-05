@@ -19,7 +19,7 @@ fn init(trace: const blot_check_staging_origins::Trace&, paths: const u8[:][:],
     }
     return OwnedOrigins { entries[entry_start..] , ..}, blot_error::Error.none;
 }
-fn deinit(self_: OwnedOrigins&) { self_.entries = []; }
+fn deinit(self_: OwnedOrigins&) { self_.entries = default<blot_check_diagnostic_location::Origin[:]>(); }
 struct WithOrigins<P> { payload: P, origins: const Origin[:] }
 fn jsonStringify<P>(self_: WithOrigins<P>, stream) -> blot_error::Error {
     let opened = stream.beginObject(); if opened != blot_error::Error.none { return opened; }

@@ -231,6 +231,7 @@ import eval.semantic_parallel;
 import eval.source_owners;
 import eval.specialization;
 import eval.type_evidence;
+import eval.type_evidence_schema;
 import eval.worker_packet;
 import execution_policy;
 import parse.ast;
@@ -1174,8 +1175,8 @@ fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_associated_admission::W
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_capability_contract_core::Alias)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_capability_contract_core::Builder)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_capability_contract_core::CallableOrigin)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
+fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_capability_contract_core::Callables)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_capability_contract_core::Environment)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
-fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_capability_contract_core::InputBodyCheck)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_capability_contract_source::Builder)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_capability_contract_source::Entry)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_check_capability_contract_source::Environment)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}

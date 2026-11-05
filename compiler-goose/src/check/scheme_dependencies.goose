@@ -15,8 +15,8 @@ struct Entry {
     root_lease: LeaseRef = LeaseRef {..}, variable_lease: LeaseRef = LeaseRef {..}, row_lease: LeaseRef = LeaseRef {..},
 }
 fn copySnapshot(source: const u32[:]) -> const u32[:], LeaseRef, blot_error::Error {
-    if source.len == 0 { return [], LeaseRef {..}, blot_error::Error.none; }
-    if next_generation == 0xffffffffffffffff { return [], LeaseRef {..}, blot_error::Error.type_limit; }
+    if source.len == 0 { return default<const u32[:]>(), LeaseRef {..}, blot_error::Error.none; }
+    if next_generation == 0xffffffffffffffff { return default<const u32[:]>(), LeaseRef {..}, blot_error::Error.type_limit; }
     let generation = next_generation; next_generation += 1;
     let values = snapshot_values.alloc_slice(source.len);
     for value, index in source { values[index] = value; }

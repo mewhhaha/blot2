@@ -23,7 +23,7 @@ fn rowLabels(self_: View, row: Id) -> const Label[:] { if row == 0 { return self
 struct Snapshot { operations: const Operation[:], arguments: const u32[:], rows: const Row[:], labels: const Label[:], owner_id: u64 }
 struct SnapshotTables { operations: Operation[>..]&, arguments: u32[>..]&, rows: Row[>..]&, labels: Label[>..]& }
 fn view(self_: const Snapshot&) -> View { return View { self_.operations, self_.arguments, self_.rows, self_.labels, self_.owner_id }; }
-fn deinit(self_: Snapshot&) { self_.operations = []; self_.arguments = []; self_.rows = []; self_.labels = []; self_.owner_id = 0; }
+fn deinit(self_: Snapshot&) { self_.operations = default<const blot_check_effect_evidence::Operation[:]>(); self_.arguments = default<const u32[:]>(); self_.rows = default<const blot_check_effect_evidence::Row[:]>(); self_.labels = default<const blot_check_effect_evidence::Label[:]>(); self_.owner_id = 0; }
 struct OperationBuffer { storage: Operation[:]=default<Operation[:]>(),items: Operation[:]=default<Operation[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_OperationBuffer: Operation[>..]=[];
 fn ensure(self_: OperationBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_OperationBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }

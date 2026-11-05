@@ -105,16 +105,16 @@ fn clone(self_: Key) -> Key, Error {
     return result, blot_error::Error.none;
 }
 fn deinit(self_: Key&) {
-    releaseOwned(self_.sources); self_.sources = [];
-    releaseOwned(self_.interfaces); self_.interfaces = [];
-    releaseOwned(self_.source_units); self_.source_units = [];
-    releaseOwned(self_.scalar_reads); self_.scalar_reads = [];
-    releaseOwned(self_.plain_reads); self_.plain_reads = [];
-    releaseOwned(self_.plain_publications); self_.plain_publications = [];
-    releaseOwned(self_.call_publications); self_.call_publications = [];
-    releaseOwned(self_.call_reads); self_.call_reads = [];
-    releaseOwned(self_.summary_reads); self_.summary_reads = [];
-    releaseOwned(self_.summary_publications); self_.summary_publications = [];
+    releaseOwned(self_.sources); self_.sources = default<const BindingRef[:]>();
+    releaseOwned(self_.interfaces); self_.interfaces = default<const BindingRef[:]>();
+    releaseOwned(self_.source_units); self_.source_units = default<const u32[:]>();
+    releaseOwned(self_.scalar_reads); self_.scalar_reads = default<const ScalarRead[:]>();
+    releaseOwned(self_.plain_reads); self_.plain_reads = default<const PlainRead[:]>();
+    releaseOwned(self_.plain_publications); self_.plain_publications = default<const PlainPublication[:]>();
+    releaseOwned(self_.call_publications); self_.call_publications = default<CallPublication[:]>();
+    releaseOwned(self_.call_reads); self_.call_reads = default<CallRead[:]>();
+    releaseOwned(self_.summary_reads); self_.summary_reads = default<Summary[:]>();
+    releaseOwned(self_.summary_publications); self_.summary_publications = default<Summary[:]>();
 }
 fn proofKey(target: BindingRef, evidence: u32) -> blot_eval_core_eval::CallProofKey {
     return blot_eval_core_eval::CallProofKey { target: BindingRef { target.unit - 1, target.binding , ..}, evidence: evidence , ..};
@@ -371,7 +371,7 @@ fn contains(self_: const RecorderSourcesSeenMap&,key: BindingRef) -> bool { retu
 fn insert(self_: RecorderSourcesSeenMap&,key: BindingRef,value: bool) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSourcesSeenMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: RecorderSourcesSeenMap&,key: BindingRef) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecorderSourcesSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn release(self_: RecorderSourcesSeenMap&) { if self_.slots.len!=0 { pool_RecorderSourcesSeenMap.free_slice(self_.slots); } self_.slots=[]; self_.count=0; }
+fn release(self_: RecorderSourcesSeenMap&) { if self_.slots.len!=0 { pool_RecorderSourcesSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<BindingRef,bool>[:]>(); self_.count=0; }
 struct RecorderInterfacesBuffer { storage: BindingRef[:]=default<BindingRef[:]>(),items: BindingRef[:]=default<BindingRef[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_RecorderInterfacesBuffer: BindingRef[>..]=[];
 fn ensure(self_: RecorderInterfacesBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_RecorderInterfacesBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
@@ -387,7 +387,7 @@ fn contains(self_: const RecorderInterfacesSeenMap&,key: BindingRef) -> bool { r
 fn insert(self_: RecorderInterfacesSeenMap&,key: BindingRef,value: bool) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderInterfacesSeenMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: RecorderInterfacesSeenMap&,key: BindingRef) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecorderInterfacesSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn release(self_: RecorderInterfacesSeenMap&) { if self_.slots.len!=0 { pool_RecorderInterfacesSeenMap.free_slice(self_.slots); } self_.slots=[]; self_.count=0; }
+fn release(self_: RecorderInterfacesSeenMap&) { if self_.slots.len!=0 { pool_RecorderInterfacesSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<BindingRef,bool>[:]>(); self_.count=0; }
 struct RecorderSourceUnitsBuffer { storage: u32[:]=default<u32[:]>(),items: u32[:]=default<u32[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_RecorderSourceUnitsBuffer: u32[>..]=[];
 fn ensure(self_: RecorderSourceUnitsBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_RecorderSourceUnitsBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
@@ -403,7 +403,7 @@ fn contains(self_: const RecorderSourceUnitsSeenMap&,key: u32) -> bool { return 
 fn insert(self_: RecorderSourceUnitsSeenMap&,key: u32,value: bool) { var view=blot_support_pooled_map::Map<u32,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSourceUnitsSeenMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: RecorderSourceUnitsSeenMap&,key: u32) { var view=blot_support_pooled_map::Map<u32,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecorderSourceUnitsSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn release(self_: RecorderSourceUnitsSeenMap&) { if self_.slots.len!=0 { pool_RecorderSourceUnitsSeenMap.free_slice(self_.slots); } self_.slots=[]; self_.count=0; }
+fn release(self_: RecorderSourceUnitsSeenMap&) { if self_.slots.len!=0 { pool_RecorderSourceUnitsSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u32,bool>[:]>(); self_.count=0; }
 struct RecorderReadsBuffer { storage: ScalarRead[:]=default<ScalarRead[:]>(),items: ScalarRead[:]=default<ScalarRead[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_RecorderReadsBuffer: ScalarRead[>..]=[];
 fn ensure(self_: RecorderReadsBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_RecorderReadsBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
@@ -419,7 +419,7 @@ fn contains(self_: const RecorderSeenMap&,key: u64) -> bool { return self_.get(k
 fn insert(self_: RecorderSeenMap&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSeenMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: RecorderSeenMap&,key: u64) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecorderSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn release(self_: RecorderSeenMap&) { if self_.slots.len!=0 { pool_RecorderSeenMap.free_slice(self_.slots); } self_.slots=[]; self_.count=0; }
+fn release(self_: RecorderSeenMap&) { if self_.slots.len!=0 { pool_RecorderSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,u32>[:]>(); self_.count=0; }
 struct RecorderPlainReadsBuffer { storage: PlainRead[:]=default<PlainRead[:]>(),items: PlainRead[:]=default<PlainRead[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_RecorderPlainReadsBuffer: PlainRead[>..]=[];
 fn ensure(self_: RecorderPlainReadsBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_RecorderPlainReadsBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
@@ -443,7 +443,7 @@ fn contains(self_: const RecorderPlainSeenMap&,key: u64) -> bool { return self_.
 fn insert(self_: RecorderPlainSeenMap&,key: u64,value: PlainSeen) { var view=blot_support_pooled_map::Map<u64,PlainSeen> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderPlainSeenMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: RecorderPlainSeenMap&,key: u64) { var view=blot_support_pooled_map::Map<u64,PlainSeen> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecorderPlainSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn release(self_: RecorderPlainSeenMap&) { if self_.slots.len!=0 { pool_RecorderPlainSeenMap.free_slice(self_.slots); } self_.slots=[]; self_.count=0; }
+fn release(self_: RecorderPlainSeenMap&) { if self_.slots.len!=0 { pool_RecorderPlainSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,PlainSeen>[:]>(); self_.count=0; }
 struct RecorderCallPublicationsBuffer { storage: CallPublication[:]=default<CallPublication[:]>(),items: CallPublication[:]=default<CallPublication[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_RecorderCallPublicationsBuffer: CallPublication[>..]=[];
 fn ensure(self_: RecorderCallPublicationsBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_RecorderCallPublicationsBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
@@ -459,7 +459,7 @@ fn contains(self_: const RecorderCallsSeenMap&,key: CallPublication) -> bool { r
 fn insert(self_: RecorderCallsSeenMap&,key: CallPublication,value: bool) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderCallsSeenMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: RecorderCallsSeenMap&,key: CallPublication) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecorderCallsSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn release(self_: RecorderCallsSeenMap&) { if self_.slots.len!=0 { pool_RecorderCallsSeenMap.free_slice(self_.slots); } self_.slots=[]; self_.count=0; }
+fn release(self_: RecorderCallsSeenMap&) { if self_.slots.len!=0 { pool_RecorderCallsSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<CallPublication,bool>[:]>(); self_.count=0; }
 struct RecorderCallReadsBuffer { storage: CallRead[:]=default<CallRead[:]>(),items: CallRead[:]=default<CallRead[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_RecorderCallReadsBuffer: CallRead[>..]=[];
 fn ensure(self_: RecorderCallReadsBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_RecorderCallReadsBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
@@ -475,7 +475,7 @@ fn contains(self_: const RecorderCallReadsSeenMap&,key: CallPublication) -> bool
 fn insert(self_: RecorderCallReadsSeenMap&,key: CallPublication,value: bool) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderCallReadsSeenMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: RecorderCallReadsSeenMap&,key: CallPublication) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecorderCallReadsSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn release(self_: RecorderCallReadsSeenMap&) { if self_.slots.len!=0 { pool_RecorderCallReadsSeenMap.free_slice(self_.slots); } self_.slots=[]; self_.count=0; }
+fn release(self_: RecorderCallReadsSeenMap&) { if self_.slots.len!=0 { pool_RecorderCallReadsSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<CallPublication,bool>[:]>(); self_.count=0; }
 struct RecorderSummaryReadsBuffer { storage: Summary[:]=default<Summary[:]>(),items: Summary[:]=default<Summary[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_RecorderSummaryReadsBuffer: Summary[>..]=[];
 fn ensure(self_: RecorderSummaryReadsBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_RecorderSummaryReadsBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
@@ -499,7 +499,7 @@ fn contains(self_: const RecorderSummariesSeenMap&,key: SummaryKey) -> bool { re
 fn insert(self_: RecorderSummariesSeenMap&,key: SummaryKey,value: u32) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSummariesSeenMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: RecorderSummariesSeenMap&,key: SummaryKey) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecorderSummariesSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn release(self_: RecorderSummariesSeenMap&) { if self_.slots.len!=0 { pool_RecorderSummariesSeenMap.free_slice(self_.slots); } self_.slots=[]; self_.count=0; }
+fn release(self_: RecorderSummariesSeenMap&) { if self_.slots.len!=0 { pool_RecorderSummariesSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<SummaryKey,u32>[:]>(); self_.count=0; }
 struct RecorderSummaryReadsSeenMap { count: i64=0,slots: dictionary_slot<SummaryKey,u32>[:]=default<dictionary_slot<SummaryKey,u32>[:]>() }
 reusable[] var pool_RecorderSummaryReadsSeenMap: dictionary_slot<SummaryKey,u32>[>..]=[];
 fn get(self_: const RecorderSummaryReadsSeenMap&,key: SummaryKey) -> u32? { let view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self_.count,slots:self_.slots, ..}; return blot_support_pooled_map::get(view,key); }
@@ -507,7 +507,7 @@ fn contains(self_: const RecorderSummaryReadsSeenMap&,key: SummaryKey) -> bool {
 fn insert(self_: RecorderSummaryReadsSeenMap&,key: SummaryKey,value: u32) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSummaryReadsSeenMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: RecorderSummaryReadsSeenMap&,key: SummaryKey) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self_.count,slots:self_.slots, ..}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecorderSummaryReadsSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn release(self_: RecorderSummaryReadsSeenMap&) { if self_.slots.len!=0 { pool_RecorderSummaryReadsSeenMap.free_slice(self_.slots); } self_.slots=[]; self_.count=0; }
+fn release(self_: RecorderSummaryReadsSeenMap&) { if self_.slots.len!=0 { pool_RecorderSummaryReadsSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<SummaryKey,u32>[:]>(); self_.count=0; }
 
 struct RecorderBacking { sources: RecorderSourcesBuffer=RecorderSourcesBuffer {..},sources_seen: RecorderSourcesSeenMap=RecorderSourcesSeenMap {..},interfaces: RecorderInterfacesBuffer=RecorderInterfacesBuffer {..},interfaces_seen: RecorderInterfacesSeenMap=RecorderInterfacesSeenMap {..},source_units: RecorderSourceUnitsBuffer=RecorderSourceUnitsBuffer {..},source_units_seen: RecorderSourceUnitsSeenMap=RecorderSourceUnitsSeenMap {..},reads: RecorderReadsBuffer=RecorderReadsBuffer {..},seen: RecorderSeenMap=RecorderSeenMap {..},plain_reads: RecorderPlainReadsBuffer=RecorderPlainReadsBuffer {..},plain_publications: RecorderPlainPublicationsBuffer=RecorderPlainPublicationsBuffer {..},plain_seen: RecorderPlainSeenMap=RecorderPlainSeenMap {..},call_publications: RecorderCallPublicationsBuffer=RecorderCallPublicationsBuffer {..},calls_seen: RecorderCallsSeenMap=RecorderCallsSeenMap {..},call_reads: RecorderCallReadsBuffer=RecorderCallReadsBuffer {..},call_reads_seen: RecorderCallReadsSeenMap=RecorderCallReadsSeenMap {..},summary_reads: RecorderSummaryReadsBuffer=RecorderSummaryReadsBuffer {..},summary_publications: RecorderSummaryPublicationsBuffer=RecorderSummaryPublicationsBuffer {..},summaries_seen: RecorderSummariesSeenMap=RecorderSummariesSeenMap {..},summary_reads_seen: RecorderSummaryReadsSeenMap=RecorderSummaryReadsSeenMap {..} }
 reusable var recorder_backings: RecorderBacking[>..]=[];

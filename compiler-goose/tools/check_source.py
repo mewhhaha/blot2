@@ -36,7 +36,8 @@ try:items=json.loads(text)
 except json.JSONDecodeError:
  try:items=json.JSONDecoder().raw_decode(text[text.index('['):])[0]
  except (json.JSONDecodeError,ValueError):pass
-errors=[i for i in items if i.get('severity')=='error']
+if not isinstance(items,list):items=[]
+errors=[i for i in items if isinstance(i,dict) and i.get('severity')=='error']
 if not errors:
  for match in re.finditer(r'^(.+?):(\d+): error: (.+)$',text,re.M):
   errors.append({'file':match[1],'line':int(match[2]),'message':match[3],'severity':'error'})

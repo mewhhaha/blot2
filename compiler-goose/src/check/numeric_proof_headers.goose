@@ -34,7 +34,7 @@ fn clone(self_: Owned, destination: OwnedTables) -> Owned, Error {
     return Owned { self_.arity, destination.value_slots[value_start..], destination.proof_slots[proof_start..],
         destination.values[kind_start..], destination.operands[operand_start..], destination.requirements[requirement_start..], self_.result , ..}, blot_error::Error.none;
 }
-fn deinit(self_: Owned&) { self_.value_slots = []; self_.proof_slots = []; self_.values = []; self_.operands = []; self_.requirements = []; self_.result.present = false; }
+fn deinit(self_: Owned&) { self_.value_slots = default<const u32[:]>(); self_.proof_slots = default<const u32[:]>(); self_.values = default<const blot_check_numeric_proof_headers::Kind[:]>(); self_.operands = default<const blot_check_numeric_proof_headers::Term[:]>(); self_.requirements = default<const blot_check_numeric_proof_headers::Requirement[:]>(); self_.result.present = false; }
 struct Named { binding: u32, header: Owned }
 fn find(values: const Named[:], binding: u32) -> const Owned? { for &value in values { if value.binding == binding { return value.header; } } return null; }
 fn equal(left: Owned, right: Owned) -> bool { return blot_structural::equal(left, right); }
