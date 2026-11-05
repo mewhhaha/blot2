@@ -76,21 +76,21 @@ fn init(store: blot_check_types::Store, module: const Module&, views: Views&, re
 }
 fn initialize(self: Solver&, module: const Module&, views: Views&) -> Error {
     let store: blot_check_types::Store& = self.store;
-    store.use_resolution_cache = true; store.use_composite_cache = false; store.nodes.clear(); store.nodes += module.types.nodes; store.extra.clear(); store.extra += module.types.extra;
-    store.operations.clear(); store.operations += module.types.operations; store.quantifier_goals += module.types.quantifier_goals; store.quantifier_obligations += module.types.quantifier_obligations;
-    store.effects.rows.clear(); store.effects.rows += module.types.effects.rows; store.effects.labels.clear(); store.effects.labels += module.types.effects.labels;
+    store.use_resolution_cache = true; store.use_composite_cache = false; store.nodes.clear(); store.nodes.items += module.types.nodes; store.extra.clear(); store.extra.items += module.types.extra;
+    store.operations.clear(); store.operations.items += module.types.operations; store.quantifier_goals.items += module.types.quantifier_goals; store.quantifier_obligations.items += module.types.quantifier_obligations;
+    store.effects.rows.clear(); store.effects.rows.items += module.types.effects.rows; store.effects.labels.clear(); store.effects.labels.items += module.types.effects.labels;
     let scope, error = store.rigidScope(); if error != Error.none { return convert(error); } self.scope = scope;
     for index in 0..views.scheme_count { let scheme = views.schemes[index];
         if module.types.node(scheme.root).tag != blot_check_types::Tag.forall { for formal in module.types.list(scheme.variables) { if self.remaining == 0 || formal >= module.types.nodes.len { return Error.invalid_artifact; } self.remaining -= 1; if formal < 4096 { self.rigid_types.set(formal); } else { self.rigid_type_overflow.insert(formal, true); } } }
         for formal in module.types.list(scheme.row_variables) { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; self.rigid_rows.insert(formal, true); }
     }
-    for &node, id in store.nodes { node.closed_height = 0; node.closed_generation = 0;
+    for &node, id in store.nodes.items { node.closed_height = 0; node.closed_generation = 0;
         if node.tag == blot_check_types::Tag.variable { if views.source_instances && views.instance_variables.contains(id) { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; if id < 4096 { self.rigid_types.set(id); } else { self.rigid_type_overflow.insert(id as u32, true); } } node = blot_check_types::Node { blot_check_types::Tag.rigid, a: scope, b: id as u32 }; }
     }
-    for index in 0..module.types.effects.rows.len { let row = store.effects.rows[index]; match row.tail { blot_check_effects::Tail.variable match_payload_34 => { let value = match_payload_34.value; 
-        if views.closed_rows.contains(index) { store.effects.rows[index].tail = blot_check_effects::Tail.closed; }
+    for index in 0..module.types.effects.rows.len { let row = store.effects.rows.items[index]; match row.tail { blot_check_effects::Tail.variable match_payload_34 => { let value = match_payload_34.value; 
+        if views.closed_rows.contains(index) { store.effects.rows.items[index].tail = blot_check_effects::Tail.closed; }
         else { if views.source_instances && views.instance_rows.contains(value) && !self.rigid_rows.contains(value) { if self.remaining == 0 || value >= module.types.effects.variable_count { return Error.invalid_artifact; } self.remaining -= 1; self.rigid_rows.insert(value, true); }
-            let rigid, error = store.rigid(scope, value, 1); if error != Error.none { return convert(error); } store.effects.rows[index].tail = blot_check_effects::Tail.formal { rigid };
+            let rigid, error = store.rigid(scope, value, 1); if error != Error.none { return convert(error); } store.effects.rows.items[index].tail = blot_check_effects::Tail.formal { rigid };
         }
     }, _ => {}, } }
     store.has_projections = true; store.has_rank_types = true; store.has_usage_types = true;
@@ -115,7 +115,7 @@ fn rememberSharedGoal(self: Solver&, key: SharedGoal, depth: i64) -> Error {
 }
 fn deinit(self: Solver&) { self.shared_authority.present = false; self.shared_goals.clear(); self.rigid_type_overflow.clear(); self.rigid_rows.clear(); self.store.deinit(); }
 fn refresh(self: Solver&) {
-    self.graph = blot_check_core::Types { owner_id: self.store.owner_id, nodes: self.store.nodes[:], extra: self.store.extra[:], effects: blot_check_core::EffectRows { self.store.effects.rows[:], self.store.effects.labels[:], self.store.effects.variables.len as u32 }, operations: self.store.operations[:], quantifier_goals: self.store.quantifier_goals[:], quantifier_obligations: self.store.quantifier_obligations[:] };
+    self.graph = blot_check_core::Types { owner_id: self.store.owner_id, nodes: self.store.nodes.items[:], extra: self.store.extra.items[:], effects: blot_check_core::EffectRows { self.store.effects.rows.items[:], self.store.effects.labels.items[:], self.store.effects.variables.len as u32 }, operations: self.store.operations.items[:], quantifier_goals: self.store.quantifier_goals.items[:], quantifier_obligations: self.store.quantifier_obligations.items[:] };
     { let optional_binding_76 .= self.view; if optional_binding_76 { let view .= optional_binding_76; view = self.graph;  } }
 }
 fn step(self: Solver&) -> Error { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; return Error.none; }

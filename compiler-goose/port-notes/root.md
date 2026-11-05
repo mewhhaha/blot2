@@ -212,3 +212,18 @@ conservative whole-unit fallback and source evaluation order remain explicit.
 The manifest owns typed declaration runs; it never authorizes checked schemes.
 No port compilation, execution, test, checker, lint or format verification has
 run. All passes remain unverified and the production port is incomplete.
+
+Public binding relocation, graph correspondence and complete hidden-method
+source facts now have full first production writing passes. Typed method
+sources borrow retained Core/current Checked owners; returned maps retain only
+owned numeric correspondence and provenance spans. Exact sharing, source work
+budgets, redacted slots and sparse capability roots remain admission checks.
+
+Evaluator source-owner, body-recipe and lexical-input caches now have durable
+pooled metadata. Each recipe record and immutable visit run survives later
+cache growth; recipes.at(index) returns its stable record. Lexical input rows
+use inputs.items; published key words and semantic mappings own separate runs.
+Interfaces is a fixed typed map with explicit cleanup. Exact option-key work
+charges occur per option, including partial construction at a limit. Session
+factories and remaining consumers are being adapted. These source passes are
+unverified, and no compiler/checker/test/lint/format execution has run.

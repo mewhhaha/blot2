@@ -97,7 +97,7 @@ fn wakeExternal(self: Queue) { wake(self, external); }
 fn observe(self: Queue, store: const blot_check_types::Store&) {
     let physical = self.type_generation != store.closed_generation || self.row_generation != store.effects.physical_epoch || store.closed_generation == 0xffff || store.effects.physical_epoch == any_write || self.type_versions > store.versions.len || self.row_versions > store.effects.versions.len;
     if physical { wakeAll(self); }
-    else { for write in store.versions[self.type_versions..] { wake(self, (write.variable as u64) * 2); } for write in store.effects.versions[self.row_versions..] { wake(self, (write.variable as u64) * 2 + 1); } }
+    else { for write in store.versions.items[self.type_versions..] { wake(self, (write.variable as u64) * 2); } for write in store.effects.versions.items[self.row_versions..] { wake(self, (write.variable as u64) * 2 + 1); } }
     if physical || self.type_versions != store.versions.len || self.row_versions != store.effects.versions.len { wake(self, any_write); }
     if self.clock != store.cursor() { wake(self, future_clock); }
     self.type_versions = store.versions.len; self.row_versions = store.effects.versions.len; self.type_generation = store.closed_generation; self.row_generation = store.effects.physical_epoch; self.clock = store.cursor();

@@ -14,7 +14,7 @@ struct Copier {
     private_nodes: const blot_parse_ast::Id[:] = [], private_bindings: const u32[:] = [], private_tree: const blot_parse_ast::Tree? = null,
     private_scopes: dictionary<u32,u32>&, operation_mapping: const dictionary<Identity,Identity>? = null,
     field_mapping: const u32[:] = [], has_field_mapping: bool = false, nominal_mapping: const dictionary<Identity,Identity>? = null,
-    fresh_variables: bool = false, fresh_rows: bool = false, source: blot_check_frozen_types::Source, destination: blot_check_types::Store&,
+    fresh_variables: bool = false, fresh_rows: bool = false, source: blot_check_frozen_types::Source, destination: blot_check_types::Store,
     associated: bool = false, mapping: dictionary<Id,Id>&, row_variables: dictionary<u32,u32>&, rows: dictionary<u32,u32>&, labels: dictionary<u32,u32>&,
 }
 fn init(source: blot_check_frozen_types::Source, destination: blot_check_types::Store&, tables: Tables) -> Copier { return Copier { private_scopes: tables.private_scopes, source, destination, mapping: tables.mapping, row_variables: tables.row_variables, rows: tables.rows, labels: tables.labels }; }

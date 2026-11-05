@@ -658,14 +658,14 @@ fn prepareCommit(source: const Store&,destination: Store&) -> Error { if !valid(
  return blot_check_effect_evidence::prepareCommit(source.effects,destination.effects); }
 // Publication moves typed capacity runs; old destination storage is reclaimed.
 fn commit(source: Store&,destination: Store&) { assert(valid(source)&&valid(destination)&&source.owner_id!=destination.owner_id);
- destination.nodes.deinit(); destination.nodes=source.nodes; source.nodes=NodeBuffer {};
- destination.extra.deinit(); destination.extra=source.extra; source.extra=WordBuffer {};
+ destination.nodes.deinit(); destination.nodes.items=source.nodes; source.nodes=NodeBuffer {};
+ destination.extra.deinit(); destination.extra.items=source.extra; source.extra=WordBuffer {};
  destination.next.deinit(); destination.next=source.next; source.next=WordBuffer {};
  destination.buckets.deinit(); destination.buckets=source.buckets; source.buckets=Buckets {};
  destination.projection_owners.deinit(); destination.projection_owners=source.projection_owners; source.projection_owners=OwnersBuffer {};
  destination.projection_quantifiers.deinit(); destination.projection_quantifiers=source.projection_quantifiers; source.projection_quantifiers=WordBuffer {};
- destination.quantifier_goals.deinit(); destination.quantifier_goals=source.quantifier_goals; source.quantifier_goals=QuantifierBuffer {};
- destination.quantifier_obligations.deinit(); destination.quantifier_obligations=source.quantifier_obligations; source.quantifier_obligations=GoalBuffer {};
+ destination.quantifier_goals.deinit(); destination.quantifier_goals.items=source.quantifier_goals; source.quantifier_goals=QuantifierBuffer {};
+ destination.quantifier_obligations.deinit(); destination.quantifier_obligations.items=source.quantifier_obligations; source.quantifier_obligations=GoalBuffer {};
  blot_check_effect_evidence::commit(source.effects,destination.effects); let identity=destination.owner_id; destination.owner_id=source.owner_id; states[destination.lease-1].owner_id=destination.owner_id; source.owner_id=identity; states[source.lease-1].owner_id=source.owner_id;
 }
 

@@ -10,10 +10,10 @@ import support.pooled_buffer;
 type Error=blot_error::Error;
 type Tag=blot_eval_type_evidence::Tag;
 struct Frame { start: u32,len: u32 }
-struct Importer { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View,destination: blot_check_types::Store&,types: dictionary<u32,u32>&,rows: dictionary<u32,u32>&,binders: u32[>..<]&,frames: Frame[128],scope_count: i64=0 }
+struct Importer { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View,destination: blot_check_types::Store,types: dictionary<u32,u32>&,rows: dictionary<u32,u32>&,binders: u32[>..<]&,frames: Frame[128],scope_count: i64=0 }
 fn ty<I>(self: I&,id: u32,depth: i64) -> u32,Error { var arguments=Words {}; var goals=Goals {}; var children=Words {}; var fields=Fields {}; let value,error=tyInner(self,id,depth,arguments,goals,children,fields); arguments.deinit(); goals.deinit(); children.deinit(); fields.deinit(); return value,error; }
 fn tyInner<I>(self: I&,id: u32,depth: i64,arguments: Words&,goals: Goals&,copied_children: Words&,field_values: Fields&) -> u32,Error {
- let destination: blot_check_types::Store&=target(self);
+ let destination=target(self);
  if id<=5 { return id,Error.none; } if depth>=256 { return 0,Error.type_limit; }
  if self.scope_count==0 { let known=self.types.get(id); if known { return known,Error.none; } }
  let e=destination.chargeProjection(); if e!=Error.none { return 0,e; } let n=self.source.node(id); let tag=n.tag; var result: u32=0;
@@ -63,7 +63,7 @@ fn tyInner<I>(self: I&,id: u32,depth: i64,arguments: Words&,goals: Goals&,copied
 }
 fn row<I>(self: I&,id: u32,depth: i64) -> u32,Error { var labels=Words {}; var arguments=Words {}; let value,error=rowInner(self,id,depth,labels,arguments); labels.deinit(); arguments.deinit(); return value,error; }
 fn rowInner<I>(self: I&,id: u32,depth: i64,labels: Words&,arguments: Words&) -> u32,Error {
- let destination: blot_check_types::Store&=target(self);
+ let destination=target(self);
  if id==0 { return 0,Error.none; } if depth>=256 { return 0,Error.type_limit; } if self.scope_count==0 { let known=self.rows.get(id); if known { return known,Error.none; } }
  let e=destination.chargeProjection(); if e!=Error.none { return 0,e; } 
  for label in self.source.effects.rowLabels(id) { arguments.items=arguments.storage[..0];
@@ -86,12 +86,12 @@ fn push(self: Goals&,value: blot_check_types::Obligation) { if self.failure!=Err
 fn push(self: Fields&,value: blot_check_types::Field) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,field_runs); }
 fn deinit(self: Goals&) { blot_support_pooled_buffer::deinit(self,goal_runs); }
 fn deinit(self: Fields&) { blot_support_pooled_buffer::deinit(self,field_runs); }
-struct PooledImporter { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View=blot_eval_type_evidence::View {nodes:[],extra:[],effects:blot_check_effect_evidence::View {}},destination: blot_check_types::Store?=null,types: WordMap=WordMap {},rows: WordMap=WordMap {},binders: Words=Words {},frames: Frame[128]=[Frame {0,0};128],scope_count: i64=0 }
+struct PooledImporter { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View=blot_eval_type_evidence::View {nodes:[],extra:[],effects:blot_check_effect_evidence::View {}},destination: blot_check_types::Store=blot_check_types::Store {},types: WordMap=WordMap {},rows: WordMap=WordMap {},binders: Words=Words {},frames: Frame[128]=[Frame {0,0};128],scope_count: i64=0 }
 fn initPooled(source: blot_eval_type_evidence::View,destination: blot_check_types::Store&) -> PooledImporter { return PooledImporter {source:source,destination:destination}; }
-fn deinit(self: PooledImporter&) { self.types.deinit(); self.rows.deinit(); self.binders.deinit(); self.destination .= null; self.scope_count=0; self.owner_id=0; }
+fn deinit(self: PooledImporter&) { self.types.deinit(); self.rows.deinit(); self.binders.deinit(); self.destination=Store {}; self.scope_count=0; self.owner_id=0; }
 fn deinit(self: Importer&) { self.types.clear(); self.rows.clear(); self.binders.clear(); self.scope_count=0; self.owner_id=0; }
-fn target(self: Importer&) -> blot_check_types::Store& { return self.destination; }
-fn target(self: PooledImporter&) -> blot_check_types::Store& { if self.destination==null { abort("inactive closed evidence importer"); } return self.destination; }
+fn target(self: Importer&) -> blot_check_types::Store { return self.destination; }
+fn target(self: PooledImporter&) -> blot_check_types::Store { if self.destination.owner_id==0 { abort("inactive closed evidence importer"); } return self.destination; }
 fn binderLength(self: Importer&) -> i64 { return self.binders.len; }
 fn binderLength(self: PooledImporter&) -> i64 { return self.binders.items.len; }
 fn binderValues(self: Importer&) -> const u32[:] { return self.binders; }
@@ -100,4 +100,4 @@ fn pushBinder(self: Importer&,value: u32) -> Error { self.binders.push(value); r
 fn pushBinder(self: PooledImporter&,value: u32) -> Error { self.binders.push(value); return self.binders.failure; }
 fn resizeBinders(self: Importer&,length: i64) { self.binders.resize(length); }
 fn resizeBinders(self: PooledImporter&,length: i64) { assert(length>=0&&length<=self.binders.items.len); self.binders.items=self.binders.storage[..length]; }
-fn withImporter<C,F,R>(source: blot_eval_type_evidence::View,destination: blot_check_types::Store&,context: C&) -> R,Error { var importer=initPooled(source,destination); let result,error=F(context,importer); importer.deinit(); return result,error; }
+fn withImporter<C,F,R>(source: blot_eval_type_evidence::View,destination: blot_check_types::Store,context: C&) -> R,Error { var importer=initPooled(source,destination); let result,error=F(context,importer); importer.deinit(); return result,error; }

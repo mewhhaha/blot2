@@ -138,8 +138,8 @@ fn init(types: ValueType[>..<]&, instructions: Instruction[>..<]&, names: u8[>..
 }
 fn name(module: const Module&, range: Range) -> const u8[:] { module.names[range.start..range.start + range.len] }
 fn parameters(module: const Module&, function: Function) -> const ValueType[:] { module.types[function.parameters.start..function.parameters.start + function.parameters.len] }
-fn locals(module: const Module&, function: Function) -> const ValueType[:] { module.types[function.locals.start..function.locals.start + function.locals.len] }
-fn instructions(module: const Module&, function: Function) -> const Instruction[:] { module.instructions[function.instructions.start..function.instructions.start + function.instructions.len] }
+fn locals(module: const Module&, function: Function) -> const ValueType[:] { if function.borrowed_body { return function.borrowed_locals; } return module.types[function.locals.start..function.locals.start + function.locals.len]; }
+fn instructions(module: const Module&, function: Function) -> const Instruction[:] { if function.borrowed_body { return function.borrowed_instructions; } return module.instructions[function.instructions.start..function.instructions.start + function.instructions.len]; }
 fn signatureParameters(module: const Module&, signature: Signature) -> const ValueType[:] { module.types[signature.parameters.start..signature.parameters.start + signature.parameters.len] }
 fn ownName(module: Module&, value: const u8[:]) -> Range {
     let result = Range { start: module.names.len, len: value.len }; module.names.append(value); return result;
@@ -257,6 +257,7 @@ fn appendInstruction(module: Module&, range: Range, inst: Instruction) -> Range 
     module.instructions.push(inst); result.len++; return result;
 }
 fn addLocal(module: Module&, id: u32, ty: ValueType) -> u32, blot_error::Error {
+    let materialized = materializeBody(module,id); if materialized != blot_error::Error.none { return 0,materialized; }
     let function = module.functions[id]; let index = function.parameters.len + function.locals.len;
     if index > 4294967295 { return 0, blot_error::Error.module_too_large; }
     if module.artifacts { let error = blot_reuse_artifact_emitter::recordLocal(module.artifacts, id, ty); if error != blot_error::Error.none { return 0, error; } }
@@ -286,6 +287,7 @@ fn emit(module: Module&, id: u32, instruction: Instruction) -> blot_error::Error
     return emitReference(module, id, instruction, role);
 }
 fn emitReference(module: Module&, id: u32, instruction: Instruction, role: blot_reuse_artifact_emitter::Role) -> blot_error::Error {
+    let materialized = materializeBody(module,id); if materialized != blot_error::Error.none { return materialized; }
     let table = role == blot_reuse_artifact_emitter::Role.table_function || role == blot_reuse_artifact_emitter::Role.callable_function;
     assert(!table || instruction.op == blot_backend_runtime_ir::OP_i32_const);
     let error = recordTableReference(module, role, instruction.operand, blot_support::some(id), module.functions[id].instructions.len as u32); if error != blot_error::Error.none { return error; }
@@ -923,9 +925,20 @@ fn publishBody(module: Module&, locals: const ValueType[:], code: const Instruct
     let code_range = Range { start: module.instructions.len, len: code.len }; module.instructions.append(code);
     return blot_backend_runtime_ir::Body { locals: local_range, instructions: code_range };
 }
+fn clearBorrowed(function: Function&) { function.borrowed_body = false; function.borrowed_locals = []; function.borrowed_instructions = []; }
+fn materializeBody(module: Module&,id: u32) -> blot_error::Error {
+    if id >= module.functions.len { return blot_error::Error.invalid_function_reference; } let function = module.functions[id]; if !function.borrowed_body { return blot_error::Error.none; }
+    let body = publishBody(module,function.borrowed_locals,function.borrowed_instructions); module.functions[id].locals = body.locals; module.functions[id].instructions = body.instructions; clearBorrowed(module.functions[id]); return blot_error::Error.none;
+}
+fn publishFunctionBody(module: Module&,id: u32,locals: const ValueType[:],code: const Instruction[:]) -> blot_error::Error {
+    if id >= module.functions.len { return blot_error::Error.invalid_function_reference; } let body = publishBody(module,locals,code); module.functions[id].locals = body.locals; module.functions[id].instructions = body.instructions; clearBorrowed(module.functions[id]); var annotations: u32 = 0; for instruction in code { if instruction.op == blot_backend_runtime_ir::OP_ownership { annotations++; } } module.functions[id].annotations = annotations; return blot_error::Error.none;
+}
+fn publishInstructions(module: Module&,id: u32,code: const Instruction[:]) -> blot_error::Error {
+    let materialized = materializeBody(module,id); if materialized != blot_error::Error.none { return materialized; } let range = Range { start: module.instructions.len,len: code.len }; module.instructions.append(code); module.functions[id].instructions = range; var annotations: u32 = 0; for instruction in code { if instruction.op == blot_backend_runtime_ir::OP_ownership { annotations++; } } module.functions[id].annotations = annotations; return blot_error::Error.none;
+}
 fn preparedView(module: Module&, prepared: const Prepared[:], id: i64) -> Function {
     var result = module.functions[id];
-    if prepared[id].body.present { result.locals = prepared[id].body.value.locals; result.instructions = prepared[id].body.value.instructions; }
+    if prepared[id].body.present { result.locals = prepared[id].body.value.locals; result.instructions = prepared[id].body.value.instructions; clearBorrowed(result); }
     return result;
 }
 fn deinit(module: Module&) {

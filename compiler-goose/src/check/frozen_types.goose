@@ -7,7 +7,7 @@ struct Graph {
     quantifier_goals: const blot_check_types::QuantifierGoals[:],
     quantifier_obligations: const blot_check_types::Obligation[:],
 }
-enum Source { inactive, store { value: const blot_check_types::Store& }, frozen { value: Graph } }
+enum Source { inactive, store { value: blot_check_types::Store }, frozen { value: Graph } }
 fn quantifierGoals(self: Source, owner: blot_check_types::Id) -> const blot_check_types::Obligation[:] {
     match self { inactive => { abort("inactive frozen source descriptor"); },
         store s => { return s.value.quantifierGoals(owner); },
@@ -42,7 +42,7 @@ fn operationCount(self: Source) -> i64 {
     match self { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.operations.len; }, frozen s => { return s.value.operations.len; }, }
 }
 fn operation(self: Source, id: blot_check_effects::Label) -> blot_check_types::Operation {
-    match self { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.operations[id]; }, frozen s => { return s.value.operations[id]; }, }
+    match self { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.operations.items[id]; }, frozen s => { return s.value.operations[id]; }, }
 }
 fn row(self: Source, id: blot_check_effects::Id) -> blot_check_effects::Row {
     match self { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.effects.node(id); }, frozen s => { return s.value.rows[id]; }, }

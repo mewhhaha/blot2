@@ -148,7 +148,7 @@
       "zig": "compiler/src/backend/cohort_candidate.zig",
       "goose": "compiler-goose/src/backend/cohort_candidate.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/collection_edit_call.zig",
@@ -514,7 +514,7 @@
       "zig": "compiler/src/backend/region_candidate.zig",
       "goose": "compiler-goose/src/backend/region_candidate.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/request_backend_tests.zig",
@@ -700,7 +700,7 @@
       "zig": "compiler/src/backend/source_origins.zig",
       "goose": "compiler-goose/src/backend/source_origins.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/startup_emission_facts.zig",
@@ -2889,19 +2889,19 @@
       "zig": "compiler/src/reuse/frontend_binding_relocation.zig",
       "goose": "compiler-goose/src/reuse/frontend_binding_relocation.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/frontend_graph_correspondence.zig",
       "goose": "compiler-goose/src/reuse/frontend_graph_correspondence.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/frontend_method_sources.zig",
       "goose": "compiler-goose/src/reuse/frontend_method_sources.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/frontend_reference_relocation.zig",

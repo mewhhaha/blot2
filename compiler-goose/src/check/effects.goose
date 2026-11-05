@@ -453,7 +453,7 @@ var inactive_resolved=Map_resolved{};
 
 
 
-reusable[] var owner_states:OwnerState[>..];
+reusable var owner_states:OwnerState[>..]=[];
 var next_owner_generation:u64=1;
 
 struct Table_rows {storage:Row[:]=[],items:Row[:]=[],len:i64=0,failure:Error=Error.none}
@@ -513,19 +513,23 @@ fn index_of(self:const Table_versions&,value:const Version&)->i64 {return self.i
 fn restore(self:Table_versions&,values:const Version[:])->Error {self.clear();self.append(values);return self.failure;}
 struct Map_resolved { count: i64 = 0, failure:Error=Error.none, slots: dictionary_slot<Id,Id>[:] = [] }
 fn probe(map: const Map_resolved&,key: Id) -> i64 {
-    if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    if map.count == 0 { return -1; }
+    let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
     loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key == key { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
 }
 fn get(map: const Map_resolved&,key: Id) -> Id? { let index = probe(map,key); if index < 0 { return null; } return map.slots[index].val; }
 fn contains(map: const Map_resolved&,key: Id) -> bool { return probe(map,key) >= 0; }
 fn release(slots: dictionary_slot<Id,Id>[:]) { if slots.len != 0 { pool_Map_resolved.free_slice(slots); } }
 fn grow(map: Map_resolved&,capacity: i64) {
+    if map.failure != Error.none { return; } if capacity < 8 || capacity > 0x1fffffffffffffff { map.failure = Error.out_of_memory; return; }
     let replacement = pool_Map_resolved.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<Id,Id> { default<Id>(),default<Id>(),0 }; }
     for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
     release(map.slots); map.slots = replacement;
 }
 fn insert(map: Map_resolved&,key: Id,value: Id) -> bool {
+    if map.failure != Error.none { return false; } if map.count > 0x1ffffffffffffffe || map.slots.len > 0x1fffffffffffffff { map.failure = Error.out_of_memory; return false; }
     if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
+    if map.failure != Error.none { return false; }
     let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
     loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<Id,Id> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<Id,Id> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
 }
@@ -542,7 +546,7 @@ fn each<F>(map: Map_resolved&) { for &slot in map.slots { if slot.tag != 0 { F(s
 reusable[] var pool_Map_resolved:dictionary_slot<Id,Id>[>..];
 fn restore(map:Map_resolved&,slots:const dictionary_slot<Id,Id>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return Error.invalid_artifact;}return Error.none;}let run=pool_Map_resolved.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return Error.none;}
 fn valid(self:const Store&)->bool {return self.lease!=0 && self.lease-1<owner_states.len && owner_states[self.lease-1].live && owner_states[self.lease-1].generation==self.owner_generation;}
-fn initPooled(options:Options=Options{})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{},Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true});let state:OwnerState&=owner_states[index];var self=Store{lease:(index+1) as u32,owner_generation:generation,rows:state.rows,labels:state.labels,variables:state.variables,versions:state.versions,resolved:state.resolved,physical_epoch:state.physical_epoch,mutation_epoch:state.mutation_epoch,resolved_physical:state.resolved_physical,resolved_high_water:state.resolved_high_water,use_resolution_cache:state.use_resolution_cache,next_position:state.next_position,};self.use_resolution_cache=options.resolution_cache;self.rows.push(Row{});if self.rows.failure!=Error.none {return default<Store>(),self.rows.failure;}if self.rows.failure!=Error.none {let error=self.rows.failure;self.deinit();return Store{},error;}return self,Error.none;}
+fn initPooled(options:Options=Options{})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{},Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true});let state:OwnerState&=owner_states[index];var self=Store{lease:(index+1) as u32,owner_generation:generation,rows:state.rows,labels:state.labels,variables:state.variables,versions:state.versions,resolved:state.resolved,physical_epoch:state.physical_epoch,mutation_epoch:state.mutation_epoch,resolved_physical:state.resolved_physical,resolved_high_water:state.resolved_high_water,use_resolution_cache:state.use_resolution_cache,next_position:state.next_position,};self.use_resolution_cache=options.resolution_cache;self.rows.push(Row{});if self.rows.failure!=Error.none {let error=self.rows.failure;self.deinit();return Store{},error;}return self,Error.none;}
 fn init()->Store,Error {return initPooled();}
 fn initWithOptions(options:Options)->Store,Error {return initPooled(options);}
 fn deinit(self:Store&) {if self.lease==0 {return;}assert(valid(self));self.rows.deinit();self.labels.deinit();self.variables.deinit();self.versions.deinit();self.resolved.deinit();let index=self.lease-1;owner_states[index].live=false;owner_states.free(index);self=Store{};}

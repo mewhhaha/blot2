@@ -3,7 +3,7 @@ namespace blot_check_rank_walk;
 import support.error;
 import support.pooled_buffer;
 struct Walker<C> {
-    store: blot_check_types::Store&, rigid_scope: u32, free_bound: bool,
+    store: blot_check_types::Store, rigid_scope: u32, free_bound: bool,
     collected: C&, remaining: i64&,
     collecting: bool = false, budgeted: bool = false, quantifier: bool = false,
     scopes: blot_check_types::List[128] = [blot_check_types::List {}; 128],
@@ -73,7 +73,7 @@ recursive fn visit<C>(self: Walker<C>&, root: blot_check_types::Id, depth: i64) 
         array, list, cursor, resolver => { return visit(self, node.a, depth + 1); },
         product => {
             for index in node.b {
-                let found, error = visit(self, self.store.extra[node.a + index], depth + 1);
+                let found, error = visit(self, self.store.extra.items[node.a + index], depth + 1);
                 if error != blot_error::Error.none || found { return found, error; }
             }
         },

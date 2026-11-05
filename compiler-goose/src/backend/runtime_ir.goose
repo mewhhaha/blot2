@@ -304,6 +304,9 @@ struct Function {
     entry: bool = false, provider_parameter: u8 = unknown_provider,
     callable_layout: u32 = 0, signature: u32 = 0, parameter_roles: u64 = 0,
     annotations: u32 = 0, locals: Range, instructions: Range,
+    // Detached views borrow source bodies until their first typed mutation.
+    // These fields are native ownership metadata, excluded from every wire view.
+    borrowed_body: bool = false,borrowed_locals: const ValueType[:] = [],borrowed_instructions: const Instruction[:] = [],
 }
 fn codeLength(function: Function) -> i64 { function.instructions.len - function.annotations }
 fn parameterRole(function: Function, index: i64) -> Role {
