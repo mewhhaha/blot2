@@ -24,7 +24,7 @@ fn runAbove<Executor>(executor: Executor&, io_available: bool, requested: u8, na
     var order: u32[>..<]; for input, index in inputs { if input.present { order.append(index as u32); } }
     // Stable insertion order implements source largest-first then source index.
     for ignored in 1..order.len { var index = ignored; while index != 0 { let left = order[index - 1]; let right = order[index]; let l = inputs[left].value.tree.nodes.len; let r = inputs[right].value.tree.nodes.len; if l > r || (l == r && left < right) { break; } order[index - 1] = right; order[index] = left; index -= 1; } }
-    slots.clear(); for input in inputs { slots.append(Slot { requested: input.present }); }
+    slots.clear(); for input in inputs { slots.append(Slot { requested: input.present , ..}); }
     // All owner copies finish before any worker starts. Failed packet creation
     // rolls back the entire prepared batch and leaves the caller's inputs live.
     let err = executor.begin(inputs.len); if err != Error.none { return blot_support::none<Batch<Executor>>(), err; }
@@ -34,7 +34,7 @@ fn runAbove<Executor>(executor: Executor&, io_available: bool, requested: u8, na
     // Caller executes the same Goose worker loop. Work indices are claimed by
     // the executor's flat transport; completed/error packets retain their slot.
     executor.executeCaller(order); let err = executor.finish(); if err != Error.none { executor.cancelAndJoin(); executor.deinit(); slots.clear(); return blot_support::none<Batch<Executor>>(), err; }
-    return blot_support::some(Batch<Executor> { executor:executor, slots:slots, workers:workers, active:true }), Error.none;
+    return blot_support::some(Batch<Executor> { executor:executor, slots:slots, workers:workers, active:true , ..}), Error.none;
 }
 fn Batch::take(self: Batch&, index: i64) -> blot_reuse_dependency_payload::Owned<blot_check_core::Module>, Error {
     let executor .= self.executor; let slots .= self.slots; assert(executor && slots);

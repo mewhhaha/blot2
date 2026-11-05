@@ -30,8 +30,8 @@ fn validatePrelude(value: const FrozenDependency&, source: const u8[:], producer
     { let propagated_error = require(owner.core.unit == 1 && owner.interface.unit == 1); if propagated_error != Error.none { return propagated_error; } }
     { let propagated_error = blot_reuse_dependency_interface_validation::validate(owner.interface, value.symbols.len, value.modules.len); if propagated_error != Error.none { return propagated_error; } }
     { let propagated_error = blot_reuse_dependency_interface_validation::validateGraphWithBudget(owner.interface, associated_remaining); if propagated_error != Error.none { return propagated_error; } }
-    let units = [blot_check_frozen_core_validation::ModuleRef { owner.core }];
-    let context = blot_check_frozen_core_validation::Context { units: units, symbol_count: blot_support::some(value.symbols.len), source_length: blot_support::some(owner.identity.source_bytes) };
+    let units = [blot_check_frozen_core_validation::ModuleRef { owner.core , ..}];
+    let context = blot_check_frozen_core_validation::Context { units: units, symbol_count: blot_support::some(value.symbols.len), source_length: blot_support::some(owner.identity.source_bytes) , ..};
     { let propagated_error = blot_check_frozen_core_validation::validateWithBudget(owner.core, context, associated_remaining); if propagated_error != Error.none { return propagated_error; } }
     { let propagated_error = blot_reuse_module_abstraction_validation::publicView(owner.interface); if propagated_error != Error.none { return propagated_error; } }
     { let propagated_error = blot_reuse_module_abstraction_validation::storageContracts(owner.interface, owner.core); if propagated_error != Error.none { return propagated_error; } }

@@ -368,7 +368,7 @@ fn offset<T>(name: const u8[:]) -> u32 {
 
 fn fields<T>(out: Field[>..]&) {
     let roles = layout_roles(default<T>());
-    for role, index in roles { out.push(Field { (index * 4) as u32, role }); }
+    for role, index in roles { out.push(Field { (index * 4) as u32, role , ..}); }
 }
 fn fields<T>() -> Field[>..] {
     var result: Field[>..] = [];

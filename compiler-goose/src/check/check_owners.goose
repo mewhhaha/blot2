@@ -183,7 +183,7 @@ reusable[] var checked_header_requirements:blot_check_numeric_proof_contracts::R
 reusable[] var checked_header_parameters:u32[>..];
 fn CheckedOwner::valid(self:CheckedOwner)->bool {return self.lease!=0 && self.lease-1<checked_owners.len && checked_owners[self.lease-1].live && checked_owners[self.lease-1].generation==self.generation;}
 fn checkedOwnerState(self:CheckedOwner)->CheckedOwnerState& {assert(self.valid());return checked_owners[self.lease-1];}
-fn newCheckedOwner()->CheckedOwner,blot_error::Error {if checked_owners.len>=0xffffffff {return CheckedOwner{},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let index=checked_owners.alloc_index(CheckedOwnerState{generation:generation,live:true});return CheckedOwner{(index+1) as u32,generation},blot_error::Error.none;}
+fn newCheckedOwner()->CheckedOwner,blot_error::Error {if checked_owners.len>=0xffffffff {return CheckedOwner{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let index=checked_owners.alloc_index(CheckedOwnerState{generation:generation,live:true, ..});return CheckedOwner{(index+1) as u32,generation, ..},blot_error::Error.none;}
 fn ownChecked_function_exit_lambdas(owner:CheckedOwner,values:const blot_parse_ast::Id[:])->blot_parse_ast::Id[:] {let state .= checkedOwnerState(owner);assert(state.function_exit_lambdas.len==0);let result=checked_function_exit_lambdas.alloc_slice(values.len);for value,index in values {result[index]=value;}state.function_exit_lambdas=result;return result;}
 fn ownChecked_usage_loans(owner:CheckedOwner,values:const UsageLoan[:])->UsageLoan[:] {let state .= checkedOwnerState(owner);assert(state.usage_loans.len==0);let result=checked_usage_loans.alloc_slice(values.len);for value,index in values {result[index]=value;}state.usage_loans=result;return result;}
 fn ownChecked_proof_contracts(owner:CheckedOwner,values:const ProofContract[:])->ProofContract[:] {let state .= checkedOwnerState(owner);assert(state.proof_contracts.len==0);let result=checked_proof_contracts.alloc_slice(values.len);for value,index in values {result[index]=value;}state.proof_contracts=result;return result;}
@@ -271,7 +271,7 @@ if header.operands.len!=0 {checked_header_operands.free_slice(header.operands);h
 if header.requirements.len!=0 {checked_header_requirements.free_slice(header.requirements);header.requirements=[];}
 if header.parameters.len!=0 {checked_header_parameters.free_slice(header.parameters);header.parameters=[];}
 }
-fn ownCheckedHeaders(owner:CheckedOwner,contracts:ProofContract[:]) {let state .= checkedOwnerState(owner);state.headers=checked_headers.alloc_slice(contracts.len);for &contract,index in contracts {var lease=CheckedHeaderLease{};
+fn ownCheckedHeaders(owner:CheckedOwner,contracts:ProofContract[:]) {let state .= checkedOwnerState(owner);state.headers=checked_headers.alloc_slice(contracts.len);for &contract,index in contracts {var lease=CheckedHeaderLease{..};
 lease.value_slots=checked_header_value_slots.alloc_slice(contract.header.value_slots.len);for value,slot in contract.header.value_slots {lease.value_slots[slot]=value;}contract.header.value_slots=lease.value_slots;
 lease.proof_slots=checked_header_proof_slots.alloc_slice(contract.header.proof_slots.len);for value,slot in contract.header.proof_slots {lease.proof_slots[slot]=value;}contract.header.proof_slots=lease.proof_slots;
 lease.values=checked_header_values.alloc_slice(contract.header.values.len);for value,slot in contract.header.values {lease.values[slot]=value;}contract.header.values=lease.values;
@@ -422,6 +422,6 @@ if state.body_introductions.len!=0 {checked_body_introductions.free_slice(state.
 if state.body_parameters.len!=0 {checked_body_parameters.free_slice(state.body_parameters);state.body_parameters=[];}
 if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.body_uses=[];}
 if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=[];}
-for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=[];}let index=self.lease-1;state.live=false;checked_owners.free(index);self=CheckedOwner{};}
+for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=[];}let index=self.lease-1;state.live=false;checked_owners.free(index);self=CheckedOwner{..};}
 fn Checked::deinit(self:Checked&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);if self.editor.present && self.editor.value.context.present {self.editor.value.context.value.deinit();}self.types.deinit();self.parameter_patterns.deinit();self.owner.deinit();self=default<Checked>();}
 fn SourceValidation::deinit(self:SourceValidation&) {if !self.owner.valid() {return;}deinitDiagnosticPayloads(self.diagnostics);self.types.deinit();self.parameter_patterns.deinit();self.owner.deinit();self=default<SourceValidation>();}

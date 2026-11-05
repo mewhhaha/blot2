@@ -9,13 +9,13 @@ struct Control { start: u32, alternate: u32 = absent }
 struct Graph { nodes: Node[>..]&, predecessors: Predecessor[>..]&, valid: bool = true }
 fn init(nodes: Node[>..]&, predecessors: Predecessor[>..]&, instructions: const blot_backend_runtime_ir::Instruction[:]) -> Graph {
     nodes.clear(); predecessors.clear();
-    for index in 0..instructions.len + 1 { nodes.push(Node {}); }
-    var graph = Graph { nodes: nodes, predecessors: predecessors };
+    for index in 0..instructions.len + 1 { nodes.push(Node {..}); }
+    var graph = Graph { nodes: nodes, predecessors: predecessors , ..};
     var ends: u32[>..] = []; var controls: Control[>..] = [];
     for index in 0..instructions.len { ends.push(absent); }
     for inst, index in instructions {
         let at = index as u32;
-        if inst.op == blot_backend_runtime_ir::OP_block || inst.op == blot_backend_runtime_ir::OP_loop || inst.op == blot_backend_runtime_ir::OP_if_ { controls.push(Control { start: at }); }
+        if inst.op == blot_backend_runtime_ir::OP_block || inst.op == blot_backend_runtime_ir::OP_loop || inst.op == blot_backend_runtime_ir::OP_if_ { controls.push(Control { start: at , ..}); }
         else if inst.op == blot_backend_runtime_ir::OP_else_ {
             if controls.len == 0 { graph.valid = false; return graph; }
             let top = controls.len - 1; let control = controls[top];
@@ -31,7 +31,7 @@ fn init(nodes: Node[>..]&, predecessors: Predecessor[>..]&, instructions: const 
     for inst, index in instructions {
         let at = index as u32; nodes[at].next[0] = at + 1;
         if inst.op == blot_backend_runtime_ir::OP_block || inst.op == blot_backend_runtime_ir::OP_loop || inst.op == blot_backend_runtime_ir::OP_if_ {
-            controls.push(Control { start: at });
+            controls.push(Control { start: at , ..});
             if inst.op == blot_backend_runtime_ir::OP_if_ && nodes[at].next[1] == absent { nodes[at].next[1] = ends[at]; }
         } else if inst.op == blot_backend_runtime_ir::OP_else_ { nodes[at].next[0] = ends[at]; }
         else if inst.op == blot_backend_runtime_ir::OP_end { controls.pop(); }
@@ -52,7 +52,7 @@ fn init(nodes: Node[>..]&, predecessors: Predecessor[>..]&, instructions: const 
         let node = nodes[index];
         for next in node.next {
             if next == absent { continue; }
-            predecessors.push(Predecessor { from: index as u32, next: nodes[next].first });
+            predecessors.push(Predecessor { from: index as u32, next: nodes[next].first , ..});
             nodes[next].first = (predecessors.len - 1) as u32;
         }
     }

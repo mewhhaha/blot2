@@ -28,7 +28,7 @@ fn optionalSymbol(self: const Importer&, value: u32&) -> Error {
 }
 fn remapTarget<T>(self: const Importer&, value: T&) -> Error {
     if value.binding != 0 {
-        var target = blot_check_core::BindingRef { value.unit, value.binding };
+        var target = blot_check_core::BindingRef { value.unit, value.binding , ..};
         { let propagated_error = self.remapReference(target); if propagated_error != Error.none { return propagated_error; } } value.unit = target.unit; value.binding = target.binding;
     }
     return Error.none;
@@ -121,7 +121,7 @@ fn coreEqualMapped(self: const Importer&, old: const Module&, current: const Mod
         fields[index] = field; let error = self.optionalSymbol(fields[index].symbol);
         if error != Error.none { return false, error; }
     }
-    blot_check_source_sort::pdqContext(0, fields.len, FieldSort { fields });
+    blot_check_source_sort::pdqContext(0, fields.len, FieldSort { fields , ..});
     if !blot_structural::equal(fields, current.field_names) { return false, Error.none; }
     var unit = old.unit;
     if unit != 0 { let mapped, error = self.unit(unit, false); if error != Error.none { return false, error; } unit = mapped; }

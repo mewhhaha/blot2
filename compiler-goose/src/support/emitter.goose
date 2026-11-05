@@ -24,7 +24,7 @@ fn value<M>(emitter: Emitter<M>&, local: Local) {
     op(emitter, blot_backend_runtime_ir::OP_local_get, local.id);
 }
 fn temp<M>(emitter: Emitter<M>&) -> Local {
-    if emitter.failure != Error.none { return Local {}; }
+    if emitter.failure != Error.none { return Local {..}; }
     let local, error = blot_backend_runtime_code::temp(emitter.code);
     emitter.failure = error;
     return local;

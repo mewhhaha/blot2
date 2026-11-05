@@ -125,7 +125,7 @@ fn deinit(self: Key&) {
     releaseOwned(self.summary_publications); self.summary_publications = [];
 }
 fn proofKey(target: BindingRef, evidence: u32) -> blot_eval_core_eval::CallProofKey {
-    return blot_eval_core_eval::CallProofKey { target: BindingRef { target.unit - 1, target.binding }, evidence: evidence };
+    return blot_eval_core_eval::CallProofKey { target: BindingRef { target.unit - 1, target.binding , ..}, evidence: evidence , ..};
 }
 fn matches<S>(self: Key, session: const S&) -> bool {
     if !self.matchesBase(session) { return false; }
@@ -141,7 +141,7 @@ fn matchesBase<S>(self: Key, session: const S&) -> bool {
         blot_eval_type_evidence::Tag.boolean, blot_eval_type_evidence::Tag.unsigned32,
         blot_eval_type_evidence::Tag.floating32, blot_eval_type_evidence::Tag.never];
     if session.storage.evidence.nodes.len < tags.len { return false; }
-    for tag, index in tags { if session.storage.evidence.nodes.items[index] != blot_eval_type_evidence::Node { tag: tag } { return false; } }
+    for tag, index in tags { if session.storage.evidence.nodes.items[index] != blot_eval_type_evidence::Node { tag: tag , ..} { return false; } }
     for read in self.scalar_reads {
         if read.evidence > 5 || read.target.unit == 0 || read.target.unit > session.units.len { return false; }
         let module = session.units[read.target.unit - 1];
@@ -181,7 +181,7 @@ fn reasonCode(value: Reason) -> u32 {
 struct PlainSeen { initial: blot_support::Option<bool>, publication: blot_support::Option<i64> }
 struct Recorder {
     rejected: u16 = 0, eligible: bool, empty_call_inputs: bool = true, source_complete: bool = true,
-    root: BindingRef = BindingRef { 0, 0 }, serial: u64 = 0, max_reads: i64,
+    root: BindingRef = BindingRef { 0, 0 , ..}, serial: u64 = 0, max_reads: i64,
     sources: RecorderSourcesBuffer&,
     sources_seen: RecorderSourcesSeenMap&,
     interfaces: RecorderInterfacesBuffer&,
@@ -244,7 +244,7 @@ fn init(t: RecorderTables, eligible: bool, max_reads: i64) -> Recorder {
         summary_publications: t.summary_publications,
         summaries_seen: t.summaries_seen,
         summary_reads_seen: t.summary_reads_seen,
-    };
+     ..};
 }
 fn deinit(self: Recorder&) {
     self.sources.clear();
@@ -275,7 +275,7 @@ fn scalar(self: Recorder&, target: BindingRef, actual: u32) -> Error {
     let id = (target.unit as u64 << 32) | target.binding;
     { let optional_source_40 .= self.seen.get(id); if optional_source_40 { let previous = optional_source_40; if previous != actual { self.invalidate(Reason.changed_input); } return Error.none;  } }
     if self.plain_reads.len >= self.max_reads || self.reads.len >= self.max_reads - self.plain_reads.len { self.invalidate(Reason.read_limit); return Error.none; }
-    self.seen.insert(id, actual); self.reads.push(ScalarRead { target, actual }); return Error.none;
+    self.seen.insert(id, actual); self.reads.push(ScalarRead { target, actual , ..}); return Error.none;
 }
 fn plainRead(self: Recorder&, key: u64, actual: blot_support::Option<bool>) -> Error {
     if !self.eligible { return Error.none; }
@@ -285,7 +285,7 @@ fn plainRead(self: Recorder&, key: u64, actual: blot_support::Option<bool>) -> E
         if expected != actual { self.invalidate(Reason.changed_input); } return Error.none;
      } }
     if self.plain_reads.len >= self.max_reads || self.reads.len >= self.max_reads - self.plain_reads.len { self.invalidate(Reason.read_limit); return Error.none; }
-    self.plain_seen.insert(key, PlainSeen { initial: actual }); self.plain_reads.push(PlainRead { key, actual }); return Error.none;
+    self.plain_seen.insert(key, PlainSeen { initial: actual , ..}); self.plain_reads.push(PlainRead { key, actual , ..}); return Error.none;
 }
 fn plainRead(self: Recorder&, key: u64, actual: const bool?) -> Error {
     { let optional_source_38 .= actual; if optional_source_38 { let value .= optional_source_38; return self.plainRead(key, blot_support::some(value));  } } return self.plainRead(key, blot_support::none<bool>());
@@ -295,25 +295,25 @@ fn plainPublish(self: Recorder&, key: u64, value: bool) -> Error {
     { let optional_source_37 .= self.plain_seen.get(key); if optional_source_37 { let observed .= optional_source_37;
         if observed.publication.present { self.plain_publications.items[observed.publication.value].value = value; }
         else {
-            let at = self.plain_publications.len; self.plain_publications.push(PlainPublication { key, value });
+            let at = self.plain_publications.len; self.plain_publications.push(PlainPublication { key, value , ..});
             observed.publication = blot_support::some(at);
         }
      } else { self.invalidate(Reason.changed_input); } }
     return Error.none;
 }
 fn callPublish(self: Recorder&, target: BindingRef, actual: u32) -> Error {
-    if !self.eligible { return Error.none; } let call = CallPublication { target, actual };
+    if !self.eligible { return Error.none; } let call = CallPublication { target, actual , ..};
     if self.calls_seen.contains(call) { return Error.none; }
     if self.call_publications.len >= self.max_reads { self.invalidate(Reason.read_limit); return Error.none; }
     self.calls_seen.insert(call, true); self.call_publications.push(call); return Error.none;
 }
 fn callRead(self: Recorder&, target: BindingRef, actual: u32, present: bool) -> Error {
-    if !self.eligible { return Error.none; } let call = CallPublication { target, actual };
+    if !self.eligible { return Error.none; } let call = CallPublication { target, actual , ..};
     if self.calls_seen.contains(call) { if !present { self.invalidate(Reason.changed_input); } return Error.none; }
     if self.empty_call_inputs { if present { self.invalidate(Reason.call_read); } return Error.none; }
     { let optional_source_36 .= self.call_reads_seen.get(call); if optional_source_36 { let previous = optional_source_36; if previous != present { self.invalidate(Reason.changed_input); } return Error.none;  } }
     if self.call_reads.len >= self.max_reads { self.invalidate(Reason.read_limit); return Error.none; }
-    self.call_reads_seen.insert(call, present); self.call_reads.push(CallRead { target, actual, present }); return Error.none;
+    self.call_reads_seen.insert(call, present); self.call_reads.push(CallRead { target, actual, present , ..}); return Error.none;
 }
 fn summaryRead(self: Recorder&, value: Summary) -> Error {
     if !self.eligible { return Error.none; }
@@ -347,7 +347,7 @@ fn sourceUnit(self: Recorder&, unit: u32) -> Error {
 fn key(self: const Recorder&) -> blot_support::Option<Key> { if self.failure()!=Error.none { return blot_support::none<Key>(); }
     if !self.eligible { return blot_support::none<Key>(); }
     return blot_support::some(Key { self.empty_call_inputs, self.source_complete, self.sources.items, self.interfaces.items, self.source_units.items,
-        self.reads.items, self.plain_reads.items, self.plain_publications.items, self.call_publications.items, self.call_reads.items, self.summary_reads.items, self.summary_publications.items });
+        self.reads.items, self.plain_reads.items, self.plain_publications.items, self.call_publications.items, self.call_reads.items, self.summary_reads.items, self.summary_publications.items , ..});
 }
 fn withRecorder<C,F>(session: const blot_eval_core_eval::Session&,context: C&) -> Error { var owner,error=initRecorderOwner(session); if error!=Error.none { return error; } let recorder=owner.borrow(); assert(recorder); let result=F(context,recorder); let allocation_error=recorder.failure(); owner.deinit(); if result!=Error.none { return result; } return allocation_error; }
 // Shrinking a retained typed run releases its exact allocation extent.
@@ -374,10 +374,10 @@ fn clear(self: RecorderSourcesBuffer&) { blot_support_pooled_buffer::clear(self)
 fn deinit(self: RecorderSourcesBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderSourcesBuffer); self.len=0; self.failure=Error.none; }
 struct RecorderSourcesSeenMap { count: i64=0,slots: dictionary_slot<BindingRef,bool>[:]=[] }
 reusable[] var pool_RecorderSourcesSeenMap: dictionary_slot<BindingRef,bool>[>..]=[];
-fn get(self: const RecorderSourcesSeenMap&,key: BindingRef) -> bool? { let view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self: const RecorderSourcesSeenMap&,key: BindingRef) -> bool? { let view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots, ..}; return blot_support_pooled_map::get(view,key); }
 fn contains(self: const RecorderSourcesSeenMap&,key: BindingRef) -> bool { return self.get(key)!=null; }
-fn insert(self: RecorderSourcesSeenMap&,key: BindingRef,value: bool) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSourcesSeenMap); self.count=view.count; self.slots=view.slots; }
-fn remove(self: RecorderSourcesSeenMap&,key: BindingRef) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn insert(self: RecorderSourcesSeenMap&,key: BindingRef,value: bool) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSourcesSeenMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderSourcesSeenMap&,key: BindingRef) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
 fn clear(self: RecorderSourcesSeenMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
 fn release(self: RecorderSourcesSeenMap&) { if self.slots.len!=0 { pool_RecorderSourcesSeenMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
 struct RecorderInterfacesBuffer { storage: BindingRef[:]=[],items: BindingRef[:]=[],len: i64=0,failure: Error=Error.none }
@@ -390,10 +390,10 @@ fn clear(self: RecorderInterfacesBuffer&) { blot_support_pooled_buffer::clear(se
 fn deinit(self: RecorderInterfacesBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderInterfacesBuffer); self.len=0; self.failure=Error.none; }
 struct RecorderInterfacesSeenMap { count: i64=0,slots: dictionary_slot<BindingRef,bool>[:]=[] }
 reusable[] var pool_RecorderInterfacesSeenMap: dictionary_slot<BindingRef,bool>[>..]=[];
-fn get(self: const RecorderInterfacesSeenMap&,key: BindingRef) -> bool? { let view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self: const RecorderInterfacesSeenMap&,key: BindingRef) -> bool? { let view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots, ..}; return blot_support_pooled_map::get(view,key); }
 fn contains(self: const RecorderInterfacesSeenMap&,key: BindingRef) -> bool { return self.get(key)!=null; }
-fn insert(self: RecorderInterfacesSeenMap&,key: BindingRef,value: bool) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderInterfacesSeenMap); self.count=view.count; self.slots=view.slots; }
-fn remove(self: RecorderInterfacesSeenMap&,key: BindingRef) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn insert(self: RecorderInterfacesSeenMap&,key: BindingRef,value: bool) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderInterfacesSeenMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderInterfacesSeenMap&,key: BindingRef) { var view=blot_support_pooled_map::Map<BindingRef,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
 fn clear(self: RecorderInterfacesSeenMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
 fn release(self: RecorderInterfacesSeenMap&) { if self.slots.len!=0 { pool_RecorderInterfacesSeenMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
 struct RecorderSourceUnitsBuffer { storage: u32[:]=[],items: u32[:]=[],len: i64=0,failure: Error=Error.none }
@@ -406,10 +406,10 @@ fn clear(self: RecorderSourceUnitsBuffer&) { blot_support_pooled_buffer::clear(s
 fn deinit(self: RecorderSourceUnitsBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderSourceUnitsBuffer); self.len=0; self.failure=Error.none; }
 struct RecorderSourceUnitsSeenMap { count: i64=0,slots: dictionary_slot<u32,bool>[:]=[] }
 reusable[] var pool_RecorderSourceUnitsSeenMap: dictionary_slot<u32,bool>[>..]=[];
-fn get(self: const RecorderSourceUnitsSeenMap&,key: u32) -> bool? { let view=blot_support_pooled_map::Map<u32,bool> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self: const RecorderSourceUnitsSeenMap&,key: u32) -> bool? { let view=blot_support_pooled_map::Map<u32,bool> {count:self.count,slots:self.slots, ..}; return blot_support_pooled_map::get(view,key); }
 fn contains(self: const RecorderSourceUnitsSeenMap&,key: u32) -> bool { return self.get(key)!=null; }
-fn insert(self: RecorderSourceUnitsSeenMap&,key: u32,value: bool) { var view=blot_support_pooled_map::Map<u32,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSourceUnitsSeenMap); self.count=view.count; self.slots=view.slots; }
-fn remove(self: RecorderSourceUnitsSeenMap&,key: u32) { var view=blot_support_pooled_map::Map<u32,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn insert(self: RecorderSourceUnitsSeenMap&,key: u32,value: bool) { var view=blot_support_pooled_map::Map<u32,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSourceUnitsSeenMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderSourceUnitsSeenMap&,key: u32) { var view=blot_support_pooled_map::Map<u32,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
 fn clear(self: RecorderSourceUnitsSeenMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
 fn release(self: RecorderSourceUnitsSeenMap&) { if self.slots.len!=0 { pool_RecorderSourceUnitsSeenMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
 struct RecorderReadsBuffer { storage: ScalarRead[:]=[],items: ScalarRead[:]=[],len: i64=0,failure: Error=Error.none }
@@ -422,10 +422,10 @@ fn clear(self: RecorderReadsBuffer&) { blot_support_pooled_buffer::clear(self); 
 fn deinit(self: RecorderReadsBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderReadsBuffer); self.len=0; self.failure=Error.none; }
 struct RecorderSeenMap { count: i64=0,slots: dictionary_slot<u64,u32>[:]=[] }
 reusable[] var pool_RecorderSeenMap: dictionary_slot<u64,u32>[>..]=[];
-fn get(self: const RecorderSeenMap&,key: u64) -> u32? { let view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self: const RecorderSeenMap&,key: u64) -> u32? { let view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots, ..}; return blot_support_pooled_map::get(view,key); }
 fn contains(self: const RecorderSeenMap&,key: u64) -> bool { return self.get(key)!=null; }
-fn insert(self: RecorderSeenMap&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSeenMap); self.count=view.count; self.slots=view.slots; }
-fn remove(self: RecorderSeenMap&,key: u64) { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn insert(self: RecorderSeenMap&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSeenMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderSeenMap&,key: u64) { var view=blot_support_pooled_map::Map<u64,u32> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
 fn clear(self: RecorderSeenMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
 fn release(self: RecorderSeenMap&) { if self.slots.len!=0 { pool_RecorderSeenMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
 struct RecorderPlainReadsBuffer { storage: PlainRead[:]=[],items: PlainRead[:]=[],len: i64=0,failure: Error=Error.none }
@@ -446,10 +446,10 @@ fn clear(self: RecorderPlainPublicationsBuffer&) { blot_support_pooled_buffer::c
 fn deinit(self: RecorderPlainPublicationsBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderPlainPublicationsBuffer); self.len=0; self.failure=Error.none; }
 struct RecorderPlainSeenMap { count: i64=0,slots: dictionary_slot<u64,PlainSeen>[:]=[] }
 reusable[] var pool_RecorderPlainSeenMap: dictionary_slot<u64,PlainSeen>[>..]=[];
-fn get(self: const RecorderPlainSeenMap&,key: u64) -> PlainSeen? { let view=blot_support_pooled_map::Map<u64,PlainSeen> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self: const RecorderPlainSeenMap&,key: u64) -> PlainSeen? { let view=blot_support_pooled_map::Map<u64,PlainSeen> {count:self.count,slots:self.slots, ..}; return blot_support_pooled_map::get(view,key); }
 fn contains(self: const RecorderPlainSeenMap&,key: u64) -> bool { return self.get(key)!=null; }
-fn insert(self: RecorderPlainSeenMap&,key: u64,value: PlainSeen) { var view=blot_support_pooled_map::Map<u64,PlainSeen> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderPlainSeenMap); self.count=view.count; self.slots=view.slots; }
-fn remove(self: RecorderPlainSeenMap&,key: u64) { var view=blot_support_pooled_map::Map<u64,PlainSeen> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn insert(self: RecorderPlainSeenMap&,key: u64,value: PlainSeen) { var view=blot_support_pooled_map::Map<u64,PlainSeen> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderPlainSeenMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderPlainSeenMap&,key: u64) { var view=blot_support_pooled_map::Map<u64,PlainSeen> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
 fn clear(self: RecorderPlainSeenMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
 fn release(self: RecorderPlainSeenMap&) { if self.slots.len!=0 { pool_RecorderPlainSeenMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
 struct RecorderCallPublicationsBuffer { storage: CallPublication[:]=[],items: CallPublication[:]=[],len: i64=0,failure: Error=Error.none }
@@ -462,10 +462,10 @@ fn clear(self: RecorderCallPublicationsBuffer&) { blot_support_pooled_buffer::cl
 fn deinit(self: RecorderCallPublicationsBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderCallPublicationsBuffer); self.len=0; self.failure=Error.none; }
 struct RecorderCallsSeenMap { count: i64=0,slots: dictionary_slot<CallPublication,bool>[:]=[] }
 reusable[] var pool_RecorderCallsSeenMap: dictionary_slot<CallPublication,bool>[>..]=[];
-fn get(self: const RecorderCallsSeenMap&,key: CallPublication) -> bool? { let view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self: const RecorderCallsSeenMap&,key: CallPublication) -> bool? { let view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots, ..}; return blot_support_pooled_map::get(view,key); }
 fn contains(self: const RecorderCallsSeenMap&,key: CallPublication) -> bool { return self.get(key)!=null; }
-fn insert(self: RecorderCallsSeenMap&,key: CallPublication,value: bool) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderCallsSeenMap); self.count=view.count; self.slots=view.slots; }
-fn remove(self: RecorderCallsSeenMap&,key: CallPublication) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn insert(self: RecorderCallsSeenMap&,key: CallPublication,value: bool) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderCallsSeenMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderCallsSeenMap&,key: CallPublication) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
 fn clear(self: RecorderCallsSeenMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
 fn release(self: RecorderCallsSeenMap&) { if self.slots.len!=0 { pool_RecorderCallsSeenMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
 struct RecorderCallReadsBuffer { storage: CallRead[:]=[],items: CallRead[:]=[],len: i64=0,failure: Error=Error.none }
@@ -478,10 +478,10 @@ fn clear(self: RecorderCallReadsBuffer&) { blot_support_pooled_buffer::clear(sel
 fn deinit(self: RecorderCallReadsBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderCallReadsBuffer); self.len=0; self.failure=Error.none; }
 struct RecorderCallReadsSeenMap { count: i64=0,slots: dictionary_slot<CallPublication,bool>[:]=[] }
 reusable[] var pool_RecorderCallReadsSeenMap: dictionary_slot<CallPublication,bool>[>..]=[];
-fn get(self: const RecorderCallReadsSeenMap&,key: CallPublication) -> bool? { let view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self: const RecorderCallReadsSeenMap&,key: CallPublication) -> bool? { let view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots, ..}; return blot_support_pooled_map::get(view,key); }
 fn contains(self: const RecorderCallReadsSeenMap&,key: CallPublication) -> bool { return self.get(key)!=null; }
-fn insert(self: RecorderCallReadsSeenMap&,key: CallPublication,value: bool) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderCallReadsSeenMap); self.count=view.count; self.slots=view.slots; }
-fn remove(self: RecorderCallReadsSeenMap&,key: CallPublication) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn insert(self: RecorderCallReadsSeenMap&,key: CallPublication,value: bool) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderCallReadsSeenMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderCallReadsSeenMap&,key: CallPublication) { var view=blot_support_pooled_map::Map<CallPublication,bool> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
 fn clear(self: RecorderCallReadsSeenMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
 fn release(self: RecorderCallReadsSeenMap&) { if self.slots.len!=0 { pool_RecorderCallReadsSeenMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
 struct RecorderSummaryReadsBuffer { storage: Summary[:]=[],items: Summary[:]=[],len: i64=0,failure: Error=Error.none }
@@ -502,28 +502,28 @@ fn clear(self: RecorderSummaryPublicationsBuffer&) { blot_support_pooled_buffer:
 fn deinit(self: RecorderSummaryPublicationsBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderSummaryPublicationsBuffer); self.len=0; self.failure=Error.none; }
 struct RecorderSummariesSeenMap { count: i64=0,slots: dictionary_slot<SummaryKey,u32>[:]=[] }
 reusable[] var pool_RecorderSummariesSeenMap: dictionary_slot<SummaryKey,u32>[>..]=[];
-fn get(self: const RecorderSummariesSeenMap&,key: SummaryKey) -> u32? { let view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self: const RecorderSummariesSeenMap&,key: SummaryKey) -> u32? { let view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots, ..}; return blot_support_pooled_map::get(view,key); }
 fn contains(self: const RecorderSummariesSeenMap&,key: SummaryKey) -> bool { return self.get(key)!=null; }
-fn insert(self: RecorderSummariesSeenMap&,key: SummaryKey,value: u32) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSummariesSeenMap); self.count=view.count; self.slots=view.slots; }
-fn remove(self: RecorderSummariesSeenMap&,key: SummaryKey) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn insert(self: RecorderSummariesSeenMap&,key: SummaryKey,value: u32) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSummariesSeenMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderSummariesSeenMap&,key: SummaryKey) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
 fn clear(self: RecorderSummariesSeenMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
 fn release(self: RecorderSummariesSeenMap&) { if self.slots.len!=0 { pool_RecorderSummariesSeenMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
 struct RecorderSummaryReadsSeenMap { count: i64=0,slots: dictionary_slot<SummaryKey,u32>[:]=[] }
 reusable[] var pool_RecorderSummaryReadsSeenMap: dictionary_slot<SummaryKey,u32>[>..]=[];
-fn get(self: const RecorderSummaryReadsSeenMap&,key: SummaryKey) -> u32? { let view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self: const RecorderSummaryReadsSeenMap&,key: SummaryKey) -> u32? { let view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots, ..}; return blot_support_pooled_map::get(view,key); }
 fn contains(self: const RecorderSummaryReadsSeenMap&,key: SummaryKey) -> bool { return self.get(key)!=null; }
-fn insert(self: RecorderSummaryReadsSeenMap&,key: SummaryKey,value: u32) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSummaryReadsSeenMap); self.count=view.count; self.slots=view.slots; }
-fn remove(self: RecorderSummaryReadsSeenMap&,key: SummaryKey) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn insert(self: RecorderSummaryReadsSeenMap&,key: SummaryKey,value: u32) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::insert(view,key,value,pool_RecorderSummaryReadsSeenMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderSummaryReadsSeenMap&,key: SummaryKey) { var view=blot_support_pooled_map::Map<SummaryKey,u32> {count:self.count,slots:self.slots, ..}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
 fn clear(self: RecorderSummaryReadsSeenMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
 fn release(self: RecorderSummaryReadsSeenMap&) { if self.slots.len!=0 { pool_RecorderSummaryReadsSeenMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
 
-struct RecorderBacking { sources: RecorderSourcesBuffer=RecorderSourcesBuffer {},sources_seen: RecorderSourcesSeenMap=RecorderSourcesSeenMap {},interfaces: RecorderInterfacesBuffer=RecorderInterfacesBuffer {},interfaces_seen: RecorderInterfacesSeenMap=RecorderInterfacesSeenMap {},source_units: RecorderSourceUnitsBuffer=RecorderSourceUnitsBuffer {},source_units_seen: RecorderSourceUnitsSeenMap=RecorderSourceUnitsSeenMap {},reads: RecorderReadsBuffer=RecorderReadsBuffer {},seen: RecorderSeenMap=RecorderSeenMap {},plain_reads: RecorderPlainReadsBuffer=RecorderPlainReadsBuffer {},plain_publications: RecorderPlainPublicationsBuffer=RecorderPlainPublicationsBuffer {},plain_seen: RecorderPlainSeenMap=RecorderPlainSeenMap {},call_publications: RecorderCallPublicationsBuffer=RecorderCallPublicationsBuffer {},calls_seen: RecorderCallsSeenMap=RecorderCallsSeenMap {},call_reads: RecorderCallReadsBuffer=RecorderCallReadsBuffer {},call_reads_seen: RecorderCallReadsSeenMap=RecorderCallReadsSeenMap {},summary_reads: RecorderSummaryReadsBuffer=RecorderSummaryReadsBuffer {},summary_publications: RecorderSummaryPublicationsBuffer=RecorderSummaryPublicationsBuffer {},summaries_seen: RecorderSummariesSeenMap=RecorderSummariesSeenMap {},summary_reads_seen: RecorderSummaryReadsSeenMap=RecorderSummaryReadsSeenMap {} }
+struct RecorderBacking { sources: RecorderSourcesBuffer=RecorderSourcesBuffer {..},sources_seen: RecorderSourcesSeenMap=RecorderSourcesSeenMap {..},interfaces: RecorderInterfacesBuffer=RecorderInterfacesBuffer {..},interfaces_seen: RecorderInterfacesSeenMap=RecorderInterfacesSeenMap {..},source_units: RecorderSourceUnitsBuffer=RecorderSourceUnitsBuffer {..},source_units_seen: RecorderSourceUnitsSeenMap=RecorderSourceUnitsSeenMap {..},reads: RecorderReadsBuffer=RecorderReadsBuffer {..},seen: RecorderSeenMap=RecorderSeenMap {..},plain_reads: RecorderPlainReadsBuffer=RecorderPlainReadsBuffer {..},plain_publications: RecorderPlainPublicationsBuffer=RecorderPlainPublicationsBuffer {..},plain_seen: RecorderPlainSeenMap=RecorderPlainSeenMap {..},call_publications: RecorderCallPublicationsBuffer=RecorderCallPublicationsBuffer {..},calls_seen: RecorderCallsSeenMap=RecorderCallsSeenMap {..},call_reads: RecorderCallReadsBuffer=RecorderCallReadsBuffer {..},call_reads_seen: RecorderCallReadsSeenMap=RecorderCallReadsSeenMap {..},summary_reads: RecorderSummaryReadsBuffer=RecorderSummaryReadsBuffer {..},summary_publications: RecorderSummaryPublicationsBuffer=RecorderSummaryPublicationsBuffer {..},summaries_seen: RecorderSummariesSeenMap=RecorderSummariesSeenMap {..},summary_reads_seen: RecorderSummaryReadsSeenMap=RecorderSummaryReadsSeenMap {..} }
 reusable var recorder_backings: RecorderBacking[>..]=[];
 struct RecorderOwnerState { value: Recorder,backing: u32,generation: u64,live: bool=true }
 struct RecorderOwner { lease: u32=0,generation: u64=0 }
 reusable var recorder_owners: RecorderOwnerState[>..]=[];
 var next_recorder_generation: u64=1;
-fn initRecorderOwner(session: const blot_eval_core_eval::Session&) -> RecorderOwner,Error { if next_recorder_generation==0xffffffffffffffff||recorder_owners.len>=0xffffffff||recorder_backings.len>=0xffffffff { return RecorderOwner {},Error.out_of_memory; } let generation=next_recorder_generation; next_recorder_generation++; let at=recorder_backings.alloc_index(RecorderBacking {}); let backing: RecorderBacking&=recorder_backings[at]; let tables=RecorderTables {sources:backing.sources,sources_seen:backing.sources_seen,interfaces:backing.interfaces,interfaces_seen:backing.interfaces_seen,source_units:backing.source_units,source_units_seen:backing.source_units_seen,reads:backing.reads,seen:backing.seen,plain_reads:backing.plain_reads,plain_publications:backing.plain_publications,plain_seen:backing.plain_seen,call_publications:backing.call_publications,calls_seen:backing.calls_seen,call_reads:backing.call_reads,call_reads_seen:backing.call_reads_seen,summary_reads:backing.summary_reads,summary_publications:backing.summary_publications,summaries_seen:backing.summaries_seen,summary_reads_seen:backing.summary_reads_seen}; var value=init(tables,true,session.options.max_values); value.empty_call_inputs=session.specializations.validated_calls.count==0; value.serial=session.principal_recordings; let owner=recorder_owners.alloc_index(RecorderOwnerState {value,at as u32,generation,true}); return RecorderOwner {(owner+1) as u32,generation},Error.none; }
+fn initRecorderOwner(session: const blot_eval_core_eval::Session&) -> RecorderOwner,Error { if next_recorder_generation==0xffffffffffffffff||recorder_owners.len>=0xffffffff||recorder_backings.len>=0xffffffff { return RecorderOwner {..},Error.out_of_memory; } let generation=next_recorder_generation; next_recorder_generation++; let at=recorder_backings.alloc_index(RecorderBacking {..}); let backing: RecorderBacking&=recorder_backings[at]; let tables=RecorderTables {sources:backing.sources,sources_seen:backing.sources_seen,interfaces:backing.interfaces,interfaces_seen:backing.interfaces_seen,source_units:backing.source_units,source_units_seen:backing.source_units_seen,reads:backing.reads,seen:backing.seen,plain_reads:backing.plain_reads,plain_publications:backing.plain_publications,plain_seen:backing.plain_seen,call_publications:backing.call_publications,calls_seen:backing.calls_seen,call_reads:backing.call_reads,call_reads_seen:backing.call_reads_seen,summary_reads:backing.summary_reads,summary_publications:backing.summary_publications,summaries_seen:backing.summaries_seen,summary_reads_seen:backing.summary_reads_seen, ..}; var value=init(tables,true,session.options.max_values); value.empty_call_inputs=session.specializations.validated_calls.count==0; value.serial=session.principal_recordings; let owner=recorder_owners.alloc_index(RecorderOwnerState {value,at as u32,generation,true, ..}); return RecorderOwner {(owner+1) as u32,generation, ..},Error.none; }
 fn borrow(self: RecorderOwner) -> Recorder? { if self.lease==0||self.lease-1>=recorder_owners.len { return null; } let owner: RecorderOwnerState&=recorder_owners[self.lease-1]; if !owner.live||owner.generation!=self.generation { return null; } return owner.value; }
-fn deinit(self: RecorderOwner&) { if self.lease==0 { return; } let at=self.lease-1; assert(at<recorder_owners.len&&recorder_owners[at].live&&recorder_owners[at].generation==self.generation); let owner: RecorderOwnerState&=recorder_owners[at]; owner.value.deinit(); let backing: RecorderBacking&=recorder_backings[owner.backing]; backing.sources.deinit(); release(backing.sources_seen); backing.interfaces.deinit(); release(backing.interfaces_seen); backing.source_units.deinit(); release(backing.source_units_seen); backing.reads.deinit(); release(backing.seen); backing.plain_reads.deinit(); backing.plain_publications.deinit(); release(backing.plain_seen); backing.call_publications.deinit(); release(backing.calls_seen); backing.call_reads.deinit(); release(backing.call_reads_seen); backing.summary_reads.deinit(); backing.summary_publications.deinit(); release(backing.summaries_seen); release(backing.summary_reads_seen); recorder_backings.free(owner.backing); owner.live=false; recorder_owners.free(at); self=RecorderOwner {}; }
+fn deinit(self: RecorderOwner&) { if self.lease==0 { return; } let at=self.lease-1; assert(at<recorder_owners.len&&recorder_owners[at].live&&recorder_owners[at].generation==self.generation); let owner: RecorderOwnerState&=recorder_owners[at]; owner.value.deinit(); let backing: RecorderBacking&=recorder_backings[owner.backing]; backing.sources.deinit(); release(backing.sources_seen); backing.interfaces.deinit(); release(backing.interfaces_seen); backing.source_units.deinit(); release(backing.source_units_seen); backing.reads.deinit(); release(backing.seen); backing.plain_reads.deinit(); backing.plain_publications.deinit(); release(backing.plain_seen); backing.call_publications.deinit(); release(backing.calls_seen); backing.call_reads.deinit(); release(backing.call_reads_seen); backing.summary_reads.deinit(); backing.summary_publications.deinit(); release(backing.summaries_seen); release(backing.summary_reads_seen); recorder_backings.free(owner.backing); owner.live=false; recorder_owners.free(at); self=RecorderOwner {..}; }
 fn failure(self: const Recorder&) -> Error { if self.sources.failure!=Error.none { return self.sources.failure; } if self.interfaces.failure!=Error.none { return self.interfaces.failure; } if self.source_units.failure!=Error.none { return self.source_units.failure; } if self.reads.failure!=Error.none { return self.reads.failure; } if self.plain_reads.failure!=Error.none { return self.plain_reads.failure; } if self.plain_publications.failure!=Error.none { return self.plain_publications.failure; } if self.call_publications.failure!=Error.none { return self.call_publications.failure; } if self.call_reads.failure!=Error.none { return self.call_reads.failure; } if self.summary_reads.failure!=Error.none { return self.summary_reads.failure; } if self.summary_publications.failure!=Error.none { return self.summary_publications.failure; } return Error.none; }

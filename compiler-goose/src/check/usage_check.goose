@@ -15,7 +15,7 @@ struct Work { remaining: i64 = 65536 }
 fn charge(self: Work&, amount: i64) -> Error { if amount > self.remaining { return Error.type_limit; } self.remaining -= amount; return Error.none; }
 struct NominalFact { identity: blot_check_types::NominalIdentity, has_usage: bool }
 struct Memo { safe: dictionary<Id,bool>&, epoch: blot_support::Option<u64> = blot_support::none<u64>(), row_epoch: blot_support::Option<u64> = blot_support::none<u64>(), nominals: NominalFact[>..<]& }
-fn initMemo(safe: dictionary<Id,bool>&, nominals: NominalFact[>..<]&) -> Memo { return Memo { safe, nominals: nominals }; }
+fn initMemo(safe: dictionary<Id,bool>&, nominals: NominalFact[>..<]&) -> Memo { return Memo { safe, nominals: nominals , ..}; }
 fn deinit(self: Memo&) { self.safe.clear(); self.nominals.clear(); }
 enum Mode { affine, any, borrow }
 struct NominalStore<S,N> { store: S, nominals: N, work: Work& }
@@ -47,21 +47,21 @@ fn shape<S,N>(self: const NominalStore<S,N>&, value: blot_check_types::Node) -> 
 fn nominalProperty<S,N>(self: const NominalStore<S,N>&, value: blot_check_types::Node, mode: Mode) -> bool, Error {
     for nominal in self.nominals { let error = self.work.charge(1); if error != Error.none { return false, error; } if nominal.identity.unit == value.a && nominal.identity.decl == value.b { if mode == Mode.any { return nominal.has_usage, Error.none; } return nominal.affine, Error.none; } } return false, Error.none;
 }
-fn nominalShape(store, nominals, node: blot_check_types::Node, work: Work&) -> Error { let context = NominalStore { store, nominals, work }; let error = work.charge(1); if error != Error.none { return error; } return shape(context, node); }
-fn affine(store, root: Id) -> bool, Error { var work = Work {}; let empty: const blot_check_core::Nominal[:] = []; let context = NominalStore { store, empty, work }; return inspectWithMemo(context, root, Mode.affine, work, null); }
-fn borrowed(store, root: Id) -> bool, Error { var work = Work {}; let empty: const blot_check_core::Nominal[:] = []; let context = NominalStore { store, empty, work }; return inspectWithMemo(context, root, Mode.borrow, work, null); }
-fn contains(store, root: Id) -> bool, Error { var work = Work {}; let empty: const blot_check_core::Nominal[:] = []; let context = NominalStore { store, empty, work }; return inspectWithMemo(context, root, Mode.any, work, null); }
-fn affineNominal(store, nominals, root: Id) -> bool, Error { var work = Work {}; return affineNominalWork(store, nominals, root, work); }
-fn affineNominalWork(store, nominals, root: Id, work: Work&) -> bool, Error { let context = NominalStore { store, nominals, work }; return inspectWithMemo(context, root, Mode.affine, work, null); }
-fn containsNominal(store, nominals, root: Id) -> bool, Error { var work = Work {}; return containsNominalWork(store, nominals, root, work); }
-fn containsNominalWork(store, nominals, root: Id, work: Work&) -> bool, Error { let context = NominalStore { store, nominals, work }; return inspectWithMemo(context, root, Mode.any, work, null); }
+fn nominalShape(store, nominals, node: blot_check_types::Node, work: Work&) -> Error { let context = NominalStore { store, nominals, work , ..}; let error = work.charge(1); if error != Error.none { return error; } return shape(context, node); }
+fn affine(store, root: Id) -> bool, Error { var work = Work {..}; let empty: const blot_check_core::Nominal[:] = []; let context = NominalStore { store, empty, work , ..}; return inspectWithMemo(context, root, Mode.affine, work, null); }
+fn borrowed(store, root: Id) -> bool, Error { var work = Work {..}; let empty: const blot_check_core::Nominal[:] = []; let context = NominalStore { store, empty, work , ..}; return inspectWithMemo(context, root, Mode.borrow, work, null); }
+fn contains(store, root: Id) -> bool, Error { var work = Work {..}; let empty: const blot_check_core::Nominal[:] = []; let context = NominalStore { store, empty, work , ..}; return inspectWithMemo(context, root, Mode.any, work, null); }
+fn affineNominal(store, nominals, root: Id) -> bool, Error { var work = Work {..}; return affineNominalWork(store, nominals, root, work); }
+fn affineNominalWork(store, nominals, root: Id, work: Work&) -> bool, Error { let context = NominalStore { store, nominals, work , ..}; return inspectWithMemo(context, root, Mode.affine, work, null); }
+fn containsNominal(store, nominals, root: Id) -> bool, Error { var work = Work {..}; return containsNominalWork(store, nominals, root, work); }
+fn containsNominalWork(store, nominals, root: Id, work: Work&) -> bool, Error { let context = NominalStore { store, nominals, work , ..}; return inspectWithMemo(context, root, Mode.any, work, null); }
 fn containsNominalMemoWork(store: const blot_check_types::Store&, nominals, root: Id, work: Work&, memo: Memo&) -> bool, Error {
     let epoch = store.mutation_epoch; var same_catalog = memo.nominals.len == nominals.len;
     if same_catalog { for prior, index in memo.nominals { let error = work.charge(1); if error != Error.none { return false, error; } let nominal = nominals[index]; if prior.identity != nominal.identity || prior.has_usage != nominal.has_usage { same_catalog = false; break; } } }
     if !memo.epoch.present || memo.epoch.value != epoch || !memo.row_epoch.present || memo.row_epoch.value != store.effects.mutation_epoch || !same_catalog || epoch == 0xffffffffffffffff { memo.safe.clear(); }
     memo.epoch = blot_support::some(epoch); memo.row_epoch = blot_support::some(store.effects.mutation_epoch);
-    if !same_catalog { memo.nominals.clear(); for nominal in nominals { let error = work.charge(1); if error != Error.none { return false, error; } memo.nominals += NominalFact { nominal.identity, nominal.has_usage }; } }
-    let context = NominalStore { store, nominals, work }; if epoch == 0xffffffffffffffff || store.effects.mutation_epoch == 0xffffffffffffffff { return inspectWithMemo(context, root, Mode.any, work, null); } return inspectWithMemo(context, root, Mode.any, work, memo);
+    if !same_catalog { memo.nominals.clear(); for nominal in nominals { let error = work.charge(1); if error != Error.none { return false, error; } memo.nominals += NominalFact { nominal.identity, nominal.has_usage , ..}; } }
+    let context = NominalStore { store, nominals, work , ..}; if epoch == 0xffffffffffffffff || store.effects.mutation_epoch == 0xffffffffffffffff { return inspectWithMemo(context, root, Mode.any, work, null); } return inspectWithMemo(context, root, Mode.any, work, memo);
 }
 struct Pending { ids: Id[4096], slots: u16[8192] = [0; 8192], count: i64 = 0 }
 fn add(self: Pending&, source, raw: Id, budget: Work&, known: Memo?) -> Error {
@@ -72,7 +72,7 @@ fn add(self: Pending&, source, raw: Id, budget: Work&, known: Memo?) -> Error {
     if self.count == self.ids.len { return Error.type_limit; } self.ids[self.count] = id; self.count += 1; self.slots[slot] = self.count as u16; return Error.none;
 }
 fn inspectWithMemo(store, root: Id, mode: Mode, work: Work&, memo: Memo?) -> bool, Error {
-    var pending = Pending {}; let error = pending.add(store, root, work, memo); if error != Error.none { return false, error; } var next: i64 = 0;
+    var pending = Pending {..}; let error = pending.add(store, root, work, memo); if error != Error.none { return false, error; } var next: i64 = 0;
     while next != pending.count { let error = work.charge(1); if error != Error.none { return false, error; } let id = pending.ids[next]; next += 1; let node = store.node(id);
         let error = store.shape(node); if error != Error.none { return false, error; }
         if mode != Mode.borrow && node.tag == Tag.nominal { let property, error = store.nominalProperty(node, mode); if error != Error.none { return false, error; } if property { return true, Error.none; } }
@@ -84,7 +84,7 @@ fn inspectWithMemo(store, root: Id, mode: Mode, work: Work&, memo: Memo?) -> boo
         var child: Id[1] = [node.a]; var edges: const Id[:] = [];
         match node.tag {
             Tag.usage, Tag.array, Tag.list, Tag.cursor, Tag.forall, Tag.existential => { edges = child; },
-            Tag.product => { edges = store.list(blot_check_types::List { node.a, node.b }); },
+            Tag.product => { edges = store.list(blot_check_types::List { node.a, node.b , ..}); },
             Tag.nominal, Tag.projection => { edges = store.nominalArguments(node); },
             Tag.function => { if mode == Mode.any { let error = pending.add(store, node.a, work, memo); if error != Error.none { return false, error; } let error = pending.add(store, node.b, work, memo); if error != Error.none { return false, error; } } },
             Tag.record => { for index in 0..node.b { let error = work.charge(1); if error != Error.none { return false, error; } let error = pending.add(store, store.recordField(node, index).ty, work, memo); if error != Error.none { return false, error; } } },
@@ -104,7 +104,7 @@ fn restore<E>(self: Walker<E>&, states: const State[:]) { self.states.resize(sta
 fn state<E>(self: Walker<E>&, binding: u32) -> State? { for &entry in self.states { if entry.binding == binding { return entry; } } return null; }
 fn introduce<E>(self: Walker<E>&, binding: u32) -> Error {
     if binding == 0 || self.state(binding) != null { return Error.none; } let affine, error = affineNominal(self.engine.types, self.engine.nominals, self.engine.bindings[binding].ty); if error != Error.none { return error; } if !affine { return Error.none; }
-    if self.states.len == 4096 { return Error.type_limit; } self.states += State { binding }; return Error.none;
+    if self.states.len == 4096 { return Error.type_limit; } self.states += State { binding , ..}; return Error.none;
 }
 fn use<E>(self: Walker<E>&, binding: u32, source: AstId) -> Error {
     if binding == 0 { return Error.none; } let affine, error = affineNominal(self.engine.types, self.engine.nominals, self.engine.bindings[binding].ty); if error != Error.none { return error; } if !affine { return Error.none; }
@@ -121,7 +121,7 @@ recursive fn suite<E>(self: Walker<E>&, source: AstId, depth: i64) -> Outcome, E
 }
 fn block<E>(self: Walker<E>&, source: AstId, depth: i64) -> Outcome, Error {
     var joined: State[>..] = []; let error = snapshot(self, joined); if error != Error.none { return Outcome.live, error; }
-    var frame = ExitFrame { joined }; let outer = self.returns; self.returns .= frame; let flow, error = suite(self, source, depth + 1); self.returns .= outer; if error != Error.none { return flow, error; } self.states.resize(joined.len);
+    var frame = ExitFrame { joined , ..}; let outer = self.returns; self.returns .= frame; let flow, error = suite(self, source, depth + 1); self.returns .= outer; if error != Error.none { return flow, error; } self.states.resize(joined.len);
     if frame.seen { if flow == Outcome.exit { restore(self, joined); } else { for &entry, index in self.states { if entry.first == 0 { entry.first = joined[index].first; } } } return Outcome.live, Error.none; } return flow, Error.none;
 }
 fn integer<E>(self: Walker<E>&, source: AstId) -> blot_support::Option<u32> {
@@ -158,10 +158,10 @@ fn captureChildren<E>(self: Walker<E>&, source: AstId, output: AstId[>..]&) {
         blot_parse_ast::tag_product, blot_parse_ast::tag_record, blot_parse_ast::tag_array, blot_parse_ast::tag_block => { output += self.engine.tree.children(source); },
         blot_parse_ast::tag_let_stmt => { let binding = self.engine.tree.binding(source); output += binding.value; if binding.fallback != 0 { output += binding.fallback; } },
         blot_parse_ast::tag_use_stmt, blot_parse_ast::tag_iterator_bind => { output += node.b; },
-        blot_parse_ast::tag_infix_chain => { output += node.a; output += self.engine.tree.list(blot_parse_ast::List { node.b, node.c }); },
+        blot_parse_ast::tag_infix_chain => { output += node.a; output += self.engine.tree.list(blot_parse_ast::List { node.b, node.c , ..}); },
         blot_parse_ast::tag_case_expr => {
-            let inputs = self.engine.tree.extra.items[node.a..node.a + 2]; output += self.engine.tree.list(blot_parse_ast::List { inputs[0], inputs[1] });
-            for arm in self.engine.tree.list(blot_parse_ast::List { node.b, node.c }) { let start = self.engine.tree.node(arm).c; let details = self.engine.tree.extra.items[start..start + 2]; if details[0] != 0 { output += details[0]; } output += details[1]; }
+            let inputs = self.engine.tree.extra.items[node.a..node.a + 2]; output += self.engine.tree.list(blot_parse_ast::List { inputs[0], inputs[1] , ..});
+            for arm in self.engine.tree.list(blot_parse_ast::List { node.b, node.c , ..}) { let start = self.engine.tree.node(arm).c; let details = self.engine.tree.extra.items[start..start + 2]; if details[0] != 0 { output += details[0]; } output += details[1]; }
         },
         blot_parse_ast::tag_if_let_stmt => { output += node.b; for body in self.engine.tree.extra.items[node.c..node.c + 2] { if body != 0 { output += body; } } },
         blot_parse_ast::tag_for_stmt => { output += node.b; let end = self.engine.tree.extra.items[node.c]; if end != 0 { output += end; } output += self.engine.tree.extra.items[node.c + 1]; },
@@ -194,10 +194,10 @@ fn branches<E>(self: Walker<E>&, left: AstId, right: AstId, suites: bool, depth:
     if left_flow == Outcome.exit && right_flow == Outcome.exit { return Outcome.exit, Error.none; } return Outcome.live, Error.none;
 }
 fn cases<E>(self: Walker<E>&, node: blot_parse_ast::Node, depth: i64) -> Outcome, Error {
-    let inputs = self.engine.tree.extra.items[node.a..node.a + 2]; for input in self.engine.tree.list(blot_parse_ast::List { inputs[0], inputs[1] }) { let flow, error = expression(self, input, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } }
+    let inputs = self.engine.tree.extra.items[node.a..node.a + 2]; for input in self.engine.tree.list(blot_parse_ast::List { inputs[0], inputs[1] , ..}) { let flow, error = expression(self, input, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } }
     var before: State[>..] = []; let error = snapshot(self, before); if error != Error.none { return Outcome.live, error; } var joined: State[>..] = []; let error = snapshot(self, joined); if error != Error.none { return Outcome.live, error; } var live = false;
-    for arm_id in self.engine.tree.list(blot_parse_ast::List { node.b, node.c }) { restore(self, before); let arm = self.engine.tree.node(arm_id);
-        for row in self.engine.tree.list(blot_parse_ast::List { arm.a, arm.b }) { for pattern_id in self.engine.tree.children(row) { let error = pattern(self, pattern_id, depth + 1); if error != Error.none { return Outcome.live, error; } } }
+    for arm_id in self.engine.tree.list(blot_parse_ast::List { node.b, node.c , ..}) { restore(self, before); let arm = self.engine.tree.node(arm_id);
+        for row in self.engine.tree.list(blot_parse_ast::List { arm.a, arm.b , ..}) { for pattern_id in self.engine.tree.children(row) { let error = pattern(self, pattern_id, depth + 1); if error != Error.none { return Outcome.live, error; } } }
         let details = self.engine.tree.extra.items[arm.c..arm.c + 2];
         if details[0] != 0 { let flow, error = expression(self, details[0], depth + 1); if error != Error.none { return flow, error; } if flow == Outcome.exit { self.states.resize(before.len); continue; }
             for &entry, index in before { if entry.first == 0 { entry.first = self.states[index].first; } }
@@ -277,7 +277,7 @@ recursive fn expression<E>(self: Walker<E>&, source: AstId, depth: i64) -> Outco
         blot_parse_ast::tag_binary => { let flow, error = expression(self, node.b, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } let flow, error = expression(self, node.c, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } },
         blot_parse_ast::tag_apply, blot_parse_ast::tag_index_access => { return application(self, source, depth); },
         blot_parse_ast::tag_case_expr => { return cases(self, node, depth + 1); },
-        blot_parse_ast::tag_infix_chain => { let flow, error = expression(self, node.a, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } for tail in self.engine.tree.list(blot_parse_ast::List { node.b, node.c }) { let flow, error = expression(self, tail, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } } },
+        blot_parse_ast::tag_infix_chain => { let flow, error = expression(self, node.a, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } for tail in self.engine.tree.list(blot_parse_ast::List { node.b, node.c , ..}) { let flow, error = expression(self, tail, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } } },
         blot_parse_ast::tag_if_let_stmt => {
             let flow, error = expression(self, node.b, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } let before = self.states.len;
             let error = pattern(self, node.a, depth + 1); if error != Error.none { return Outcome.live, error; } let bodies = self.engine.tree.extra.items[node.c..node.c + 2];
@@ -285,7 +285,7 @@ recursive fn expression<E>(self: Walker<E>&, source: AstId, depth: i64) -> Outco
         },
         blot_parse_ast::tag_request_case => {
             var prior: State[>..] = []; let error = snapshot(self, prior); if error != Error.none { return Outcome.live, error; }
-            for arm_id in self.engine.tree.list(blot_parse_ast::List { node.b, node.c }) { restore(self, prior); let arm = self.engine.tree.node(arm_id); if arm.b != 0 { let error = pattern(self, arm.b, depth + 1); if error != Error.none { return Outcome.live, error; } }
+            for arm_id in self.engine.tree.list(blot_parse_ast::List { node.b, node.c , ..}) { restore(self, prior); let arm = self.engine.tree.node(arm_id); if arm.b != 0 { let error = pattern(self, arm.b, depth + 1); if error != Error.none { return Outcome.live, error; } }
                 let flow, error = suite(self, arm.c, depth + 1); if error != Error.none { return flow, error; } self.states.resize(prior.len);
                 for after, index in self.states { let before = prior[index]; if after.first != before.first || after.loan != before.loan { let error = self.engine.usageDiagnostic(blot_check_check::Code.multiplicity_unknown, arm_id); if error != Error.none { return Outcome.live, error; } } }
             } restore(self, prior);
@@ -336,7 +336,7 @@ fn loopExpression<E>(self: Walker<E>&, source: AstId, depth: i64) -> Outcome, Er
     if node.tag == blot_parse_ast::tag_for_stmt { let end = self.engine.tree.extra.items[node.c]; if end != 0 { let flow, error = expression(self, end, depth + 1); if error != Error.none || flow == Outcome.exit { return flow, error; } } }
     var single = false; if node.tag == blot_parse_ast::tag_range_stmt { single = singleIteration(self, node.a, node.b); } if node.tag == blot_parse_ast::tag_for_stmt { single = singleIteration(self, node.b, self.engine.tree.extra.items[node.c]); }
     var prior: State[>..] = []; let error = snapshot(self, prior); if error != Error.none { return Outcome.live, error; } var exits: State[>..] = []; let error = snapshot(self, exits); if error != Error.none { return Outcome.live, error; }
-    var frame = ExitFrame { exits }; let outer = self.breaks; self.breaks .= frame; let flow, error = loopBody(self, source, node, prior, frame, single, depth); self.breaks .= outer; if error != Error.none { return flow, error; } restore(self, exits);
+    var frame = ExitFrame { exits , ..}; let outer = self.breaks; self.breaks .= frame; let flow, error = loopBody(self, source, node, prior, frame, single, depth); self.breaks .= outer; if error != Error.none { return flow, error; } restore(self, exits);
     if (node.tag == blot_parse_ast::tag_forever_stmt || single) && !frame.seen { return Outcome.exit, Error.none; } return Outcome.live, Error.none;
 }
 fn loopBody<E>(self: Walker<E>&, source: AstId, node: blot_parse_ast::Node, prior: const State[:], frame: ExitFrame&, single: bool, depth: i64) -> Outcome, Error {
@@ -347,7 +347,7 @@ fn loopBody<E>(self: Walker<E>&, source: AstId, node: blot_parse_ast::Node, prio
     if flow == Outcome.live && single { record(self, frame); } return flow, Error.none;
 }
 fn validate<E>(engine: E) -> Error {
-    var states: State[>..<] = []; var walker = Walker<E> { engine, states: states, task_views: engine.pool.lookup("@task.read").present || engine.pool.lookup("@task.write").present };
+    var states: State[>..<] = []; var walker = Walker<E> { engine, states: states, task_views: engine.pool.lookup("@task.read").present || engine.pool.lookup("@task.write").present , ..};
     for root in engine.tree.roots.items { if engine.tree.node(root).tag != blot_parse_ast::tag_value_decl { continue; } walker.states.clear(); walker.remaining = 65536; let binding = engine.resolved[root]; let body = engine.tree.value_decl(root).body;
         if binding != 0 && blot_check_cleanup_contracts::pureNominal(engine.types, engine.nominals, engine.bindings[binding].ty) && !blot_check_cleanup_contracts::source(engine, body) { let error = engine.usageDiagnostic(blot_check_check::Code.cleanup_not_safe, body); if error != Error.none { return error; } }
         let flow, error = expression(walker, body, 0); if error == Error.type_limit { let error = engine.usageDiagnostic(blot_check_check::Code.usage_analysis_limit, root); if error != Error.none { return error; } continue; } if error != Error.none { return error; }
@@ -394,7 +394,7 @@ fn blot_structural::hash<S>(sink: S&, value: blot_check_usage_check::Mode) { blo
 import support.pooled_buffer;
 import support.pooled_map;
 import dictionary;
-struct PooledMemo {safe:blot_support_pooled_map::Map<Id,bool> = blot_support_pooled_map::Map<Id,bool>{},epoch:blot_support::Option<u64> = blot_support::none<u64>(),row_epoch:blot_support::Option<u64> = blot_support::none<u64>(),nominals:blot_support_pooled_buffer::Buffer<NominalFact> = blot_support_pooled_buffer::Buffer<NominalFact>{}}
+struct PooledMemo {safe:blot_support_pooled_map::Map<Id,bool> = blot_support_pooled_map::Map<Id,bool>{..},epoch:blot_support::Option<u64> = blot_support::none<u64>(),row_epoch:blot_support::Option<u64> = blot_support::none<u64>(),nominals:blot_support_pooled_buffer::Buffer<NominalFact> = blot_support_pooled_buffer::Buffer<NominalFact>{..}}
 reusable[] var pooled_safe_slots:dictionary_slot<Id,bool>[>..];
 reusable[] var pooled_nominal_facts:NominalFact[>..];
 fn deinit(self:PooledMemo&) {blot_support_pooled_map::deinit(self.safe,pooled_safe_slots);blot_support_pooled_buffer::deinit(self.nominals,pooled_nominal_facts);}
@@ -403,8 +403,8 @@ fn containsNominalMemoWork(store: const blot_check_types::Store&, nominals, root
     if same_catalog { for prior, index in memo.nominals.items { let error = work.charge(1); if error != Error.none { return false, error; } let nominal = nominals[index]; if prior.identity != nominal.identity || prior.has_usage != nominal.has_usage { same_catalog = false; break; } } }
     if !memo.epoch.present || memo.epoch.value != epoch || !memo.row_epoch.present || memo.row_epoch.value != store.effects.mutation_epoch || !same_catalog || epoch == 0xffffffffffffffff { memo.safe.clear(); }
     memo.epoch = blot_support::some(epoch); memo.row_epoch = blot_support::some(store.effects.mutation_epoch);
-    if !same_catalog { memo.nominals.clear(); for nominal in nominals { let error = work.charge(1); if error != Error.none { return false, error; } let append_error=blot_support_pooled_buffer::push(memo.nominals,NominalFact { nominal.identity, nominal.has_usage },pooled_nominal_facts); if append_error!=Error.none {return false,append_error;} } }
-    let context = NominalStore { store, nominals, work }; if epoch == 0xffffffffffffffff || store.effects.mutation_epoch == 0xffffffffffffffff { return inspectWithPooledMemo(context, root, Mode.any, work, null); } return inspectWithPooledMemo(context, root, Mode.any, work, memo);
+    if !same_catalog { memo.nominals.clear(); for nominal in nominals { let error = work.charge(1); if error != Error.none { return false, error; } let append_error=blot_support_pooled_buffer::push(memo.nominals,NominalFact { nominal.identity, nominal.has_usage , ..},pooled_nominal_facts); if append_error!=Error.none {return false,append_error;} } }
+    let context = NominalStore { store, nominals, work , ..}; if epoch == 0xffffffffffffffff || store.effects.mutation_epoch == 0xffffffffffffffff { return inspectWithPooledMemo(context, root, Mode.any, work, null); } return inspectWithPooledMemo(context, root, Mode.any, work, memo);
 }
 fn addPooled(self: Pending&, source, raw: Id, budget: Work&, known: PooledMemo?) -> Error {
     if !source.valid(raw) { return Error.type_limit; } let id = source.head(raw, 0); if !source.valid(id) { return Error.type_limit; }
@@ -414,7 +414,7 @@ fn addPooled(self: Pending&, source, raw: Id, budget: Work&, known: PooledMemo?)
     if self.count == self.ids.len { return Error.type_limit; } self.ids[self.count] = id; self.count += 1; self.slots[slot] = self.count as u16; return Error.none;
 }
 fn inspectWithPooledMemo(store, root: Id, mode: Mode, work: Work&, memo: PooledMemo?) -> bool, Error {
-    var pending = Pending {}; let error = pending.addPooled(store, root, work, memo); if error != Error.none { return false, error; } var next: i64 = 0;
+    var pending = Pending {..}; let error = pending.addPooled(store, root, work, memo); if error != Error.none { return false, error; } var next: i64 = 0;
     while next != pending.count { let error = work.charge(1); if error != Error.none { return false, error; } let id = pending.ids[next]; next += 1; let node = store.node(id);
         let error = store.shape(node); if error != Error.none { return false, error; }
         if mode != Mode.borrow && node.tag == Tag.nominal { let property, error = store.nominalProperty(node, mode); if error != Error.none { return false, error; } if property { return true, Error.none; } }
@@ -426,7 +426,7 @@ fn inspectWithPooledMemo(store, root: Id, mode: Mode, work: Work&, memo: PooledM
         var child: Id[1] = [node.a]; var edges: const Id[:] = [];
         match node.tag {
             Tag.usage, Tag.array, Tag.list, Tag.cursor, Tag.forall, Tag.existential => { edges = child; },
-            Tag.product => { edges = store.list(blot_check_types::List { node.a, node.b }); },
+            Tag.product => { edges = store.list(blot_check_types::List { node.a, node.b , ..}); },
             Tag.nominal, Tag.projection => { edges = store.nominalArguments(node); },
             Tag.function => { if mode == Mode.any { let error = pending.addPooled(store, node.a, work, memo); if error != Error.none { return false, error; } let error = pending.addPooled(store, node.b, work, memo); if error != Error.none { return false, error; } } },
             Tag.record => { for index in 0..node.b { let error = work.charge(1); if error != Error.none { return false, error; } let error = pending.addPooled(store, store.recordField(node, index).ty, work, memo); if error != Error.none { return false, error; } } },

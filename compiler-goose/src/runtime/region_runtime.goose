@@ -38,12 +38,12 @@ fn valid(self: Prepared, module: const Module&) -> bool {
     let reference = blot_backend_runtime_ir::ROLE_reference; let scalar = blot_backend_runtime_ir::ROLE_scalar;
     let reference_pair = blot_backend_runtime_ir::packParameterRoles([reference, reference]);
     let contracts = [
-        Contract { self.runtime.allocate, [], i32, reference, 0 },
-        Contract { self.runtime.project, [i32, i32], i32, reference, reference_pair },
-        Contract { self.runtime.store, [i32, i32, i32], none, scalar, blot_backend_runtime_ir::packParameterRoles([scalar, reference, reference]) },
-        Contract { self.runtime.close, [i32, i32], none, scalar, reference_pair },
-        Contract { self.runtime.frame_allocate, [i32], i32, reference, blot_backend_runtime_ir::packParameterRoles([scalar]) },
-        Contract { self.runtime.member_at, [i32, i32], i32, reference, blot_backend_runtime_ir::packParameterRoles([reference, scalar]) },
+        Contract { self.runtime.allocate, [], i32, reference, 0 , ..},
+        Contract { self.runtime.project, [i32, i32], i32, reference, reference_pair , ..},
+        Contract { self.runtime.store, [i32, i32, i32], none, scalar, blot_backend_runtime_ir::packParameterRoles([scalar, reference, reference]) , ..},
+        Contract { self.runtime.close, [i32, i32], none, scalar, reference_pair , ..},
+        Contract { self.runtime.frame_allocate, [i32], i32, reference, blot_backend_runtime_ir::packParameterRoles([scalar]) , ..},
+        Contract { self.runtime.member_at, [i32, i32], i32, reference, blot_backend_runtime_ir::packParameterRoles([reference, scalar]) , ..},
     ];
     for contract, at in contracts {
         if contract.id >= module.functions.len { return false; }
@@ -71,7 +71,7 @@ fn complete(c: Code&, arena: Arena) {
 }
 fn owner(c: Code&, arena: Arena, plan: Plan, value: Local) -> Local {
     complete(c, arena); c.value(value); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.trap();
-    if c.failure != Error.none { return Local {}; }
+    if c.failure != Error.none { return Local {..}; }
     let head, error = blot_runtime_shared_rc::checkedHead(c.code, value); c.failure = error;
     c.value(head); c.load(blot_runtime_runtime_layout::ArenaHeader_flags); c.value(flag); c.op(blot_backend_runtime_ir::OP_i32_and); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.trap();
     c.value(head); c.load(blot_runtime_runtime_layout::ArenaHeader_flags); c.value(blot_runtime_shared_rc::dead | blot_runtime_shared_rc::resource_owner); c.op(blot_backend_runtime_ir::OP_i32_and); c.trap();
@@ -87,7 +87,7 @@ fn emitAllocate(c: Code&, arena: Arena, plan: Plan) -> Error {
     c.value(value); return c.failure;
 }
 fn emitProject(c: Code&, arena: Arena, plan: Plan) -> Error {
-    let value = Local { 0 }; let parent = Local { 1 }; let checked = owner(c, arena, plan, parent);
+    let value = Local { 0 , ..}; let parent = Local { 1 , ..}; let checked = owner(c, arena, plan, parent);
     for member in plan.members { c.value(value); c.value(parent); c.value(member.offset); c.op(blot_backend_runtime_ir::OP_i32_add); c.op(blot_backend_runtime_ir::OP_i32_eq); c.when(); c.value(parent); c.ret(); c.end(); }
     c.value(value); c.value(parent); c.value(plan.frame_bytes); c.op(blot_backend_runtime_ir::OP_i32_add); c.op(blot_backend_runtime_ir::OP_i32_ge_u); c.value(value); c.value(parent); c.value(plan.bytes); c.op(blot_backend_runtime_ir::OP_i32_add); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.op(blot_backend_runtime_ir::OP_i32_and); c.trap();
     c.value(value); return c.failure;
@@ -101,7 +101,7 @@ fn allocateFunctions(module: Module&) -> Runtime, Error {
         let id, error = module.addTypedFunction(parameters[..counts[index]], results[index], roles[index]);
         if error != Error.none { return default<Runtime>(), error; } ids[index] = id;
     }
-    return Runtime { ids[0], ids[1], ids[2], ids[3], ids[4], ids[5] }, Error.none;
+    return Runtime { ids[0], ids[1], ids[2], ids[3], ids[4], ids[5] , ..}, Error.none;
 }
 fn install(module: Module&, plan: Plan) -> Runtime, Error {
     if !plan.valid() { return default<Runtime>(), Error.invalid_region; }
@@ -114,17 +114,17 @@ fn install(module: Module&, plan: Plan) -> Runtime, Error {
     { let propagated_error = module.setParameterRoles(result.close, blot_backend_runtime_ir::packParameterRoles([reference, reference])); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
     { let propagated_error = module.setParameterRoles(result.frame_allocate, blot_backend_runtime_ir::packParameterRoles([scalar])); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
     { let propagated_error = module.setParameterRoles(result.member_at, blot_backend_runtime_ir::packParameterRoles([reference, scalar])); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
-    var frame = blot_emitter::init(module, result.frame_allocate); let frame_bytes = Local { 0 };
+    var frame = blot_emitter::init(module, result.frame_allocate); let frame_bytes = Local { 0 , ..};
     frame.value(frame_bytes); frame.value(plan.frame_bytes); frame.op(blot_backend_runtime_ir::OP_i32_ne); frame.trap(); frame.call(result.allocate);
     { let propagated_error = frame.failure; if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
-    var member = blot_emitter::init(module, result.member_at); let parent = Local { 0 }; let offset = Local { 1 };
+    var member = blot_emitter::init(module, result.member_at); let parent = Local { 0 , ..}; let offset = Local { 1 , ..};
     let checked = owner(member, arena, plan, parent); let matched = member.temp();
     for entry in plan.members { member.value(matched); member.value(offset); member.value(entry.offset); member.op(blot_backend_runtime_ir::OP_i32_eq); member.op(blot_backend_runtime_ir::OP_i32_or); member.set(matched); }
     member.value(matched); member.op(blot_backend_runtime_ir::OP_i32_eqz); member.trap(); member.value(parent); member.value(offset); member.op(blot_backend_runtime_ir::OP_i32_add);
     { let propagated_error = member.failure; if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
     var allocation = blot_emitter::init(module, result.allocate); { let propagated_error = emitAllocate(allocation, arena, plan); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
     var projection = blot_emitter::init(module, result.project); { let propagated_error = emitProject(projection, arena, plan); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
-    var store = blot_emitter::init(module, result.store); let target = Local { 0 }; let value = Local { 1 }; let value_owner = Local { 2 };
+    var store = blot_emitter::init(module, result.store); let target = Local { 0 , ..}; let value = Local { 1 , ..}; let value_owner = Local { 2 , ..};
     store.value(target); store.value(value); store.value(value_owner); store.call(result.project); store.call(arena.root_store); { let propagated_error = store.failure; if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }
     var close = blot_emitter::init(module, result.close);
     close.value(target); close.value(value); close.call(result.project); close.call(arena.root_close); { let propagated_error = close.failure; if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }

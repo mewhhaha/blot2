@@ -39,7 +39,7 @@ recursive fn render<C>(context: C&, bytes: u8[>..<]&, ty: u32, depth: i64, budge
             for index in 0..node.c {
                 if budget == 0 { { let propagated_error = text(context, bytes, "..."); if propagated_error != Error.none { return propagated_error; } } break; }
                 if index != 0 { { let propagated_error = text(context, bytes, ", "); if propagated_error != Error.none { return propagated_error; } } }
-                let binder = context.types.list(blot_check_types::List { node.b, node.c })[index];
+                let binder = context.types.list(blot_check_types::List { node.b, node.c , ..})[index];
                 { let propagated_error = render(context, bytes, binder, depth + 1, budget, stable); if propagated_error != Error.none { return propagated_error; } }
             }
             { let propagated_error = text(context, bytes, "] => "); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = render(context, bytes, node.a, depth + 1, budget, stable); if propagated_error != Error.none { return propagated_error; } }
@@ -96,7 +96,7 @@ recursive fn render<C>(context: C&, bytes: u8[>..<]&, ty: u32, depth: i64, budge
             { let propagated_error = text(context, bytes, "("); if propagated_error != Error.none { return propagated_error; } }
             for index in 0..node.b {
                 if budget == 0 { { let propagated_error = text(context, bytes, ", ..."); if propagated_error != Error.none { return propagated_error; } } break; }
-                let child = context.types.list(blot_check_types::List { node.a, node.b })[index];
+                let child = context.types.list(blot_check_types::List { node.a, node.b , ..})[index];
                 if index != 0 { { let propagated_error = text(context, bytes, ", "); if propagated_error != Error.none { return propagated_error; } } }
                 { let propagated_error = render(context, bytes, child, depth + 1, budget, stable); if propagated_error != Error.none { return propagated_error; } }
             }

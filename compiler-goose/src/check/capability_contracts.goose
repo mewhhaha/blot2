@@ -59,7 +59,7 @@ recursive fn parameterDepth(self: View, root: Id, remaining: i64&, depth: i64) -
     }
 }
 fn validate(self: View, root: Id, arity: u32, portable: bool) -> Error {
-    if self.nodes.len == 0 || self.nodes.len > 4096 || self.words.len > 65536 || root >= self.nodes.len || arity > 16 || self.nodes[0] != Term { Tag.empty } { return Error.invalid_capability_contract; }
+    if self.nodes.len == 0 || self.nodes.len > 4096 || self.words.len > 65536 || root >= self.nodes.len || arity > 16 || self.nodes[0] != Term { Tag.empty , ..} { return Error.invalid_capability_contract; }
     var visits: i64 = 0; var depths: u8[4096] = [0; 4096]; var roles: u8[65536] = [0; 65536];
     for node, index in self.nodes { visits += 1; if visits > 65536 { return Error.capability_analysis_limit; }
         match node.tag {
@@ -100,31 +100,31 @@ recursive fn boundScopes(self: View, root: Id, arity: u32, callable_arity: u32, 
 }
 struct Recipe { arity: u32, root: Id, nodes: const Term[:], words: const u32[:] }
 struct Owned { arity: u32, root: Id, nodes: const Term[:] = [], words: const u32[:] = [] }
-fn view(self: Recipe) -> View { return View { self.nodes, self.words }; }
-fn view(self: Owned) -> View { return View { self.nodes, self.words }; }
-fn clone(self: Owned, nodes: Term[>..]&, words: u32[>..]&) -> Owned, Error { let first = nodes.len; let second = words.len; nodes += self.nodes; words += self.words; return Owned { self.arity, self.root, nodes[first..], words[second..] }, Error.none; }
+fn view(self: Recipe) -> View { return View { self.nodes, self.words , ..}; }
+fn view(self: Owned) -> View { return View { self.nodes, self.words , ..}; }
+fn clone(self: Owned, nodes: Term[>..]&, words: u32[>..]&) -> Owned, Error { let first = nodes.len; let second = words.len; nodes += self.nodes; words += self.words; return Owned { self.arity, self.root, nodes[first..], words[second..] , ..}, Error.none; }
 fn deinit(self: Owned&) { self.nodes = []; self.words = []; }
 struct Mark { nodes: i64, words: i64, visits: i64 }
 struct Store {
- nodes: TermBuffer& = inactive_terms, words: WordBuffer& = inactive_words, limits: Limits = Limits {}, visits: i64 = 0,
+ nodes: TermBuffer& = inactive_terms, words: WordBuffer& = inactive_words, limits: Limits = Limits {..}, visits: i64 = 0,
     budget: blot_check_logical_scratch_budget::Budget? = null,
-    node_allocation: blot_check_logical_scratch_budget::ArrayBlock = blot_check_logical_scratch_budget::ArrayBlock {element_size:16,alignment:4},
-    word_allocation: blot_check_logical_scratch_budget::ArrayBlock = blot_check_logical_scratch_budget::ArrayBlock {element_size:4,alignment:4}, lease:u32=0,generation:u64=0 }
+    node_allocation: blot_check_logical_scratch_budget::ArrayBlock = blot_check_logical_scratch_budget::ArrayBlock {element_size:16,alignment:4, ..},
+    word_allocation: blot_check_logical_scratch_budget::ArrayBlock = blot_check_logical_scratch_budget::ArrayBlock {element_size:4,alignment:4, ..}, lease:u32=0,generation:u64=0 }
 
-fn mark(self: const Store&) -> Mark { return Mark { self.nodes.len, self.words.len, self.visits }; }
+fn mark(self: const Store&) -> Mark { return Mark { self.nodes.len, self.words.len, self.visits , ..}; }
 fn rollback(self: Store&, checkpoint: Mark) { self.nodes.resize(checkpoint.nodes); self.words.resize(checkpoint.words); self.visits = checkpoint.visits; }
-fn deinit(self: Store&) { if self.lease==0 {return;}assert(valid(self));self.nodes.deinit();self.words.deinit();let index=self.lease-1;store_states[index].live=false;store_states.free(index);self=Store{}; }
-fn view(self: const Store&) -> View { return View { self.nodes.items[:], self.words.items[:] }; }
+fn deinit(self: Store&) { if self.lease==0 {return;}assert(valid(self));self.nodes.deinit();self.words.deinit();let index=self.lease-1;store_states[index].live=false;store_states.free(index);self=Store{..}; }
+fn view(self: const Store&) -> View { return View { self.nodes.items[:], self.words.items[:] , ..}; }
 fn visit(self: Store&, depth: i64) -> Error { if depth >= self.limits.depth || self.visits >= self.limits.visits { return Error.capability_analysis_limit; } self.visits += 1; return Error.none; }
 fn append(self: Store&, term: Term) -> Id, Error {
-    let before = mark(self); if self.nodes.len == 0 { let error = ensureNodes(self,1); if error != Error.none { return 0,error; } self.nodes.push(Term { Tag.empty }); } for known, index in self.nodes.items { if known == term { return index as u32, Error.none; } }
+    let before = mark(self); if self.nodes.len == 0 { let error = ensureNodes(self,1); if error != Error.none { return 0,error; } self.nodes.push(Term { Tag.empty , ..}); } for known, index in self.nodes.items { if known == term { return index as u32, Error.none; } }
     if self.nodes.len >= self.limits.nodes { rollback(self, before); return 0, Error.capability_analysis_limit; } let id = self.nodes.len as u32; let error = ensureNodes(self,self.nodes.len+1); if error != Error.none { rollback(self,before); return 0,error; } self.nodes.push(term); return id, Error.none;
 }
 fn aggregate(self: Store&, tag: Tag, children: const u32[:]) -> Id, Error {
     let before = mark(self); if tag != Tag.product && tag != Tag.record && tag != Tag.captures && tag != Tag.join { return 0, Error.invalid_capability_contract; }
     var room: i64 = 0; if self.words.len < self.limits.words { room = self.limits.words - self.words.len; } if children.len > room { return 0, Error.capability_analysis_limit; }
     for node, index in self.nodes.items { if node.tag == tag && node.b == children.len && self.view().children(node) == children { return index as u32, Error.none; } }
-    let start = self.words.len as u32; let growth = ensureWords(self,self.words.len+children.len); if growth != Error.none { return 0,growth; } self.words.append(children); let id, error = append(self, Term { tag, start, children.len as u32 }); if error != Error.none { rollback(self, before); } return id, error;
+    let start = self.words.len as u32; let growth = ensureWords(self,self.words.len+children.len); if growth != Error.none { return 0,growth; } self.words.append(children); let id, error = append(self, Term { tag, start, children.len as u32 , ..}); if error != Error.none { rollback(self, before); } return id, error;
 }
 fn project(self: Store&, base: Id, selector: u32, kind: Projection) -> Id, Error { let before = mark(self); let id, error = projectDepth(self, base, selector, kind, 0); if error != Error.none { rollback(self, before); } return id, error; }
 recursive fn projectDepth(self: Store&, base: Id, selector: u32, kind: Projection, depth: i64) -> Id, Error {
@@ -134,19 +134,19 @@ recursive fn projectDepth(self: Store&, base: Id, selector: u32, kind: Projectio
     if kind == Projection.payload && term.tag == Tag.wrapped { return term.a, Error.none; }
     if kind == Projection.index && term.tag == Tag.product { if selector >= term.b { return 0, Error.invalid_capability_contract; } return self.words.items[term.a + selector], Error.none; }
     if kind == Projection.field && term.tag == Tag.record { for field in 0..term.b / 2 { if self.words.items[term.a + field * 2] == selector { return self.words.items[term.a + field * 2 + 1], Error.none; } } return 0, Error.invalid_capability_contract; }
-    return append(self, Term { Tag.project, base, selector, projectionCode(kind) });
+    return append(self, Term { Tag.project, base, selector, projectionCode(kind) , ..});
 }
 fn elements(self: Store&, base: Id) -> Id, Error { let before = mark(self); let id, error = elementsDepth(self, base, 0); if error != Error.none { rollback(self, before); } return id, error; }
 recursive fn elementsDepth(self: Store&, base: Id, depth: i64) -> Id, Error {
     let error = visit(self, depth); if error != Error.none { return 0, error; } if base >= self.nodes.len { return 0, Error.invalid_capability_contract; } let term = self.nodes.items[base]; if term.tag == Tag.empty || term.tag == Tag.unknown { return base, Error.none; }
     if term.tag == Tag.product || term.tag == Tag.join { var children: Id[4096]; if term.b > children.len { return 0, Error.capability_analysis_limit; } for index in 0..term.b { let child = self.words.items[term.a + index]; children[index] = child; if term.tag == Tag.join { let id, error = elementsDepth(self, child, depth + 1); if error != Error.none { return 0, error; } children[index] = id; } } return aggregate(self, Tag.join, children[..term.b]); }
-    return append(self, Term { Tag.elements, base });
+    return append(self, Term { Tag.elements, base , ..});
 }
-fn own(self: const Store&, arity: u32, root: Id, nodes: Term[>..]&, words: u32[>..]&) -> Owned, Error { let error = self.view().validate(root, arity, true); if error != Error.none { return default<Owned>(), error; } return clone(Owned { arity, root, self.nodes.items[:], self.words.items[:] }, nodes, words); }
+fn own(self: const Store&, arity: u32, root: Id, nodes: Term[>..]&, words: u32[>..]&) -> Owned, Error { let error = self.view().validate(root, arity, true); if error != Error.none { return default<Owned>(), error; } return clone(Owned { arity, root, self.nodes.items[:], self.words.items[:] , ..}, nodes, words); }
 fn instantiate<H>(self: Store&, header: H, arguments: const Id[:]) -> Id, Error { let before = mark(self); let id, error = instantiateBody(self, header, arguments); if error != Error.none { rollback(self, before); } return id, error; }
 fn instantiateBody<H>(self: Store&, header: H, arguments: const Id[:]) -> Id, Error {
     let error = header.view().validate(header.root, header.arity, true); if error != Error.none { return 0, error; } if arguments.len != header.arity { return 0, Error.invalid_capability_contract; }
-    if self.nodes.len == 0 { let id, error = append(self, Term { Tag.empty }); if error != Error.none { return 0, error; } }
+    if self.nodes.len == 0 { let id, error = append(self, Term { Tag.empty , ..}); if error != Error.none { return 0, error; } }
     for argument in arguments { if argument >= self.nodes.len { return 0, Error.invalid_capability_contract; } }
     var needed: bool[4096] = [false; 4096]; needed[header.root] = true; var reverse = header.nodes.len;
     while reverse != 0 { reverse -= 1; if !needed[reverse] { continue; } let term = header.nodes[reverse];
@@ -161,8 +161,8 @@ struct Frame { node: Id, next: u32 = 0 }
 fn instantiateCanonical<H>(self: Store&, header: H, arguments: const Id[:]) -> Id, Error { let before = mark(self); let id, error = canonicalBody(self, header, arguments); if error != Error.none { rollback(self, before); } return id, error; }
 fn canonicalBody<H>(self: Store&, header: H, arguments: const Id[:]) -> Id, Error {
     let source = header.view(); let error = source.validate(header.root, header.arity, true); if error != Error.none { return 0, error; } if arguments.len != header.arity { return 0, Error.invalid_capability_contract; }
-    if self.nodes.len == 0 { let id, error = append(self, Term { Tag.empty }); if error != Error.none { return 0, error; } } for argument in arguments { if argument >= self.nodes.len { return 0, Error.invalid_capability_contract; } }
-    var map: Id[4096] = [0xffffffff; 4096]; map[0] = 0; var stack: Frame[130]; var depth: i64 = 1; stack[0] = Frame { header.root };
+    if self.nodes.len == 0 { let id, error = append(self, Term { Tag.empty , ..}); if error != Error.none { return 0, error; } } for argument in arguments { if argument >= self.nodes.len { return 0, Error.invalid_capability_contract; } }
+    var map: Id[4096] = [0xffffffff; 4096]; map[0] = 0; var stack: Frame[130]; var depth: i64 = 1; stack[0] = Frame { header.root , ..};
     while depth != 0 { let top: Frame& = stack[depth - 1]; if map[top.node] != 0xffffffff { depth -= 1; continue; } let term = source.nodes[top.node]; var pending: Id = 0xffffffff;
         match term.tag {
             Tag.callable => { while top.next < 2 { var child = term.c; if top.next == 0 { child = term.b; } top.next += 1; if map[child] == 0xffffffff { pending = child; break; } } },
@@ -170,7 +170,7 @@ fn canonicalBody<H>(self: Store&, header: H, arguments: const Id[:]) -> Id, Erro
             Tag.captures, Tag.product, Tag.record, Tag.join => { let children = source.children(term); while top.next < children.len { let position = top.next; top.next += 1; if term.tag == Tag.record && position % 2 == 0 { continue; } if map[children[position]] == 0xffffffff { pending = children[position]; break; } } },
             _ => {},
         }
-        if pending != 0xffffffff { if depth == stack.len { return 0, Error.capability_analysis_limit; } stack[depth] = Frame { pending }; depth += 1; continue; }
+        if pending != 0xffffffff { if depth == stack.len { return 0, Error.capability_analysis_limit; } stack[depth] = Frame { pending , ..}; depth += 1; continue; }
         let error = visit(self, 0); if error != Error.none { return 0, error; } let id, error = copy(self, source, term, map, arguments); if error != Error.none { return 0, error; } map[top.node] = id; depth -= 1;
     } return map[header.root], Error.none;
 }
@@ -179,9 +179,9 @@ fn copy(self: Store&, source: View, term: Term, map: const Id[4096]&, arguments:
         Tag.empty => { return 0, Error.none; },
         Tag.unknown, Tag.argument => { return append(self, term); },
         Tag.parameter => { return arguments[term.a], Error.none; },
-        Tag.callable => { return append(self, Term { Tag.callable, term.a, map[term.b], map[term.c] }); },
+        Tag.callable => { return append(self, Term { Tag.callable, term.a, map[term.b], map[term.c] , ..}); },
         Tag.authority => { return 0, Error.invalid_capability_contract; },
-        Tag.wrapped => { return append(self, Term { Tag.wrapped, map[term.a] }); },
+        Tag.wrapped => { return append(self, Term { Tag.wrapped, map[term.a] , ..}); },
         Tag.elements => { return elements(self, map[term.a]); },
         Tag.project => { let kind, error = projectionFromCode(term.c); if error != Error.none { return 0, error; } return project(self, map[term.a], term.b, kind); },
         Tag.captures, Tag.product, Tag.record, Tag.join => { let children = source.children(term); var mapped: u32[4096]; if children.len > mapped.len { return 0, Error.capability_analysis_limit; }
@@ -191,9 +191,9 @@ fn copy(self: Store&, source: View, term: Term, map: const Id[4096]&, arguments:
 }
 fn callable(self: Store&, header: Recipe, captures: Id) -> Id, Error { let before = mark(self); let id, error = callableBody(self, header, captures); if error != Error.none { rollback(self, before); } return id, error; }
 fn callableBody(self: Store&, header: Recipe, captures: Id) -> Id, Error {
-    if self.nodes.len == 0 { let id, error = append(self, Term { Tag.empty }); if error != Error.none { return 0, error; } } if header.arity == 0 || header.arity > 16 || captures >= self.nodes.len { return 0, Error.invalid_capability_contract; }
-    var arguments: Id[16]; for index in 0..header.arity { let id, error = append(self, Term { Tag.argument, index as u32 }); if error != Error.none { return 0, error; } arguments[index] = id; }
-    let result, error = instantiate(self, header, arguments[..header.arity]); if error != Error.none { return 0, error; } return append(self, Term { Tag.callable, header.arity, captures, result });
+    if self.nodes.len == 0 { let id, error = append(self, Term { Tag.empty , ..}); if error != Error.none { return 0, error; } } if header.arity == 0 || header.arity > 16 || captures >= self.nodes.len { return 0, Error.invalid_capability_contract; }
+    var arguments: Id[16]; for index in 0..header.arity { let id, error = append(self, Term { Tag.argument, index as u32 , ..}); if error != Error.none { return 0, error; } arguments[index] = id; }
+    let result, error = instantiate(self, header, arguments[..header.arity]); if error != Error.none { return 0, error; } return append(self, Term { Tag.callable, header.arity, captures, result , ..});
 }
 recursive fn callableArity(self: const Store&, root: Id, arity: i64, remaining: i64&, depth: i64) -> bool, Error {
     if root >= self.nodes.len || depth >= 128 || remaining == 0 { return false, Error.capability_analysis_limit; } remaining -= 1; let node = self.nodes.items[root];
@@ -226,7 +226,7 @@ recursive fn invokeDepth(self: Store&, root: Id, arguments: const Id[:], depth: 
             Tag.empty, Tag.unknown => { result = index as u32; },
             Tag.argument => { if node.a >= arguments.len { return 0, Error.invalid_capability_contract; } result = arguments[node.a]; },
             Tag.parameter, Tag.authority => { return 0, Error.invalid_capability_contract; },
-            Tag.callable => { let id, error = append(self, Term { Tag.callable, node.a, map[node.b], node.c }); if error != Error.none { return 0, error; } result = id; },
+            Tag.callable => { let id, error = append(self, Term { Tag.callable, node.a, map[node.b], node.c , ..}); if error != Error.none { return 0, error; } result = id; },
             _ => { let id, error = copy(self, self.view(), node, map, arguments); if error != Error.none { return 0, error; } result = id; },
         } map[index] = result;
     }
@@ -234,14 +234,14 @@ recursive fn invokeDepth(self: Store&, root: Id, arguments: const Id[:], depth: 
 }
 struct Binding { binding: u32, root: Id }
 struct Collection { nodes: const Term[:] = [], words: const u32[:] = [], bindings: const Binding[:] = [] }
-fn header(self: Collection, binding: u32, arity: u32) -> blot_support::Option<Recipe> { for entry in self.bindings { if entry.binding == binding { return blot_support::some(Recipe { arity, entry.root, self.nodes, self.words }); } } return blot_support::none<Recipe>(); }
+fn header(self: Collection, binding: u32, arity: u32) -> blot_support::Option<Recipe> { for entry in self.bindings { if entry.binding == binding { return blot_support::some(Recipe { arity, entry.root, self.nodes, self.words , ..}); } } return blot_support::none<Recipe>(); }
 struct CollectionTables { nodes: Term[>..]&, words: u32[>..]&, bindings: Binding[>..]& }
-fn select(self: Collection, bindings, keep: const bool[:], has_keep: bool, destination: CollectionTables) -> Collection, Error {let initialized,error=initPooled();if error!=Error.none {return Collection{},error;}var store=initialized;var roots:Binding[>..<]=[];let result,failure=selectValues(self,bindings,keep,has_keep,destination,store,roots);store.deinit();return result,failure;}
-fn selectValues(self:Collection,bindings,keep:const bool[:],has_keep:bool,destination:CollectionTables,store:Store&,roots:Binding[>..<]&)->Collection,Error {for entry in self.bindings {if entry.binding>=bindings.len {return Collection{},Error.invalid_capability_contract;}let binding=bindings[entry.binding];if binding.kind!=blot_check_check::Kind.global || !binding.capability_parameters.present() {continue;}if has_keep && !keep[entry.binding] {continue;}let found=header(self,entry.binding,binding.capability_parameters.arity());if !found.present {return Collection{},Error.invalid_capability_contract;}let recipe=found.value;var arguments:u32[16]=[0;16];for index in 0..recipe.arity {let id,error=append(store,Term{Tag.parameter,index as u32});if error!=Error.none {return Collection{},error;}arguments[index]=id;}let root,error=instantiateCanonical(store,recipe,arguments[..recipe.arity]);if error!=Error.none {return Collection{},error;}roots.push(Binding{entry.binding,root});}if roots.len==0 {return Collection{},Error.none;}return clone(Collection{store.nodes.items[:],store.words.items[:],roots[:]},destination);}
+fn select(self: Collection, bindings, keep: const bool[:], has_keep: bool, destination: CollectionTables) -> Collection, Error {let initialized,error=initPooled();if error!=Error.none {return Collection{..},error;}var store=initialized;var roots:Binding[>..<]=[];let result,failure=selectValues(self,bindings,keep,has_keep,destination,store,roots);store.deinit();return result,failure;}
+fn selectValues(self:Collection,bindings,keep:const bool[:],has_keep:bool,destination:CollectionTables,store:Store&,roots:Binding[>..<]&)->Collection,Error {for entry in self.bindings {if entry.binding>=bindings.len {return Collection{..},Error.invalid_capability_contract;}let binding=bindings[entry.binding];if binding.kind!=blot_check_check::Kind.global || !binding.capability_parameters.present() {continue;}if has_keep && !keep[entry.binding] {continue;}let found=header(self,entry.binding,binding.capability_parameters.arity());if !found.present {return Collection{..},Error.invalid_capability_contract;}let recipe=found.value;var arguments:u32[16]=[0;16];for index in 0..recipe.arity {let id,error=append(store,Term{Tag.parameter,index as u32, ..});if error!=Error.none {return Collection{..},error;}arguments[index]=id;}let root,error=instantiateCanonical(store,recipe,arguments[..recipe.arity]);if error!=Error.none {return Collection{..},error;}roots.push(Binding{entry.binding,root, ..});}if roots.len==0 {return Collection{..},Error.none;}return clone(Collection{store.nodes.items[:],store.words.items[:],roots[:], ..},destination);}
 
 fn validate(self: Collection, binding_count: i64, symbol_count: i64) -> Error {
     if self.bindings.len == 0 { if self.nodes.len != 0 || self.words.len != 0 { return Error.invalid_capability_contract; } return Error.none; }
-    let error = validate(View { self.nodes, self.words }, 0, 16, true); if error != Error.none { return error; } var previous: u32 = 0; var has_previous = false;
+    let error = validate(View { self.nodes, self.words , ..}, 0, 16, true); if error != Error.none { return error; } var previous: u32 = 0; var has_previous = false;
     for entry in self.bindings { if entry.binding == 0 || entry.binding >= binding_count || (has_previous && entry.binding <= previous) || entry.root >= self.nodes.len { return Error.invalid_capability_contract; } previous = entry.binding; has_previous = true; }
     for node in self.nodes {
         if node.tag == Tag.record { for field in 0..node.b / 2 { if self.words[node.a + field * 2] >= symbol_count { return Error.invalid_capability_contract; } } }
@@ -250,9 +250,9 @@ fn validate(self: Collection, binding_count: i64, symbol_count: i64) -> Error {
 }
 fn clone(self: Collection, destination: CollectionTables) -> Collection, Error {
     let nodes = destination.nodes.len; let words = destination.words.len; let bindings = destination.bindings.len; destination.nodes += self.nodes; destination.words += self.words; destination.bindings += self.bindings;
-    return Collection { destination.nodes[nodes..], destination.words[words..], destination.bindings[bindings..] }, Error.none;
+    return Collection { destination.nodes[nodes..], destination.words[words..], destination.bindings[bindings..] , ..}, Error.none;
 }
-fn deinit(self: Collection&) { self = Collection {}; }
+fn deinit(self: Collection&) { self = Collection {..}; }
 fn equivalent(left: View, left_root: Id, right: View, right_root: Id) -> bool, Error { var remaining: i64 = 65536; return equivalentDepth(left, left_root, right, right_root, remaining, 0); }
 recursive fn equivalentDepth(left: View, left_root: Id, right: View, right_root: Id, remaining: i64&, depth: i64) -> bool, Error {
     if depth >= 128 || remaining == 0 { return false, Error.capability_analysis_limit; } remaining -= 1; if left_root >= left.nodes.len || right_root >= right.nodes.len { return false, Error.invalid_capability_contract; } let a = left.nodes[left_root]; let b = right.nodes[right_root]; if a.tag != b.tag { return false, Error.none; }
@@ -353,9 +353,9 @@ struct TermBuffer {storage:Term[:]=[],items:Term[:]=[],len:i64=0}
 struct WordBuffer {storage:u32[:]=[],items:u32[:]=[],len:i64=0}
 reusable[] var term_runs:Term[>..];
 reusable[] var word_runs:u32[>..];
-var inactive_terms=TermBuffer{};
-var inactive_words=WordBuffer{};
-struct StoreState {terms:TermBuffer=TermBuffer{},words:WordBuffer=WordBuffer{},generation:u64=0,live:bool=false}
+var inactive_terms=TermBuffer{..};
+var inactive_words=WordBuffer{..};
+struct StoreState {terms:TermBuffer=TermBuffer{..},words:WordBuffer=WordBuffer{..},generation:u64=0,live:bool=false}
 reusable[] var store_states:StoreState[>..];
 var store_generation:u64=1;
 fn ensure(self:TermBuffer&,minimum:i64)->Error {return blot_support_pooled_buffer::ensure(self,minimum,term_runs);}
@@ -369,8 +369,8 @@ fn clear(self:WordBuffer&) {self.items=self.storage[..0];self.len=0;}
 fn deinit(self:TermBuffer&) {blot_support_pooled_buffer::deinit(self,term_runs);self.len=0;}
 fn deinit(self:WordBuffer&) {blot_support_pooled_buffer::deinit(self,word_runs);self.len=0;}
 fn valid(self:const Store&)->bool {return self.lease!=0 && self.lease-1<store_states.len && store_states[self.lease-1].live && store_states[self.lease-1].generation==self.generation;}
-fn activate(self:Store&)->Error {if self.lease!=0 {assert(valid(self));return Error.none;}if store_generation==0xffffffffffffffff || store_states.len>=0xffffffff {return Error.out_of_memory;}let generation=store_generation;store_generation+=1;let index=store_states.alloc_index(StoreState{generation:generation,live:true});self.nodes .= store_states[index].terms;self.words .= store_states[index].words;self.lease=(index+1) as u32;self.generation=generation;return Error.none;}
-fn initPooled()->Store,Error {var result=Store{};let error=activate(result);return result,error;}
+fn activate(self:Store&)->Error {if self.lease!=0 {assert(valid(self));return Error.none;}if store_generation==0xffffffffffffffff || store_states.len>=0xffffffff {return Error.out_of_memory;}let generation=store_generation;store_generation+=1;let index=store_states.alloc_index(StoreState{generation:generation,live:true, ..});self.nodes .= store_states[index].terms;self.words .= store_states[index].words;self.lease=(index+1) as u32;self.generation=generation;return Error.none;}
+fn initPooled()->Store,Error {var result=Store{..};let error=activate(result);return result,error;}
 fn init()->Store,Error {return initPooled();}
 fn withStore<C,F>(context:C&)->Error {let initialized,error=initPooled();if error!=Error.none {return error;}var store=initialized;let result=F(context,store);store.deinit();return result;}
 fn withStoreValue<C,F,R>(context:C&)->R,Error {let initialized,error=initPooled();if error!=Error.none {return default<R>(),error;}var store=initialized;let result,failure=F(context,store);store.deinit();return result,failure;}

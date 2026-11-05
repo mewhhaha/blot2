@@ -13,7 +13,7 @@ struct Site {
     span: blot_check_core::Span, kind: Kind = Kind.other_materialization, requested_bytes: blot_support::Option<u32>, emissions: u32 = 1,
 }
 struct Snapshot { sites: Site[>..<]&, omitted: i64 = 0 }
-fn clone(source: Snapshot&, sites: Site[>..<]&) -> Snapshot { sites.clear(); sites.append(source.sites[..]); return Snapshot { sites: sites, omitted: source.omitted }; }
+fn clone(source: Snapshot&, sites: Site[>..<]&) -> Snapshot { sites.clear(); sites.append(source.sites[..]); return Snapshot { sites: sites, omitted: source.omitted , ..}; }
 fn deinit(snapshot: Snapshot&) { snapshot.sites.clear(); snapshot.omitted = 0; }
 fn category(tag: blot_check_core::Tag) -> Kind {
     if tag == blot_check_core::Tag.closure { return Kind.closure_storage; }
@@ -43,14 +43,14 @@ fn capture(sites: Site[>..<]&, units: const blot_check_core::Module[:], names: b
                 }
             }
             if found { continue; } if sites.len == max_sites { omitted++; continue; }
-            var site = Site { unit: record.unit, span: span, kind: kind, requested_bytes: bytes }; var path: const u8[:] = "";
+            var site = Site { unit: record.unit, span: span, kind: kind, requested_bytes: bytes , ..}; var path: const u8[:] = "";
             if names.present { let value = blot_backend_runtime_identity::owner(names.value, record.unit); if value.present { path = value.value; } }
             var length = path.len; if length > 160 { length = 160; }
             while length != 0 && length < path.len && (path[length] & 192) == 128 { length--; }
             for index in 0..length { site.filename[index] = path[index]; } site.filename_len = length as u8; site.filename_truncated = length != path.len; sites.push(site);
         }
     }
-    return Snapshot { sites: sites, omitted: omitted };
+    return Snapshot { sites: sites, omitted: omitted , ..};
 }
 fn kindName(kind: Kind) -> const u8[:] {
     if kind == Kind.closure_storage { return "closure_storage"; } if kind == Kind.constructor_storage { return "constructor_storage"; }

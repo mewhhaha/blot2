@@ -13,7 +13,7 @@ fn dirname(path: const u8[:]) -> blot_support::Option<const u8[:]> {
 fn components(path: const u8[:],out: Component[>..<]&) -> Error {
     var cursor: i64 = 0; while cursor < path.len {
         while cursor < path.len && path[cursor] == '/' { cursor++; } let start = cursor; while cursor < path.len && path[cursor] != '/' { if path[cursor] == 0 { return Error.invalid_path; } cursor++; }
-        if cursor > start { out.push(Component { start,cursor - start }); }
+        if cursor > start { out.push(Component { start,cursor - start , ..}); }
     } return Error.none;
 }
 fn normalize(path: const u8[:],out: u8[>..<]&) -> Error {

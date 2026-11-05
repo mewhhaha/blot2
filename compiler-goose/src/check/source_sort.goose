@@ -24,7 +24,7 @@ fn unguardedInsertionContext(a:i64,b:i64,context) {var i=a+1;while i<b {var j=i;
 fn siftDown(a:i64,target:i64,b:i64,context) {var current=target;while true {if current-a>0x3fffffffffffffff {break;}var child=(current-a)*2+a+1;if child>=b {break;}let next=child+1;if next<b && context.lessThan(child,next) {child=next;}if context.lessThan(child,current) {break;}context.swap(child,current);current=child;}}
 fn heapContext(a:i64,b:i64,context) {assert(a<=b);var i=a+(b-a)/2;while i>a {i-=1;siftDown(a,i,b,context);}i=b;while i>a {i-=1;context.swap(a,i);siftDown(a,a,i,context);}}
 fn pdqContext(a:i64,b:i64,context) {
-    var limit:i64=0;var length=b-a;while length>1 {length>>=1;limit+=1;}var stack:Range[64];var range=Range{a,b,limit,true,true,true};var top:i64=0;
+    var limit:i64=0;var length=b-a;while length>1 {length>>=1;limit+=1;}var stack:Range[64];var range=Range{a,b,limit,true,true,true, ..};var top:i64=0;
     while true {
         while true {let len=range.b-range.a;if len<=24 {if range.leftmost {insertionContext(range.a,range.b,context);}else {unguardedInsertionContext(range.a,range.b,context);}break;}if range.limit==0 {heapContext(range.a,range.b,context);break;}
             if !range.balanced {breakPatterns(range.a,range.b,context);range.limit-=1;}var pivot:i64=0;var hint=chosePivot(range.a,range.b,pivot,context);
@@ -34,7 +34,7 @@ fn pdqContext(a:i64,b:i64,context) {
             var mid=pivot;let was_partitioned=partition(range.a,range.b,mid,context);let left_len=mid-range.a;let right_len=range.b-(mid+1);let threshold=len/8;let left_smaller=left_len<right_len;
             var smaller_len=right_len;var smaller_start=mid+1;var larger_start=range.a;var smaller_end=range.b;var larger_end=mid;var smaller_leftmost=false;var larger_leftmost=range.leftmost;
             if left_smaller {smaller_len=left_len;smaller_start=range.a;larger_start=mid+1;smaller_end=mid;larger_end=range.b;smaller_leftmost=range.leftmost;larger_leftmost=false;}
-            let balanced=smaller_len>=threshold;stack[top]=Range{larger_start,larger_end,range.limit,larger_leftmost,balanced,was_partitioned};top+=1;range.a=smaller_start;range.b=smaller_end;range.leftmost=smaller_leftmost;range.balanced=true;range.partitioned=was_partitioned;
+            let balanced=smaller_len>=threshold;stack[top]=Range{larger_start,larger_end,range.limit,larger_leftmost,balanced,was_partitioned, ..};top+=1;range.a=smaller_start;range.b=smaller_end;range.leftmost=smaller_leftmost;range.balanced=true;range.partitioned=was_partitioned;
         }
         if top==0 {break;}top-=1;range=stack[top];
     }

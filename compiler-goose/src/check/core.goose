@@ -46,14 +46,14 @@ struct Parameter {
 }
 struct Binding {
     capability_flow: blot_check_check::CapabilityFlow = blot_check_check::CapabilityFlow.unknown,
-    capability_parameters: blot_check_capability_flow::Parameters = blot_check_capability_flow::Parameters {},
+    capability_parameters: blot_check_capability_flow::Parameters = blot_check_capability_flow::Parameters {..},
     private: bool = false,
     initializer: Id = 0,
     kind: blot_check_check::Kind,
     ty: blot_check_types::Id,
     scheme: blot_check_types::Scheme,
-    public_variables: blot_check_types::List = blot_check_types::List {},
-    public_rows: blot_check_types::List = blot_check_types::List {},
+    public_variables: blot_check_types::List = blot_check_types::List {..},
+    public_rows: blot_check_types::List = blot_check_types::List {..},
     has_explicit: bool = false,
     body_id: BodyId = 0,
     target: BindingRef,
@@ -64,8 +64,8 @@ struct RuntimeName {
     point: u32
 }
 struct DeclarationDependencies {
-    references: List = List {},
-    members: List = List {},
+    references: List = List {..},
+    members: List = List {..},
     runtime_metadata: Id = 0
 }
 struct DependencyMember {
@@ -79,12 +79,12 @@ struct ErasedDeclarationReference {
 struct Body {
     binding: BindingId = 0,
     root: Id = 0,
-    parameters: List = List {},
-    scheme: blot_check_types::Scheme = blot_check_types::Scheme {},
-    closed_rows: blot_check_types::List = blot_check_types::List {},
-    span: Span = Span { start: 0, end: 0 },
-    declaration_name: Name = Name {},
-    export_name: Name = Name {},
+    parameters: List = List {..},
+    scheme: blot_check_types::Scheme = blot_check_types::Scheme {..},
+    closed_rows: blot_check_types::List = blot_check_types::List {..},
+    span: Span = Span { start: 0, end: 0 , ..},
+    declaration_name: Name = Name {..},
+    export_name: Name = Name {..},
     exported: bool = false,
     runtime: bool = false,
     is_function: bool = false
@@ -115,8 +115,8 @@ struct DictionarySelection {
     quantifier: blot_check_types::Id,
     goal: u32,
     proof: DictionaryProof,
-    members: List = List {},
-    contents: List = List {}
+    members: List = List {..},
+    contents: List = List {..}
 }
 struct Call {
     target: BindingRef,
@@ -138,11 +138,11 @@ struct Obligation {
     other: blot_check_types::Id = 0,
     signature: blot_check_types::Id = 0,
     operator: blot_check_types::Operator = blot_check_types::Operator.none,
-    identity: blot_check_types::NominalIdentity = blot_check_types::NominalIdentity { unit: 0, decl: 0 },
+    identity: blot_check_types::NominalIdentity = blot_check_types::NominalIdentity { unit: 0, decl: 0 , ..},
     explicit: bool = false,
-    qualification_span: blot_support::Option<Span> = blot_support::Option<Span> { false, default<Span>() },
+    qualification_span: blot_support::Option<Span> = blot_support::Option<Span> { false, default<Span>() , ..},
     qualification_unit: u32 = 0,
-    diagnostic_name: Name = Name {}
+    diagnostic_name: Name = Name {..}
 }
 struct Associated {
     identity: blot_check_types::NominalIdentity,
@@ -156,9 +156,9 @@ struct Nominal {
     closed_storage: bool = false,
     private: bool = false,
     is_opaque: bool = false,
-    storage: blot_backend_opaque_storage::Storage = blot_backend_opaque_storage::Storage {},
-    diagnostic_name: Name = Name {},
-    diagnostic_origin: Name = Name {},
+    storage: blot_backend_opaque_storage::Storage = blot_backend_opaque_storage::Storage {..},
+    diagnostic_name: Name = Name {..},
+    diagnostic_origin: Name = Name {..},
     identity: blot_check_types::NominalIdentity,
     parameters: blot_check_types::List,
     variables: blot_check_types::List,
@@ -166,10 +166,10 @@ struct Nominal {
 }
 struct OperationName {
     identity: blot_check_types::NominalIdentity,
-    diagnostic_name: Name = Name {},
-    diagnostic_origin: Name = Name {},
-    variables: blot_check_types::List = blot_check_types::List {},
-    parameters: blot_check_types::List = blot_check_types::List {},
+    diagnostic_name: Name = Name {..},
+    diagnostic_origin: Name = Name {..},
+    variables: blot_check_types::List = blot_check_types::List {..},
+    parameters: blot_check_types::List = blot_check_types::List {..},
     parameter: blot_check_types::Id = 0,
     result: blot_check_types::Id = 0
 }
@@ -199,7 +199,7 @@ struct Pattern {
     a: u32 = 0,
     b: u32 = 0,
     c: u32 = 0,
-    span: Span = Span { start: 0, end: 0 }
+    span: Span = Span { start: 0, end: 0 , ..}
 }
 struct PatternRow {
     patterns: List
@@ -228,7 +228,7 @@ struct UpdateInfo {
     path: List,
     value: Id,
     self_binding: BindingId,
-    selectors: List = List {}
+    selectors: List = List {..}
 }
 struct ClosureInfo {
     qualifier: BindingId = 0,
@@ -236,15 +236,15 @@ struct ClosureInfo {
     parameter: Parameter,
     captures: List,
     function_type: blot_check_types::Id = 0,
-    closed_rows: blot_check_types::List = blot_check_types::List {}
+    closed_rows: blot_check_types::List = blot_check_types::List {..}
 }
 enum ResolverOperation { monad, pure, bind, forward, iterate, run }
 struct ResolverInfo {
     operation: ResolverOperation,
     resolver: Id,
-    arguments: List = List {},
+    arguments: List = List {..},
     member: u32 = 0,
-    method: BindingRef = BindingRef { binding: 0 },
+    method: BindingRef = BindingRef { binding: 0 , ..},
     method_type: blot_check_types::Id = 0
 }
 struct OperationValue {
@@ -253,7 +253,7 @@ struct OperationValue {
     signature: blot_check_types::Id,
     witness: Id = 0,
     witness_result: blot_check_types::Id = 0,
-    instance: blot_check_types::NominalIdentity = blot_check_types::NominalIdentity { unit: 0, decl: 0 },
+    instance: blot_check_types::NominalIdentity = blot_check_types::NominalIdentity { unit: 0, decl: 0 , ..},
     capability: Id = 0
 }
 struct HandleEffects {
@@ -275,11 +275,11 @@ struct RequestLoopInfo {
     value_type: blot_check_types::Id,
     result_type: blot_check_types::Id,
     state_type: blot_check_types::Id,
-    arms: List = List {},
+    arms: List = List {..},
     completion_pattern: PatternId = 0,
     completion_body: Id = 0,
-    completion_state_bindings: List = List {},
-    carries: List = List {},
+    completion_state_bindings: List = List {..},
+    carries: List = List {..},
     return_target: Id = 0
 }
 enum LoopKind { forever, range, array }
@@ -295,7 +295,7 @@ struct LoopInfo {
     end: Id = 0,
     pattern: PatternId = 0,
     body: Id,
-    carries: List = List {},
+    carries: List = List {..},
     can_exit: bool = false
 }
 enum Code { unchecked, unsupported, unresolved_binding, invalid_call, complexity }
@@ -318,8 +318,8 @@ struct Contract {
     predicates: blot_check_types::List,
     members: blot_check_types::List,
     requires_implementation: bool,
-    row_parameter_names: blot_check_types::List = blot_check_types::List {},
-    row_parameters: blot_check_types::List = blot_check_types::List {}
+    row_parameter_names: blot_check_types::List = blot_check_types::List {..},
+    row_parameters: blot_check_types::List = blot_check_types::List {..}
 }
 struct SelectedUse {
     node: Id,
@@ -329,7 +329,7 @@ struct Types {
     owner_id: u64 = 0,
     nodes: const blot_check_types::Node[:],
     extra: const blot_check_types::Id[:],
-    effects: EffectRows = EffectRows {},
+    effects: EffectRows = EffectRows {..},
     operations: const blot_check_types::Operation[:] = [],
     quantifier_goals: const blot_check_types::QuantifierGoals[:] = [],
     quantifier_obligations: const blot_check_types::Obligation[:] = []
@@ -340,7 +340,7 @@ struct Module {
     has_usage_contracts: bool = false,
     has_numeric_proofs: bool = false,
     proof_contracts: ProofContract[:] = [],
-    capability_contracts: blot_check_capability_contracts::Collection = blot_check_capability_contracts::Collection {},
+    capability_contracts: blot_check_capability_contracts::Collection = blot_check_capability_contracts::Collection {..},
     field_names: FieldName[:] = [],
     runtime_names: RuntimeName[:] = [],
     source_names: RuntimeName[:] = [],
@@ -422,7 +422,7 @@ fn message(self: Diagnostic) -> const u8[:] {
     }
 }
 fn node(self: const EffectRows&, id: blot_check_effects::Id) -> blot_check_effects::Row {
-    if id == 0 && self.rows.len == 0 { return blot_check_effects::Row {}; }
+    if id == 0 && self.rows.len == 0 { return blot_check_effects::Row {..}; }
     return self.rows[id];
 }
 fn list(self: const EffectRows&, span: blot_check_effects::List) -> const blot_check_effects::Label[:] { return self.labels[span.start..span.start + span.len]; }
@@ -447,7 +447,7 @@ fn nominalArguments(self: const Types&, value: blot_check_types::Node) -> const 
 }
 fn recordField(self: const Types&, value: blot_check_types::Node, index: i64) -> blot_check_types::Field {
     assert(value.tag == blot_check_types::Tag.record && index < value.b);
-    return blot_check_types::Field { self.extra[value.a + index * 2], self.extra[value.a + index * 2 + 1] };
+    return blot_check_types::Field { self.extra[value.a + index * 2], self.extra[value.a + index * 2 + 1] , ..};
 }
 fn row(self: const Types&, id: blot_check_effects::Id) -> blot_check_effects::Row { return self.effects.node(id); }
 fn rowLabels(self: const Types&, id: blot_check_effects::Id) -> const blot_check_effects::Label[:] { return self.effects.list(self.row(id).labels); }
@@ -488,7 +488,7 @@ struct PackageOpening { body: Id, binders: blot_check_types::List }
 fn packageOpening(self: const Module&, id: Id) -> PackageOpening {
     let value = self.node(id); assert(value.tag == Tag.package_unpack);
     let metadata = self.extra[value.c..value.c + 3];
-    return PackageOpening { metadata[0], blot_check_types::List { metadata[1], metadata[2] } };
+    return PackageOpening { metadata[0], blot_check_types::List { metadata[1], metadata[2] , ..} , ..};
 }
 fn typeOf(self: const Module&, id: Id) -> blot_check_types::Id { return self.nodes[id].ty; }
 fn operationValue(self: const Module&, id: Id) -> OperationValue {
@@ -497,8 +497,8 @@ fn operationValue(self: const Module&, id: Id) -> OperationValue {
 fn operationValueArguments(self: const Module&, id: Id) -> const blot_check_types::Id[:] { return self.types.list(self.operationValue(id).arguments); }
 fn handleEffects(self: const Module&, id: Id) -> blot_support::Option<HandleEffects> {
     let value = self.node(id); assert(value.tag == Tag.handle);
-    if value.c == 0 { return blot_support::Option<HandleEffects> { false, default<HandleEffects>() }; }
-    return blot_support::Option<HandleEffects> { true, self.handle_effects[value.c - 1] };
+    if value.c == 0 { return blot_support::Option<HandleEffects> { false, default<HandleEffects>() , ..}; }
+    return blot_support::Option<HandleEffects> { true, self.handle_effects[value.c - 1] , ..};
 }
 fn dispatchSignature(self: const Module&, id: Id) -> blot_check_types::Id {
     if self.dispatch_signatures.len == 0 { return 0; } return self.dispatch_signatures[id];
@@ -520,7 +520,7 @@ fn children(self: const Module&, id: Id) -> const Id[:] {
 }
 fn call(self: const Module&, id: Id) -> Call {
     let value = self.node(id); assert(value.tag == Tag.call); let target = self.calls[value.a];
-    return Call { target.target, target.callee_type, self.children(id) };
+    return Call { target.target, target.callee_type, self.children(id) , ..};
 }
 fn dictionaryOffset(self: const Module&, quantifier: blot_check_types::Id, wanted_goal: u32, wanted_member: u32) -> i64, blot_error::Error {
     let goals = self.types.quantifierGoals(quantifier);
@@ -597,7 +597,7 @@ fn closureCaptures(self: const Module&, id: Id) -> const BindingId[:] { let rang
 fn resolverInfo(self: const Module&, id: Id) -> ResolverInfo { let value = self.node(id); assert(value.tag == Tag.resolver_op); return self.resolver_ops[value.a]; }
 fn resolverArguments(self: const Module&, id: Id) -> const Id[:] { let range = self.resolverInfo(id).arguments; return self.extra[range.start..range.start + range.len]; }
 fn primitive(self: const Module&, id: Id) -> Primitive { let value = self.node(id); assert(value.tag == Tag.primitive_function); return self.primitives[value.a]; }
-fn panicMessage(self: const Module&, id: Id) -> const u8[:] { let value = self.node(id); assert(value.tag == Tag.panic); return self.name(Name { value.a, value.b }); }
+fn panicMessage(self: const Module&, id: Id) -> const u8[:] { let value = self.node(id); assert(value.tag == Tag.panic); return self.name(Name { value.a, value.b , ..}); }
 
 fn tagCode(value: Tag) -> u32 {
     match value {
@@ -1056,13 +1056,13 @@ fn blot_structural::hash<S>(sink: S&, value: blot_check_core::DictionaryProof) {
 struct TypesStampView {
     nodes: const blot_check_types::Node[:],
     extra: const blot_check_types::Id[:],
-    effects: EffectRows = EffectRows {},
+    effects: EffectRows = EffectRows {..},
     operations: const blot_check_types::Operation[:] = [],
     quantifier_goals: const blot_check_types::QuantifierGoals[:] = [],
     quantifier_obligations: const blot_check_types::Obligation[:] = []
 }
 fn typesStampView(self: const Types&) -> TypesStampView {
-    return TypesStampView { self.nodes, self.extra, self.effects, self.operations, self.quantifier_goals, self.quantifier_obligations };
+    return TypesStampView { self.nodes, self.extra, self.effects, self.operations, self.quantifier_goals, self.quantifier_obligations , ..};
 }
 
 struct StampView {
@@ -1070,7 +1070,7 @@ struct StampView {
     has_usage_contracts: bool = false,
     has_numeric_proofs: bool = false,
     proof_contracts: const ProofContract[:] = [],
-    capability_contracts: blot_check_capability_contracts::Collection = blot_check_capability_contracts::Collection {},
+    capability_contracts: blot_check_capability_contracts::Collection = blot_check_capability_contracts::Collection {..},
     field_names: const FieldName[:] = [],
     runtime_names: const RuntimeName[:] = [],
     source_names: const RuntimeName[:] = [],
@@ -1130,7 +1130,7 @@ struct StampView {
     body_lowerings: i64
 }
 fn stampView(self: const Module&) -> StampView {
-    return StampView { self.has_rank_contracts, self.has_usage_contracts, self.has_numeric_proofs, self.proof_contracts, self.capability_contracts, self.field_names, self.runtime_names, self.source_names, self.declaration_dependencies, self.dependency_references, self.dependency_members, self.erased_declaration_references, self.request_loops, self.request_arms, self.tag_calls, self.unit, typesStampView(self.types), self.nodes, self.spans, self.extra, self.bindings, self.bodies, self.parameters, self.references, self.calls, self.merges, self.merge_ranges, self.names, self.obligations, self.nominals, self.operation_names, self.constructors, self.projections, self.projection_variants, self.patterns, self.pattern_rows, self.match_arms, self.matches, self.updates, self.update_steps, self.closures, self.associated, self.contracts, self.contract_members, self.implementations, self.implementation_members, self.member_templates, self.selected_proofs, self.selected_members, self.selected_edges, self.selected_uses, self.dictionary_selections, self.dictionary_uses, self.primitives, self.loops, self.loop_carries, self.resolver_ops, self.operation_values, self.handle_effects, self.dispatch_signatures, self.diagnostics, self.body_lowerings };
+    return StampView { self.has_rank_contracts, self.has_usage_contracts, self.has_numeric_proofs, self.proof_contracts, self.capability_contracts, self.field_names, self.runtime_names, self.source_names, self.declaration_dependencies, self.dependency_references, self.dependency_members, self.erased_declaration_references, self.request_loops, self.request_arms, self.tag_calls, self.unit, typesStampView(self.types), self.nodes, self.spans, self.extra, self.bindings, self.bodies, self.parameters, self.references, self.calls, self.merges, self.merge_ranges, self.names, self.obligations, self.nominals, self.operation_names, self.constructors, self.projections, self.projection_variants, self.patterns, self.pattern_rows, self.match_arms, self.matches, self.updates, self.update_steps, self.closures, self.associated, self.contracts, self.contract_members, self.implementations, self.implementation_members, self.member_templates, self.selected_proofs, self.selected_members, self.selected_edges, self.selected_uses, self.dictionary_selections, self.dictionary_uses, self.primitives, self.loops, self.loop_carries, self.resolver_ops, self.operation_values, self.handle_effects, self.dispatch_signatures, self.diagnostics, self.body_lowerings , ..};
 }
 
 type ImplementationMemberKind = blot_reuse_principal_interface::ImplementationMemberKind;

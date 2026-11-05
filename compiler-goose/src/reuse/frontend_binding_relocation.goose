@@ -30,10 +30,10 @@ reusable[] var owned_qualifications:Qualification[>..]=[];
 fn words(length:i64,initial:u32)->u32[:] {let result=owned_words.alloc_slice(length);for &word in result {word=initial;}return result;}
 fn release(values:u32[:]) {if values.len!=0 {owned_words.free_slice(values);}}
 struct Map {bindings:u32[:]=[],nominals:u32[:]=[],constructors:u32[:]=[],contracts:u32[:]=[],implementations:u32[:]=[],qualifications:Qualification[:]=[]}
-fn deinit(self:Map&) {release(self.bindings);release(self.nominals);release(self.constructors);release(self.contracts);release(self.implementations);if self.qualifications.len!=0 {owned_qualifications.free_slice(self.qualifications);}self=Map {};}
+fn deinit(self:Map&) {release(self.bindings);release(self.nominals);release(self.constructors);release(self.contracts);release(self.implementations);if self.qualifications.len!=0 {owned_qualifications.free_slice(self.qualifications);}self=Map {..};}
 fn binding(self:Map,old:u32)->blot_support::Option<u32> {if old==0||old>=self.bindings.len||self.bindings[old]==0 {return blot_support::none<u32>();}return blot_support::some(self.bindings[old]);}
 fn qualification(self:Map,old:Span)->Span {
- var low:i64=0;var high=self.qualifications.len;while low<high {let middle=low+(high-low)/2;let value=self.qualifications[middle];if value.before==old {return value.after;}if qualificationLess(value,Qualification {old,old}) {low=middle+1;}else {high=middle;}}return old;
+ var low:i64=0;var high=self.qualifications.len;while low<high {let middle=low+(high-low)/2;let value=self.qualifications[middle];if value.before==old {return value.after;}if qualificationLess(value,Qualification {old,old, ..}) {low=middle+1;}else {high=middle;}}return old;
 }
 fn moved(values:const u32[:],missing:u32)->bool {for current,old in values {if current!=missing&&current!=old {return true;}}return false;}
 fn changes(self:Map)->bool {for value in self.qualifications {if value.before!=value.after {return true;}}return moved(self.bindings,0)||moved(self.nominals,0)||moved(self.constructors,0)||moved(self.contracts,unmapped)||moved(self.implementations,unmapped);}
@@ -44,33 +44,33 @@ fn catalog(self:Map,kind:ExportKind,old:u32)->blot_support::Option<u32> {
  if old==0||old>=entries.len||entries[old]==0 {return blot_support::none<u32>();}return blot_support::some(entries[old]);
 }
 enum Stage {eligibility,public_index,public_match,nominals,constructors,contracts,implementations,graph,checked}
-struct Progress {graph:blot_reuse_frontend_graph_correspondence::Diagnostic=blot_reuse_frontend_graph_correspondence::Diagnostic {},stage:Stage=Stage.eligibility,binding:u32=0,other:u32=0,unnamed:bool=false,kind:Kind=Kind.global}
+struct Progress {graph:blot_reuse_frontend_graph_correspondence::Diagnostic=blot_reuse_frontend_graph_correspondence::Diagnostic {..},stage:Stage=Stage.eligibility,binding:u32=0,other:u32=0,unnamed:bool=false,kind:Kind=Kind.global}
 struct Targets {progress:Progress?=null,units:const blot_support::Option<Map>[:]=[],methods:blot_support::Option<blot_reuse_frontend_method_sources::Sources>,comparisons_left:i64?=null}
 fn changes(self:Targets)->bool {for map in self.units {if map.present&&map.value.changes() {return true;}}return false;}
 fn target(self:Targets,old:Target)->blot_support::Option<Target> {
- if old.binding==0||old.unit==0||old.unit>self.units.len {return blot_support::some(old);}let map=self.units[old.unit-1];if !map.present {return blot_support::some(old);}let binding=map.value.binding(old.binding);if !binding.present {return blot_support::none<Target>();}return blot_support::some(Target {old.unit,binding.value});
+ if old.binding==0||old.unit==0||old.unit>self.units.len {return blot_support::some(old);}let map=self.units[old.unit-1];if !map.present {return blot_support::some(old);}let binding=map.value.binding(old.binding);if !binding.present {return blot_support::none<Target>();}return blot_support::some(Target {old.unit,binding.value, ..});
 }
 fn qualification(self:Targets,unit:u32,span:Span)->Span {if unit==0||unit>self.units.len {return span;}let map=self.units[unit-1];if !map.present {return span;}return map.value.qualification(span);}
 fn exported(self:Targets,old:blot_reuse_frozen_dependency::Export)->blot_support::Option<blot_reuse_frozen_dependency::Export> {
  var result=old;let target=self.target(old.target);if !target.present {return blot_support::none<blot_reuse_frozen_dependency::Export>();}result.target=target.value;if old.target.unit==0 {return blot_support::none<blot_reuse_frozen_dependency::Export>();}if old.target.unit>self.units.len {return blot_support::some(result);}let map=self.units[old.target.unit-1];if !map.present {return blot_support::some(result);}let catalog=map.value.catalog(old.kind,old.catalog);if !catalog.present {return blot_support::none<blot_reuse_frozen_dependency::Export>();}result.catalog=catalog.value;return blot_support::some(result);
 }
 fn visible(value:blot_reuse_principal_interface::Binding)->bool {return !value.private&&(value.kind==Kind.global||value.kind==Kind.external);}
-struct BindingKey {name:u32=0,kind:Kind=Kind.global,target:Target=Target {0,0}}
+struct BindingKey {name:u32=0,kind:Kind=Kind.global,target:Target=Target {0,0, ..}}
 fn hash(key:BindingKey)->u64 {var value=(key.name as u64)<<32|key.target.binding as u64;value^=(key.target.unit as u64)*0x9e3779b185ebca87;value^=(kindCode(key.kind) as u64)*0xc2b2ae3d27d4eb4f;return value;}
 fn current(value:blot_reuse_principal_interface::Binding)->blot_support::Option<BindingKey> {
- if value.name!=0 {var target=Target {0,0};if value.kind==Kind.external&&value.external.present {target=value.external.value;}return blot_support::some(BindingKey {value.name,value.kind,target});}
- if value.kind!=Kind.external||!value.external.present {return blot_support::none<BindingKey>();}return blot_support::some(BindingKey {0,value.kind,value.external.value});
+ if value.name!=0 {var target=Target {0,0, ..};if value.kind==Kind.external&&value.external.present {target=value.external.value;}return blot_support::some(BindingKey {value.name,value.kind,target, ..});}
+ if value.kind!=Kind.external||!value.external.present {return blot_support::none<BindingKey>();}return blot_support::some(BindingKey {0,value.kind,value.external.value, ..});
 }
 struct CatalogKey {name:u32,identity:blot_check_types::NominalIdentity}
 fn hash(key:CatalogKey)->u64 {return (key.name as u64)<<32^(key.identity.unit as u64)*0x9e3779b185ebca87^key.identity.decl as u64;}
 struct ConstructorKey {parent:u32,tag:u32}
 fn hash(key:ConstructorKey)->u64 {return (key.parent as u64)<<32|key.tag as u64;}
 fn namedCatalogIndex<E>(entries:const E[:],sentinel:bool,remaining:i64&,result:dictionary<CatalogKey,u32>&)->Error {
- for entry,index in entries {if (sentinel&&index==0)||entry.private {continue;}if remaining==0 {return Error.declined;}remaining--;let key=CatalogKey {entry.name,entry.identity};if result.contains(key) {return Error.declined;}result.insert(key,index as u32);}return Error.none;
+ for entry,index in entries {if (sentinel&&index==0)||entry.private {continue;}if remaining==0 {return Error.declined;}remaining--;let key=CatalogKey {entry.name,entry.identity, ..};if result.contains(key) {return Error.declined;}result.insert(key,index as u32);}return Error.none;
 }
 fn privateContractsOnly(owner:const Interface&)->bool {
  for contract in owner.contracts {if !contract.private {return false;}}for member in owner.contract_members {if member.name!=0||member.root!=0 {return false;}}
- let inert=blot_check_types::Obligation {ty:0,kind:blot_check_types::ObligationKind.type_rep,source:0,explicit:true};for predicate in owner.contract_predicates {if !blot_structural::equal(predicate,inert) {return false;}}return true;
+ let inert=blot_check_types::Obligation {ty:0,kind:blot_check_types::ObligationKind.type_rep,source:0,explicit:true, ..};for predicate in owner.contract_predicates {if !blot_structural::equal(predicate,inert) {return false;}}return true;
 }
 fn privateEffectsOnly(owner:const Interface&)->bool {
  for family,index in owner.effect_families {if index==0&&family.identity.unit==0&&family.identity.decl==0 {continue;}if !family.private {return false;}}
@@ -87,8 +87,8 @@ fn eligible(left:const Interface&,right:const Interface&)->bool {
  if !privateEffectsOnly(left)||!privateEffectsOnly(right) {if left.effect_families.len!=right.effect_families.len||left.effect_templates.len!=right.effect_templates.len {return false;}}return true;
 }
 fn compare(left:const Interface&,right:const Interface&,targets:Targets)->blot_support::Option<Map>,Error {
- let progress=targets.progress;if progress {progress=Progress {};}let reported=targets.comparisons_left;if reported {reported=65536;}
- if !eligible(left,right) {return blot_support::none<Map>(),Error.none;}var map=Map {bindings:words(left.bindings.len,0)};var comparisons:i64=65536;
+ let progress=targets.progress;if progress {progress=Progress {..};}let reported=targets.comparisons_left;if reported {reported=65536;}
+ if !eligible(left,right) {return blot_support::none<Map>(),Error.none;}var map=Map {bindings:words(left.bindings.len,0), ..};var comparisons:i64=65536;
  let error=buildMap(left,right,targets,map,comparisons);if reported {reported=comparisons;}
  if error!=Error.none {map.deinit();if error==Error.out_of_memory {return blot_support::none<Map>(),error;}return blot_support::none<Map>(),Error.none;}
  return blot_support::some(map),Error.none;
@@ -118,24 +118,24 @@ fn buildMap(left:const Interface&,right:const Interface&,targets:Targets,map:Map
  for value,index in right.bindings {if index!=0&&visible(value)&&!used[index] {return Error.declined;}}
  stage(targets,Stage.nominals);map.nominals=words(left.nominals.len,0);var nominal_used:bool[>..<]=[];nominal_used.resize(right.nominals.len,false);var nominals_index:dictionary<CatalogKey,u32>=dictionary<CatalogKey,u32> {};
  { let propagated_error = namedCatalogIndex(right.nominals,true,comparisons,nominals_index); if propagated_error != Error.none { return propagated_error; } }
- for old,index in left.nominals {if index==0||old.private {continue;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let next=nominals_index.get(CatalogKey {old.name,old.identity});if !next||nominal_used[next] {return Error.declined;}nominal_used[next]=true;map.nominals[index]=next;}
+ for old,index in left.nominals {if index==0||old.private {continue;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let next=nominals_index.get(CatalogKey {old.name,old.identity, ..});if !next||nominal_used[next] {return Error.declined;}nominal_used[next]=true;map.nominals[index]=next;}
  for value,index in right.nominals {if index!=0&&!value.private&&!nominal_used[index] {return Error.declined;}}
  stage(targets,Stage.constructors);map.constructors=words(left.constructors.len,0);var constructor_used:bool[>..<]=[];constructor_used.resize(right.constructors.len,false);var constructor_index:dictionary<ConstructorKey,u32>=dictionary<ConstructorKey,u32> {};
- for value,index in right.constructors {if index==0||value.nominal==0||right.nominals[value.nominal].private {continue;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let key=ConstructorKey {value.nominal,value.tag};if constructor_index.contains(key) {return Error.declined;}constructor_index.insert(key,index as u32);}
+ for value,index in right.constructors {if index==0||value.nominal==0||right.nominals[value.nominal].private {continue;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let key=ConstructorKey {value.nominal,value.tag, ..};if constructor_index.contains(key) {return Error.declined;}constructor_index.insert(key,index as u32);}
  for old,index in left.constructors {
-  if index==0||old.nominal==0||old.nominal>=map.nominals.len||left.nominals[old.nominal].private {continue;}let parent=map.nominals[old.nominal];if parent==0 {return Error.declined;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let next=constructor_index.get(ConstructorKey {parent,old.tag});if !next||constructor_used[next] {return Error.declined;}constructor_used[next]=true;map.constructors[index]=next;
+  if index==0||old.nominal==0||old.nominal>=map.nominals.len||left.nominals[old.nominal].private {continue;}let parent=map.nominals[old.nominal];if parent==0 {return Error.declined;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let next=constructor_index.get(ConstructorKey {parent,old.tag, ..});if !next||constructor_used[next] {return Error.declined;}constructor_used[next]=true;map.constructors[index]=next;
  }
  for value,index in right.constructors {if index!=0&&value.nominal!=0&&!right.nominals[value.nominal].private&&!constructor_used[index] {return Error.declined;}}
  if !privateContractsOnly(left)||!privateContractsOnly(right) {
   stage(targets,Stage.contracts);map.contracts=words(left.contracts.len,unmapped);var contract_used:bool[>..<]=[];contract_used.resize(right.contracts.len,false);var contracts_index:dictionary<CatalogKey,u32>=dictionary<CatalogKey,u32> {};
   { let propagated_error = namedCatalogIndex(right.contracts,false,comparisons,contracts_index); if propagated_error != Error.none { return propagated_error; } }
-  for old,index in left.contracts {if old.private {continue;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let next=contracts_index.get(CatalogKey {old.name,old.identity});if !next||contract_used[next] {return Error.declined;}contract_used[next]=true;map.contracts[index]=next;}
+  for old,index in left.contracts {if old.private {continue;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let next=contracts_index.get(CatalogKey {old.name,old.identity, ..});if !next||contract_used[next] {return Error.declined;}contract_used[next]=true;map.contracts[index]=next;}
   for value,index in right.contracts {if !value.private&&!contract_used[index] {return Error.declined;}}
  }
  stage(targets,Stage.implementations);map.implementations=words(left.implementations.len,unmapped);var implementation_used:bool[>..<]=[];implementation_used.resize(right.implementations.len,false);var implementations_index:dictionary<CatalogKey,u32>=dictionary<CatalogKey,u32> {};
  { let propagated_error = namedCatalogIndex(right.implementations,false,comparisons,implementations_index); if propagated_error != Error.none { return propagated_error; } }
  for old,index in left.implementations {
-  if old.private {continue;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let next=implementations_index.get(CatalogKey {old.name,old.identity});if !next||implementation_used[next] {return Error.declined;}implementation_used[next]=true;map.implementations[index]=next;let current=right.implementations[next];if old.members.len!=current.members.len {return Error.declined;}
+  if old.private {continue;}{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }let next=implementations_index.get(CatalogKey {old.name,old.identity, ..});if !next||implementation_used[next] {return Error.declined;}implementation_used[next]=true;map.implementations[index]=next;let current=right.implementations[next];if old.members.len!=current.members.len {return Error.declined;}
   for from,ordinal in left.implementation_members[old.members.start..old.members.start+old.members.len] {
    let to=right.implementation_members[current.members.start+ordinal];{ let propagated_error = budget(comparisons); if propagated_error != Error.none { return propagated_error; } }if from.name!=to.name||from.kind!=to.kind {return Error.declined;}if from.kind!=blot_reuse_principal_interface::ImplementationMemberKind.value {continue;}
    if from.target.unit==0||from.target.binding==0||to.target.unit!=from.target.unit||to.target.binding==0 {return Error.declined;}
@@ -143,7 +143,7 @@ fn buildMap(left:const Interface&,right:const Interface&,targets:Targets,map:Map
    if from.target.binding>=map.bindings.len||to.target.binding>=right.bindings.len {return Error.declined;}let before=left.bindings[from.target.binding];let after=right.bindings[to.target.binding];
    if before.private!=after.private||before.kind!=Kind.global||after.kind!=Kind.global {return Error.declined;}
    if before.private {
-    if !targets.methods.present {return Error.declined;}let sources=targets.methods.value;let role=blot_reuse_frontend_method_sources::Role {old.identity,from.name};let old_method=sources.before(role,from.target.binding);let new_method=sources.after(role,to.target.binding);
+    if !targets.methods.present {return Error.declined;}let sources=targets.methods.value;let role=blot_reuse_frontend_method_sources::Role {old.identity,from.name, ..};let old_method=sources.before(role,from.target.binding);let new_method=sources.after(role,to.target.binding);
     if !old_method.present||!new_method.present {return Error.declined;}let old_header=old_method.value;let new_header=new_method.value;
     if old_header.flow!=new_header.flow||old_header.parameters!=new_header.parameters||old_header.recipe.present!=new_header.recipe.present {return Error.declined;}
     if old_header.recipe.present {let recipe=old_header.recipe.value;let after_recipe=new_header.recipe.value;if recipe.arity!=after_recipe.arity {return Error.declined;}let same,error=blot_check_capability_contracts::equivalent(recipe.view(),recipe.root,after_recipe.view(),after_recipe.root);if error==Error.out_of_memory {return error;}if error!=Error.none||!same {return Error.declined;}}
@@ -160,12 +160,12 @@ fn kindCode(kind:Kind)->u32 {match kind {Kind.global=>0,Kind.local=>1,Kind.param
 
 type QualificationBuffer=blot_support_pooled_buffer::Buffer<Qualification>;
 reusable[] var qualification_runs:Qualification[>..]=[];
-struct Checker {qualifications:QualificationBuffer=QualificationBuffer {},left:const Interface&,right:const Interface&,graph:blot_reuse_frontend_graph_correspondence::Match&,map:Map,targets:Targets,remaining:i64=65536}
+struct Checker {qualifications:QualificationBuffer=QualificationBuffer {..},left:const Interface&,right:const Interface&,graph:blot_reuse_frontend_graph_correspondence::Match&,map:Map,targets:Targets,remaining:i64=65536}
 fn work(self:Checker&,depth:i64)->Error {if depth>=128||self.remaining==0 {return Error.declined;}self.remaining--;return Error.none;}
 fn checkGraphs(left:const Interface&,right:const Interface&,targets:Targets,map:Map&)->Error {
  stage(targets,Stage.graph);let prepared,error=blot_reuse_frontend_graph_correspondence::init(left.graph,right.graph);if error!=Error.none {return error;}
  if !prepared.present {let progress=targets.progress;if progress {progress.graph.reason=blot_reuse_frontend_graph_correspondence::Reason.size_limit;}return Error.declined;}
- var graph=prepared.value;var checker=Checker {left:left,right:right,graph:graph,map:copy(map),targets:targets};
+ var graph=prepared.value;var checker=Checker {left:left,right:right,graph:graph,map:copy(map),targets:targets, ..};
  if left.implementations.len!=0||right.implementations.len!=0 {checker.remaining=4096;graph.remaining=4096;}
  let error=checker.check();if error==Error.declined&&graph.diagnostic.reason==blot_reuse_frontend_graph_correspondence::Reason.none {graph.diagnostic.reason=blot_reuse_frontend_graph_correspondence::Reason.catalog;}
  let progress=targets.progress;if progress {progress.graph=graph.diagnostic;progress.graph.remaining=graph.remaining;}graph.deinit();
@@ -208,7 +208,7 @@ fn implementations(self:Checker&)->Error {
  // Preserve source table order: members before predicates, left before right.
  for value,index in self.left.implementation_members {if value.name==0&&value.root==0&&value.target.unit==0&&value.target.binding==0 {continue;}{ let propagated_error = self.implementationClaims(self.left,index,true); if propagated_error != Error.none { return propagated_error; } }}
  for value,index in self.right.implementation_members {if value.name==0&&value.root==0&&value.target.unit==0&&value.target.binding==0 {continue;}{ let propagated_error = self.implementationClaims(self.right,index,true); if propagated_error != Error.none { return propagated_error; } }}
- let inert=blot_check_types::Obligation {ty:0,kind:blot_check_types::ObligationKind.type_rep,source:0,explicit:true};
+ let inert=blot_check_types::Obligation {ty:0,kind:blot_check_types::ObligationKind.type_rep,source:0,explicit:true, ..};
  for value,index in self.left.implementation_predicates {if blot_structural::equal(value,inert) {continue;}{ let propagated_error = self.implementationClaims(self.left,index,false); if propagated_error != Error.none { return propagated_error; } }}
  for value,index in self.right.implementation_predicates {if blot_structural::equal(value,inert) {continue;}{ let propagated_error = self.implementationClaims(self.right,index,false); if propagated_error != Error.none { return propagated_error; } }}
  for old,index in self.left.implementations {
@@ -263,7 +263,7 @@ fn privateContractSlots(self:Checker&,owner:const Interface&)->Error {
   for header in owner.contracts {{ let propagated_error = self.work(0); if propagated_error != Error.none { return propagated_error; } }if !header.private&&header.identity==member.contract&&index>=header.members.start&&index-header.members.start<header.members.len {public=true;}}
   if !public {return Error.declined;}
  }
- let inert=blot_check_types::Obligation {ty:0,kind:blot_check_types::ObligationKind.type_rep,source:0,explicit:true};
+ let inert=blot_check_types::Obligation {ty:0,kind:blot_check_types::ObligationKind.type_rep,source:0,explicit:true, ..};
  for predicate,index in owner.contract_predicates {
   if blot_structural::equal(predicate,inert) {continue;}var public=false;
   for header in owner.contracts {{ let propagated_error = self.work(0); if propagated_error != Error.none { return propagated_error; } }if !header.private&&index>=header.predicates.start&&index-header.predicates.start<header.predicates.len {public=true;}}
@@ -299,7 +299,7 @@ fn obligation(self:Checker&,from:blot_check_types::Obligation,to:blot_check_type
 fn provenance(self:Checker&,unit:u32,before:Span,after:Span)->Error {
  if before.start>before.end||after.start>after.end {return Error.declined;}if unit!=self.left.unit {if self.targets.qualification(unit,before)!=after {return Error.declined;}return Error.none;}
  for prior in self.qualifications.items {{ let propagated_error = self.work(0); if propagated_error != Error.none { return propagated_error; } }if prior.before==before {if prior.after!=after {return Error.declined;}return Error.none;}if prior.after==after {return Error.declined;}}
- return blot_support_pooled_buffer::push(self.qualifications,Qualification {before,after},qualification_runs);
+ return blot_support_pooled_buffer::push(self.qualifications,Qualification {before,after, ..},qualification_runs);
 }
 recursive fn patternList(self:Checker&,old:List,current:List,depth:i64)->Error {
  { let propagated_error = self.work(depth); if propagated_error != Error.none { return propagated_error; } }if old.len!=current.len {return Error.declined;}let before=self.left.patterns.extra[old.start..old.start+old.len];let after=self.right.patterns.extra[current.start..current.start+current.len];for from,index in before {{ let propagated_error = self.pattern(from,after[index],depth+1); if propagated_error != Error.none { return propagated_error; } }}return Error.none;
@@ -307,5 +307,5 @@ recursive fn patternList(self:Checker&,old:List,current:List,depth:i64)->Error {
 recursive fn pattern(self:Checker&,old:u32,current:u32,depth:i64)->Error {
  { let propagated_error = self.work(depth); if propagated_error != Error.none { return propagated_error; } }let from=self.left.patterns.nodes[old];let to=self.right.patterns.nodes[current];if from.kind!=to.kind||from.b!=to.b {return Error.declined;}if from.kind==blot_check_parameter_patterns::Kind.binding {return self.graph.ty(from.a,to.a);}
  if from.kind==blot_check_parameter_patterns::Kind.record {for field in 0..from.b {let before=self.left.patterns.extra[from.a+field*2..from.a+field*2+2];let after=self.right.patterns.extra[to.a+field*2..to.a+field*2+2];if before[0]!=after[0] {return Error.declined;}{ let propagated_error = self.pattern(before[1],after[1],depth+1); if propagated_error != Error.none { return propagated_error; } }}}
- else {{ let propagated_error = self.patternList(List {from.a,from.b},List {to.a,to.b},depth+1); if propagated_error != Error.none { return propagated_error; } }}return Error.none;
+ else {{ let propagated_error = self.patternList(List {from.a,from.b, ..},List {to.a,to.b, ..},depth+1); if propagated_error != Error.none { return propagated_error; } }}return Error.none;
 }

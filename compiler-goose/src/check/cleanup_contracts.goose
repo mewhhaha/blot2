@@ -23,7 +23,7 @@ fn recordField<S,N>(self: const NominalTypes<S,N>&, value: blot_check_types::Nod
 fn typeBound<S,N>(self: const NominalTypes<S,N>&, id: Id) -> bool { return id < self.store.nodes.len; }
 fn rowBound<S,N>(self: const NominalTypes<S,N>&, id: u32) -> bool { return id < self.store.effects.rows.len; }
 fn payload(store, id: Id) -> bool { let empty: const blot_check_core::Nominal[:] = []; return payloadNominal(store, empty, id); }
-fn payloadNominal(store, nominals, id: Id) -> bool { var budget = Budget {}; return payloadDepth(store, nominals, id, budget, 0); }
+fn payloadNominal(store, nominals, id: Id) -> bool { var budget = Budget {..}; return payloadDepth(store, nominals, id, budget, 0); }
 recursive fn payloadDepth(store, nominals, id: Id, budget: Budget&, depth: i64) -> bool {
     if budget.charge(depth) != Error.none || !typeBound(store, id) { return false; } let node = store.node(store.head(id, 0));
     if scalar(node.tag) { return node.a == 0 && node.b == 0 && node.c == 0; }
@@ -53,7 +53,7 @@ recursive fn equalStorage(store: const blot_check_core::Types&, left: Id, right:
     } return true, Error.none;
 }
 fn closedStorage(module: const blot_check_core::Module&) -> Error {
-    var budget = Budget {}; var constructor_work = blot_check_usage_check::Work {};
+    var budget = Budget {..}; var constructor_work = blot_check_usage_check::Work {..};
     for node in module.nodes { let error = budget.charge(0); if error != Error.none { return error; }
         if node.tag != blot_check_core::Tag.product && node.tag != blot_check_core::Tag.record && node.tag != blot_check_core::Tag.array && node.tag != blot_check_core::Tag.construct { continue; }
         var ty = node.ty; if !typeBound(module.types, ty) { return Error.unsafe_cleanup; } let wrapper = module.types.node(ty);
@@ -103,7 +103,7 @@ struct SourceReceipt { safe: bool = false, host: bool = false }
 fn source(engine, root: blot_parse_ast::Id) -> bool { return sourceRecipe(engine, root, false).safe; }
 fn sourceTransferred(engine, root: blot_parse_ast::Id) -> bool { return sourceRecipe(engine, root, true).safe; }
 fn sourceForeign(engine, root: blot_parse_ast::Id) -> bool { return sourceRecipe(engine, root, false).host; }
-struct SourceWalker<E> { engine: E, budget: Budget = Budget {}, transferred: bool, host: bool = false }
+struct SourceWalker<E> { engine: E, budget: Budget = Budget {..}, transferred: bool, host: bool = false }
 recursive fn callable<E>(self: SourceWalker<E>&, root: blot_parse_ast::Id, depth: i64) -> Error {
     let error = self.budget.charge(depth); if error != Error.none { return error; } let node = self.engine.tree.node(root);
     match node.tag {
@@ -143,10 +143,10 @@ recursive fn expression<E>(self: SourceWalker<E>&, id: blot_parse_ast::Id, depth
     } return Error.none;
 }
 fn sourceRecipe<E>(engine: E, root: blot_parse_ast::Id, transferred: bool) -> SourceReceipt {
-    var walker = SourceWalker<E> { engine, transferred: transferred }; var direct = root;
+    var walker = SourceWalker<E> { engine, transferred: transferred , ..}; var direct = root;
     while engine.tree.node(direct).tag == blot_parse_ast::tag_group { direct = engine.tree.node(direct).a; }
-    if engine.tree.node(direct).tag != blot_parse_ast::tag_lambda { let host = sourceHost(engine, direct); return SourceReceipt { host, host }; }
-    if expression(walker, engine.tree.node(direct).b, 0) != Error.none { return SourceReceipt {}; } return SourceReceipt { true, walker.host };
+    if engine.tree.node(direct).tag != blot_parse_ast::tag_lambda { let host = sourceHost(engine, direct); return SourceReceipt { host, host , ..}; }
+    if expression(walker, engine.tree.node(direct).b, 0) != Error.none { return SourceReceipt {..}; } return SourceReceipt { true, walker.host , ..};
 }
 fn immutable(module: const blot_check_core::Module&, root: blot_check_core::Id) -> Error { return immutableRecipe(module, root, false, null); }
 fn immutableTransferred(module: const blot_check_core::Module&, root: blot_check_core::Id) -> Error { return immutableRecipe(module, root, true, null); }
@@ -164,7 +164,7 @@ fn immutableRecipe(module: const blot_check_core::Module&, root: blot_check_core
     if immutableHost(module, root) { return Error.none; } if root == 0 || root >= module.nodes.len || module.node(root).tag != blot_check_core::Tag.closure || module.node(root).a >= module.closures.len { return Error.unsafe_cleanup; }
     let closure = module.closure(root); return immutableAdapter(module, module.typeOf(root), closure.parameter, closure.body, transferred, remaining);
 }
-struct CoreWalker { module: const blot_check_core::Module&, budget: Budget = Budget {}, transferred: bool, host: bool = false }
+struct CoreWalker { module: const blot_check_core::Module&, budget: Budget = Budget {..}, transferred: bool, host: bool = false }
 recursive fn callable(self: CoreWalker&, id: blot_check_core::Id, depth: i64) -> Error {
     let error = self.budget.charge(depth); if error != Error.none { return error; } if id == 0 || id >= self.module.nodes.len { return Error.unsafe_cleanup; } let node = self.module.node(id);
     match node.tag {
@@ -198,7 +198,7 @@ fn finiteLoop(self: CoreWalker&, id: blot_check_core::Id, depth: i64) -> Error {
     let error = self.budget.charge(depth + 1); if error != Error.none { return error; } let error = expression(self, loop.body, depth + 1); if error != Error.none { return error; } return self.budget.repeat(before, iterations);
 }
 fn immutableAdapter(module: const blot_check_core::Module&, ty: Id, parameter: blot_check_core::Parameter, body: blot_check_core::Id, transferred: bool, remaining: i64?) -> Error {
-    var walker = CoreWalker { module, transferred: transferred }; { let optional_binding_74 .= remaining; if optional_binding_74 { let budget .= optional_binding_74; walker.budget.remaining = budget;  } }
+    var walker = CoreWalker { module, transferred: transferred , ..}; { let optional_binding_74 .= remaining; if optional_binding_74 { let budget .= optional_binding_74; walker.budget.remaining = budget;  } }
     let error = checkAdapter(walker, ty, parameter, body); { let optional_binding_73 .= remaining; if optional_binding_73 { let budget .= optional_binding_73; budget = walker.budget.remaining;  } } return error;
 }
 fn equalType(module: const blot_check_core::Module&, left: Id, right: Id) -> bool { let equal, error = blot_check_rank_equal::equal(module.types, left, right, true); return error == Error.none && equal; }
@@ -210,7 +210,7 @@ fn checkAdapter(walker: CoreWalker&, ty: Id, parameter: blot_check_core::Paramet
     let error = expression(walker, body, 0); if error != Error.none { return error; } if walker.host != (header.c != 0) { return Error.unsafe_cleanup; } return Error.none;
 }
 fn validate(module: const blot_check_core::Module&) -> Error {
-    if closedStorage(module) != Error.none { return Error.invalid_artifact; } var owned: Id[4096]; var count: i64 = 0; var budget = Budget {};
+    if closedStorage(module) != Error.none { return Error.invalid_artifact; } var owned: Id[4096]; var count: i64 = 0; var budget = Budget {..};
     for node, id in module.nodes {
         if budget.charge(0) != Error.none { return Error.invalid_artifact; }
         if node.tag == blot_check_core::Tag.resource_scope || node.tag == blot_check_core::Tag.resource_acquire { if count == owned.len || node.b == 0 || node.b >= module.nodes.len { return Error.invalid_artifact; } owned[count] = module.typeOf(node.b); count += 1; }

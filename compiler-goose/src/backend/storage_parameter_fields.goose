@@ -21,13 +21,13 @@ fn projection(record: NominalRecord,module: const blot_check_core::Module&,index
 }
 fn nominalRecord(module: const blot_check_core::Module&,ty: u32,remaining: i64&) -> blot_support::Option<NominalRecord> {
     let node = module.types.node(ty); if node.tag != blot_check_types::Tag.nominal || module.types.nominalArguments(node).len != 0 { return blot_support::none<NominalRecord>(); }
-    for nominal,ordinal in module.nominals { if remaining == 0 { return blot_support::none<NominalRecord>(); } remaining--; if nominal.identity.unit != node.a || nominal.identity.decl != node.b { continue; } if nominal.is_opaque || nominal.affine || nominal.has_usage || nominal.parameters.len != 0 || nominal.variables.len != 0 { return blot_support::none<NominalRecord>(); } let constructors = module.nominalConstructors(ordinal as u32); if constructors.len != 1 { return blot_support::none<NominalRecord>(); } let constructor = module.constructor(constructors[0]); if module.types.node(constructor.payload).tag != blot_check_types::Tag.record { return blot_support::none<NominalRecord>(); } return blot_support::some(NominalRecord { identity: nominal.identity,tag: constructor.tag }); } return blot_support::none<NominalRecord>();
+    for nominal,ordinal in module.nominals { if remaining == 0 { return blot_support::none<NominalRecord>(); } remaining--; if nominal.identity.unit != node.a || nominal.identity.decl != node.b { continue; } if nominal.is_opaque || nominal.affine || nominal.has_usage || nominal.parameters.len != 0 || nominal.variables.len != 0 { return blot_support::none<NominalRecord>(); } let constructors = module.nominalConstructors(ordinal as u32); if constructors.len != 1 { return blot_support::none<NominalRecord>(); } let constructor = module.constructor(constructors[0]); if module.types.node(constructor.payload).tag != blot_check_types::Tag.record { return blot_support::none<NominalRecord>(); } return blot_support::some(NominalRecord { identity: nominal.identity,tag: constructor.tag , ..}); } return blot_support::none<NominalRecord>();
 }
 struct Walk { module: const blot_check_core::Module&,parameter: u32,nominal: blot_support::Option<NominalRecord>,fields: Fields,remaining: i64 = 100000 }
 reusable var walks: Walk[>..] = [];
 fn collect(module: const blot_check_core::Module&,root: u32,parameter: u32,nominal: blot_support::Option<NominalRecord>) -> Fields,Error {
-    let index = walks.alloc_index(Walk { module,parameter,nominal }); let walk: Walk& = walks[index]; let error = visit(walk,root,0);
-    if error != Error.none && error != Error.plan_limit { walk.fields.deinit(); walks.free(index); return Fields {},error; } if error == Error.plan_limit { walk.fields.whole = true; } let fields = walk.fields; walk.fields = Fields {}; walks.free(index); return fields,Error.none;
+    let index = walks.alloc_index(Walk { module,parameter,nominal , ..}); let walk: Walk& = walks[index]; let error = visit(walk,root,0);
+    if error != Error.none && error != Error.plan_limit { walk.fields.deinit(); walks.free(index); return Fields {..},error; } if error == Error.plan_limit { walk.fields.whole = true; } let fields = walk.fields; walk.fields = Fields {..}; walks.free(index); return fields,Error.none;
 }
 fn target(walk: const Walk&,reference: blot_check_core::BindingRef) -> bool { (reference.unit == 0 || reference.unit == walk.module.unit) && reference.binding == walk.parameter }
 fn wholeBinding(walk: Walk&,binding: u32) { if binding == walk.parameter { walk.fields.whole = true; } }
@@ -48,5 +48,5 @@ recursive fn visit(walk: Walk&,id: u32,depth: i64) -> Error {
         constant,scalar,associated,logical,apply,record_merge,block_,suite,bind,return_,product,record,construct,array,array_op,storage,call,panic,break_=>{},
         _=>{ return Error.plan_limit; },
     }
-    var children = Children { walk,depth: depth + 1 }; return blot_eval_body_recipe::appendChildren(children,module,id,false);
+    var children = Children { walk,depth: depth + 1 , ..}; return blot_eval_body_recipe::appendChildren(children,module,id,false);
 }

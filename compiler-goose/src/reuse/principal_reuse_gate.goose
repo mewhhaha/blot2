@@ -60,7 +60,7 @@ fn deinit(self: Gate&) {
         release(self.closure_offsets); release(self.offsets); release(self.dirty); release(self.local_dirty); release(self.call_origins);
         storage.free(at);
     }
-    self = Gate {};
+    self = Gate {..};
 }
 fn init(allocation_owner: u64, old: const Pools&, units: const Module[:], names: blot_support::Option<View>) -> Gate, Error {
     return initWithStamps(allocation_owner, old, units, names, null);
@@ -72,10 +72,10 @@ fn initConstantReceipts(allocation_owner: u64, old: const Pools&, units: const M
     return initMode(allocation_owner, old, units, names, stamps, true);
 }
 fn initMode(allocation_owner: u64, old: const Pools&, units: const Module[:], names: blot_support::Option<View>, stamps: blot_reuse_code_artifacts::ModuleStamps?, constant_types: bool) -> Gate, Error {
-    if units.len == 0x7fffffffffffffff || next_generation == 0xffffffffffffffff || storage.len >= 0xffffffff { return Gate {}, Error.out_of_memory; }
+    if units.len == 0x7fffffffffffffff || next_generation == 0xffffffffffffffff || storage.len >= 0xffffffff { return Gate {..}, Error.out_of_memory; }
     var binding_count: i64 = 0; var closure_count: i64 = 0;
     for module in units {
-        if module.bindings.len > 0x7fffffffffffffff - binding_count || module.closures.len > 0x7fffffffffffffff - closure_count { return Gate {}, Error.out_of_memory; }
+        if module.bindings.len > 0x7fffffffffffffff - binding_count || module.closures.len > 0x7fffffffffffffff - closure_count { return Gate {..}, Error.out_of_memory; }
         binding_count += module.bindings.len; closure_count += module.closures.len;
     }
     let structural = bits.alloc_slice(units.len); let certified = bits.alloc_slice(units.len);
@@ -87,12 +87,12 @@ fn initMode(allocation_owner: u64, old: const Pools&, units: const Module[:], na
     for &owner in closures { owner = 0; } offsets[0] = 0; closure_offsets[0] = 0;
     for module, index in units { offsets[index + 1] = offsets[index] + module.bindings.len; closure_offsets[index + 1] = closure_offsets[index] + module.closures.len; }
     let generation = next_generation; next_generation++;
-    let slot = storage.alloc_index(Storage { 1, generation });
+    let slot = storage.alloc_index(Storage { 1, generation , ..});
     var result = Gate { constant_types: constant_types, allocation_owner: allocation_owner, units: units, source_pools: old,
         structural_units: structural, certified_images: certified, closure_owners: closures, closure_offsets: closure_offsets,
-        offsets: offsets, dirty: dirty, local_dirty: local_dirty, call_origins: origins, storage: (slot + 1) as u32, generation: generation };
+        offsets: offsets, dirty: dirty, local_dirty: local_dirty, call_origins: origins, storage: (slot + 1) as u32, generation: generation , ..};
     let error = initialize(result, old, names, stamps, structural, certified, closures, dirty, local_dirty, origins);
-    if error != Error.none { result.deinit(); return Gate {}, error; }
+    if error != Error.none { result.deinit(); return Gate {..}, error; }
     return result, Error.none;
 }
 fn initialize(result: Gate&, old: const Pools&, names: blot_support::Option<View>, stamps: blot_reuse_code_artifacts::ModuleStamps?,
@@ -118,9 +118,9 @@ fn initialize(result: Gate&, old: const Pools&, names: blot_support::Option<View
     if !all_structural { for &module, unit in units { if !structural[unit] && !catalogEqual(old.modules[unit].module, module, result.constant_types) { return Error.none; } } }
     var old_units: blot_check_frozen_core_validation::ModuleRef[>..<] = [];
     var current_units: blot_check_frozen_core_validation::ModuleRef[>..<] = [];
-    for &module, unit in units { old_units.push(blot_check_frozen_core_validation::ModuleRef { old.modules[unit].module }); current_units.push(blot_check_frozen_core_validation::ModuleRef { module }); }
-    let old_context = blot_check_frozen_core_validation::Context { units: old_units[..], symbol_count: blot_support::some(previous.symbols.len) };
-    let current_context = blot_check_frozen_core_validation::Context { units: current_units[..], symbol_count: blot_support::some(current.symbols.len) };
+    for &module, unit in units { old_units.push(blot_check_frozen_core_validation::ModuleRef { old.modules[unit].module , ..}); current_units.push(blot_check_frozen_core_validation::ModuleRef { module , ..}); }
+    let old_context = blot_check_frozen_core_validation::Context { units: old_units[..], symbol_count: blot_support::some(previous.symbols.len) , ..};
+    let current_context = blot_check_frozen_core_validation::Context { units: current_units[..], symbol_count: blot_support::some(current.symbols.len) , ..};
     let equivalent_context = blot_check_frozen_core_validation::equivalentContext(old_context, current_context, old_units[..], current_units[..]);
     var certified_context = false; var same_context = false;
     if old.dependency_certificate.present {
@@ -147,7 +147,7 @@ fn initialize(result: Gate&, old: const Pools&, names: blot_support::Option<View
         for binding, index in module.bindings[1..] {
             let id = (index + 1) as u32;
             if binding.kind == blot_check_check::Kind.global && binding.body_id == 0 { return Error.none; }
-            if binding.kind == blot_check_check::Kind.external && !result.declaration(BindingRef { (unit + 1) as u32, id }).present { return Error.none; }
+            if binding.kind == blot_check_check::Kind.external && !result.declaration(BindingRef { (unit + 1) as u32, id , ..}).present { return Error.none; }
         }
         for reference in module.dependency_references { var target = reference; if target.unit == 0 { target.unit = (unit + 1) as u32; } if !result.declaration(target).present { return Error.none; } }
         for candidate in module.associated { var target = candidate.target; if target.unit == 0 { target.unit = (unit + 1) as u32; } if !result.declaration(target).present { return Error.none; } }
@@ -157,7 +157,7 @@ fn initialize(result: Gate&, old: const Pools&, names: blot_support::Option<View
         let pin = old.modules[unit];
         if !structural[unit] {
             for &flag in dirty[result.offsets[unit]..result.offsets[unit + 1]] { flag = true; }
-            let error = blot_reuse_declaration_projection::withWorkspace(pin.module, ProjectContext { result, module, unit, dirty, origins, closures, reached }, projectUnit);
+            let error = blot_reuse_declaration_projection::withWorkspace(pin.module, ProjectContext { result, module, unit, dirty, origins, closures, reached , ..}, projectUnit);
             if error != Error.none { return error; }
             continue;
         }
@@ -204,8 +204,8 @@ fn admitsPrincipal(self: const Gate&, target: BindingRef) -> bool {
 fn admitsReceipt<R>(self: const Gate&, record: const R&) -> bool {
     for source in record.sources { if !self.admits(source) { return false; } }
     for read in record.scalar_reads { if !self.admits(read.target) { return false; } }
-    for read in record.call_reads { if !self.admits(BindingRef { read.unit, read.binding }) { return false; } }
-    for call in record.call_publications { if !self.admits(BindingRef { call.unit, call.binding }) { return false; } } return true;
+    for read in record.call_reads { if !self.admits(BindingRef { read.unit, read.binding , ..}) { return false; } }
+    for call in record.call_publications { if !self.admits(BindingRef { call.unit, call.binding , ..}) { return false; } } return true;
 }
 fn admitsLocalSource(self: const Gate&, target: BindingRef) -> bool { return self.admitsCallIdentity(target) && !self.local_dirty[self.offsets[target.unit - 1] + target.binding]; }
 fn admitsCheckedInterface(self: const Gate&, target: BindingRef) -> bool { return self.checkedInterfaceEqual(target, true); }
@@ -226,9 +226,9 @@ fn admitsCompletedInterface(self: const Gate&, target: BindingRef) -> bool, Erro
     let body .= current.body(target.binding); assert(body); var needs_proof = !body.is_function;
     for requirement in current.obligations[scheme.obligations.start..scheme.obligations.start + scheme.obligations.len] { needs_proof = needs_proof || !requirement.explicit; }
     if needs_proof {
-        var owners: blot_check_frozen_core_validation::ModuleRef[>..<] = []; for &module in self.units { owners.push(blot_check_frozen_core_validation::ModuleRef { module }); }
+        var owners: blot_check_frozen_core_validation::ModuleRef[>..<] = []; for &module in self.units { owners.push(blot_check_frozen_core_validation::ModuleRef { module , ..}); }
         var remaining: i64 = 65536;
-        let error = blot_check_package_core::checkedInterfaceBody(current, target.binding, blot_check_frozen_core_validation::Context { units: owners[..] }, remaining);
+        let error = blot_check_package_core::checkedInterfaceBody(current, target.binding, blot_check_frozen_core_validation::Context { units: owners[..] , ..}, remaining);
         if error == Error.out_of_memory { return false, error; } if error != Error.none { return false, Error.none; }
     }
     return true, Error.none;
@@ -236,7 +236,7 @@ fn admitsCompletedInterface(self: const Gate&, target: BindingRef) -> bool, Erro
 fn admitsClosure(self: const Gate&, unit: u32, catalog: u32) -> bool {
     if !self.enabled || unit == 0 || unit > self.units.len || catalog >= self.units[unit - 1].closures.len { return false; }
     if self.structural_units[unit - 1] { return true; } let owner = self.closure_owners[self.closure_offsets[unit - 1] + catalog];
-    return owner != 0 && self.admitsLocalSource(BindingRef { unit, owner });
+    return owner != 0 && self.admitsLocalSource(BindingRef { unit, owner , ..});
 }
 enum IdentityFailure { none, disabled, bounds, kind, binding_type, source_position, declaration_origin, body, scheme_root, scheme, flags }
 fn admitsCallIdentity(self: const Gate&, target: BindingRef) -> bool { return self.callIdentityFailure(target) == IdentityFailure.none; }
@@ -258,16 +258,16 @@ fn callIdentityFailure(self: const Gate&, target: BindingRef) -> IdentityFailure
 fn admitsRefinement<R>(self: const Gate&, record: const R&) -> bool {
     for source in record.sources { if !self.admitsLocalSource(source) { return false; } }
     for read in record.scalar_reads { if !self.admits(read.target) { return false; } }
-    for read in record.call_reads { let target = BindingRef { read.unit, read.binding }; if read.present { if !self.admitsCallIdentity(target) { return false; } } else if !self.admitsLocalSource(target) { return false; } }
-    for call in record.call_publications { if !self.admitsLocalSource(BindingRef { call.unit, call.binding }) { return false; } } return true;
+    for read in record.call_reads { let target = BindingRef { read.unit, read.binding , ..}; if read.present { if !self.admitsCallIdentity(target) { return false; } } else if !self.admitsLocalSource(target) { return false; } }
+    for call in record.call_publications { if !self.admitsLocalSource(BindingRef { call.unit, call.binding , ..}) { return false; } } return true;
 }
 fn freezeValidation(self: const Gate&, pins: const blot_reuse_code_artifacts::ModulePin[:]) -> blot_support::Option<blot_reuse_dependency_certificate::Certificate>, Error {
     if !self.dependencies_validated || pins.len != self.units.len || !self.validation_names.present { return blot_support::none<blot_reuse_dependency_certificate::Certificate>(), Error.none; }
     var units: blot_check_frozen_core_validation::ModuleRef[>..<] = [];
-    for pin, index in pins { let module: const Module& = self.units[index]; if pin.module .!= module { return blot_support::none<blot_reuse_dependency_certificate::Certificate>(), Error.none; } units.push(blot_check_frozen_core_validation::ModuleRef { module }); }
+    for pin, index in pins { let module: const Module& = self.units[index]; if pin.module .!= module { return blot_support::none<blot_reuse_dependency_certificate::Certificate>(), Error.none; } units.push(blot_check_frozen_core_validation::ModuleRef { module , ..}); }
     var previous: const blot_reuse_dependency_certificate::Certificate? = null;
     if self.source_pools && self.source_pools.dependency_certificate.present { previous .= self.source_pools.dependency_certificate.value; }
-    let certificate, error = blot_reuse_dependency_certificate::captureReusing(blot_check_frozen_core_validation::Context { units: units[..], symbol_count: blot_support::some(self.validation_symbols) }, pins, self.validation_names.value, previous, self.certified_images);
+    let certificate, error = blot_reuse_dependency_certificate::captureReusing(blot_check_frozen_core_validation::Context { units: units[..], symbol_count: blot_support::some(self.validation_symbols) , ..}, pins, self.validation_names.value, previous, self.certified_images);
     return certificate, error;
 }
 fn targetDirty(self: const Gate&, owner: i64, target: BindingRef) -> bool { var unit = owner; if target.unit != 0 { unit = target.unit - 1; } return self.dirty[self.offsets[unit] + target.binding]; }
@@ -308,7 +308,7 @@ fn dirtySelections(gate: const Gate&, dirty: bool[:]) -> Error {
         if candidates.len == known { return Error.none; } var changed = false;
         for &module, unit in gate.units { for binding, offset in module.bindings[1..] {
             let index = gate.offsets[unit] + offset + 1; if dirty[index] || binding.kind != blot_check_check::Kind.global { continue; }
-            var span = MemberSpan { members.len, 0 }; let prior .= scanned.get(index);
+            var span = MemberSpan { members.len, 0 , ..}; let prior .= scanned.get(index);
             if prior { span = prior; }
             else {
                 let error = blot_reuse_declaration_dependencies::selectionMembers(module, module.bodies[binding.body_id], members);
@@ -324,7 +324,7 @@ fn dirtySelections(gate: const Gate&, dirty: bool[:]) -> Error {
 fn obligationsEqual(previous: const blot_check_core::Obligation[:], current: const blot_check_core::Obligation[:]) -> bool {
     if previous.len != current.len { return false; }
     for before, index in previous {
-        var left = before; var right = current[index]; left.span = blot_check_core::Span { 0, 0 }; right.span = left.span;
+        var left = before; var right = current[index]; left.span = blot_check_core::Span { 0, 0 , ..}; right.span = left.span;
         if left.qualification_span.present { left.qualification_span.value = left.span; } if right.qualification_span.present { right.qualification_span.value = right.span; }
         if !blot_structural::equal(left, right) { return false; }
     } return true;
@@ -358,7 +358,7 @@ fn namespaceEqual(old: const Pools&, units: const Module[:], previous: View, cur
 }
 fn validText(bytes: const u8[:]) -> bool { if bytes.len == 0 || !blot_backend_runtime_identity::validUtf8(bytes) { return false; } for byte in bytes { if byte == 0 { return false; } } return true; }
 fn validDependencies(module: const Module&, units: const blot_check_frozen_core_validation::ModuleRef[:], symbol_count: i64) -> bool, Error {
-    let error = blot_check_frozen_core_validation::validate(module, blot_check_frozen_core_validation::Context { units: units, symbol_count: blot_support::some(symbol_count) });
+    let error = blot_check_frozen_core_validation::validate(module, blot_check_frozen_core_validation::Context { units: units, symbol_count: blot_support::some(symbol_count) , ..});
     if error == Error.out_of_memory { return false, error; } if error != Error.none { return false, Error.none; }
     var erased: i64 = 0;
     for node, id in module.nodes { if node.tag != blot_check_core::Tag.effect_reflection || node.a != blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.of) { continue; } if erased >= module.erased_declaration_references.len || module.erased_declaration_references[erased].node != id { return false, Error.none; } erased++; }
@@ -388,8 +388,8 @@ fn scalarRoot(module: const Module&, id: u32) -> blot_support::Option<u32> {
         blot_check_core::Tag.if_value, blot_check_core::Tag.if_stmt, blot_check_core::Tag.state_provider => { if value.a == id || value.b == id || value.c == id { return no; } },
         blot_check_core::Tag.bind, blot_check_core::Tag.construct => { if value.b == id { return no; } },
         blot_check_core::Tag.return_, blot_check_core::Tag.project, blot_check_core::Tag.computation, blot_check_core::Tag.result_associated => { if value.a == id { return no; } },
-        blot_check_core::Tag.block_, blot_check_core::Tag.suite, blot_check_core::Tag.product, blot_check_core::Tag.record, blot_check_core::Tag.array, blot_check_core::Tag.array_op, blot_check_core::Tag.storage => { if rangeHas(module.extra, blot_check_core::List { value.a, value.b }, id) { return no; } },
-        blot_check_core::Tag.call, blot_check_core::Tag.break_ => { if rangeHas(module.extra, blot_check_core::List { value.b, value.c }, id) { return no; } },
+        blot_check_core::Tag.block_, blot_check_core::Tag.suite, blot_check_core::Tag.product, blot_check_core::Tag.record, blot_check_core::Tag.array, blot_check_core::Tag.array_op, blot_check_core::Tag.storage => { if rangeHas(module.extra, blot_check_core::List { value.a, value.b , ..}, id) { return no; } },
+        blot_check_core::Tag.call, blot_check_core::Tag.break_ => { if rangeHas(module.extra, blot_check_core::List { value.b, value.c , ..}, id) { return no; } },
         blot_check_core::Tag.pattern_bind, blot_check_core::Tag.request_decision => { if value.b == id || value.c == id { return no; } },
         blot_check_core::Tag.effect_reflection => { if value.a >= blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.count) && (value.b == id || value.c == id) { return no; } },
         _ => {},

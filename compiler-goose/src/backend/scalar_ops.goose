@@ -59,13 +59,13 @@ fn bitsFloat(value: u32) -> f32 {
 fn boolean(value: bool) -> u32 { if value { return 1; } return 0; }
 fn evaluate(op: blot_check_core::Op, a: Value, b: Value) -> Value, blot_error::Error {
     let selected = opcode(op, a.scalar);
-    if !selected.present { return Value {}, blot_error::Error.unsupported; }
+    if !selected.present { return Value {..}, blot_error::Error.unsupported; }
     let machine = selected.value; let x = bitsFloat(a.bits); let y = bitsFloat(b.bits); var bits: u32 = 0;
     if machine == blot_backend_runtime_ir::OP_i32_add { bits = (a.bits as u64 + b.bits as u64) as! u32; }
     else if machine == blot_backend_runtime_ir::OP_i32_sub { bits = (a.bits as u64 + 4294967296 - b.bits as u64) as! u32; }
     else if machine == blot_backend_runtime_ir::OP_i32_mul { bits = (a.bits as u64 * b.bits as u64) as! u32; }
     else if machine == blot_backend_runtime_ir::OP_i32_div_u || machine == blot_backend_runtime_ir::OP_i32_rem_u {
-        if b.bits == 0 { return Value {}, blot_error::Error.integer_divide_by_zero; }
+        if b.bits == 0 { return Value {..}, blot_error::Error.integer_divide_by_zero; }
         if machine == blot_backend_runtime_ir::OP_i32_div_u { bits = a.bits / b.bits; } else { bits = a.bits % b.bits; }
     } else if machine == blot_backend_runtime_ir::OP_i32_and { bits = a.bits & b.bits; }
     else if machine == blot_backend_runtime_ir::OP_i32_or { bits = a.bits | b.bits; }
@@ -103,13 +103,13 @@ fn evaluate(op: blot_check_core::Op, a: Value, b: Value) -> Value, blot_error::E
     else if machine == blot_backend_runtime_ir::OP_f32_convert_i32_u { bits = floatBits(a.bits as f32); }
     else if machine == blot_backend_runtime_ir::OP_i32_trunc_sat_f32_u {
         if x != x || x <= 0.0 { bits = 0; } else if x >= 4294967296.0 { bits = 4294967295; } else { bits = x as u32; }
-    } else { return Value {}, blot_error::Error.unsupported; }
-    return Value { scalar: resultScalar(op, a.scalar), bits: bits }, blot_error::Error.none;
+    } else { return Value {..}, blot_error::Error.unsupported; }
+    return Value { scalar: resultScalar(op, a.scalar), bits: bits , ..}, blot_error::Error.none;
 }
 fn evaluateExact(op: blot_check_core::Op, a: Value, b: Value) -> Value, blot_error::Error {
     let result, error = evaluate(op, a, b); if error != blot_error::Error.none { return result, error; }
     if result.scalar == blot_backend_runtime_ir::SC_f32 && (op == blot_check_core::Op.add || op == blot_check_core::Op.sub || op == blot_check_core::Op.mul || op == blot_check_core::Op.div || op == blot_check_core::Op.ceil || op == blot_check_core::Op.floor || op == blot_check_core::Op.trunc || op == blot_check_core::Op.sqrt || op == blot_check_core::Op.min || op == blot_check_core::Op.max) {
-        let value = bitsFloat(result.bits); if value != value { return Value {}, blot_error::Error.unsupported; }
+        let value = bitsFloat(result.bits); if value != value { return Value {..}, blot_error::Error.unsupported; }
     }
     return result, blot_error::Error.none;
 }

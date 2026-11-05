@@ -106,19 +106,64 @@ isolation while borrowing the same immutable data. Recursive grammar and
 source-operator scratch use typed reusable buffers; read-only observers accept
 const owners. Source symbol hashing uses shared oracle-shaped Wyhash.
 
+TapeOwner/ObservationOwner and principal/constant RecorderOwner now supply
+canonical generation-checked global descriptors before Session stores observer
+borrows. Specialization restores previous Session observers before releasing
+these owners. MemberTrace likewise has a global typed metadata slot. Recorder
+backing tables/maps and live scalar state are pooled, and publication observes
+logical allocation failures before constructing a complete receipt.
+
+The assigned BodyCache digest pass and full dependency_snapshot production
+projection/freezing pass are written. Snapshot outputs use Payload.Owned<Graph>
+or Owned<Interface>; private callbacks are statically typed and copy their state
+back on all exits. BoundScope handles own copied typed ID runs, so recursive
+caller arrays never escape into scope metadata. Test-only eager digest helpers
+remain in the frozen oracle and are excluded from production Goose.
+
+partial_dependency and dependency_consumer now have full first production
+passes. Prepared.catalog_owner retains the Core descriptor vector, paths,
+identity bytes/name tables, order, import ordinals and digests; unit_owners retain
+nested Core payloads, and seed_pin retains explicit snapshot authority. Raw
+read-only Frozen inputs copy cached Core safely; pinned prefix rebinding restores
+exact source descriptor identity. These added copy costs are unmeasured.
+Prepared.takeCore returns Owned<Core>, revokes the source-completion receipt and
+leaves an inert same-unit descriptor. Backend pinResult retains catalog, unit and
+seed journals before successful outputs escape frontend teardown. Diagnostic
+publication owns code/message/details JSON and preserves native field names and
+token/code strings despite Goose's explicit optional-presence fields.
+
+Editor ownership leaves now have complete first production passes:
+hole_diagnostics, completion_probe, completion_fit, completion_names,
+editor_completion, revision_inputs and source_overlays. The native repository
+has no completion_source/completions modules; editor_completion is the actual
+query orchestrator. Test helpers/laws remain in the Zig oracle only.
+
+Hole graphs preserve bounded visitation, text, scope and requirement order and
+serialize diagnostic-local IDs. Completion answers own every item/diagnostic
+text and cloned semantic context. Revision providers retain successful and
+failed outcomes, exact settings, source digests and import decisions; freezing
+moves the owner and rejects stale mutable provider descriptors. Source overlays
+own stable per-entry runs instead of slices into a growing byte buffer.
+Persisted::adopt receives a typed decoded owner with value:Wire and deinit(),
+consumes it only after success, and makes a private owned record. That extra
+copy, all reusable-pool costs and OS acquisition timing remain unmeasured.
+
 ## Remaining construction and qualification
 
-- Complete retained observer lifetimes: Tape/MemberTrace/Observation and recorder
-  descriptor references stored in Session must root at durable typed metadata,
-  including specialization refineFresh and nested principal/constant recording.
 - Finish the recursive callback/reference and temporary-owner integration pass;
   the completed-interface ModuleRef work list and worker adapter boundaries need
   their final concrete owner alignment. Immutable slices must not outlive a
   growing table unless backed by retained immutable runs or a live store handle.
-- Align root-written retained/project-check/snapshot/format APIs and partial
-  Prepared transfer APIs with dependency_closure's explicit Owner contracts.
-  CoreBuilder has agreed to return Owned<Core.Module>; parallel Input carries
-  fixed Tree/Checked values. Driver wiring and native packet adapters remain.
+- Complete root/backend driver and publication wiring: each successful result
+  pins all input owners and retires its public workspace exactly once. Concrete
+  workspace factories and remaining project-check/format leaf APIs are still in
+  progress. CoreBuilder returns Owned<Core.Module>; parallel Input carries fixed
+  Tree/Checked values.
+- Goose thread programs copy globals and reject nonflat mutable global state.
+  Existing pooled reference/slice metadata makes current thread_fn worker paths
+  unqualified. The agreed eventual transport is independent OS worker processes
+  running the Goose worker CLI, preserving copied packets, quotas, cancellation,
+  joins and publication order. That integration is not yet implemented or timed.
 - Finish nominal enum/codecs, .items observations and source/public API alignment
   across all port owners. Inactive frozen/projection variants must abort on
   observation and never constitute successful proof or graph admission.

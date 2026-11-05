@@ -129,15 +129,15 @@ fn depth(self: const Context&) -> i64 {
     return count;
 }
 fn appendEvent(self: Context&, event: Event) {
-    self.events.push(StampedEvent { self.clock, event }); self.clock++;
+    self.events.push(StampedEvent { self.clock, event , ..}); self.clock++;
 }
 fn enter(self: Context&, request: Request) -> Scope, Error {
-    if self.jobs.len == 4294967295 { return Scope { self, 0, 0, false }, Error.out_of_memory; }
+    if self.jobs.len == 4294967295 { return Scope { self, 0, 0, false , ..}, Error.out_of_memory; }
     let id = (self.jobs.len + 1) as u32;
     let parent = self.active_job;
-    self.jobs.push(Job { parent: parent, request: request });
-    appendEvent(self, Event.enter { id }); self.active_job = id;
-    return Scope { self, id, parent }, Error.none;
+    self.jobs.push(Job { parent: parent, request: request , ..});
+    appendEvent(self, Event.enter { id , ..}); self.active_job = id;
+    return Scope { self, id, parent , ..}, Error.none;
 }
 fn requireFreshCode(self: Context&) {
     if self.active_job != 0 { self.jobs[self.active_job - 1].reusable = false; }
@@ -161,7 +161,7 @@ fn appendSpan<T>(items: T[>..<]&, span: Span, value: T, capacity: u32&) -> Span 
         for index in span.len { items[start + index] = items[span.start + index]; }
         capacity = grown;
     }
-    items[start + span.len] = value; return Span { start, span.len + 1 };
+    items[start + span.len] = value; return Span { start, span.len + 1 , ..};
 }
 fn readInlineBody(self: Context&, target: blot_check_core::BindingRef) -> Error {
     if self.active_job == 0 { return Error.none; }
@@ -177,7 +177,7 @@ fn readStaticValue(self: Context&, target: blot_check_core::BindingRef, value: u
         let read = self.static_reads[span.start + at];
         if read.target == target && read.value == value { return Error.none; }
     }
-    self.jobs[index].static_reads = appendSpan(self.static_reads, span, StaticRead { target, value }, self.jobs[index].static_capacity);
+    self.jobs[index].static_reads = appendSpan(self.static_reads, span, StaticRead { target, value , ..}, self.jobs[index].static_capacity);
     return Error.none;
 }
 fn hasStaticValues(self: const Context&) -> bool {
@@ -191,7 +191,7 @@ fn hit(self: Scope&, function: u32) -> Error {
     assert(self.live && self.context.active_job == self.id);
     self.context.functionCapacity(function);
     let target = self.context.function_jobs[function];
-    self.context.appendEvent(Event.hit { self.id, target, function });
+    self.context.appendEvent(Event.hit { self.id, target, function , ..});
     self.context.jobs[self.id - 1].function = blot_support::some(function);
     self.context.jobs[self.id - 1].target_job = target;
     self.context.jobs[self.id - 1].state = State.hit; return Error.none;
@@ -200,7 +200,7 @@ fn reserve(self: Scope&, function: u32) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
     self.context.functionCapacity(function); assert(self.context.function_jobs[function] == 0);
-    self.context.appendEvent(Event.reserve { self.id, function });
+    self.context.appendEvent(Event.reserve { self.id, function , ..});
     self.context.function_jobs[function] = self.id;
     self.context.jobs[self.id - 1].function = blot_support::some(function);
     self.context.jobs[self.id - 1].state = State.reserved; return Error.none;
@@ -209,11 +209,11 @@ fn solved(self: Scope&, mappings: const blot_backend_layout::Mapping[:],
     rows: const blot_backend_layout::RowMapping[:], templates: const blot_reuse_substitution_keys::Entry[:]) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
-    let m = Span { self.context.mappings.len as u32, mappings.len as u32 };
-    let r = Span { self.context.rows.len as u32, rows.len as u32 };
-    let t = Span { self.context.templates.len as u32, templates.len as u32 };
+    let m = Span { self.context.mappings.len as u32, mappings.len as u32 , ..};
+    let r = Span { self.context.rows.len as u32, rows.len as u32 , ..};
+    let t = Span { self.context.templates.len as u32, templates.len as u32 , ..};
     self.context.mappings.append(mappings); self.context.rows.append(rows); self.context.templates.append(templates);
-    self.context.appendEvent(Event.solved { self.id });
+    self.context.appendEvent(Event.solved { self.id , ..});
     self.context.jobs[self.id - 1].mappings = m; self.context.jobs[self.id - 1].rows = r;
     self.context.jobs[self.id - 1].templates = t; self.context.jobs[self.id - 1].solved = true;
     return Error.none;
@@ -223,7 +223,7 @@ fn complete(self: Scope&, function: u32, result_template: blot_support::Option<u
     assert(self.live && self.context.active_job == self.id);
     self.context.functionCapacity(function); let owner = self.context.function_jobs[function];
     assert(owner == 0 || owner == self.id);
-    self.context.appendEvent(Event.complete { self.id, function, result_template });
+    self.context.appendEvent(Event.complete { self.id, function, result_template , ..});
     self.context.function_jobs[function] = self.id;
     self.context.jobs[self.id - 1].function = blot_support::some(function);
     self.context.jobs[self.id - 1].result_template = result_template;
@@ -232,8 +232,8 @@ fn complete(self: Scope&, function: u32, result_template: blot_support::Option<u
 fn completeValue(self: Scope&, value: u32, shape: u32) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
-    let result = ValueResult { value, shape };
-    self.context.appendEvent(Event.complete_value { self.id, result });
+    let result = ValueResult { value, shape , ..};
+    self.context.appendEvent(Event.complete_value { self.id, result , ..});
     self.context.jobs[self.id - 1].value = blot_support::some(result);
     self.context.jobs[self.id - 1].state = State.complete; return Error.none;
 }
@@ -242,7 +242,7 @@ fn completeGlobal(self: Scope&, global: u32) -> Error {
     assert(self.live && self.context.active_job == self.id);
     while self.context.global_jobs.len <= global { self.context.global_jobs.push(0); }
     assert(self.context.global_jobs[global] == 0);
-    self.context.appendEvent(Event.complete_global { self.id, global });
+    self.context.appendEvent(Event.complete_global { self.id, global , ..});
     self.context.global_jobs[global] = self.id;
     self.context.jobs[self.id - 1].global = blot_support::some(global);
     self.context.jobs[self.id - 1].state = State.complete; return Error.none;
@@ -251,7 +251,7 @@ fn hitGlobal(self: Scope&, global: u32) -> Error {
     assert(self.context != null);
     assert(self.live && self.context.active_job == self.id);
     var target: u32 = 0; if global < self.context.global_jobs.len { target = self.context.global_jobs[global]; }
-    self.context.appendEvent(Event.hit_global { self.id, target, global });
+    self.context.appendEvent(Event.hit_global { self.id, target, global , ..});
     self.context.jobs[self.id - 1].global = blot_support::some(global);
     self.context.jobs[self.id - 1].target_job = target;
     self.context.jobs[self.id - 1].state = State.hit; return Error.none;
@@ -261,7 +261,7 @@ fn deinit(self: Scope&) {
     assert(self.live && self.context.active_job == self.id);
     let state = self.context.jobs[self.id - 1].state;
     if state == State.pending || state == State.reserved { self.context.jobs[self.id - 1].state = State.failed; }
-    self.context.appendEvent(Event.leave { self.id, self.parent });
+    self.context.appendEvent(Event.leave { self.id, self.parent , ..});
     self.context.active_job = self.parent; self.live = false;
 }
 
@@ -273,13 +273,13 @@ struct StampCounts {
 fn delta(after: StampCounts, before: StampCounts) -> StampCounts {
     return StampCounts { after.stamps - before.stamps, after.bytes - before.bytes,
         after.input_updates - before.input_updates, after.hash_updates - before.hash_updates,
-        after.buffer_flushes - before.buffer_flushes, after.direct_chunks - before.direct_chunks };
+        after.buffer_flushes - before.buffer_flushes, after.direct_chunks - before.direct_chunks , ..};
 }
 enum StampAlgorithm { buffered, reference }
 struct Stamping { algorithm: StampAlgorithm = StampAlgorithm.buffered, counts: StampCounts? = null }
 struct StampHash {
     hash: blot_support_blake3::State, bytes: u8[4096], len: i64 = 0,
-    buffered: bool, counts: StampCounts = StampCounts {},
+    buffered: bool, counts: StampCounts = StampCounts {..},
 }
 fn flush(self: StampHash&) {
     if self.len == 0 { return; }
@@ -301,7 +301,7 @@ fn update(self: StampHash&, source: const u8[:]) {
     }
 }
 fn stamp<T>(options: Stamping, value: T) -> u8[32] {
-    var hash = StampHash { hash: blot_support_blake3::init(), buffered: options.algorithm == StampAlgorithm.buffered };
+    var hash = StampHash { hash: blot_support_blake3::init(), buffered: options.algorithm == StampAlgorithm.buffered , ..};
     hash.update("BLOT-PINNED-ARTIFACT-1"); blot_structural::hash(hash, value); hash.flush();
     hash.counts.stamps = 1;
     { let optional_source_16 .= options.counts; if optional_source_16 { let counts .= optional_source_16;
@@ -311,9 +311,9 @@ fn stamp<T>(options: Stamping, value: T) -> u8[32] {
      } }
     return hash.hash.final();
 }
-fn stamp<T>(value: T) -> u8[32] { stamp(Stamping {}, value) }
-fn stampBuffered<T>(value: T) -> u8[32] { stamp(Stamping { algorithm: StampAlgorithm.buffered }, value) }
-fn stampReference<T>(value: T) -> u8[32] { stamp(Stamping { algorithm: StampAlgorithm.reference }, value) }
+fn stamp<T>(value: T) -> u8[32] { stamp(Stamping {..}, value) }
+fn stampBuffered<T>(value: T) -> u8[32] { stamp(Stamping { algorithm: StampAlgorithm.buffered , ..}, value) }
+fn stampReference<T>(value: T) -> u8[32] { stamp(Stamping { algorithm: StampAlgorithm.reference , ..}, value) }
 
 // Goose composite equality compares slice members by buffer identity. Keeping
 // the fixed header itself gives an exact boundary comparison; no address hash
@@ -332,7 +332,7 @@ fn update(self: CompareStream&, bytes: const u8[:]) {
     self.at += bytes.len;
 }
 fn sameStampValue<T>(left: T, right: T) -> bool {
-    var bytes: u8[>..<] = []; var sink = CompareStream { bytes: bytes };
+    var bytes: u8[>..<] = []; var sink = CompareStream { bytes: bytes , ..};
     blot_structural::hash(sink, left); sink.compare = true;
     blot_structural::hash(sink, right); return sink.same && sink.at == bytes.len;
 }
@@ -345,7 +345,7 @@ struct ModulePin {
     header: blot_check_core::StampView, stamp: blot_support::Option<u8[32]>,
 }
 fn init(unit: u32, module: const blot_check_core::Module&, path: const u8[:]) -> ModulePin {
-    return ModulePin { unit: unit, module: module, canonical_path: path, token: freshToken(), header: headerPrint(module) };
+    return ModulePin { unit: unit, module: module, canonical_path: path, token: freshToken(), header: headerPrint(module) , ..};
 }
 fn validated(unit: u32, module: const blot_check_core::Module&, path: const u8[:]) -> ModulePin {
     var pin = init(unit, module, path); pin.stamp = blot_support::some(stamp(module)); return pin;
@@ -378,7 +378,7 @@ fn record(self: ModuleStamps&, module: blot_check_core::Module, token: Token,
     digest: blot_support::Option<u8[32]>) -> i64, Error {
     var known = digest;
     if self.validate && !known.present { known = blot_support::some(stamp(module)); self.hashed++; }
-    let index = self.entries.len; self.entries.push(ModuleStampEntry { module, token, known });
+    let index = self.entries.len; self.entries.push(ModuleStampEntry { module, token, known , ..});
     return index, Error.none;
 }
 fn proveSame(self: ModuleStamps&, left: const blot_check_core::Module&, right: const blot_check_core::Module&) -> bool, Error {
@@ -442,7 +442,7 @@ recursive fn pinIntact(pin: const ModulePin&, memo: ModuleStamps? = null) -> boo
 
 struct IdentityMetadata { bytes: const u8[:], symbols: const blot_backend_runtime_identity::Name[:], owners: const blot_backend_runtime_identity::Name[:] }
 fn view(self: IdentityMetadata) -> blot_backend_runtime_identity::View {
-    return blot_backend_runtime_identity::View { self.bytes, self.symbols, self.owners };
+    return blot_backend_runtime_identity::View { self.bytes, self.symbols, self.owners , ..};
 }
 struct Substitutions { entries: const blot_reuse_substitution_keys::Entry[:] = [], spans: const Span[:] = [] }
 fn get(self: const Substitutions&, id: u32) -> const blot_reuse_substitution_keys::Entry[:] {
@@ -565,6 +565,14 @@ fn releaseOwned(source: const ModulePin[:]) {
     let first: const ModulePin& = source[0]; let start = owned_pins.index_of(first);
     assert(start >= 0); owned_pins.free_slice(owned_pins[start..start + source.len]);
 }
+// Retarget uniquely owned pin records after the publication owner copied every
+// immutable Core header and retained its actual payload journal. No proof grows.
+fn rebindModuleHeaders(pools:Pools&,headers:const blot_check_core::Module[:])->Error {
+ if pools.modules.len!=headers.len {return Error.invalid_artifact;}
+ for pin,index in pools.modules {let header=headers[index];var unit=header.unit;if unit==0 {unit=(index+1) as u32;}if pin.unit!=unit || pin.header!=headerPrint(header) || !sameStorage(pin.module,header) {return Error.invalid_artifact;}}
+ if pools.modules.len==0 {return Error.none;}let first:const ModulePin&=pools.modules[0];let start=owned_pins.index_of(first);if start<0 {return Error.invalid_artifact;}
+ for index in headers.len {owned_pins[start+index].module .= headers[index];}return Error.none;
+}
 reusable[] var owned_spans: Span[>..] = [];
 fn allocateOwned_spans(len: i64) -> Span[:] { return owned_spans.alloc_slice(len); }
 fn copyOwned(source: const Span[:]) -> const Span[:] {
@@ -677,13 +685,13 @@ fn releaseOwned(source: const blot_reuse_constant_receipt::Record[:]) {
 fn capture(store: const blot_reuse_substitution_keys::Store&) -> Substitutions {
     let entries = copyOwned(store.entries);
     let spans = allocateOwned_spans(store.spans.len);
-    for from, index in store.spans { spans[index] = Span { from.start, from.len }; }
-    return Substitutions { entries, spans };
+    for from, index in store.spans { spans[index] = Span { from.start, from.len , ..}; }
+    return Substitutions { entries, spans , ..};
 }
-fn deinit(self: Substitutions&) { releaseOwned(self.entries); releaseOwned(self.spans); self = Substitutions {}; }
+fn deinit(self: Substitutions&) { releaseOwned(self.entries); releaseOwned(self.spans); self = Substitutions {..}; }
 fn captureBridge<C>(store: const C&) -> Bridge {
     return Bridge { copyOwned(store.partial.nodes), copyOwned(store.partial.extra),
-        copyOwned(store.to), copyOwned(store.from), copyOwned(store.row_to), copyOwned(store.row_from), copyOwned(store.shapes) };
+        copyOwned(store.to), copyOwned(store.from), copyOwned(store.row_to), copyOwned(store.row_from), copyOwned(store.shapes) , ..};
 }
 fn deinit(self: Bridge&) {
     releaseOwned(self.nodes); releaseOwned(self.extra); releaseOwned(self.to); releaseOwned(self.from);
@@ -998,7 +1006,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     var previous: const Pools? = null;
     { let optional_source_12 .= memo; if optional_source_12 { let cache .= optional_source_12; previous = cache.previous;  } }
     var candidate = default<Pools>();
-    var copying = CaptureState { shared: blot_eval_pool_leases::Builder {} };
+    var copying = CaptureState { shared: blot_eval_pool_leases::Builder {..} , ..};
     { let optional_source_11 .= previous; if optional_source_11 { let old .= optional_source_11; copying.shared.previous = old.leases;  } }
     candidate.project_identity = identity.present;
     if identity.present {
@@ -1008,7 +1016,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
             copying.capture_identity_bytes(identity.value.bytes, old.bytes),
             copying.capture_identity_symbols(identity.value.symbols, old.symbols),
             copying.capture_identity_owners(identity.value.owners, old.owners),
-        });
+         ..});
     }
     let modules = allocateOwned_pins(generator.units.len);
     for &module, index in generator.units {
@@ -1088,12 +1096,12 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
         owner_id: blot_native::fresh_owner_id(),
         values: copyOwned(generator.representations.instance_arguments.values),
         spans: copyOwned(generator.representations.instance_arguments.spans),
-    };
+     ..};
     candidate.captures = copying.capture_captures(generator.planning.template_catalog, old.captures);
     { let optional_source_7 .= generator.representations.connection; if optional_source_7 { let connection .= optional_source_7; candidate.bridge = blot_support::some(captureBridge(connection));  } }
     var locations: FieldLocation[>..<] = [];
     for slot in session.field_locations.slots {
-        if slot.tag != 0 { locations.push(FieldLocation { slot.key.family, slot.key.tag, slot.key.name, slot.val.field, slot.val.len }); }
+        if slot.tag != 0 { locations.push(FieldLocation { slot.key.family, slot.key.tag, slot.key.name, slot.val.field, slot.val.len , ..}); }
     }
     // Source field-location order is family/tag/name, independent of buckets.
     for index in 1..locations.len {
@@ -1110,15 +1118,15 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     candidate.field_locations_stamp = stamp(candidate.field_locations);
     let operations = allocateOwned_operations(generator.planning.runtime_operations.entries.len);
     for entry, index in generator.planning.runtime_operations.entries {
-        operations[index] = Operation { copyOwned(generator.planning.runtime_operations.key(entry)), entry.foreign, entry.runtime };
+        operations[index] = Operation { copyOwned(generator.planning.runtime_operations.key(entry)), entry.foreign, entry.runtime , ..};
     }
     candidate.operations = operations;
     var relocations: OperationRelocation[>..<] = [];
     for entry in generator.planning.runtime_operations.relocations {
         var location = default<OperationLocation>();
-        if entry.location.word { location = OperationLocation.word { entry.location.index }; }
-        else { location = OperationLocation.instruction { entry.location.function, entry.location.index }; }
-        relocations.push(OperationRelocation { entry.operation, location });
+        if entry.location.word { location = OperationLocation.word { entry.location.index , ..}; }
+        else { location = OperationLocation.instruction { entry.location.function, entry.location.index , ..}; }
+        relocations.push(OperationRelocation { entry.operation, location , ..});
     }
     candidate.operation_relocations = copying.capture_operation_relocations(relocations, old.operation_relocations);
     candidate.operations_finalized = generator.planning.runtime_operations.finalized;
@@ -1127,44 +1135,44 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
         if entry.tag != 0 {
             var result_template = blot_support::none<u32>();
             { let optional_source_6 .= generator.planning.template_results.get(entry.key); if optional_source_6 { let found = optional_source_6; result_template = blot_support::some(found);  } }
-            functions.push(Function { Request.named { entry.key }, entry.val, result_template });
+            functions.push(Function { Request.named { entry.key }, entry.val, result_template , ..});
         }
     }
     for entry in generator.planning.closures.slots {
         if entry.tag != 0 {
             var result_template = blot_support::none<u32>();
             { let optional_source_5 .= generator.planning.closure_template_results.get(entry.key); if optional_source_5 { let found = optional_source_5; result_template = blot_support::some(found);  } }
-            functions.push(Function { Request.closure { entry.key }, entry.val, result_template });
+            functions.push(Function { Request.closure { entry.key }, entry.val, result_template , ..});
         }
     }
     for entry in generator.planning.callables.slots {
         if entry.tag != 0 {
             var result_template = blot_support::none<u32>();
-            functions.push(Function { Request.callable { entry.key }, entry.val, result_template });
+            functions.push(Function { Request.callable { entry.key }, entry.val, result_template , ..});
         }
     }
     for entry in generator.planning.constructor_functions.slots {
         if entry.tag != 0 {
             var result_template = blot_support::none<u32>();
-            functions.push(Function { Request.constructor { entry.key }, entry.val, result_template });
+            functions.push(Function { Request.constructor { entry.key }, entry.val, result_template , ..});
         }
     }
     for entry in generator.planning.primitive_functions.slots {
         if entry.tag != 0 {
             var result_template = blot_support::none<u32>();
-            functions.push(Function { Request.primitive { entry.key }, entry.val, result_template });
+            functions.push(Function { Request.primitive { entry.key }, entry.val, result_template , ..});
         }
     }
     for entry in generator.planning.operation_functions.slots {
         if entry.tag != 0 {
             var result_template = blot_support::none<u32>();
-            functions.push(Function { Request.operation { entry.key }, entry.val, result_template });
+            functions.push(Function { Request.operation { entry.key }, entry.val, result_template , ..});
         }
     }
     for entry in generator.planning.host_functions.slots {
         if entry.tag != 0 {
             var result_template = blot_support::none<u32>();
-            functions.push(Function { Request.host { entry.key }, entry.val, result_template });
+            functions.push(Function { Request.host { entry.key }, entry.val, result_template , ..});
         }
     }
     for index in 1..functions.len {
@@ -1175,12 +1183,12 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     candidate.functions = copying.capture_functions(functions, old.functions);
     var serialized: Serialized[>..<] = [];
     for entry in generator.static_data.cache.slots {
-        if entry.tag != 0 { serialized.push(Serialized { entry.key.value, entry.key.ty, entry.val }); }
+        if entry.tag != 0 { serialized.push(Serialized { entry.key.value, entry.key.ty, entry.val , ..}); }
     }
     candidate.serialized = copying.capture_serialized(serialized, old.serialized);
     var globals: RuntimeGlobal[>..<] = [];
     for entry in generator.planning.runtime_globals.slots {
-        if entry.tag != 0 { globals.push(RuntimeGlobal { entry.key, entry.val.global, entry.val.initializer, entry.val.active }); }
+        if entry.tag != 0 { globals.push(RuntimeGlobal { entry.key, entry.val.global, entry.val.initializer, entry.val.active , ..}); }
     }
     candidate.runtime_globals = copying.capture_runtime_globals(globals, old.runtime_globals);
     candidate.runtime_order = copying.capture_runtime_order(generator.planning.runtime_order, old.runtime_order);
@@ -1191,24 +1199,24 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     candidate.provider_cells = copying.capture_provider_cells(session.providers.cells, old.provider_cells);
     candidate.break_values = copying.capture_break_values(session.break_values, old.break_values);
     var slots: Slot[>..<] = [];
-    for from in session.slots { slots.push(Slot { blot_eval_core_eval::slotStateCode(from.state), from.traced, from.value }); }
+    for from in session.slots { slots.push(Slot { blot_eval_core_eval::slotStateCode(from.state), from.traced, from.value , ..}); }
     candidate.slots = copying.capture_slots(slots, old.slots);
     var requests: RequestCell[>..<] = [];
-    for from in session.request_cells { requests.push(RequestCell { from.state, from.exit, from.status }); }
+    for from in session.request_cells { requests.push(RequestCell { from.state, from.exit, from.status , ..}); }
     candidate.request_cells = copying.capture_request_cells(requests, old.request_cells);
     var handlers: RequestHandler[>..<] = [];
-    for from in session.request_handlers { handlers.push(RequestHandler { from.callback, from.cell, from.outer }); }
+    for from in session.request_handlers { handlers.push(RequestHandler { from.callback, from.cell, from.outer , ..}); }
     candidate.request_handlers = copying.capture_request_handlers(handlers, old.request_handlers);
     let arrays = allocateOwned_arrays(generator.planning.array_proofs.count);
     var count: i64 = 0;
     for entry in generator.planning.array_proofs.slots {
-        if entry.tag != 0 { arrays[count] = ArrayProof { entry.key, copyOwned(entry.val.updates) }; count++; }
+        if entry.tag != 0 { arrays[count] = ArrayProof { entry.key, copyOwned(entry.val.updates) , ..}; count++; }
     }
     candidate.array_proofs = arrays;
     let discards = allocateOwned_discards(generator.planning.discard_proofs.count);
     count = 0;
     for entry in generator.planning.discard_proofs.slots {
-        if entry.tag != 0 { discards[count] = DiscardProof { entry.key, copyOwned(entry.val.unused) }; count++; }
+        if entry.tag != 0 { discards[count] = DiscardProof { entry.key, copyOwned(entry.val.unused) , ..}; count++; }
     }
     candidate.discard_proofs = discards;
     candidate.evaluator_steps = session.steps; candidate.evaluator_demanded = session.demanded;
@@ -1251,9 +1259,9 @@ fn recordPrincipal(self: Context&, target: blot_check_core::BindingRef, options:
         if error != Error.none { blot_eval_core_eval::releaseSolvedTypes(mappings); blot_eval_core_eval::releaseSolvedRows(rows); return error; }
         input_key = blot_support::some(owned);
      } }
-    var builder = self.principal_queries.begin(blot_reuse_principal_query::Key { target, options });
-    builder.read(blot_reuse_principal_query::Dependencies { input_key });
-    builder.stage(blot_eval_core_eval::SolvedEvidence { types: mappings, rows: rows });
+    var builder = self.principal_queries.begin(blot_reuse_principal_query::Key { target, options , ..});
+    builder.read(blot_reuse_principal_query::Dependencies { input_key , ..});
+    builder.stage(blot_eval_core_eval::SolvedEvidence { types: mappings, rows: rows , ..});
     var candidate = builder.complete(); builder.abort();
     if !candidate.present { return Error.none; }
     let prepared, error = self.principal_queries.prepare(candidate.value);

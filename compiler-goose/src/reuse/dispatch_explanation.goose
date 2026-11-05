@@ -37,7 +37,7 @@ fn freeText(value: Text) {
 }
 fn cloneText(value: Text) -> Text { if value.present { return blot_support::some(copyText(value.value)); } return blot_support::none<const u8[:]>(); }
 fn deinit(self: Origin&) { freeText(self.name); freeText(self.path); self.name.present = false; self.path.present = false; }
-fn clone(self: Origin) -> Origin { return Origin { cloneText(self.name), cloneText(self.path), self.span }; }
+fn clone(self: Origin) -> Origin { return Origin { cloneText(self.name), cloneText(self.path), self.span , ..}; }
 fn deinit(self: Step&) { freeText(self.member); freeText(self.ty); self.member.present = false; self.ty.present = false; }
 fn deinit(self: Context&) { freeText(self.path); self.path.present = false; }
 fn deinit(self: Candidate&) { freeText(self.operand); if self.origin.present { self.origin.value.deinit(); } self.operand.present = false; self.origin.present = false; }
@@ -56,25 +56,25 @@ fn copyContexts(items: const Context[:]) -> Context[:] {
 fn deinit(self: Explanation&) {
     for &candidate in self.candidates { candidate.deinit(); } for &step in self.steps { step.deinit(); } for &context in self.contexts { context.deinit(); }
     freeCandidates(self.candidates); freeSteps(self.steps); freeContexts(self.contexts); freeText(self.operation); freeText(self.member);
-    self = Explanation {};
+    self = Explanation {..};
 }
 fn clone(self: Explanation) -> Explanation, Error {
-    var result = Explanation { operation: cloneText(self.operation), member: cloneText(self.member), truncated: self.truncated };
+    var result = Explanation { operation: cloneText(self.operation), member: cloneText(self.member), truncated: self.truncated , ..};
     if self.candidates.len != 0 {
         let out = candidate_runs.alloc_slice(self.candidates.len);
         for old, index in self.candidates {
-            out[index] = Candidate { side: old.side, operand: cloneText(old.operand), outcome: old.outcome };
+            out[index] = Candidate { side: old.side, operand: cloneText(old.operand), outcome: old.outcome , ..};
             if old.origin.present { out[index].origin = blot_support::some(old.origin.value.clone()); }
         }
         result.candidates = out;
     }
     if self.steps.len != 0 {
         let out = step_runs.alloc_slice(self.steps.len);
-        for old, index in self.steps { out[index] = Step { cloneText(old.member), cloneText(old.ty), old.outcome }; } result.steps = out;
+        for old, index in self.steps { out[index] = Step { cloneText(old.member), cloneText(old.ty), old.outcome , ..}; } result.steps = out;
     }
     if self.contexts.len != 0 {
         let out = context_runs.alloc_slice(self.contexts.len);
-        for old, index in self.contexts { out[index] = Context { old.kind, cloneText(old.path), old.span }; } result.contexts = out;
+        for old, index in self.contexts { out[index] = Context { old.kind, cloneText(old.path), old.span , ..}; } result.contexts = out;
     }
     return result, Error.none;
 }
@@ -111,8 +111,8 @@ fn fit(self: Explanation&) -> Error {
     }
 }
 struct Builder {
-    candidates: Candidate[4] = [Candidate { side: Side.left, outcome: Outcome.no_member }; 4],
-    len: i64 = 0, steps: Step[8] = [Step { outcome: Outcome.selected }; 8], step_len: i64 = 0, truncated: bool = false,
+    candidates: Candidate[4] = [Candidate { side: Side.left, outcome: Outcome.no_member , ..}; 4],
+    len: i64 = 0, steps: Step[8] = [Step { outcome: Outcome.selected , ..}; 8], step_len: i64 = 0, truncated: bool = false,
 }
 fn deinit(self: Builder&) {
     for index in self.len { self.candidates[index].deinit(); }
@@ -121,25 +121,25 @@ fn deinit(self: Builder&) {
 }
 fn add(self: Builder&, side: Side, operand: Text, outcome: Outcome) {
     if self.len == max_candidates { freeText(operand); self.truncated = true; return; }
-    self.candidates[self.len] = Candidate { side: side, operand: operand, outcome: outcome }; self.len++;
+    self.candidates[self.len] = Candidate { side: side, operand: operand, outcome: outcome , ..}; self.len++;
 }
 fn ownText(self: Builder&, value: const u8[:]) -> const u8[:], Error {
     if value.len > max_text { self.truncated = true; } return copyText(value[..boundary(value, max_text)]), Error.none;
 }
 fn makeOrigin(self: Builder&, name: const u8[:], path: Text, span: blot_support::Option<blot_parse_ast::Span>) -> Origin, Error {
-    let owned, error = self.ownText(name); if error != Error.none { return Origin {}, error; }
-    var result = Origin { name: blot_support::some(owned), span: span };
+    let owned, error = self.ownText(name); if error != Error.none { return Origin {..}, error; }
+    var result = Origin { name: blot_support::some(owned), span: span , ..};
     if path.present {
-        let owned, error = self.ownText(path.value); if error != Error.none { result.deinit(); return Origin {}, error; } result.path = blot_support::some(owned);
+        let owned, error = self.ownText(path.value); if error != Error.none { result.deinit(); return Origin {..}, error; } result.path = blot_support::some(owned);
     }
     return result, Error.none;
 }
 fn addOrigin(self: Builder&, operand: Text, outcome: Outcome, value: Origin) {
     if self.len == max_candidates { freeText(operand); var origin = value; origin.deinit(); self.truncated = true; return; }
-    self.candidates[self.len] = Candidate { Side.implementation, blot_support::some(value), operand, outcome }; self.len++;
+    self.candidates[self.len] = Candidate { Side.implementation, blot_support::some(value), operand, outcome , ..}; self.len++;
 }
 fn addStep(self: Builder&, member: Text, ty: Text, outcome: Outcome) -> Error {
-    var value = Step { ty: ty, outcome: outcome };
+    var value = Step { ty: ty, outcome: outcome , ..};
     if self.step_len == max_steps { value.deinit(); self.truncated = true; return Error.none; }
     if member.present {
         let text, error = self.ownText(member.value); if error != Error.none { value.deinit(); return error; } value.member = blot_support::some(text);
@@ -151,13 +151,13 @@ fn own(self: Builder&, bytes: u8[>..<]&) -> const u8[:], Error {
     let result = copyText(bytes); bytes.clear(); return result, Error.none;
 }
 fn finish(self: Builder&, operation: Text, member: Text) -> Explanation, Error {
-    var result = Explanation { truncated: self.truncated };
+    var result = Explanation { truncated: self.truncated , ..};
     if self.len != 0 { let out = candidate_runs.alloc_slice(self.len); for index in self.len { out[index] = self.candidates[index]; } result.candidates = out; }
     if self.step_len != 0 { let out = step_runs.alloc_slice(self.step_len); for index in self.step_len { out[index] = self.steps[index]; } result.steps = out; }
     self.len = 0; self.step_len = 0;
     if operation.present { result.operation = blot_support::some(copyText(operation.value[..boundary(operation.value, max_text)])); }
     if member.present { if member.value.len > max_text { self.truncated = true; } result.member = blot_support::some(copyText(member.value[..boundary(member.value, max_text)])); }
-    let error = result.fit(); if error != Error.none { result.deinit(); return Explanation {}, error; } return result, Error.none;
+    let error = result.fit(); if error != Error.none { result.deinit(); return Explanation {..}, error; } return result, Error.none;
 }
 fn boundary(text: const u8[:], limit: i64) -> i64 {
     if text.len <= limit { return text.len; } var end = limit;

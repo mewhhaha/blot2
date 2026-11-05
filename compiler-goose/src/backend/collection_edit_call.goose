@@ -31,7 +31,7 @@ fn analyze(units: const blot_check_core::Module[:],owner: u32,id: u32) -> blot_s
             for parameter,parameter_index in source.bodyParameters(body) { if parameter.binding != 0 && parameter.binding == reference.binding { positions[index] = forwarded_positions[parameter_index]; found = true; break; } } if !found { return blot_support::none<Plan>(); } let bit = (1 as u8) << positions[index] as u32; if (used & bit) != 0 { return blot_support::none<Plan>(); } used |= bit;
         }
         if condition != 0 && !borrowPredicate(units,target.unit,condition,source.bodyParameters(body)[positions[0]].binding,0) { return blot_support::none<Plan>(); } var forwarded = blot_support::none<blot_check_core::BindingRef>(); if forwarded_target.present { forwarded = blot_support::some(target); }
-        return blot_support::some(Plan { target: outer_target.value,forwarded_target: forwarded,op,positions,count,receiver: call.arguments[positions[0]],edit,success,arguments: [call.arguments[0],call.arguments[1],call.arguments[2]] });
+        return blot_support::some(Plan { target: outer_target.value,forwarded_target: forwarded,op,positions,count,receiver: call.arguments[positions[0]],edit,success,arguments: [call.arguments[0],call.arguments[1],call.arguments[2]] , ..});
     } return blot_support::none<Plan>();
 }
 recursive fn borrowPredicate(units: const blot_check_core::Module[:],unit: u32,id: u32,receiver: u32,depth: i64) -> bool {

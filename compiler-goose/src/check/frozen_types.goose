@@ -30,12 +30,12 @@ fn nominalArguments(self: Source, value: blot_check_types::Node) -> const blot_c
     }
 }
 fn projectionMember(self: Source, value: blot_check_types::Node) -> u32 {
-    return list(self, blot_check_types::List { value.c + 1 + nominalArguments(self, value).len as u32, 1 })[0];
+    return list(self, blot_check_types::List { value.c + 1 + nominalArguments(self, value).len as u32, 1 , ..})[0];
 }
 fn recordField(self: Source, value: blot_check_types::Node, index: i64) -> blot_check_types::Field {
     match self { inactive => { abort("inactive frozen source descriptor"); },
         store s => { return s.value.recordField(value, index); },
-        frozen s => { return blot_check_types::Field { s.value.extra[value.a + index * 2], s.value.extra[value.a + index * 2 + 1] }; },
+        frozen s => { return blot_check_types::Field { s.value.extra[value.a + index * 2], s.value.extra[value.a + index * 2 + 1] , ..}; },
     }
 }
 fn operationCount(self: Source) -> i64 {
@@ -61,7 +61,7 @@ fn list(self: Patterns, span: blot_check_parameter_patterns::List) -> const blot
 fn field(self: Patterns, value: blot_check_parameter_patterns::Node, index: i64) -> blot_check_parameter_patterns::Field {
     match self { inactive => { abort("inactive frozen source descriptor"); },
         store s => { return s.value.field(value, index); },
-        frozen s => { return blot_check_parameter_patterns::Field { s.value.extra[value.a + index * 2], s.value.extra[value.a + index * 2 + 1] }; },
+        frozen s => { return blot_check_parameter_patterns::Field { s.value.extra[value.a + index * 2], s.value.extra[value.a + index * 2 + 1] , ..}; },
     }
 }
 

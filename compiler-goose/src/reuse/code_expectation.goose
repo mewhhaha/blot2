@@ -33,8 +33,8 @@ fn children(view: View, id: Id) -> const Id[:] {
 fn init(nodes: Node[>..<]&, extra: Id[>..<]&, next: Id[>..<]&, buckets: dictionary<u64, Id>&) -> Store, Error {
     nodes.clear(); extra.clear(); next.clear(); buckets.clear();
     let tags = [Tag.absent, Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32, Tag.never];
-    for tag in tags { nodes.push(Node { tag: tag }); next.push(0); }
-    return Store { blot_native::fresh_owner_id(), nodes, extra, next, buckets }, Error.none;
+    for tag in tags { nodes.push(Node { tag: tag , ..}); next.push(0); }
+    return Store { blot_native::fresh_owner_id(), nodes, extra, next, buckets , ..}, Error.none;
 }
 fn deinit(store: Store&) { store.nodes.clear(); store.extra.clear(); store.next.clear(); store.buckets.clear(); }
 fn view(store: Store&) -> View { View { store.nodes, store.extra } }
@@ -132,7 +132,7 @@ recursive fn internFields(store: Store&, tag: Tag, a: u32, b: u32, c: u32, value
     }
     if store.nodes.len >= 4294967295 || values.len >= 4294967295 ||
         store.extra.len > 4294967295 - values.len - 1 { return 0, Error.expectation_limit; }
-    var n = Node { tag, a, b, c };
+    var n = Node { tag, a, b, c , ..};
     match tag {
         Tag.product, Tag.record => {
             n.a = store.extra.len as u32;

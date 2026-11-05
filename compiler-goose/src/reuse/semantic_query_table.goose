@@ -33,7 +33,7 @@ fn releaseBuckets(items: const Bucket[:]) {
     assert(at >= 0); bucket_storage.free_slice(bucket_storage[at..at + items.len]);
 }
 fn deinit(self: PositionIndex&) {
-    releaseLinks(self.links); releaseBuckets(self.buckets); self = PositionIndex {};
+    releaseLinks(self.links); releaseBuckets(self.buckets); self = PositionIndex {..};
 }
 fn bucketPosition(self: const PositionIndex&, fingerprint: u64) -> i64 {
     if self.buckets.len == 0 { return -1; }
@@ -64,7 +64,7 @@ fn resizeIndex(self: PositionIndex&, links: i64, buckets: i64) {
     if buckets > self.buckets.len {
         let old = self.buckets;
         self.buckets = bucket_storage.alloc_slice(buckets);
-        for index in buckets { self.buckets[index] = Bucket {}; }
+        for index in buckets { self.buckets[index] = Bucket {..}; }
         for bucket in old {
             if bucket.occupied { let at = self.bucketPosition(bucket.fingerprint); assert(at >= 0); self.buckets[at] = bucket; }
         }
@@ -77,12 +77,12 @@ fn publish(self: PositionIndex&, fingerprint: u64) {
     let position = self.count as u32;
     var previous = blot_support::none<u32>();
     if self.buckets[at].occupied { previous = blot_support::some(self.buckets[at].ends.newest); }
-    self.links[position] = Link { older: previous };
+    self.links[position] = Link { older: previous , ..};
     self.count++;
     if previous.present {
         self.links[previous.value].newer = blot_support::some(position); self.buckets[at].ends.newest = position;
     } else {
-        self.buckets[at] = Bucket { fingerprint, Ends { position, position }, true }; self.bucket_count++;
+        self.buckets[at] = Bucket { fingerprint, Ends { position, position , ..}, true , ..}; self.bucket_count++;
     }
 }
 struct Cursor {
@@ -102,7 +102,7 @@ fn candidates(self: const PositionIndex&, fingerprint: u64, order: Order, budget
         if order == Order.oldest_first { position = blot_support::some(self.buckets[at].ends.oldest); }
         else { position = blot_support::some(self.buckets[at].ends.newest); }
     }
-    return Cursor { self, position, order, budget };
+    return Cursor { self, position, order, budget , ..};
 }
 struct OwnedRecord<K,D,V,A> { key: K, dependencies: D, value: V }
 fn deinit<K,D,V,A>(self: OwnedRecord<K,D,V,A>&) { self.key.deinit(); self.dependencies.deinit(); self.value.deinit(); }
@@ -123,10 +123,10 @@ fn complete<K,D,V,A>(self: Builder<K,D,V,A>&) -> blot_support::Option<Candidate<
     if !self.key.present || !self.dependencies.present || !self.value.present {
         return blot_support::none<Candidate<K,D,V,A>>();
     }
-    let record = OwnedRecord<K,D,V,A> { self.key.value, self.dependencies.value, self.value.value };
+    let record = OwnedRecord<K,D,V,A> { self.key.value, self.dependencies.value, self.value.value , ..};
     if !self.adapter.complete(record) { return blot_support::none<Candidate<K,D,V,A>>(); }
     self.key.present = false; self.dependencies.present = false; self.value.present = false;
-    return blot_support::some(Candidate<K,D,V,A> { blot_native::fresh_owner_id(), blot_support::some(record), self.adapter });
+    return blot_support::some(Candidate<K,D,V,A> { blot_native::fresh_owner_id(), blot_support::some(record), self.adapter , ..});
 }
 fn abort<K,D,V,A>(self: Candidate<K,D,V,A>&) {
     if self.record.present { self.record.value.deinit(); self.record.present = false; }
@@ -134,15 +134,15 @@ fn abort<K,D,V,A>(self: Candidate<K,D,V,A>&) {
 struct Prepared { owner: u64, candidate: u64, position: i64, fingerprint: u64, bytes: i64 }
 struct Table<K,D,V,A> {
     owner: u64 = 0, records: OwnedRecord<K,D,V,A>[:] = [], backing: OwnedRecord<K,D,V,A>[:] = [],
-    index: PositionIndex = PositionIndex {}, limits: Limits = Limits {}, adapter: A,
+    index: PositionIndex = PositionIndex {..}, limits: Limits = Limits {..}, adapter: A,
     owned_bytes: i64 = 0, capacity_bytes: i64 = 0, saturated: i64 = 0,
 }
-fn init<K,D,V,A>(adapter: A, limits: Limits = Limits {}) -> Table<K,D,V,A> {
-    return Table<K,D,V,A> { owner: blot_native::fresh_owner_id(), limits: limits, adapter: adapter };
+fn init<K,D,V,A>(adapter: A, limits: Limits = Limits {..}) -> Table<K,D,V,A> {
+    return Table<K,D,V,A> { owner: blot_native::fresh_owner_id(), limits: limits, adapter: adapter , ..};
 }
 fn storage<K,D,V,A>(self: const Table<K,D,V,A>&) -> Storage {
     return Storage { records: self.records.len, payload_bytes: self.owned_bytes,
-        capacity_bytes: self.capacity_bytes, saturated: self.saturated };
+        capacity_bytes: self.capacity_bytes, saturated: self.saturated , ..};
 }
 fn deinit<K,D,V,A>(self: Table<K,D,V,A>&) {
     for index in self.records.len { self.records[index].deinit(); }
@@ -151,7 +151,7 @@ fn deinit<K,D,V,A>(self: Table<K,D,V,A>&) {
     self.owner = 0;
 }
 fn begin<K,D,V,A>(self: const Table<K,D,V,A>&, owned_key: K) -> Builder<K,D,V,A> {
-    return Builder<K,D,V,A> { key: blot_support::some(owned_key), adapter: self.adapter };
+    return Builder<K,D,V,A> { key: blot_support::some(owned_key), adapter: self.adapter , ..};
 }
 fn canAdmit<K,D,V,A>(self: const Table<K,D,V,A>&, minimum_bytes: i64) -> bool {
     return self.records.len < self.limits.records && self.records.len < 4294967295 &&
@@ -173,8 +173,8 @@ fn prepare<K,D,V,A>(self: Table<K,D,V,A>&, candidate: const Candidate<K,D,V,A>&)
     // owners remain live, and never publishes a record or a position early.
     var temporary = self.capacity_bytes;
     if capacity != self.backing.len { temporary += capacity * self.adapter.recordBytes(); }
-    if links != self.index.links.len { temporary += links * bytes_of([Link {}]).len; }
-    if buckets != self.index.buckets.len { temporary += buckets * bytes_of([Bucket {}]).len; }
+    if links != self.index.links.len { temporary += links * bytes_of([Link {..}]).len; }
+    if buckets != self.index.buckets.len { temporary += buckets * bytes_of([Bucket {..}]).len; }
     if temporary > self.limits.retained_capacity { self.saturate(); return blot_support::none<Prepared>(), Error.none; }
     if capacity != self.backing.len {
         let out, error = self.adapter.allocateRecords(capacity);
@@ -185,9 +185,9 @@ fn prepare<K,D,V,A>(self: Table<K,D,V,A>&, candidate: const Candidate<K,D,V,A>&)
     }
     self.index.resizeIndex(links, buckets);
     self.capacity_bytes = self.backing.len * self.adapter.recordBytes() +
-        self.index.links.len * bytes_of([Link {}]).len + self.index.buckets.len * bytes_of([Bucket {}]).len;
+        self.index.links.len * bytes_of([Link {..}]).len + self.index.buckets.len * bytes_of([Bucket {..}]).len;
     return blot_support::some(Prepared { self.owner, candidate.owner, self.records.len,
-        self.adapter.fingerprint(candidate.record.value.key), bytes }), Error.none;
+        self.adapter.fingerprint(candidate.record.value.key), bytes , ..}), Error.none;
 }
 fn validPrepared<K,D,V,A>(self: const Table<K,D,V,A>&, prepared: Prepared, candidate: const Candidate<K,D,V,A>&) -> bool {
     if !candidate.record.present { return false; }
@@ -199,7 +199,7 @@ fn publish<K,D,V,A>(self: Table<K,D,V,A>&, prepared: Prepared, candidate: Candid
     self.backing[self.records.len] = candidate.record.value; candidate.record.present = false;
     self.records = self.backing[..self.records.len + 1]; self.index.publish(prepared.fingerprint);
     self.owned_bytes += prepared.bytes;
-    return Handle<A> { prepared.position as u32, self.owner };
+    return Handle<A> { prepared.position as u32, self.owner , ..};
 }
 fn get<K,D,V,A>(self: const Table<K,D,V,A>&, handle: Handle<A>) -> const OwnedRecord<K,D,V,A>? {
     if handle.owner != self.owner || handle.position >= self.records.len { return null; }

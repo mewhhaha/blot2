@@ -1,5 +1,7 @@
 // Named code instances and constants share the checked immutable Core graph.
 namespace blot_backend_core_backend;
+import .result_publication;
+import reuse.dependency_payload;
 import .substitution_buffers;
 import std;
 import dictionary;
@@ -112,14 +114,17 @@ struct QueryTables {
     canonical: blot_reuse_semantic_query_table::Storage, source_description: blot_reuse_semantic_query_table::Storage, open_residual: blot_reuse_semantic_query_table::Storage,
     executable_fragment: blot_reuse_semantic_query_table::Storage, executable_optimizer: blot_reuse_semantic_query_table::Storage,
 }
+var inactive_result_bytes: u8[>..<] = [];
+var inactive_result_message: u8[>..<] = [];
 struct Result {
+    active: bool = false,publication_owner: blot_backend_result_publication::Owner,publication_epoch: u64 = 0,publication_pinned: bool = false,publication_units: const blot_check_core::Module[:] = [],
     allocation_emission: blot_backend_allocation_emission::Snapshot&? = null, timing: blot_backend_backend_timing::Stats,
     counters: blot_work_counters::Counters, optimization: blot_backend_function_facts::Stats, runtime_optimization: blot_backend_optimized_bodies::Stats,
     module_stamps: ModuleStamps, refinements: blot_reuse_refinement_receipt::Stats, completed_queries: blot_eval_completed_specialization_query::Stats, query_tables: QueryTables,
     artifacts: blot_support::Option<ArtifactSummary>, capture: blot_reuse_artifact_capture::Capture&? = null, whole_module_only: bool = false,
     reuse: blot_reuse_artifact_fragment::Stats, principal: blot_reuse_principal_evidence_reuse::Stats, source_validation: blot_reuse_dependency_certificate::Stats,
-    bytes: u8[>..<]&, diagnostic: blot_support::Option<Diagnostic>, code_instances: i64 = 0, callable_wrappers: i64 = 0, emitted_functions: i64 = 0, constant_steps: i64 = 0,
-    constant_receipts: blot_reuse_constant_receipt::Stats, owned_message: u8[>..<]&, explanation: blot_reuse_dispatch_explanation::Explanation&? = null,
+    bytes: u8[>..<]& = inactive_result_bytes, diagnostic: blot_support::Option<Diagnostic>, code_instances: i64 = 0, callable_wrappers: i64 = 0, emitted_functions: i64 = 0, constant_steps: i64 = 0,
+    constant_receipts: blot_reuse_constant_receipt::Stats, owned_message: u8[>..<]& = inactive_result_message, explanation: blot_reuse_dispatch_explanation::Explanation&? = null,
     startup_observation: blot_backend_startup_emission_facts::Snapshot&? = null,
 }
 struct Generator {
@@ -151,7 +156,7 @@ fn init(generator: Generator&, journal: blot_reuse_artifact_emitter::Recorder&?)
 }
 fn unit(generator: Generator&, id: u32) -> const blot_check_core::Module& { generator.units[id - 1] }
 fn decline(generator: Generator&, unit_id: u32, span: blot_check_core::Span, code: Code) -> blot_error::Error {
-    if !generator.diagnostic.present { generator.diagnostic = blot_support::some(Diagnostic { unit: unit_id, span: span, code: code, origins: generator.staging_trace }); }
+    if !generator.diagnostic.present { generator.diagnostic = blot_support::some(Diagnostic { unit: unit_id, span: span, code: code, origins: generator.staging_trace , ..}); }
     return blot_error::Error.declined;
 }
 fn fail(generator: Generator&, unit_id: u32, node: blot_check_core::Id, code: Code) -> blot_error::Error { decline(generator, unit_id, generator.unit(unit_id).span(node), code) }
@@ -159,7 +164,7 @@ fn failSpecialization(generator: Generator&, unit_id: u32, node: blot_check_core
     let fresh = !generator.diagnostic.present; let failure = fail(generator, unit_id, node, code);
     if fresh && blot_eval_core_eval::callerDependentUse(generator.unit(unit_id), node) && generator.evaluator.specialization_origin.present {
         let origin = generator.evaluator.specialization_origin.value; let diagnostic = generator.diagnostic.value;
-        if unit_id != origin.unit || diagnostic.span != origin.span { generator.diagnostic.value.related = blot_support::some(blot_eval_core_eval::SourceLocation { unit: unit_id, span: diagnostic.span }); generator.diagnostic.value.unit = origin.unit; generator.diagnostic.value.span = origin.span; }
+        if unit_id != origin.unit || diagnostic.span != origin.span { generator.diagnostic.value.related = blot_support::some(blot_eval_core_eval::SourceLocation { unit: unit_id, span: diagnostic.span , ..}); generator.diagnostic.value.unit = origin.unit; generator.diagnostic.value.span = origin.span; }
     }
     return failure;
 }
@@ -223,9 +228,9 @@ fn callableLayout(generator: Generator&, function_id: u32, ty: blot_backend_layo
     return generator.module.setCallableLayout(function_id, ty);
 }
 recursive fn completeRetainedRows(generator: Generator&, requested: blot_backend_layout::Id, actual: blot_backend_layout::Id, depth: i64) -> blot_backend_layout::Id, blot_error::Error {
-    if depth >= 128 { return 0, decline(generator, 1, blot_check_core::Span {}, Code.unresolved_type); } if requested == blot_backend_layout::erased { return actual, blot_error::Error.none; }
+    if depth >= 128 { return 0, decline(generator, 1, blot_check_core::Span {..}, Code.unresolved_type); } if requested == blot_backend_layout::erased { return actual, blot_error::Error.none; }
     let wanted = generator.representations.store.node(requested); let proven = generator.representations.store.node(actual);
-    if wanted.tag != proven.tag { return 0, decline(generator, 1, blot_check_core::Span {}, Code.unresolved_type); }
+    if wanted.tag != proven.tag { return 0, decline(generator, 1, blot_check_core::Span {..}, Code.unresolved_type); }
     if wanted.tag != blot_backend_layout::Tag.function { return requested, blot_error::Error.none; }
     let input, input_error = completeRetainedRows(generator, wanted.a, proven.a, depth + 1); if input_error != blot_error::Error.none { return 0, input_error; }
     let output, output_error = completeRetainedRows(generator, wanted.b, proven.b, depth + 1); if output_error != blot_error::Error.none { return 0, output_error; }
@@ -246,10 +251,10 @@ fn codeLayout(generator: Generator&, unit_id: u32, ty: blot_check_types::Id, map
 }
 fn internLayout(generator: Generator&, tag: blot_backend_layout::Tag, a: u32, b: u32, values: const u32[:]) -> blot_backend_layout::Id, blot_error::Error {
     var selected: u32; var error: blot_error::Error; if tag == blot_backend_layout::Tag.record { selected,error = generator.representations.store.internRecord(values); } else { selected,error = generator.representations.store.intern(tag,a,b,values); }
-    if error == blot_error::Error.out_of_memory { return 0,error; } if error != blot_error::Error.none { return 0,decline(generator,1,blot_check_core::Span {},Code.complexity); } return selected,blot_error::Error.none;
+    if error == blot_error::Error.out_of_memory { return 0,error; } if error != blot_error::Error.none { return 0,decline(generator,1,blot_check_core::Span {..},Code.complexity); } return selected,blot_error::Error.none;
 }
 fn internLayoutWithEffects(generator: Generator&, tag: blot_backend_layout::Tag, a: u32, b: u32, row: u32, values: const u32[:]) -> blot_backend_layout::Id, blot_error::Error {
-    let selected, error = generator.representations.store.internWithEffects(tag, a, b, row, values); if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {}, Code.complexity); } return selected, blot_error::Error.none;
+    let selected, error = generator.representations.store.internWithEffects(tag, a, b, row, values); if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {..}, Code.complexity); } return selected, blot_error::Error.none;
 }
 fn codeLayoutWithRows(generator: Generator&, unit_id: u32, ty: blot_check_types::Id, mappings: const Mapping[:], rows: const RowMapping[:], span: blot_check_core::Span) -> blot_backend_layout::Id, blot_error::Error {
     let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.layouts); let selected, error = generator.representations.store.fromTypeWithRows(generator.unit(unit_id), ty, mappings, rows, true); timing.deinit();
@@ -264,33 +269,33 @@ fn evaluationFailure(generator: Generator&) -> blot_error::Error {
         let item = generator.evaluator.diagnostic.value; var code = item.code;
         if code == Code.unsupported || code == Code.cycle { code = Code.constant_expression; }
         var span = item.span;
-        if code == Code.const_panic && !item.tag_origin && item.origins.len == 0 && generator.staging_trace.len == 0 { span = blot_check_core::Span {}; }
+        if code == Code.const_panic && !item.tag_origin && item.origins.len == 0 && generator.staging_trace.len == 0 { span = blot_check_core::Span {..}; }
         let fresh = !generator.diagnostic.present; let result = decline(generator, item.unit, span, code); generator.diagnostic.value.detail = item.detail;
         if fresh { generator.diagnostic.value.dispatch = item.dispatch; generator.diagnostic.value.implementation_trace = item.implementation_trace; generator.diagnostic.value.related = item.related; if item.origins.len != 0 { generator.diagnostic.value.origins = item.origins; } }
         return result;
     }
-    return decline(generator, 1, blot_check_core::Span {}, Code.constant_expression);
+    return decline(generator, 1, blot_check_core::Span {..}, Code.constant_expression);
 }
 fn constant(generator: Generator&, target: blot_check_core::BindingRef, ty: blot_backend_layout::Id) -> Value, blot_error::Error {
     let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.constants);
     var scope = blot_support::none<blot_reuse_code_artifacts::Scope>();
     if generator.artifacts {
-        let opened, error = generator.artifacts.enter(blot_reuse_code_artifacts::Request.constant { key: blot_reuse_code_artifacts::ConstantKey { target: target, ty: ty } });
-        if error != blot_error::Error.none { timing.deinit(); return Value {}, error; } scope = blot_support::some(opened);
+        let opened, error = generator.artifacts.enter(blot_reuse_code_artifacts::Request.constant { key: blot_reuse_code_artifacts::ConstantKey { target: target, ty: ty , ..} , ..});
+        if error != blot_error::Error.none { timing.deinit(); return Value {..}, error; } scope = blot_support::some(opened);
     }
     let value, error = constantScoped(generator, target, ty, scope);
     if scope.present { scope.value.deinit(); } timing.deinit(); return value, error;
 }
 fn constantScoped(generator: Generator&, target: blot_check_core::BindingRef, ty: blot_backend_layout::Id, scope: blot_support::Option<blot_reuse_code_artifacts::Scope>&) -> Value, blot_error::Error {
     let id, evaluated = generator.evaluator.richValue(target);
-    if evaluated != blot_error::Error.none { if evaluated == blot_error::Error.out_of_memory { return Value {}, evaluated; } return Value {}, evaluationFailure(generator); }
+    if evaluated != blot_error::Error.none { if evaluated == blot_error::Error.out_of_memory { return Value {..}, evaluated; } return Value {..}, evaluationFailure(generator); }
     if generator.representations.store.node(ty).tag != blot_backend_layout::Tag.owning {
         let scalar = generator.evaluator.valueScalar(id);
-        if scalar.present { if scope.present { let error = scope.value.completeValue(id, ty); if error != blot_error::Error.none { return Value {}, error; } } return scalar.value, blot_error::Error.none; }
+        if scalar.present { if scope.present { let error = scope.value.completeValue(id, ty); if error != blot_error::Error.none { return Value {..}, error; } } return scalar.value, blot_error::Error.none; }
     }
-    let bits, serialized = generator.static_data.serialize(generator, id, ty, 0); if serialized != blot_error::Error.none { return Value {}, serialized; }
-    if scope.present { let error = scope.value.completeValue(id, ty); if error != blot_error::Error.none { return Value {}, error; } }
-    let scalar = generator.representations.store.scalar(ty); var kind = blot_backend_runtime_ir::SC_pointer; if scalar.present { kind = scalar.value; } return Value { scalar: kind, bits: bits }, blot_error::Error.none;
+    let bits, serialized = generator.static_data.serialize(generator, id, ty, 0); if serialized != blot_error::Error.none { return Value {..}, serialized; }
+    if scope.present { let error = scope.value.completeValue(id, ty); if error != blot_error::Error.none { return Value {..}, error; } }
+    let scalar = generator.representations.store.scalar(ty); var kind = blot_backend_runtime_ir::SC_pointer; if scalar.present { kind = scalar.value; } return Value { scalar: kind, bits: bits , ..}, blot_error::Error.none;
 }
 fn discardableClosure(generator: Generator&, owner: u32, catalog: u32) -> bool {
     let source .= generator.unit(owner); let metadata = source.closures[catalog];
@@ -327,12 +332,12 @@ fn nominalPayload(generator: Generator&, family: u64, tag: u32, ty: blot_backend
     for constructor in source.constructors {
         let nominal = source.nominal(constructor.nominal); if nominal.identity.unit != owner || nominal.identity.decl != declaration || constructor.tag != tag { continue; }
         let parameters = source.types.list(nominal.parameters); let arguments = generator.representations.store.children(ty);
-        if parameters.len != arguments.len { return 0, decline(generator, owner, blot_check_core::Span {}, Code.unresolved_type); }
+        if parameters.len != arguments.len { return 0, decline(generator, owner, blot_check_core::Span {..}, Code.unresolved_type); }
         if constructor.payload == 0 { return 1, blot_error::Error.none; } var mappings: Mapping[>..<] = [];
-        for parameter, index in parameters { let error = mapType(generator, owner, mappings, parameter, arguments[index], blot_check_core::Span {}); if error != blot_error::Error.none { return 0, error; } }
-        return codeLayout(generator, owner, constructor.payload, mappings, blot_check_core::Span {});
+        for parameter, index in parameters { let error = mapType(generator, owner, mappings, parameter, arguments[index], blot_check_core::Span {..}); if error != blot_error::Error.none { return 0, error; } }
+        return codeLayout(generator, owner, constructor.payload, mappings, blot_check_core::Span {..});
     }
-    return 0, decline(generator, owner, blot_check_core::Span {}, Code.unresolved_type);
+    return 0, decline(generator, owner, blot_check_core::Span {..}, Code.unresolved_type);
 }
 fn captureLayout<M,R>(generator: Generator&, owner: u32, binding: blot_check_core::BindingId, value: blot_eval_core_eval::ValueId, mappings: M&, rows: R&) -> blot_backend_layout::Id, blot_error::Error { let declaration = generator.unit(owner).binding(binding); return captureTypeLayout(generator, owner, declaration.ty, declaration.span, value, mappings, rows); }
 fn captureTypeLayout<M,R>(generator: Generator&, owner: u32, ty: blot_check_types::Id, span: blot_check_core::Span, value: blot_eval_core_eval::ValueId, mappings: M&, rows: R&) -> blot_backend_layout::Id, blot_error::Error {
@@ -349,36 +354,36 @@ fn captureTypeLayout<M,R>(generator: Generator&, owner: u32, ty: blot_check_type
 fn normalize(generator: Generator&, owner: u32, reference: blot_check_core::BindingRef) -> blot_check_core::BindingRef, blot_error::Error {
     var target = reference; if target.unit == 0 { target.unit = owner; }
     for step in 0..256 {
-        if target.unit == 0 || target.unit > generator.units.len || target.binding == 0 || target.binding >= generator.unit(target.unit).bindings.len { return blot_check_core::BindingRef {}, decline(generator, owner, blot_check_core::Span {}, Code.unsupported); }
+        if target.unit == 0 || target.unit > generator.units.len || target.binding == 0 || target.binding >= generator.unit(target.unit).bindings.len { return blot_check_core::BindingRef {..}, decline(generator, owner, blot_check_core::Span {..}, Code.unsupported); }
         let source .= generator.unit(target.unit); let binding = source.binding(target.binding);
         if binding.kind == blot_check_core::BindingKind.external { let previous = target.unit; target = binding.target; if target.unit == 0 { target.unit = previous; } continue; }
         let body .= source.body(target.binding);
         if body != null { let tag = source.types.node(binding.ty).tag; if (tag == blot_check_types::Tag.function || tag == blot_check_types::Tag.forall) && body.parameters.len == 0 && source.node(body.root).tag == blot_check_core::Tag.reference { let previous = target.unit; target = source.reference(body.root); if target.unit == 0 { target.unit = previous; } continue; } }
         return target, blot_error::Error.none;
     }
-    return blot_check_core::BindingRef {}, decline(generator, owner, blot_check_core::Span {}, Code.complexity);
+    return blot_check_core::BindingRef {..}, decline(generator, owner, blot_check_core::Span {..}, Code.complexity);
 }
 fn mappingEvidence(generator: Generator&, mappings: const Mapping[:]) -> u32, blot_error::Error {
     var words: u32[>..<] = [];
     for mapping in mappings {
         if mapping.instance.decl != 0 { continue; }
         let actual, error = generator.representations.toEvidence(generator.evaluator.evidenceStore(), mapping.layout);
-        if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {}, Code.unresolved_type); }
+        if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {..}, Code.unresolved_type); }
         words.append([mapping.variable, actual]);
     }
     let result, error = generator.evaluator.storage.evidence.intern(blot_eval_type_evidence::Tag.record, 0, 0, words);
-    if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {}, Code.unresolved_type); } return result, blot_error::Error.none;
+    if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {..}, Code.unresolved_type); } return result, blot_error::Error.none;
 }
 fn rowMappingEvidence(generator: Generator&, rows: const RowMapping[:]) -> u32, blot_error::Error {
     var entries: blot_reuse_substitution_keys::Entry[>..<] = [];
     for mapping in rows {
         if mapping.row == blot_backend_layout::unknown_row { continue; }
         let actual, error = generator.representations.rowToEvidence(generator.evaluator.evidenceStore(), mapping.row);
-        if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {}, Code.unresolved_type); }
-        entries.push(blot_reuse_substitution_keys::Entry { variable: mapping.variable, value: actual });
+        if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {..}, Code.unresolved_type); }
+        entries.push(blot_reuse_substitution_keys::Entry { variable: mapping.variable, value: actual , ..});
     }
     let result, error = generator.representations.row_keys.intern(entries);
-    if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {}, Code.unresolved_type); } return result, blot_error::Error.none;
+    if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {..}, Code.unresolved_type); } return result, blot_error::Error.none;
 }
 fn mappingItems(values: Mapping[>..<]&) -> Mapping[:] { return values[..]; }
 fn mappingItems(values: blot_backend_substitution_buffers::Mappings&) -> Mapping[:] { return values.items; }
@@ -391,8 +396,8 @@ fn appendRows(rows: blot_backend_substitution_buffers::Rows&,value: RowMapping) 
 fn loadSemanticRows<R>(generator: Generator&, mappings: const blot_eval_type_evidence::RowMapping[:], rows: R&) -> blot_error::Error {
     for mapping in mappings {
         let concrete, error = generator.representations.rowFromEvidence(generator.evaluator.evidenceStore(), mapping.evidence);
-        if error == blot_error::Error.out_of_memory { return error; } if error != blot_error::Error.none { return decline(generator, 1, blot_check_core::Span {}, Code.unresolved_type); }
-        let appended = appendRows(rows,RowMapping { variable: mapping.variable,row: concrete }); if appended != blot_error::Error.none { return appended; }
+        if error == blot_error::Error.out_of_memory { return error; } if error != blot_error::Error.none { return decline(generator, 1, blot_check_core::Span {..}, Code.unresolved_type); }
+        let appended = appendRows(rows,RowMapping { variable: mapping.variable,row: concrete , ..}); if appended != blot_error::Error.none { return appended; }
     }
     return blot_error::Error.none;
 }
@@ -409,16 +414,16 @@ fn directCallableEnvironment(generator: Generator&, ty: blot_backend_layout::Id,
 }
 let max_parameters: i64 = blot_reuse_code_artifacts::max_parameters;
 fn signature(generator: Generator&, target: blot_check_core::BindingRef, ty: blot_check_types::Id, source_id: u32, mappings: const Mapping[:], rows: const RowMapping[:], span: blot_check_core::Span, complete: bool) -> Key, blot_error::Error {
-    let normalized, normalized_error = normalize(generator, source_id, target); if normalized_error != blot_error::Error.none { return Key {}, normalized_error; }
-    var key = Key { target: normalized }; let root, root_error = functionRoot(generator, source_id, ty, span); if root_error != blot_error::Error.none { return key, root_error; } var current = root;
-    var instances: blot_check_types::NominalIdentity[max_parameters] = [blot_check_types::NominalIdentity {}; max_parameters]; var has_instances = false;
+    let normalized, normalized_error = normalize(generator, source_id, target); if normalized_error != blot_error::Error.none { return Key {..}, normalized_error; }
+    var key = Key { target: normalized , ..}; let root, root_error = functionRoot(generator, source_id, ty, span); if root_error != blot_error::Error.none { return key, root_error; } var current = root;
+    var instances: blot_check_types::NominalIdentity[max_parameters] = [blot_check_types::NominalIdentity {..}; max_parameters]; var has_instances = false;
     let producer .= generator.unit(key.target.unit).body(key.target.binding); var limit = max_parameters; if producer != null && producer.parameters.len != 0 { limit = producer.parameters.len; }
     while generator.unit(source_id).types.node(current).tag == blot_check_types::Tag.function && key.count < limit {
         if key.count == max_parameters { return key, decline(generator, source_id, span, Code.complexity); }
         let n = generator.unit(source_id).types.node(current); let input = generator.unit(source_id).types.node(n.a);
         if input.tag == blot_check_types::Tag.scoped {
-            has_instances = true; instances[key.count] = blot_check_types::selectionAtom(generator.unit(source_id).types, blot_backend_layout::mappedInstance(blot_check_types::NominalIdentity { unit: input.b, decl: input.c }, mappings));
-        } else if has_instances { instances[key.count] = blot_check_types::NominalIdentity {}; }
+            has_instances = true; instances[key.count] = blot_check_types::selectionAtom(generator.unit(source_id).types, blot_backend_layout::mappedInstance(blot_check_types::NominalIdentity { unit: input.b, decl: input.c , ..}, mappings));
+        } else if has_instances { instances[key.count] = blot_check_types::NominalIdentity {..}; }
         if complete { let parameter, error = typeLayout(generator, source_id, n.a, mappings, span); if error != blot_error::Error.none { return key, error; } key.parameters[key.count] = parameter; }
         else { let parameter, error = codeLayoutWithRows(generator, source_id, n.a, mappings, rows, span); if error != blot_error::Error.none { return key, error; } key.parameters[key.count] = parameter; }
         let effects, error = generator.representations.store.rowFromType(generator.unit(source_id), n.c, mappings, rows, !complete);
@@ -436,22 +441,22 @@ fn signature(generator: Generator&, target: blot_check_core::BindingRef, ty: blo
 fn entrySignature(generator: Generator&, target: blot_check_core::BindingRef, ty: blot_check_types::Id, span: blot_check_core::Span) -> Key, blot_error::Error {
     let physical, initial_error = generator.representations.store.fromType(generator.unit(target.unit), ty, []);
     if initial_error == blot_error::Error.none { return signature(generator, target, ty, target.unit, [], [], span, true); }
-    if initial_error == blot_error::Error.out_of_memory { return Key {}, initial_error; }
+    if initial_error == blot_error::Error.out_of_memory { return Key {..}, initial_error; }
     let value, evaluated = generator.evaluator.richValue(target);
-    if evaluated != blot_error::Error.none { if evaluated == blot_error::Error.out_of_memory { return Key {}, evaluated; } return Key {}, evaluationFailure(generator); }
+    if evaluated != blot_error::Error.none { if evaluated == blot_error::Error.out_of_memory { return Key {..}, evaluated; } return Key {..}, evaluationFailure(generator); }
     let inferred, inference_error = generator.evaluator.inferEntryClosure(value);
     if inference_error != blot_error::Error.none {
-        if inference_error == blot_error::Error.out_of_memory { return Key {}, inference_error; }
-        if inference_error == blot_error::Error.declined && generator.evaluator.diagnostic.present && generator.evaluator.diagnostic.value.code == Code.unsupported { return Key {}, decline(generator, target.unit, span, Code.unresolved_type); }
-        return Key {}, evaluationFailure(generator);
+        if inference_error == blot_error::Error.out_of_memory { return Key {..}, inference_error; }
+        if inference_error == blot_error::Error.declined && generator.evaluator.diagnostic.present && generator.evaluator.diagnostic.value.code == Code.unsupported { return Key {..}, decline(generator, target.unit, span, Code.unresolved_type); }
+        return Key {..}, evaluationFailure(generator);
     }
-    if !inferred.present { return Key {}, decline(generator, target.unit, span, Code.entry_type); }
+    if !inferred.present { return Key {..}, decline(generator, target.unit, span, Code.entry_type); }
     let concrete, converted = generator.representations.fromEvidence(generator.evaluator.evidenceStore(), generator.evaluator.valueEvidence(inferred.value));
-    if converted == blot_error::Error.out_of_memory { return Key {}, converted; } if converted != blot_error::Error.none { return Key {}, decline(generator, target.unit, span, Code.unresolved_type); }
+    if converted == blot_error::Error.out_of_memory { return Key {..}, converted; } if converted != blot_error::Error.none { return Key {..}, decline(generator, target.unit, span, Code.unresolved_type); }
     var mappings: Mapping[>..<] = []; var rows: RowMapping[>..<] = [];
-    let mapped = mapTypeDepth(generator, target.unit, mappings, rows, ty, concrete, span, 0); if mapped != blot_error::Error.none { return Key {}, mapped; }
+    let mapped = mapTypeDepth(generator, target.unit, mappings, rows, ty, concrete, span, 0); if mapped != blot_error::Error.none { return Key {..}, mapped; }
     let physical_final, checked = generator.representations.store.fromTypeWithRows(generator.unit(target.unit), ty, mappings, rows, false);
-    if checked == blot_error::Error.out_of_memory { return Key {}, checked; } if checked != blot_error::Error.none { return Key {}, decline(generator, target.unit, span, Code.unresolved_type); }
+    if checked == blot_error::Error.out_of_memory { return Key {..}, checked; } if checked != blot_error::Error.none { return Key {..}, decline(generator, target.unit, span, Code.unresolved_type); }
     return signature(generator, target, ty, target.unit, mappings, rows, span, false);
 }
 fn seedNamedInstance<M>(generator: Generator&, key: Key, mappings: M&) -> blot_error::Error {
@@ -461,7 +466,7 @@ fn seedNamedInstance<M>(generator: Generator&, key: Key, mappings: M&) -> blot_e
         let arrow = source.types.node(root); if arrow.tag != blot_check_types::Tag.function { return decline(generator, key.target.unit, binding.span, Code.unresolved_type); } root = arrow.b;
         let input = source.types.node(arrow.a); if input.tag != blot_check_types::Tag.scoped || input.b != 0 || instance.unit == 0 { continue; }
         var found = false; for entry in mappingItems(mappings) { if entry.variable != input.c { continue; } if entry.instance != instance { return decline(generator, key.target.unit, binding.span, Code.unresolved_type); } found = true; break; }
-        if !found { let appended = appendMappings(mappings,Mapping { variable: input.c,layout: blot_backend_layout::erased,instance }); if appended != blot_error::Error.none { return appended; } }
+        if !found { let appended = appendMappings(mappings,Mapping { variable: input.c,layout: blot_backend_layout::erased,instance , ..}); if appended != blot_error::Error.none { return appended; } }
     }
     return blot_error::Error.none;
 }
@@ -504,7 +509,7 @@ fn unusedAggregate(generator: Generator&, unit_id: u32, binding: blot_check_core
 }
 fn specializer(generator: Generator&) -> blot_eval_specialization::Service, blot_error::Error {
     let bridge, error = generator.representations.representationBridge(generator.evaluator.evidenceStore());
-    return blot_eval_specialization::Service { timing: generator.work_timing, units: generator.units, evaluator: generator.evaluator, layouts: generator.representations.store, bridge: bridge, refinement_stats: generator.refinement_stats, refinement_regions: generator.work.refinement_regions, cache: generator }, error;
+    return blot_eval_specialization::Service { timing: generator.work_timing, units: generator.units, evaluator: generator.evaluator, layouts: generator.representations.store, bridge: bridge, refinement_stats: generator.refinement_stats, refinement_regions: generator.work.refinement_regions, cache: generator , ..}, error;
 }
 fn lookupRefinement(generator: Generator&, root: blot_reuse_refinement_receipt::Root, shape: blot_reuse_code_expectation::View, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:], rows: const blot_eval_type_evidence::RowMapping[:]) -> blot_support::Option<blot_eval_core_eval::SolvedEvidence>, blot_error::Error {
     let local, error = blot_reuse_refinement_receipt::lookupLocal(generator, root, expected, seeds, rows); if error != blot_error::Error.none || local.present { return local, error; }
@@ -542,8 +547,8 @@ fn refineMappingsCaptures<M,R>(generator: Generator&, unit_id: u32, root: blot_r
 }
 fn refineAccessorMappings<M,R>(generator: Generator&, unit_id: u32, catalog: u32, expected: u32, mappings: M&, rows: R&, span: blot_check_core::Span, captures: const blot_eval_core_eval::RetainedCapture[:]) -> blot_error::Error {
     let projection,projection_error = blot_eval_specialization::physicalProjection(generator.representations.store,mappings); if projection_error != blot_error::Error.none { return projection_error; } let service, error = specializer(generator); if error != blot_error::Error.none { return error; }
-    let selected = blot_eval_core_eval::CodeProjection.static_code { projection }; service.code_projection = blot_support::some(selected);
-    let mapped = service.refineMappingsCaptures(unit_id, blot_reuse_refinement_receipt::Root.closure { unit: unit_id, catalog: catalog }, expected, mappings, rows, span, captures);
+    let selected = blot_eval_core_eval::CodeProjection.static_code { projection , ..}; service.code_projection = blot_support::some(selected);
+    let mapped = service.refineMappingsCaptures(unit_id, blot_reuse_refinement_receipt::Root.closure { unit: unit_id, catalog: catalog , ..}, expected, mappings, rows, span, captures);
     if mapped != blot_error::Error.none { return specializationFailure(generator, service, mapped); } return blot_error::Error.none;
 }
 fn mapCapturedFunction<M,R>(generator: Generator&, unit_id: u32, function_type: blot_check_types::Id, expected: u32, mappings: M&, rows: R&, span: blot_check_core::Span) -> blot_error::Error {
@@ -604,7 +609,7 @@ fn emitNamedOwner(context: NamedEmission&, emitter: blot_backend_backend_emissio
         let retained = capturedTemplate(generator, key.templates, parameter.binding);
         if retained.present {
             let template = retained.value; var environment = blot_support::none<u32>(); if template.has_environment { environment = blot_support::some(local); }
-            emitter.templates.insert(parameter.binding, blot_backend_backend_emission::Template { scalar_environment: template.scalar_environment, callable_instances: template.callable_instances, staged: template.staged, unit: template.unit, node: template.node, environment: environment, captures: template.captures, templates: template.templates, computation: template.computation, evidence: template.evidence, rows: template.rows });
+            emitter.templates.insert(parameter.binding, blot_backend_backend_emission::Template { scalar_environment: template.scalar_environment, callable_instances: template.callable_instances, staged: template.staged, unit: template.unit, node: template.node, environment: environment, captures: template.captures, templates: template.templates, computation: template.computation, evidence: template.evidence, rows: template.rows , ..});
         } else { emitter.locals.insert(parameter.binding, local); }
     }
     if key.dictionaries {
@@ -625,7 +630,7 @@ fn namedAlias(generator: Generator&, key: Key, body: const blot_check_core::Body
     while reverse > 0 { reverse--; let ty, error = internLayoutWithEffects(generator, blot_backend_layout::Tag.function, key.parameters[reverse], full, key.effects[reverse], []); if error != blot_error::Error.none { return 0, error; } full = ty; }
     if source.binding(key.target.binding).has_explicit {
         var mappings: Mapping[>..<] = []; var rows: RowMapping[>..<] = [];
-        let error = refineMappings(generator, unit_id, blot_reuse_refinement_receipt::Root.body { key.target }, full, mappings, rows, body.span); if error != blot_error::Error.none { return 0, error; }
+        let error = refineMappings(generator, unit_id, blot_reuse_refinement_receipt::Root.body { key.target , ..}, full, mappings, rows, body.span); if error != blot_error::Error.none { return 0, error; }
     }
     let root = source.node(body.root);
     if !body.runtime && root.tag == blot_check_core::Tag.primitive_function {
@@ -674,7 +679,7 @@ fn function(generator: Generator&, key: Key) -> u32, blot_error::Error {
     recursive fn cleanup_continuation_28() -> u32, blot_error::Error {
 
     var scope = blot_support::none<blot_reuse_code_artifacts::Scope>();
-    if generator.artifacts != null { let entered, error = generator.artifacts.enter(blot_reuse_code_artifacts::Request.named { key }); if error != blot_error::Error.none { return 0, error; } scope = blot_support::some(entered); }
+    if generator.artifacts != null { let entered, error = generator.artifacts.enter(blot_reuse_code_artifacts::Request.named { key , ..}); if error != blot_error::Error.none { return 0, error; } scope = blot_support::some(entered); }
     
     recursive fn cleanup_continuation_27() -> u32, blot_error::Error {
 
@@ -686,10 +691,10 @@ fn function(generator: Generator&, key: Key) -> u32, blot_error::Error {
         }
     }
     if generator.retained != null {
-        let job, error = findRetained(generator, generator.retained, blot_reuse_code_artifacts::Request.named { key }); if error != blot_error::Error.none { return 0, error; }
+        let job, error = findRetained(generator, generator.retained, blot_reuse_code_artifacts::Request.named { key , ..}); if error != blot_error::Error.none { return 0, error; }
         if job.present {
             var actor: blot_reuse_code_artifacts::Scope&? = null; if scope.present { actor .= scope.value; }
-            let function_id, replayed = reconstructRetained(generator, generator.retained, job.value, blot_reuse_code_artifacts::Request.named { key }, actor); if replayed != blot_error::Error.none { return 0, replayed; }
+            let function_id, replayed = reconstructRetained(generator, generator.retained, job.value, blot_reuse_code_artifacts::Request.named { key , ..}, actor); if replayed != blot_error::Error.none { return 0, replayed; }
             let requested = generator.planning.startup_facts.request(function_id, blot_backend_startup_emission_facts::Kind.named, key.target.unit, key.target.binding, true); if requested != blot_error::Error.none { return 0, requested; }
             generator.planning.startup_facts.complete(function_id); return function_id, blot_error::Error.none;
         }
@@ -732,8 +737,8 @@ fn function(generator: Generator&, key: Key) -> u32, blot_error::Error {
         let error = blot_backend_dictionary_layout::bindOwner(source, generator.representations.store, mappings, owner.value, 0, owner.value.formals(source), false);
         if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, fail(generator, unit_id, body.root, Code.unresolved_type); }
     }
-    var context = NamedEmission { key, body, parameter_locals, runtime_count, resolved.root };
-    let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: unit_id, function_id: function_id, provider_local: blot_support::some(runtime_count), mappings: mappings, row_mappings: rows, factory_template: key.template_result }, context, emitNamedOwner);
+    var context = NamedEmission { key, body, parameter_locals, runtime_count, resolved.root , ..};
+    let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: unit_id, function_id: function_id, provider_local: blot_support::some(runtime_count), mappings: mappings, row_mappings: rows, factory_template: key.template_result , ..}, context, emitNamedOwner);
     if emitted != blot_error::Error.none { return 0, emitted; }
     if scope.present {
         let solved = scope.value.solved(mappings, rows, generator.representations.template_keys.get(key.templates)); if solved != blot_error::Error.none { return 0, solved; }
@@ -764,7 +769,7 @@ fn function(generator: Generator&, key: Key) -> u32, blot_error::Error {
 
 fn lookupValue<K,V>(map: const dictionary<K,V>&, key: K) -> blot_support::Option<V> { let value = map.get(key); if value { return blot_support::some(value); } return blot_support::none<V>(); }
 fn captureTemplate(generator: Generator&, template: blot_backend_backend_emission::Template) -> u32, blot_error::Error {
-    let retained = CapturedTemplate { unit: template.unit, node: template.node, captures: template.captures, templates: template.templates, staged: template.staged, has_environment: template.environment.present, scalar_environment: template.scalar_environment, computation: template.computation, evidence: template.evidence, rows: template.rows, callable_instances: template.callable_instances };
+    let retained = CapturedTemplate { unit: template.unit, node: template.node, captures: template.captures, templates: template.templates, staged: template.staged, has_environment: template.environment.present, scalar_environment: template.scalar_environment, computation: template.computation, evidence: template.evidence, rows: template.rows, callable_instances: template.callable_instances , ..};
     block { let existing = generator.planning.template_instances.get(retained); if existing { return existing, blot_error::Error.none; } }
     if generator.planning.template_catalog.len >= 4294967295 { return 0, blot_error::Error.module_too_large; }
     let id = (generator.planning.template_catalog.len + 1) as u32; generator.planning.template_catalog.push(retained); generator.planning.template_instances.insert(retained, id); return id, blot_error::Error.none;
@@ -780,7 +785,7 @@ recursive fn releaseRetainedCapture(capture: blot_eval_core_eval::RetainedCaptur
 }
 recursive fn retainedCapture(generator: Generator&, binding: blot_check_core::BindingId, template: CapturedTemplate, depth: i64) -> blot_eval_core_eval::RetainedCapture, blot_error::Error {
     if depth >= 256 { return default<blot_eval_core_eval::RetainedCapture>(), fail(generator, template.unit, template.node, Code.complexity); }
-    var rows: blot_eval_type_evidence::RowMapping[>..<] = []; for row in generator.representations.row_keys.get(template.rows) { rows.push(blot_eval_type_evidence::RowMapping { row.variable, row.value }); }
+    var rows: blot_eval_type_evidence::RowMapping[>..<] = []; for row in generator.representations.row_keys.get(template.rows) { rows.push(blot_eval_type_evidence::RowMapping { row.variable, row.value , ..}); }
     var children: blot_eval_core_eval::RetainedCapture[>..<] = []; var values: blot_eval_core_eval::RetainedValue[>..<] = []; var published = false;
     
     recursive fn cleanup_continuation_24() -> blot_eval_core_eval::RetainedCapture, blot_error::Error {
@@ -794,14 +799,14 @@ recursive fn retainedCapture(generator: Generator&, binding: blot_check_core::Bi
             else if index < generator.representations.store.children(template.captures).len {
                 let actual, error = generator.representations.toEvidence(generator.evaluator.evidenceStore(), generator.representations.store.children(template.captures)[index]);
                 if error != blot_error::Error.none { if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { return default<blot_eval_core_eval::RetainedCapture>(), error; } return default<blot_eval_core_eval::RetainedCapture>(), fail(generator, template.unit, template.node, Code.unresolved_type); }
-                values.push(blot_eval_core_eval::RetainedValue { captured, actual });
+                values.push(blot_eval_core_eval::RetainedValue { captured, actual , ..});
             }
         }
     }
     let owned_rows = retained_rows.alloc_slice(rows.len); for row, index in rows { owned_rows[index] = row; }
     let owned_values = retained_values.alloc_slice(values.len); for value, index in values { owned_values[index] = value; }
     let owned_children = retained_children.alloc_slice(children.len); for child, index in children { owned_children[index] = child; }
-    published = true; return blot_eval_core_eval::RetainedCapture { binding: binding, unit: template.unit, node: template.node, mappings: template.evidence, rows: owned_rows, values: owned_values, captures: owned_children, computation: template.computation }, blot_error::Error.none;
+    published = true; return blot_eval_core_eval::RetainedCapture { binding: binding, unit: template.unit, node: template.node, mappings: template.evidence, rows: owned_rows, values: owned_values, captures: owned_children, computation: template.computation , ..}, blot_error::Error.none;
 
     }
     let cleanup_result_24_0,cleanup_result_24_1 = cleanup_continuation_24();
@@ -812,7 +817,7 @@ fn resolveClosureMappings<M,R>(generator: Generator&, key: blot_reuse_code_artif
     let source .= unit(generator, key.unit); let metadata = source.closures[key.catalog]; let captures = source.extra[metadata.captures.start..metadata.captures.start + metadata.captures.len]; let fn_type = generator.representations.store.node(key.ty);
     for entry in generator.representations.row_keys.get(key.rows) {
         let concrete, error = generator.representations.rowFromEvidence(generator.evaluator.evidenceStore(), entry.value); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return fail(generator, key.unit, metadata.body, Code.unresolved_type); }
-        let appended = appendRows(rows,RowMapping { entry.variable,concrete }); if appended != blot_error::Error.none { return appended; }
+        let appended = appendRows(rows,RowMapping { entry.variable,concrete , ..}); if appended != blot_error::Error.none { return appended; }
     }
     if key.evidence != 0 {
         let words = generator.evaluator.storage.evidence.children(key.evidence); var index: i64 = 0;
@@ -828,16 +833,16 @@ fn resolveClosureMappings<M,R>(generator: Generator&, key: blot_reuse_code_artif
     let input = mapType(generator, key.unit, mappings, metadata.parameter.ty, fn_type.a, metadata.parameter.span); if input != blot_error::Error.none { return input; }
     let output = mapType(generator, key.unit, mappings, source.typeOf(metadata.body), fn_type.b, source.span(metadata.body)); if output != blot_error::Error.none { return output; }
     if metadata.function_type != 0 { let error = mapTypeDepth(generator, key.unit, mappings, rows, metadata.function_type, key.ty, source.span(metadata.body), 0); if error != blot_error::Error.none { return error; } }
-    var hints = blot_backend_substitution_buffers::Hints {}; 
+    var hints = blot_backend_substitution_buffers::Hints {..}; 
     recursive fn cleanup_continuation_23() -> blot_error::Error {
 
     for binding in captures {
         let captured = capturedStatic(generator, key.static_values, binding);
-        if captured.present { let appended = hints.push(blot_eval_core_eval::RetainedCapture { value: captured.value,binding,unit: key.unit,node: 0 }); if appended != blot_error::Error.none { return appended; } }
+        if captured.present { let appended = hints.push(blot_eval_core_eval::RetainedCapture { value: captured.value,binding,unit: key.unit,node: 0 , ..}); if appended != blot_error::Error.none { return appended; } }
         else { let template = capturedTemplate(generator, key.templates, binding); if template.present { let hint, error = retainedCapture(generator, binding, template.value, 0); if error != blot_error::Error.none { return error; } let appended = hints.push(hint); if appended != blot_error::Error.none { releaseRetainedCapture(hint); return appended; } } }
     }
     if key.parameter_template != 0 { let hint, error = retainedCapture(generator, metadata.parameter.binding, generator.planning.template_catalog[key.parameter_template - 1], 0); if error != blot_error::Error.none { return error; } let appended = hints.push(hint); if appended != blot_error::Error.none { releaseRetainedCapture(hint); return appended; } }
-    return refineMappingsCaptures(generator, key.unit, blot_reuse_refinement_receipt::Root.closure { key.unit, key.catalog }, key.ty, mappings, rows, source.span(metadata.body), hints.items);
+    return refineMappingsCaptures(generator, key.unit, blot_reuse_refinement_receipt::Root.closure { key.unit, key.catalog , ..}, key.ty, mappings, rows, source.span(metadata.body), hints.items);
 
     }
     let cleanup_result_23_0 = cleanup_continuation_23();
@@ -846,7 +851,7 @@ fn resolveClosureMappings<M,R>(generator: Generator&, key: blot_reuse_code_artif
 }
 fn templateMetadata(template: CapturedTemplate, local: u32) -> blot_backend_backend_emission::Template {
     var environment = blot_support::none<u32>(); if template.has_environment { environment = blot_support::some(local); }
-    return blot_backend_backend_emission::Template { scalar_environment: template.scalar_environment, callable_instances: template.callable_instances, staged: template.staged, unit: template.unit, node: template.node, environment: environment, captures: template.captures, templates: template.templates, computation: template.computation, evidence: template.evidence, rows: template.rows };
+    return blot_backend_backend_emission::Template { scalar_environment: template.scalar_environment, callable_instances: template.callable_instances, staged: template.staged, unit: template.unit, node: template.node, environment: environment, captures: template.captures, templates: template.templates, computation: template.computation, evidence: template.evidence, rows: template.rows , ..};
 }
 fn enterScope(generator: Generator&, request: blot_reuse_code_artifacts::Request) -> blot_support::Option<blot_reuse_code_artifacts::Scope>, blot_error::Error {
     if generator.artifacts == null { return blot_support::none<blot_reuse_code_artifacts::Scope>(), blot_error::Error.none; }
@@ -885,7 +890,7 @@ fn closureFunction(generator: Generator&, key: blot_reuse_code_artifacts::Closur
     let stage = generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.specialization); 
     recursive fn cleanup_continuation_22() -> u32, blot_error::Error {
 
-    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.closure { key }); if scope_error != blot_error::Error.none { return 0, scope_error; } 
+    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.closure { key , ..}); if scope_error != blot_error::Error.none { return 0, scope_error; } 
     recursive fn cleanup_continuation_21() -> u32, blot_error::Error {
 
     block {
@@ -893,10 +898,10 @@ fn closureFunction(generator: Generator&, key: blot_reuse_code_artifacts::Closur
         if existing { let error = generator.planning.startup_facts.request(existing, blot_backend_startup_emission_facts::Kind.anonymous, key.unit, key.catalog, true); if error != blot_error::Error.none { return 0, error; } if scope.present { let hit = scope.value.hit(existing); if hit != blot_error::Error.none { return 0, hit; } } return existing, blot_error::Error.none; }
     }
     if key.staged == 0 && generator.retained != null {
-        let job, error = findRetained(generator, generator.retained, blot_reuse_code_artifacts::Request.closure { key }); if error != blot_error::Error.none { return 0, error; }
+        let job, error = findRetained(generator, generator.retained, blot_reuse_code_artifacts::Request.closure { key , ..}); if error != blot_error::Error.none { return 0, error; }
         if job.present {
             var actor: blot_reuse_code_artifacts::Scope&? = null; if scope.present { actor .= scope.value; }
-            let function_id, rebuilt = reconstructRetained(generator, generator.retained, job.value, blot_reuse_code_artifacts::Request.closure { key }, actor); if rebuilt != blot_error::Error.none { return 0, rebuilt; }
+            let function_id, rebuilt = reconstructRetained(generator, generator.retained, job.value, blot_reuse_code_artifacts::Request.closure { key , ..}, actor); if rebuilt != blot_error::Error.none { return 0, rebuilt; }
             let requested = generator.planning.startup_facts.request(function_id, blot_backend_startup_emission_facts::Kind.anonymous, key.unit, key.catalog, true); if requested != blot_error::Error.none { return 0, requested; } generator.planning.startup_facts.complete(function_id); return function_id, blot_error::Error.none;
         }
     }
@@ -921,11 +926,11 @@ fn closureFunction(generator: Generator&, key: blot_reuse_code_artifacts::Closur
 
     var mappings: Mapping[>..<] = []; var rows: RowMapping[>..<] = []; let resolved = resolveClosureMappings(generator, key, mappings, rows); if resolved != blot_error::Error.none { return 0, resolved; }
     if key.dictionaries {
-        let owner = source.types.node(metadata.function_type); let bound = blot_backend_dictionary_layout::bind(source, generator.representations.store, mappings, metadata.function_type, 0, blot_check_types::List { owner.b, owner.c }, false);
+        let owner = source.types.node(metadata.function_type); let bound = blot_backend_dictionary_layout::bind(source, generator.representations.store, mappings, metadata.function_type, 0, blot_check_types::List { owner.b, owner.c , ..}, false);
         if bound != blot_error::Error.none { if bound == blot_error::Error.out_of_memory { return 0, bound; } return 0, fail(generator, key.unit, metadata.body, Code.unresolved_type); }
     }
-    var staged = blot_support::none<u32>(); if key.staged != 0 { staged = blot_support::some(key.staged); } var context = ClosureEmission { key };
-    let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { staged: staged, generator: generator, unit_id: key.unit, function_id: function_id, provider_local: blot_support::some(2 as u32), mappings: mappings, row_mappings: rows, factory_template: key.template_result }, context, emitClosureOwner);
+    var staged = blot_support::none<u32>(); if key.staged != 0 { staged = blot_support::some(key.staged); } var context = ClosureEmission { key , ..};
+    let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { staged: staged, generator: generator, unit_id: key.unit, function_id: function_id, provider_local: blot_support::some(2 as u32), mappings: mappings, row_mappings: rows, factory_template: key.template_result , ..}, context, emitClosureOwner);
     if emitted != blot_error::Error.none { return 0, emitted; }
     if key.static_values == 0 && scope.present { let solved = scope.value.solved(mappings, rows, generator.representations.template_keys.get(key.templates)); if solved != blot_error::Error.none { return 0, solved; } }
     if scope.present { let completed = scope.value.complete(function_id, lookupValue(generator.planning.closure_template_results, key)); if completed != blot_error::Error.none { return 0, completed; } }
@@ -985,14 +990,14 @@ fn emitCallableOwner(context: CallableEmission&, emitter: blot_backend_backend_e
         }
         return emitter.emit(blot_backend_runtime_ir::OP_call, target);
     }
-    let next_key = blot_reuse_code_artifacts::CallableKey { target: key.target, ty: key.ty, applied: key.applied + 1, templates: key.templates, dictionaries: key.dictionaries, bound_dictionaries: key.bound_dictionaries, instance_arguments: key.instance_arguments };
+    let next_key = blot_reuse_code_artifacts::CallableKey { target: key.target, ty: key.ty, applied: key.applied + 1, templates: key.templates, dictionaries: key.dictionaries, bound_dictionaries: key.bound_dictionaries, instance_arguments: key.instance_arguments , ..};
     if erased_argument { let next, error = callable(generator, next_key); if error != blot_error::Error.none { return error; } return emitter.descriptor(next, blot_support::some(0 as u32)); }
     if !key.dictionaries && directCallableEnvironment(generator, key.ty, key.applied + 1) { let next, error = callable(generator, next_key); if error != blot_error::Error.none { return error; } return emitter.descriptor(next, blot_support::some(1 as u32)); }
     var retained: u32[17]; var count: u32 = 0;
     if key.dictionaries { let dictionary_array, error = internLayout(generator, blot_backend_layout::Tag.array, 3, 0, []); if error != blot_error::Error.none { return error; } retained[0] = dictionary_array; count = 1; }
     for parameter in direct.parameters[..key.applied + 1] { if generator.representations.store.node(parameter).tag == blot_backend_layout::Tag.erased_proof { continue; } retained[count] = parameter; count++; }
     var environment_roles: blot_backend_runtime_ir::Role[17]; for parameter, index in retained[..count] { environment_roles[index] = layoutRole(generator, parameter); }
-    let environment, allocated = emitter.allocate(count * 4, blot_backend_backend_emission::AllocationRoles { words: environment_roles[..count] }); if allocated != blot_error::Error.none { return allocated; } var stored: u32 = 0;
+    let environment, allocated = emitter.allocate(count * 4, blot_backend_backend_emission::AllocationRoles { words: environment_roles[..count] , ..}); if allocated != blot_error::Error.none { return allocated; } var stored: u32 = 0;
     if key.dictionaries {
         let get = emitter.emit(blot_backend_runtime_ir::OP_local_get, environment); if get != blot_error::Error.none { return get; }
         if key.applied == 0 && !key.bound_dictionaries { let argument = emitter.emit(blot_backend_runtime_ir::OP_local_get, context.provider_local + 1); if argument != blot_error::Error.none { return argument; } }
@@ -1054,14 +1059,14 @@ recursive fn callable(generator: Generator&, key: blot_reuse_code_artifacts::Cal
     if key.bound_dictionaries && !key.dictionaries { return 0, decline(generator, key.target.unit, unit(generator, key.target.unit).binding(key.target.binding).span, Code.unsupported); }
     let selected, selection_error = selectMemberTemplate(generator, key.target.unit, 0, key.target, key.ty); if selection_error != blot_error::Error.none { return 0, selection_error; }
     if selected != key.target { var actual = key; actual.target = selected; actual.templates = 0; return callable(generator, actual); }
-    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.callable { key }); if scope_error != blot_error::Error.none { return 0, scope_error; } 
+    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.callable { key , ..}); if scope_error != blot_error::Error.none { return 0, scope_error; } 
     recursive fn cleanup_continuation_18() -> u32, blot_error::Error {
 
     block { let existing = generator.planning.callables.get(key); if existing { if scope.present { let hit = scope.value.hit(existing); if hit != blot_error::Error.none { return 0, hit; } } return existing, blot_error::Error.none; } }
     let source .= unit(generator, key.target.unit); let body .= source.body(key.target.binding); if body == null { return 0, decline(generator, key.target.unit, source.binding(key.target.binding).span, Code.unsupported); }
     if body.parameters.len == 0 { return callableAlias(generator, key, body, scope); }
     if body.parameters.len > max_parameters || key.applied >= body.parameters.len { return 0, decline(generator, key.target.unit, body.span, Code.unsupported); }
-    var direct = Key { dictionaries: key.dictionaries, instance_arguments: key.instance_arguments, target: key.target, count: body.parameters.len as u8, templates: key.templates }; var ty = key.ty; var current: blot_backend_layout::Node;
+    var direct = Key { dictionaries: key.dictionaries, instance_arguments: key.instance_arguments, target: key.target, count: body.parameters.len as u8, templates: key.templates , ..}; var ty = key.ty; var current: blot_backend_layout::Node;
     for index in 0..body.parameters.len {
         let n = generator.representations.store.node(ty); if n.tag != blot_backend_layout::Tag.function { return 0, decline(generator, key.target.unit, body.span, Code.unresolved_type); }
         direct.parameters[index] = n.a; direct.effects[index] = n.c; if index == key.applied { current = n; } ty = n.b;
@@ -1075,8 +1080,8 @@ recursive fn callable(generator: Generator&, key: blot_reuse_code_artifacts::Cal
     let complete_type, type_error = internLayoutWithEffects(generator, blot_backend_layout::Tag.function, current.a, current.b, current.c, []); if type_error != blot_error::Error.none { return 0, type_error; }
     let layout = callableLayout(generator, function_id, complete_type); if layout != blot_error::Error.none { return 0, layout; } generator.planning.callables.insert(key, function_id);
     if scope.present { let reserved = scope.value.reserve(function_id); if reserved != blot_error::Error.none { return 0, reserved; } }
-    var context = CallableEmission { key, direct, current, provider_local, body.parameters.len };
-    let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: key.target.unit, function_id: function_id, provider_local: blot_support::some(provider_local), mappings: [] }, context, emitCallableOwner); if emitted != blot_error::Error.none { return 0, emitted; }
+    var context = CallableEmission { key, direct, current, provider_local, body.parameters.len , ..};
+    let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: key.target.unit, function_id: function_id, provider_local: blot_support::some(provider_local), mappings: [] , ..}, context, emitCallableOwner); if emitted != blot_error::Error.none { return 0, emitted; }
     if scope.present { let completed = scope.value.complete(function_id, blot_support::none<u32>()); if completed != blot_error::Error.none { return 0, completed; } } return function_id, blot_error::Error.none;
 
     }
@@ -1090,13 +1095,13 @@ fn emitConstructorOwner(context: ConstructorEmission&, emitter: blot_backend_bac
     if source.nominal(metadata.nominal).is_opaque { return emitter.emit(blot_backend_runtime_ir::OP_local_get, 1); }
     let payload_type = source.types.node(metadata.payload); var record_local = blot_support::none<u32>();
     if payload_type.tag == blot_check_types::Tag.record && payload_type.b == 1 {
-        let roles: blot_backend_runtime_ir::Role[1] = [layoutRole(generator, fn_type.a)]; let record, error = emitter.allocate(4, blot_backend_backend_emission::AllocationRoles { words: roles }); if error != blot_error::Error.none { return error; }
+        let roles: blot_backend_runtime_ir::Role[1] = [layoutRole(generator, fn_type.a)]; let record, error = emitter.allocate(4, blot_backend_backend_emission::AllocationRoles { words: roles , ..}); if error != blot_error::Error.none { return error; }
         var store = blot_backend_runtime_ir::OP_i32_store; if generator.representations.store.machine(fn_type.a) == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; }
         let emitted = emitOps(emitter, [blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, record), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, 1), blot_backend_runtime_ir::instruction(store)]); if emitted != blot_error::Error.none { return emitted; } record_local = blot_support::some(record);
     } else if payload_type.tag == blot_check_types::Tag.record { let record, error = emitter.recordRepresentation(payload_type, 1, true); if error != blot_error::Error.none { return error; } record_local = blot_support::some(record); }
     if record_local.present && record_local.value != 1 { let marked = emitter.markAcyclic(record_local.value, fn_type.a); if marked != blot_error::Error.none { return marked; } }
     var role = layoutRole(generator, fn_type.a); if record_local.present { role = blot_backend_runtime_ir::ROLE_reference; } let roles: blot_backend_runtime_ir::Role[2] = [blot_backend_runtime_ir::ROLE_scalar, role];
-    let address, allocated = emitter.allocate(8, blot_backend_backend_emission::AllocationRoles { words: roles }); if allocated != blot_error::Error.none { return allocated; }
+    let address, allocated = emitter.allocate(8, blot_backend_backend_emission::AllocationRoles { words: roles , ..}); if allocated != blot_error::Error.none { return allocated; }
     if record_local.present || layoutRole(generator, fn_type.a) == blot_backend_runtime_ir::ROLE_reference { let marked = emitter.markAcyclic(address, fn_type.b); if marked != blot_error::Error.none { return marked; } }
     var payload: u32 = 1; if record_local.present { payload = record_local.value; } var store = blot_backend_runtime_ir::OP_i32_store; if !record_local.present && generator.representations.store.machine(fn_type.a) == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; }
     return emitOps(emitter, [
@@ -1105,17 +1110,17 @@ fn emitConstructorOwner(context: ConstructorEmission&, emitter: blot_backend_bac
     ]);
 }
 fn constructorFunction(generator: Generator&, key: blot_reuse_code_artifacts::ConstructorKey) -> u32, blot_error::Error {
-    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.constructor { key }); if scope_error != blot_error::Error.none { return 0, scope_error; } 
+    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.constructor { key , ..}); if scope_error != blot_error::Error.none { return 0, scope_error; } 
     recursive fn cleanup_continuation_17() -> u32, blot_error::Error {
 
     block { let existing = generator.planning.constructor_functions.get(key); if existing { if scope.present { let hit = scope.value.hit(existing); if hit != blot_error::Error.none { return 0, hit; } } return existing, blot_error::Error.none; } }
-    let fn_type = generator.representations.store.node(key.ty); if fn_type.tag != blot_backend_layout::Tag.function { return 0, decline(generator, key.unit, blot_check_core::Span { 0, 0 }, Code.unresolved_type); }
+    let fn_type = generator.representations.store.node(key.ty); if fn_type.tag != blot_backend_layout::Tag.function { return 0, decline(generator, key.unit, blot_check_core::Span { 0, 0 , ..}, Code.unresolved_type); }
     let parameters: blot_backend_runtime_ir::ValueType[3] = [blot_backend_runtime_ir::VT_i32, generator.representations.store.machine(fn_type.a), blot_backend_runtime_ir::VT_i32];
     let function_id, added = generator.module.addTypedFunction(parameters, generator.representations.store.machine(fn_type.b), layoutRole(generator, fn_type.b)); if added != blot_error::Error.none { return 0, added; }
     let described = setParameterRoles(generator, function_id, closureRoles(generator, fn_type.a), blot_support::some(2 as u16)); if described != blot_error::Error.none { return 0, described; }
     let layout = callableLayout(generator, function_id, key.ty); if layout != blot_error::Error.none { return 0, layout; } generator.planning.constructor_functions.insert(key, function_id);
     if scope.present { let reserved = scope.value.reserve(function_id); if reserved != blot_error::Error.none { return 0, reserved; } }
-    var context = ConstructorEmission { key, fn_type }; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: key.unit, function_id: function_id, provider_local: blot_support::some(2 as u32), mappings: [] }, context, emitConstructorOwner); if emitted != blot_error::Error.none { return 0, emitted; }
+    var context = ConstructorEmission { key, fn_type , ..}; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: key.unit, function_id: function_id, provider_local: blot_support::some(2 as u32), mappings: [] , ..}, context, emitConstructorOwner); if emitted != blot_error::Error.none { return 0, emitted; }
     if scope.present { let completed = scope.value.complete(function_id, blot_support::none<u32>()); if completed != blot_error::Error.none { return 0, completed; } } return function_id, blot_error::Error.none;
 
     }
@@ -1150,17 +1155,17 @@ fn emitPrimitiveOwner(context: PrimitiveEmission&, emitter: blot_backend_backend
         return emitter.arrayLocals(0, metadata.array_op, locals[..metadata.arity], machines[..metadata.arity], context.result, parameters[0]);
     }
     var roles: blot_backend_runtime_ir::Role[3]; for parameter, index in parameters[..key.applied + 1] { roles[index] = layoutRole(generator, parameter); }
-    let environment, allocated = emitter.allocate((key.applied + 1) * 4, blot_backend_backend_emission::AllocationRoles { words: roles[..key.applied + 1] }); if allocated != blot_error::Error.none { return allocated; }
+    let environment, allocated = emitter.allocate((key.applied + 1) * 4, blot_backend_backend_emission::AllocationRoles { words: roles[..key.applied + 1] , ..}); if allocated != blot_error::Error.none { return allocated; }
     for parameter, index in parameters[..key.applied] {
         var load = blot_backend_runtime_ir::OP_i32_load; var store = blot_backend_runtime_ir::OP_i32_store; if generator.representations.store.machine(parameter) == blot_backend_runtime_ir::VT_f32 { load = blot_backend_runtime_ir::OP_f32_load; store = blot_backend_runtime_ir::OP_f32_store; }
         let emitted = emitOps(emitter, [blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, environment), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, 0), blot_backend_runtime_ir::instruction(load, (index * 4) as u32), blot_backend_runtime_ir::instruction(store, (index * 4) as u32)]); if emitted != blot_error::Error.none { return emitted; }
     }
     var store = blot_backend_runtime_ir::OP_i32_store; if generator.representations.store.machine(context.current.a) == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; }
     let emitted = emitOps(emitter, [blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, environment), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, 1), blot_backend_runtime_ir::instruction(store, key.applied * 4)]); if emitted != blot_error::Error.none { return emitted; }
-    let next, error = primitiveFunction(generator, blot_reuse_code_artifacts::PrimitiveKey { unit: key.unit, catalog: key.catalog, ty: key.ty, applied: key.applied + 1 }); if error != blot_error::Error.none { return error; } return emitter.descriptor(next, blot_support::some(environment));
+    let next, error = primitiveFunction(generator, blot_reuse_code_artifacts::PrimitiveKey { unit: key.unit, catalog: key.catalog, ty: key.ty, applied: key.applied + 1 , ..}); if error != blot_error::Error.none { return error; } return emitter.descriptor(next, blot_support::some(environment));
 }
 recursive fn primitiveFunction(generator: Generator&, key: blot_reuse_code_artifacts::PrimitiveKey) -> u32, blot_error::Error {
-    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.primitive { key }); if scope_error != blot_error::Error.none { return 0, scope_error; } 
+    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.primitive { key , ..}); if scope_error != blot_error::Error.none { return 0, scope_error; } 
     recursive fn cleanup_continuation_16() -> u32, blot_error::Error {
 
     block { let existing = generator.planning.primitive_functions.get(key); if existing { if scope.present { let hit = scope.value.hit(existing); if hit != blot_error::Error.none { return 0, hit; } } return existing, blot_error::Error.none; } }
@@ -1173,7 +1178,7 @@ recursive fn primitiveFunction(generator: Generator&, key: blot_reuse_code_artif
     let complete_type, error = internLayoutWithEffects(generator, blot_backend_layout::Tag.function, current.a, current.b, current.c, []); if error != blot_error::Error.none { return 0, error; }
     let layout = callableLayout(generator, function_id, complete_type); if layout != blot_error::Error.none { return 0, layout; } generator.planning.primitive_functions.insert(key, function_id);
     if scope.present { let reserved = scope.value.reserve(function_id); if reserved != blot_error::Error.none { return 0, reserved; } }
-    var context = PrimitiveEmission { key, parameters, current, ty }; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: key.unit, function_id: function_id, provider_local: blot_support::some(2 as u32), mappings: [] }, context, emitPrimitiveOwner); if emitted != blot_error::Error.none { return 0, emitted; }
+    var context = PrimitiveEmission { key, parameters, current, ty , ..}; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: key.unit, function_id: function_id, provider_local: blot_support::some(2 as u32), mappings: [] , ..}, context, emitPrimitiveOwner); if emitted != blot_error::Error.none { return 0, emitted; }
     if scope.present { let completed = scope.value.complete(function_id, blot_support::none<u32>()); if completed != blot_error::Error.none { return 0, completed; } } return function_id, blot_error::Error.none;
 
     }
@@ -1208,7 +1213,7 @@ fn operationLayoutLabel(generator: Generator&, operation_type: u32, unit_id: u32
     let operation = generator.representations.store.node(operation_type); if operation.tag != blot_backend_layout::Tag.nominal { return 0, decline(generator, unit_id, span, Code.unresolved_type); }
     var source_arguments: u32[>..<] = []; source_arguments.append(generator.representations.store.children(operation_type)); var arguments: u32[>..<] = [];
     for argument in source_arguments { let actual, error = generator.representations.toEvidence(generator.evaluator.evidenceStore(), argument); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, Code.unresolved_type); } arguments.push(actual); }
-    let semantic, error = generator.evaluator.storage.evidence.effects.internOperation(blot_check_types::NominalIdentity { operation.a, operation.b }, arguments);
+    let semantic, error = generator.evaluator.storage.evidence.effects.internOperation(blot_check_types::NominalIdentity { operation.a, operation.b , ..}, arguments);
     if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, Code.unresolved_type); } return semantic, blot_error::Error.none;
 }
 fn requestLabel(generator: Generator&, unit_id: u32, label: u32, mappings: const Mapping[:], rows: const RowMapping[:], span: blot_check_core::Span) -> u32, blot_error::Error {
@@ -1232,19 +1237,19 @@ fn hostCallback(generator: const Generator&, ty: u32) -> blot_support::Option<bl
         let payload = generator.representations.store.node(argument.a);
         if payload.tag == blot_backend_layout::Tag.unit || payload.tag == blot_backend_layout::Tag.boolean || payload.tag == blot_backend_layout::Tag.unsigned32 || payload.tag == blot_backend_layout::Tag.floating32 || (payload.tag == blot_backend_layout::Tag.array && (generator.representations.store.node(payload.a).tag == blot_backend_layout::Tag.unsigned32 || generator.representations.store.node(payload.a).tag == blot_backend_layout::Tag.floating32)) {
             let parameter = generator.representations.store.abi(argument.a); if !parameter.present { return blot_support::none<blot_backend_wasm::Callback>(); }
-            return blot_support::some(blot_backend_wasm::Callback { parameter: parameter.value, result: blot_backend_runtime_ir::SC_unit, cleanup: true, owned: generator.persistent_outputs });
+            return blot_support::some(blot_backend_wasm::Callback { parameter: parameter.value, result: blot_backend_runtime_ir::SC_unit, cleanup: true, owned: generator.persistent_outputs , ..});
         }
-        return blot_support::some(blot_backend_wasm::Callback { parameter: blot_backend_runtime_ir::SC_u32, result: blot_backend_runtime_ir::SC_unit, cleanup: true, owned: generator.persistent_outputs, data: true, schema: argument.a });
+        return blot_support::some(blot_backend_wasm::Callback { parameter: blot_backend_runtime_ir::SC_u32, result: blot_backend_runtime_ir::SC_unit, cleanup: true, owned: generator.persistent_outputs, data: true, schema: argument.a , ..});
     }
     let parameter = generator.representations.store.abi(arrow.a); let result = generator.representations.store.abi(arrow.b); if !parameter.present || !result.present { return blot_support::none<blot_backend_wasm::Callback>(); }
-    return blot_support::some(blot_backend_wasm::Callback { parameter: parameter.value, result: result.value });
+    return blot_support::some(blot_backend_wasm::Callback { parameter: parameter.value, result: result.value , ..});
 }
 fn hostFunction(generator: Generator&, key: blot_reuse_code_artifacts::HostKey) -> u32, blot_error::Error {
-    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.host { key }); if scope_error != blot_error::Error.none { return 0, scope_error; } 
+    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.host { key , ..}); if scope_error != blot_error::Error.none { return 0, scope_error; } 
     recursive fn cleanup_continuation_15() -> u32, blot_error::Error {
 
     block { let existing = generator.planning.host_functions.get(key); if existing { if scope.present { let hit = scope.value.hit(existing); if hit != blot_error::Error.none { return 0, hit; } } return existing, blot_error::Error.none; } }
-    let selected = hostCallback(generator, key.ty); if !selected.present { return 0, decline(generator, 1, blot_check_core::Span { 0, 0 }, Code.entry_type); } var callback = selected.value;
+    let selected = hostCallback(generator, key.ty); if !selected.present { return 0, decline(generator, 1, blot_check_core::Span { 0, 0 , ..}, Code.entry_type); } var callback = selected.value;
     if key.owned && !callback.cleanup { return 0, blot_error::Error.invalid_function_reference; } callback.owned = key.owned;
     let references, references_error = generator.module.ensureHostReferences(); if references_error != blot_error::Error.none { return 0, references_error; }
     let imported, import_error = generator.module.importHostCallback(callback); if import_error != blot_error::Error.none { return 0, import_error; }
@@ -1253,7 +1258,7 @@ fn hostFunction(generator: Generator&, key: blot_reuse_code_artifacts::HostKey) 
     let roles: blot_backend_runtime_ir::Role[3] = [blot_backend_runtime_ir::ROLE_reference, layoutRole(generator, arrow.a), blot_backend_runtime_ir::ROLE_reference]; let described = setParameterRoles(generator, function_id, blot_backend_runtime_ir::packParameterRoles(roles), blot_support::some(2 as u16)); if described != blot_error::Error.none { return 0, described; }
     let layout = callableLayout(generator, function_id, key.ty); if layout != blot_error::Error.none { return 0, layout; } generator.planning.host_functions.insert(key, function_id);
     if scope.present { let reserved = scope.value.reserve(function_id); if reserved != blot_error::Error.none { return 0, reserved; } }
-    let borrowed = blot_backend_runtime_ir::Ownership { kind: blot_backend_runtime_ir::OWN_scope, chunk: 14 }; let marker = generator.module.emit(function_id, blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_ownership, blot_backend_runtime_ir::pack(borrowed))); if marker != blot_error::Error.none { return 0, marker; }
+    let borrowed = blot_backend_runtime_ir::Ownership { kind: blot_backend_runtime_ir::OWN_scope, chunk: 14 , ..}; let marker = generator.module.emit(function_id, blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_ownership, blot_backend_runtime_ir::pack(borrowed))); if marker != blot_error::Error.none { return 0, marker; }
     if !callback.owned {
         let emitted = generator.module.emitSlice(function_id, [
             blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, 0), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_get, references.active), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ne), blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),
@@ -1340,17 +1345,17 @@ fn emitOperationOwner(context: OperationEmission&, emitter: blot_backend_backend
     return emitOps(emitter, [I(blot_backend_runtime_ir::OP_end), I(blot_backend_runtime_ir::OP_end)]);
 }
 fn operationFunction(generator: Generator&, key: blot_reuse_code_artifacts::OperationKey) -> u32, blot_error::Error {
-    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.operation { key }); if scope_error != blot_error::Error.none { return 0, scope_error; } 
+    let scope, scope_error = enterScope(generator, blot_reuse_code_artifacts::Request.operation { key , ..}); if scope_error != blot_error::Error.none { return 0, scope_error; } 
     recursive fn cleanup_continuation_14() -> u32, blot_error::Error {
 
     block { let existing = generator.planning.operation_functions.get(key); if existing { if scope.present { let hit = scope.value.hit(existing); if hit != blot_error::Error.none { return 0, hit; } } return existing, blot_error::Error.none; } }
-    let arrow = generator.representations.store.node(key.ty); if arrow.tag != blot_backend_layout::Tag.function { return 0, decline(generator, 1, blot_check_core::Span { 0, 0 }, Code.unresolved_type); }
+    let arrow = generator.representations.store.node(key.ty); if arrow.tag != blot_backend_layout::Tag.function { return 0, decline(generator, 1, blot_check_core::Span { 0, 0 , ..}, Code.unresolved_type); }
     let argument_machine = generator.representations.store.machine(arrow.a); let result_machine = generator.representations.store.machine(arrow.b); let parameters: blot_backend_runtime_ir::ValueType[3] = [blot_backend_runtime_ir::VT_i32, argument_machine, blot_backend_runtime_ir::VT_i32];
     let function_id, added = generator.module.addTypedFunction(parameters, result_machine, layoutRole(generator, arrow.b)); if added != blot_error::Error.none { return 0, added; }
     let described = setParameterRoles(generator, function_id, closureRoles(generator, arrow.a), blot_support::some(2 as u16)); if described != blot_error::Error.none { return 0, described; }
     let layout = callableLayout(generator, function_id, key.ty); if layout != blot_error::Error.none { return 0, layout; } generator.planning.operation_functions.insert(key, function_id);
     if scope.present { let reserved = scope.value.reserve(function_id); if reserved != blot_error::Error.none { return 0, reserved; } }
-    var context = OperationEmission { key, arrow, argument_machine, result_machine }; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: 1, function_id: function_id, provider_local: blot_support::some(2 as u32), mappings: [] }, context, emitOperationOwner); if emitted != blot_error::Error.none { return 0, emitted; }
+    var context = OperationEmission { key, arrow, argument_machine, result_machine , ..}; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator, unit_id: 1, function_id: function_id, provider_local: blot_support::some(2 as u32), mappings: [] , ..}, context, emitOperationOwner); if emitted != blot_error::Error.none { return 0, emitted; }
     if scope.present { let completed = scope.value.complete(function_id, blot_support::none<u32>()); if completed != blot_error::Error.none { return 0, completed; } } return function_id, blot_error::Error.none;
 
     }
@@ -1361,24 +1366,24 @@ fn operationFunction(generator: Generator&, key: blot_reuse_code_artifacts::Oper
 struct HostSchemaContext { generator: Generator&, layouts: blot_backend_layout::Store& }
 struct HostPhysical { floating: bool = false, reference: bool = false }
 recursive fn physical(context: HostSchemaContext, id: u32, remaining: i64&, depth: i64) -> HostPhysical, blot_error::Error {
-    if depth >= 128 || remaining == 0 || id == 0 || id >= context.layouts.nodes.len { return HostPhysical {}, blot_error::Error.layout_limit; } remaining--; let n = context.layouts.node(id);
-    if n.tag == blot_backend_layout::Tag.unit || n.tag == blot_backend_layout::Tag.boolean || n.tag == blot_backend_layout::Tag.unsigned32 { return HostPhysical {}, blot_error::Error.none; }
-    if n.tag == blot_backend_layout::Tag.floating32 { return HostPhysical { floating: true }, blot_error::Error.none; }
-    if n.tag == blot_backend_layout::Tag.product || n.tag == blot_backend_layout::Tag.record || n.tag == blot_backend_layout::Tag.array || n.tag == blot_backend_layout::Tag.list { return HostPhysical { reference: true }, blot_error::Error.none; }
-    if n.tag != blot_backend_layout::Tag.nominal || n.a == 0 || n.a > context.generator.units.len { return HostPhysical {}, blot_error::Error.layout_limit; }
+    if depth >= 128 || remaining == 0 || id == 0 || id >= context.layouts.nodes.len { return HostPhysical {..}, blot_error::Error.layout_limit; } remaining--; let n = context.layouts.node(id);
+    if n.tag == blot_backend_layout::Tag.unit || n.tag == blot_backend_layout::Tag.boolean || n.tag == blot_backend_layout::Tag.unsigned32 { return HostPhysical {..}, blot_error::Error.none; }
+    if n.tag == blot_backend_layout::Tag.floating32 { return HostPhysical { floating: true , ..}, blot_error::Error.none; }
+    if n.tag == blot_backend_layout::Tag.product || n.tag == blot_backend_layout::Tag.record || n.tag == blot_backend_layout::Tag.array || n.tag == blot_backend_layout::Tag.list { return HostPhysical { reference: true , ..}, blot_error::Error.none; }
+    if n.tag != blot_backend_layout::Tag.nominal || n.a == 0 || n.a > context.generator.units.len { return HostPhysical {..}, blot_error::Error.layout_limit; }
     let source .= unit(context.generator,n.a); var selected: i64 = -1;
-    for candidate,index in source.nominals { if remaining == 0 { return HostPhysical {}, blot_error::Error.layout_limit; } remaining--; if candidate.identity.unit == n.a && candidate.identity.decl == n.b { selected = index; break; } }
-    if selected < 0 { return HostPhysical {}, blot_error::Error.layout_limit; } let definition = source.nominals[selected];
-    if !definition.closed_storage || definition.has_usage { return HostPhysical {}, blot_error::Error.layout_limit; } if !definition.is_opaque { return HostPhysical { reference: true }, blot_error::Error.none; }
+    for candidate,index in source.nominals { if remaining == 0 { return HostPhysical {..}, blot_error::Error.layout_limit; } remaining--; if candidate.identity.unit == n.a && candidate.identity.decl == n.b { selected = index; break; } }
+    if selected < 0 { return HostPhysical {..}, blot_error::Error.layout_limit; } let definition = source.nominals[selected];
+    if !definition.closed_storage || definition.has_usage { return HostPhysical {..}, blot_error::Error.layout_limit; } if !definition.is_opaque { return HostPhysical { reference: true , ..}, blot_error::Error.none; }
     match definition.storage.kind {
-        unit,boolean,unsigned32 => { return HostPhysical {}, blot_error::Error.none; }, floating32 => { return HostPhysical { floating: true }, blot_error::Error.none; }, reference => { return HostPhysical { reference: true }, blot_error::Error.none; },
+        unit,boolean,unsigned32 => { return HostPhysical {..}, blot_error::Error.none; }, floating32 => { return HostPhysical { floating: true , ..}, blot_error::Error.none; }, reference => { return HostPhysical { reference: true , ..}, blot_error::Error.none; },
         parameter => {
             let parameters = source.types.list(definition.parameters); let actuals = context.layouts.children(id);
-            if definition.storage.parameter >= parameters.len || parameters.len != actuals.len { return HostPhysical {}, blot_error::Error.layout_limit; } var ordinal: u32 = 0;
-            let selected,error = selectParameter(context,source,parameters[definition.storage.parameter],actuals[definition.storage.parameter],definition.storage.selector,ordinal,remaining,depth + 1); if error != blot_error::Error.none { return HostPhysical {},error; }
-            if !selected.present { return HostPhysical {},blot_error::Error.layout_limit; } return physical(context,selected.value,remaining,depth + 1);
+            if definition.storage.parameter >= parameters.len || parameters.len != actuals.len { return HostPhysical {..}, blot_error::Error.layout_limit; } var ordinal: u32 = 0;
+            let selected,error = selectParameter(context,source,parameters[definition.storage.parameter],actuals[definition.storage.parameter],definition.storage.selector,ordinal,remaining,depth + 1); if error != blot_error::Error.none { return HostPhysical {..},error; }
+            if !selected.present { return HostPhysical {..},blot_error::Error.layout_limit; } return physical(context,selected.value,remaining,depth + 1);
         },
-        unknown => { return HostPhysical {},blot_error::Error.layout_limit; },
+        unknown => { return HostPhysical {..},blot_error::Error.layout_limit; },
     }
 }
 recursive fn selectParameter(context: HostSchemaContext, source: const blot_check_core::Module&, parameter: u32, actual: u32, target: u32, ordinal: u32&, remaining: i64&, depth: i64) -> blot_support::Option<u32>, blot_error::Error {
@@ -1407,16 +1412,16 @@ fn nominal(context: HostSchemaContext, id: u32, remaining: i64&) -> blot_backend
     let hidden = definition.is_opaque || definition.private; var variants: blot_backend_host_cleanup_shapes::Variant[>..<] = []; var mappings: Mapping[>..<] = []; let actuals = context.layouts.children(id);
     for parameter,index in source.types.list(definition.parameters) {
         let charged = shapeTypeWork(source,parameter,remaining,0); if charged != blot_error::Error.none { return default<blot_backend_host_cleanup_shapes::Facts>(),charged; }
-        let error = mapType(generator,n.a,mappings,parameter,actuals[index],blot_check_core::Span { 0,0 }); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return default<blot_backend_host_cleanup_shapes::Facts>(),error; } return default<blot_backend_host_cleanup_shapes::Facts>(),blot_error::Error.layout_limit; }
+        let error = mapType(generator,n.a,mappings,parameter,actuals[index],blot_check_core::Span { 0,0 , ..}); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return default<blot_backend_host_cleanup_shapes::Facts>(),error; } return default<blot_backend_host_cleanup_shapes::Facts>(),blot_error::Error.layout_limit; }
     }
-    if hidden { return blot_backend_host_cleanup_shapes::Facts { source.name(definition.diagnostic_name),true,[] },blot_error::Error.none; }
+    if hidden { return blot_backend_host_cleanup_shapes::Facts { source.name(definition.diagnostic_name),true,[] , ..},blot_error::Error.none; }
     for constructor in source.constructors {
         if remaining == 0 { return default<blot_backend_host_cleanup_shapes::Facts>(),blot_error::Error.layout_limit; } remaining--; if source.nominal(constructor.nominal).identity != definition.identity { continue; }
         let charged = shapeTypeWork(source,constructor.payload,remaining,0); if charged != blot_error::Error.none { return default<blot_backend_host_cleanup_shapes::Facts>(),charged; }
-        let child,error = codeLayoutWithRows(generator,n.a,constructor.payload,mappings,[],blot_check_core::Span { 0,0 }); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return default<blot_backend_host_cleanup_shapes::Facts>(),error; } return default<blot_backend_host_cleanup_shapes::Facts>(),blot_error::Error.layout_limit; }
-        variants.push(blot_backend_host_cleanup_shapes::Variant { constructor.tag,child });
+        let child,error = codeLayoutWithRows(generator,n.a,constructor.payload,mappings,[],blot_check_core::Span { 0,0 , ..}); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return default<blot_backend_host_cleanup_shapes::Facts>(),error; } return default<blot_backend_host_cleanup_shapes::Facts>(),blot_error::Error.layout_limit; }
+        variants.push(blot_backend_host_cleanup_shapes::Variant { constructor.tag,child , ..});
     }
-    return blot_backend_host_cleanup_shapes::Facts { source.name(definition.diagnostic_name),false,blot_backend_host_cleanup_shapes::copyVariants(variants) },blot_error::Error.none;
+    return blot_backend_host_cleanup_shapes::Facts { source.name(definition.diagnostic_name),false,blot_backend_host_cleanup_shapes::copyVariants(variants) , ..},blot_error::Error.none;
 }
 recursive fn shapeTypeWork(module: const blot_check_core::Module&, id: u32, remaining: i64&, depth: i64) -> blot_error::Error {
     if remaining == 0 || depth >= 128 || id == 0 || id >= module.types.nodes.len { return blot_error::Error.layout_limit; } remaining--; let n = module.types.node(id);
@@ -1432,8 +1437,8 @@ recursive fn shapeTypeWork(module: const blot_check_core::Module&, id: u32, rema
 }
 fn emitHostDataSchemas(generator: Generator&) -> blot_error::Error {
     var roots: u32[>..<] = []; for item in generator.module.exports { if item.callback.present && item.callback.value.data { roots.push(item.callback.value.schema); } } if roots.len == 0 { return blot_error::Error.none; }
-    var bytes: u8[>..<] = []; let error = blot_backend_host_cleanup_shapes::build(HostSchemaContext { generator,generator.representations.store },roots,bytes);
-    if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return decline(generator,1,blot_check_core::Span { 0,0 },Code.complexity); } return generator.module.setCleanupDataMetadata(bytes);
+    var bytes: u8[>..<] = []; let error = blot_backend_host_cleanup_shapes::build(HostSchemaContext { generator,generator.representations.store , ..},roots,bytes);
+    if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return decline(generator,1,blot_check_core::Span { 0,0 , ..},Code.complexity); } return generator.module.setCleanupDataMetadata(bytes);
 }
 fn ownerRuntime(generator: Generator&) -> blot_runtime_public_owners::Runtime, blot_error::Error {
     if generator.public_owners.present { return generator.public_owners.value,blot_error::Error.none; }
@@ -1443,7 +1448,7 @@ fn ownerRuntime(generator: Generator&) -> blot_runtime_public_owners::Runtime, b
     generator.public_owners = blot_support::some(runtime); return runtime,blot_error::Error.none;
 }
 fn ownerBoundary(generator: const Generator&, ty: u32) -> blot_support::Option<blot_backend_wasm::OwnerBoundary> {
-    let n = generator.representations.store.node(ty); if n.tag != blot_backend_layout::Tag.owning { return blot_support::none<blot_backend_wasm::OwnerBoundary>(); } var kind: u8 = 1; if n.b == blot_check_types::usagekind_shared { kind = 2; } return blot_support::some(blot_backend_wasm::OwnerBoundary { schema: n.a,kind: kind });
+    let n = generator.representations.store.node(ty); if n.tag != blot_backend_layout::Tag.owning { return blot_support::none<blot_backend_wasm::OwnerBoundary>(); } var kind: u8 = 1; if n.b == blot_check_types::usagekind_shared { kind = 2; } return blot_support::some(blot_backend_wasm::OwnerBoundary { schema: n.a,kind: kind , ..});
 }
 fn freshOwnerInput(generator: const Generator&, ty: u32) -> blot_support::Option<Scalar> {
     let payload = generator.representations.store.node(ty);
@@ -1459,7 +1464,7 @@ fn onceEntry(generator: Generator&, wrapper: u32, guard: blot_support::Option<u3
 }
 fn hostDescriptor(generator: Generator&, emitter: blot_backend_backend_emission::Owner&, stub: u32, handle: u32) -> u32,blot_error::Error {
     let roles: blot_backend_runtime_ir::Role[3] = [blot_backend_runtime_ir::ROLE_scalar,blot_backend_runtime_ir::ROLE_scalar,blot_backend_runtime_ir::ROLE_scalar];
-    let descriptor,error = emitter.allocate(blot_runtime_runtime_layout::HostClosure_bytes,blot_backend_backend_emission::AllocationRoles { words: roles }); if error != blot_error::Error.none { return 0,error; }
+    let descriptor,error = emitter.allocate(blot_runtime_runtime_layout::HostClosure_bytes,blot_backend_backend_emission::AllocationRoles { words: roles , ..}); if error != blot_error::Error.none { return 0,error; }
     let pointer = emitter.emit(blot_backend_runtime_ir::OP_local_get,descriptor); if pointer != blot_error::Error.none { return 0,pointer; }
     let code = emitter.referenceConstant(stub,blot_reuse_artifact_emitter::Role.table_function); if code != blot_error::Error.none { return 0,code; }
     let prefix = emitOps(emitter,[I(blot_backend_runtime_ir::OP_i32_store),I(blot_backend_runtime_ir::OP_local_get,descriptor),I(blot_backend_runtime_ir::OP_local_get,descriptor)]); if prefix != blot_error::Error.none { return 0,prefix; }
@@ -1490,8 +1495,8 @@ fn emitCallbackEntryOwner(context: CallbackEntryEmission&, emitter: blot_backend
         let nested,nested_error = hostDescriptor(generator,emitter,context.stub,handle); if nested_error != blot_error::Error.none { return nested_error; }
         let nested_store = emitOps(emitter,[I(blot_backend_runtime_ir::OP_local_get,nested),I(blot_backend_runtime_ir::OP_local_set,descriptor),I(blot_backend_runtime_ir::OP_else_)]); if nested_store != blot_error::Error.none { return nested_store; }
         let address = generator.module.data.len as u32; let allocated,allocated_error = generator.module.dataObject([context.stub,address,0]); if allocated_error != blot_error::Error.none { return allocated_error; }
-        let code = generator.module.dataReference(address,blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.callable_function,value: context.stub }); if code != blot_error::Error.none { return code; }
-        let environment = generator.module.dataReference(address + 4,blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.static_address,value: address }); if environment != blot_error::Error.none { return environment; }
+        let code = generator.module.dataReference(address,blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.callable_function,value: context.stub , ..}); if code != blot_error::Error.none { return code; }
+        let environment = generator.module.dataReference(address + 4,blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.static_address,value: address , ..}); if environment != blot_error::Error.none { return environment; }
         let checked = emitOps(emitter,[I(blot_backend_runtime_ir::OP_local_get,handle),I(blot_backend_runtime_ir::OP_if_),I(blot_backend_runtime_ir::OP_unreachable_),I(blot_backend_runtime_ir::OP_end)]); if checked != blot_error::Error.none { return checked; }
         let reference = emitter.referenceConstant(address,blot_reuse_artifact_emitter::Role.static_address); if reference != blot_error::Error.none { return reference; }
         let stored = emitter.emit(blot_backend_runtime_ir::OP_local_set,descriptor); if stored != blot_error::Error.none { return stored; }
@@ -1511,13 +1516,13 @@ fn emitCallbackEntryOwner(context: CallbackEntryEmission&, emitter: blot_backend
 }
 fn entryCallbackFunction(generator: Generator&,target: u32,parameter: u32,result: Scalar,guard: blot_support::Option<u32>,output: blot_support::Option<blot_backend_wasm::OwnerBoundary>) -> u32,blot_error::Error {
     let callback = hostCallback(generator,parameter); if !callback.present { return 0,blot_error::Error.invalid_function_reference; }
-    let stub,stub_error = hostFunction(generator,blot_reuse_code_artifacts::HostKey { ty: parameter,owned: callback.value.owned }); if stub_error != blot_error::Error.none { return 0,stub_error; }
+    let stub,stub_error = hostFunction(generator,blot_reuse_code_artifacts::HostKey { ty: parameter,owned: callback.value.owned , ..}); if stub_error != blot_error::Error.none { return 0,stub_error; }
     let arena,arena_error = generator.module.ensureArena(); if arena_error != blot_error::Error.none { return 0,arena_error; }
     let references,references_error = generator.module.ensureHostReferences(); if references_error != blot_error::Error.none { return 0,references_error; }
     let wrapper,wrapper_error = generator.module.addTypedFunction([blot_backend_runtime_ir::VT_externref],blot_backend_runtime_ir::machine(result),blot_backend_runtime_ir::role(result)); if wrapper_error != blot_error::Error.none { return 0,wrapper_error; }
     let once = onceEntry(generator,wrapper,guard); if once != blot_error::Error.none { return 0,once; }
-    var context = CallbackEntryEmission { target,parameter,result,callback.value,stub,arena,references,output };
-    let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: 1,function_id: wrapper,mappings: [] },context,emitCallbackEntryOwner); if emitted != blot_error::Error.none { return 0,emitted; } return wrapper,blot_error::Error.none;
+    var context = CallbackEntryEmission { target,parameter,result,callback.value,stub,arena,references,output , ..};
+    let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: 1,function_id: wrapper,mappings: [] , ..},context,emitCallbackEntryOwner); if emitted != blot_error::Error.none { return 0,emitted; } return wrapper,blot_error::Error.none;
 }
 struct EntryEmission { target: u32,owning: blot_support::Option<u32>,input: blot_support::Option<blot_backend_wasm::OwnerBoundary>,output: blot_support::Option<blot_backend_wasm::OwnerBoundary>,leased: bool }
 fn emitEntryOwner(context: EntryEmission&,emitter: blot_backend_backend_emission::Owner&) -> blot_error::Error {
@@ -1537,7 +1542,7 @@ fn entryFunction(generator: Generator&,target: u32,parameter: Scalar,result: Sca
     if parameter != blot_backend_runtime_ir::SC_array_u32 && parameter != blot_backend_runtime_ir::SC_array_f32 && generator.module.arena.present {
         let reset = generator.module.emitSlice(wrapper,[I(blot_backend_runtime_ir::OP_i32_const),I(blot_backend_runtime_ir::OP_call,generator.module.arena.value.reset),I(blot_backend_runtime_ir::OP_drop)]); if reset != blot_error::Error.none { return 0,reset; }
     }
-    var context = EntryEmission { target,owning,input,output,leased }; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: 1,function_id: wrapper,mappings: [] },context,emitEntryOwner); if emitted != blot_error::Error.none { return 0,emitted; } return wrapper,blot_error::Error.none;
+    var context = EntryEmission { target,owning,input,output,leased , ..}; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: 1,function_id: wrapper,mappings: [] , ..},context,emitEntryOwner); if emitted != blot_error::Error.none { return 0,emitted; } return wrapper,blot_error::Error.none;
 }
 fn entryData(view: blot_eval_type_evidence::View,id: u32,arrays: bool) -> bool {
     let n = view.node(id); if n.tag == blot_eval_type_evidence::Tag.unit || n.tag == blot_eval_type_evidence::Tag.boolean || n.tag == blot_eval_type_evidence::Tag.unsigned32 || n.tag == blot_eval_type_evidence::Tag.floating32 { return true; }
@@ -1583,9 +1588,9 @@ fn validateEntryInterfaces(generator: Generator&,entry: u32) -> blot_error::Erro
     let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.interfaces); 
     recursive fn cleanup_continuation_13() -> blot_error::Error {
  let source .= unit(generator,entry);
-    var headers: blot_eval_core_eval::SourceInterface[>..<] = []; for body in source.bodies { headers.push(blot_eval_core_eval::SourceInterface {}); }
+    var headers: blot_eval_core_eval::SourceInterface[>..<] = []; for body in source.bodies { headers.push(blot_eval_core_eval::SourceInterface {..}); }
     for functions in [true,false] { for body,index in source.bodies[1..] {
-        if !body.exported || body.is_function != functions { continue; } let target = blot_check_core::BindingRef { entry,body.binding }; let before = generator.evaluator.steps;
+        if !body.exported || body.is_function != functions { continue; } let target = blot_check_core::BindingRef { entry,body.binding , ..}; let before = generator.evaluator.steps;
         let header,error = generator.evaluator.sourceInterface(target); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return evaluationFailure(generator); } headers[index + 1] = header; assert(generator.evaluator.steps == before);
     } }
     for functions in [true,false] { for body,index in source.bodies[1..] {
@@ -1601,17 +1606,17 @@ fn validateEntryInterfaces(generator: Generator&,entry: u32) -> blot_error::Erro
     return cleanup_result_13_0;
 }
 fn generate(generator: Generator&,entry: u32,unit_order: const u32[:]) -> blot_error::Error {
-    if entry == 0 || entry > generator.units.len { return decline(generator,1,blot_check_core::Span { 0,0 },Code.unsupported); } let source .= unit(generator,entry); var exports: i64 = 0;
+    if entry == 0 || entry > generator.units.len { return decline(generator,1,blot_check_core::Span { 0,0 , ..},Code.unsupported); } let source .= unit(generator,entry); var exports: i64 = 0;
     block {
         let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.principals); defer { timing.deinit(); } let valid = validateEntryInterfaces(generator,entry); if valid != blot_error::Error.none { return valid; }
         for functions in [true,false] { for body in source.bodies[1..] {
-            if !body.exported || body.is_function != functions { continue; } exports++; let error = generator.evaluator.prepare(blot_check_core::BindingRef { entry,body.binding }); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return evaluationFailure(generator); }
+            if !body.exported || body.is_function != functions { continue; } exports++; let error = generator.evaluator.prepare(blot_check_core::BindingRef { entry,body.binding , ..}); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return evaluationFailure(generator); }
         } }
-        if exports == 0 { return decline(generator,entry,blot_check_core::Span { 0,0 },Code.no_entry); }
+        if exports == 0 { return decline(generator,entry,blot_check_core::Span { 0,0 , ..},Code.no_entry); }
     }
     block { let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.startup); defer { timing.deinit(); } let planned = generator.planning.planRuntime(generator,entry,unit_order); if planned != blot_error::Error.none { return planned; } }
     for body in source.bodies[1..] {
-        if !body.exported { continue; } let target = blot_check_core::BindingRef { entry,body.binding };
+        if !body.exported { continue; } let target = blot_check_core::BindingRef { entry,body.binding , ..};
         if body.is_function || source.types.node(source.binding(body.binding).ty).tag == blot_check_types::Tag.function {
             let key,key_error = entrySignature(generator,target,body.scheme.root,body.span); if key_error != blot_error::Error.none { return key_error; }
             if key.count != 1 || !foreignRow(generator,key.effects[0],false) { return decline(generator,entry,body.span,Code.entry_type); }
@@ -1648,7 +1653,7 @@ fn generate(generator: Generator&,entry: u32,unit_order: const u32[:]) -> blot_e
             let exported = generator.module.exportConstant(source.name(body.export_name),value.value.scalar,value.value.bits); if exported != blot_error::Error.none { return exported; }
         }
     }
-    if exports == 0 { return decline(generator,entry,blot_check_core::Span { 0,0 },Code.no_entry); } return emitHostDataSchemas(generator);
+    if exports == 0 { return decline(generator,entry,blot_check_core::Span { 0,0 , ..},Code.no_entry); } return emitHostDataSchemas(generator);
 }
 struct EntryDisplay { generator: Generator&,text: u8[>..<]& }
 fn append(display: EntryDisplay&,bytes: const u8[:]) -> blot_error::Error { display.text.append(bytes); return blot_error::Error.none; }
@@ -1708,11 +1713,11 @@ recursive fn ty(display: EntryDisplay&,id: u32,depth: u8) -> bool,blot_error::Er
     return true,blot_error::Error.none;
 }
 fn declineEntryInterface(generator: Generator&,entry: u32,body: const blot_check_core::Body&,header: blot_eval_core_eval::SourceInterface) -> blot_error::Error {
-    let point = unit(generator,entry).sourceNamePoint(body.binding); var code = Code.entry_type; if body.runtime { code = Code.entry_let_type; } let failure = decline(generator,entry,blot_check_core::Span { point,point },code);
+    let point = unit(generator,entry).sourceNamePoint(body.binding); var code = Code.entry_type; if body.runtime { code = Code.entry_let_type; } let failure = decline(generator,entry,blot_check_core::Span { point,point , ..},code);
     var message: u8[>..<] = []; let name = unit(generator,entry).name(body.export_name);
     if !header.selected { message.append("entry `"); message.append(name); message.append("` has a generic type, so it cannot be a Wasm export: "); message.append(entry_abi_rule); }
     else {
-        if header.generic || header.evidence == 0 { return failure; } var text: u8[>..<] = []; var display = EntryDisplay { generator,text }; let printed,error = ty(display,header.evidence,64); if error != blot_error::Error.none { return error; } if !printed { return failure; }
+        if header.generic || header.evidence == 0 { return failure; } var text: u8[>..<] = []; var display = EntryDisplay { generator,text , ..}; let printed,error = ty(display,header.evidence,64); if error != blot_error::Error.none { return error; } if !printed { return failure; }
         if body.runtime {
             message.append("entry let `"); message.append(name); message.append("` initializes a runtime value of type "); message.append(text); message.append("; the guest ABI exports runtime-initialized values only as Unit, U32, F32 or Bool globals or as functions that fit it: "); message.append(entry_abi_rule);
         } else { message.append("entry `"); message.append(name); message.append("` has type "); message.append(text); message.append(", which does not fit the guest ABI: "); message.append(entry_abi_rule); }
@@ -1739,7 +1744,7 @@ fn ownsArrayUpdate(generator: Generator&,unit_id: u32,id: u32) -> bool,blot_erro
 fn numericCheck(generator: Generator&,unit_id: u32,id: u32) -> bool,blot_error::Error {
     if id == 0 { return false,blot_error::Error.none; } block { let known = generator.planning.numeric_plans.get(unit_id); if known { return known.admits(id),blot_error::Error.none; } }
     var units: (const blot_check_core::Module&)[>..<] = []; for source in generator.units { units.push(source); }
-    let plan,error = blot_check_numeric_proof_core::analyze(unit(generator,unit_id),units,blot_check_numeric_proof_core::Options {}); if error != blot_error::Error.none { return false,error; }
+    let plan,error = blot_check_numeric_proof_core::analyze(unit(generator,unit_id),units,blot_check_numeric_proof_core::Options {..}); if error != blot_error::Error.none { return false,error; }
     let admitted = plan.admits(id); generator.planning.numeric_plans.insert(unit_id,plan); return admitted,blot_error::Error.none;
 }
 let default_artifact_replay = blot_compiler_defaults::artifact_replay;
@@ -1754,6 +1759,7 @@ struct CompileOptions {
 // Every mutable owner is placed by the driver before provider borrows bind.
 // Successful retained output keeps its own contexts until Result.deinit.
 struct CompileWorkspace {
+    publication_owner: blot_backend_result_publication::Owner,compiled_units: const blot_check_core::Module[:] = [],
     allocation_owner: u64,generator: Generator&,session_tables: blot_eval_core_eval::SessionTables,
     module_stamps: blot_reuse_code_artifacts::ModuleStamps&,journal: blot_reuse_artifact_emitter::Recorder&,metadata: blot_reuse_code_artifacts::Context&,
     retained: blot_reuse_artifact_fragment::State&,principal_state: blot_reuse_principal_evidence_reuse::State&,persisted_principals: blot_reuse_principal_archive::Reader&,query_state: blot_eval_completed_specialization_query::State&,constant_state: blot_reuse_constant_receipt_reuse::State&,
@@ -1767,11 +1773,13 @@ struct CompileRun {
     retained: blot_reuse_artifact_fragment::State&? = null,principal_state: blot_reuse_principal_evidence_reuse::State&? = null,persisted_principals: blot_reuse_principal_archive::Reader&? = null,query_state: blot_eval_completed_specialization_query::State&? = null,constant_state: blot_reuse_constant_receipt_reuse::State&? = null,
     origins: blot_backend_source_origins::View&? = null,candidate: blot_backend_region_candidate::Extension&? = null,vectors: blot_backend_simd_abi::View&? = null,optimized: blot_backend_optimized_bodies::Capture&? = null,
 }
-fn emptyResult(workspace: CompileWorkspace&) -> Result { workspace.bytes.clear(); workspace.message.clear(); return Result { bytes: workspace.bytes,owned_message: workspace.message }; }
+fn emptyResult(workspace: CompileWorkspace&) -> Result { assert(blot_backend_result_publication::canMutate(workspace.publication_owner)); workspace.bytes.clear(); workspace.message.clear(); return Result { bytes: workspace.bytes,owned_message: workspace.message , ..}; }
 fn deinit(result: Result&) {
+    if result.publication_owner.slot != 0 { assert(blot_backend_result_publication::resultValid(result.publication_owner,result.publication_epoch,result.publication_pinned)); }
     if result.allocation_emission != null { result.allocation_emission.deinit(); result.allocation_emission .= null; }
     if result.capture != null { result.capture.deinit(); result.capture .= null; } if result.explanation != null { result.explanation.deinit(); result.explanation .= null; }
     if result.startup_observation != null { result.startup_observation.deinit(); result.startup_observation .= null; } result.bytes.clear(); result.owned_message.clear(); result.diagnostic = blot_support::none<Diagnostic>();
+    if result.publication_owner.slot != 0 { blot_backend_result_publication::releaseResult(result.publication_owner,result.publication_epoch,result.publication_pinned); } result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = []; result.active = false; result.bytes .= inactive_result_bytes; result.owned_message .= inactive_result_message;
 }
 fn deinit(run: CompileRun&) {
     if run.optimized != null { run.optimized.deinit(); } if run.vectors != null { run.vectors.deinit(); } if run.candidate != null { run.candidate.deinit(); } if run.origins != null { run.origins.deinit(); }
@@ -1779,17 +1787,18 @@ fn deinit(run: CompileRun&) {
     if run.generator_alive { run.workspace.generator.deinit(); } if run.metadata_alive { run.workspace.metadata.deinit(); } if run.journal_alive { run.workspace.journal.deinit(); } if run.stamps_alive { run.workspace.module_stamps.deinit(); }
 }
 fn resetGenerator(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],journal: blot_reuse_artifact_emitter::Recorder&?) -> blot_error::Error {
+    assert(blot_backend_result_publication::canMutate(workspace.publication_owner));
     let generator .= workspace.generator; generator.diagnostic_contexts.deinit(); generator.numeric_rows.deinit(); generator.planning.deinit(); generator.module.reset(); generator.static_data.deinit();
     let evaluator_error = generator.evaluator.reset(workspace.session_tables,units); if evaluator_error != blot_error::Error.none { return evaluator_error; }
     let representation_error = generator.representations.init(units); if representation_error != blot_error::Error.none { return representation_error; }
-    generator.allocation_owner = workspace.allocation_owner; generator.inline_named = true; generator.speculative_locals = true; generator.speculated = false; generator.ragged_probe_limit = blot_backend_ragged_builder::probe_limit; generator.work_timing = blot_backend_backend_timing::Work {}; generator.units = units; generator.spawn_units = [];
+    generator.allocation_owner = workspace.allocation_owner; generator.inline_named = true; generator.speculative_locals = true; generator.speculated = false; generator.ragged_probe_limit = blot_backend_ragged_builder::probe_limit; generator.work_timing = blot_backend_backend_timing::Work {..}; generator.units = units; generator.spawn_units = [];
     generator.artifacts .= null; generator.retained .= null; generator.principal_state .= null; generator.persisted_principals .= null; generator.query_state .= null; generator.constant_state .= null; generator.refinement_owner .= null;
-    generator.principal_stats = blot_reuse_principal_evidence_reuse::Stats {}; generator.refinement_stats = blot_reuse_refinement_receipt::Stats {}; generator.work = blot_reuse_artifact_fragment::Stats {}; generator.persistent_outputs = false; generator.memory_profile = false;
-    generator.public_owners = blot_support::none<blot_runtime_public_owners::Runtime>(); generator.task_context = blot_support::none<blot_runtime_task_context::Functions>(); generator.request_owner = blot_support::none<u32>(); generator.scoped_effects = false; generator.diagnostic = blot_support::none<Diagnostic>(); generator.staging_trace = blot_check_staging_origins::Trace {}; generator.instance_depth = 0;
+    generator.principal_stats = blot_reuse_principal_evidence_reuse::Stats {..}; generator.refinement_stats = blot_reuse_refinement_receipt::Stats {..}; generator.work = blot_reuse_artifact_fragment::Stats {..}; generator.persistent_outputs = false; generator.memory_profile = false;
+    generator.public_owners = blot_support::none<blot_runtime_public_owners::Runtime>(); generator.task_context = blot_support::none<blot_runtime_task_context::Functions>(); generator.request_owner = blot_support::none<u32>(); generator.scoped_effects = false; generator.diagnostic = blot_support::none<Diagnostic>(); generator.staging_trace = blot_check_staging_origins::Trace {..}; generator.instance_depth = 0;
     generator.planning.runtime_operations.identity = blot_support::none<blot_backend_runtime_identity::View>(); generator.planning.runtime_operations.artifacts .= null; generator.planning.init(); return init(generator,journal);
 }
 fn prepare(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Error {
-    let workspace .= run.workspace; let generator .= workspace.generator; run.clock = blot_backend_backend_timing::init(run.options.io); run.timing = blot_backend_backend_timing::Stats {};
+    let workspace .= run.workspace; let generator .= workspace.generator; run.clock = blot_backend_backend_timing::init(run.options.io); run.timing = blot_backend_backend_timing::Stats {..};
     if run.options.identity.present {
         let names = run.options.identity.value; if names.owners.len != run.units.len { return blot_error::Error.invalid_function_reference; }
         for source,index in run.units { if source.unit != index + 1 || !names.owner(source.unit).present { return blot_error::Error.invalid_function_reference; } }
@@ -1801,7 +1810,7 @@ fn prepare(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Error {
     if query_previous != null && query_previous.metadata.pools.present { workspace.module_stamps.previous .= query_previous.metadata.pools.value; }
     workspace.module_stamps.compare_contents = true; workspace.module_stamps.validate = run.options.validate_pins; workspace.module_stamps.computed = 0; workspace.module_stamps.reused = 0; workspace.module_stamps.comparisons = 0; workspace.module_stamps.copied = 0; workspace.module_stamps.hashed = 0; run.stamps_alive = true;
     if workspace.module_stamps.previous != null { run.stamps .= workspace.module_stamps; }
-    workspace.journal.deinit(); workspace.journal = blot_reuse_artifact_emitter::init(blot_reuse_artifact_emitter::Tables { records: workspace.journal.records,bytes: workspace.journal.bytes,parameters: workspace.journal.parameters,operations: workspace.journal.operations,pending_instructions: workspace.journal.pending_instructions }); run.journal_alive = true;
+    workspace.journal.deinit(); workspace.journal = blot_reuse_artifact_emitter::init(blot_reuse_artifact_emitter::Tables { records: workspace.journal.records,bytes: workspace.journal.bytes,parameters: workspace.journal.parameters,operations: workspace.journal.operations,pending_instructions: workspace.journal.pending_instructions , ..}); run.journal_alive = true;
     workspace.metadata.deinit(); workspace.metadata.allocation_owner = workspace.allocation_owner; workspace.metadata.active_job = 0; workspace.metadata.clock = 0; run.metadata_alive = true;
     if run.recording { workspace.journal.owner .= workspace.metadata.active_job; workspace.journal.clock .= workspace.metadata.clock; }
     var journal: blot_reuse_artifact_emitter::Recorder&? = null; if run.recording { journal .= workspace.journal; } run.generator_alive = true;
@@ -1812,11 +1821,11 @@ fn prepare(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Error {
     generator.work_timing.clock = blot_backend_backend_timing::init(run.options.profile_backend && run.options.io); generator.work_timing.cpu_clock = blot_backend_backend_timing::initKind(run.options.profile_backend && run.options.io && blot_native::thread_cpu_available(),true);
     if run.options.profile_backend { generator.evaluator.timing .= generator.work_timing; } else { generator.evaluator.timing .= null; }
     if run.recording { generator.artifacts .= workspace.metadata; } generator.refinement_owner .= workspace.metadata;
-    generator.evaluator.diagnostic_context = blot_eval_core_eval::DiagnosticContext { identity: run.options.identity,entry: run.entry,prelude: run.options.diagnostic_prelude_unit,source_mode: run.options.diagnostic_source_mode };
+    generator.evaluator.diagnostic_context = blot_eval_core_eval::DiagnosticContext { identity: run.options.identity,entry: run.entry,prelude: run.options.diagnostic_prelude_unit,source_mode: run.options.diagnostic_source_mode , ..};
     generator.planning.startup_facts.enabled = run.options.observe_startup; generator.planning.runtime_operations.identity = run.options.identity; if run.recording { generator.planning.runtime_operations.artifacts .= workspace.journal; }
     let reused = prepareReuse(run,skip_constant_replay); if reused != blot_error::Error.none { return reused; }
     if run.options.evidence_noise {
-        for index in 0..7 { let operation,error = generator.evaluator.storage.evidence.effects.internOperation(blot_check_types::NominalIdentity { 4294967295,(9000 + index) as u32 },[blot_check_types::f32_type]); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.module_too_large; } }
+        for index in 0..7 { let operation,error = generator.evaluator.storage.evidence.effects.internOperation(blot_check_types::NominalIdentity { 4294967295,(9000 + index) as u32 , ..},[blot_check_types::f32_type]); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.module_too_large; } }
     }
     run.timing.prepare_us = run.clock.lap(); return blot_error::Error.none;
 }
@@ -1874,7 +1883,7 @@ fn emit(run: CompileRun&) -> EmissionResult,blot_error::Error {
             }
         }
         if run.options.observe_startup { let snapshot,error = generator.planning.startup_facts.capture(generator.module); if error != blot_error::Error.none { result.deinit(); return EmissionResult.complete,error; } workspace.startup_snapshot = snapshot; result.startup_observation .= workspace.startup_snapshot; }
-        result.counters = generator.evaluator.counters; result.principal = principalStats(generator); result.code_instances = generator.planning.codeCount(generator.static_data.closures.len); result.callable_wrappers = generator.planning.wrapperCount(); result.emitted_functions = generator.module.functions.len; result.constant_steps = generator.evaluator.steps; result.constant_receipts = generator.evaluator.constant_stats; return EmissionResult.diagnostic { result },blot_error::Error.none;
+        result.counters = generator.evaluator.counters; result.principal = principalStats(generator); result.code_instances = generator.planning.codeCount(generator.static_data.closures.len); result.callable_wrappers = generator.planning.wrapperCount(); result.emitted_functions = generator.module.functions.len; result.constant_steps = generator.evaluator.steps; result.constant_receipts = generator.evaluator.constant_stats; return EmissionResult.diagnostic { result , ..},blot_error::Error.none;
     }
     if generator.evaluator.constant_receipt_retry { return EmissionResult.complete,blot_error::Error.constant_receipt_retry; } run.timing.generate_us = run.clock.lap();
     if run.options.policy.memory_profile { let arena,error = generator.module.ensureArena(); if error != blot_error::Error.none { return EmissionResult.complete,error; } }
@@ -1904,7 +1913,7 @@ fn assemble(run: CompileRun&) -> Result,blot_error::Error {
         run.origins .= workspace.origins; source_module .= workspace.origins.code.module;
     }
     if blot_backend_cohort_candidate::possible(source_module) {
-        var context = CandidatePreparation { run,source_module }; let error = blot_backend_activation_model::withBorrowed(generator,run.options.identity,context,prepareCandidate); if error != blot_error::Error.none { return emptyResult(workspace),error; }
+        var context = CandidatePreparation { run,source_module , ..}; let error = blot_backend_activation_model::withBorrowed(generator,run.options.identity,context,prepareCandidate); if error != blot_error::Error.none { return emptyResult(workspace),error; }
     }
     var assembled_module: const blot_backend_wasm::Module& .= source_module; if run.candidate != null { assembled_module .= run.candidate.view.module; }
     if run.options.policy.codegen_tier == blot_compilation_tier::Tier.optimized {
@@ -1913,7 +1922,7 @@ fn assemble(run: CompileRun&) -> Result,blot_error::Error {
     if run.options.retain_artifacts { let error = blot_backend_optimized_bodies::initInto(workspace.optimized); if error != blot_error::Error.none { return emptyResult(workspace),error; } run.optimized .= workspace.optimized; }
     var optimized_previous: const blot_backend_optimized_bodies::Capture&? = null; if run.options.previous != null && run.options.previous.optimized != null { optimized_previous .= run.options.previous.optimized; }
     if optimized_previous == null && run.options.checkpoint != null && run.options.checkpoint.optimizer != null { optimized_previous .= run.options.checkpoint.optimizer; }
-    var runtime_optimization = blot_backend_optimized_bodies::Stats {}; var rejection = blot_backend_wasm::OwnershipFailure {}; var collector_rejection = blot_backend_collector_contract::Certificate {};
+    var runtime_optimization = blot_backend_optimized_bodies::Stats {..}; var rejection = blot_backend_wasm::OwnershipFailure {..}; var collector_rejection = blot_backend_collector_contract::Certificate {..};
     var memory_profile = blot_support::none<const blot_backend_source_origins::Site[:]>(); if run.origins != null { memory_profile = blot_support::some(run.origins.sites); }
     workspace.bytes.clear(); let emitted = assembled_module.assembleCheckedWithOptions(blot_backend_wasm::AssembleOptions { compiler_identity: run.options.compiler_identity,source_digests: run.options.diagnostic_source_digests,source_names: run.options.identity,require_collector_free: run.options.policy.require_collector_free,collector_rejection: collector_rejection,memory_profile: memory_profile,rejection: rejection,io: run.options.io,workers: run.options.policy.codegen_workers,profile: run.options.profile_backend,tier: run.options.policy.codegen_tier,share_machine_code: run.options.policy.share_machine_code,previous: optimized_previous,current: run.optimized,stats: runtime_optimization },workspace.bytes);
     if emitted != blot_error::Error.none {
@@ -1922,12 +1931,12 @@ fn assemble(run: CompileRun&) -> Result,blot_error::Error {
             if collector_rejection.function.present { format(workspace.message,collector_rejection.function.value); } else { workspace.message.append("null"); } workspace.message.append(", instruction ");
             if collector_rejection.instruction.present { format(workspace.message,collector_rejection.instruction.value); } else { workspace.message.append("null"); }
             workspace.message.append(". Ordinary builds retain collection. The current certificate requires scalar host inputs, direct calls and heap allocations with no owning fields.");
-            var location = Diagnostic { unit: run.entry,span: blot_check_core::Span { 0,0 },code: Code.collector_free_unproved,detail: workspace.message };
+            var location = Diagnostic { unit: run.entry,span: blot_check_core::Span { 0,0 , ..},code: Code.collector_free_unproved,detail: workspace.message , ..};
             if collector_rejection.function.present { for site in assembled_module.semantic_sites { if site.function != collector_rejection.function.value || site.unit == 0 || site.unit > run.units.len { continue; } location.unit = site.unit; location.span = run.units[site.unit - 1].span(site.root); break; } }
             result.diagnostic = blot_support::some(location); return result,blot_error::Error.none;
         }
         if emitted == blot_error::Error.incomplete_ownership {
-            var location = Diagnostic { unit: run.entry,span: blot_check_core::Span { 0,0 },code: Code.ownership_unproved };
+            var location = Diagnostic { unit: run.entry,span: blot_check_core::Span { 0,0 , ..},code: Code.ownership_unproved , ..};
             if rejection.function.present {
                 var found = false; let failed = rejection.function.value;
                 generator.planning.instances.each() { key,function_id => { if !found && function_id == failed { location.unit = key.target.unit; location.span = generator.unit(key.target.unit).binding(key.target.binding).span; found = true; } } }
@@ -1939,7 +1948,7 @@ fn assemble(run: CompileRun&) -> Result,blot_error::Error {
         }
         if emitted == blot_error::Error.out_of_memory || emitted == blot_error::Error.module_too_large || emitted == blot_error::Error.invalid_global_reference { return emptyResult(workspace),emitted; } return emptyResult(workspace),blot_error::Error.invalid_function_reference;
     }
-    workspace.message.clear(); return Result { runtime_optimization: runtime_optimization,bytes: workspace.bytes,code_instances: generator.planning.codeCount(generator.static_data.closures.len),callable_wrappers: generator.planning.wrapperCount(),emitted_functions: assembled_module.functions.len,constant_steps: generator.evaluator.steps,constant_receipts: generator.evaluator.constant_stats,owned_message: workspace.message },blot_error::Error.none;
+    workspace.message.clear(); return Result { runtime_optimization: runtime_optimization,bytes: workspace.bytes,code_instances: generator.planning.codeCount(generator.static_data.closures.len),callable_wrappers: generator.planning.wrapperCount(),emitted_functions: assembled_module.functions.len,constant_steps: generator.evaluator.steps,constant_receipts: generator.evaluator.constant_stats,owned_message: workspace.message , ..},blot_error::Error.none;
 }
 fn addFields<T>(destination: T&,source: T) { const for <N,A> in fields<T> { destination.A += source.A; } }
 fn observe(run: CompileRun&,result: Result&) -> blot_error::Error {
@@ -1996,9 +2005,9 @@ fn recordArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
         if function.function >= journal.functions.len { return blot_error::Error.invalid_function_reference; } let owner = journal.functions[function.function].owner; if owner == 0 || owner > metadata.jobs.len { return blot_error::Error.invalid_function_reference; } let job = metadata.jobs[owner - 1];
         if job.state != blot_reuse_code_artifacts::State.complete || !job.function.present || job.function.value != function.function || job.request != function.request || job.result_template != function.result_template { return blot_error::Error.invalid_function_reference; }
     }
-    let counts = ArtifactCounts { generator.module.globals.len,generator.module.imports.len,generator.module.signatures.len,generator.module.data.len };
+    let counts = ArtifactCounts { generator.module.globals.len,generator.module.imports.len,generator.module.signatures.len,generator.module.data.len , ..};
     if run.options.artifact_replay { let replayed = replayArtifact(run,result); if replayed != blot_error::Error.none { return replayed; } }
-    result.artifacts = blot_support::some(ArtifactSummary { demands: metadata.jobs.len,jobs: metadata.pools.value.functions.len,functions: journal.functions.len,helpers: journal.functions.len - metadata.pools.value.functions.len,emission_events: journal.records.len,metadata_events: metadata.events.len,operation_symbols: journal.operations.len,templates: metadata.pools.value.captures.len,pinned_modules: metadata.pools.value.modules.len });
+    result.artifacts = blot_support::some(ArtifactSummary { demands: metadata.jobs.len,jobs: metadata.pools.value.functions.len,functions: journal.functions.len,helpers: journal.functions.len - metadata.pools.value.functions.len,emission_events: journal.records.len,metadata_events: metadata.events.len,operation_symbols: journal.operations.len,templates: metadata.pools.value.captures.len,pinned_modules: metadata.pools.value.modules.len , ..});
     if run.options.artifact_dump { return dumpArtifact(run,result,counts); } return blot_error::Error.none;
 }
 fn replayArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
@@ -2073,11 +2082,11 @@ fn publish(run: CompileRun&,result: Result&) -> blot_error::Error {
         let sealed = workspace.capture.sealExecutableQueries(); if sealed != blot_error::Error.none { return sealed; } result.query_tables.executable_fragment = workspace.capture.executable_queries.storage();
         if workspace.capture.optimized != null { result.query_tables.executable_optimizer = workspace.capture.optimized.queries.storage(); }
     }
-    result.module_stamps = ModuleStamps { workspace.module_stamps.computed,workspace.module_stamps.reused,workspace.module_stamps.comparisons,workspace.module_stamps.copied,workspace.module_stamps.hashed };
+    result.module_stamps = ModuleStamps { workspace.module_stamps.computed,workspace.module_stamps.reused,workspace.module_stamps.comparisons,workspace.module_stamps.copied,workspace.module_stamps.hashed , ..};
     run.timing.capture_us = run.clock.lap(); result.timing = run.timing; return blot_error::Error.none;
 }
 fn compileAttempt(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32,options: CompileOptions,skip_constant_replay: bool,speculative_locals: bool) -> Result,blot_error::Error {
-    var run = CompileRun { workspace: workspace,units: units,entry: entry,options: options,speculative_locals: speculative_locals }; 
+    var run = CompileRun { workspace: workspace,units: units,entry: entry,options: options,speculative_locals: speculative_locals , ..}; 
     recursive fn cleanup_continuation_6() -> Result,blot_error::Error {
 
     let prepared = prepare(run,skip_constant_replay); if prepared != blot_error::Error.none { return emptyResult(workspace),prepared; }
@@ -2100,25 +2109,28 @@ fn compileLocals(workspace: CompileWorkspace&,units: const blot_check_core::Modu
     let first,error = compileAttempt(workspace,units,entry,options,false,speculative); if error != blot_error::Error.constant_receipt_retry { return first,error; } assert(options.constant_receipts);
     let retried,retry_error = compileAttempt(workspace,units,entry,options,true,speculative); assert(retry_error != blot_error::Error.constant_receipt_retry); if retry_error != blot_error::Error.none { return retried,retry_error; } var result = retried; result.constant_receipts.retries = 1; return result,blot_error::Error.none;
 }
-fn compileWithOptions(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32,options: CompileOptions) -> Result,blot_error::Error {
+fn compileWithOptions(workspace: CompileWorkspace&,source_units: const blot_check_core::Module[:],entry: u32,options: CompileOptions) -> Result,blot_error::Error {
+    let units,input_error = blot_backend_result_publication::inputUnits(workspace.publication_owner,source_units); if input_error != blot_error::Error.none { return Result {..},input_error; }
+    let publication_epoch,publication_error = blot_backend_result_publication::beginCompile(workspace.publication_owner); if publication_error != blot_error::Error.none { return Result {..},publication_error; } workspace.compiled_units = units;
     let trace_space = blot_phase_profile::enterSpace(blot_phase_profile::Space.core); 
     recursive fn cleanup_continuation_5() -> Result,blot_error::Error {
 
     let required,error = blot_backend_scoped_backend::required(units,entry); if error != blot_error::Error.none { return emptyResult(workspace),error; }
     if required {
         var storage = options.policy.storage.config(); if options.storage.present { storage = options.storage.value; }
-        return blot_backend_scoped_backend::compileWithOptions(workspace,units,entry,blot_backend_scoped_backend::CompileOptions { identity: options.identity,storage: storage,tier: options.policy.codegen_tier,workers: options.policy.codegen_workers,share_machine_code: options.policy.share_machine_code,io: options.io,profile: options.profile_backend,completed_core_validation: options.completed_core_validation,source_completion: options.source_completion });
+        return blot_backend_scoped_backend::compileWithOptions(workspace,units,entry,blot_backend_scoped_backend::CompileOptions { identity: options.identity,storage: storage,tier: options.policy.codegen_tier,workers: options.policy.codegen_workers,share_machine_code: options.policy.share_machine_code,io: options.io,profile: options.profile_backend,completed_core_validation: options.completed_core_validation,source_completion: options.source_completion , ..});
     }
     let first,first_error = compileLocals(workspace,units,entry,options,true); if first_error != blot_error::Error.speculative_local_retry { return first,first_error; } return compileLocals(workspace,units,entry,options,false);
 
     }
-    let cleanup_result_5_0,cleanup_result_5_1 = cleanup_continuation_5();
-     trace_space.restore(); 
+    var cleanup_result_5_0,cleanup_result_5_1 = cleanup_continuation_5();
+     trace_space.restore();
+    blot_backend_result_publication::finishCompile(workspace.publication_owner,publication_epoch); cleanup_result_5_0.active = true; cleanup_result_5_0.publication_owner = workspace.publication_owner; cleanup_result_5_0.publication_epoch = publication_epoch; cleanup_result_5_0.publication_units = units;
     return cleanup_result_5_0,cleanup_result_5_1;
 }
-fn compile(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32) -> Result,blot_error::Error { compileWithOptions(workspace,units,entry,CompileOptions { artifact_replay: default_artifact_replay,artifact_dump: default_artifact_replay }) }
-fn compileWithIdentity(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32,names: blot_backend_runtime_identity::View) -> Result,blot_error::Error { compileWithOptions(workspace,units,entry,CompileOptions { identity: blot_support::some(names),artifact_replay: default_artifact_replay,artifact_dump: default_artifact_replay }) }
-fn compileWithEvidenceNoise(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32,noise: bool) -> Result,blot_error::Error { compileWithOptions(workspace,units,entry,CompileOptions { evidence_noise: noise }) }
+fn compile(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32) -> Result,blot_error::Error { compileWithOptions(workspace,units,entry,CompileOptions { artifact_replay: default_artifact_replay,artifact_dump: default_artifact_replay , ..}) }
+fn compileWithIdentity(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32,names: blot_backend_runtime_identity::View) -> Result,blot_error::Error { compileWithOptions(workspace,units,entry,CompileOptions { identity: blot_support::some(names),artifact_replay: default_artifact_replay,artifact_dump: default_artifact_replay , ..}) }
+fn compileWithEvidenceNoise(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32,noise: bool) -> Result,blot_error::Error { compileWithOptions(workspace,units,entry,CompileOptions { evidence_noise: noise , ..}) }
 fn taskRuntime(generator: Generator&) -> blot_runtime_task_context::Functions,blot_error::Error {
     if generator.task_context.present { return generator.task_context.value,blot_error::Error.none; } if generator.artifacts != null { generator.artifacts.requireFreshCode(); }
     let ensured = blot_runtime_task_abi::ensure(generator.module); if ensured != blot_error::Error.none { return default<blot_runtime_task_context::Functions>(),ensured; }
@@ -2141,7 +2153,7 @@ fn taskMover(generator: Generator&,ty: u32) -> u32,blot_error::Error {
     block { let known = generator.planning.task_movers.get(ty); if known { return known,blot_error::Error.none; } }
     let function_id,error = generator.module.addTypedFunction([blot_backend_runtime_ir::VT_i32],blot_backend_runtime_ir::VT_none,blot_backend_runtime_ir::ROLE_scalar); if error != blot_error::Error.none { return 0,error; }
     let described = setParameterRoles(generator,function_id,blot_backend_runtime_ir::packParameterRoles([blot_backend_runtime_ir::ROLE_reference]),blot_support::none<u16>()); if described != blot_error::Error.none { return 0,described; } generator.planning.task_movers.insert(ty,function_id);
-    var context = TaskMoverEmission { ty }; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: 1,function_id: function_id,mappings: [] },context,emitTaskMoverOwner); if emitted != blot_error::Error.none { return 0,emitted; } return function_id,blot_error::Error.none;
+    var context = TaskMoverEmission { ty , ..}; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: 1,function_id: function_id,mappings: [] , ..},context,emitTaskMoverOwner); if emitted != blot_error::Error.none { return 0,emitted; } return function_id,blot_error::Error.none;
 }
 struct ResourceAdapterEmission { machine: blot_backend_runtime_ir::ValueType,role: blot_backend_runtime_ir::Role }
 fn emitResourceAdapterOwner(context: ResourceAdapterEmission&,emitter: blot_backend_backend_emission::Owner&) -> blot_error::Error { emitter.boxOwnerStorage(context.machine,context.role) }
@@ -2156,7 +2168,7 @@ fn resourceAdapter(generator: Generator&,payload: u32) -> u32,blot_error::Error 
         let described = setParameterRoles(generator,cleanup,blot_backend_runtime_ir::packParameterRoles(roles),blot_support::some(2 as u16)); if described != blot_error::Error.none { return 0,described; }
         let loaded = generator.module.emitSlice(cleanup,[I(blot_backend_runtime_ir::OP_local_get,1),I(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_environment),I(blot_backend_runtime_ir::OP_local_get)]); if loaded != blot_error::Error.none { return 0,loaded; }
         if index == 1 { let reinterpreted = generator.module.emit(cleanup,I(blot_backend_runtime_ir::OP_f32_reinterpret_i32)); if reinterpreted != blot_error::Error.none { return 0,reinterpreted; } }
-        var context = ResourceAdapterEmission { argument_machine,payload_role }; let boxed = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: 1,function_id: cleanup,mappings: [] },context,emitResourceAdapterOwner); if boxed != blot_error::Error.none { return 0,boxed; }
+        var context = ResourceAdapterEmission { argument_machine,payload_role , ..}; let boxed = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: 1,function_id: cleanup,mappings: [] , ..},context,emitResourceAdapterOwner); if boxed != blot_error::Error.none { return 0,boxed; }
         let signature,signature_error = generator.module.internType(parameters,blot_backend_runtime_ir::VT_i32); if signature_error != blot_error::Error.none { return 0,signature_error; }
         let called = generator.module.emitSlice(cleanup,[I(blot_backend_runtime_ir::OP_local_get,2),I(blot_backend_runtime_ir::OP_local_get,1),I(blot_backend_runtime_ir::OP_i32_load,blot_runtime_runtime_layout::Closure_function),blot_backend_runtime_ir::callResult(blot_backend_runtime_ir::ROLE_scalar),I(blot_backend_runtime_ir::OP_call_indirect,signature),I(blot_backend_runtime_ir::OP_drop)]); if called != blot_error::Error.none { return 0,called; }
         let drop,drop_error = generator.module.addTypedFunction(parameters,blot_backend_runtime_ir::VT_none,blot_backend_runtime_ir::ROLE_scalar); if drop_error != blot_error::Error.none { return 0,drop_error; }
@@ -2168,11 +2180,11 @@ fn resourceAdapter(generator: Generator&,payload: u32) -> u32,blot_error::Error 
     return selected,blot_error::Error.none;
 }
 fn explainDispatch(generator: Generator&,record: blot_eval_core_eval::DispatchRecord) -> blot_reuse_dispatch_explanation::Explanation,blot_error::Error {
-    var builder = blot_reuse_dispatch_explanation::Builder {}; 
+    var builder = blot_reuse_dispatch_explanation::Builder {..}; 
     recursive fn cleanup_continuation_4() -> blot_reuse_dispatch_explanation::Explanation,blot_error::Error {
 
     for candidate in record.items() {
-        var text: u8[>..<] = []; var display = EntryDisplay { generator,text }; var spelled = false;
+        var text: u8[>..<] = []; var display = EntryDisplay { generator,text , ..}; var spelled = false;
         if candidate.operand != 0 { let success,error = ty(display,candidate.operand,16); if error != blot_error::Error.none { return default<blot_reuse_dispatch_explanation::Explanation>(),error; } spelled = success; }
         var operand = blot_support::none<const u8[:]>(); if spelled { let owned,error = builder.own(text); if error != blot_error::Error.none { return default<blot_reuse_dispatch_explanation::Explanation>(),error; } operand = blot_support::some(owned); }
         builder.add(candidate.side,operand,candidate.outcome);
@@ -2184,7 +2196,7 @@ fn explainDispatch(generator: Generator&,record: blot_eval_core_eval::DispatchRe
         var contexts: blot_reuse_dispatch_explanation::Context[>..<] = [];
         for source in record.contexts[..record.context_len] {
             var kind = blot_reuse_dispatch_explanation::ContextKind.left_operand; if source.kind == blot_eval_core_eval::DispatchContextKind.right_operand { kind = blot_reuse_dispatch_explanation::ContextKind.right_operand; }
-            var context = blot_reuse_dispatch_explanation::Context { kind: kind,span: source.span };
+            var context = blot_reuse_dispatch_explanation::Context { kind: kind,span: source.span , ..};
             if generator.evaluator.diagnostic_context.identity.present {
                 let path = generator.evaluator.diagnostic_context.identity.value.owner(source.unit);
                 if path.present { if path.value.len <= blot_reuse_dispatch_explanation::max_text { let copied,error = builder.ownText(path.value); if error != blot_error::Error.none { result.deinit(); return default<blot_reuse_dispatch_explanation::Explanation>(),error; } context.path = blot_support::some(copied); } else { result.truncated = true; } }
@@ -2201,7 +2213,7 @@ fn explainDispatch(generator: Generator&,record: blot_eval_core_eval::DispatchRe
     return cleanup_result_4_0,cleanup_result_4_1;
 }
 fn explainImplementation(generator: Generator&,trace: blot_eval_implementation_trace::Record) -> blot_reuse_dispatch_explanation::Explanation,blot_error::Error {
-    var builder = blot_reuse_dispatch_explanation::Builder { truncated: trace.truncated }; 
+    var builder = blot_reuse_dispatch_explanation::Builder { truncated: trace.truncated , ..}; 
     recursive fn cleanup_continuation_3() -> blot_reuse_dispatch_explanation::Explanation,blot_error::Error {
  let names = generator.evaluator.diagnostic_context.identity;
     for candidate in trace.candidates[..trace.len] {
@@ -2212,7 +2224,7 @@ fn explainImplementation(generator: Generator&,trace: blot_eval_implementation_t
         let origin,error = builder.makeOrigin(name,path,blot_support::none<blot_check_core::Span>()); if error != blot_error::Error.none { return default<blot_reuse_dispatch_explanation::Explanation>(),error; } builder.addOrigin(blot_support::none<const u8[:]>(),candidate.outcome,origin);
     }
     for step in trace.steps[..trace.step_len] {
-        var text: u8[>..<] = []; var display = EntryDisplay { generator,text }; var spelling = blot_support::none<const u8[:]>();
+        var text: u8[>..<] = []; var display = EntryDisplay { generator,text , ..}; var spelling = blot_support::none<const u8[:]>();
         if step.ty != 0 {
             let printed,error = ty(display,step.ty,16); if error != blot_error::Error.none { return default<blot_reuse_dispatch_explanation::Explanation>(),error; }
             if printed { let copied,copy_error = builder.own(text); if copy_error != blot_error::Error.none { return default<blot_reuse_dispatch_explanation::Explanation>(),copy_error; } spelling = blot_support::some(copied); }
@@ -2234,13 +2246,13 @@ fn jsonStringify(value: WireScalar,writer: blot_json::Writer&) -> blot_error::Er
     let scalar = value.value; if scalar == blot_backend_runtime_ir::SC_unit { return writer.quoted("unit"); } if scalar == blot_backend_runtime_ir::SC_u32 { return writer.quoted("u32"); } if scalar == blot_backend_runtime_ir::SC_bool { return writer.quoted("bool"); } if scalar == blot_backend_runtime_ir::SC_f32 { return writer.quoted("f32"); } if scalar == blot_backend_runtime_ir::SC_array_u32 { return writer.quoted("array_u32"); } if scalar == blot_backend_runtime_ir::SC_array_f32 { return writer.quoted("array_f32"); } assert(scalar == blot_backend_runtime_ir::SC_pointer); return writer.quoted("pointer");
 }
 struct WireOptionalScalar { value: blot_support::Option<Scalar> }
-fn jsonStringify(value: WireOptionalScalar,writer: blot_json::Writer&) -> blot_error::Error { if !value.value.present { return writer.nullValue(); } return writer.write(WireScalar { value.value.value }); }
+fn jsonStringify(value: WireOptionalScalar,writer: blot_json::Writer&) -> blot_error::Error { if !value.value.present { return writer.nullValue(); } return writer.write(WireScalar { value.value.value , ..}); }
 struct WireValueType { value: blot_backend_runtime_ir::ValueType }
 fn jsonStringify(value: WireValueType,writer: blot_json::Writer&) -> blot_error::Error {
     let ty = value.value; if ty == blot_backend_runtime_ir::VT_i32 { return writer.quoted("i32"); } if ty == blot_backend_runtime_ir::VT_f32 { return writer.quoted("f32"); } if ty == blot_backend_runtime_ir::VT_v128 { return writer.quoted("v128"); } if ty == blot_backend_runtime_ir::VT_externref { return writer.quoted("externref"); } assert(ty == blot_backend_runtime_ir::VT_none); return writer.quoted("none");
 }
 struct WireValueTypes { values: const blot_backend_runtime_ir::ValueType[:] }
-fn jsonStringify(value: WireValueTypes,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for ty in value.values { writer.element(WireValueType { ty }); } return writer.endArray(); }
+fn jsonStringify(value: WireValueTypes,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for ty in value.values { writer.element(WireValueType { ty , ..}); } return writer.endArray(); }
 struct WireRole { value: blot_backend_runtime_ir::Role }
 fn jsonStringify(value: WireRole,writer: blot_json::Writer&) -> blot_error::Error { let role = value.value; if role == blot_backend_runtime_ir::ROLE_unknown { return writer.quoted("unknown"); } if role == blot_backend_runtime_ir::ROLE_scalar { return writer.quoted("scalar"); } if role == blot_backend_runtime_ir::ROLE_reference { return writer.quoted("reference"); } assert(role == blot_backend_runtime_ir::ROLE_value); return writer.quoted("value"); }
 struct WireOp { value: blot_backend_runtime_ir::Op }
@@ -2254,32 +2266,32 @@ fn jsonStringify(value: WireRequest,writer: blot_json::Writer&) -> blot_error::E
 struct WireList<T> { items: const T[:],capacity: i64 }
 struct WireJob { metadata: const blot_reuse_code_artifacts::Context&,job: blot_reuse_code_artifacts::Job }
 fn jsonStringify(value: WireJob,writer: blot_json::Writer&) -> blot_error::Error {
-    let metadata .= value.metadata; let job = value.job; writer.beginObject(); writer.field("parent",job.parent); writer.field("request",WireRequest { job.request }); writer.field("reusable",job.reusable);
-    writer.field("inline_bodies",WireList<blot_check_core::BindingRef> { metadata.inline_bodies[job.inline_bodies.start..job.inline_bodies.start + job.inline_bodies.len],job.inline_capacity });
-    writer.field("static_reads",WireList<blot_reuse_code_artifacts::StaticRead> { metadata.static_reads[job.static_reads.start..job.static_reads.start + job.static_reads.len],job.static_capacity });
+    let metadata .= value.metadata; let job = value.job; writer.beginObject(); writer.field("parent",job.parent); writer.field("request",WireRequest { job.request , ..}); writer.field("reusable",job.reusable);
+    writer.field("inline_bodies",WireList<blot_check_core::BindingRef> { metadata.inline_bodies[job.inline_bodies.start..job.inline_bodies.start + job.inline_bodies.len],job.inline_capacity , ..});
+    writer.field("static_reads",WireList<blot_reuse_code_artifacts::StaticRead> { metadata.static_reads[job.static_reads.start..job.static_reads.start + job.static_reads.len],job.static_capacity , ..});
     writer.field("state",wireEnum(job.state)); writer.field("function",job.function); writer.field("target_job",job.target_job); writer.field("mappings",metadata.mappings[job.mappings.start..job.mappings.start + job.mappings.len]); writer.field("rows",metadata.rows[job.rows.start..job.rows.start + job.rows.len]); writer.field("templates",metadata.templates[job.templates.start..job.templates.start + job.templates.len]); writer.field("solved",job.solved); writer.field("result_template",job.result_template); writer.field("value",job.value); writer.field("global",job.global); return writer.endObject();
 }
 struct WireJobs { metadata: const blot_reuse_code_artifacts::Context& }
-fn jsonStringify(value: WireJobs,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for job in value.metadata.jobs { writer.element(WireJob { value.metadata,job }); } return writer.endArray(); }
+fn jsonStringify(value: WireJobs,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for job in value.metadata.jobs { writer.element(WireJob { value.metadata,job , ..}); } return writer.endArray(); }
 struct WireDemandEvent { value: blot_reuse_code_artifacts::Event }
 fn jsonStringify(value: WireDemandEvent,writer: blot_json::Writer&) -> blot_error::Error {
     match value.value { enter e=>{ writer.beginObject(); writer.field("enter",e.job); return writer.endObject(); },solved e=>{ writer.beginObject(); writer.field("solved",e.job); return writer.endObject(); },_=>{ return writer.unionValue(value.value); }, }
 }
 struct WireDemandEvents { values: const blot_reuse_code_artifacts::StampedEvent[:] }
-fn jsonStringify(value: WireDemandEvents,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for event in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("sequence",event.sequence); writer.field("event",WireDemandEvent { event.event }); writer.endObject(); } return writer.endArray(); }
+fn jsonStringify(value: WireDemandEvents,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for event in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("sequence",event.sequence); writer.field("event",WireDemandEvent { event.event , ..}); writer.endObject(); } return writer.endArray(); }
 struct WireOperand { value: blot_reuse_artifact_emitter::Operand }
 fn jsonStringify(value: WireOperand,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("role",wireEnum(value.value.role)); writer.field("value",value.value.value); return writer.endObject(); }
 struct WireSymbolicInstructions { values: const blot_reuse_artifact_emitter::SymbolicInstruction[:] }
-fn jsonStringify(value: WireSymbolicInstructions,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for instruction in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("op",WireOp { instruction.op }); writer.field("operand",WireOperand { instruction.operand }); writer.endObject(); } return writer.endArray(); }
+fn jsonStringify(value: WireSymbolicInstructions,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for instruction in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("op",WireOp { instruction.op , ..}); writer.field("operand",WireOperand { instruction.operand , ..}); writer.endObject(); } return writer.endArray(); }
 struct WireFunctionArtifacts { values: const blot_reuse_artifact_emitter::FunctionArtifact[:] }
 fn jsonStringify(value: WireFunctionArtifacts,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for function in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("owner",function.owner); writer.field("resource_owner",function.resource_owner); writer.field("role",wireEnum(function.role)); writer.field("signature",function.signature); writer.field("creation_sequence",function.creation_sequence); writer.field("locals",function.locals); writer.field("instructions",function.instructions); writer.endObject(); } return writer.endArray(); }
 struct WireCallback { value: blot_support::Option<blot_backend_wasm::Callback> }
 fn jsonStringify(value: WireCallback,writer: blot_json::Writer&) -> blot_error::Error {
-    if !value.value.present { return writer.nullValue(); } let callback = value.value.value; writer.beginObject(); writer.field("parameter",WireScalar { callback.parameter }); writer.field("result",WireScalar { callback.result }); writer.field("cleanup",callback.cleanup); writer.field("owned",callback.owned); writer.field("data",callback.data); writer.field("schema",callback.schema); writer.field("concurrent",callback.concurrent); return writer.endObject();
+    if !value.value.present { return writer.nullValue(); } let callback = value.value.value; writer.beginObject(); writer.field("parameter",WireScalar { callback.parameter , ..}); writer.field("result",WireScalar { callback.result , ..}); writer.field("cleanup",callback.cleanup); writer.field("owned",callback.owned); writer.field("data",callback.data); writer.field("schema",callback.schema); writer.field("concurrent",callback.concurrent); return writer.endObject();
 }
 struct WireOwnerBoundary { value: blot_support::Option<blot_backend_wasm::OwnerBoundary> }
 fn jsonStringify(value: WireOwnerBoundary,writer: blot_json::Writer&) -> blot_error::Error {
-    if !value.value.present { return writer.nullValue(); } let owner = value.value.value; writer.beginObject(); writer.field("schema",owner.schema); writer.key("kind"); if owner.kind == 1 { writer.quoted("unique"); } else { assert(owner.kind == 2); writer.quoted("shared"); } writer.field("fresh",WireOptionalScalar { owner.fresh }); return writer.endObject();
+    if !value.value.present { return writer.nullValue(); } let owner = value.value.value; writer.beginObject(); writer.field("schema",owner.schema); writer.key("kind"); if owner.kind == 1 { writer.quoted("unique"); } else { assert(owner.kind == 2); writer.quoted("shared"); } writer.field("fresh",WireOptionalScalar { owner.fresh , ..}); return writer.endObject();
 }
 struct WireSemanticSite { value: blot_backend_wasm::SemanticSite }
 fn jsonStringify(value: WireSemanticSite,writer: blot_json::Writer&) -> blot_error::Error {
@@ -2289,27 +2301,27 @@ struct WireEmissionEvent { value: blot_reuse_artifact_emitter::Event }
 fn jsonStringify(value: WireEmissionEvent,writer: blot_json::Writer&) -> blot_error::Error {
     match value.value {
         demand event=>{ writer.beginObject(); writer.key("demand"); writer.beginObject(); writer.field("kind",wireEnum(event.kind)); writer.field("id",event.id); writer.field("hit",event.hit); writer.endObject(); return writer.endObject(); },
-        signature event=>{ writer.beginObject(); writer.key("signature"); writer.beginObject(); writer.field("id",event.id); writer.field("parameters",event.parameters); writer.field("result",WireValueType { event.result }); writer.endObject(); return writer.endObject(); },
-        function event=>{ writer.beginObject(); writer.key("function"); writer.beginObject(); writer.field("id",event.id); writer.field("signature",event.signature); writer.field("result_role",WireRole { event.result_role }); writer.endObject(); return writer.endObject(); },
-        semantic_site event=>{ writer.beginObject(); writer.field("semantic_site",WireSemanticSite { event.value }); return writer.endObject(); },
-        local event=>{ writer.beginObject(); writer.key("local"); writer.beginObject(); writer.field("function",event.function); writer.field("ty",WireValueType { event.ty }); writer.endObject(); return writer.endObject(); },
-        instruction event=>{ writer.beginObject(); writer.key("instruction"); writer.beginObject(); writer.field("function",event.function); writer.field("op",WireOp { event.op }); writer.field("operand",WireOperand { event.operand }); writer.endObject(); return writer.endObject(); },
-        global event=>{ writer.beginObject(); writer.key("global"); writer.beginObject(); writer.field("id",event.id); writer.field("scalar",WireScalar { event.scalar }); writer.field("bits",WireOperand { event.bits }); writer.field("mutable",event.mutable); writer.endObject(); return writer.endObject(); },
-        global_bits event=>{ writer.beginObject(); writer.key("global_bits"); writer.beginObject(); writer.field("id",event.id); writer.field("bits",WireOperand { event.bits }); writer.endObject(); return writer.endObject(); },
-        data_word event=>{ writer.beginObject(); writer.key("data_word"); writer.beginObject(); writer.field("address",event.address); writer.field("operand",WireOperand { event.operand }); writer.endObject(); return writer.endObject(); },
+        signature event=>{ writer.beginObject(); writer.key("signature"); writer.beginObject(); writer.field("id",event.id); writer.field("parameters",event.parameters); writer.field("result",WireValueType { event.result , ..}); writer.endObject(); return writer.endObject(); },
+        function event=>{ writer.beginObject(); writer.key("function"); writer.beginObject(); writer.field("id",event.id); writer.field("signature",event.signature); writer.field("result_role",WireRole { event.result_role , ..}); writer.endObject(); return writer.endObject(); },
+        semantic_site event=>{ writer.beginObject(); writer.field("semantic_site",WireSemanticSite { event.value , ..}); return writer.endObject(); },
+        local event=>{ writer.beginObject(); writer.key("local"); writer.beginObject(); writer.field("function",event.function); writer.field("ty",WireValueType { event.ty , ..}); writer.endObject(); return writer.endObject(); },
+        instruction event=>{ writer.beginObject(); writer.key("instruction"); writer.beginObject(); writer.field("function",event.function); writer.field("op",WireOp { event.op , ..}); writer.field("operand",WireOperand { event.operand , ..}); writer.endObject(); return writer.endObject(); },
+        global event=>{ writer.beginObject(); writer.key("global"); writer.beginObject(); writer.field("id",event.id); writer.field("scalar",WireScalar { event.scalar , ..}); writer.field("bits",WireOperand { event.bits , ..}); writer.field("mutable",event.mutable); writer.endObject(); return writer.endObject(); },
+        global_bits event=>{ writer.beginObject(); writer.key("global_bits"); writer.beginObject(); writer.field("id",event.id); writer.field("bits",WireOperand { event.bits , ..}); writer.endObject(); return writer.endObject(); },
+        data_word event=>{ writer.beginObject(); writer.key("data_word"); writer.beginObject(); writer.field("address",event.address); writer.field("operand",WireOperand { event.operand , ..}); writer.endObject(); return writer.endObject(); },
         host_references event=>{ writer.beginObject(); writer.field("host_references",event.value); return writer.endObject(); },public_owners event=>{ writer.beginObject(); writer.field("public_owners",event.value); return writer.endObject(); },cleanup_data event=>{ writer.beginObject(); writer.field("cleanup_data",event.span); return writer.endObject(); },
         export_ event=>{
-            writer.beginObject(); writer.key("export_"); writer.beginObject(); writer.field("name",event.name); writer.field("index",event.index); writer.field("parameter",WireScalar { event.parameter }); writer.field("result",WireScalar { event.result }); writer.field("global",event.global); writer.field("callback",WireCallback { event.callback }); writer.field("once",event.once); writer.field("parameter_owner",WireOwnerBoundary { event.parameter_owner }); writer.field("result_owner",WireOwnerBoundary { event.result_owner }); writer.field("owner_adapter",event.owner_adapter); writer.field("task_adapter",event.task_adapter); writer.field("task_runtime",event.task_runtime); writer.field("entry",event.entry); writer.endObject(); return writer.endObject();
+            writer.beginObject(); writer.key("export_"); writer.beginObject(); writer.field("name",event.name); writer.field("index",event.index); writer.field("parameter",WireScalar { event.parameter , ..}); writer.field("result",WireScalar { event.result , ..}); writer.field("global",event.global); writer.field("callback",WireCallback { event.callback , ..}); writer.field("once",event.once); writer.field("parameter_owner",WireOwnerBoundary { event.parameter_owner , ..}); writer.field("result_owner",WireOwnerBoundary { event.result_owner , ..}); writer.field("owner_adapter",event.owner_adapter); writer.field("task_adapter",event.task_adapter); writer.field("task_runtime",event.task_runtime); writer.field("entry",event.entry); writer.endObject(); return writer.endObject();
         },
-        static_field event=>{ writer.beginObject(); writer.key("static_field"); writer.beginObject(); writer.field("address",event.address); writer.field("role",WireRole { event.role }); writer.endObject(); return writer.endObject(); },start event=>{ writer.beginObject(); writer.field("start",event.id); return writer.endObject(); },
+        static_field event=>{ writer.beginObject(); writer.key("static_field"); writer.beginObject(); writer.field("address",event.address); writer.field("role",WireRole { event.role , ..}); writer.endObject(); return writer.endObject(); },start event=>{ writer.beginObject(); writer.field("start",event.id); return writer.endObject(); },
         _=>{ return writer.unionValue(value.value); },
     }
 }
 struct WireEmissionRecords { values: const blot_reuse_artifact_emitter::Record[:] }
-fn jsonStringify(value: WireEmissionRecords,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for record in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("sequence",record.sequence); writer.field("owner",record.owner); writer.field("event",WireEmissionEvent { record.event }); writer.endObject(); } return writer.endArray(); }
+fn jsonStringify(value: WireEmissionRecords,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for record in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("sequence",record.sequence); writer.field("owner",record.owner); writer.field("event",WireEmissionEvent { record.event , ..}); writer.endObject(); } return writer.endArray(); }
 struct WireEmission { journal: const blot_reuse_artifact_emitter::Recorder& }
 fn jsonStringify(value: WireEmission,writer: blot_json::Writer&) -> blot_error::Error {
-    let journal .= value.journal; writer.beginObject(); writer.field("records",WireEmissionRecords { journal.records }); writer.field("bytes",journal.bytes[..]); writer.field("parameters",WireValueTypes { journal.parameters }); writer.field("operations",journal.operations[..]); writer.field("functions",WireFunctionArtifacts { journal.functions }); writer.field("locals",WireValueTypes { journal.locals }); writer.field("instructions",WireSymbolicInstructions { journal.instructions }); return writer.endObject();
+    let journal .= value.journal; writer.beginObject(); writer.field("records",WireEmissionRecords { journal.records , ..}); writer.field("bytes",journal.bytes[..]); writer.field("parameters",WireValueTypes { journal.parameters , ..}); writer.field("operations",journal.operations[..]); writer.field("functions",WireFunctionArtifacts { journal.functions , ..}); writer.field("locals",WireValueTypes { journal.locals , ..}); writer.field("instructions",WireSymbolicInstructions { journal.instructions , ..}); return writer.endObject();
 }
 struct WireLayoutNodes { values: const blot_backend_layout::Node[:] }
 fn jsonStringify(value: WireLayoutNodes,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for node in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("tag",wireEnum(node.tag)); writer.field("a",node.a); writer.field("b",node.b); writer.field("c",node.c); writer.endObject(); } return writer.endArray(); }
@@ -2318,53 +2330,53 @@ fn jsonStringify(value: WireEvidenceNodes,writer: blot_json::Writer&) -> blot_er
 struct WireEffects { value: blot_check_effect_evidence::Snapshot }
 fn jsonStringify(value: WireEffects,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("operations",value.value.operations); writer.field("arguments",value.value.arguments); writer.field("rows",value.value.rows); writer.field("labels",value.value.labels); return writer.endObject(); }
 struct WireLayouts { value: blot_reuse_code_artifacts::Layouts }
-fn jsonStringify(value: WireLayouts,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("nodes",WireLayoutNodes { value.value.nodes }); writer.field("extra",value.value.extra); writer.field("effects",WireEffects { value.value.effects }); writer.field("universal_dictionaries",value.value.universal_dictionaries); return writer.endObject(); }
+fn jsonStringify(value: WireLayouts,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("nodes",WireLayoutNodes { value.value.nodes , ..}); writer.field("extra",value.value.extra); writer.field("effects",WireEffects { value.value.effects , ..}); writer.field("universal_dictionaries",value.value.universal_dictionaries); return writer.endObject(); }
 struct WireEvidenceGoals { values: const blot_eval_type_evidence::Goal[:] }
 fn jsonStringify(value: WireEvidenceGoals,writer: blot_json::Writer&) -> blot_error::Error {
     writer.beginArray(); for goal in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("ty",goal.ty); writer.field("kind",wireEnum(goal.kind)); writer.field("name",goal.name); writer.field("result",goal.result); writer.field("other",goal.other); writer.field("signature",goal.signature); writer.field("operator",wireEnum(goal.operator)); writer.field("identity",goal.identity); writer.field("explicit",goal.explicit); writer.endObject(); } return writer.endArray();
 }
 struct WireEvidence { value: blot_eval_type_evidence::Snapshot }
-fn jsonStringify(value: WireEvidence,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("nodes",WireEvidenceNodes { value.value.nodes }); writer.field("extra",value.value.extra); writer.field("effects",WireEffects { value.value.effects }); writer.field("quantifier_goals",value.value.quantifier_goals); writer.field("quantifier_obligations",WireEvidenceGoals { value.value.quantifier_obligations }); return writer.endObject(); }
+fn jsonStringify(value: WireEvidence,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("nodes",WireEvidenceNodes { value.value.nodes , ..}); writer.field("extra",value.value.extra); writer.field("effects",WireEffects { value.value.effects , ..}); writer.field("quantifier_goals",value.value.quantifier_goals); writer.field("quantifier_obligations",WireEvidenceGoals { value.value.quantifier_obligations , ..}); return writer.endObject(); }
 struct WireValues { values: const blot_eval_eval_values::ValueInfo[:] }
-fn jsonStringify(value: WireValues,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for info in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("nominal",info.nominal); writer.field("start",info.start); writer.field("len",info.len); writer.field("bits",info.bits); writer.field("kind",wireEnum(info.kind)); writer.field("scalar",WireScalar { info.scalar }); writer.endObject(); } return writer.endArray(); }
+fn jsonStringify(value: WireValues,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for info in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("nominal",info.nominal); writer.field("start",info.start); writer.field("len",info.len); writer.field("bits",info.bits); writer.field("kind",wireEnum(info.kind)); writer.field("scalar",WireScalar { info.scalar , ..}); writer.endObject(); } return writer.endArray(); }
 struct WireClosures { values: const blot_eval_eval_values::ClosureValue[:] }
 fn jsonStringify(value: WireClosures,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for closure in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("staged",closure.staged); writer.field("unit",closure.unit); writer.field("identity",closure.identity); writer.field("applied",closure.applied); writer.field("origin",wireEnum(closure.origin)); writer.field("mappings",closure.mappings); writer.field("row_mappings",closure.row_mappings); writer.field("ty",closure.ty); writer.endObject(); } return writer.endArray(); }
 struct WireImplementationFact { value: blot_eval_implementation_evidence::Fact }
 fn jsonStringify(value: WireImplementationFact,writer: blot_json::Writer&) -> blot_error::Error { let fact = value.value; writer.beginObject(); writer.field("kind",wireEnum(fact.kind)); writer.field("operator",wireEnum(fact.operator)); writer.field("identity",fact.identity); writer.field("name",fact.name); writer.field("operands",fact.operands[..]); writer.field("target",fact.target); return writer.endObject(); }
 struct WireImplementationProofs { values: const blot_eval_implementation_evidence::Proof[:] }
-fn jsonStringify(value: WireImplementationProofs,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for proof in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("kind",wireEnum(proof.kind)); writer.field("predicate",WireImplementationFact { proof.predicate }); writer.field("context",proof.context); writer.field("implementation",proof.implementation); writer.field("contract",proof.contract); writer.field("arguments",proof.arguments); writer.field("members",proof.members); writer.field("prerequisites",proof.prerequisites); writer.endObject(); } return writer.endArray(); }
+fn jsonStringify(value: WireImplementationProofs,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for proof in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("kind",wireEnum(proof.kind)); writer.field("predicate",WireImplementationFact { proof.predicate , ..}); writer.field("context",proof.context); writer.field("implementation",proof.implementation); writer.field("contract",proof.contract); writer.field("arguments",proof.arguments); writer.field("members",proof.members); writer.field("prerequisites",proof.prerequisites); writer.endObject(); } return writer.endArray(); }
 struct WireImplementationMembers { values: const blot_eval_implementation_evidence::Member[:] }
 fn jsonStringify(value: WireImplementationMembers,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for member in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("name",member.name); writer.field("kind",wireEnum(member.kind)); writer.field("root",member.root); writer.field("target",member.target); writer.endObject(); } return writer.endArray(); }
 struct WireImplementationSnapshot { value: blot_eval_implementation_evidence::Snapshot }
-fn jsonStringify(value: WireImplementationSnapshot,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("proofs",WireImplementationProofs { value.value.proofs }); writer.field("arguments",value.value.arguments); writer.field("members",WireImplementationMembers { value.value.members }); writer.field("edges",value.value.edges); return writer.endObject(); }
+fn jsonStringify(value: WireImplementationSnapshot,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("proofs",WireImplementationProofs { value.value.proofs , ..}); writer.field("arguments",value.value.arguments); writer.field("members",WireImplementationMembers { value.value.members , ..}); writer.field("edges",value.value.edges); return writer.endObject(); }
 struct WireEvaluatorSnapshot { value: blot_eval_core_eval::Snapshot }
 fn jsonStringify(value: WireEvaluatorSnapshot,writer: blot_json::Writer&) -> blot_error::Error {
-    let snapshot = value.value; writer.beginObject(); writer.field("code_origins",snapshot.code_origins); writer.field("values",WireValues { snapshot.values }); writer.field("children",snapshot.children); writer.field("closures",WireClosures { snapshot.closures }); writer.field("value_evidence",snapshot.value_evidence); writer.field("type_mappings",snapshot.type_mappings); writer.field("row_mappings",snapshot.row_mappings); writer.field("evidence",WireEvidence { snapshot.evidence }); writer.field("value_records",snapshot.value_records); writer.field("record_layouts",snapshot.record_layouts); writer.field("field_names",snapshot.field_names); writer.field("implementation_proofs",WireImplementationSnapshot { snapshot.implementation_proofs }); return writer.endObject();
+    let snapshot = value.value; writer.beginObject(); writer.field("code_origins",snapshot.code_origins); writer.field("values",WireValues { snapshot.values , ..}); writer.field("children",snapshot.children); writer.field("closures",WireClosures { snapshot.closures , ..}); writer.field("value_evidence",snapshot.value_evidence); writer.field("type_mappings",snapshot.type_mappings); writer.field("row_mappings",snapshot.row_mappings); writer.field("evidence",WireEvidence { snapshot.evidence , ..}); writer.field("value_records",snapshot.value_records); writer.field("record_layouts",snapshot.record_layouts); writer.field("field_names",snapshot.field_names); writer.field("implementation_proofs",WireImplementationSnapshot { snapshot.implementation_proofs , ..}); return writer.endObject();
 }
 struct WireBridge { value: blot_support::Option<blot_reuse_code_artifacts::Bridge> }
-fn jsonStringify(value: WireBridge,writer: blot_json::Writer&) -> blot_error::Error { if !value.value.present { return writer.nullValue(); } let bridge = value.value.value; writer.beginObject(); writer.field("nodes",WireEvidenceNodes { bridge.nodes }); writer.field("extra",bridge.extra); writer.field("to",bridge.to); writer.field("from",bridge.from); writer.field("row_to",bridge.row_to); writer.field("row_from",bridge.row_from); writer.field("shapes",bridge.shapes); return writer.endObject(); }
+fn jsonStringify(value: WireBridge,writer: blot_json::Writer&) -> blot_error::Error { if !value.value.present { return writer.nullValue(); } let bridge = value.value.value; writer.beginObject(); writer.field("nodes",WireEvidenceNodes { bridge.nodes , ..}); writer.field("extra",bridge.extra); writer.field("to",bridge.to); writer.field("from",bridge.from); writer.field("row_to",bridge.row_to); writer.field("row_from",bridge.row_from); writer.field("shapes",bridge.shapes); return writer.endObject(); }
 struct WireFunctions { values: const blot_reuse_code_artifacts::Function[:] }
-fn jsonStringify(value: WireFunctions,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for function in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("request",WireRequest { function.request }); writer.field("function",function.function); writer.field("result_template",function.result_template); writer.endObject(); } return writer.endArray(); }
+fn jsonStringify(value: WireFunctions,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for function in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("request",WireRequest { function.request , ..}); writer.field("function",function.function); writer.field("result_template",function.result_template); writer.endObject(); } return writer.endArray(); }
 struct WireOperationLocation { value: blot_reuse_code_artifacts::OperationLocation }
 fn jsonStringify(value: WireOperationLocation,writer: blot_json::Writer&) -> blot_error::Error { match value.value { word address=>{ writer.beginObject(); writer.field("word",address.address); return writer.endObject(); },_=>{ return writer.unionValue(value.value); }, } }
 struct WireOperationRelocations { values: const blot_reuse_code_artifacts::OperationRelocation[:] }
-fn jsonStringify(value: WireOperationRelocations,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for relocation in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("operation",relocation.operation); writer.field("location",WireOperationLocation { relocation.location }); writer.endObject(); } return writer.endArray(); }
+fn jsonStringify(value: WireOperationRelocations,writer: blot_json::Writer&) -> blot_error::Error { writer.beginArray(); for relocation in value.values { writer.separator(blot_json::FrameKind.array); writer.beginObject(); writer.field("operation",relocation.operation); writer.field("location",WireOperationLocation { relocation.location , ..}); writer.endObject(); } return writer.endArray(); }
 struct WireOwnedPools { value: const blot_reuse_code_artifacts::Pools& }
 fn jsonStringify(value: WireOwnedPools,writer: blot_json::Writer&) -> blot_error::Error {
-    let pools .= value.value; writer.beginObject(); writer.field("project_identity",pools.project_identity); writer.field("identity",pools.identity); writer.field("layouts",WireLayouts { pools.layouts }); writer.field("evaluator",WireEvaluatorSnapshot { pools.evaluator }); writer.field("rows",pools.rows); writer.field("templates",pools.templates); writer.field("captures",pools.captures); writer.field("bridge",WireBridge { pools.bridge }); writer.field("field_locations",pools.field_locations); writer.field("field_locations_stamp",pools.field_locations_stamp[..]); writer.field("functions",WireFunctions { pools.functions }); writer.field("serialized",pools.serialized); writer.field("runtime_globals",pools.runtime_globals); writer.field("runtime_order",pools.runtime_order); writer.field("operations",pools.operations); writer.field("operation_relocations",WireOperationRelocations { pools.operation_relocations }); writer.field("operations_finalized",pools.operations_finalized); return writer.endObject();
+    let pools .= value.value; writer.beginObject(); writer.field("project_identity",pools.project_identity); writer.field("identity",pools.identity); writer.field("layouts",WireLayouts { pools.layouts , ..}); writer.field("evaluator",WireEvaluatorSnapshot { pools.evaluator , ..}); writer.field("rows",pools.rows); writer.field("templates",pools.templates); writer.field("captures",pools.captures); writer.field("bridge",WireBridge { pools.bridge , ..}); writer.field("field_locations",pools.field_locations); writer.field("field_locations_stamp",pools.field_locations_stamp[..]); writer.field("functions",WireFunctions { pools.functions , ..}); writer.field("serialized",pools.serialized); writer.field("runtime_globals",pools.runtime_globals); writer.field("runtime_order",pools.runtime_order); writer.field("operations",pools.operations); writer.field("operation_relocations",WireOperationRelocations { pools.operation_relocations , ..}); writer.field("operations_finalized",pools.operations_finalized); return writer.endObject();
 }
 fn printArtifact<T>(label: const u8[:],value: T) -> blot_error::Error {
-    var bytes: u8[>..<] = []; let error = blot_json::toBytes(value,bytes,blot_json::Options { emit_strings_as_arrays: true,emit_nonportable_numbers_as_strings: true }); if error != blot_error::Error.none { return error; }
+    var bytes: u8[>..<] = []; let error = blot_json::toBytes(value,bytes,blot_json::Options { emit_strings_as_arrays: true,emit_nonportable_numbers_as_strings: true , ..}); if error != blot_error::Error.none { return error; }
     var line: u8[>..<] = []; line.append(label); line.push(' '); line.append(bytes); line.push('\n'); blot_native::debug_write(line); return blot_error::Error.none;
 }
 struct WireModulePin { unit: u32,path: const u8[:],token: blot_reuse_code_artifacts::Token,stamp: u8[32] }
 fn jsonStringify(value: WireModulePin,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("unit",value.unit); writer.field("path",value.path); writer.field("token",value.token); writer.field("stamp",value.stamp[..]); return writer.endObject(); }
 fn dumpArtifact(run: CompileRun&,result: Result&,counts: ArtifactCounts) -> blot_error::Error {
     let metadata .= run.workspace.metadata; let journal .= run.workspace.journal; assert(metadata.pools.present); let pools: const blot_reuse_code_artifacts::Pools& = metadata.pools.value;
-    let jobs = printArtifact("ARTIFACT_JOBS",WireJobs { metadata }); if jobs != blot_error::Error.none { return jobs; } let demands = printArtifact("ARTIFACT_DEMAND_EVENTS",WireDemandEvents { metadata.events }); if demands != blot_error::Error.none { return demands; }
-    let emission = printArtifact("ARTIFACT_EMISSION",WireEmission { journal }); if emission != blot_error::Error.none { return emission; }
-    for pin in pools.modules { let error = printArtifact("ARTIFACT_MODULE_PIN",WireModulePin { pin.unit,pin.canonical_path,pin.token,pin.stamp }); if error != blot_error::Error.none { return error; } }
-    let owned = printArtifact("ARTIFACT_OWNED_POOLS",WireOwnedPools { pools }); if owned != blot_error::Error.none { return owned; }
+    let jobs = printArtifact("ARTIFACT_JOBS",WireJobs { metadata , ..}); if jobs != blot_error::Error.none { return jobs; } let demands = printArtifact("ARTIFACT_DEMAND_EVENTS",WireDemandEvents { metadata.events , ..}); if demands != blot_error::Error.none { return demands; }
+    let emission = printArtifact("ARTIFACT_EMISSION",WireEmission { journal , ..}); if emission != blot_error::Error.none { return emission; }
+    for pin in pools.modules { let error = printArtifact("ARTIFACT_MODULE_PIN",WireModulePin { pin.unit,pin.canonical_path,pin.token,pin.stamp , ..}); if error != blot_error::Error.none { return error; } }
+    let owned = printArtifact("ARTIFACT_OWNED_POOLS",WireOwnedPools { pools , ..}); if owned != blot_error::Error.none { return owned; }
     var line: u8[>..<] = []; line.append("ARTIFACT_METADATA {\"demands\":"); format(line,metadata.jobs.len); line.append(",\"events\":"); format(line,metadata.events.len); line.append(",\"complete_functions\":"); format(line,pools.functions.len); line.append(",\"templates\":"); format(line,pools.captures.len); line.append(",\"pinned_modules\":"); format(line,pools.modules.len); line.append("}\n"); blot_native::debug_write(line); line.clear();
     line.append("ARTIFACT_REPLAY {\"events\":"); format(line,journal.records.len); line.append(",\"owned_bytes\":"); format(line,journal.bytes.len); line.append(",\"functions\":"); format(line,result.emitted_functions); line.append(",\"globals\":"); format(line,counts.globals); line.append(",\"imports\":"); format(line,counts.imports); line.append(",\"signatures\":"); format(line,counts.signatures); line.append(",\"data_bytes\":"); format(line,counts.data_bytes); line.append(",\"source_work_during_replay\":0,\"semantic_reuse\":false}\n"); blot_native::debug_write(line); return blot_error::Error.none;
 }
@@ -2388,7 +2400,7 @@ fn capturedClosureFunction(generator: Generator&,header: blot_eval_core_eval::Cl
     let caller = generator.planning.startup_facts.active; generator.planning.startup_facts.active = function_id; 
     recursive fn cleanup_continuation_1() -> u32,blot_error::Error {
 
-    var context = CapturedClosureEmission { header,captured }; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: header.unit,function_id: function_id,provider_local: blot_support::some(2 as u32),mappings: mappings,row_mappings: rows },context,emitCapturedClosureOwner); if emitted != blot_error::Error.none { return 0,emitted; } generator.planning.startup_facts.complete(function_id); return function_id,blot_error::Error.none;
+    var context = CapturedClosureEmission { header,captured , ..}; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: header.unit,function_id: function_id,provider_local: blot_support::some(2 as u32),mappings: mappings,row_mappings: rows , ..},context,emitCapturedClosureOwner); if emitted != blot_error::Error.none { return 0,emitted; } generator.planning.startup_facts.complete(function_id); return function_id,blot_error::Error.none;
 
     }
     let cleanup_result_1_0,cleanup_result_1_1 = cleanup_continuation_1();
@@ -2399,4 +2411,23 @@ fn capturedClosureFunction(generator: Generator&,header: blot_eval_core_eval::Cl
     let cleanup_result_2_0,cleanup_result_2_1 = cleanup_continuation_2();
      generator.instance_depth--; 
     return cleanup_result_2_0,cleanup_result_2_1;
+}
+
+// The canonical driver binds a distinct workspace owner before public emission.
+fn bindPublicationOwner(workspace: CompileWorkspace&,driver_owner: u64) -> blot_error::Error {
+    if workspace.publication_owner.slot != 0 { return blot_error::Error.invalid_artifact; } let owner,error = blot_backend_result_publication::init(driver_owner,workspace.allocation_owner); if error != blot_error::Error.none { return error; } workspace.publication_owner = owner; return blot_error::Error.none;
+}
+// Pin before assigning units to evaluator, generator, metadata or replay contexts.
+fn pinWorkspaceInputs(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],catalog_owner: blot_reuse_dependency_payload::Owner,unit_owners: const blot_reuse_dependency_payload::Owner[:],seed_owners: const blot_reuse_dependency_payload::Owner[:]) -> blot_error::Error {
+    let error = blot_backend_result_publication::stageInputs(workspace.publication_owner,units,catalog_owner,unit_owners,seed_owners); if error != blot_error::Error.none { return error; }
+    let held,held_error = blot_backend_result_publication::inputUnits(workspace.publication_owner,units); assert(held_error == blot_error::Error.none); workspace.compiled_units = held; return blot_error::Error.none;
+}
+fn publicationCanReclaim(workspace: const CompileWorkspace&) -> bool { return blot_backend_result_publication::canReclaim(workspace.publication_owner); }
+fn pinResult(result: Result&,catalog_owner: blot_reuse_dependency_payload::Owner,unit_owners: const blot_reuse_dependency_payload::Owner[:],seed_owners: const blot_reuse_dependency_payload::Owner[:]) -> blot_error::Error {
+    if !result.active { assert(result.publication_owner.slot == 0 && !result.publication_pinned && result.capture == null && result.allocation_emission == null && result.explanation == null && result.startup_observation == null && !result.diagnostic.present && result.bytes.len == 0 && result.owned_message.len == 0); return blot_error::Error.none; }
+    if result.publication_owner.slot == 0 || result.publication_pinned { return blot_error::Error.invalid_artifact; }
+    var modules: const blot_reuse_code_artifacts::ModulePin[:] = []; if result.capture != null && result.capture.metadata.pools.present { modules = result.capture.metadata.pools.value.modules; }
+    var pins,error = blot_backend_result_publication::prepare(result.publication_owner,result.publication_epoch,result.publication_units,catalog_owner,unit_owners,seed_owners,modules); if error != blot_error::Error.none { return error; }
+    if result.capture != null && result.capture.metadata.pools.present { let rebound = blot_reuse_code_artifacts::rebindModuleHeaders(result.capture.metadata.pools.value,pins.headers); if rebound != blot_error::Error.none { pins.deinit(); return rebound; } }
+    blot_backend_result_publication::commit(result.publication_owner,result.publication_epoch,pins); result.publication_pinned = true; result.publication_units = blot_backend_result_publication::units(result.publication_owner,result.publication_epoch); return blot_error::Error.none;
 }

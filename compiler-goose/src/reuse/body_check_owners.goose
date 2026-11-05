@@ -90,7 +90,7 @@ total+=self.accesses.len*28;
 total+=self.rebindings.len*12;
 total+=self.members.len*16;
 for binding in self.bindings {total+=binding.name.len;}for predicate in self.predicates {total+=predicate.name.len;}for member in self.members {total+=member.len;}let loops .= self.loops;if loops {total+=49+loops.carries.len*20+loops.exits.len*16+loops.bindings.len*4;}let auxiliary .= self.auxiliary;if auxiliary {total+=auxiliary.bytes();}return total;}
-fn deinit(self:Loops&) {assert(self.live);releaseOwned(self.carries);releaseOwned(self.exits);releaseOwned(self.bindings);let at=loop_owners.index_of(self);assert(at>=0);self=Loops{};loop_owners.free(at);}
+fn deinit(self:Loops&) {assert(self.live);releaseOwned(self.carries);releaseOwned(self.exits);releaseOwned(self.bindings);let at=loop_owners.index_of(self);assert(at>=0);self=Loops{..};loop_owners.free(at);}
 fn deinit(self:Body&) {
 releaseOwned(self.name);
 releaseOwned(self.source);
@@ -108,7 +108,7 @@ releaseOwned(self.local_schemes);
 releaseOwned(self.fields);
 releaseOwned(self.accesses);
 releaseOwned(self.field_tags);
-let loops .= self.loops;if loops {loops.deinit();}let auxiliary .= self.auxiliary;if auxiliary {auxiliary.deinit();}for member in self.members {releaseOwned(member);}releaseOwned(self.members);self=Body{};}
-fn release(self:Chunk&) {assert(self.live && self.references>0);self.references-=1;if self.references!=0 {return;}for &body in self.bodies {body.deinit();}releaseOwned(self.bodies);self.graph_owner.deinit();for nominal in self.nominals {releaseOwned(nominal.name);}releaseOwned(self.nominals);for name in self.field_names {releaseOwned(name);}releaseOwned(self.field_names);releaseOwned(self.qualifications);let at=chunks.index_of(self);assert(at>=0);self=Chunk{};chunks.free(at);}
+let loops .= self.loops;if loops {loops.deinit();}let auxiliary .= self.auxiliary;if auxiliary {auxiliary.deinit();}for member in self.members {releaseOwned(member);}releaseOwned(self.members);self=Body{..};}
+fn release(self:Chunk&) {assert(self.live && self.references>0);self.references-=1;if self.references!=0 {return;}for &body in self.bodies {body.deinit();}releaseOwned(self.bodies);self.graph_owner.deinit();for nominal in self.nominals {releaseOwned(nominal.name);}releaseOwned(self.nominals);for name in self.field_names {releaseOwned(name);}releaseOwned(self.field_names);releaseOwned(self.qualifications);let at=chunks.index_of(self);assert(at>=0);self=Chunk{..};chunks.free(at);}
 fn publishChunk(cache:Cache&,owner:Chunk&)->Error {let error=publishChunkBodies(cache,owner);owner.release();return error;}
 fn publishChunkBodies(cache:Cache&,owner:Chunk&)->Error {for &body in owner.bodies {let error=cache.retain(body);if error!=Error.none {return error;}}return Error.none;}

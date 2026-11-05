@@ -20,21 +20,21 @@ fn checkLengths(metadata: i64, payload: i64) -> Error {
 fn readRequestFrame(reader: blot_io::Reader, bytes: u8[>..<]&) -> RequestFrame, bool, Error {
     var header: u8[8] = default<u8[8]>();
     let count, error = blot_io::read_short(reader, header);
-    if error != Error.none { return RequestFrame { bytes[..0], 0 }, false, error; }
-    if count == 0 { return RequestFrame { bytes[..0], 0 }, false, Error.none; }
-    if count != 8 { return RequestFrame { bytes[..0], 0 }, false, Error.truncated_frame; }
+    if error != Error.none { return RequestFrame { bytes[..0], 0 , ..}, false, error; }
+    if count == 0 { return RequestFrame { bytes[..0], 0 , ..}, false, Error.none; }
+    if count != 8 { return RequestFrame { bytes[..0], 0 , ..}, false, Error.truncated_frame; }
     let metadata = blot_bytes::get_u32(header, 0) as i64;
     let payload = blot_bytes::get_u32(header, 4) as i64;
     let checked = checkLengths(metadata, payload);
-    if checked != Error.none { return RequestFrame { bytes[..0], 0 }, false, checked; }
+    if checked != Error.none { return RequestFrame { bytes[..0], 0 , ..}, false, checked; }
     bytes.clear(); bytes.resize(metadata + payload, 0);
     let read = blot_io::read_all(reader, bytes);
     if read != Error.none {
         bytes.clear();
-        if read == Error.end_of_stream { return RequestFrame { bytes[..0], 0 }, false, Error.truncated_frame; }
-        return RequestFrame { bytes[..0], 0 }, false, read;
+        if read == Error.end_of_stream { return RequestFrame { bytes[..0], 0 , ..}, false, Error.truncated_frame; }
+        return RequestFrame { bytes[..0], 0 , ..}, false, read;
     }
-    return RequestFrame { bytes, metadata }, true, Error.none;
+    return RequestFrame { bytes, metadata , ..}, true, Error.none;
 }
 fn readRequest(reader: blot_io::Reader, bytes: u8[>..<]&) -> bool, Error {
     var header: u8[8] = default<u8[8]>();

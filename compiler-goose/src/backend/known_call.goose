@@ -9,10 +9,10 @@ fn resolve(units: const blot_check_core::Module[:], unit: u32, id: blot_check_co
     let source .= units[unit - 1];
     if source.node(id).tag == blot_check_core::Tag.call {
         let call = source.call(id); if call.arguments.len > 16 { return blot_support::none<Call>(); }
-        var result = Call { target: call.target, count: call.arguments.len, signature: call.callee_type };
+        var result = Call { target: call.target, count: call.arguments.len, signature: call.callee_type , ..};
         for argument, index in call.arguments { result.arguments[index] = argument; } return blot_support::some(result);
     }
-    var result = Call {}; var reverse: blot_check_core::Id[16] = [0; 16]; var root = id;
+    var result = Call {..}; var reverse: blot_check_core::Id[16] = [0; 16]; var root = id;
     while source.node(root).tag == blot_check_core::Tag.apply {
         if result.count == 16 { return blot_support::none<Call>(); }
         reverse[result.count] = source.node(root).b; result.count++; root = source.node(root).a;
@@ -27,7 +27,7 @@ fn resolve(units: const blot_check_core::Module[:], unit: u32, id: blot_check_co
         let ty = source.types.node(source.typeOf(node.a));
         if ty.tag != blot_check_types::Tag.array && ty.tag != blot_check_types::Tag.list && ty.tag != blot_check_types::Tag.cursor { return blot_support::none<Call>(); }
         var subtraction: u32 = 0; if ty.tag == blot_check_types::Tag.cursor { subtraction = 2; } else if ty.tag == blot_check_types::Tag.list { subtraction = 1; }
-        let identity = blot_check_types::NominalIdentity { unit: 0, decl: 4294967295 - subtraction }; let projection = source.projection(node.b); var found = false;
+        let identity = blot_check_types::NominalIdentity { unit: 0, decl: 4294967295 - subtraction , ..}; let projection = source.projection(node.b); var found = false;
         for method in source.associated { if method.member == projection.field && method.identity == identity { result.target = method.target; found = true; break; } }
         if !found { return blot_support::none<Call>(); }
         result.signature = source.dispatchSignature(root); reverse[result.count] = node.a; result.count++;
@@ -47,7 +47,7 @@ fn wrapper(units: const blot_check_core::Module[:], owner: u32, call: Call) -> b
             let previous = target.unit; target = source.reference(body.root); if target.unit == 0 { target.unit = previous; } continue;
         }
         if !body.is_function || body.parameters.len != call.count { return blot_support::none<Wrapper>(); }
-        return blot_support::some(Wrapper { target: target, body: body });
+        return blot_support::some(Wrapper { target: target, body: body , ..});
     }
     return blot_support::none<Wrapper>();
 }

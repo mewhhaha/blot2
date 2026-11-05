@@ -49,7 +49,7 @@ fn collect(nodes: u32[1024]&,count: i64&,id: u32) -> bool { if contains(nodes[..
 fn sort(values: u32[:]) { var gap = values.len / 2; while gap > 0 { for index in gap..values.len { let value = values[index]; var position = index; while position >= gap && values[position - gap] > value { values[position] = values[position - gap]; position -= gap; } values[position] = value; } gap /= 2; } }
 fn check(source: const blot_check_core::Module&,uses: const blot_backend_unit_index::Uses&,root: u32,binding: u32) -> bool { return checkSteps(source,uses,root,binding,[]).present; }
 fn checkSteps(source: const blot_check_core::Module&,uses: const blot_backend_unit_index::Uses&,root: u32,binding: u32,steps: const Step[:]) -> blot_support::Option<Family> {
-    var closure = Proof { source,steps }; if !closure.add(binding) { return blot_support::none<Family>(); } var next: i64 = 0;
+    var closure = Proof { source,steps , ..}; if !closure.add(binding) { return blot_support::none<Family>(); } var next: i64 = 0;
     while next < closure.len {
         let member = closure.bindings[next]; next++; for step in steps { if step.input == member && step.rest != 0 && !closure.add(step.rest) { return blot_support::none<Family>(); } }
         for index in uses.carries.get(member) { if !closure.carry(source.loop_carries[index]) { return blot_support::none<Family>(); } }
@@ -64,10 +64,10 @@ fn checkSteps(source: const blot_check_core::Module&,uses: const blot_backend_un
         for id in uses.definitions.get(member) { if !collect(nodes,node_count,id) { return blot_support::none<Family>(); } } for id in uses.inputs.get(member) { if !collect(nodes,node_count,id) { return blot_support::none<Family>(); } }
         if steps.len == 0 { continue; } for id in uses.references.get(member) { for entry in uses.values.get(id) { if !collect(nodes,node_count,entry.exit) { return blot_support::none<Family>(); } } }
     }
-    sort(carries[..carry_count]); sort(nodes[..node_count]); var proof = Proof { source,steps }; if !proof.add(binding) { return blot_support::none<Family>(); } var previous: i64 = 0;
+    sort(carries[..carry_count]); sort(nodes[..node_count]); var proof = Proof { source,steps , ..}; if !proof.add(binding) { return blot_support::none<Family>(); } var previous: i64 = 0;
     while previous != proof.len { previous = proof.len; for step in steps { if proof.contains(step.input) && step.rest != 0 && !proof.add(step.rest) { return blot_support::none<Family>(); } } for index in carries[..carry_count] { if !proof.carry(source.loop_carries[index]) { return blot_support::none<Family>(); } }
         for id in nodes[..node_count] { let node = source.node(id); if steps.len != 0 && node.tag == blot_check_core::Tag.break_ && source.node(node.a).tag == blot_check_core::Tag.loop_ { for position in 0..source.breakValues(id).len { if !proof.exitAt(id,position as u32) { return blot_support::none<Family>(); } } } if node.tag == blot_check_core::Tag.bind && !proof.bind(id) { return blot_support::none<Family>(); } }
     }
     for member in proof.bindings[..proof.len] { let flags = uses.flagsOf(member); if flags.merge_branch || flags.merge_result || flags.captured { return blot_support::none<Family>(); } }
-    if !proof.visit(root,0) { return blot_support::none<Family>(); } return blot_support::some(Family { proof.bindings,proof.len });
+    if !proof.visit(root,0) { return blot_support::none<Family>(); } return blot_support::some(Family { proof.bindings,proof.len , ..});
 }

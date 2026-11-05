@@ -38,10 +38,10 @@ fn emit(module: Module&) -> Runtime, Error {
     if e4 != Error.none { return default<Runtime>(), e4; }
     let top, e5 = blot_backend_wasm::addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
     if e5 != Error.none { return default<Runtime>(), e5; }
-    let runtime = Runtime { allocate, reset, length, base, end, top };
+    let runtime = Runtime { allocate, reset, length, base, end, top , ..};
     {
         var c = blot_emitter::init(module, allocate);
-        let bytes = Local { 0 }; let address = blot_emitter::temp(c);
+        let bytes = Local { 0 , ..}; let address = blot_emitter::temp(c);
         blot_emitter::value(c, bytes); blot_emitter::op(c, blot_backend_runtime_ir::OP_i32_eqz);
         blot_emitter::value(c, bytes); blot_emitter::value(c, 3);
         blot_emitter::op(c, blot_backend_runtime_ir::OP_i32_and);
@@ -64,7 +64,7 @@ fn emit(module: Module&) -> Runtime, Error {
     }
     {
         var c = blot_emitter::init(module, length);
-        let address = Local { 0 }; let count = blot_emitter::temp(c);
+        let address = Local { 0 , ..}; let count = blot_emitter::temp(c);
         blot_emitter::value(c, address); blot_emitter::globalGet(c, base);
         blot_emitter::op(c, blot_backend_runtime_ir::OP_i32_lt_u);
         blot_emitter::value(c, address); blot_emitter::value(c, 3);
@@ -84,6 +84,6 @@ fn emit(module: Module&) -> Runtime, Error {
         blot_emitter::value(c, count);
         if c.failure != Error.none { return default<Runtime>(), c.failure; }
     }
-    module.array_transport = blot_support::some(blot_backend_wasm::ArrayTransport { allocate, reset });
+    module.array_transport = blot_support::some(blot_backend_wasm::ArrayTransport { allocate, reset , ..});
     return runtime, Error.none;
 }

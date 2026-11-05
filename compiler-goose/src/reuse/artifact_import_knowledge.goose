@@ -20,7 +20,7 @@ fn deinit(self: ByteBuffer&) { blot_support_pooled_buffer::deinit(self, knowledg
 fn push(self: FrameBuffer&, value: KnowledgeFrame) -> Error { return blot_support_pooled_buffer::push(self, value, knowledge_frames); }
 fn clear(self: FrameBuffer&) { self.items = self.storage[..0]; }
 fn deinit(self: FrameBuffer&) { blot_support_pooled_buffer::deinit(self, knowledge_frames); }
-struct Knowledge { store: const blot_backend_layout::Store? = null, layouts: ByteBuffer = ByteBuffer {}, rows: ByteBuffer = ByteBuffer {}, frames: FrameBuffer = FrameBuffer {} }
+struct Knowledge { store: const blot_backend_layout::Store? = null, layouts: ByteBuffer = ByteBuffer {..}, rows: ByteBuffer = ByteBuffer {..}, frames: FrameBuffer = FrameBuffer {..} }
 fn deinit(self: Knowledge&) { self.layouts.deinit(); self.rows.deinit(); self.frames.deinit(); self.store .= null; }
 fn table(self: Knowledge&, kind: KnowledgeKind) -> ByteBuffer& { if kind == knowledge_layout { return self.layouts; } return self.rows; }
 fn absent(store: const blot_backend_layout::Store&, kind: KnowledgeKind, id: u32) -> blot_support::Option<i16> {
@@ -35,7 +35,7 @@ fn ceiling(self: Knowledge&, store: const blot_backend_layout::Store&, kind: Kno
     let missing = absent(store, kind, id); if missing.present { return missing.value, Error.none; }
     let first = self.layouts.resize(store.nodes.len); if first != Error.none { return -1, first; } let second = self.rows.resize(store.effects.rows.len); if second != Error.none { return -1, second; }
     if self.table(kind).items[id] >= 2 { return self.table(kind).items[id] as i16 - 3, Error.none; } assert(self.frames.items.len == 0);
-    let appended = self.frames.push(KnowledgeFrame { kind, id }); if appended != Error.none { return -1, appended; } self.table(kind).items[id] = 1;
+    let appended = self.frames.push(KnowledgeFrame { kind, id , ..}); if appended != Error.none { return -1, appended; } self.table(kind).items[id] = 1;
     let error = self.completeCeilings(store);
     if error != Error.none { for frame in self.frames.items { self.table(frame.kind).items[frame.id] = 0; } self.frames.clear(); return -1, error; }
     return self.table(kind).items[id] as i16 - 3, Error.none;
@@ -50,24 +50,24 @@ fn completeCeilings(self: Knowledge&, store: const blot_backend_layout::Store&) 
         var known = absent(store, child.value.kind, child.value.id);
         if !known.present { let stored = self.table(child.value.kind).items[child.value.id]; if stored == 1 { known = blot_support::some(-1 as i16); } else if stored != 0 { known = blot_support::some(stored as i16 - 3); } }
         if known.present { frame.ceiling = min(frame.ceiling, known.value - 1); continue; }
-        let error = self.frames.push(KnowledgeFrame { child.value.kind, child.value.id }); if error != Error.none { return error; } self.table(child.value.kind).items[child.value.id] = 1;
+        let error = self.frames.push(KnowledgeFrame { child.value.kind, child.value.id , ..}); if error != Error.none { return error; } self.table(child.value.kind).items[child.value.id] = 1;
     } return Error.none;
 }
 fn nextChild(store: const blot_backend_layout::Store&, frame: KnowledgeFrame&) -> blot_support::Option<KnowledgeChild> {
     let no = blot_support::none<KnowledgeChild>();
     if frame.kind == knowledge_row {
         let view = store.effects.view(); let labels = view.rowLabels(frame.id);
-        while frame.next < labels.len { let arguments = view.operationArguments(labels[frame.next]); if frame.argument < arguments.len { frame.argument++; return blot_support::some(KnowledgeChild { knowledge_layout, arguments[frame.argument - 1] }); } frame.next++; frame.argument = 0; } return no;
+        while frame.next < labels.len { let arguments = view.operationArguments(labels[frame.next]); if frame.argument < arguments.len { frame.argument++; return blot_support::some(KnowledgeChild { knowledge_layout, arguments[frame.argument - 1] , ..}); } frame.next++; frame.argument = 0; } return no;
     }
     let n = store.node(frame.id); let index = frame.next; frame.next++;
     match n.tag {
         blot_backend_layout::Tag.invalid, blot_backend_layout::Tag.erased => { frame.ceiling = -1; return no; },
-        blot_backend_layout::Tag.function => { if index == 0 { return blot_support::some(KnowledgeChild { knowledge_row, n.c }); } if index == 1 { return blot_support::some(KnowledgeChild { knowledge_layout, n.a }); } if index == 2 { return blot_support::some(KnowledgeChild { knowledge_layout, n.b }); } },
-        blot_backend_layout::Tag.provider => { if index == 0 { return blot_support::some(KnowledgeChild { knowledge_row, n.c }); } if index == 1 { return blot_support::some(KnowledgeChild { knowledge_layout, n.a }); } },
-        blot_backend_layout::Tag.array, blot_backend_layout::Tag.list, blot_backend_layout::Tag.cursor, blot_backend_layout::Tag.resolver => { if index == 0 { return blot_support::some(KnowledgeChild { knowledge_layout, n.a }); } },
-        blot_backend_layout::Tag.state_provider => { if index == 0 { return blot_support::some(KnowledgeChild { knowledge_layout, n.a }); } if index == 1 { return blot_support::some(KnowledgeChild { knowledge_layout, n.b }); } if index == 2 { return blot_support::some(KnowledgeChild { knowledge_layout, n.c }); } },
-        blot_backend_layout::Tag.product, blot_backend_layout::Tag.nominal => { let items = store.children(frame.id); if index < items.len { return blot_support::some(KnowledgeChild { knowledge_layout, items[index] }); } },
-        blot_backend_layout::Tag.record => { let items = store.children(frame.id); let at = index as i64 * 2 + 1; if at < items.len { return blot_support::some(KnowledgeChild { knowledge_layout, items[at] }); } },
+        blot_backend_layout::Tag.function => { if index == 0 { return blot_support::some(KnowledgeChild { knowledge_row, n.c , ..}); } if index == 1 { return blot_support::some(KnowledgeChild { knowledge_layout, n.a , ..}); } if index == 2 { return blot_support::some(KnowledgeChild { knowledge_layout, n.b , ..}); } },
+        blot_backend_layout::Tag.provider => { if index == 0 { return blot_support::some(KnowledgeChild { knowledge_row, n.c , ..}); } if index == 1 { return blot_support::some(KnowledgeChild { knowledge_layout, n.a , ..}); } },
+        blot_backend_layout::Tag.array, blot_backend_layout::Tag.list, blot_backend_layout::Tag.cursor, blot_backend_layout::Tag.resolver => { if index == 0 { return blot_support::some(KnowledgeChild { knowledge_layout, n.a , ..}); } },
+        blot_backend_layout::Tag.state_provider => { if index == 0 { return blot_support::some(KnowledgeChild { knowledge_layout, n.a , ..}); } if index == 1 { return blot_support::some(KnowledgeChild { knowledge_layout, n.b , ..}); } if index == 2 { return blot_support::some(KnowledgeChild { knowledge_layout, n.c , ..}); } },
+        blot_backend_layout::Tag.product, blot_backend_layout::Tag.nominal => { let items = store.children(frame.id); if index < items.len { return blot_support::some(KnowledgeChild { knowledge_layout, items[index] , ..}); } },
+        blot_backend_layout::Tag.record => { let items = store.children(frame.id); let at = index as i64 * 2 + 1; if at < items.len { return blot_support::some(KnowledgeChild { knowledge_layout, items[at] , ..}); } },
         _ => {},
     } return no;
 }

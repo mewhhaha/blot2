@@ -48,7 +48,7 @@ recursive fn walkNode<S>(self: Walker<S>&, left: blot_check_types::Id, right: bl
         forall, existential => {
             if a.c != b.c { return false, blot_error::Error.none; }
             if self.depth == self.frames.len { return false, blot_error::Error.type_limit; }
-            let frame = Frame { blot_check_types::List { a.b, a.c }, blot_check_types::List { b.b, b.c } };
+            let frame = Frame { blot_check_types::List { a.b, a.c }, blot_check_types::List { b.b, b.c , ..} , ..};
             let first = self.store.list(frame.left); let second = self.store.list(frame.right);
             for av, i in first {
                 let bv = second[i];
@@ -93,8 +93,8 @@ recursive fn walkNode<S>(self: Walker<S>&, left: blot_check_types::Id, right: bl
         },
         product => {
             if a.b != b.b { return false, blot_error::Error.none; }
-            let first = self.store.list(blot_check_types::List { a.a, a.b });
-            let second = self.store.list(blot_check_types::List { b.a, b.b });
+            let first = self.store.list(blot_check_types::List { a.a, a.b , ..});
+            let second = self.store.list(blot_check_types::List { b.a, b.b , ..});
             for av, i in first {
                 let child, error = walkEqual(self, av, second[i]); if error != blot_error::Error.none || !child { return child, error; }
             }
@@ -188,14 +188,14 @@ recursive fn walkRow<S>(self: Walker<S>&, left: blot_check_effects::Id, right: b
     return true, blot_error::Error.none;
 }
 fn equal<S>(store: S, left: blot_check_types::Id, right: blot_check_types::Id, symbolic: bool) -> bool, blot_error::Error {
-    var budget: i64 = 0; var walker = Walker<S> { store, symbolic, budget };
+    var budget: i64 = 0; var walker = Walker<S> { store, symbolic, budget , ..};
     return walkEqual(walker, left, right);
 }
 fn operationEqual<S>(store: S, left: blot_check_effects::Label, right: blot_check_effects::Label, symbolic: bool) -> bool, blot_error::Error {
-    var budget: i64 = 0; var walker = Walker<S> { store, symbolic, budget };
+    var budget: i64 = 0; var walker = Walker<S> { store, symbolic, budget , ..};
     return walkOperation(walker, left, right);
 }
 fn equalWithBudget<S>(store: S, left: blot_check_types::Id, right: blot_check_types::Id, symbolic: bool, budget: i64&) -> bool, blot_error::Error {
-    var walker = Walker<S> { store, symbolic, budget, budgeted: true };
+    var walker = Walker<S> { store, symbolic, budget, budgeted: true , ..};
     return walkEqual(walker, left, right);
 }

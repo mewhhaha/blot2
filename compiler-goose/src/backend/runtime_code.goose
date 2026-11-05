@@ -21,7 +21,7 @@ fn value<M>(c: Code<M>&, code: const blot_backend_runtime_ir::Instruction[:]) ->
 }
 fn temp<M>(c: Code<M>&) -> Local, blot_error::Error {
     let id, error = blot_backend_wasm::addLocal(c.module, c.function, blot_backend_runtime_ir::VT_i32);
-    return Local { id: id }, error;
+    return Local { id: id , ..}, error;
 }
 fn set<M>(c: Code<M>&, local: Local) -> blot_error::Error { op(c, blot_backend_runtime_ir::OP_local_set, local.id) }
 fn set<M>(c: Code<M>&, local: Local, number: u32) -> blot_error::Error {

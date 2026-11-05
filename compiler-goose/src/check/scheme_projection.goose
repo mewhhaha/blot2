@@ -33,8 +33,8 @@ fn selectProjection(self: Resolver&, mapping: blot_check_package_contracts::Prin
             let error = charge(mapping.remaining); if error != Error.none { return error; } views.pure_rows = pure_rows; views.closed_rows = closed_rows;
             if goal.kind != blot_check_types::ObligationKind.contract || goal.identity.unit != projection.a || goal.identity.decl != projection.b { continue; }
             let tuple = self.producer.types.node(goal.ty); if tuple.tag != blot_check_types::Tag.product || tuple.b != arguments.len { continue; }
-            let required = self.producer.types.list(blot_check_types::List { tuple.a, tuple.b });
-            var owned = blot_check_package_contracts::Principal { left: self.producer.types, right: self.producer.types, remaining: mapping.remaining, left_rows: scheme.closed_rows };
+            let required = self.producer.types.list(blot_check_types::List { tuple.a, tuple.b , ..});
+            var owned = blot_check_package_contracts::Principal { left: self.producer.types, right: self.producer.types, remaining: mapping.remaining, left_rows: scheme.closed_rows , ..};
             if self.applied != null { owned = owner_mapping; owned.foreign_views = false; } var matches = true;
             for clause, index in required { let error = owned.validate(clause, arguments[index]); if error != Error.none { if mapping.remaining == 0 { return Error.invalid_artifact; } matches = false; break; } }
             if self.applied != null && (!blot_structural::equal(owned.witnesses, owner_mapping.witnesses) || !blot_structural::equal(owned.scheme_row_witnesses, owner_mapping.scheme_row_witnesses)) { matches = false; } if !matches { continue; }
@@ -51,7 +51,7 @@ fn selectProjection(self: Resolver&, mapping: blot_check_package_contracts::Prin
                     let members = self.module.contract_members[declaration.members.start..declaration.members.start + declaration.members.len]; let selected = self.module.selected_members[proof.members.start..proof.members.start + proof.members.len];
                     for member, index in members { let error = charge(mapping.remaining); if error != Error.none { return error; } if member.name != member_name { continue; } let selected = selected[index];
                         if member.kind == blot_check_core::ContractMemberKind.value || selected.kind != blot_check_core::ImplementationMemberKind.type_ || selected.name != member_name { return Error.invalid_artifact; }
-                        var endpoint = blot_check_package_contracts::Principal { left: self.module.types, right: self.module.types, remaining: mapping.remaining, views: mapping.views }; return endpoint.validate(selected.root, actual);
+                        var endpoint = blot_check_package_contracts::Principal { left: self.module.types, right: self.module.types, remaining: mapping.remaining, views: mapping.views , ..}; return endpoint.validate(selected.root, actual);
                     } return Error.invalid_artifact;
                  } } return Error.invalid_artifact;
             }

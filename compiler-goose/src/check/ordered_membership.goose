@@ -4,7 +4,7 @@ import std;
 import dictionary;
 import support.error;
 struct Index { members: dictionary<u32, bool>&, enabled: bool = true, covered: i64 = 0 }
-fn init(members: dictionary<u32, bool>&) -> Index { members.clear(); return Index { members }; }
+fn init(members: dictionary<u32, bool>&) -> Index { members.clear(); return Index { members , ..}; }
 fn deinit(self: Index&) { self.members.clear(); self.covered = 0; }
 fn contains(self: Index&, values: const u32[:], value: u32) -> bool, blot_error::Error {
     if !self.enabled || values.len < 64 {
@@ -19,8 +19,8 @@ fn contains(self: Index&, values: const u32[:], value: u32) -> bool, blot_error:
     return self.members.contains(value), blot_error::Error.none;
 }
 import support.pooled_map;
-struct PooledIndex {members:blot_support_pooled_map::Map<u32,bool> = blot_support_pooled_map::Map<u32,bool>{},enabled:bool=true,covered:i64=0}
+struct PooledIndex {members:blot_support_pooled_map::Map<u32,bool> = blot_support_pooled_map::Map<u32,bool>{..},enabled:bool=true,covered:i64=0}
 reusable[] var membership_slots:dictionary_slot<u32,bool>[>..];
-fn initPooled(enabled:bool=true)->PooledIndex {return PooledIndex{enabled:enabled};}
+fn initPooled(enabled:bool=true)->PooledIndex {return PooledIndex{enabled:enabled, ..};}
 fn deinit(self:PooledIndex&) {self.members.deinit(membership_slots);self.covered=0;}
 fn contains(self:PooledIndex&,values:const u32[:],value:u32)->bool,blot_error::Error {if !self.enabled || values.len<64 {for item in values {if item==value {return true,blot_error::Error.none;}}return false,blot_error::Error.none;}assert(values.len>=self.covered);while self.covered<values.len {self.members.insert(values[self.covered],true,membership_slots);self.covered+=1;}return self.members.contains(value),blot_error::Error.none;}

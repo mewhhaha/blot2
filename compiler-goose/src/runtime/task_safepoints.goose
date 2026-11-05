@@ -41,21 +41,21 @@ fn run(module: Module&, function: Function) -> blot_support::Option<blot_backend
             let name = module.importName(inst.operand);
             publication = name == "open" || name == "spawn";
         }
-        if source_call || publication { code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint }); }
+        if source_call || publication { code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint , ..}); }
         let suspend = suspends(module, inst);
         if suspend {
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint });
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, current });
-            code.push(Instruction { blot_backend_runtime_ir::OP_local_set, context as u32 });
+            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint , ..});
+            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, current , ..});
+            code.push(Instruction { blot_backend_runtime_ir::OP_local_set, context as u32 , ..});
         }
         if inst.op == blot_backend_runtime_ir::OP_br || inst.op == blot_backend_runtime_ir::OP_br_if {
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint });
+            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint , ..});
         }
         code.push(inst);
         if suspend {
-            code.push(Instruction { blot_backend_runtime_ir::OP_local_get, context as u32 });
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, resume_ });
-            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint });
+            code.push(Instruction { blot_backend_runtime_ir::OP_local_get, context as u32 , ..});
+            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, resume_ , ..});
+            code.push(Instruction { blot_backend_runtime_ir::OP_call_import, checkpoint , ..});
         }
     }
     return blot_support::some(module.publishBody(locals, code)), Error.none;

@@ -21,7 +21,7 @@ struct Batch { context: Context, spawn_contracts: bool }
 fn moduleHasSpawnContracts(module: const Module&) -> bool { for binding in module.bindings { if binding.capability_flow == blot_check_check::CapabilityFlow.spawn_task { return true; } } return false; }
 fn withBatch<C,F>(context: Context, state: C) {
     var spawn = false; for owner in context.units { if moduleHasSpawnContracts(owner.value) { spawn = true; break; } }
-    let batch = Batch { context, spawn }; return F(state, batch);
+    let batch = Batch { context, spawn , ..}; return F(state, batch);
 }
 fn units(self: const Batch&) -> const ModuleRef[:] { return self.context.units; }
 fn hasSpawnContracts(self: const Batch&, module: const Module&) -> bool { return self.spawn_contracts || moduleHasSpawnContracts(module); }
@@ -29,7 +29,7 @@ fn validateWithBudget(self: const Batch&, module: const Module&, source_length: 
     var context = self.context; context.source_length = source_length; return validateBatchWithBudget(module, context, remaining, self);
 }
 struct OwnerBounds { binding_count: i64 }
-fn ownerBounds(module: const Module&) -> OwnerBounds { return OwnerBounds { module.bindings.len }; }
+fn ownerBounds(module: const Module&) -> OwnerBounds { return OwnerBounds { module.bindings.len , ..}; }
 fn reusableModules(modules: const ModuleRef[:], caller: bool) -> bool {
     for ref in modules {
         let module .= ref.value;
@@ -44,7 +44,7 @@ fn reusableModules(modules: const ModuleRef[:], caller: bool) -> bool {
 }
 fn reusableContext(context: Context, callers: const ModuleRef[:]) -> bool { return callers.len != 0 && reusableModules(callers, true); }
 struct NominalFact { identity: blot_check_types::NominalIdentity, affine: bool, has_usage: bool, closed_storage: bool }
-fn nominalFact(value: blot_check_core::Nominal) -> NominalFact { return NominalFact { value.identity, value.affine, value.has_usage, value.closed_storage }; }
+fn nominalFact(value: blot_check_core::Nominal) -> NominalFact { return NominalFact { value.identity, value.affine, value.has_usage, value.closed_storage , ..}; }
 struct ImageOwner { unit: u32, bounds: OwnerBounds, nominals: blot_check_core::List }
 struct ContextImage {
     owners: const ImageOwner[:] = [], nominal_facts: const NominalFact[:] = [], reusable: bool = false,
@@ -53,15 +53,15 @@ struct ContextImage {
 reusable[] var image_owners: ImageOwner[>..] = [];
 reusable[] var image_facts: NominalFact[>..] = [];
 fn capture(context: Context, callers: const ModuleRef[:]) -> ContextImage, Error {
-    var count: i64 = 0; for ref in context.units { if ref.value.nominals.len > 0xffffffff - count { return ContextImage {}, Error.out_of_memory; } count += ref.value.nominals.len; }
+    var count: i64 = 0; for ref in context.units { if ref.value.nominals.len > 0xffffffff - count { return ContextImage {..}, Error.out_of_memory; } count += ref.value.nominals.len; }
     let owners = image_owners.alloc_slice(context.units.len); let facts = image_facts.alloc_slice(count); var offset: u32 = 0;
-    for ref, index in context.units { let module .= ref.value; owners[index] = ImageOwner { module.unit, ownerBounds(module), blot_check_core::List { offset, module.nominals.len as u32 } }; for nominal, n in module.nominals { facts[offset + n] = nominalFact(nominal); } offset += module.nominals.len as u32; }
-    return ContextImage { owners: owners, nominal_facts: facts, reusable: reusableContext(context, callers), symbol_count: context.symbol_count, source_length: context.source_length, forbidden_owner: context.forbidden_owner }, Error.none;
+    for ref, index in context.units { let module .= ref.value; owners[index] = ImageOwner { module.unit, ownerBounds(module), blot_check_core::List { offset, module.nominals.len as u32 , ..} , ..}; for nominal, n in module.nominals { facts[offset + n] = nominalFact(nominal); } offset += module.nominals.len as u32; }
+    return ContextImage { owners: owners, nominal_facts: facts, reusable: reusableContext(context, callers), symbol_count: context.symbol_count, source_length: context.source_length, forbidden_owner: context.forbidden_owner , ..}, Error.none;
 }
 fn deinit(self: ContextImage&) {
     if self.owners.len != 0 { let first: const ImageOwner& = self.owners[0]; let at = image_owners.index_of(first); assert(at >= 0); image_owners.free_slice(image_owners[at..at + self.owners.len]); }
     if self.nominal_facts.len != 0 { let first: const NominalFact& = self.nominal_facts[0]; let at = image_facts.index_of(first); assert(at >= 0); image_facts.free_slice(image_facts[at..at + self.nominal_facts.len]); }
-    self = ContextImage {};
+    self = ContextImage {..};
 }
 fn matches(self: const ContextImage&, context: Context, callers: const ModuleRef[:]) -> bool {
     if !self.reusable || !reusableContext(context, callers) || self.owners.len != context.units.len || !blot_structural::equal(self.symbol_count, context.symbol_count) || !blot_structural::equal(self.source_length, context.source_length) || !blot_structural::equal(self.forbidden_owner, context.forbidden_owner) { return false; }

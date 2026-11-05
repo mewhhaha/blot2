@@ -20,7 +20,7 @@ struct Capture {
 }
 fn init(metadata: blot_reuse_code_artifacts::Context&, emission: blot_reuse_artifact_emitter::Recorder&,
     queries: blot_reuse_executable_query::FragmentTable&, cached_units: i64 = 0) -> Capture {
-    return Capture { metadata: metadata, emission: emission, cached_units: cached_units, executable_queries: queries };
+    return Capture { metadata: metadata, emission: emission, cached_units: cached_units, executable_queries: queries , ..};
 }
 
 fn sealExecutableQueries(self: Capture&) -> Error {
@@ -39,13 +39,13 @@ fn sealExecutableQueries(self: Capture&) -> Error {
         if !job.reusable { continue; }
         let size = blot_reuse_executable_query::dependencyBytes<blot_check_core::BindingRef,blot_reuse_code_artifacts::StaticRead>(job.inline_bodies.len, job.static_reads.len);
         if !size.present || !self.executable_queries.canAdmit(size.value) { self.executable_queries.saturate(); return Error.none; }
-        var builder = self.executable_queries.begin(blot_reuse_executable_query::FragmentKey { function.request });
+        var builder = self.executable_queries.begin(blot_reuse_executable_query::FragmentKey { function.request , ..});
         let bodies = self.metadata.inline_bodies[job.inline_bodies.start..job.inline_bodies.start + job.inline_bodies.len];
         let reads = self.metadata.static_reads[job.static_reads.start..job.static_reads.start + job.static_reads.len];
         builder.read(blot_reuse_executable_query::FragmentDependencies {
             blot_reuse_executable_query::copyBodyReads(bodies), blot_reuse_executable_query::copyStaticReads(reads), owner, job.reusable,
-        });
-        builder.stage(blot_reuse_executable_query::FragmentResult { function.function, owner });
+         ..});
+        builder.stage(blot_reuse_executable_query::FragmentResult { function.function, owner , ..});
         var candidate = builder.complete(); builder.abort(); assert(candidate.present);
         let prepared, error = self.executable_queries.prepare(candidate.value);
         if error != Error.none { candidate.value.abort(); return error; }

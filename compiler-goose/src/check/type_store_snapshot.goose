@@ -9,9 +9,9 @@ struct Range { start: i64 = 0, len: i64 = 0 }
 struct State {
     store_owner_id: u64,
     store_use_closed_rows: bool = true,
-    store_closed_rows: blot_check_types::ClosedRow[4] = [blot_check_types::ClosedRow {}; 4],
+    store_closed_rows: blot_check_types::ClosedRow[4] = [blot_check_types::ClosedRow {..}; 4],
     store_use_operation_rows: bool = true,
-    store_operation_rows: blot_check_types::OperationRow[64] = [blot_check_types::OperationRow {}; 64],
+    store_operation_rows: blot_check_types::OperationRow[64] = [blot_check_types::OperationRow {..}; 64],
     store_has_usage_types: bool = false,
     store_has_rank_types: bool = false,
     store_next_rigid_scope: u32 = 1,
@@ -29,7 +29,7 @@ struct State {
     store_closed_effect_physical_epoch: u64 = 0,
     store_mutation_epoch: u64 = 0,
     store_occurs_steps: u64 = 0,
-    store_normalization: blot_work_counters::Normalization = blot_work_counters::Normalization {},
+    store_normalization: blot_work_counters::Normalization = blot_work_counters::Normalization {..},
     store_resolution_steps: u64 = 0,
     store_occurs_generation: u32 = 0,
     store_use_resolution_cache: bool = true,
@@ -82,28 +82,28 @@ struct Snapshot { state: State, lease_index: u32 = 0, generation: u64 = 0,
     composites_entries: const blot_reuse_composite_resolution_cache::Entry[:] = [],
 }
 struct Lease { live: bool = false, generation: u64 = 0,
-    store_nodes: Range = Range {},
-    store_extra: Range = Range {},
-    store_variables: Range = Range {},
-    store_versions: Range = Range {},
-    store_operations: Range = Range {},
-    store_operation_links: Range = Range {},
-    store_quantifier_goals: Range = Range {},
-    store_quantifier_obligations: Range = Range {},
-    store_occurs_seen: Range = Range {},
-    store_closed_row_index: Range = Range {},
-    store_closed_operation_index: Range = Range {},
-    store_variable_views: Range = Range {},
-    store_associated_equations: Range = Range {},
-    store_projection_resolutions: Range = Range {},
-    store_operation_chains: Range = Range {},
-    effects_rows: Range = Range {},
-    effects_labels: Range = Range {},
-    effects_variables: Range = Range {},
-    effects_versions: Range = Range {},
-    effects_resolved: Range = Range {},
-    resolved_entries: Range = Range {},
-    composites_entries: Range = Range {},
+    store_nodes: Range = Range {..},
+    store_extra: Range = Range {..},
+    store_variables: Range = Range {..},
+    store_versions: Range = Range {..},
+    store_operations: Range = Range {..},
+    store_operation_links: Range = Range {..},
+    store_quantifier_goals: Range = Range {..},
+    store_quantifier_obligations: Range = Range {..},
+    store_occurs_seen: Range = Range {..},
+    store_closed_row_index: Range = Range {..},
+    store_closed_operation_index: Range = Range {..},
+    store_variable_views: Range = Range {..},
+    store_associated_equations: Range = Range {..},
+    store_projection_resolutions: Range = Range {..},
+    store_operation_chains: Range = Range {..},
+    effects_rows: Range = Range {..},
+    effects_labels: Range = Range {..},
+    effects_variables: Range = Range {..},
+    effects_versions: Range = Range {..},
+    effects_resolved: Range = Range {..},
+    resolved_entries: Range = Range {..},
+    composites_entries: Range = Range {..},
 }
 reusable var leases: Lease[>..] = [];
 var next_generation: u64 = 1;
@@ -130,7 +130,7 @@ reusable[] var pool_effects_resolved: dictionary_slot<u32, u32>[>..] = [];
 reusable[] var pool_resolved_entries: blot_reuse_epoch_resolution_cache::Entry[>..] = [];
 reusable[] var pool_composites_entries: blot_reuse_composite_resolution_cache::Entry[>..] = [];
 fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
-    if !blot_check_types::valid(store) || store.owner_id == 0 { return Snapshot {}, Error.invalid_artifact; }
+    if !blot_check_types::valid(store) || store.owner_id == 0 { return Snapshot {..}, Error.invalid_artifact; }
     if store.owner_id == 0 || next_generation == 0xffffffffffffffff || leases.len == 0xffffffff { return default<Snapshot>(), Error.type_limit; }
     var result = Snapshot { state: State {
         store_owner_id: store.owner_id,
@@ -181,140 +181,139 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
         store_associated_equations_count: store.associated_equations.count,
         store_projection_resolutions_count: store.projection_resolutions.count,
         store_operation_chains_count: store.operation_chains.count,
-        effects_resolved_count: store.effects.resolved.count,
-    } };
-    let generation = next_generation; next_generation += 1; var lease = Lease { true, generation };
+        effects_resolved_count: store.effects.resolved.count, ..} , ..};
+    let generation = next_generation; next_generation += 1; var lease = Lease { true, generation , ..};
     if store.nodes.len != 0 {
         let run = pool_store_nodes.alloc_slice(store.nodes.len);
         for value, index in store.nodes.items { run[index] = value; }
         let first: const blot_check_types::Node& = run[0];
-        lease.store_nodes = Range { pool_store_nodes.index_of(first), run.len }; result.store_nodes = run;
+        lease.store_nodes = Range { pool_store_nodes.index_of(first), run.len , ..}; result.store_nodes = run;
     }
     if store.extra.len != 0 {
         let run = pool_store_extra.alloc_slice(store.extra.len);
         for value, index in store.extra.items { run[index] = value; }
         let first: const u32& = run[0];
-        lease.store_extra = Range { pool_store_extra.index_of(first), run.len }; result.store_extra = run;
+        lease.store_extra = Range { pool_store_extra.index_of(first), run.len , ..}; result.store_extra = run;
     }
     if store.variables.len != 0 {
         let run = pool_store_variables.alloc_slice(store.variables.len);
         for value, index in store.variables.items { run[index] = value; }
         let first: const blot_check_types::Variable& = run[0];
-        lease.store_variables = Range { pool_store_variables.index_of(first), run.len }; result.store_variables = run;
+        lease.store_variables = Range { pool_store_variables.index_of(first), run.len , ..}; result.store_variables = run;
     }
     if store.versions.len != 0 {
         let run = pool_store_versions.alloc_slice(store.versions.len);
         for value, index in store.versions.items { run[index] = value; }
         let first: const blot_check_types::Version& = run[0];
-        lease.store_versions = Range { pool_store_versions.index_of(first), run.len }; result.store_versions = run;
+        lease.store_versions = Range { pool_store_versions.index_of(first), run.len , ..}; result.store_versions = run;
     }
     if store.operations.len != 0 {
         let run = pool_store_operations.alloc_slice(store.operations.len);
         for value, index in store.operations.items { run[index] = value; }
         let first: const blot_check_types::Operation& = run[0];
-        lease.store_operations = Range { pool_store_operations.index_of(first), run.len }; result.store_operations = run;
+        lease.store_operations = Range { pool_store_operations.index_of(first), run.len , ..}; result.store_operations = run;
     }
     if store.operation_links.len != 0 {
         let run = pool_store_operation_links.alloc_slice(store.operation_links.len);
         for value, index in store.operation_links.items { run[index] = value; }
         let first: const blot_check_types::OperationLink& = run[0];
-        lease.store_operation_links = Range { pool_store_operation_links.index_of(first), run.len }; result.store_operation_links = run;
+        lease.store_operation_links = Range { pool_store_operation_links.index_of(first), run.len , ..}; result.store_operation_links = run;
     }
     if store.quantifier_goals.len != 0 {
         let run = pool_store_quantifier_goals.alloc_slice(store.quantifier_goals.len);
         for value, index in store.quantifier_goals.items { run[index] = value; }
         let first: const blot_check_types::QuantifierGoals& = run[0];
-        lease.store_quantifier_goals = Range { pool_store_quantifier_goals.index_of(first), run.len }; result.store_quantifier_goals = run;
+        lease.store_quantifier_goals = Range { pool_store_quantifier_goals.index_of(first), run.len , ..}; result.store_quantifier_goals = run;
     }
     if store.quantifier_obligations.len != 0 {
         let run = pool_store_quantifier_obligations.alloc_slice(store.quantifier_obligations.len);
         for value, index in store.quantifier_obligations.items { run[index] = value; }
         let first: const blot_check_types::Obligation& = run[0];
-        lease.store_quantifier_obligations = Range { pool_store_quantifier_obligations.index_of(first), run.len }; result.store_quantifier_obligations = run;
+        lease.store_quantifier_obligations = Range { pool_store_quantifier_obligations.index_of(first), run.len , ..}; result.store_quantifier_obligations = run;
     }
     if store.occurs_seen.len != 0 {
         let run = pool_store_occurs_seen.alloc_slice(store.occurs_seen.len);
         for value, index in store.occurs_seen.items { run[index] = value; }
         let first: const u32& = run[0];
-        lease.store_occurs_seen = Range { pool_store_occurs_seen.index_of(first), run.len }; result.store_occurs_seen = run;
+        lease.store_occurs_seen = Range { pool_store_occurs_seen.index_of(first), run.len , ..}; result.store_occurs_seen = run;
     }
     if store.closed_row_index.len != 0 {
         let run = pool_store_closed_row_index.alloc_slice(store.closed_row_index.len);
         for value, index in store.closed_row_index.items { run[index] = value; }
         let first: const blot_check_types::RowCertificate& = run[0];
-        lease.store_closed_row_index = Range { pool_store_closed_row_index.index_of(first), run.len }; result.store_closed_row_index = run;
+        lease.store_closed_row_index = Range { pool_store_closed_row_index.index_of(first), run.len , ..}; result.store_closed_row_index = run;
     }
     if store.closed_operation_index.len != 0 {
         let run = pool_store_closed_operation_index.alloc_slice(store.closed_operation_index.len);
         for value, index in store.closed_operation_index.items { run[index] = value; }
         let first: const blot_check_types::RowCertificate& = run[0];
-        lease.store_closed_operation_index = Range { pool_store_closed_operation_index.index_of(first), run.len }; result.store_closed_operation_index = run;
+        lease.store_closed_operation_index = Range { pool_store_closed_operation_index.index_of(first), run.len , ..}; result.store_closed_operation_index = run;
     }
     if store.variable_views.slots.len != 0 {
         let run = pool_store_variable_views.alloc_slice(store.variable_views.slots.len);
         for value, index in store.variable_views.slots { run[index] = value; }
         let first: const dictionary_slot<u64, u32>& = run[0];
-        lease.store_variable_views = Range { pool_store_variable_views.index_of(first), run.len }; result.store_variable_views = run;
+        lease.store_variable_views = Range { pool_store_variable_views.index_of(first), run.len , ..}; result.store_variable_views = run;
     }
     if store.associated_equations.slots.len != 0 {
         let run = pool_store_associated_equations.alloc_slice(store.associated_equations.slots.len);
         for value, index in store.associated_equations.slots { run[index] = value; }
         let first: const dictionary_slot<u32, u32>& = run[0];
-        lease.store_associated_equations = Range { pool_store_associated_equations.index_of(first), run.len }; result.store_associated_equations = run;
+        lease.store_associated_equations = Range { pool_store_associated_equations.index_of(first), run.len , ..}; result.store_associated_equations = run;
     }
     if store.projection_resolutions.slots.len != 0 {
         let run = pool_store_projection_resolutions.alloc_slice(store.projection_resolutions.slots.len);
         for value, index in store.projection_resolutions.slots { run[index] = value; }
         let first: const dictionary_slot<blot_check_types::ProjectionResolution, u32>& = run[0];
-        lease.store_projection_resolutions = Range { pool_store_projection_resolutions.index_of(first), run.len }; result.store_projection_resolutions = run;
+        lease.store_projection_resolutions = Range { pool_store_projection_resolutions.index_of(first), run.len , ..}; result.store_projection_resolutions = run;
     }
     if store.operation_chains.slots.len != 0 {
         let run = pool_store_operation_chains.alloc_slice(store.operation_chains.slots.len);
         for value, index in store.operation_chains.slots { run[index] = value; }
         let first: const dictionary_slot<blot_check_types::OperationKey, blot_check_types::OperationChain>& = run[0];
-        lease.store_operation_chains = Range { pool_store_operation_chains.index_of(first), run.len }; result.store_operation_chains = run;
+        lease.store_operation_chains = Range { pool_store_operation_chains.index_of(first), run.len , ..}; result.store_operation_chains = run;
     }
     if store.effects.rows.len != 0 {
         let run = pool_effects_rows.alloc_slice(store.effects.rows.len);
         for value, index in store.effects.rows.items { run[index] = value; }
         let first: const blot_check_effects::Row& = run[0];
-        lease.effects_rows = Range { pool_effects_rows.index_of(first), run.len }; result.effects_rows = run;
+        lease.effects_rows = Range { pool_effects_rows.index_of(first), run.len , ..}; result.effects_rows = run;
     }
     if store.effects.labels.len != 0 {
         let run = pool_effects_labels.alloc_slice(store.effects.labels.len);
         for value, index in store.effects.labels.items { run[index] = value; }
         let first: const u32& = run[0];
-        lease.effects_labels = Range { pool_effects_labels.index_of(first), run.len }; result.effects_labels = run;
+        lease.effects_labels = Range { pool_effects_labels.index_of(first), run.len , ..}; result.effects_labels = run;
     }
     if store.effects.variables.len != 0 {
         let run = pool_effects_variables.alloc_slice(store.effects.variables.len);
         for value, index in store.effects.variables.items { run[index] = value; }
         let first: const blot_check_effects::Variable& = run[0];
-        lease.effects_variables = Range { pool_effects_variables.index_of(first), run.len }; result.effects_variables = run;
+        lease.effects_variables = Range { pool_effects_variables.index_of(first), run.len , ..}; result.effects_variables = run;
     }
     if store.effects.versions.len != 0 {
         let run = pool_effects_versions.alloc_slice(store.effects.versions.len);
         for value, index in store.effects.versions.items { run[index] = value; }
         let first: const blot_check_effects::Version& = run[0];
-        lease.effects_versions = Range { pool_effects_versions.index_of(first), run.len }; result.effects_versions = run;
+        lease.effects_versions = Range { pool_effects_versions.index_of(first), run.len , ..}; result.effects_versions = run;
     }
     if store.effects.resolved.slots.len != 0 {
         let run = pool_effects_resolved.alloc_slice(store.effects.resolved.slots.len);
         for value, index in store.effects.resolved.slots { run[index] = value; }
         let first: const dictionary_slot<u32, u32>& = run[0];
-        lease.effects_resolved = Range { pool_effects_resolved.index_of(first), run.len }; result.effects_resolved = run;
+        lease.effects_resolved = Range { pool_effects_resolved.index_of(first), run.len , ..}; result.effects_resolved = run;
     }
     if store.resolved.entries.len != 0 {
         let run = pool_resolved_entries.alloc_slice(store.resolved.entries.len);
         for value, index in store.resolved.entries.items { run[index] = value; }
         let first: const blot_reuse_epoch_resolution_cache::Entry& = run[0];
-        lease.resolved_entries = Range { pool_resolved_entries.index_of(first), run.len }; result.resolved_entries = run;
+        lease.resolved_entries = Range { pool_resolved_entries.index_of(first), run.len , ..}; result.resolved_entries = run;
     }
     if store.composites.entries.len != 0 {
         let run = pool_composites_entries.alloc_slice(store.composites.entries.len);
         for value, index in store.composites.entries.items { run[index] = value; }
         let first: const blot_reuse_composite_resolution_cache::Entry& = run[0];
-        lease.composites_entries = Range { pool_composites_entries.index_of(first), run.len }; result.composites_entries = run;
+        lease.composites_entries = Range { pool_composites_entries.index_of(first), run.len , ..}; result.composites_entries = run;
     }
     let index = leases.alloc_index(lease); result.lease_index = (index + 1) as u32; result.generation = generation;
     store.nodes.clear();
@@ -473,138 +472,138 @@ fn cloneSnapshot(source: const Snapshot&) -> Snapshot, Error {
     if source.lease_index == 0 || source.lease_index > leases.len { return default<Snapshot>(), Error.invalid_artifact; }
     let owned = leases[source.lease_index - 1]; if !owned.live || owned.generation != source.generation { return default<Snapshot>(), Error.invalid_artifact; }
     if next_generation == 0xffffffffffffffff || leases.len == 0xffffffff { return default<Snapshot>(), Error.type_limit; }
-    let generation = next_generation; next_generation += 1; var lease = Lease { true, generation }; var result = Snapshot { state: source.state };
+    let generation = next_generation; next_generation += 1; var lease = Lease { true, generation , ..}; var result = Snapshot { state: source.state , ..};
     if source.store_nodes.len != 0 {
         let run = pool_store_nodes.alloc_slice(source.store_nodes.len);
         for value, index in source.store_nodes { run[index] = value; }
         let first: const blot_check_types::Node& = run[0];
-        lease.store_nodes = Range { pool_store_nodes.index_of(first), run.len }; result.store_nodes = run;
+        lease.store_nodes = Range { pool_store_nodes.index_of(first), run.len , ..}; result.store_nodes = run;
     }
     if source.store_extra.len != 0 {
         let run = pool_store_extra.alloc_slice(source.store_extra.len);
         for value, index in source.store_extra { run[index] = value; }
         let first: const u32& = run[0];
-        lease.store_extra = Range { pool_store_extra.index_of(first), run.len }; result.store_extra = run;
+        lease.store_extra = Range { pool_store_extra.index_of(first), run.len , ..}; result.store_extra = run;
     }
     if source.store_variables.len != 0 {
         let run = pool_store_variables.alloc_slice(source.store_variables.len);
         for value, index in source.store_variables { run[index] = value; }
         let first: const blot_check_types::Variable& = run[0];
-        lease.store_variables = Range { pool_store_variables.index_of(first), run.len }; result.store_variables = run;
+        lease.store_variables = Range { pool_store_variables.index_of(first), run.len , ..}; result.store_variables = run;
     }
     if source.store_versions.len != 0 {
         let run = pool_store_versions.alloc_slice(source.store_versions.len);
         for value, index in source.store_versions { run[index] = value; }
         let first: const blot_check_types::Version& = run[0];
-        lease.store_versions = Range { pool_store_versions.index_of(first), run.len }; result.store_versions = run;
+        lease.store_versions = Range { pool_store_versions.index_of(first), run.len , ..}; result.store_versions = run;
     }
     if source.store_operations.len != 0 {
         let run = pool_store_operations.alloc_slice(source.store_operations.len);
         for value, index in source.store_operations { run[index] = value; }
         let first: const blot_check_types::Operation& = run[0];
-        lease.store_operations = Range { pool_store_operations.index_of(first), run.len }; result.store_operations = run;
+        lease.store_operations = Range { pool_store_operations.index_of(first), run.len , ..}; result.store_operations = run;
     }
     if source.store_operation_links.len != 0 {
         let run = pool_store_operation_links.alloc_slice(source.store_operation_links.len);
         for value, index in source.store_operation_links { run[index] = value; }
         let first: const blot_check_types::OperationLink& = run[0];
-        lease.store_operation_links = Range { pool_store_operation_links.index_of(first), run.len }; result.store_operation_links = run;
+        lease.store_operation_links = Range { pool_store_operation_links.index_of(first), run.len , ..}; result.store_operation_links = run;
     }
     if source.store_quantifier_goals.len != 0 {
         let run = pool_store_quantifier_goals.alloc_slice(source.store_quantifier_goals.len);
         for value, index in source.store_quantifier_goals { run[index] = value; }
         let first: const blot_check_types::QuantifierGoals& = run[0];
-        lease.store_quantifier_goals = Range { pool_store_quantifier_goals.index_of(first), run.len }; result.store_quantifier_goals = run;
+        lease.store_quantifier_goals = Range { pool_store_quantifier_goals.index_of(first), run.len , ..}; result.store_quantifier_goals = run;
     }
     if source.store_quantifier_obligations.len != 0 {
         let run = pool_store_quantifier_obligations.alloc_slice(source.store_quantifier_obligations.len);
         for value, index in source.store_quantifier_obligations { run[index] = value; }
         let first: const blot_check_types::Obligation& = run[0];
-        lease.store_quantifier_obligations = Range { pool_store_quantifier_obligations.index_of(first), run.len }; result.store_quantifier_obligations = run;
+        lease.store_quantifier_obligations = Range { pool_store_quantifier_obligations.index_of(first), run.len , ..}; result.store_quantifier_obligations = run;
     }
     if source.store_occurs_seen.len != 0 {
         let run = pool_store_occurs_seen.alloc_slice(source.store_occurs_seen.len);
         for value, index in source.store_occurs_seen { run[index] = value; }
         let first: const u32& = run[0];
-        lease.store_occurs_seen = Range { pool_store_occurs_seen.index_of(first), run.len }; result.store_occurs_seen = run;
+        lease.store_occurs_seen = Range { pool_store_occurs_seen.index_of(first), run.len , ..}; result.store_occurs_seen = run;
     }
     if source.store_closed_row_index.len != 0 {
         let run = pool_store_closed_row_index.alloc_slice(source.store_closed_row_index.len);
         for value, index in source.store_closed_row_index { run[index] = value; }
         let first: const blot_check_types::RowCertificate& = run[0];
-        lease.store_closed_row_index = Range { pool_store_closed_row_index.index_of(first), run.len }; result.store_closed_row_index = run;
+        lease.store_closed_row_index = Range { pool_store_closed_row_index.index_of(first), run.len , ..}; result.store_closed_row_index = run;
     }
     if source.store_closed_operation_index.len != 0 {
         let run = pool_store_closed_operation_index.alloc_slice(source.store_closed_operation_index.len);
         for value, index in source.store_closed_operation_index { run[index] = value; }
         let first: const blot_check_types::RowCertificate& = run[0];
-        lease.store_closed_operation_index = Range { pool_store_closed_operation_index.index_of(first), run.len }; result.store_closed_operation_index = run;
+        lease.store_closed_operation_index = Range { pool_store_closed_operation_index.index_of(first), run.len , ..}; result.store_closed_operation_index = run;
     }
     if source.store_variable_views.len != 0 {
         let run = pool_store_variable_views.alloc_slice(source.store_variable_views.len);
         for value, index in source.store_variable_views { run[index] = value; }
         let first: const dictionary_slot<u64, u32>& = run[0];
-        lease.store_variable_views = Range { pool_store_variable_views.index_of(first), run.len }; result.store_variable_views = run;
+        lease.store_variable_views = Range { pool_store_variable_views.index_of(first), run.len , ..}; result.store_variable_views = run;
     }
     if source.store_associated_equations.len != 0 {
         let run = pool_store_associated_equations.alloc_slice(source.store_associated_equations.len);
         for value, index in source.store_associated_equations { run[index] = value; }
         let first: const dictionary_slot<u32, u32>& = run[0];
-        lease.store_associated_equations = Range { pool_store_associated_equations.index_of(first), run.len }; result.store_associated_equations = run;
+        lease.store_associated_equations = Range { pool_store_associated_equations.index_of(first), run.len , ..}; result.store_associated_equations = run;
     }
     if source.store_projection_resolutions.len != 0 {
         let run = pool_store_projection_resolutions.alloc_slice(source.store_projection_resolutions.len);
         for value, index in source.store_projection_resolutions { run[index] = value; }
         let first: const dictionary_slot<blot_check_types::ProjectionResolution, u32>& = run[0];
-        lease.store_projection_resolutions = Range { pool_store_projection_resolutions.index_of(first), run.len }; result.store_projection_resolutions = run;
+        lease.store_projection_resolutions = Range { pool_store_projection_resolutions.index_of(first), run.len , ..}; result.store_projection_resolutions = run;
     }
     if source.store_operation_chains.len != 0 {
         let run = pool_store_operation_chains.alloc_slice(source.store_operation_chains.len);
         for value, index in source.store_operation_chains { run[index] = value; }
         let first: const dictionary_slot<blot_check_types::OperationKey, blot_check_types::OperationChain>& = run[0];
-        lease.store_operation_chains = Range { pool_store_operation_chains.index_of(first), run.len }; result.store_operation_chains = run;
+        lease.store_operation_chains = Range { pool_store_operation_chains.index_of(first), run.len , ..}; result.store_operation_chains = run;
     }
     if source.effects_rows.len != 0 {
         let run = pool_effects_rows.alloc_slice(source.effects_rows.len);
         for value, index in source.effects_rows { run[index] = value; }
         let first: const blot_check_effects::Row& = run[0];
-        lease.effects_rows = Range { pool_effects_rows.index_of(first), run.len }; result.effects_rows = run;
+        lease.effects_rows = Range { pool_effects_rows.index_of(first), run.len , ..}; result.effects_rows = run;
     }
     if source.effects_labels.len != 0 {
         let run = pool_effects_labels.alloc_slice(source.effects_labels.len);
         for value, index in source.effects_labels { run[index] = value; }
         let first: const u32& = run[0];
-        lease.effects_labels = Range { pool_effects_labels.index_of(first), run.len }; result.effects_labels = run;
+        lease.effects_labels = Range { pool_effects_labels.index_of(first), run.len , ..}; result.effects_labels = run;
     }
     if source.effects_variables.len != 0 {
         let run = pool_effects_variables.alloc_slice(source.effects_variables.len);
         for value, index in source.effects_variables { run[index] = value; }
         let first: const blot_check_effects::Variable& = run[0];
-        lease.effects_variables = Range { pool_effects_variables.index_of(first), run.len }; result.effects_variables = run;
+        lease.effects_variables = Range { pool_effects_variables.index_of(first), run.len , ..}; result.effects_variables = run;
     }
     if source.effects_versions.len != 0 {
         let run = pool_effects_versions.alloc_slice(source.effects_versions.len);
         for value, index in source.effects_versions { run[index] = value; }
         let first: const blot_check_effects::Version& = run[0];
-        lease.effects_versions = Range { pool_effects_versions.index_of(first), run.len }; result.effects_versions = run;
+        lease.effects_versions = Range { pool_effects_versions.index_of(first), run.len , ..}; result.effects_versions = run;
     }
     if source.effects_resolved.len != 0 {
         let run = pool_effects_resolved.alloc_slice(source.effects_resolved.len);
         for value, index in source.effects_resolved { run[index] = value; }
         let first: const dictionary_slot<u32, u32>& = run[0];
-        lease.effects_resolved = Range { pool_effects_resolved.index_of(first), run.len }; result.effects_resolved = run;
+        lease.effects_resolved = Range { pool_effects_resolved.index_of(first), run.len , ..}; result.effects_resolved = run;
     }
     if source.resolved_entries.len != 0 {
         let run = pool_resolved_entries.alloc_slice(source.resolved_entries.len);
         for value, index in source.resolved_entries { run[index] = value; }
         let first: const blot_reuse_epoch_resolution_cache::Entry& = run[0];
-        lease.resolved_entries = Range { pool_resolved_entries.index_of(first), run.len }; result.resolved_entries = run;
+        lease.resolved_entries = Range { pool_resolved_entries.index_of(first), run.len , ..}; result.resolved_entries = run;
     }
     if source.composites_entries.len != 0 {
         let run = pool_composites_entries.alloc_slice(source.composites_entries.len);
         for value, index in source.composites_entries { run[index] = value; }
         let first: const blot_reuse_composite_resolution_cache::Entry& = run[0];
-        lease.composites_entries = Range { pool_composites_entries.index_of(first), run.len }; result.composites_entries = run;
+        lease.composites_entries = Range { pool_composites_entries.index_of(first), run.len , ..}; result.composites_entries = run;
     }
     let index = leases.alloc_index(lease); result.lease_index = (index + 1) as u32; result.generation = generation; return result, Error.none;
 }

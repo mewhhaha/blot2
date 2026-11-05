@@ -4,7 +4,7 @@ import std;
 import dictionary;
 import support.error;
 struct Names { map: dictionary<u32, const u8[:]>& }
-fn init(map: dictionary<u32, const u8[:]>&) -> Names { return Names { map }; }
+fn init(map: dictionary<u32, const u8[:]>&) -> Names { return Names { map , ..}; }
 fn deinit(self: Names&) { self.map.clear(); }
 fn add(self: Names&, module: const blot_check_core::Module&) -> blot_error::Error {
     for field in module.field_names {

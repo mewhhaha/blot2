@@ -26,5 +26,5 @@ fn remove<K,V>(map: Map<K,V>&,key: K) -> bool {
 }
 fn clear<K,V>(map: Map<K,V>&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
 fn deinit<K,V>(map: Map<K,V>&,pool: dictionary_slot<K,V>[>..]&) { release(map.slots,pool); map.slots = []; map.count = 0; }
-fn clone<K,V>(map: const Map<K,V>&,pool: dictionary_slot<K,V>[>..]&) -> Map<K,V> { var copy = Map<K,V> {}; if map.slots.len != 0 { let slots = pool.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn clone<K,V>(map: const Map<K,V>&,pool: dictionary_slot<K,V>[>..]&) -> Map<K,V> { var copy = Map<K,V> {..}; if map.slots.len != 0 { let slots = pool.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
 fn each<K,V,F>(map: Map<K,V>&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }

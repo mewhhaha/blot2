@@ -57,7 +57,7 @@ fn rewriteSource(view: Extension&,proof: const blot_backend_activation_graph::Co
     let owner = proof.graph.sites[proof.owner]; var owner_end = blot_support::none<i64>(); var owner_local = blot_support::none<u32>(); let original_owner = view.module.functions[owner.function];
     for instruction,at in view.module.instructions(original_owner) { let fact = blot_backend_provider_origins::constructor(view.module,original_owner,at); if !fact.present || fact.value.allocation != owner.at { continue; } owner_end = blot_support::some(fact.value.end); owner_local = blot_support::some(fact.value.local); } if !owner_end.present { return Error.unsupported_cohort; }
     for function in 0..view.original_functions {
-        var touched = owner.function == function; for site,id in proof.graph.sites { if (proof.members & (1 as u64 << id)) != 0 && site.function == function { touched = true; } } if !touched { continue; } let body,body_error = own(view,function as u32); if body_error != Error.none { return body_error; } assert(body != null); var replacement = Code {};
+        var touched = owner.function == function; for site,id in proof.graph.sites { if (proof.members & (1 as u64 << id)) != 0 && site.function == function { touched = true; } } if !touched { continue; } let body,body_error = own(view,function as u32); if body_error != Error.none { return body_error; } assert(body != null); var replacement = Code {..};
         recursive fn lower() -> Error {
             for instruction,at in view.module.instructions(body) {
                 var member = false; for site,id in proof.graph.sites { if (proof.members & (1 as u64 << id)) != 0 && site.function == function && site.at == at { member = true; } }
@@ -73,7 +73,7 @@ fn rewriteSource(view: Extension&,proof: const blot_backend_activation_graph::Co
     } return Error.none;
 }
 fn insert(view: Extension&,id: u32,position: i64,inserted: const Instruction[:]) -> Error {
-    let body,error = own(view,id); if error != Error.none { return error; } assert(body != null); let original = view.module.instructions(body); if position < 0 || position > original.len { return Error.unsupported_cohort; } var replacement = Code {};
+    let body,error = own(view,id); if error != Error.none { return error; } assert(body != null); let original = view.module.instructions(body); if position < 0 || position > original.len { return Error.unsupported_cohort; } var replacement = Code {..};
     fn lower() -> Error { let prefix = replacement.append(original[..position]); if prefix != Error.none { return prefix; } let middle = replacement.append(inserted); if middle != Error.none { return middle; } let suffix = replacement.append(original[position..]); if suffix != Error.none { return suffix; } return replaceBody(view,id,replacement.items); }
     let result = lower(); replacement.deinit(); return result;
 }
@@ -90,7 +90,7 @@ fn storeFastpath(view: Extension&) -> Error {
 }
 fn closedRetirement(view: Extension&,proof: const blot_backend_activation_graph::Cohort&,helper: u32) -> Error {
     var allowed = proof.members | (1 as u64 << proof.owner); for site,id in proof.graph.sites { if site.kind == blot_backend_activation_graph::SiteKind.static_data { allowed |= 1 as u64 << id; } } for site,id in proof.graph.sites { if (proof.members & (1 as u64 << id)) != 0 && (site.borrowed_head || (site.children & ~allowed) != 0) { return Error.unsupported_cohort; } }
-    assert(view.module.arena.present); let arena = view.module.arena.value; let body = view.module.functions[helper]; var replacement = Code {}; var found: i64 = 0;
+    assert(view.module.arena.present); let arena = view.module.arena.value; let body = view.module.functions[helper]; var replacement = Code {..}; var found: i64 = 0;
     fn lower() -> Error {
         for instruction in view.module.instructions(body) {
             if instruction.op != blot_backend_runtime_ir::OP_call || instruction.operand != arena.retire { let copied = replacement.push(instruction); if copied != Error.none { return copied; } continue; }

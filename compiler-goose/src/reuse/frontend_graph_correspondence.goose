@@ -16,8 +16,8 @@ enum Reason {none,size_limit,depth_limit,work_limit,invalid_index,type_sharing,r
 struct Diagnostic {reason:Reason=Reason.none,located:bool=false,row:bool=false,left:u32=0,right:u32=0,left_tag:Tag=Tag.absent,right_tag:Tag=Tag.absent,depth:i64=0,remaining:i64=0}
 struct Bijection {forward:u32[:]=[],reverse:u32[:]=[]}
 reusable[] var bijection_words:u32[>..]=[];
-fn initBijection(left:i64,right:i64)->Bijection {let forward=bijection_words.alloc_slice(left);let reverse=bijection_words.alloc_slice(right);for &item in forward {item=missing;}for &item in reverse {item=missing;}return Bijection {forward,reverse};}
-fn deinit(self:Bijection&) {if self.forward.len!=0 {bijection_words.free_slice(self.forward);}if self.reverse.len!=0 {bijection_words.free_slice(self.reverse);}self=Bijection {};}
+fn initBijection(left:i64,right:i64)->Bijection {let forward=bijection_words.alloc_slice(left);let reverse=bijection_words.alloc_slice(right);for &item in forward {item=missing;}for &item in reverse {item=missing;}return Bijection {forward,reverse, ..};}
+fn deinit(self:Bijection&) {if self.forward.len!=0 {bijection_words.free_slice(self.forward);}if self.reverse.len!=0 {bijection_words.free_slice(self.reverse);}self=Bijection {..};}
 fn enter(self:Bijection&,left:u32,right:u32)->bool,Error {
  if left>=self.forward.len||right>=self.reverse.len {return false,Error.invalid_index;}let prior=self.forward[left];
  if prior!=missing {if prior!=right||self.reverse[right]!=left {return false,Error.sharing;}return true,Error.none;}
@@ -29,14 +29,14 @@ reusable[] var pair_slots:dictionary_slot<u64,bool>[>..]=[];
 reusable[] var variable_slots:dictionary_slot<u32,u32>[>..]=[];
 struct Match {
  left:blot_check_frozen_types::Source=blot_check_frozen_types::Source.inactive,right:blot_check_frozen_types::Source=blot_check_frozen_types::Source.inactive,
- types:Bijection=Bijection {},rows:Bijection=Bijection {},row_variables:Bijection=Bijection {},type_pairs:Pairs=Pairs {},row_pairs:Pairs=Pairs {},variables:Variables=Variables {},reverse_variables:Variables=Variables {},remaining:i64=65536,diagnostic:Diagnostic=Diagnostic {},
+ types:Bijection=Bijection {..},rows:Bijection=Bijection {..},row_variables:Bijection=Bijection {..},type_pairs:Pairs=Pairs {..},row_pairs:Pairs=Pairs {..},variables:Variables=Variables {..},reverse_variables:Variables=Variables {..},remaining:i64=65536,diagnostic:Diagnostic=Diagnostic {..},
 }
 fn init(left:const blot_check_frozen_types::Graph&,right:const blot_check_frozen_types::Graph&)->blot_support::Option<Match>,Error {
  if left.nodes.len>65536||right.nodes.len>65536||left.rows.len>65536||right.rows.len>65536||left.row_variable_count>65536||right.row_variable_count>65536 {return blot_support::none<Match>(),Error.none;}
- let result=Match {left:blot_check_frozen_types::Source.frozen {copy(left)},right:blot_check_frozen_types::Source.frozen {copy(right)},types:initBijection(left.nodes.len,right.nodes.len),rows:initBijection(left.rows.len,right.rows.len),row_variables:initBijection(left.row_variable_count,right.row_variable_count)};
+ let result=Match {left:blot_check_frozen_types::Source.frozen {copy(left), ..},right:blot_check_frozen_types::Source.frozen {copy(right), ..},types:initBijection(left.nodes.len,right.nodes.len),rows:initBijection(left.rows.len,right.rows.len),row_variables:initBijection(left.row_variable_count,right.row_variable_count), ..};
  return blot_support::some(result),Error.none;
 }
-fn deinit(self:Match&) {self.types.deinit();self.rows.deinit();self.row_variables.deinit();blot_support_pooled_map::deinit(self.type_pairs,pair_slots);blot_support_pooled_map::deinit(self.row_pairs,pair_slots);blot_support_pooled_map::deinit(self.variables,variable_slots);blot_support_pooled_map::deinit(self.reverse_variables,variable_slots);self=Match {};}
+fn deinit(self:Match&) {self.types.deinit();self.rows.deinit();self.row_variables.deinit();blot_support_pooled_map::deinit(self.type_pairs,pair_slots);blot_support_pooled_map::deinit(self.row_pairs,pair_slots);blot_support_pooled_map::deinit(self.variables,variable_slots);blot_support_pooled_map::deinit(self.reverse_variables,variable_slots);self=Match {..};}
 fn decline(self:Match&,reason:Reason)->Error {if self.diagnostic.reason==Reason.none {self.diagnostic.reason=reason;}return Error.declined;}
 fn work(self:Match&,depth:i64)->Error {if depth>=128 {return self.decline(Reason.depth_limit);}if self.remaining==0 {return self.decline(Reason.work_limit);}self.remaining--;return Error.none;}
 fn enter(self:Match&,map:Bijection&,left:u32,right:u32,reason:Reason)->bool,Error {
@@ -69,7 +69,7 @@ recursive fn typeNode(self:Match&,left:u32,right:u32,depth:i64)->Error {
   Tag.function=>{{ let propagated_error = self.typeDepth(before.a,after.a,depth+1); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = self.typeDepth(before.b,after.b,depth+1); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = self.rowDepth(before.c,after.c,depth+1); if propagated_error != Error.none { return propagated_error; } }},
   Tag.array,Tag.list,Tag.cursor,Tag.resolver=>{if before.b!=after.b||before.c!=after.c {return self.decline(Reason.content);}{ let propagated_error = self.typeDepth(before.a,after.a,depth+1); if propagated_error != Error.none { return propagated_error; } }},
   Tag.provider=>{if before.b!=after.b {return self.decline(Reason.content);}{ let propagated_error = self.typeDepth(before.a,after.a,depth+1); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = self.rowDepth(before.c,after.c,depth+1); if propagated_error != Error.none { return propagated_error; } }},
-  Tag.product=>{if before.c!=after.c {return self.decline(Reason.content);}{ let propagated_error = self.typeListDepth(List {before.a,before.b},List {after.a,after.b},depth+1); if propagated_error != Error.none { return propagated_error; } }},
+  Tag.product=>{if before.c!=after.c {return self.decline(Reason.content);}{ let propagated_error = self.typeListDepth(List {before.a,before.b, ..},List {after.a,after.b, ..},depth+1); if propagated_error != Error.none { return propagated_error; } }},
   Tag.record=>{
    if before.b!=after.b||before.c!=after.c {return self.decline(Reason.content);}
    for index in 0..before.b {{ let propagated_error = self.work(depth+1); if propagated_error != Error.none { return propagated_error; } }let from=self.left.recordField(before,index);let to=self.right.recordField(after,index);if from.name!=to.name {return self.decline(Reason.content);}{ let propagated_error = self.typeDepth(from.ty,to.ty,depth+1); if propagated_error != Error.none { return propagated_error; } }}

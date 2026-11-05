@@ -2,7 +2,7 @@
 namespace blot_check_package_row_facts;
 import support.error;
 struct Page { key: i64 = 0, bits: u64 = 0 }
-struct Facts { pages: Page[128] = [Page {}; 128] }
+struct Facts { pages: Page[128] = [Page {..}; 128] }
 fn contains(self: const Facts&, row: i64) -> bool {
     let key = (row >> 6) + 1; var position = (key - 1) % self.pages.len;
     for attempt in self.pages.len {

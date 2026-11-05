@@ -13,12 +13,12 @@ struct Requirements { colors: i64, path: i64 }
 struct Item { kind: Kind, id: i64 }
 struct Graph { m: const Module&, starts: i64[19] }
 fn initGraph(m: const Module&) -> Graph,Error {
-    var graph=Graph{m,[0;19]}; let counts=[m.types.nodes.len,m.types.effects.rows.len,m.types.operations.len,m.nodes.len,m.patterns.len,m.closures.len,m.matches.len,m.match_arms.len,m.pattern_rows.len,m.updates.len,m.update_steps.len,m.loops.len,m.request_loops.len,m.request_arms.len,m.resolver_ops.len,m.operation_values.len,m.bindings.len,m.obligations.len];
+    var graph=Graph{m,[0;19], ..}; let counts=[m.types.nodes.len,m.types.effects.rows.len,m.types.operations.len,m.nodes.len,m.patterns.len,m.closures.len,m.matches.len,m.match_arms.len,m.pattern_rows.len,m.updates.len,m.update_steps.len,m.loops.len,m.request_loops.len,m.request_arms.len,m.resolver_ops.len,m.operation_values.len,m.bindings.len,m.obligations.len];
     for size,i in counts { let value,error=sum(graph.starts[i],size); if error != Error.none { return graph,error; } graph.starts[i+1]=value; } return graph,Error.none;
 }
 fn vertex(self: Graph,kind: Kind,id: i64) -> i64 { return self.starts[kindCode(kind)]+id; }
 fn count(self: Graph) -> i64 { return self.starts[kind_count]; }
-fn item(self: const Graph&,vertex: i64) -> Item { assert(vertex >= 0 && vertex < self.count()); var k: i64=0; while vertex >= self.starts[k+1] { k++; } return Item{kinds[k],vertex-self.starts[k]}; }
+fn item(self: const Graph&,vertex: i64) -> Item { assert(vertex >= 0 && vertex < self.count()); var k: i64=0; while vertex >= self.starts[k+1] { k++; } return Item{kinds[k],vertex-self.starts[k], ..}; }
 fn to(self: Graph,kind: Kind,id: i64) -> blot_support::Option<i64> { return blot_support::some(self.vertex(kind,id)); }
 fn edge(self: const Graph&,vertex: i64,slot: i64) -> blot_support::Option<i64> {
     let no=blot_support::none<i64>(); let part=self.item(vertex); let id=part.id; let m .= self.m;
@@ -74,17 +74,17 @@ fn edge(self: const Graph&,vertex: i64,slot: i64) -> blot_support::Option<i64> {
     } return no;
 }
 fn scratchRequirements(module: const Module&) -> Requirements,Error {
-    let graph,error=initGraph(module); if error != Error.none { return Requirements{0,0},error; }
-    let extras,extra_error=sum(module.types.extra.len,module.extra.len); if extra_error != Error.none { return Requirements{0,0},extra_error; }
-    let stage,stage_error=sum(extras,stagingBindingCount(module)); if stage_error != Error.none { return Requirements{0,0},stage_error; }
-    let colors,color_error=sum(graph.count(),stage); if color_error != Error.none { return Requirements{0,0},color_error; } return Requirements{colors,graph.count()},Error.none;
+    let graph,error=initGraph(module); if error != Error.none { return Requirements{0,0, ..},error; }
+    let extras,extra_error=sum(module.types.extra.len,module.extra.len); if extra_error != Error.none { return Requirements{0,0, ..},extra_error; }
+    let stage,stage_error=sum(extras,stagingBindingCount(module)); if stage_error != Error.none { return Requirements{0,0, ..},stage_error; }
+    let colors,color_error=sum(graph.count(),stage); if color_error != Error.none { return Requirements{0,0, ..},color_error; } return Requirements{colors,graph.count(), ..},Error.none;
 }
 fn scratchSize(module: const Module&) -> i64,Error { let needed,error=scratchRequirements(module); if error != Error.none { return 0,error; } return max(needed.colors,needed.path),Error.none; }
 fn cycles(graph: Graph,scratch: Scratch) -> Error {
     let count=graph.count(); { let propagated_error = require(scratch.colors.len >= count && scratch.path.len >= count); if propagated_error != Error.none { return propagated_error; } } for &color in scratch.colors[..count] { color=0; }
-    for root in count { if scratch.colors[root] != 0 { continue; } var depth: i64=1; scratch.path[0]=Frame{root}; scratch.colors[root]=1;
+    for root in count { if scratch.colors[root] != 0 { continue; } var depth: i64=1; scratch.path[0]=Frame{root, ..}; scratch.colors[root]=1;
         while depth != 0 { let top: Frame&=scratch.path[depth-1]; let child=graph.edge(top.vertex,top.edge);
-            if child.present { top.edge++; match scratch.colors[child.value] { 0=>{scratch.colors[child.value]=1; scratch.path[depth]=Frame{child.value}; depth++;},1=>{return Error.invalid_artifact;},2=>{},_=>{abort("invalid traversal color");} } }
+            if child.present { top.edge++; match scratch.colors[child.value] { 0=>{scratch.colors[child.value]=1; scratch.path[depth]=Frame{child.value, ..}; depth++;},1=>{return Error.invalid_artifact;},2=>{},_=>{abort("invalid traversal color");} } }
             else { scratch.colors[top.vertex]=2; depth--; }
         }
     } return Error.none;

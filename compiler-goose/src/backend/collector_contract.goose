@@ -15,7 +15,7 @@ fn helper(arena: blot_backend_wasm::Arena, id: u32) -> bool {
     return false;
 }
 fn analyze<P>(module: blot_backend_wasm::Module&, bodies: const P[:]) -> Certificate {
-    var result = Certificate {};
+    var result = Certificate {..};
     if module.public_arena { result.reason = Reason.public_arena; return result; }
     if module.imports.len != 0 || module.host_references.present { result.reason = Reason.host_import; return result; }
     if module.mutable_static { result.reason = Reason.mutable_static; return result; }

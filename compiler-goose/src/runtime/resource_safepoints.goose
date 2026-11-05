@@ -31,12 +31,12 @@ fn run(module: Module&, function: Function) -> blot_support::Option<blot_backend
     locals.append(module.locals(function));
     let source = module.instructions(function);
     for inst in source {
-        if before(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain }); }
+        if before(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain , ..}); }
         code.push(inst);
-        if after(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain }); }
+        if after(module, inst) { code.push(IR { blot_backend_runtime_ir::OP_call_import, drain , ..}); }
     }
     if source.len == 0 || source[source.len - 1].op != blot_backend_runtime_ir::OP_return_ {
-        code.push(IR { blot_backend_runtime_ir::OP_call_import, drain });
+        code.push(IR { blot_backend_runtime_ir::OP_call_import, drain , ..});
     }
     return blot_support::some(module.publishBody(locals, code)), Error.none;
 }

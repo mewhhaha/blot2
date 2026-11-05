@@ -32,7 +32,7 @@ fn Shapes::nominal(self: Shapes&, unit: u32, decl: u32, arguments: i64) -> Nomin
     if unit == 0 || unit > self.units.len || decl == 0 { return default<Nominal>(), Error.invalid_artifact; } let module .= self.units[unit - 1].core; var found = blot_support::none<u32>();
     for family, index in module.nominals { let err = self.step(0); if err != Error.none { return default<Nominal>(), err; } if family.identity.decl != decl || (family.identity.unit != 0 && family.identity.unit != unit) { continue; }
         if found.present || family.parameters.len != arguments { return default<Nominal>(), Error.invalid_artifact; } found = blot_support::some(index as u32);
-    } if !found.present { return default<Nominal>(), Error.invalid_artifact; } return Nominal { unit, found.value }, Error.none;
+    } if !found.present { return default<Nominal>(), Error.invalid_artifact; } return Nominal { unit, found.value , ..}, Error.none;
 }
 fn Shapes::row(self: Shapes&, id: u32, depth: i64) -> u32, Error {
     let err = self.step(depth); if err != Error.none { return 0, err; } var labels: u32[>..<]; let view = self.snapshot.evidence.view().effects;
@@ -75,9 +75,9 @@ fn Shapes::source(self: Shapes&, producer: const Module&, closure: Closure, ty: 
     var mappings: blot_eval_type_evidence::Mapping[>..<]; var rows: blot_eval_type_evidence::RowMapping[>..<];
     for mapping in self.snapshot.type_mappings[closure.mappings.start..closure.mappings.start + closure.mappings.len] { if mapping.variable >= producer.types.nodes.len { return 0, Error.invalid_artifact; } let node = producer.types.node(mapping.variable);
         if node.tag != blot_check_types::Tag.variable && !(node.tag == blot_check_types::Tag.bound && node.b == 0 && node.c == 0) { continue; } for prior in mappings { if prior.variable == mapping.variable { return 0, Error.invalid_artifact; } }
-        let value, err = self.evidence(mapping.evidence, 0); if err != Error.none { return 0, err; } mappings.append(blot_eval_type_evidence::Mapping { mapping.variable, value });
+        let value, err = self.evidence(mapping.evidence, 0); if err != Error.none { return 0, err; } mappings.append(blot_eval_type_evidence::Mapping { mapping.variable, value , ..});
     }
-    for mapping in self.snapshot.row_mappings[closure.row_mappings.start..closure.row_mappings.start + closure.row_mappings.len] { for prior in rows { if prior.variable == mapping.variable { return 0, Error.invalid_artifact; } } let value, err = self.row(mapping.evidence, 0); if err != Error.none { return 0, err; } rows.append(blot_eval_type_evidence::RowMapping { mapping.variable, value }); }
+    for mapping in self.snapshot.row_mappings[closure.row_mappings.start..closure.row_mappings.start + closure.row_mappings.len] { for prior in rows { if prior.variable == mapping.variable { return 0, Error.invalid_artifact; } } let value, err = self.row(mapping.evidence, 0); if err != Error.none { return 0, err; } rows.append(blot_eval_type_evidence::RowMapping { mapping.variable, value , ..}); }
     let result, err = self.store.projectWithBudget(producer.types, ty, mappings, rows, self.remaining); if err != Error.none { return 0, failure(err); } let err = self.admitted(result, 0); return result, err;
 }
 fn Shapes::value(self: Shapes&, id: u32, expected: u32, depth: i64) -> Error {
@@ -112,7 +112,7 @@ fn Shapes::value(self: Shapes&, id: u32, expected: u32, depth: i64) -> Error {
 struct Context<Units> { units: Units, snapshot: const Snapshot& }
 fn withShapes(context: Context&, store: blot_eval_type_evidence::Store&) -> Error {
     let snapshot .= context.snapshot; var imported: u32[>..<]; imported.resize(snapshot.evidence.nodes.len); for &value in imported { value = 0; }
-    var shapes = Shapes { units: context.units, snapshot: snapshot, store: store, imported: imported }; let evidence = snapshot.evidence.view();
+    var shapes = Shapes { units: context.units, snapshot: snapshot, store: store, imported: imported , ..}; let evidence = snapshot.evidence.view();
     for value, id in snapshot.values {
         if value.kind == Kind.descriptor { if value.nominal == 0 || value.nominal >= evidence.nodes.len || value.len != 0 || value.bits != 0 { return Error.invalid_artifact; } if snapshot.value_evidence[id] != 0 { let ty = evidence.node(snapshot.value_evidence[id]); if ty.tag != Tag.nominal || ty.a != blot_check_typed_staging::descriptor_identity.unit || ty.b != blot_check_typed_staging::descriptor_identity.decl { return Error.invalid_artifact; } let args = evidence.children(snapshot.value_evidence[id]); if args.len != 1 || args[0] != value.nominal { return Error.invalid_artifact; } } let imported, err = shapes.evidence(value.nominal as u32, 0); if err != Error.none { return err; } }
         if value.kind != Kind.code { continue; } if value.bits >= snapshot.closures.len { return Error.invalid_artifact; } let closure = snapshot.closures[value.bits];
@@ -130,5 +130,5 @@ fn validate(snapshot: const Snapshot&, units) -> Error {
     var previous: u32 = 0; for origin in snapshot.code_origins { if origin.value == 0 || origin.value <= previous || origin.value >= snapshot.values.len || snapshot.values[origin.value].kind != Kind.code || origin.generator.unit == 0 || origin.generator.unit > units.len { return Error.invalid_artifact; } let owner .= units[origin.generator.unit - 1].core; if origin.generator.node == 0 || origin.generator.node >= owner.nodes.len || origin.generator.node >= owner.spans.len { return Error.invalid_artifact; } previous = origin.value; }
     for closure in snapshot.closures { if closure.staged >= snapshot.values.len || (closure.staged != 0 && snapshot.values[closure.staged].kind != Kind.code) { return Error.invalid_artifact; } }
     var staged = false; for value in snapshot.values { if value.kind == Kind.code || value.kind == Kind.descriptor { staged = true; break; } } if !staged { return Error.none; }
-    var context = Context { units, snapshot }; return blot_eval_type_evidence::withStore<Context,withShapes>(context);
+    var context = Context { units, snapshot , ..}; return blot_eval_type_evidence::withStore<Context,withShapes>(context);
 }

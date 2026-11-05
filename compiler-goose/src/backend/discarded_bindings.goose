@@ -5,7 +5,7 @@ struct Proof { owner: bool[>..<]&, start: i64 = 0, len: i64 = 0 }
 fn admits(proof: Proof&, binding: blot_check_core::BindingId) -> bool { binding < proof.len && proof.owner[proof.start + binding] }
 fn mark(proof: Proof&, binding: blot_check_core::BindingId) { if binding < proof.len { proof.owner[proof.start + binding] = false; } }
 fn init(unused: bool[>..<]&, module: const blot_check_core::Module&, unit_id: u32) -> Proof {
-    var proof = Proof { owner: unused, start: unused.len }; var candidate = false;
+    var proof = Proof { owner: unused, start: unused.len , ..}; var candidate = false;
     for node in module.nodes {
         if node.tag != blot_check_core::Tag.bind { continue; }
         let value = module.node(node.b);

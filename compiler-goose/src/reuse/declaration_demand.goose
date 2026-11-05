@@ -13,11 +13,11 @@ type UnitId=u32;
 type Id=blot_parse_ast::Id;
 struct Stats {total:i64=0,reached:i64=0,fallback_units:i64=0,transitions:i64=0}
 struct Unit {declarations:const Id[:]=[],total:i64=0}
-struct Plan {units:const Unit[:]=[],stats:Stats=Stats {}}
+struct Plan {units:const Unit[:]=[],stats:Stats=Stats {..}}
 reusable[] var plan_units:Unit[>..]=[];
 reusable[] var plan_roots:Id[>..]=[];
 fn releaseRoots(values:const Id[:]) {if values.len==0 {return;}let first:const Id&=values[0];let at=plan_roots.index_of(first);assert(at>=0);plan_roots.free_slice(plan_roots[at..at+values.len]);}
-fn deinit(self:Plan&) {for unit in self.units {releaseRoots(unit.declarations);}if self.units.len!=0 {let first:const Unit&=self.units[0];let at=plan_units.index_of(first);assert(at>=0);plan_units.free_slice(plan_units[at..at+self.units.len]);}self=Plan {};}
+fn deinit(self:Plan&) {for unit in self.units {releaseRoots(unit.declarations);}if self.units.len!=0 {let first:const Unit&=self.units[0];let at=plan_units.index_of(first);assert(at>=0);plan_units.free_slice(plan_units[at..at+self.units.len]);}self=Plan {..};}
 fn wants(self:const Plan&,unit:UnitId,declaration:Id)->bool {
  if unit==0||unit>self.units.len {return true;}let roots=self.units[unit-1].declarations;var low:i64=0;var high=roots.len;
  while low<high {let middle=low+(high-low)/2;if roots[middle]<declaration {low=middle+1;}else {high=middle;}}return low<roots.len&&roots[low]==declaration;
@@ -26,15 +26,15 @@ struct Key {unit:UnitId,name:u32}
 fn hash(key:Key)->u64 {return (key.unit as u64)<<32|key.name as u64;}
 struct Name {value:u32=0,namespace:UnitId=0,public:bool=false,ambiguous:bool=false}
 struct Declaration {unit:UnitId,node:Id,owner:Id,seed:bool}
-struct Builder {source:const Project&,declarations:Declaration[>..<]&,names:dictionary<Key,Name>&,exports:dictionary<Key,Name>&,selected:bool[>..<]&,fallback:bool[>..<]&,work:u32[>..<]&,current:UnitId=0,stats:Stats=Stats {}}
+struct Builder {source:const Project&,declarations:Declaration[>..<]&,names:dictionary<Key,Name>&,exports:dictionary<Key,Name>&,selected:bool[>..<]&,fallback:bool[>..<]&,work:u32[>..<]&,current:UnitId=0,stats:Stats=Stats {..}}
 fn put(self:Builder&,key:Key,name:Name)->Error {
  let old=self.names.get(key);if old {if old.value==0&&old.namespace==0&&name.value==0&&name.namespace==0 {return Error.none;}old.ambiguous=true;}else {self.names.insert(key,name);}return Error.none;
 }
 fn dotted(text:const u8[:])->i64 {for byte,index in text {if byte=='.' {return index;}}return -1;}
 fn value(self:Builder&,unit:UnitId,root:Id,method:Id)->Error {
  let tree .= self.source.unit(unit).tree;let declaration=tree.value_decl(root);let associated=dotted(self.source.symbols.get(declaration.name))>=0;var owner=root;if method!=0 {owner=method;}
- self.declarations.push(Declaration {unit,root,owner,method!=0||associated||declaration.exported});
- if method==0 {{ let propagated_error = self.put(Key {unit,declaration.name},Name {value:self.declarations.len as u32,public:self.source.symbols.get(declaration.modifier)!="private"&&!tree.declaration_traits(root).private}); if propagated_error != Error.none { return propagated_error; } }}return Error.none;
+ self.declarations.push(Declaration {unit,root,owner,method!=0||associated||declaration.exported, ..});
+ if method==0 {{ let propagated_error = self.put(Key {unit,declaration.name, ..},Name {value:self.declarations.len as u32,public:self.source.symbols.get(declaration.modifier)!="private"&&!tree.declaration_traits(root).private, ..}); if propagated_error != Error.none { return propagated_error; } }}return Error.none;
 }
 fn collect(self:Builder&)->Error {
  for &unit,index in self.source.units.items {
@@ -43,9 +43,9 @@ fn collect(self:Builder&)->Error {
    let node=unit.tree.node(root);
    match node.tag {
     blot_parse_ast::tag_value_decl=>{{ let propagated_error = self.value(id,root,0); if propagated_error != Error.none { return propagated_error; } }},
-    blot_parse_ast::tag_implementation_decl=>{{ let propagated_error = self.put(Key {id,node.a},Name {public:!unit.tree.declaration_traits(root).private}); if propagated_error != Error.none { return propagated_error; } }for member in unit.tree.list(unit.tree.implementation(root).members) {if unit.tree.node(member).tag==blot_parse_ast::tag_value_decl {{ let propagated_error = self.value(id,member,root); if propagated_error != Error.none { return propagated_error; } }}}},
-    blot_parse_ast::tag_data_decl=>{let traits=unit.tree.declaration_traits(root);{ let propagated_error = self.put(Key {id,node.a},Name {public:!traits.private}); if propagated_error != Error.none { return propagated_error; } }for constructor in unit.tree.children(node.b) {{ let propagated_error = self.put(Key {id,unit.tree.node(constructor).a},Name {public:!traits.private&&!traits.is_opaque}); if propagated_error != Error.none { return propagated_error; } }}},
-    blot_parse_ast::tag_type_alias_decl,blot_parse_ast::tag_contract_decl,blot_parse_ast::tag_effect_decl,blot_parse_ast::tag_effect_type_decl=>{{ let propagated_error = self.put(Key {id,node.a},Name {public:!unit.tree.declaration_traits(root).private}); if propagated_error != Error.none { return propagated_error; } }},
+    blot_parse_ast::tag_implementation_decl=>{{ let propagated_error = self.put(Key {id,node.a, ..},Name {public:!unit.tree.declaration_traits(root).private, ..}); if propagated_error != Error.none { return propagated_error; } }for member in unit.tree.list(unit.tree.implementation(root).members) {if unit.tree.node(member).tag==blot_parse_ast::tag_value_decl {{ let propagated_error = self.value(id,member,root); if propagated_error != Error.none { return propagated_error; } }}}},
+    blot_parse_ast::tag_data_decl=>{let traits=unit.tree.declaration_traits(root);{ let propagated_error = self.put(Key {id,node.a, ..},Name {public:!traits.private, ..}); if propagated_error != Error.none { return propagated_error; } }for constructor in unit.tree.children(node.b) {{ let propagated_error = self.put(Key {id,unit.tree.node(constructor).a, ..},Name {public:!traits.private&&!traits.is_opaque, ..}); if propagated_error != Error.none { return propagated_error; } }}},
+    blot_parse_ast::tag_type_alias_decl,blot_parse_ast::tag_contract_decl,blot_parse_ast::tag_effect_decl,blot_parse_ast::tag_effect_type_decl=>{{ let propagated_error = self.put(Key {id,node.a, ..},Name {public:!unit.tree.declaration_traits(root).private, ..}); if propagated_error != Error.none { return propagated_error; } }},
     _=>{},
    }
   }
@@ -53,7 +53,7 @@ fn collect(self:Builder&)->Error {
  return Error.none;
 }
 recursive fn exported(self:Builder&,unit:UnitId,name:u32,depth:i64)->blot_support::Option<Name> {
- if unit==0||unit>self.source.units.len||depth>=64 {return blot_support::none<Name>();}let key=Key {unit,name};
+ if unit==0||unit>self.source.units.len||depth>=64 {return blot_support::none<Name>();}let key=Key {unit,name, ..};
  {let found=self.exports.get(key);if found {return blot_support::some(copy(found));}}
  {let found=self.names.get(key);if found {if found.public {return blot_support::some(copy(found));}}}
  let tree .= self.source.unit(unit).tree;
@@ -69,11 +69,11 @@ fn importNames(self:Builder&)->Error {
   for imported in self.source.unitImports(id) {
    if imported.declaration.node==0 {{ let propagated_error = self.whole(id); if propagated_error != Error.none { return propagated_error; } }continue;}
    let forwarding=unit.tree.node(imported.declaration.node).tag==blot_parse_ast::tag_export_decl;
-   if imported.namespace!=0 {{ let propagated_error = self.put(Key {id,imported.namespace},Name {namespace:imported.target}); if propagated_error != Error.none { return propagated_error; } }if forwarding {{ let propagated_error = self.whole(id); if propagated_error != Error.none { return propagated_error; } }}continue;}
+   if imported.namespace!=0 {{ let propagated_error = self.put(Key {id,imported.namespace, ..},Name {namespace:imported.target, ..}); if propagated_error != Error.none { return propagated_error; } }if forwarding {{ let propagated_error = self.whole(id); if propagated_error != Error.none { return propagated_error; } }}continue;}
    for binding in unit.tree.list(imported.bindings) {
-    let alias=unit.tree.import_binding(binding);let found=self.exported(imported.target,alias.name,0);var target=Name {};
-    if found.present {target=found.value;}else {{ let propagated_error = self.whole(imported.target); if propagated_error != Error.none { return propagated_error; } }}target.public=forwarding;{ let propagated_error = self.put(Key {id,alias.alias},target); if propagated_error != Error.none { return propagated_error; } }
-    if forwarding {let old=self.exports.get(Key {id,alias.alias});if old {old.ambiguous=true;}else {self.exports.insert(Key {id,alias.alias},target);}}
+    let alias=unit.tree.import_binding(binding);let found=self.exported(imported.target,alias.name,0);var target=Name {..};
+    if found.present {target=found.value;}else {{ let propagated_error = self.whole(imported.target); if propagated_error != Error.none { return propagated_error; } }}target.public=forwarding;{ let propagated_error = self.put(Key {id,alias.alias, ..},target); if propagated_error != Error.none { return propagated_error; } }
+    if forwarding {let old=self.exports.get(Key {id,alias.alias, ..});if old {old.ambiguous=true;}else {self.exports.insert(Key {id,alias.alias, ..},target);}}
    }
   }
  }
@@ -90,16 +90,16 @@ fn exportedPath(self:Builder&,unit:UnitId,spelling:const u8[:])->blot_support::O
  for character,index in spelling {if character!='.' {continue;}let prefix,exists=self.source.symbols.lookup(spelling[..index]);if exists {let found=self.exported(unit,prefix,0);if found.present {return found;}}}return blot_support::none<Name>();
 }
 fn visible(self:Builder&,unit:UnitId,name:u32)->blot_support::Option<Name> {
- {let found=self.names.get(Key {unit,name});if found {return blot_support::some(copy(found));}}
+ {let found=self.names.get(Key {unit,name, ..});if found {return blot_support::some(copy(found));}}
  let spelling=self.source.symbols.get(name);let dot=dotted(spelling);
  if dot>=0 {
   let head,exists=self.source.symbols.lookup(spelling[..dot]);if exists {
-   let base=self.names.get(Key {unit,head});if base {let value=copy(base);if value.namespace==0 {return blot_support::some(value);}return self.exportedPath(value.namespace,spelling[dot+1..]);}
+   let base=self.names.get(Key {unit,head, ..});if base {let value=copy(base);if value.namespace==0 {return blot_support::some(value);}return self.exportedPath(value.namespace,spelling[dot+1..]);}
   }
  }
  if self.source.unit(unit).implicit_prelude {let found=self.exported(self.source.prelude_unit,name,0);if found.present {return found;}}
  let builtins:const u8[:][19]=["U32","F32","Bool","Unit","Never","Array","List","Cursor","GrowArray","ResizeArray","Ref","View","Link","Demand","Computation","EffectSet","EffectDescriptor","Code","Descriptor"];
- for builtin in builtins {if spelling==builtin {return blot_support::some(Name {});}}return blot_support::none<Name>();
+ for builtin in builtins {if spelling==builtin {return blot_support::some(Name {..});}}return blot_support::none<Name>();
 }
 fn contains(values:const u32[:],name:u32)->bool {for value in values {if value==name {return true;}}return false;}
 fn shadowed(self:const Builder&,locals:const u32[:],name:u32)->bool {
@@ -141,8 +141,8 @@ fn resolve(self:Builder&,kind:blot_reuse_global_references::Kind,name:u32,member
 fn prepare(loaded:const Project&)->blot_support::Option<Plan>,Error {
  if loaded.compiled_modules.len!=0||loaded.diagnostics.len!=0 {return blot_support::none<Plan>(),Error.none;}
  var declarations:Declaration[>..<]=[];var names:dictionary<Key,Name>=dictionary<Key,Name> {};var exports:dictionary<Key,Name>=dictionary<Key,Name> {};var selected:bool[>..<]=[];var fallback:bool[>..<]=[];var work:u32[>..<]=[];
- var builder=Builder {loaded,declarations,names,exports,selected,fallback,work};let error=prepareBuilder(builder);if error!=Error.none {return blot_support::none<Plan>(),error;}
- let units=plan_units.alloc_slice(loaded.units.len);for &unit in units {unit=Unit {};}
+ var builder=Builder {loaded,declarations,names,exports,selected,fallback,work, ..};let error=prepareBuilder(builder);if error!=Error.none {return blot_support::none<Plan>(),error;}
+ let units=plan_units.alloc_slice(loaded.units.len);for &unit in units {unit=Unit {..};}
  for declaration in declarations {units[declaration.unit-1].total++;}
  for &unit,index in units {
   var count:i64=0;for declaration,ordinal in declarations {if declaration.unit==index+1&&selected[ordinal] {count++;}}
@@ -150,7 +150,7 @@ fn prepare(loaded:const Project&)->blot_support::Option<Plan>,Error {
   // Integer ordering is total; tie order cannot affect the membership manifest.
   sort(roots);unit.declarations=roots;
  }
- builder.stats.total=declarations.len;builder.stats.reached=work.len;return blot_support::some(Plan {units,builder.stats}),Error.none;
+ builder.stats.total=declarations.len;builder.stats.reached=work.len;return blot_support::some(Plan {units,builder.stats, ..}),Error.none;
 }
 fn prepareBuilder(builder:Builder&)->Error {
  { let propagated_error = builder.collect(); if propagated_error != Error.none { return propagated_error; } }builder.selected.resize(builder.declarations.len,false);builder.fallback.resize(builder.source.units.len,false);{ let propagated_error = builder.importNames(); if propagated_error != Error.none { return propagated_error; } }

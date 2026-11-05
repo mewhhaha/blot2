@@ -20,17 +20,17 @@ fn resize(self:EntryBuffer&,length:i64,value:Entry) {
  let replacement=entry_runs.alloc_slice(length);for old,index in self.items {replacement[index]=old;}
  for index in self.len..length {replacement[index]=value;}clear(self);self.items=replacement;self.len=length;
 }
-struct State {entries:EntryBuffer=EntryBuffer {},generation: u32=0, mutation: u32=0, other: u32=0, count: i64=0, high_water: i64=0,live:bool=false,owner:u64=0}
+struct State {entries:EntryBuffer=EntryBuffer {..},generation: u32=0, mutation: u32=0, other: u32=0, count: i64=0, high_water: i64=0,live:bool=false,owner:u64=0}
 reusable var states:State[>..]=[];
-var inactive:State=State {};
+var inactive:State=State {..};
 struct Cache {entries:EntryBuffer&=inactive.entries,generation: u32&=inactive.generation, mutation: u32&=inactive.mutation, other: u32&=inactive.other, count: i64&=inactive.count, high_water: i64&=inactive.high_water,lease:u32=0,lease_generation:u64=0}
 fn initPooled()->Cache,Error {
- if states.len>=0xffffffff {return Cache {},Error.out_of_memory;}
- let generation=blot_native::fresh_owner_id();let at=states.alloc_index(State {live:true,owner:generation});let state:State&=states[at];
- return Cache {entries:state.entries,generation:state.generation, mutation:state.mutation, other:state.other, count:state.count, high_water:state.high_water,lease:(at+1) as u32,lease_generation:generation},Error.none;
+ if states.len>=0xffffffff {return Cache {..},Error.out_of_memory;}
+ let generation=blot_native::fresh_owner_id();let at=states.alloc_index(State {live:true,owner:generation, ..});let state:State&=states[at];
+ return Cache {entries:state.entries,generation:state.generation, mutation:state.mutation, other:state.other, count:state.count, high_water:state.high_water,lease:(at+1) as u32,lease_generation:generation, ..},Error.none;
 }
 fn valid(cache:const Cache&)->bool {return cache.lease!=0&&cache.lease-1<states.len&&states[cache.lease-1].live&&states[cache.lease-1].owner==cache.lease_generation;}
-fn deinit(cache:Cache&) {if cache.lease==0 {return;}assert(valid(cache));cache.entries.clear();let at=cache.lease-1;states[at].live=false;states.free(at);cache=Cache {};}
+fn deinit(cache:Cache&) {if cache.lease==0 {return;}assert(valid(cache));cache.entries.clear();let at=cache.lease-1;states[at].live=false;states.free(at);cache=Cache {..};}
 fn activate(cache: Cache&, mutation: u32, other: u32) -> bool {
     assert(valid(cache));
     if cache.generation == 4294967295 { return false; }
@@ -63,7 +63,7 @@ fn place(entries: Entry[:], entry: Entry) {
 }
 fn grow(cache:Cache&)->Error {
  var capacity:i64=8;if cache.entries.len!=0 {if cache.entries.len>0x3fffffffffffffff {return Error.out_of_memory;}capacity=cache.entries.len*2;}
- let replacement=entry_runs.alloc_slice(capacity);for &entry in replacement {entry=Entry {};}
+ let replacement=entry_runs.alloc_slice(capacity);for &entry in replacement {entry=Entry {..};}
  for entry in cache.entries.items {if entry.generation==cache.generation {place(replacement,entry);}}
  cache.entries.clear();cache.entries.items=replacement;cache.entries.len=capacity;return Error.none;
 }
@@ -83,7 +83,7 @@ fn put(cache: Cache&, root: u32, result: u32) -> Error {
         slot = index(root, cache.entries.len - 1);
         while cache.entries.items[slot].generation == cache.generation { slot = (slot + 1) & (cache.entries.len - 1); }
     }
-    cache.entries.items[slot] = Entry { cache.generation, root, result };
+    cache.entries.items[slot] = Entry { cache.generation, root, result , ..};
     cache.count++; cache.high_water = max(cache.high_water, root as i64 + 1);
     return Error.none;
 }

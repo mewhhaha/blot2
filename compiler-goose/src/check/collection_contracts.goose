@@ -37,13 +37,13 @@ fn validate(types: const blot_check_core::Types&, operation: blot_check_core::Ar
             if first.tag != blot_check_types::Tag.array { return blot_error::Error.invalid_artifact; } let index = proof.same(blot_check_types::u32_type, inputs[1]); if index != blot_error::Error.none { return index; }
             var lane_type = output_; if operation == blot_backend_collection_ops::Op.simd_store { lane_type = inputs[2]; } let lanes = types.node(lane_type);
             if lanes.tag != blot_check_types::Tag.product || lanes.b != 4 { return blot_error::Error.invalid_artifact; }
-            for lane in types.list(blot_check_types::List { lanes.a, lanes.b }) { let error = proof.same(first.a, lane); if error != blot_error::Error.none { return error; } }
+            for lane in types.list(blot_check_types::List { lanes.a, lanes.b , ..}) { let error = proof.same(first.a, lane); if error != blot_error::Error.none { return error; } }
             if operation == blot_backend_collection_ops::Op.simd_store { return proof.same(inputs[0], output_); }
         },
         cursor_has, cursor_value, cursor_advance => {
             if first.tag != blot_check_types::Tag.cursor { return blot_error::Error.invalid_artifact; }
             let sequence = types.node(first.a); var readable = blot_check_storage_types::readableElement(types, first.a);
-            if sequence.tag == blot_check_types::Tag.list { readable = blot_support::Option<blot_check_types::Id> { true, sequence.a }; }
+            if sequence.tag == blot_check_types::Tag.list { readable = blot_support::Option<blot_check_types::Id> { true, sequence.a , ..}; }
             if !readable.present { var element: blot_check_types::Id = 0; if operation == blot_backend_collection_ops::Op.cursor_value { element = output_; } let error = proof.collection(first.a, element); if error != blot_error::Error.none { return error; } }
             match operation {
                 cursor_has => { return proof.same(blot_check_types::boolean, output_); }, cursor_value => { if readable.present { return proof.same(readable.value, output_); } },

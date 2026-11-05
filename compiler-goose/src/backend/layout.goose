@@ -51,13 +51,13 @@ fn withStore<C,F>(context: C&) -> blot_error::Error {
     var closed_units: ClosedUnit[>..<] = []; var closed_kind_bytes: u8[>..<] = []; var closed_layouts: dictionary<u64,Id>; var names: dictionary<u32,const u8[:]>;
     var nodes: Node[>..<] = []; var extra: u32[>..<] = []; var universal_dictionaries: UniversalDictionaries[>..<] = []; var next: u32[>..<] = []; var buckets: dictionary<u64,u32>; var solver_owners: blot_backend_runtime_ir::Range[>..<] = []; var solver_binders: u32[>..<] = []; var type_owners: u32[>..<] = [];
     let effects,error = blot_check_effect_evidence::init(); if error != blot_error::Error.none { return error; }
-    var store = Store { closed: ClosedLayouts { units: [],kinds: closed_units,kind_bytes: closed_kind_bytes,layouts: closed_layouts },opaque_sources: [],record_names: blot_check_record_order::init(names),effects,nodes,extra,universal_dictionaries,next,buckets,solver_owners,solver_binders,type_owners };
+    var store = Store { closed: ClosedLayouts { units: [],kinds: closed_units,kind_bytes: closed_kind_bytes,layouts: closed_layouts , ..},opaque_sources: [],record_names: blot_check_record_order::init(names),effects,nodes,extra,universal_dictionaries,next,buckets,solver_owners,solver_binders,type_owners , ..};
     let initialized = init(store); if initialized != blot_error::Error.none { store.deinit(); return initialized; } let result = F(context,store); store.deinit(); return result;
 }
 fn init(store: Store&) -> blot_error::Error {
     store.nodes.clear(); store.next.clear(); store.extra.clear(); store.universal_dictionaries.clear(); store.buckets.clear(); store.solver_owners.clear(); store.solver_binders.clear(); store.type_owners.clear();
     assert(store.effects.rows.len != 0); // Caller initializes the effect-evidence context from its Tables first.
-    for tag in [Tag.invalid, Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32, Tag.never, Tag.erased] { store.nodes.push(Node { tag: tag }); store.next.push(0); }
+    for tag in [Tag.invalid, Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32, Tag.never, Tag.erased] { store.nodes.push(Node { tag: tag , ..}); store.next.push(0); }
     return blot_error::Error.none;
 }
 fn node(store: const Store&, id: Id) -> Node { store.nodes[id] }
@@ -148,7 +148,7 @@ recursive fn opaqueParameter(store: const Store&, module: const blot_check_core:
     if n.tag == blot_check_types::Tag.variable { let selected = ordinal; ordinal++; if selected == target { return blot_support::some(actual); } return blot_support::none<Id>(); }
     let argument = node(store, actual);
     if n.tag == blot_check_types::Tag.product && argument.tag == Tag.product && n.b == argument.b {
-        let parameters = module.types.list(blot_check_types::List { start: n.a, len: n.b });
+        let parameters = module.types.list(blot_check_types::List { start: n.a, len: n.b , ..});
         for child, index in parameters { let selected = opaqueParameter(store, module, child, children(store, actual)[index], target, ordinal, depth + 1, remaining); if selected.present { return selected; } }
     } else if n.tag == blot_check_types::Tag.record && argument.tag == Tag.record {
         for index in 0..n.b { let field = module.types.recordField(n, index); let fields = children(store, actual); for slot in 0..fields.len / 2 { if fields[slot * 2] != field.name { continue; } let selected = opaqueParameter(store, module, field.ty, fields[slot * 2 + 1], target, ordinal, depth + 1, remaining); if selected.present { return selected; } break; } }
@@ -218,12 +218,12 @@ fn internFieldsWithDictionaries(store: Store&, tag: Tag, a: u32, b: u32, row: u3
         if same { return candidate, blot_error::Error.none; } candidate = store.next[candidate];
     }
     if store.nodes.len == 4294967295 || values.len >= 4294967295 || store.extra.len > 4294967295 - values.len - 1 || store.extra.len + values.len + 1 > 4294967295 - slots.len { return 0, blot_error::Error.layout_limit; }
-    var n = Node { tag: tag, a: a, b: b, c: row };
+    var n = Node { tag: tag, a: a, b: b, c: row , ..};
     if tag == Tag.product || tag == Tag.record { n.a = store.extra.len as u32; n.b = values.len as u32; if tag == Tag.record { n.b /= 2; } store.extra.append(values); }
     else if tag == Tag.universal || tag == Tag.existential { n.c = store.extra.len as u32; store.extra.append(values); }
     else if tag == Tag.nominal { n.c = store.extra.len as u32; store.extra.push(values.len as u32); store.extra.append(values); }
     let id = store.nodes.len as u32;
-    if dictionary_abi { store.universal_dictionaries.push(UniversalDictionaries { owner: id, start: store.extra.len as u32, len: slots.len as u32 }); store.extra.append(slots); }
+    if dictionary_abi { store.universal_dictionaries.push(UniversalDictionaries { owner: id, start: store.extra.len as u32, len: slots.len as u32 , ..}); store.extra.append(slots); }
     var previous: u32 = 0; let old = store.buckets.get(fingerprint); if old { previous = old; }
     store.nodes.push(n); store.next.push(previous); store.buckets.insert(fingerprint, id); return id, blot_error::Error.none;
 }
@@ -280,7 +280,7 @@ recursive fn closedType(module: const blot_check_core::Module&, kinds: u8[:], ty
     else if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor || n.tag == blot_check_types::Tag.resolver || n.tag == blot_check_types::Tag.usage { closed = closedType(module, kinds, n.a, depth + 1); }
     else if n.tag == blot_check_types::Tag.function { closed = closedType(module, kinds, n.a, depth + 1) && closedType(module, kinds, n.b, depth + 1) && tailClosed(module.types.row(n.c).tail) && module.types.rowLabels(n.c).len == 0; }
     else if n.tag == blot_check_types::Tag.product || n.tag == blot_check_types::Tag.nominal {
-        var fields = module.types.list(blot_check_types::List { start: n.a, len: n.b }); if n.tag == blot_check_types::Tag.nominal { fields = module.types.nominalArguments(n); }
+        var fields = module.types.list(blot_check_types::List { start: n.a, len: n.b , ..}); if n.tag == blot_check_types::Tag.nominal { fields = module.types.nominalArguments(n); }
         closed = true; for child in fields { if !closedType(module, kinds, child, depth + 1) { closed = false; break; } }
     } else if n.tag == blot_check_types::Tag.record {
         closed = true; for index in 0..n.b { if !closedType(module, kinds, module.types.recordField(n, index).ty, depth + 1) { closed = false; break; } }
@@ -291,9 +291,9 @@ fn closedKey(closed: ClosedLayouts&, module: const blot_check_core::Module&, ty:
     if closed.units.len == 0 { return blot_support::none<u64>(); }
     var unit: i64 = -1; for &source, index in closed.units { if source .== module { unit = index; break; } }
     if unit < 0 || ty >= module.types.nodes.len { return blot_support::none<u64>(); }
-    if closed.kinds.len == 0 { for index in 0..closed.units.len { closed.kinds.push(ClosedUnit {}); } }
+    if closed.kinds.len == 0 { for index in 0..closed.units.len { closed.kinds.push(ClosedUnit {..}); } }
     if closed.kinds[unit].kinds.len != module.types.nodes.len {
-        let range = blot_backend_runtime_ir::Range { start: closed.kind_bytes.len, len: module.types.nodes.len };
+        let range = blot_backend_runtime_ir::Range { start: closed.kind_bytes.len, len: module.types.nodes.len , ..};
         for index in 0..range.len { closed.kind_bytes.push(0); } closed.kinds[unit].kinds = range;
     }
     let kinds = closed.kinds[unit].kinds;
@@ -323,7 +323,7 @@ fn tailInfo<T>(tail: T) -> u8, u32 {
 }
 recursive fn fromTypeToken(store: Store&, module: const blot_check_core::Module&, ty: blot_check_types::Id, mappings: const Mapping[:], rows: const RowMapping[:], depth: i64, allow_erased: bool) -> Id, blot_error::Error {
     let n = module.types.node(ty); if n.tag != blot_check_types::Tag.scoped { return fromTypeDepth(store, module, ty, mappings, rows, depth, allow_erased); }
-    let instance = blot_check_types::selectionAtom(module.types, mappedInstance(blot_check_types::NominalIdentity { unit: n.b, decl: n.c }, mappings));
+    let instance = blot_check_types::selectionAtom(module.types, mappedInstance(blot_check_types::NominalIdentity { unit: n.b, decl: n.c , ..}, mappings));
     if instance.unit == 0 || instance.decl == 0 { return 0, blot_error::Error.unresolved_type; }
     let payload, error = fromTypeDepth(store, module, n.a, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; }
     return internWithEffects(store, Tag.scoped, payload, instance.unit, instance.decl, []);
@@ -347,7 +347,7 @@ recursive fn fromTypeNode(store: Store&, module: const blot_check_core::Module&,
             for goal, ordinal in module.types.quantifierGoals(owner) {
                 if goal.kind != blot_check_types::ObligationKind.contract || goal.identity.unit != n.a || goal.identity.decl != n.b { continue; }
                 let tuple = module.types.node(goal.ty); if tuple.tag != blot_check_types::Tag.product || tuple.b != arguments.len { continue; }
-                var matches = true; let expected = module.types.list(blot_check_types::List { start: tuple.a, len: tuple.b });
+                var matches = true; let expected = module.types.list(blot_check_types::List { start: tuple.a, len: tuple.b , ..});
                 for value, index in expected { let same, error = blot_check_rank_equal::equal(module.types, value, arguments[index], true); if error != blot_error::Error.none { return 0, blot_error::Error.layout_limit; } if !same { matches = false; } }
                 if !matches { continue; }
                 let member_name = module.types.projectionMember(n);
@@ -393,7 +393,7 @@ recursive fn fromTypeNode(store: Store&, module: const blot_check_core::Module&,
             for index in 0..n.b { let field = module.types.recordField(n, index); values.push(field.name); let child, error = fromTypeDepth(store, module, field.ty, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } values.push(child); }
             return internRecord(store, values);
         }
-        var children = module.types.list(blot_check_types::List { start: n.a, len: n.b }); if n.tag == blot_check_types::Tag.nominal { children = module.types.nominalArguments(n); }
+        var children = module.types.list(blot_check_types::List { start: n.a, len: n.b , ..}); if n.tag == blot_check_types::Tag.nominal { children = module.types.nominalArguments(n); }
         for child in children { let value, error = fromTypeDepth(store, module, child, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } values.push(value); }
         if n.tag == blot_check_types::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values); } return intern(store, Tag.product, 0, 0, values);
     }
@@ -404,7 +404,7 @@ fn fromTypeQuantified(store: Store&, module: const blot_check_core::Module&, n: 
     for binder, ordinal in module.types.list(blot_check_types::List { start: n.b, len: n.c }) {
         let leaf = module.types.node(binder); if leaf.tag != blot_check_types::Tag.bound || leaf.a != ordinal || leaf.b > 2 || leaf.c != 0 { return 0, blot_error::Error.unresolved_type; }
         let layout, error = internWithEffects(store, Tag.opened, ordinal as u32, 0, leaf.b, []); if error != blot_error::Error.none { return 0, error; }
-        owned.push(Mapping { variable: binder, layout: layout });
+        owned.push(Mapping { variable: binder, layout: layout , ..});
     }
     for mapping in mappings {
         var outer = mapping; let representation = node(store, mapping.layout);
@@ -643,13 +643,13 @@ recursive fn fromSolverDepth(store: Store&, source: blot_check_types::Store&, ty
     }
     if n.tag == blot_check_types::Tag.forall || n.tag == blot_check_types::Tag.existential {
         if n.c == 0 || n.c > 128 { return 0, blot_error::Error.layout_limit; }
-        var owned: u32[>..<] = []; owned.append(source.list(blot_check_types::List { start: n.b, len: n.c })); var binders: Id[128] = [0; 128];
+        var owned: u32[>..<] = []; owned.append(source.list(blot_check_types::List { start: n.b, len: n.c , ..})); var binders: Id[128] = [0; 128];
         for formal, ordinal in owned {
             let leaf = source.node(formal); if leaf.tag != blot_check_types::Tag.bound || leaf.a != ordinal || leaf.b > 2 || leaf.c != 0 { return 0, blot_error::Error.unresolved_type; }
             let value, error = internWithEffects(store, Tag.opened, ordinal as u32, 0, leaf.b, []); if error != blot_error::Error.none { return 0, error; } binders[ordinal] = value;
         }
         if store.solver_owners.len >= 128 { return 0, blot_error::Error.layout_limit; }
-        let mark = store.solver_binders.len; let range = blot_backend_runtime_ir::Range { start: mark, len: owned.len }; store.solver_binders.append(owned); store.solver_owners.push(range);
+        let mark = store.solver_binders.len; let range = blot_backend_runtime_ir::Range { start: mark, len: owned.len , ..}; store.solver_binders.append(owned); store.solver_owners.push(range);
         let body, error = fromSolverDepth(store, source, n.a, depth + 1, budget); store.solver_owners.pop(); store.solver_binders.resize(mark); if error != blot_error::Error.none { return 0, error; }
         var tag = Tag.existential; if n.tag == blot_check_types::Tag.forall { tag = Tag.universal; } return intern(store, tag, body, n.c, binders[..n.c]);
     }
@@ -685,7 +685,7 @@ recursive fn fromSolverDepth(store: Store&, source: blot_check_types::Store&, ty
             for index in 0..n.b { let field = source.recordField(n, index); values.push(field.name); let child, error = fromSolverDepth(store, source, field.ty, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(child); } return internRecord(store, values);
         }
         var source_children: u32[>..<] = [];
-        if n.tag == blot_check_types::Tag.nominal { source_children.append(source.nominalArguments(n)); } else { source_children.append(source.list(blot_check_types::List { start: n.a, len: n.b })); }
+        if n.tag == blot_check_types::Tag.nominal { source_children.append(source.nominalArguments(n)); } else { source_children.append(source.list(blot_check_types::List { start: n.a, len: n.b , ..})); }
         for child in source_children { let value, error = fromSolverDepth(store, source, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(value); }
         if n.tag == blot_check_types::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values); } return intern(store, Tag.product, 0, 0, values);
     }

@@ -43,7 +43,7 @@ struct SymbolicInstruction { op: Op, operand: Operand }
 enum FunctionRole { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_allocate_typed, arena_retain, arena_release, arena_release_lease, arena_retire, arena_free, arena_store_word, arena_copy_words, arena_decrement, arena_root_allocate, arena_root_reserve, arena_root_pop, arena_root_open, arena_root_close, arena_root_enter, arena_root_leave, arena_root_store, arena_root_public_allocate, arena_root_public_reset, arena_root_authority, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure, list_directory, list_leaf_count, list_write_leaves, arena_cycle_enqueue, arena_cycle_unlink, arena_cycle_visit, arena_cycle_collect, arena_cycle_safe, arena_mark_acyclic, arena_allocate_shaped, arena_root_allocate_shaped, list_address_unchecked, list_set_unchecked, public_owner_publish, public_owner_take, task_mover, list_snapshot }
 struct FunctionArtifact {
     owner: u32 = 0, resource_owner: u32 = 0, role: FunctionRole = FunctionRole.unknown,
-    signature: u32 = 0, creation_sequence: u64 = 0, locals: Span = Span {}, instructions: Span = Span {},
+    signature: u32 = 0, creation_sequence: u64 = 0, locals: Span = Span {..}, instructions: Span = Span {..},
 }
 struct Operation { key: Span, foreign: bool }
 struct Tables {
@@ -82,7 +82,7 @@ fn append(self: Recorder&, event: Event) -> Error {
     assert(!self.sealed); var sequence = self.local_clock;
     { let optional_source_58 .= self.clock; if optional_source_58 { let clock .= optional_source_58; sequence = clock; clock++;  } else { self.local_clock++; } }
     var owner: u32 = 0; { let optional_source_57 .= self.owner; if optional_source_57 { let current .= optional_source_57; owner = current;  } }
-    self.records.push(Record { sequence, owner, event }); return Error.none;
+    self.records.push(Record { sequence, owner, event , ..}); return Error.none;
 }
 fn appendInstruction(self: Recorder&, function: u32, op: Op, operand: Operand) -> Error {
     assert(!self.sealed && !self.frozen_instructions);
@@ -96,16 +96,16 @@ fn appendInstruction(self: Recorder&, function: u32, op: Op, operand: Operand) -
                 Event.instruction_run run => {
                     if run.function == function && last.sequence + run.instructions.len == sequence &&
                         run.instructions.start as i64 + run.instructions.len == self.pending_instructions.len {
-                        self.pending_instructions.push(SymbolicInstruction { op, operand });
-                        self.records[index].event = Event.instruction_run { function, Span { run.instructions.start, run.instructions.len + 1 } };
+                        self.pending_instructions.push(SymbolicInstruction { op, operand , ..});
+                        self.records[index].event = Event.instruction_run { function, Span { run.instructions.start, run.instructions.len + 1 , ..} , ..};
                         { let optional_source_54 .= self.clock; if optional_source_54 { let clock .= optional_source_54; clock++;  } else { self.local_clock++; } } return Error.none;
                     }
                 }, _ => {},
             }
         }
     }
-    let start = self.pending_instructions.len as u32; self.pending_instructions.push(SymbolicInstruction { op, operand });
-    return self.append(Event.instruction_run { function, Span { start, 1 } });
+    let start = self.pending_instructions.len as u32; self.pending_instructions.push(SymbolicInstruction { op, operand , ..});
+    return self.append(Event.instruction_run { function, Span { start, 1 , ..} , ..});
 }
 fn instructionRun(self: const Recorder&, span: Span) -> blot_support::Option<const SymbolicInstruction[:]> {
     var values: const SymbolicInstruction[:] = self.pending_instructions;
@@ -123,49 +123,49 @@ fn recordLists(self: Recorder&, lists: blot_runtime_list_runtime::Runtime) -> Er
 }
 fn recordListsExtension(self: Recorder&, lists: blot_runtime_list_runtime::Runtime) -> Error {
     assert(self.lists.present);
-    let error = self.append(Event.list_extension { lists.address_unchecked, lists.set_unchecked, lists.snapshot });
+    let error = self.append(Event.list_extension { lists.address_unchecked, lists.set_unchecked, lists.snapshot , ..});
     if error != Error.none { return error; } self.lists = blot_support::some(lists); return Error.none;
 }
 fn raw(self: Recorder&, value: const u8[:]) -> Span, Error {
-    if self.bytes.len > 4294967295 || value.len > 4294967295 - self.bytes.len { return Span {}, Error.out_of_memory; }
-    let span = Span { self.bytes.len as u32, value.len as u32 }; self.bytes.append(value); return span, Error.none;
+    if self.bytes.len > 4294967295 || value.len > 4294967295 - self.bytes.len { return Span {..}, Error.out_of_memory; }
+    let span = Span { self.bytes.len as u32, value.len as u32 , ..}; self.bytes.append(value); return span, Error.none;
 }
 fn signature(self: Recorder&, id: u32, parameters: const ValueType[:], result: ValueType) -> Error {
     let mark = self.parameters.len;
     if mark > 4294967295 || parameters.len > 4294967295 - mark { return Error.out_of_memory; }
-    let span = Span { mark as u32, parameters.len as u32 }; self.parameters.append(parameters);
-    let error = self.append(Event.signature { id, span, result }); if error != Error.none { self.parameters.resize(mark); } return error;
+    let span = Span { mark as u32, parameters.len as u32 , ..}; self.parameters.append(parameters);
+    let error = self.append(Event.signature { id, span, result , ..}); if error != Error.none { self.parameters.resize(mark); } return error;
 }
 fn importFunction(self: Recorder&, id: u32, namespace_name: const u8[:], name: const u8[:], signature: u32) -> Error {
     let mark = self.bytes.len;
     let ns, e1 = self.raw(namespace_name); if e1 != Error.none { return e1; }
     let imported, e2 = self.raw(name); if e2 != Error.none { self.bytes.resize(mark); return e2; }
-    let error = self.append(Event.import_ { id, ns, imported, signature }); if error != Error.none { self.bytes.resize(mark); } return error;
+    let error = self.append(Event.import_ { id, ns, imported, signature , ..}); if error != Error.none { self.bytes.resize(mark); } return error;
 }
 fn cleanupData(self: Recorder&, bytes: const u8[:]) -> Error {
-    let span, error = self.raw(bytes); if error != Error.none { return error; } return self.append(Event.cleanup_data { span });
+    let span, error = self.raw(bytes); if error != Error.none { return error; } return self.append(Event.cleanup_data { span , ..});
 }
 fn data(self: Recorder&, address: u32, bytes: const u8[:]) -> Error {
     let mark = self.bytes.len; let span, error = self.raw(bytes); if error != Error.none { return error; }
-    let result = self.append(Event.data { address, span }); if result != Error.none { self.bytes.resize(mark); } return result;
+    let result = self.append(Event.data { address, span , ..}); if result != Error.none { self.bytes.resize(mark); } return result;
 }
 fn exportItem(self: Recorder&, module: blot_backend_wasm::Module&, item: blot_backend_wasm::Export, entry: bool) -> Error {
     let mark = self.bytes.len; let name, error = self.raw(module.name(item.name)); if error != Error.none { return error; }
     let result = self.append(Event.export_ { name, item.index, item.parameter, item.result, item.global, item.callback, item.once,
-        item.parameter_owner, item.result_owner, item.owner_adapter, item.task_adapter, item.task_runtime, entry });
+        item.parameter_owner, item.result_owner, item.owner_adapter, item.task_adapter, item.task_runtime, entry , ..});
     if result != Error.none { self.bytes.resize(mark); } return result;
 }
 fn captureOperations<S>(self: Recorder&, store: S&) -> Error {
     assert(self.operations.len == 0);
     for entry in store.entries {
         let mark = self.bytes.len; let key, error = self.raw(store.key(entry));
-        if error != Error.none { self.bytes.resize(mark); return error; } self.operations.push(Operation { key, entry.foreign });
+        if error != Error.none { self.bytes.resize(mark); return error; } self.operations.push(Operation { key, entry.foreign , ..});
     }
     return Error.none;
 }
 fn operationSymbol(self: Recorder&, id: u32, key: const u8[:], foreign: bool) -> Error {
     let mark = self.bytes.len; let bytes, error = self.raw(key); if error != Error.none { return error; }
-    let result = self.append(Event.operation_symbol { id, bytes, foreign }); if result != Error.none { self.bytes.resize(mark); } return result;
+    let result = self.append(Event.operation_symbol { id, bytes, foreign , ..}); if result != Error.none { self.bytes.resize(mark); } return result;
 }
 fn slice(self: const Recorder&, span: Span) -> const u8[:] { self.bytes[span.start..span.start + span.len] }
 fn seal(self: Recorder&) { self.owner = null; self.clock = null; self.sealed = true; }
@@ -192,7 +192,7 @@ fn freezeFunctions(self: Recorder&, function_owners: const u32[:]) -> Error {
         }
     }
     let functions = owned_functions.alloc_slice(count);
-    for index in count { functions[index] = FunctionArtifact {}; }
+    for index in count { functions[index] = FunctionArtifact {..}; }
     let locals = owned_locals.alloc_slice(local_count); let instructions = owned_instructions.alloc_slice(instruction_count);
     for record in self.records {
         match record.event {
@@ -200,7 +200,7 @@ fn freezeFunctions(self: Recorder&, function_owners: const u32[:]) -> Error {
                 var owner: u32 = 0; if item.id < function_owners.len { owner = function_owners[item.id]; }
                 var role = FunctionRole.unknown; if owner != 0 { role = FunctionRole.job; }
                 functions[item.id] = FunctionArtifact { owner: owner, resource_owner: record.owner, role: role,
-                    signature: item.signature, creation_sequence: record.sequence };
+                    signature: item.signature, creation_sequence: record.sequence , ..};
             },
             Event.local item => { functions[item.function].locals.len++; },
             Event.instruction item => { functions[item.function].instructions.len++; },
@@ -244,14 +244,14 @@ fn freezeFunctions(self: Recorder&, function_owners: const u32[:]) -> Error {
             },
             Event.instruction item => {
                 let span = functions[item.function].instructions;
-                instructions[span.start + span.len] = SymbolicInstruction { item.op, item.operand }; functions[item.function].instructions.len++;
+                instructions[span.start + span.len] = SymbolicInstruction { item.op, item.operand , ..}; functions[item.function].instructions.len++;
             },
             Event.instruction_run item => {
                 let span = functions[item.function].instructions; let source = self.instructionRun(item.instructions); assert(source.present);
                 let start = span.start + span.len;
                 for instruction, at in source.value { instructions[start + at] = instruction; }
                 functions[item.function].instructions.len += item.instructions.len;
-                self.records[index].event = Event.instruction_run { item.function, Span { start, item.instructions.len } };
+                self.records[index].event = Event.instruction_run { item.function, Span { start, item.instructions.len , ..} , ..};
             }, _ => {},
         }
     }
@@ -313,7 +313,7 @@ fn replayInstruction(self: const Replay&, module: blot_backend_wasm::Module&, fu
     if operand.role == Role.callable_layout && (op != blot_backend_runtime_ir::OP_ownership || operand.value == 0 || operand.value >= 67108864) { return Error.invalid_artifact; }
     let actual_function, e1 = self.get(self.functions, function); if e1 != Error.none { return e1; }
     let actual_operand, e2 = self.resolve(operand); if e2 != Error.none { return e2; }
-    return module.emitReference(actual_function, blot_backend_runtime_ir::Instruction { op, actual_operand }, operand.role);
+    return module.emitReference(actual_function, blot_backend_runtime_ir::Instruction { op, actual_operand , ..}, operand.role);
 }
 fn materialize(self: const Recorder&, destination: blot_backend_wasm::Module&) -> Error { self.replayInto(destination) }
 fn replayInto(self: const Recorder&, module: blot_backend_wasm::Module&) -> Error {
@@ -321,7 +321,7 @@ fn replayInto(self: const Recorder&, module: blot_backend_wasm::Module&) -> Erro
     if module.data.len != 0 || module.arena.present || module.host_references.present { return Error.unsupported_arena_composition; }
     var functions: u32[>..<] = []; var signatures: u32[>..<] = []; var imports: u32[>..<] = [];
     var globals: u32[>..<] = []; var operations: u32[>..<] = []; var data: DataRange[>..<] = [];
-    var replay = Replay { self, functions, signatures, imports, globals, operations, data };
+    var replay = Replay { self, functions, signatures, imports, globals, operations, data , ..};
     let prepared = replay.prepareOperations(); if prepared != Error.none { return prepared; }
     for record in self.records {
         let error = replayEvent(replay, module, record.event); if error != Error.none { return error; }
@@ -374,7 +374,7 @@ fn replayEvent(replay: Replay&, module: blot_backend_wasm::Module&, event: Event
         },
         Event.data item => {
             let address = module.data.len as u32; module.data.append(replay.journal.slice(item.bytes));
-            replay.data.push(DataRange { item.address, address, item.bytes.len });
+            replay.data.push(DataRange { item.address, address, item.bytes.len , ..});
         },
         Event.data_word item => {
             let address, e1 = replay.address(item.address); if e1 != Error.none { return e1; }
@@ -385,7 +385,7 @@ fn replayEvent(replay: Replay&, module: blot_backend_wasm::Module&, event: Event
         },
         Event.arena => {
             if !replay.journal.arena.present { return Error.invalid_artifact; }
-            let original = replay.journal.arena.value; var mapped = blot_backend_wasm::Arena {};
+            let original = replay.journal.arena.value; var mapped = blot_backend_wasm::Arena {..};
             const for <N,A> in fields<blot_backend_wasm::Arena> {
                 var value: u32 = 0; var error = Error.none;
                 if arenaFunctionName(N) { let actual, failed = replay.get(replay.functions, original.A); value = actual; error = failed; }
@@ -399,7 +399,7 @@ fn replayEvent(replay: Replay&, module: blot_backend_wasm::Module&, event: Event
             let release, e2 = replay.get(replay.functions, item.value.release); if e2 != Error.none { return e2; }
             let cursor, e3 = replay.get(replay.globals, item.value.cursor); if e3 != Error.none { return e3; }
             let active, e4 = replay.get(replay.globals, item.value.active); if e4 != Error.none { return e4; }
-            module.host_references = blot_support::some(blot_backend_wasm::HostReferences { retain, release, cursor, active });
+            module.host_references = blot_support::some(blot_backend_wasm::HostReferences { retain, release, cursor, active , ..});
         },
         Event.lists => {
             if !replay.journal.lists.present { return Error.invalid_artifact; }
@@ -422,7 +422,7 @@ fn replayEvent(replay: Replay&, module: blot_backend_wasm::Module&, event: Event
             if failure != Error.none { return failure; }
             let name = module.ownName(replay.journal.slice(item.name));
             module.exports.push(blot_backend_wasm::Export { name, index, item.parameter, item.result, item.global, item.callback,
-                item.once, item.parameter_owner, item.result_owner, item.owner_adapter, item.task_adapter, item.task_runtime });
+                item.once, item.parameter_owner, item.result_owner, item.owner_adapter, item.task_adapter, item.task_runtime , ..});
             if item.entry { module.functions[index].entry = true; }
         },
         Event.public_arena => { module.public_arena = true; }, Event.mutable_static => { module.mutable_static = true; },
@@ -432,33 +432,33 @@ fn replayEvent(replay: Replay&, module: blot_backend_wasm::Module&, event: Event
     return Error.none;
 }
 
-fn recordDemand(self: Recorder&, kind: ResourceKind, id: u32, hit: bool) -> Error { self.append(Event.demand { kind, id, hit }) }
+fn recordDemand(self: Recorder&, kind: ResourceKind, id: u32, hit: bool) -> Error { self.append(Event.demand { kind, id, hit , ..}) }
 
-fn recordFunction(self: Recorder&, id: u32, signature: u32, role: blot_backend_runtime_ir::Role) -> Error { self.append(Event.function { id, signature, role }) }
+fn recordFunction(self: Recorder&, id: u32, signature: u32, role: blot_backend_runtime_ir::Role) -> Error { self.append(Event.function { id, signature, role , ..}) }
 
-fn recordParameterRoles(self: Recorder&, function: u32, roles: u64) -> Error { self.append(Event.parameter_roles { function, roles }) }
+fn recordParameterRoles(self: Recorder&, function: u32, roles: u64) -> Error { self.append(Event.parameter_roles { function, roles , ..}) }
 
-fn recordProviderParameter(self: Recorder&, function: u32, index: u16) -> Error { self.append(Event.provider_parameter { function, index }) }
+fn recordProviderParameter(self: Recorder&, function: u32, index: u16) -> Error { self.append(Event.provider_parameter { function, index , ..}) }
 
-fn recordCallableLayout(self: Recorder&, function: u32, layout: u32) -> Error { self.append(Event.callable_layout { function, layout }) }
+fn recordCallableLayout(self: Recorder&, function: u32, layout: u32) -> Error { self.append(Event.callable_layout { function, layout , ..}) }
 
-fn recordSemanticSite(self: Recorder&, site: blot_backend_wasm::SemanticSite) -> Error { self.append(Event.semantic_site { site }) }
+fn recordSemanticSite(self: Recorder&, site: blot_backend_wasm::SemanticSite) -> Error { self.append(Event.semantic_site { site , ..}) }
 
-fn recordLocal(self: Recorder&, function: u32, ty: ValueType) -> Error { self.append(Event.local { function, ty }) }
+fn recordLocal(self: Recorder&, function: u32, ty: ValueType) -> Error { self.append(Event.local { function, ty , ..}) }
 
-fn recordGlobal(self: Recorder&, id: u32, scalar: blot_backend_runtime_ir::Scalar, bits: Operand, mutable: bool) -> Error { self.append(Event.global { id, scalar, bits, mutable }) }
+fn recordGlobal(self: Recorder&, id: u32, scalar: blot_backend_runtime_ir::Scalar, bits: Operand, mutable: bool) -> Error { self.append(Event.global { id, scalar, bits, mutable , ..}) }
 
-fn recordGlobalBits(self: Recorder&, id: u32, bits: Operand) -> Error { self.append(Event.global_bits { id, bits }) }
+fn recordGlobalBits(self: Recorder&, id: u32, bits: Operand) -> Error { self.append(Event.global_bits { id, bits , ..}) }
 
-fn recordDataWord(self: Recorder&, address: u32, operand: Operand) -> Error { self.append(Event.data_word { address, operand }) }
+fn recordDataWord(self: Recorder&, address: u32, operand: Operand) -> Error { self.append(Event.data_word { address, operand , ..}) }
 
-fn recordHostReferences(self: Recorder&, value: blot_backend_wasm::HostReferences) -> Error { self.append(Event.host_references { value }) }
+fn recordHostReferences(self: Recorder&, value: blot_backend_wasm::HostReferences) -> Error { self.append(Event.host_references { value , ..}) }
 
-fn recordPublicOwners(self: Recorder&, value: blot_runtime_public_owners::Runtime) -> Error { self.append(Event.public_owners { value }) }
+fn recordPublicOwners(self: Recorder&, value: blot_runtime_public_owners::Runtime) -> Error { self.append(Event.public_owners { value , ..}) }
 
-fn recordStart(self: Recorder&, id: u32) -> Error { self.append(Event.start { id }) }
+fn recordStart(self: Recorder&, id: u32) -> Error { self.append(Event.start { id , ..}) }
 
-fn recordStaticField(self: Recorder&, address: u32, role: blot_backend_runtime_ir::Role) -> Error { self.append(Event.static_field { address, role }) }
+fn recordStaticField(self: Recorder&, address: u32, role: blot_backend_runtime_ir::Role) -> Error { self.append(Event.static_field { address, role , ..}) }
 
 fn recordPublicArena(self: Recorder&) -> Error { self.append(Event.public_arena) }
 

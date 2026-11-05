@@ -219,14 +219,14 @@ reusable[] var pool_blot_check_core__HandleEffects: blot_check_core::HandleEffec
 
 reusable[] var pool_blot_check_core__Diagnostic: blot_check_core::Diagnostic[>..] = [];
 
-struct Owned { module: blot_check_core::Module, lease: u32 = 0, generation: u64 = 0,payload_owner:blot_reuse_dependency_payload::Owner=blot_reuse_dependency_payload::Owner {} }
+struct Owned { module: blot_check_core::Module, lease: u32 = 0, generation: u64 = 0,payload_owner:blot_reuse_dependency_payload::Owner=blot_reuse_dependency_payload::Owner {..} }
 struct Writer { output: u8[>..<]&, start: i64, failure: Error = Error.none, remaining: i64 = element_limit }
 struct Reader { bytes: const u8[:], at: i64 = 0, remaining: i64 = element_limit, head: u32 = 0 }
 fn charge(writer: Writer&, depth: i64) -> bool { if writer.failure != Error.none { return false; } if depth > depth_limit || writer.remaining == 0 { writer.failure = Error.artifact_limit; return false; } writer.remaining--; return true; }
 fn debit(reader: Reader&, depth: i64) -> Error { if depth > depth_limit || reader.remaining == 0 { return Error.artifact_limit; } reader.remaining--; return Error.none; }
 fn put(writer: Writer&, bits: u64, width: i64) { if writer.failure != Error.none { return; } if writer.output.len - writer.start > packet_limit - width { writer.failure = Error.artifact_limit; return; } for index in width { writer.output.push((bits >> ((index * 8) as u32)) as! u8); } }
 fn get(reader: Reader&, width: i64) -> u64, Error { if reader.at > reader.bytes.len || width > reader.bytes.len - reader.at { return 0, Error.invalid_artifact; } var bits: u64 = 0; for index in width { bits |= (reader.bytes[reader.at + index] as u64) << ((index * 8) as u32); } reader.at += width; return bits, Error.none; }
-fn remember(reader: Reader&, value: Run) -> Error { if links.len >= 0xffffffff { return Error.out_of_memory; } let at = links.alloc_index(Link { value, reader.head }); reader.head = (at + 1) as u32; return Error.none; }
+fn remember(reader: Reader&, value: Run) -> Error { if links.len >= 0xffffffff { return Error.out_of_memory; } let at = links.alloc_index(Link { value, reader.head , ..}); reader.head = (at + 1) as u32; return Error.none; }
 fn releaseRuns(head: u32) { var next = head; while next != 0 { let at = next - 1; let link = links[at]; next = link.next; match link.value {
 
     Run.run_u32 run => { pool_u32.free_slice(run.values); },
@@ -400,7 +400,7 @@ fn read_u32___(reader: Reader&, depth: i64) -> u32[:], Error {
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_u32.alloc_slice(count as i64); let recorded = remember(reader, Run.run_u32 { run });
+    let run = pool_u32.alloc_slice(count as i64); let recorded = remember(reader, Run.run_u32 { run , ..});
     if recorded != Error.none { pool_u32.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_u32(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -411,7 +411,7 @@ fn read_blot_check_numeric_proof_terms__Kind___(reader: Reader&, depth: i64) -> 
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_numeric_proof_terms__Kind.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_numeric_proof_terms__Kind { run });
+    let run = pool_blot_check_numeric_proof_terms__Kind.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_numeric_proof_terms__Kind { run , ..});
     if recorded != Error.none { pool_blot_check_numeric_proof_terms__Kind.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_numeric_proof_terms__Kind(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -422,7 +422,7 @@ fn read_blot_check_numeric_proof_terms__Term___(reader: Reader&, depth: i64) -> 
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_numeric_proof_terms__Term.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_numeric_proof_terms__Term { run });
+    let run = pool_blot_check_numeric_proof_terms__Term.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_numeric_proof_terms__Term { run , ..});
     if recorded != Error.none { pool_blot_check_numeric_proof_terms__Term.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_numeric_proof_terms__Term(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -433,7 +433,7 @@ fn read_blot_check_numeric_proof_contracts__Requirement___(reader: Reader&, dept
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_numeric_proof_contracts__Requirement.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_numeric_proof_contracts__Requirement { run });
+    let run = pool_blot_check_numeric_proof_contracts__Requirement.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_numeric_proof_contracts__Requirement { run , ..});
     if recorded != Error.none { pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_numeric_proof_contracts__Requirement(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -444,7 +444,7 @@ fn read_blot_check_numeric_proof_headers__Named___(reader: Reader&, depth: i64) 
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_numeric_proof_headers__Named.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_numeric_proof_headers__Named { run });
+    let run = pool_blot_check_numeric_proof_headers__Named.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_numeric_proof_headers__Named { run , ..});
     if recorded != Error.none { pool_blot_check_numeric_proof_headers__Named.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_numeric_proof_headers__Named(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -455,7 +455,7 @@ fn read_blot_check_capability_contracts__Term___(reader: Reader&, depth: i64) ->
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_capability_contracts__Term.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_capability_contracts__Term { run });
+    let run = pool_blot_check_capability_contracts__Term.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_capability_contracts__Term { run , ..});
     if recorded != Error.none { pool_blot_check_capability_contracts__Term.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_capability_contracts__Term(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -466,7 +466,7 @@ fn read_blot_check_capability_contracts__Binding___(reader: Reader&, depth: i64)
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_capability_contracts__Binding.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_capability_contracts__Binding { run });
+    let run = pool_blot_check_capability_contracts__Binding.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_capability_contracts__Binding { run , ..});
     if recorded != Error.none { pool_blot_check_capability_contracts__Binding.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_capability_contracts__Binding(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -477,7 +477,7 @@ fn read_blot_check_core__FieldName___(reader: Reader&, depth: i64) -> blot_check
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__FieldName.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__FieldName { run });
+    let run = pool_blot_check_core__FieldName.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__FieldName { run , ..});
     if recorded != Error.none { pool_blot_check_core__FieldName.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__FieldName(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -488,7 +488,7 @@ fn read_blot_check_core__RuntimeName___(reader: Reader&, depth: i64) -> blot_che
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__RuntimeName.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__RuntimeName { run });
+    let run = pool_blot_check_core__RuntimeName.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__RuntimeName { run , ..});
     if recorded != Error.none { pool_blot_check_core__RuntimeName.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__RuntimeName(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -499,7 +499,7 @@ fn read_blot_check_core__DeclarationDependencies___(reader: Reader&, depth: i64)
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__DeclarationDependencies.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__DeclarationDependencies { run });
+    let run = pool_blot_check_core__DeclarationDependencies.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__DeclarationDependencies { run , ..});
     if recorded != Error.none { pool_blot_check_core__DeclarationDependencies.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__DeclarationDependencies(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -510,7 +510,7 @@ fn read_blot_check_core__BindingRef___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__BindingRef.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__BindingRef { run });
+    let run = pool_blot_check_core__BindingRef.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__BindingRef { run , ..});
     if recorded != Error.none { pool_blot_check_core__BindingRef.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__BindingRef(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -521,7 +521,7 @@ fn read_blot_check_core__DependencyMember___(reader: Reader&, depth: i64) -> blo
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__DependencyMember.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__DependencyMember { run });
+    let run = pool_blot_check_core__DependencyMember.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__DependencyMember { run , ..});
     if recorded != Error.none { pool_blot_check_core__DependencyMember.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__DependencyMember(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -532,7 +532,7 @@ fn read_blot_check_core__ErasedDeclarationReference___(reader: Reader&, depth: i
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__ErasedDeclarationReference.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__ErasedDeclarationReference { run });
+    let run = pool_blot_check_core__ErasedDeclarationReference.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__ErasedDeclarationReference { run , ..});
     if recorded != Error.none { pool_blot_check_core__ErasedDeclarationReference.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__ErasedDeclarationReference(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -543,7 +543,7 @@ fn read_blot_check_core__RequestLoopInfo___(reader: Reader&, depth: i64) -> blot
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__RequestLoopInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__RequestLoopInfo { run });
+    let run = pool_blot_check_core__RequestLoopInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__RequestLoopInfo { run , ..});
     if recorded != Error.none { pool_blot_check_core__RequestLoopInfo.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__RequestLoopInfo(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -554,7 +554,7 @@ fn read_blot_check_core__RequestArm___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__RequestArm.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__RequestArm { run });
+    let run = pool_blot_check_core__RequestArm.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__RequestArm { run , ..});
     if recorded != Error.none { pool_blot_check_core__RequestArm.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__RequestArm(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -565,7 +565,7 @@ fn read_blot_check_types__Node___(reader: Reader&, depth: i64) -> blot_check_typ
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_types__Node.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_types__Node { run });
+    let run = pool_blot_check_types__Node.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_types__Node { run , ..});
     if recorded != Error.none { pool_blot_check_types__Node.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_types__Node(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -576,7 +576,7 @@ fn read_blot_check_effects__Row___(reader: Reader&, depth: i64) -> blot_check_ef
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_effects__Row.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_effects__Row { run });
+    let run = pool_blot_check_effects__Row.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_effects__Row { run , ..});
     if recorded != Error.none { pool_blot_check_effects__Row.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_effects__Row(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -587,7 +587,7 @@ fn read_blot_check_types__Operation___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_types__Operation.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_types__Operation { run });
+    let run = pool_blot_check_types__Operation.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_types__Operation { run , ..});
     if recorded != Error.none { pool_blot_check_types__Operation.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_types__Operation(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -598,7 +598,7 @@ fn read_blot_check_types__QuantifierGoals___(reader: Reader&, depth: i64) -> blo
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_types__QuantifierGoals.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_types__QuantifierGoals { run });
+    let run = pool_blot_check_types__QuantifierGoals.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_types__QuantifierGoals { run , ..});
     if recorded != Error.none { pool_blot_check_types__QuantifierGoals.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_types__QuantifierGoals(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -609,7 +609,7 @@ fn read_blot_check_types__Obligation___(reader: Reader&, depth: i64) -> blot_che
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_types__Obligation.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_types__Obligation { run });
+    let run = pool_blot_check_types__Obligation.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_types__Obligation { run , ..});
     if recorded != Error.none { pool_blot_check_types__Obligation.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_types__Obligation(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -620,7 +620,7 @@ fn read_blot_check_core__Node___(reader: Reader&, depth: i64) -> blot_check_core
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Node.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Node { run });
+    let run = pool_blot_check_core__Node.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Node { run , ..});
     if recorded != Error.none { pool_blot_check_core__Node.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Node(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -631,7 +631,7 @@ fn read_blot_parse_ast__Span___(reader: Reader&, depth: i64) -> blot_parse_ast::
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_parse_ast__Span.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_parse_ast__Span { run });
+    let run = pool_blot_parse_ast__Span.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_parse_ast__Span { run , ..});
     if recorded != Error.none { pool_blot_parse_ast__Span.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_parse_ast__Span(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -642,7 +642,7 @@ fn read_blot_check_core__Binding___(reader: Reader&, depth: i64) -> blot_check_c
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Binding.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Binding { run });
+    let run = pool_blot_check_core__Binding.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Binding { run , ..});
     if recorded != Error.none { pool_blot_check_core__Binding.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Binding(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -653,7 +653,7 @@ fn read_blot_check_core__Body___(reader: Reader&, depth: i64) -> blot_check_core
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Body.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Body { run });
+    let run = pool_blot_check_core__Body.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Body { run , ..});
     if recorded != Error.none { pool_blot_check_core__Body.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Body(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -664,7 +664,7 @@ fn read_blot_check_core__Parameter___(reader: Reader&, depth: i64) -> blot_check
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Parameter.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Parameter { run });
+    let run = pool_blot_check_core__Parameter.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Parameter { run , ..});
     if recorded != Error.none { pool_blot_check_core__Parameter.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Parameter(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -675,7 +675,7 @@ fn read_blot_check_core__CallInfo___(reader: Reader&, depth: i64) -> blot_check_
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__CallInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__CallInfo { run });
+    let run = pool_blot_check_core__CallInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__CallInfo { run , ..});
     if recorded != Error.none { pool_blot_check_core__CallInfo.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__CallInfo(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -686,7 +686,7 @@ fn read_blot_check_core__Merge___(reader: Reader&, depth: i64) -> blot_check_cor
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Merge.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Merge { run });
+    let run = pool_blot_check_core__Merge.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Merge { run , ..});
     if recorded != Error.none { pool_blot_check_core__Merge.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Merge(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -697,7 +697,7 @@ fn read_blot_check_core__List___(reader: Reader&, depth: i64) -> blot_check_core
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__List.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__List { run });
+    let run = pool_blot_check_core__List.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__List { run , ..});
     if recorded != Error.none { pool_blot_check_core__List.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__List(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -708,7 +708,7 @@ fn read_u8___(reader: Reader&, depth: i64) -> u8[:], Error {
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_u8.alloc_slice(count as i64); let recorded = remember(reader, Run.run_u8 { run });
+    let run = pool_u8.alloc_slice(count as i64); let recorded = remember(reader, Run.run_u8 { run , ..});
     if recorded != Error.none { pool_u8.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_u8(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -719,7 +719,7 @@ fn read_blot_check_core__Obligation___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Obligation.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Obligation { run });
+    let run = pool_blot_check_core__Obligation.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Obligation { run , ..});
     if recorded != Error.none { pool_blot_check_core__Obligation.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Obligation(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -730,7 +730,7 @@ fn read_blot_check_core__Nominal___(reader: Reader&, depth: i64) -> blot_check_c
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Nominal.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Nominal { run });
+    let run = pool_blot_check_core__Nominal.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Nominal { run , ..});
     if recorded != Error.none { pool_blot_check_core__Nominal.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Nominal(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -741,7 +741,7 @@ fn read_blot_check_core__OperationName___(reader: Reader&, depth: i64) -> blot_c
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__OperationName.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__OperationName { run });
+    let run = pool_blot_check_core__OperationName.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__OperationName { run , ..});
     if recorded != Error.none { pool_blot_check_core__OperationName.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__OperationName(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -752,7 +752,7 @@ fn read_blot_check_core__Constructor___(reader: Reader&, depth: i64) -> blot_che
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Constructor.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Constructor { run });
+    let run = pool_blot_check_core__Constructor.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Constructor { run , ..});
     if recorded != Error.none { pool_blot_check_core__Constructor.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Constructor(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -763,7 +763,7 @@ fn read_blot_check_core__Projection___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Projection.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Projection { run });
+    let run = pool_blot_check_core__Projection.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Projection { run , ..});
     if recorded != Error.none { pool_blot_check_core__Projection.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Projection(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -774,7 +774,7 @@ fn read_blot_check_core__ProjectionVariant___(reader: Reader&, depth: i64) -> bl
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__ProjectionVariant.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__ProjectionVariant { run });
+    let run = pool_blot_check_core__ProjectionVariant.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__ProjectionVariant { run , ..});
     if recorded != Error.none { pool_blot_check_core__ProjectionVariant.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__ProjectionVariant(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -785,7 +785,7 @@ fn read_blot_check_core__Pattern___(reader: Reader&, depth: i64) -> blot_check_c
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Pattern.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Pattern { run });
+    let run = pool_blot_check_core__Pattern.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Pattern { run , ..});
     if recorded != Error.none { pool_blot_check_core__Pattern.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Pattern(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -796,7 +796,7 @@ fn read_blot_check_core__PatternRow___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__PatternRow.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__PatternRow { run });
+    let run = pool_blot_check_core__PatternRow.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__PatternRow { run , ..});
     if recorded != Error.none { pool_blot_check_core__PatternRow.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__PatternRow(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -807,7 +807,7 @@ fn read_blot_check_core__MatchArm___(reader: Reader&, depth: i64) -> blot_check_
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__MatchArm.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__MatchArm { run });
+    let run = pool_blot_check_core__MatchArm.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__MatchArm { run , ..});
     if recorded != Error.none { pool_blot_check_core__MatchArm.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__MatchArm(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -818,7 +818,7 @@ fn read_blot_check_core__MatchInfo___(reader: Reader&, depth: i64) -> blot_check
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__MatchInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__MatchInfo { run });
+    let run = pool_blot_check_core__MatchInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__MatchInfo { run , ..});
     if recorded != Error.none { pool_blot_check_core__MatchInfo.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__MatchInfo(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -829,7 +829,7 @@ fn read_blot_check_core__UpdateInfo___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__UpdateInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__UpdateInfo { run });
+    let run = pool_blot_check_core__UpdateInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__UpdateInfo { run , ..});
     if recorded != Error.none { pool_blot_check_core__UpdateInfo.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__UpdateInfo(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -840,7 +840,7 @@ fn read_blot_check_core__UpdateStep___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__UpdateStep.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__UpdateStep { run });
+    let run = pool_blot_check_core__UpdateStep.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__UpdateStep { run , ..});
     if recorded != Error.none { pool_blot_check_core__UpdateStep.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__UpdateStep(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -851,7 +851,7 @@ fn read_blot_check_core__ClosureInfo___(reader: Reader&, depth: i64) -> blot_che
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__ClosureInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__ClosureInfo { run });
+    let run = pool_blot_check_core__ClosureInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__ClosureInfo { run , ..});
     if recorded != Error.none { pool_blot_check_core__ClosureInfo.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__ClosureInfo(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -862,7 +862,7 @@ fn read_blot_check_core__Associated___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Associated.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Associated { run });
+    let run = pool_blot_check_core__Associated.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Associated { run , ..});
     if recorded != Error.none { pool_blot_check_core__Associated.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Associated(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -873,7 +873,7 @@ fn read_blot_check_core__Contract___(reader: Reader&, depth: i64) -> blot_check_
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Contract.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Contract { run });
+    let run = pool_blot_check_core__Contract.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Contract { run , ..});
     if recorded != Error.none { pool_blot_check_core__Contract.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Contract(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -884,7 +884,7 @@ fn read_blot_reuse_principal_interface__ContractMember___(reader: Reader&, depth
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_reuse_principal_interface__ContractMember.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__ContractMember { run });
+    let run = pool_blot_reuse_principal_interface__ContractMember.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__ContractMember { run , ..});
     if recorded != Error.none { pool_blot_reuse_principal_interface__ContractMember.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_reuse_principal_interface__ContractMember(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -895,7 +895,7 @@ fn read_blot_reuse_principal_interface__Implementation___(reader: Reader&, depth
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_reuse_principal_interface__Implementation.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__Implementation { run });
+    let run = pool_blot_reuse_principal_interface__Implementation.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__Implementation { run , ..});
     if recorded != Error.none { pool_blot_reuse_principal_interface__Implementation.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_reuse_principal_interface__Implementation(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -906,7 +906,7 @@ fn read_blot_reuse_principal_interface__ImplementationMember___(reader: Reader&,
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_reuse_principal_interface__ImplementationMember.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__ImplementationMember { run });
+    let run = pool_blot_reuse_principal_interface__ImplementationMember.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__ImplementationMember { run , ..});
     if recorded != Error.none { pool_blot_reuse_principal_interface__ImplementationMember.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_reuse_principal_interface__ImplementationMember(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -917,7 +917,7 @@ fn read_blot_reuse_principal_interface__MemberTemplate___(reader: Reader&, depth
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_reuse_principal_interface__MemberTemplate.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__MemberTemplate { run });
+    let run = pool_blot_reuse_principal_interface__MemberTemplate.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__MemberTemplate { run , ..});
     if recorded != Error.none { pool_blot_reuse_principal_interface__MemberTemplate.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_reuse_principal_interface__MemberTemplate(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -928,7 +928,7 @@ fn read_blot_reuse_principal_interface__SelectedProof___(reader: Reader&, depth:
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_reuse_principal_interface__SelectedProof.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__SelectedProof { run });
+    let run = pool_blot_reuse_principal_interface__SelectedProof.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_reuse_principal_interface__SelectedProof { run , ..});
     if recorded != Error.none { pool_blot_reuse_principal_interface__SelectedProof.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_reuse_principal_interface__SelectedProof(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -939,7 +939,7 @@ fn read_blot_check_core__SelectedUse___(reader: Reader&, depth: i64) -> blot_che
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__SelectedUse.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__SelectedUse { run });
+    let run = pool_blot_check_core__SelectedUse.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__SelectedUse { run , ..});
     if recorded != Error.none { pool_blot_check_core__SelectedUse.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__SelectedUse(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -950,7 +950,7 @@ fn read_blot_check_core__DictionarySelection___(reader: Reader&, depth: i64) -> 
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__DictionarySelection.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__DictionarySelection { run });
+    let run = pool_blot_check_core__DictionarySelection.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__DictionarySelection { run , ..});
     if recorded != Error.none { pool_blot_check_core__DictionarySelection.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__DictionarySelection(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -961,7 +961,7 @@ fn read_blot_check_core__DictionaryUse___(reader: Reader&, depth: i64) -> blot_c
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__DictionaryUse.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__DictionaryUse { run });
+    let run = pool_blot_check_core__DictionaryUse.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__DictionaryUse { run , ..});
     if recorded != Error.none { pool_blot_check_core__DictionaryUse.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__DictionaryUse(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -972,7 +972,7 @@ fn read_blot_check_core__Primitive___(reader: Reader&, depth: i64) -> blot_check
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Primitive.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Primitive { run });
+    let run = pool_blot_check_core__Primitive.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Primitive { run , ..});
     if recorded != Error.none { pool_blot_check_core__Primitive.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Primitive(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -983,7 +983,7 @@ fn read_blot_check_core__LoopInfo___(reader: Reader&, depth: i64) -> blot_check_
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__LoopInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__LoopInfo { run });
+    let run = pool_blot_check_core__LoopInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__LoopInfo { run , ..});
     if recorded != Error.none { pool_blot_check_core__LoopInfo.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__LoopInfo(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -994,7 +994,7 @@ fn read_blot_check_core__LoopCarry___(reader: Reader&, depth: i64) -> blot_check
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__LoopCarry.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__LoopCarry { run });
+    let run = pool_blot_check_core__LoopCarry.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__LoopCarry { run , ..});
     if recorded != Error.none { pool_blot_check_core__LoopCarry.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__LoopCarry(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -1005,7 +1005,7 @@ fn read_blot_check_core__ResolverInfo___(reader: Reader&, depth: i64) -> blot_ch
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__ResolverInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__ResolverInfo { run });
+    let run = pool_blot_check_core__ResolverInfo.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__ResolverInfo { run , ..});
     if recorded != Error.none { pool_blot_check_core__ResolverInfo.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__ResolverInfo(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -1016,7 +1016,7 @@ fn read_blot_check_core__OperationValue___(reader: Reader&, depth: i64) -> blot_
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__OperationValue.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__OperationValue { run });
+    let run = pool_blot_check_core__OperationValue.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__OperationValue { run , ..});
     if recorded != Error.none { pool_blot_check_core__OperationValue.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__OperationValue(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -1027,7 +1027,7 @@ fn read_blot_check_core__HandleEffects___(reader: Reader&, depth: i64) -> blot_c
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__HandleEffects.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__HandleEffects { run });
+    let run = pool_blot_check_core__HandleEffects.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__HandleEffects { run , ..});
     if recorded != Error.none { pool_blot_check_core__HandleEffects.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__HandleEffects(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -1038,7 +1038,7 @@ fn read_blot_check_core__Diagnostic___(reader: Reader&, depth: i64) -> blot_chec
     let charged = debit(reader, depth); if charged != Error.none { return [], charged; }
     let count, error = get(reader, 8); if error != Error.none { return [], error; }
     if count > reader.remaining as u64 || count > element_limit as u64 { return [], Error.artifact_limit; } if count == 0 { return [], Error.none; }
-    let run = pool_blot_check_core__Diagnostic.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Diagnostic { run });
+    let run = pool_blot_check_core__Diagnostic.alloc_slice(count as i64); let recorded = remember(reader, Run.run_blot_check_core__Diagnostic { run , ..});
     if recorded != Error.none { pool_blot_check_core__Diagnostic.free_slice(run); return [], recorded; }
     for index in count as i64 { let value, failure = read_blot_check_core__Diagnostic(reader, depth + 1); if failure != Error.none { return [], failure; } run[index] = value; } return run, Error.none;
 }
@@ -2427,15 +2427,15 @@ return blot_check_effects::Tail.closed, Error.none; },
 
         1 => { 
 let value, failure_value = read_u32(reader, depth + 1); if failure_value != Error.none { return default<blot_check_effects::Tail>(), failure_value; } 
-return blot_check_effects::Tail.variable { value: value }, Error.none; },
+return blot_check_effects::Tail.variable { value: value , ..}, Error.none; },
 
         2 => { 
 let value, failure_value = read_u32(reader, depth + 1); if failure_value != Error.none { return default<blot_check_effects::Tail>(), failure_value; } 
-return blot_check_effects::Tail.parameter { value: value }, Error.none; },
+return blot_check_effects::Tail.parameter { value: value , ..}, Error.none; },
 
         3 => { 
 let value, failure_value = read_u32(reader, depth + 1); if failure_value != Error.none { return default<blot_check_effects::Tail>(), failure_value; } 
-return blot_check_effects::Tail.formal { value: value }, Error.none; },
+return blot_check_effects::Tail.formal { value: value , ..}, Error.none; },
 
         _ => { return default<blot_check_effects::Tail>(), Error.invalid_artifact; },
     }
@@ -4921,11 +4921,11 @@ fn read_blot_check_core__DictionaryProof(reader: Reader&, depth: i64) -> blot_ch
 
         0 => { 
 let value, failure_value = read_u32(reader, depth + 1); if failure_value != Error.none { return default<blot_check_core::DictionaryProof>(), failure_value; } 
-return blot_check_core::DictionaryProof.selected { value: value }, Error.none; },
+return blot_check_core::DictionaryProof.selected { value: value , ..}, Error.none; },
 
         1 => { 
 let value, failure_value = read_blot_check_core__DictionaryGiven(reader, depth + 1); if failure_value != Error.none { return default<blot_check_core::DictionaryProof>(), failure_value; } 
-return blot_check_core::DictionaryProof.given { value: value }, Error.none; },
+return blot_check_core::DictionaryProof.given { value: value , ..}, Error.none; },
 
         _ => { return default<blot_check_core::DictionaryProof>(), Error.invalid_artifact; },
     }
@@ -5492,11 +5492,11 @@ return blot_check_core::Code.complexity, Error.none; },
     }
 }
 
-fn digest(bytes: const u8[:]) -> u8[32] { var hash = blot_support_blake3::State {}; hash.update(bytes); return hash.final(); }
+fn digest(bytes: const u8[:]) -> u8[32] { var hash = blot_support_blake3::State {..}; hash.update(bytes); return hash.final(); }
 fn encode(module: const blot_check_core::Module&, output: u8[>..<]&) -> Error {
     let begin = output.len; output.append(packet_magic);
     for index in packet_header - packet_magic.len { output.push(0); }
-    var writer = Writer { output: output, start: output.len };
+    var writer = Writer { output: output, start: output.len , ..};
     write_blot_check_core__Module(writer, module, 0);
     if writer.failure != Error.none { output.resize(begin); return writer.failure; }
     let payload = output[begin + packet_header..]; let checksum = digest(payload);
@@ -5513,19 +5513,21 @@ fn decode(bytes: const u8[:]) -> Owned, Error {
     let length = blot_bytes::get_u64(bytes, 44); if length > packet_limit as u64 { return default<Owned>(), Error.artifact_limit; }
     if length != (bytes.len - packet_header) as u64 { return default<Owned>(), Error.invalid_artifact; }
     let actual = digest(bytes[packet_header..]); if bytes[52..84] != actual[..] { return default<Owned>(), Error.invalid_artifact; }
-    var reader = Reader { bytes: bytes[packet_header..] }; let module, error = read_blot_check_core__Module(reader, 0);
+    var reader = Reader { bytes: bytes[packet_header..] , ..}; let module, error = read_blot_check_core__Module(reader, 0);
     if error != Error.none || reader.at != reader.bytes.len { releaseRuns(reader.head); if error != Error.none { return default<Owned>(), error; } return default<Owned>(), Error.invalid_artifact; }
     if next_generation == 0xffffffffffffffff || leases.len >= 0xffffffff { releaseRuns(reader.head); return default<Owned>(), Error.out_of_memory; }
     var result = module; result.owner_id = blot_native::fresh_owner_id(); result.types.owner_id = blot_native::fresh_owner_id(); if result.owner_id == 0 || result.types.owner_id == 0 { releaseRuns(reader.head); return default<Owned>(), Error.core_limit; }
-    let generation = next_generation; next_generation++; let lease = leases.alloc_index(Lease { reader.head, generation });
-    return Owned { result, (lease + 1) as u32, generation }, Error.none;
+    var packages=false;for node in result.nodes {if node.tag==blot_check_core::Tag.package_pack {packages=true;break;}}
+    if packages && result.nodes.len!=0 {let run=pool_u32.alloc_slice(result.nodes.len);let error=remember(reader,Run.run_u32{run, ..});if error!=Error.none {pool_u32.free_slice(run);releaseRuns(reader.head);return default<Owned>(),error;}for node,index in result.nodes {run[index]=node.a;}result.package_payloads=run;}
+    let generation = next_generation; next_generation++; let lease = leases.alloc_index(Lease { reader.head, generation , ..});
+    return Owned { result, (lease + 1) as u32, generation , ..}, Error.none;
 }
 
 // A native owned copy uses the same typed dependency journal as principal
 // snapshots. It never encodes and decodes an intermediate packet.
 fn clone(module:const blot_check_core::Module&)->Owned,Error {
  let copied,error=blot_reuse_dependency_payload::clone(module);if error!=Error.none {return default<Owned>(),error;}
- return Owned {module:copied.value,payload_owner:copied.owner},Error.none;
+ return Owned {module:copied.value,payload_owner:copied.owner, ..},Error.none;
 }
 fn mutable(self:Owned&,values:const u32[:])->u32[:] {
  if self.payload_owner.lease!=0 {return self.payload_owner.mutable(values);}

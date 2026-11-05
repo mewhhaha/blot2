@@ -19,8 +19,8 @@ enum Kind { scalar, unknown, capability, product, record, wrapper, selection, ca
 struct Node {
     site: Site, context: u32 = 0, invocation: OptionId = blot_support::none<Id>(), closure: OptionId = blot_support::none<Id>(),
     kind: Kind, owner: Id, depth: u32, field: u32 = 0, contents: Id = 0, first_edge: OptionId = blot_support::none<Id>(),
-    nominal: blot_check_types::NominalIdentity = blot_check_types::NominalIdentity { 0, 0 }, target: blot_support::Option<Site> = blot_support::none<Site>(),
-    signature: blot_support::Option<TypeOrigin> = blot_support::none<TypeOrigin>(), mappings: blot_check_core::List = blot_check_core::List {}, actual_mappings: blot_check_core::List = blot_check_core::List {},
+    nominal: blot_check_types::NominalIdentity = blot_check_types::NominalIdentity { 0, 0 , ..}, target: blot_support::Option<Site> = blot_support::none<Site>(),
+    signature: blot_support::Option<TypeOrigin> = blot_support::none<TypeOrigin>(), mappings: blot_check_core::List = blot_check_core::List {..}, actual_mappings: blot_check_core::List = blot_check_core::List {..},
 }
 enum EdgeKind { value, capture, store, result, call }
 struct Edge { from: Id, to: Id, kind: EdgeKind, field: u32 = 0, next: OptionId = blot_support::none<Id>() }
@@ -36,7 +36,7 @@ struct Environment { entries: Entry[256], len: i64 = 0, types: Mapping[64], type
 fn get(self: const Environment&, binding: u32, remaining: i64&) -> blot_support::Option<Entry>, Error {
     var index = self.len; while index != 0 { if remaining == 0 { return blot_support::none<Entry>(), Error.analysis_limit; } remaining -= 1; index -= 1; if self.entries[index].binding == binding { return blot_support::some(self.entries[index]), Error.none; } } return blot_support::none<Entry>(), Error.none;
 }
-fn bind(self: Environment&, binding: u32, value: Id, depth: u32) -> Error { if binding == 0 { return Error.none; } if self.len == self.entries.len { return Error.analysis_limit; } self.entries[self.len] = Entry { binding, value, depth }; self.len += 1; return Error.none; }
+fn bind(self: Environment&, binding: u32, value: Id, depth: u32) -> Error { if binding == 0 { return Error.none; } if self.len == self.entries.len { return Error.analysis_limit; } self.entries[self.len] = Entry { binding, value, depth , ..}; self.len += 1; return Error.none; }
 struct ActiveCall { module: const Module&, body: CoreId, parent: const ActiveCall? }
 enum Parameters { closure { catalog: u32 }, body { span: blot_check_core::List } }
 struct Callable { value: Id, module: const Module&, binding: u32, body: CoreId, parameters: Parameters, environment: Environment, arguments: Id[16], count: i64 = 0, runtime: bool = false }
@@ -51,7 +51,7 @@ struct Control { module: const Module&, target: CoreId, depth: u32 }
 struct Locations { before: const Id[:], joined: Id[:], started: bool = false }
 fn locations(scan: Scan&, before: Id[>..]&, joined: Id[>..]&) -> Locations, Error {
     if scan.nodes.len > scan.remaining { return default<Locations>(), Error.analysis_limit; } scan.remaining -= scan.nodes.len;
-    for value in scan.nodes { before += value.contents; } joined.resize(before.len, 0); return Locations { before, joined }, Error.none;
+    for value in scan.nodes { before += value.contents; } joined.resize(before.len, 0); return Locations { before, joined , ..}, Error.none;
 }
 fn reset(self: Locations, scan: Scan&) -> Error { for slot, index in self.before { let error = scan.step(0); if error != Error.none { return error; } scan.nodes[index].contents = slot; } return Error.none; }
 fn collect(self: Locations&, scan: Scan&, module: const Module&, source: CoreId) -> Error {
@@ -67,27 +67,27 @@ struct Scan {
     module: const Module&, evidence: Evidence&, owners: const ModuleRef[:], type_mappings: Mapping[>..<]&, nodes: Node[>..<]&, edges: Edge[>..<]&, boundaries: Boundary[>..<]&, invocations: Invocation[>..<]&, context: u32 = 0,
     callables: Callable[>..<]&, operations: Operation[>..<]&, providers: ProviderEntry[>..<]&, frames: Frame[>..<]&, exits: Exit[>..<]&, controls: Control[>..<]&, remaining: i64 = 65536, owner: Id = 0, scope_depth: u32 = 0, binding: u32 = 0, complete: bool = true, scope_validation: bool = false, checked_owners: (const Module&)[>..<]&, active_calls: const ActiveCall? = null,
 }
-fn init(module: const Module&, owners: const ModuleRef[:], evidence: Evidence&, tables: Tables) -> Scan { return Scan { module, evidence, owners, type_mappings: tables.type_mappings, nodes: tables.nodes, edges: tables.edges, boundaries: tables.boundaries, invocations: tables.invocations, callables: tables.callables, operations: tables.operations, providers: tables.providers, frames: tables.frames, exits: tables.exits, controls: tables.controls, checked_owners: tables.checked_owners }; }
+fn init(module: const Module&, owners: const ModuleRef[:], evidence: Evidence&, tables: Tables) -> Scan { return Scan { module, evidence, owners, type_mappings: tables.type_mappings, nodes: tables.nodes, edges: tables.edges, boundaries: tables.boundaries, invocations: tables.invocations, callables: tables.callables, operations: tables.operations, providers: tables.providers, frames: tables.frames, exits: tables.exits, controls: tables.controls, checked_owners: tables.checked_owners , ..}; }
 fn deinit(self: Scan&) { self.type_mappings.clear(); self.nodes.clear(); self.edges.clear(); self.boundaries.clear(); self.invocations.clear(); self.callables.clear(); self.operations.clear(); self.providers.clear(); self.frames.clear(); self.exits.clear(); self.controls.clear(); self.checked_owners.clear(); }
 fn step(self: Scan&, depth: i64) -> Error { if self.remaining == 0 || depth >= 128 { return Error.analysis_limit; } self.remaining -= 1; return Error.none; }
-fn site(self: const Scan&, module: const Module&, source: CoreId) -> Site { return Site { module.unit, self.binding, source }; }
+fn site(self: const Scan&, module: const Module&, source: CoreId) -> Site { return Site { module.unit, self.binding, source , ..}; }
 fn value(self: Scan&, module: const Module&, source: CoreId, kind: Kind) -> Id, Error {
     let error = self.step(0); if error != Error.none { return 0, error; } if self.nodes.len >= 4096 { return 0, Error.analysis_limit; } let id = self.nodes.len as u32;
-    self.nodes += Node { site: self.site(module, source), context: self.context, kind, owner: self.owner, depth: self.scope_depth }; return id, Error.none;
+    self.nodes += Node { site: self.site(module, source), context: self.context, kind, owner: self.owner, depth: self.scope_depth , ..}; return id, Error.none;
 }
 fn mappings(self: Scan&, values: const Mapping[:]) -> blot_check_core::List, Error {
-    let error = self.step(0); if error != Error.none { return blot_check_core::List {}, error; } if values.len > self.remaining || self.type_mappings.len > 65536 || values.len > 65536 - self.type_mappings.len { return blot_check_core::List {}, Error.analysis_limit; }
-    self.remaining -= values.len; let start = self.type_mappings.len as u32; self.type_mappings += values; return blot_check_core::List { start, values.len as u32 }, Error.none;
+    let error = self.step(0); if error != Error.none { return blot_check_core::List {..}, error; } if values.len > self.remaining || self.type_mappings.len > 65536 || values.len > 65536 - self.type_mappings.len { return blot_check_core::List {..}, Error.analysis_limit; }
+    self.remaining -= values.len; let start = self.type_mappings.len as u32; self.type_mappings += values; return blot_check_core::List { start, values.len as u32 , ..}, Error.none;
 }
 fn edge(self: Scan&, from: Id, to: Id, kind: EdgeKind, field: u32) -> Error {
     let error = self.step(0); if error != Error.none { return error; } if from >= self.nodes.len || to >= self.nodes.len { return Error.invalid_artifact; } if self.edges.len >= 65536 { return Error.analysis_limit; }
-    let index = self.edges.len as u32; self.edges += Edge { from, to, kind, field, self.nodes[from].first_edge }; self.nodes[from].first_edge = blot_support::some(index); return Error.none;
+    let index = self.edges.len as u32; self.edges += Edge { from, to, kind, field, self.nodes[from].first_edge , ..}; self.nodes[from].first_edge = blot_support::some(index); return Error.none;
 }
 fn ownerModule(self: Scan&, current: const Module&, unit: u32) -> const Module?, Error {
     if unit == 0 || unit == current.unit { return current, Error.none; } var found: const Module? = null;
     for candidate_owner_ref in self.owners { let candidate: const blot_check_core::Module& = candidate_owner_ref.value; let error = self.step(0); if error != Error.none { return null, error; } if candidate.unit != unit { continue; } { let optional_binding_83 .= found; if optional_binding_83 { let prior .= optional_binding_83; if prior.owner_id == 0 || prior.owner_id != candidate.owner_id { return null, Error.invalid_artifact; }  } } found .= candidate; }
     { let optional_binding_82 .= found; if optional_binding_82 { let selected .= optional_binding_82; for prior in self.checked_owners { let error = self.step(0); if error != Error.none { return null, error; } if prior.owner_id != 0 && prior.owner_id == selected.owner_id { return selected, Error.none; } }
-        let error = blot_check_frozen_core_validation::validateBounds(selected, blot_check_frozen_core_validation::Context { units: self.owners }); if error != Error.none { return null, error; } self.checked_owners += selected; return selected, Error.none;
+        let error = blot_check_frozen_core_validation::validateBounds(selected, blot_check_frozen_core_validation::Context { units: self.owners , ..}); if error != Error.none { return null, error; } self.checked_owners += selected; return selected, Error.none;
      } } return null, Error.unsupported;
 }
 fn node(self: Scan&, module: const Module&, id: CoreId, depth: i64) -> blot_check_core::Node, Error { let error = self.step(depth); if error != Error.none { return default<blot_check_core::Node>(), error; } if id == 0 || id >= module.nodes.len || module.nodes[id].ty >= module.types.nodes.len { return default<blot_check_core::Node>(), Error.invalid_artifact; } return module.nodes[id], Error.none; }
@@ -139,12 +139,12 @@ recursive fn captureBindings(self: Scan&, graph: blot_check_frozen_core_validati
 fn closure(self: Scan&, module: const Module&, source: CoreId, catalog: u32, environment: const Environment&, depth: i64) -> Id, Error {
     if catalog >= module.closures.len { return 0, Error.invalid_artifact; } let closure = module.closures[catalog]; let result, error = self.value(module, source, Kind.callable); if error != Error.none { return 0, error; }
     let mappings, error = self.mappings(environment.types[..environment.type_len]); if error != Error.none { return 0, error; }
-    self.nodes[result].closure = blot_support::some(catalog); self.nodes[result].target = blot_support::some(Site { module.unit, self.binding, closure.body }); self.nodes[result].signature = blot_support::some(TypeOrigin { module.unit, module.nodes[source].ty }); self.nodes[result].mappings = mappings; self.nodes[result].actual_mappings = mappings;
+    self.nodes[result].closure = blot_support::some(catalog); self.nodes[result].target = blot_support::some(Site { module.unit, self.binding, closure.body , ..}); self.nodes[result].signature = blot_support::some(TypeOrigin { module.unit, module.nodes[source].ty , ..}); self.nodes[result].mappings = mappings; self.nodes[result].actual_mappings = mappings;
     if self.scope_validation { var captures = environment; let error = captures.bind(closure.parameter.binding, 0, self.scope_depth); if error != Error.none { return 0, error; } let graph, error = blot_check_frozen_core_validation::initGraph(module); if error != Error.none { return 0, Error.invalid_artifact; }
         let error = captureBindings(self, graph, graph.vertex(blot_check_frozen_core_validation::Kind.node, closure.body), captures, depth + 1); if error != Error.none { return 0, error; }
         let error = capture(self, module, closure.body, captures, result, depth + 1); if error != Error.none { return 0, error; }
     } else { let error = capture(self, module, closure.body, environment, result, depth + 1); if error != Error.none { return 0, error; } }
-    self.callables += Callable { result, module, self.binding, closure.body, Parameters.closure { catalog }, environment }; return result, Error.none;
+    self.callables += Callable { result, module, self.binding, closure.body, Parameters.closure { catalog , ..}, environment , ..}; return result, Error.none;
 }
 fn projectEvidence(self: Scan&, module: const Module&, root: u32, environment: const Environment&) -> Id, Error {
     let id, error = self.evidence.projectWithBudget(module.types, root, environment.types[..environment.type_len], [], self.remaining); if error != Error.none { if error == Error.out_of_memory { return 0, error; } return 0, Error.unsupported; } return id, Error.none;
@@ -154,23 +154,23 @@ fn named(self: Scan&, module: const Module&, source: CoreId, original: blot_chec
     for attempt in 0..128 { let error = self.step(0); if error != Error.none { return 0, error; } let owner, error = self.ownerModule(producer, target.unit); if error != Error.none { return 0, error; } { let optional_binding_81 .= owner; if optional_binding_81 { let owner .= optional_binding_81; producer .= owner;  } else { return 0, Error.unsupported; } }
         if target.binding == 0 || target.binding >= producer.bindings.len { return 0, Error.invalid_artifact; } let binding = producer.bindings[target.binding]; if binding.kind == blot_check_check::Kind.external { target = binding.target; continue; }
         if binding.kind != blot_check_check::Kind.global || binding.body_id == 0 || binding.body_id >= producer.bodies.len { return 0, Error.unsupported; } let body = producer.bodies[binding.body_id]; if !body.is_function { return 0, Error.unsupported; }
-        if body.parameters.start > producer.parameters.len || body.parameters.len > producer.parameters.len - body.parameters.start || body.parameters.len > 16 { return 0, Error.invalid_artifact; } var imported = Environment {};
+        if body.parameters.start > producer.parameters.len || body.parameters.len > producer.parameters.len - body.parameters.start || body.parameters.len > 16 { return 0, Error.invalid_artifact; } var imported = Environment {..};
         if producer.types.node(binding.ty).tag == blot_check_types::Tag.forall {
-            var views = blot_check_package_contracts::Context { types: module.types, remaining: self.remaining }; let error = views.initialize(); if error != Error.none { return 0, error; }
-            var instance = blot_check_package_contracts::Principal { left: producer.types, right: module.types, remaining: self.remaining, views, left_rows: body.closed_rows, foreign_views: true }; let error = instance.instantiate(binding.ty, actual); if error != Error.none { return 0, error; }
+            var views = blot_check_package_contracts::Context { types: module.types, remaining: self.remaining , ..}; let error = views.initialize(); if error != Error.none { return 0, error; }
+            var instance = blot_check_package_contracts::Principal { left: producer.types, right: module.types, remaining: self.remaining, views, left_rows: body.closed_rows, foreign_views: true , ..}; let error = instance.instantiate(binding.ty, actual); if error != Error.none { return 0, error; }
             let quantifier = producer.types.node(binding.ty);
-            for formal, index in producer.types.list(blot_check_types::List { quantifier.b, quantifier.c }) { let error = self.step(0); if error != Error.none { return 0, error; } let witness = instance.witnesses[index]; if producer.types.node(formal).b != 0 || witness == 0 { continue; } if imported.type_len == imported.types.len { return 0, Error.analysis_limit; }
-                let evidence, error = projectEvidence(self, module, witness, environment); if error != Error.none { return 0, error; } imported.types[imported.type_len] = Mapping { formal, evidence }; imported.type_len += 1;
+            for formal, index in producer.types.list(blot_check_types::List { quantifier.b, quantifier.c , ..}) { let error = self.step(0); if error != Error.none { return 0, error; } let witness = instance.witnesses[index]; if producer.types.node(formal).b != 0 || witness == 0 { continue; } if imported.type_len == imported.types.len { return 0, Error.analysis_limit; }
+                let evidence, error = projectEvidence(self, module, witness, environment); if error != Error.none { return 0, error; } imported.types[imported.type_len] = Mapping { formal, evidence , ..}; imported.type_len += 1;
             }
         } else {
             let relation, error = blot_check_generative_relocation::init(producer, module, binding.scheme, actual, actual, 0, 0); if error != Error.none { return 0, Error.invalid_artifact; } let spent = 65536 - relation.remaining; if spent > self.remaining { return 0, Error.analysis_limit; } self.remaining -= spent;
             for index in 0..relation.len { let pair = relation.pairs[index]; let error = self.step(0); if error != Error.none { return 0, error; } if producer.types.node(pair.before).tag != blot_check_types::Tag.variable { continue; } if imported.type_len == imported.types.len { return 0, Error.analysis_limit; }
-                let evidence, error = projectEvidence(self, module, pair.after, environment); if error != Error.none { return 0, error; } imported.types[imported.type_len] = Mapping { pair.before, evidence }; imported.type_len += 1;
+                let evidence, error = projectEvidence(self, module, pair.after, environment); if error != Error.none { return 0, error; } imported.types[imported.type_len] = Mapping { pair.before, evidence , ..}; imported.type_len += 1;
             }
         }
         let result, error = self.value(module, source, Kind.callable); if error != Error.none { return 0, error; } let mappings, error = self.mappings(imported.types[..imported.type_len]); if error != Error.none { return 0, error; } let actual_mappings, error = self.mappings(environment.types[..environment.type_len]); if error != Error.none { return 0, error; }
-        self.nodes[result].target = blot_support::some(Site { producer.unit, body.binding, body.root }); self.nodes[result].signature = blot_support::some(TypeOrigin { module.unit, actual }); self.nodes[result].mappings = mappings; self.nodes[result].actual_mappings = actual_mappings;
-        self.callables += Callable { result, producer, body.binding, body.root, Parameters.body { body.parameters }, imported, runtime: body.runtime }; return result, Error.none;
+        self.nodes[result].target = blot_support::some(Site { producer.unit, body.binding, body.root , ..}); self.nodes[result].signature = blot_support::some(TypeOrigin { module.unit, actual , ..}); self.nodes[result].mappings = mappings; self.nodes[result].actual_mappings = actual_mappings;
+        self.callables += Callable { result, producer, body.binding, body.root, Parameters.body { body.parameters , ..}, imported, runtime: body.runtime , ..}; return result, Error.none;
     } return 0, Error.analysis_limit;
 }
 fn operationEqual(self: Scan&, left: Id, right: Id) -> bool, Error {
@@ -201,7 +201,7 @@ recursive fn invoke(self: Scan&, module: const Module&, source: CoreId, function
         if invocation.count < parameterCount(invocation) { return partialCall(self, module, source, callable, invocation, function, argument, depth); }
         if callable.runtime { return self.sink(module, source, invocation.arguments[..invocation.count]); }
         var active .= self.active_calls; while true { { let optional_binding_80 .= active; if optional_binding_80 { let prior .= optional_binding_80; let error = self.step(depth); if error != Error.none { return 0, error; } if prior.module.owner_id != 0 && prior.module.owner_id == callable.module.owner_id && prior.body == callable.body { return 0, Error.unsupported; } active .= prior.parent;  } else { break; } } }
-        var current = ActiveCall { callable.module, callable.body, self.active_calls }; self.active_calls .= current;
+        var current = ActiveCall { callable.module, callable.body, self.active_calls , ..}; self.active_calls .= current;
         let result, error = executeCall(self, module, source, callable, invocation, function, depth); self.active_calls .= current.parent; return result, error;
     } let arguments: Id[2] = [function, argument]; return self.sink(module, source, arguments);
 }
@@ -218,7 +218,7 @@ fn executeCall(self: Scan&, module: const Module&, source: CoreId, callable: Cal
     var nested = callable.environment; for index in 0..parameterCount(invocation) { let error = nested.bind(parameterAt(invocation, index).binding, invocation.arguments[index], self.scope_depth); if error != Error.none { return 0, error; } }
     let call, error = self.value(module, source, Kind.event); if error != Error.none { return 0, error; } let error = self.edge(call, function, EdgeKind.call, 0); if error != Error.none { return 0, error; }
     for ordinal in 0..invocation.count { let error = self.edge(call, invocation.arguments[ordinal], EdgeKind.call, (ordinal + 1) as u32); if error != Error.none { return 0, error; } }
-    let caller = self.site(module, source); let saved_binding = self.binding; let saved_context = self.context; self.context = self.invocations.len as u32; self.invocations += Invocation { blot_support::some(saved_context), caller, function }; self.nodes[call].invocation = blot_support::some(self.context); self.binding = callable.binding;
+    let caller = self.site(module, source); let saved_binding = self.binding; let saved_context = self.context; self.context = self.invocations.len as u32; self.invocations += Invocation { blot_support::some(saved_context), caller, function , ..}; self.nodes[call].invocation = blot_support::some(self.context); self.binding = callable.binding;
     let evaluated, error = expression(self, callable.module, callable.body, nested, depth + 1); self.binding = saved_binding; self.context = saved_context; if error != Error.none { return 0, error; }
     if !evaluated.present { self.complete = false; } var result: Id = 0; if evaluated.present { result = evaluated.value; } let error = self.edge(call, result, EdgeKind.result, 0); if error != Error.none { return 0, error; } return result, Error.none;
 }
@@ -308,7 +308,7 @@ fn resourceBody(self: Scan&, module: const Module&, source: CoreId, n: blot_chec
     let borrowed, error = self.value(module, source, Kind.capability); if error != Error.none { return blot_support::none<Id>(), error; } self.nodes[borrowed].owner = owner;
     let result, error = invoke(self, module, n.c, body, borrowed, depth + 1); if error != Error.none { return blot_support::none<Id>(), error; } let cleaned, error = invoke(self, module, n.b, cleanup, acquired, depth + 1); if error != Error.none { return blot_support::none<Id>(), error; } if cleaned != 0 { return blot_support::none<Id>(), Error.invalid_artifact; }
     let escapes, error = self.reaches(result, blot_support::some(owner), blot_support::none<u32>()); if error != Error.none { return blot_support::none<Id>(), error; } if escapes { return blot_support::none<Id>(), Error.lifetime_escape; }
-    self.boundaries += Boundary { self.site(module, source), owner, result }; return blot_support::some(result), Error.none;
+    self.boundaries += Boundary { self.site(module, source), owner, result , ..}; return blot_support::some(result), Error.none;
 }
 fn taskScope(self: Scan&, module: const Module&, source: CoreId, callback_id: CoreId, environment: Environment&, depth: i64) -> OptionId, Error {
     let callback, error = self.node(module, callback_id, depth + 1); if error != Error.none { return blot_support::none<Id>(), error; }
@@ -320,7 +320,7 @@ fn taskScope(self: Scan&, module: const Module&, source: CoreId, callback_id: Co
 }
 fn taskScopeBody(self: Scan&, module: const Module&, source: CoreId, callback_id: CoreId, function: Id, owner: Id, depth: i64) -> OptionId, Error {
     let capability, error = self.value(module, callback_id, Kind.capability); if error != Error.none { return blot_support::none<Id>(), error; } let result, error = invoke(self, module, callback_id, function, capability, depth + 1); if error != Error.none { return blot_support::none<Id>(), error; }
-    let escapes, error = self.reaches(result, blot_support::some(owner), blot_support::none<u32>()); if error != Error.none { return blot_support::none<Id>(), error; } if escapes { return blot_support::none<Id>(), Error.lifetime_escape; } self.boundaries += Boundary { self.site(module, source), owner, result }; return blot_support::some(result), Error.none;
+    let escapes, error = self.reaches(result, blot_support::some(owner), blot_support::none<u32>()); if error != Error.none { return blot_support::none<Id>(), error; } if escapes { return blot_support::none<Id>(), Error.lifetime_escape; } self.boundaries += Boundary { self.site(module, source), owner, result , ..}; return blot_support::some(result), Error.none;
 }
 fn taskReceive(self: Scan&, module: const Module&, source: CoreId, input: Id, collect: bool) -> Id, Error {
     if !collect { if input >= self.nodes.len || self.nodes[input].kind != Kind.wrapper { return 0, Error.unsupported; } return self.nodes[input].contents, Error.none; }
@@ -383,7 +383,7 @@ recursive fn expression(self: Scan&, module: const Module&, source: CoreId, envi
             let result, error = expression(self, module, n.a, environment, depth + 1); if error != Error.none || !result.present { return result, error; } var target_depth = blot_support::none<u32>();
             for control in self.controls { let error = self.step(depth); if error != Error.none { return blot_support::none<Id>(), error; } if control.module.owner_id != 0 && control.module.owner_id == module.owner_id && control.target == n.b { target_depth = blot_support::some(control.depth); } }
             if !target_depth.present { return blot_support::none<Id>(), Error.invalid_artifact; } let escapes, error = self.reaches(result.value, blot_support::none<Id>(), target_depth); if error != Error.none { return blot_support::none<Id>(), error; } if escapes { return blot_support::none<Id>(), Error.lifetime_escape; }
-            self.exits += Exit { module, n.b, result.value }; return blot_support::none<Id>(), Error.none;
+            self.exits += Exit { module, n.b, result.value , ..}; return blot_support::none<Id>(), Error.none;
         },
         blot_check_core::Tag.panic => { return blot_support::none<Id>(), Error.none; },
         _ => { return blot_support::none<Id>(), Error.unsupported; },
@@ -394,7 +394,7 @@ fn operationValue(self: Scan&, module: const Module&, source: CoreId, n: blot_ch
     if metadata.witness != 0 { let value, error = expression(self, module, metadata.witness, environment, depth + 1); if error != Error.none || !value.present { return value, error; } }
     var receiver: Id = 0; if metadata.capability != 0 { let value, error = expression(self, module, metadata.capability, environment, depth + 1); if error != Error.none || !value.present { return value, error; } receiver = value.value; }
     let result, error = self.value(module, source, Kind.operation); if error != Error.none { return blot_support::none<Id>(), error; } let error = self.edge(result, receiver, EdgeKind.capture, 0); if error != Error.none { return blot_support::none<Id>(), error; }
-    var operation = Operation { result, module, metadata, receiver }; let arguments = metadata.arguments;
+    var operation = Operation { result, module, metadata, receiver , ..}; let arguments = metadata.arguments;
     if arguments.len > operation.arguments.len || arguments.start > module.types.extra.len || arguments.len > module.types.extra.len - arguments.start { return blot_support::none<Id>(), Error.invalid_artifact; }
     for argument, index in module.types.extra[arguments.start..arguments.start + arguments.len] { let evidence, error = projectEvidence(self, module, argument, environment); if error != Error.none { return blot_support::none<Id>(), error; } operation.arguments[index] = evidence; }
     operation.argument_count = arguments.len; self.operations += operation; return blot_support::some(result), Error.none;
@@ -404,7 +404,7 @@ fn providerValue(self: Scan&, module: const Module&, source: CoreId, n: blot_che
     var initial: Id = 0; var kind = Kind.provider; var write: Id = 0; var callback = second.value;
     if n.tag == blot_check_core::Tag.state_provider { let value, error = expression(self, module, n.c, environment, depth + 1); if error != Error.none || !value.present { return value, error; } initial = value.value; kind = Kind.state_provider; write = second.value; callback = 0; }
     let values: Id[3] = [read.value, second.value, initial]; let result, error = self.aggregate(module, source, kind, values); if error != Error.none { return blot_support::none<Id>(), error; }
-    self.providers += ProviderEntry { result, Provider { read.value, write, initial, callback } }; return blot_support::some(result), Error.none;
+    self.providers += ProviderEntry { result, Provider { read.value, write, initial, callback , ..} , ..}; return blot_support::some(result), Error.none;
 }
 fn handleValue(self: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, environment: Environment&, depth: i64) -> OptionId, Error {
     let provider, error = expression(self, module, n.a, environment, depth + 1); if error != Error.none || !provider.present { return provider, error; } var definition = blot_support::none<Provider>();
@@ -413,12 +413,12 @@ fn handleValue(self: Scan&, module: const Module&, source: CoreId, n: blot_check
 }
 fn handleBody(self: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, environment: Environment&, definition: Provider, mark: i64, depth: i64) -> OptionId, Error {
     var cell: Id = 0; if definition.write != 0 { let id, error = self.value(module, source, Kind.cell); if error != Error.none { return blot_support::none<Id>(), error; } cell = id; self.nodes[cell].contents = definition.initial; }
-    self.frames += Frame { definition.read, definition.write, cell, self.scope_depth, definition.callback, mark };
+    self.frames += Frame { definition.read, definition.write, cell, self.scope_depth, definition.callback, mark , ..};
     let result, error = expression(self, module, n.b, environment, depth + 1); if error != Error.none || !result.present { return result, error; } if cell == 0 { return result, Error.none; } let values: Id[2] = [self.nodes[cell].contents, result.value]; let id, error = self.aggregate(module, source, Kind.product, values); return blot_support::some(id), error;
 }
 fn aggregateValue(self: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, environment: Environment&, depth: i64) -> OptionId, Error {
     var kind = Kind.product; if n.tag == blot_check_core::Tag.record { kind = Kind.record; } let result, error = self.value(module, source, kind); if error != Error.none { return blot_support::none<Id>(), error; }
-    let children, error = self.span(module, n.a, n.b); if error != Error.none { return blot_support::none<Id>(), error; } var record = blot_check_types::Node { blot_check_types::Tag.absent };
+    let children, error = self.span(module, n.a, n.b); if error != Error.none { return blot_support::none<Id>(), error; } var record = blot_check_types::Node { blot_check_types::Tag.absent , ..};
     if n.tag == blot_check_core::Tag.record { record = module.types.node(n.ty); if record.tag != blot_check_types::Tag.record || record.a > module.types.extra.len || record.b > (module.types.extra.len - record.a) / 2 { return blot_support::none<Id>(), Error.invalid_artifact; } let fields, error = self.span(module, n.c, n.b); if error != Error.none { return blot_support::none<Id>(), error; } }
     for child, index in children { var field = index as u32; if n.tag == blot_check_core::Tag.record { let destination = module.extra[n.c + index]; if destination >= record.b { return blot_support::none<Id>(), Error.invalid_artifact; } field = module.types.extra[record.a + destination * 2]; }
         let value, error = expression(self, module, child, environment, depth + 1); if error != Error.none || !value.present { return value, error; } let error = self.edge(result, value.value, EdgeKind.value, field); if error != Error.none { return blot_support::none<Id>(), error; }
@@ -482,7 +482,7 @@ fn matchValue(self: Scan&, module: const Module&, source: CoreId, n: blot_check_
     let result, error = self.aggregate(module, source, Kind.selection, values[..count]); return blot_support::some(result), error;
 }
 fn blockValue(self: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, environment: const Environment&, depth: i64) -> OptionId, Error {
-    var nested = environment; self.controls += Control { module, source, self.scope_depth }; let mark = self.exits.len;
+    var nested = environment; self.controls += Control { module, source, self.scope_depth , ..}; let mark = self.exits.len;
     let result, error = blockBody(self, module, source, n, nested, mark, depth); self.controls.resize(self.controls.len - 1); return result, error;
 }
 fn blockBody(self: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, nested: Environment&, mark: i64, depth: i64) -> OptionId, Error {
@@ -496,15 +496,15 @@ fn blockBody(self: Scan&, module: const Module&, source: CoreId, n: blot_check_c
     if len == 0 { return blot_support::none<Id>(), Error.none; } if len == 1 { return blot_support::some(results[0]), Error.none; } let result, error = self.aggregate(module, source, Kind.selection, results[..len]); return blot_support::some(result), error;
 }
 fn takeReport(scan: Scan&, initial: i64) -> Report, Error {
-    let evidence = blot_eval_type_evidence::Snapshot { owner_id: scan.evidence.owner_id, nodes: scan.evidence.nodes[:], extra: scan.evidence.extra[:], effects: blot_check_effect_evidence::Snapshot { scan.evidence.effects.operations[:], scan.evidence.effects.arguments[:], scan.evidence.effects.rows[:], scan.evidence.effects.labels[:], scan.evidence.effects.owner_id }, quantifier_goals: scan.evidence.quantifier_goals[:], quantifier_obligations: scan.evidence.quantifier_obligations[:] };
-    return blot_check_lifetime_report_pool::own(Report { scan.nodes[:], scan.edges[:], evidence, scan.type_mappings[:], scan.boundaries[:], scan.invocations[:], scan.complete, initial - scan.remaining });
+    let evidence = blot_eval_type_evidence::Snapshot { owner_id: scan.evidence.owner_id, nodes: scan.evidence.nodes[:], extra: scan.evidence.extra[:], effects: blot_check_effect_evidence::Snapshot { scan.evidence.effects.operations[:], scan.evidence.effects.arguments[:], scan.evidence.effects.rows[:], scan.evidence.effects.labels[:], scan.evidence.effects.owner_id , ..}, quantifier_goals: scan.evidence.quantifier_goals[:], quantifier_obligations: scan.evidence.quantifier_obligations[:] , ..};
+    return blot_check_lifetime_report_pool::own(Report { scan.nodes[:], scan.edges[:], evidence, scan.type_mappings[:], scan.boundaries[:], scan.invocations[:], scan.complete, initial - scan.remaining , ..});
 }
 fn deinit(self: Report&) { let error = blot_check_lifetime_report_pool::deinit(self); assert(error == Error.none); }
 struct ScanScope<C,F> { module: const Module&, owners: const ModuleRef[:], context: C& }
-fn withScan<C,F>(module: const Module&, owners: const ModuleRef[:], context: C&) -> Error { var scope = ScanScope<C,F> { module, owners, context }; return blot_eval_type_evidence::withStore<ScanScope<C,F>,scanScope>(scope); }
+fn withScan<C,F>(module: const Module&, owners: const ModuleRef[:], context: C&) -> Error { var scope = ScanScope<C,F> { module, owners, context , ..}; return blot_eval_type_evidence::withStore<ScanScope<C,F>,scanScope>(scope); }
 fn scanScope<C,F>(scope: ScanScope<C,F>&, evidence: Evidence&) -> Error {
     var type_mappings: Mapping[>..<] = []; var nodes: Node[>..<] = []; var edges: Edge[>..<] = []; var boundaries: Boundary[>..<] = []; var invocations: Invocation[>..<] = []; var callables: Callable[>..<] = []; var operations: Operation[>..<] = []; var providers: ProviderEntry[>..<] = []; var frames: Frame[>..<] = []; var exits: Exit[>..<] = []; var controls: Control[>..<] = []; var checked_owners: (const Module&)[>..<] = [];
-    var scan = init(scope.module, scope.owners, evidence, Tables { type_mappings, nodes, edges, boundaries, invocations, callables, operations, providers, frames, exits, controls, checked_owners }); let error = F(scope.context, scan); deinit(scan); return error;
+    var scan = init(scope.module, scope.owners, evidence, Tables { type_mappings, nodes, edges, boundaries, invocations, callables, operations, providers, frames, exits, controls, checked_owners , ..}); let error = F(scope.context, scan); deinit(scan); return error;
 }
 struct Analysis { boundary: blot_check_core::BindingRef, remaining: i64 = 65536, scope: CoreId = 0, scope_only: bool = false, report: blot_support::Option<Report> = blot_support::none<Report>() }
 fn ownerContext(module: const Module&, owners: const ModuleRef[:], all: (const Module&)[>..]&, remaining: i64&) -> Error {
@@ -512,8 +512,8 @@ fn ownerContext(module: const Module&, owners: const ModuleRef[:], all: (const M
     for owner_owner_ref in owners { let owner: const blot_check_core::Module& = owner_owner_ref.value; if owner.owner_id != 0 && owner.owner_id == module.owner_id { continue; } for prior in all { let error = reportStep(remaining); if error != Error.none { return error; } if prior.unit == owner.unit { return Error.invalid_artifact; } } all += owner; } return Error.none;
 }
 fn analyze(module: const Module&, owners: const ModuleRef[:], boundary: blot_check_core::BindingRef) -> Report, Error {
-    var all: (const Module&)[>..] = []; var context = Analysis { boundary }; let error = ownerContext(module, owners, all, context.remaining); if error != Error.none { return default<Report>(), error; }
-    let error = blot_check_frozen_core_validation::validateBounds(module, blot_check_frozen_core_validation::Context { units: all }); if error != Error.none { return default<Report>(), error; }
+    var all: (const Module&)[>..] = []; var context = Analysis { boundary , ..}; let error = ownerContext(module, owners, all, context.remaining); if error != Error.none { return default<Report>(), error; }
+    let error = blot_check_frozen_core_validation::validateBounds(module, blot_check_frozen_core_validation::Context { units: all , ..}); if error != Error.none { return default<Report>(), error; }
     let error = withScan<Analysis,analyzeScan>(module, all, context); if error != Error.none { return default<Report>(), error; } if !context.report.present { return default<Report>(), Error.invalid_artifact; } return context.report.value, Error.none;
 }
 fn analyzeScan(context: Analysis&, scan: Scan&) -> Error {
@@ -522,38 +522,38 @@ fn analyzeScan(context: Analysis&, scan: Scan&) -> Error {
     var origin: i64 = 65536; if context.scope_only { origin = initial; } let report, error = takeReport(scan, origin); if error != Error.none { return error; } context.report = blot_support::some(report); return Error.none;
 }
 fn executeAnalysis(context: Analysis&, scan: Scan&) -> Error {
-    if context.scope_only { scan.invocations += Invocation { blot_support::none<Id>(), Site { unit: scan.module.unit, node: context.scope }, 0 }; let zero, error = scan.value(scan.module, 0, Kind.scalar); if error != Error.none { return error; }
-        var environment = Environment {}; let result, error = expression(scan, scan.module, context.scope, environment, 0); if error != Error.none { return error; } if scan.exits.len != 0 { return Error.invalid_artifact; } return Error.none;
+    if context.scope_only { scan.invocations += Invocation { blot_support::none<Id>(), Site { unit: scan.module.unit, node: context.scope , ..}, 0 , ..}; let zero, error = scan.value(scan.module, 0, Kind.scalar); if error != Error.none { return error; }
+        var environment = Environment {..}; let result, error = expression(scan, scan.module, context.scope, environment, 0); if error != Error.none { return error; } if scan.exits.len != 0 { return Error.invalid_artifact; } return Error.none;
     }
-    scan.invocations += Invocation { blot_support::none<Id>(), Site { unit: scan.module.unit, binding: context.boundary.binding }, 0 }; let zero, error = scan.value(scan.module, 0, Kind.scalar); if error != Error.none { return error; } scan.binding = context.boundary.binding;
+    scan.invocations += Invocation { blot_support::none<Id>(), Site { unit: scan.module.unit, binding: context.boundary.binding , ..}, 0 , ..}; let zero, error = scan.value(scan.module, 0, Kind.scalar); if error != Error.none { return error; } scan.binding = context.boundary.binding;
     let optional_owner, error = scan.ownerModule(scan.module, context.boundary.unit); if error != Error.none { return error; }
     { let optional_binding_79 .= optional_owner; if optional_binding_79 { let owner .= optional_binding_79;
         if context.boundary.binding == 0 || context.boundary.binding >= owner.bindings.len { return Error.invalid_artifact; } let binding = owner.bindings[context.boundary.binding]; if binding.body_id == 0 || binding.body_id >= owner.bodies.len { return Error.invalid_artifact; } let body = owner.bodies[binding.body_id];
-        if body.parameters.start > owner.parameters.len || body.parameters.len > owner.parameters.len - body.parameters.start { return Error.invalid_artifact; } var environment = Environment {};
+        if body.parameters.start > owner.parameters.len || body.parameters.len > owner.parameters.len - body.parameters.start { return Error.invalid_artifact; } var environment = Environment {..};
         for parameter in owner.parameters[body.parameters.start..body.parameters.start + body.parameters.len] { let unknown, error = scan.value(owner, body.root, Kind.unknown); if error != Error.none { return error; } let error = environment.bind(parameter.binding, unknown, 0); if error != Error.none { return error; } }
         let activation, error = scan.value(owner, body.root, Kind.activation); if error != Error.none { return error; } scan.owner = activation;
-        let result, error = expression(scan, owner, body.root, environment, 0); if error != Error.none { return error; } if !result.present || scan.exits.len != 0 { return Error.invalid_artifact; } scan.boundaries += Boundary { scan.site(owner, body.root), scan.owner, result.value }; return Error.none;
+        let result, error = expression(scan, owner, body.root, environment, 0); if error != Error.none { return error; } if !result.present || scan.exits.len != 0 { return Error.invalid_artifact; } scan.boundaries += Boundary { scan.site(owner, body.root), scan.owner, result.value , ..}; return Error.none;
      } } return Error.invalid_artifact;
 }
 fn analyzeScope(module: const Module&, owners: const ModuleRef[:], root: CoreId, remaining: i64&) -> Report, Error {
     if root == 0 || root >= module.nodes.len || !isScope(module.node(root)) { return default<Report>(), Error.invalid_artifact; }
     var all: (const Module&)[>..] = []; let error = ownerContext(module, owners, all, remaining); if error != Error.none { return default<Report>(), error; }
-    let error = blot_check_frozen_core_validation::validateBounds(module, blot_check_frozen_core_validation::Context { units: all }); if error != Error.none { return default<Report>(), error; }
-    var context = Analysis { boundary: blot_check_core::BindingRef {}, remaining, scope: root, scope_only: true }; let error = withScan<Analysis,analyzeScan>(module, all, context); remaining = context.remaining; if error != Error.none { return default<Report>(), error; }
+    let error = blot_check_frozen_core_validation::validateBounds(module, blot_check_frozen_core_validation::Context { units: all , ..}); if error != Error.none { return default<Report>(), error; }
+    var context = Analysis { boundary: blot_check_core::BindingRef {..}, remaining, scope: root, scope_only: true , ..}; let error = withScan<Analysis,analyzeScan>(module, all, context); remaining = context.remaining; if error != Error.none { return default<Report>(), error; }
     if !context.report.present { return default<Report>(), Error.invalid_artifact; } return context.report.value, Error.none;
 }
 struct RejectContext { remaining: i64 }
 fn rejectSupportedEscapes(module: const Module&, owners: const ModuleRef[:]) -> Error {
     var active = false; for node in module.nodes { if isScope(node) { active = true; break; } } if !active { return Error.none; }
-    var all: (const Module&)[>..] = []; var context = RejectContext { 65536 }; let error = ownerContext(module, owners, all, context.remaining); if error != Error.none { return Error.invalid_artifact; }
-    let error = blot_check_frozen_core_validation::validateBounds(module, blot_check_frozen_core_validation::Context { units: all }); if error != Error.none { return error; } let error = withScan<RejectContext,rejectScan>(module, all, context); if error == Error.out_of_memory { return error; } if error != Error.none { return Error.invalid_artifact; } return Error.none;
+    var all: (const Module&)[>..] = []; var context = RejectContext { 65536 , ..}; let error = ownerContext(module, owners, all, context.remaining); if error != Error.none { return Error.invalid_artifact; }
+    let error = blot_check_frozen_core_validation::validateBounds(module, blot_check_frozen_core_validation::Context { units: all , ..}); if error != Error.none { return error; } let error = withScan<RejectContext,rejectScan>(module, all, context); if error == Error.out_of_memory { return error; } if error != Error.none { return Error.invalid_artifact; } return Error.none;
 }
 fn rejectScan(context: RejectContext&, scan: Scan&) -> Error {
     scan.remaining = context.remaining; scan.scope_validation = true;
     for n, id in scan.module.nodes { if !isScope(n) { continue; } let error = scan.step(0); if error != Error.none { return Error.invalid_artifact; }
         scan.nodes.clear(); scan.edges.clear(); scan.callables.clear(); scan.operations.clear(); scan.providers.clear(); scan.frames.clear(); scan.exits.clear(); scan.controls.clear(); scan.invocations.clear(); scan.type_mappings.clear(); scan.complete = true;
         let zero, error = scan.value(scan.module, 0, Kind.scalar); if error != Error.none { if error == Error.out_of_memory { return error; } return Error.invalid_artifact; }
-        var environment = Environment {}; let result, error = expression(scan, scan.module, id as u32, environment, 0); if error == Error.unsupported { continue; } if error == Error.out_of_memory { return error; } if error != Error.none { return Error.invalid_artifact; }
+        var environment = Environment {..}; let result, error = expression(scan, scan.module, id as u32, environment, 0); if error == Error.unsupported { continue; } if error == Error.out_of_memory { return error; } if error != Error.none { return Error.invalid_artifact; }
     } return Error.none;
 }
 fn rejectSupportedEscapesWithScratch(module: const Module&, owners: const ModuleRef[:]) -> Error { let error = rejectSupportedEscapes(module, owners); if error != Error.none { return Error.invalid_artifact; } return Error.none; }

@@ -13,7 +13,7 @@ struct Slots { interface_types: u8[:], patterns: u8[:], core_types: u8[:], inter
 reusable[] var owned_roles: u8[>..] = [];
 fn deinit(self: Slots&) {
     release(self.interface_types); release(self.patterns); release(self.core_types); release(self.interface_capabilities); release(self.core_capabilities);
-    self = Slots { [], [], [], [], [] };
+    self = Slots { [], [], [], [], [] , ..};
 }
 fn release(values: u8[:]) { if values.len != 0 { owned_roles.free_slice(values); } }
 fn mark(slots: u8[:], start: u32, len: u32, role: u8) -> Error {
@@ -93,10 +93,10 @@ fn capabilityRoles(roles: u8[:], owner: blot_check_capability_contracts::Collect
 }
 fn collect(owner: const blot_reuse_frozen_dependency::Module&) -> Slots, Error {
     let iface .= owner.interface; let ir .= owner.core;
-    var slots = Slots { owned_roles.alloc_slice(iface.graph.extra.len), owned_roles.alloc_slice(iface.patterns.extra.len), owned_roles.alloc_slice(ir.types.extra.len), owned_roles.alloc_slice(iface.capability_contracts.words.len), owned_roles.alloc_slice(ir.capability_contracts.words.len) };
+    var slots = Slots { owned_roles.alloc_slice(iface.graph.extra.len), owned_roles.alloc_slice(iface.patterns.extra.len), owned_roles.alloc_slice(ir.types.extra.len), owned_roles.alloc_slice(iface.capability_contracts.words.len), owned_roles.alloc_slice(ir.capability_contracts.words.len) , ..};
     for &slot in slots.interface_types { slot = 0; } for &slot in slots.patterns { slot = 0; } for &slot in slots.core_types { slot = 0; }
     let error = collectInto(owner, slots);
-    if error != Error.none { slots.deinit(); return Slots { [], [], [], [], [] }, error; }
+    if error != Error.none { slots.deinit(); return Slots { [], [], [], [], [] , ..}, error; }
     return slots, Error.none;
 }
 fn collectInto(owner: const blot_reuse_frozen_dependency::Module&, slots: Slots&) -> Error {

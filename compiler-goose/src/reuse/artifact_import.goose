@@ -46,7 +46,7 @@ fn hash(key: EvidenceKey) -> u64 { return ::hash_combine(::hash_combine(::hash(k
 fn hash(key: SubstitutionKey) -> u64 { return ::hash((key.id as u64) << 32 | key.owner); }
 fn hash(key: ExpressionKey) -> u64 { return ::hash((key.unit as u64) << 32 | key.root); }
 struct Census { static_plan_inspections: i64 = 0, static_plan_hits: i64 = 0, semantic_queries: i64 = 0, semantic_hits: i64 = 0, semantic_nodes: i64 = 0, semantic_child_words: i64 = 0, row_queries: i64 = 0, row_hits: i64 = 0, row_nodes: i64 = 0, row_argument_words: i64 = 0 }
-struct OwnerCensus { principals: Census = Census {}, queries: Census = Census {}, fragments: Census = Census {} }
+struct OwnerCensus { principals: Census = Census {..}, queries: Census = Census {..}, fragments: Census = Census {..} }
 struct Solved { mappings: blot_backend_layout::Mapping[:] = [], rows: blot_backend_layout::RowMapping[:] = [], templates: blot_reuse_substitution_keys::Entry[:] = [] }
 struct IdentityMetadata { bytes: u8[:] = [], symbols: blot_backend_runtime_identity::Name[:] = [], owners: blot_backend_runtime_identity::Name[:] = [] }
 reusable[] var identity_bytes: u8[>..] = [];
@@ -54,83 +54,83 @@ reusable[] var identity_names: blot_backend_runtime_identity::Name[>..] = [];
 reusable[] var unit_words: u32[>..] = [];
 reusable[] var stable_flags: bool[>..] = [];
 reusable[] var operation_scope_runs: OperationScope[>..] = [];
-fn view(self: IdentityMetadata) -> View { return View { self.bytes, self.symbols, self.owners }; }
+fn view(self: IdentityMetadata) -> View { return View { self.bytes, self.symbols, self.owners , ..}; }
 fn copyIdentity(source: View) -> IdentityMetadata {
     let bytes = identity_bytes.alloc_slice(source.bytes.len); let symbols = identity_names.alloc_slice(source.symbols.len); let owners = identity_names.alloc_slice(source.owners.len);
     for byte, index in source.bytes { bytes[index] = byte; } for name, index in source.symbols { symbols[index] = name; } for owner, index in source.owners { owners[index] = owner; }
-    return IdentityMetadata { bytes, symbols, owners };
+    return IdentityMetadata { bytes, symbols, owners , ..};
 }
-fn deinit(self: IdentityMetadata&) { if self.bytes.len != 0 { identity_bytes.free_slice(self.bytes); } if self.symbols.len != 0 { identity_names.free_slice(self.symbols); } if self.owners.len != 0 { identity_names.free_slice(self.owners); } self = IdentityMetadata {}; }
+fn deinit(self: IdentityMetadata&) { if self.bytes.len != 0 { identity_bytes.free_slice(self.bytes); } if self.symbols.len != 0 { identity_names.free_slice(self.symbols); } if self.owners.len != 0 { identity_names.free_slice(self.owners); } self = IdentityMetadata {..}; }
 
-struct WordMap { table: blot_support_pooled_map::Map<u32,u32> = blot_support_pooled_map::Map<u32,u32> {} }
+struct WordMap { table: blot_support_pooled_map::Map<u32,u32> = blot_support_pooled_map::Map<u32,u32> {..} }
 reusable[] var wordmap_slots: dictionary_slot<u32,u32>[>..] = [];
 fn get(self: const WordMap&, key: u32) -> u32? { return blot_support_pooled_map::get(self.table, key); }
 fn contains(self: const WordMap&, key: u32) -> bool { return blot_support_pooled_map::contains(self.table, key); }
 fn insert(self: WordMap&, key: u32, value: u32) { blot_support_pooled_map::insert(self.table, key, value, wordmap_slots); }
 fn deinit(self: WordMap&) { blot_support_pooled_map::deinit(self.table, wordmap_slots); }
 
-struct EvidenceMap { table: blot_support_pooled_map::Map<EvidenceKey,u32> = blot_support_pooled_map::Map<EvidenceKey,u32> {} }
+struct EvidenceMap { table: blot_support_pooled_map::Map<EvidenceKey,u32> = blot_support_pooled_map::Map<EvidenceKey,u32> {..} }
 reusable[] var evidencemap_slots: dictionary_slot<EvidenceKey,u32>[>..] = [];
 fn get(self: const EvidenceMap&, key: EvidenceKey) -> u32? { return blot_support_pooled_map::get(self.table, key); }
 fn contains(self: const EvidenceMap&, key: EvidenceKey) -> bool { return blot_support_pooled_map::contains(self.table, key); }
 fn insert(self: EvidenceMap&, key: EvidenceKey, value: u32) { blot_support_pooled_map::insert(self.table, key, value, evidencemap_slots); }
 fn deinit(self: EvidenceMap&) { blot_support_pooled_map::deinit(self.table, evidencemap_slots); }
 
-struct RowMap { table: blot_support_pooled_map::Map<RowKey,u32> = blot_support_pooled_map::Map<RowKey,u32> {} }
+struct RowMap { table: blot_support_pooled_map::Map<RowKey,u32> = blot_support_pooled_map::Map<RowKey,u32> {..} }
 reusable[] var rowmap_slots: dictionary_slot<RowKey,u32>[>..] = [];
 fn get(self: const RowMap&, key: RowKey) -> u32? { return blot_support_pooled_map::get(self.table, key); }
 fn contains(self: const RowMap&, key: RowKey) -> bool { return blot_support_pooled_map::contains(self.table, key); }
 fn insert(self: RowMap&, key: RowKey, value: u32) { blot_support_pooled_map::insert(self.table, key, value, rowmap_slots); }
 fn deinit(self: RowMap&) { blot_support_pooled_map::deinit(self.table, rowmap_slots); }
 
-struct SubstitutionMap { table: blot_support_pooled_map::Map<SubstitutionKey,u32> = blot_support_pooled_map::Map<SubstitutionKey,u32> {} }
+struct SubstitutionMap { table: blot_support_pooled_map::Map<SubstitutionKey,u32> = blot_support_pooled_map::Map<SubstitutionKey,u32> {..} }
 reusable[] var substitutionmap_slots: dictionary_slot<SubstitutionKey,u32>[>..] = [];
 fn get(self: const SubstitutionMap&, key: SubstitutionKey) -> u32? { return blot_support_pooled_map::get(self.table, key); }
 fn contains(self: const SubstitutionMap&, key: SubstitutionKey) -> bool { return blot_support_pooled_map::contains(self.table, key); }
 fn insert(self: SubstitutionMap&, key: SubstitutionKey, value: u32) { blot_support_pooled_map::insert(self.table, key, value, substitutionmap_slots); }
 fn deinit(self: SubstitutionMap&) { blot_support_pooled_map::deinit(self.table, substitutionmap_slots); }
 
-struct ExpressionMap { table: blot_support_pooled_map::Map<ExpressionKey,const u32[:]> = blot_support_pooled_map::Map<ExpressionKey,const u32[:]> {} }
+struct ExpressionMap { table: blot_support_pooled_map::Map<ExpressionKey,const u32[:]> = blot_support_pooled_map::Map<ExpressionKey,const u32[:]> {..} }
 reusable[] var expressionmap_slots: dictionary_slot<ExpressionKey,const u32[:]>[>..] = [];
 fn get(self: const ExpressionMap&, key: ExpressionKey) -> const u32[:]? { return blot_support_pooled_map::get(self.table, key); }
 fn contains(self: const ExpressionMap&, key: ExpressionKey) -> bool { return blot_support_pooled_map::contains(self.table, key); }
 fn insert(self: ExpressionMap&, key: ExpressionKey, value: const u32[:]) { blot_support_pooled_map::insert(self.table, key, value, expressionmap_slots); }
 fn deinit(self: ExpressionMap&) { blot_support_pooled_map::deinit(self.table, expressionmap_slots); }
 
-struct PlanMap { table: blot_support_pooled_map::Map<u32,blot_reuse_source_value_template::Plan> = blot_support_pooled_map::Map<u32,blot_reuse_source_value_template::Plan> {} }
+struct PlanMap { table: blot_support_pooled_map::Map<u32,blot_reuse_source_value_template::Plan> = blot_support_pooled_map::Map<u32,blot_reuse_source_value_template::Plan> {..} }
 reusable[] var planmap_slots: dictionary_slot<u32,blot_reuse_source_value_template::Plan>[>..] = [];
 fn get(self: const PlanMap&, key: u32) -> blot_reuse_source_value_template::Plan? { return blot_support_pooled_map::get(self.table, key); }
 fn contains(self: const PlanMap&, key: u32) -> bool { return blot_support_pooled_map::contains(self.table, key); }
 fn insert(self: PlanMap&, key: u32, value: blot_reuse_source_value_template::Plan) { blot_support_pooled_map::insert(self.table, key, value, planmap_slots); }
 fn deinit(self: PlanMap&) { blot_support_pooled_map::deinit(self.table, planmap_slots); }
-struct TextMap { table: blot_support_pooled_map::Map<const u8[:],u32> = blot_support_pooled_map::Map<const u8[:],u32> {} }
+struct TextMap { table: blot_support_pooled_map::Map<const u8[:],u32> = blot_support_pooled_map::Map<const u8[:],u32> {..} }
 reusable[] var textmap_slots: dictionary_slot<const u8[:],u32>[>..] = [];
 fn get(self: const TextMap&, key: const u8[:]) -> u32? { return blot_support_pooled_map::get(self.table, key); }
 fn contains(self: const TextMap&, key: const u8[:]) -> bool { return blot_support_pooled_map::contains(self.table, key); }
 fn insert(self: TextMap&, key: const u8[:], value: u32) { blot_support_pooled_map::insert(self.table, key, value, textmap_slots); }
 fn deinit(self: TextMap&) { blot_support_pooled_map::deinit(self.table, textmap_slots); }
 struct Importer {
-    allocation_owner: u64 = 0, census: Census = Census {}, old: const Pools? = null, units: const Module[:] = [],
+    allocation_owner: u64 = 0, census: Census = Census {..}, old: const Pools? = null, units: const Module[:] = [],
     names: blot_support::Option<IdentityMetadata>, unit_map: u32[:] = [], symbol_map: u32[:] = [], stable: bool[:] = [],
     code_gate: blot_support::Option<blot_reuse_code_body_validity::Gate>, semantic_catalogs: bool = false,
     closed_evidence: blot_support::Option<blot_eval_semantic_evidence_import::PooledImporter>, enabled: bool = false, generator_owner: u64 = 0,
-    expression_nodes: ExpressionMap = ExpressionMap {}, layouts: WordMap = WordMap {}, semantic: EvidenceMap = EvidenceMap {},
-    rows: RowMap = RowMap {}, template_keys: SubstitutionMap = SubstitutionMap {}, row_keys: SubstitutionMap = SubstitutionMap {},
-    captures: WordMap = WordMap {}, value_anchors: WordMap = WordMap {},
-    static_scratch: blot_support::Option<blot_reuse_source_value_template::QueryScratch>, static_plans: PlanMap = PlanMap {}, static_plan_nodes: i64 = 0,
+    expression_nodes: ExpressionMap = ExpressionMap {..}, layouts: WordMap = WordMap {..}, semantic: EvidenceMap = EvidenceMap {..},
+    rows: RowMap = RowMap {..}, template_keys: SubstitutionMap = SubstitutionMap {..}, row_keys: SubstitutionMap = SubstitutionMap {..},
+    captures: WordMap = WordMap {..}, value_anchors: WordMap = WordMap {..},
+    static_scratch: blot_support::Option<blot_reuse_source_value_template::QueryScratch>, static_plans: PlanMap = PlanMap {..}, static_plan_nodes: i64 = 0,
     operation_labels: u32[:] = [], operation_scopes: OperationScope[:] = [], operations_indexed: bool = false,
-    knowledge: Knowledge = Knowledge {},
+    knowledge: Knowledge = Knowledge {..},
 }
 fn init(allocation_owner: u64, old: const Pools&, units: const Module[:], names: blot_support::Option<View>, cached_units: i64) -> Importer, Error { return initWithStamps(allocation_owner, old, units, names, cached_units, null); }
 fn initWithStamps(allocation_owner: u64, old: const Pools&, units: const Module[:], names: blot_support::Option<View>, cached_units: i64, stamps: blot_reuse_code_artifacts::ModuleStamps?) -> Importer, Error {
     let unit_map = unit_words.alloc_slice(old.modules.len); let stable = stable_flags.alloc_slice(old.modules.len);
     var symbol_count: i64 = 0; if old.identity.present { symbol_count = old.identity.value.symbols.len; } let symbol_map = unit_words.alloc_slice(symbol_count);
     for &word in unit_map { word = 0; } for &flag in stable { flag = false; } for &word in symbol_map { word = 0; }
-    var result = Importer { allocation_owner: allocation_owner, old: old, units: units, unit_map: unit_map, symbol_map: symbol_map, stable: stable };
-    let error = result.initialize(names, cached_units, stamps); if error != Error.none { result.deinit(); return Importer {}, error; } return result, Error.none;
+    var result = Importer { allocation_owner: allocation_owner, old: old, units: units, unit_map: unit_map, symbol_map: symbol_map, stable: stable , ..};
+    let error = result.initialize(names, cached_units, stamps); if error != Error.none { result.deinit(); return Importer {..}, error; } return result, Error.none;
 }
 fn initialize(self: Importer&, names: blot_support::Option<View>, cached_units: i64, stamps: blot_reuse_code_artifacts::ModuleStamps?) -> Error {
-    var producers = TextMap {}; var spellings = TextMap {};
+    var producers = TextMap {..}; var spellings = TextMap {..};
     let error = self.initializeMaps(names, cached_units, stamps, producers, spellings);
     producers.deinit(); spellings.deinit(); return error;
 }
@@ -169,7 +169,7 @@ fn initIndependentQuery(allocation_owner: u64, old: const Pools&, units: const M
     let unit_map = unit_words.alloc_slice(units.len); for &word, index in unit_map { word = (index + 1) as u32; }
     let symbol_map = unit_words.alloc_slice(names.symbols.len); for &word, index in symbol_map { word = index as u32; }
     let stable = stable_flags.alloc_slice(units.len); for &flag, index in stable { flag = checked.structural_units[index]; }
-    return blot_support::some(Importer { allocation_owner: allocation_owner, old: old, units: units, names: blot_support::some(copyIdentity(names)), unit_map: unit_map, symbol_map: symbol_map, stable: stable, semantic_catalogs: true, enabled: true }), Error.none;
+    return blot_support::some(Importer { allocation_owner: allocation_owner, old: old, units: units, names: blot_support::some(copyIdentity(names)), unit_map: unit_map, symbol_map: symbol_map, stable: stable, semantic_catalogs: true, enabled: true , ..}), Error.none;
 }
 fn deinit(self: Importer&) {
     if self.closed_evidence.present { self.closed_evidence.value.deinit(); self.closed_evidence.present = false; }
@@ -181,7 +181,7 @@ fn deinit(self: Importer&) {
     if self.names.present { self.names.value.deinit(); self.names.present = false; }
     if self.unit_map.len != 0 { unit_words.free_slice(self.unit_map); } if self.symbol_map.len != 0 { unit_words.free_slice(self.symbol_map); }
     if self.code_gate.present { self.code_gate.value.deinit(); self.code_gate.present = false; } if self.stable.len != 0 { stable_flags.free_slice(self.stable); }
-    self = Importer {};
+    self = Importer {..};
 }
 fn bind<G>(self: Importer&, generator: G&) -> Error {
     if !self.enabled || generator.owner_id == 0 { return Error.declined; }
@@ -191,7 +191,7 @@ fn bind<G>(self: Importer&, generator: G&) -> Error {
 fn unit(self: const Importer&, old_unit: u32, require_stable: bool) -> u32, Error { if old_unit == 0 || old_unit > self.unit_map.len { return 0, Error.declined; } let mapped = self.unit_map[old_unit - 1]; if mapped == 0 || (require_stable && !self.stable[old_unit - 1]) { return 0, Error.declined; } return mapped, Error.none; }
 fn symbol(self: const Importer&, old_symbol: u32) -> u32, Error { if old_symbol == 0 || old_symbol >= self.symbol_map.len || self.symbol_map[old_symbol] == 0 { return 0, Error.declined; } return self.symbol_map[old_symbol], Error.none; }
 fn nominalDeclaration(self: const Importer&, decl: u32) -> u32, Error { if decl & blot_check_types::opaque_name_bit != 0 { let value, error = self.symbol(decl & ~blot_check_types::opaque_name_bit); return value | blot_check_types::opaque_name_bit, error; } return decl, Error.none; }
-fn admitsBody(self: const Importer&, value: blot_check_core::BindingRef) -> bool { if value.unit == 0 || value.unit > self.unit_map.len { return false; } if self.stable[value.unit - 1] { return true; } if !self.code_gate.present { return false; } return self.code_gate.value.body(blot_check_core::BindingRef { self.unit_map[value.unit - 1], value.binding }); }
+fn admitsBody(self: const Importer&, value: blot_check_core::BindingRef) -> bool { if value.unit == 0 || value.unit > self.unit_map.len { return false; } if self.stable[value.unit - 1] { return true; } if !self.code_gate.present { return false; } return self.code_gate.value.body(blot_check_core::BindingRef { self.unit_map[value.unit - 1], value.binding , ..}); }
 fn typeUnit(self: const Importer&, source: u32) -> u32, Error { let exact_catalog = self.code_gate.present && self.code_gate.value.catalog(source); return self.unit(source, !exact_catalog); }
 fn nominal(self: const Importer&, old_unit: u32, decl: u32) -> u32, Error { return self.nominalInDomain(old_unit, decl, true); }
 fn semanticNominal(self: const Importer&, old_unit: u32, decl: u32) -> u32, Error { return self.nominalInDomain(old_unit, decl, !self.semantic_catalogs); }
@@ -257,7 +257,7 @@ recursive fn shape<G>(self: Importer&, g: G&, id: u32, depth: i64) -> u32, Error
     assert(self.old);
     if depth >= depth_limit || id == 0 || id >= self.old.layouts.nodes.len { return 0, Error.declined; }
     let known = self.layouts.get(id); if known { return known, Error.none; }
-    var values = blot_reuse_source_value_template::WordBuffer {};
+    var values = blot_reuse_source_value_template::WordBuffer {..};
     let result, error = self.shapeInto(g, id, depth, values);
     values.deinit(); return result, error;
 }
@@ -315,9 +315,9 @@ recursive fn semanticType<G>(self: Importer&, g: G&, id: u32, depth: i64) -> u32
     assert(self.old);
     if depth >= depth_limit || id == 0 || id >= self.old.evaluator.evidence.nodes.len { return 0, Error.declined; }
     self.census.semantic_queries++;
-    let key = EvidenceKey { id: id }; let known = self.semantic.get(key);
+    let key = EvidenceKey { id: id , ..}; let known = self.semantic.get(key);
     if known { self.census.semantic_hits++; return known, Error.none; }
-    var values = blot_reuse_source_value_template::WordBuffer {};
+    var values = blot_reuse_source_value_template::WordBuffer {..};
     let result, error = self.semanticTypeInto(g, id, depth, values);
     values.deinit(); return result, error;
 }
@@ -352,7 +352,7 @@ recursive fn semanticTypeInto<G>(self: Importer&, g: G&, id: u32, depth: i64, va
     var mapped: u32 = 0;
     if n.tag == EvidenceTag.state_provider { { let imported_42, import_error_42 = g.evaluator.storage.evidence.internStateProvider(a, b, c); if import_error_42 != Error.none { return 0, convert(import_error_42); } mapped = imported_42; } }
     else { { let imported_43, import_error_43 = g.evaluator.storage.evidence.internWithEffects(n.tag, a, b, c, values.items); if import_error_43 != Error.none { return 0, convert(import_error_43); } mapped = imported_43; } }
-    self.semantic.insert(EvidenceKey { id: id }, mapped);
+    self.semantic.insert(EvidenceKey { id: id , ..}, mapped);
     self.census.semantic_nodes++; self.census.semantic_child_words += values.items.len;
     return mapped, Error.none;
 }
@@ -360,10 +360,10 @@ recursive fn row<G>(self: Importer&, g: G&, domain: Domain, id: u32, depth: i64)
     if depth >= depth_limit { return 0, Error.declined; }
     if domain == Domain.layout && id == blot_backend_layout::unknown_row { return id, Error.none; }
     self.census.row_queries++;
-    let key = RowKey { domain, id }; let known = self.rows.get(key);
+    let key = RowKey { domain, id , ..}; let known = self.rows.get(key);
     if known { self.census.row_hits++; return known, Error.none; }
-    var imported = blot_reuse_source_value_template::WordBuffer {};
-    var arguments = blot_reuse_source_value_template::WordBuffer {};
+    var imported = blot_reuse_source_value_template::WordBuffer {..};
+    var arguments = blot_reuse_source_value_template::WordBuffer {..};
     let mapped, error = self.rowInto(g, domain, id, depth, imported, arguments);
     imported.deinit(); arguments.deinit(); return mapped, error;
 }
@@ -394,7 +394,7 @@ recursive fn rowInto<G>(self: Importer&, g: G&, domain: Domain, id: u32, depth: 
             { let import_error_52 = arguments.push(mapped); if import_error_52 != Error.none { return 0, convert(import_error_52); } }
         }
         var new_label: u32 = 0;
-        let identity = blot_check_types::NominalIdentity { owner, operation.identity.decl };
+        let identity = blot_check_types::NominalIdentity { owner, operation.identity.decl , ..};
         if domain == Domain.layout { { let imported_53, import_error_53 = g.representations.store.effects.internOperation(identity, arguments.items); if import_error_53 != Error.none { return 0, convert(import_error_53); } new_label = imported_53; } }
         else { { let imported_54, import_error_54 = g.evaluator.storage.evidence.effects.internOperation(identity, arguments.items); if import_error_54 != Error.none { return 0, convert(import_error_54); } new_label = imported_54; } }
         { let import_error_55 = imported.push(new_label); if import_error_55 != Error.none { return 0, convert(import_error_55); } }
@@ -402,13 +402,13 @@ recursive fn rowInto<G>(self: Importer&, g: G&, domain: Domain, id: u32, depth: 
     var mapped: u32 = 0;
     if domain == Domain.layout { { let imported_56, import_error_56 = g.representations.store.effects.internRow(imported.items); if import_error_56 != Error.none { return 0, convert(import_error_56); } mapped = imported_56; } }
     else { { let imported_57, import_error_57 = g.evaluator.storage.evidence.effects.internRow(imported.items); if import_error_57 != Error.none { return 0, convert(import_error_57); } mapped = imported_57; } }
-    self.rows.insert(RowKey { domain, id }, mapped); self.census.row_nodes++;
+    self.rows.insert(RowKey { domain, id , ..}, mapped); self.census.row_nodes++;
     return mapped, Error.none;
 }
 
 fn expressionUnit(self: const Importer&, source: u32, root: u32) -> u32, Error {
     let mapped, import_error_1 = self.unit(source, false); if import_error_1 != Error.none { return 0, convert(import_error_1); }
-    if self.stable[source - 1] || self.expression_nodes.contains(ExpressionKey { source, root }) { return mapped, Error.none; }
+    if self.stable[source - 1] || self.expression_nodes.contains(ExpressionKey { source, root , ..}) { return mapped, Error.none; }
     if !self.code_gate.present { return 0, Error.declined; }
     let gate .= self.code_gate.value.semantic;
     if !gate.enabled { return 0, Error.declined; }
@@ -436,7 +436,7 @@ fn checkFields<G>(self: const Importer&, g: G&) -> Error {
         if source_unit != 0xffffffff { let value, error = self.unit(source_unit, false); if error != Error.none { return error; } mapped = value; }
         let family = (mapped as u64) << 32 | decl;
         let name, error = self.symbol(field.name); if error != Error.none { return error; }
-        let found = g.evaluator.field_locations.get(blot_eval_core_eval::FieldKey { family, field.tag, name });
+        let found = g.evaluator.field_locations.get(blot_eval_core_eval::FieldKey { family, field.tag, name , ..});
         if !found || found.field != field.field || found.len != field.len { return Error.declined; }
     }
     return Error.none;
@@ -507,7 +507,7 @@ fn target(self: const Importer&, value: blot_check_core::BindingRef) -> blot_che
     let mapped, error = self.unit(value.unit, false);
     if error != Error.none { return default<blot_check_core::BindingRef>(), error; }
     if value.binding == 0 || value.binding >= self.units[mapped - 1].bindings.len || !self.units[mapped - 1].body(value.binding) { return default<blot_check_core::BindingRef>(), Error.declined; }
-    return blot_check_core::BindingRef { mapped, value.binding }, Error.none;
+    return blot_check_core::BindingRef { mapped, value.binding , ..}, Error.none;
 }
 fn importRequest<G>(self: Importer&, g: G&, old: blot_reuse_code_artifacts::Request) -> blot_support::Option<blot_reuse_code_artifacts::Request>, Error {
     let value, error = self.request(g, old, true);
@@ -524,7 +524,7 @@ fn matches<G>(self: Importer&, g: G&, old: blot_reuse_code_artifacts::Request, c
                         var actual = current_closure.key; actual.static_values = 0;
                         let imported, error = self.request(g, old, false);
                         if error == Error.out_of_memory { return false, error; }
-                        if error != Error.none || imported != (blot_reuse_code_artifacts::Request.closure { actual }) { return false, Error.none; }
+                        if error != Error.none || imported != (blot_reuse_code_artifacts::Request.closure { actual , ..}) { return false, Error.none; }
                         return self.matchStaticKey(g, old_closure.key.static_values, current_closure.key.static_values);
                     }
                 }, _ => {},
@@ -556,7 +556,7 @@ fn request<G>(self: Importer&, g: G&, old: blot_reuse_code_artifacts::Request, i
             }
             { let imported_7, import_error_7 = self.closedShape(g, key.result); if import_error_7 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_7); } key.result = imported_7; }
             { let imported_8, import_error_8 = self.templateKey(g, payload.key.target.unit, key.templates, 0); if import_error_8 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_8); } key.templates = imported_8; }
-            return blot_reuse_code_artifacts::Request.named { key }, Error.none;
+            return blot_reuse_code_artifacts::Request.named { key , ..}, Error.none;
         },
         blot_reuse_code_artifacts::Request.closure payload => {
             var key = payload.key; let source = payload.key;
@@ -593,7 +593,7 @@ fn request<G>(self: Importer&, g: G&, old: blot_reuse_code_artifacts::Request, i
             key.static_values = 0;
             if import_static { { let imported_20, import_error_20 = self.staticKey(g, source.static_values); if import_error_20 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_20); } key.static_values = imported_20; } }
             if key.scalar_environment && (!g.representations.store.scalarEnvironment(key.captures) || key.templates != 0 || key.static_values != 0) { return default<blot_reuse_code_artifacts::Request>(), Error.declined; }
-            return blot_reuse_code_artifacts::Request.closure { key }, Error.none;
+            return blot_reuse_code_artifacts::Request.closure { key , ..}, Error.none;
         },
         blot_reuse_code_artifacts::Request.callable payload => {
             let old_key = payload.key;
@@ -601,19 +601,19 @@ fn request<G>(self: Importer&, g: G&, old: blot_reuse_code_artifacts::Request, i
             let target, import_error_21 = self.target(old_key.target); if import_error_21 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_21); }
             let ty, import_error_22 = self.closedShape(g, old_key.ty); if import_error_22 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_22); }
             let templates, import_error_23 = self.templateKey(g, old_key.target.unit, old_key.templates, 0); if import_error_23 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_23); }
-            return blot_reuse_code_artifacts::Request.callable { blot_reuse_code_artifacts::CallableKey { target: target, ty: ty, applied: old_key.applied, templates: templates } }, Error.none;
+            return blot_reuse_code_artifacts::Request.callable { blot_reuse_code_artifacts::CallableKey { target: target, ty: ty, applied: old_key.applied, templates: templates } , ..}, Error.none;
         },
         blot_reuse_code_artifacts::Request.constructor payload => {
             let owner, import_error_24 = self.typeUnit(payload.key.unit); if import_error_24 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_24); }
             if payload.key.catalog >= self.units[owner - 1].constructors.len { return default<blot_reuse_code_artifacts::Request>(), Error.declined; }
             let ty, import_error_25 = self.closedShape(g, payload.key.ty); if import_error_25 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_25); }
-            return blot_reuse_code_artifacts::Request.constructor { blot_reuse_code_artifacts::ConstructorKey { owner, payload.key.catalog, ty } }, Error.none;
+            return blot_reuse_code_artifacts::Request.constructor { blot_reuse_code_artifacts::ConstructorKey { owner, payload.key.catalog, ty } , ..}, Error.none;
         },
         blot_reuse_code_artifacts::Request.primitive payload => {
             let owner, import_error_26 = self.unit(payload.key.unit, true); if import_error_26 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_26); }
             if payload.key.catalog >= self.units[owner - 1].primitives.len { return default<blot_reuse_code_artifacts::Request>(), Error.declined; }
             let ty, import_error_27 = self.closedShape(g, payload.key.ty); if import_error_27 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_27); }
-            return blot_reuse_code_artifacts::Request.primitive { blot_reuse_code_artifacts::PrimitiveKey { owner, payload.key.catalog, ty, payload.key.applied } }, Error.none;
+            return blot_reuse_code_artifacts::Request.primitive { blot_reuse_code_artifacts::PrimitiveKey { owner, payload.key.catalog, ty, payload.key.applied } , ..}, Error.none;
         },
         blot_reuse_code_artifacts::Request.operation payload => {
             if payload.key.operation == 0 || payload.key.operation > self.old.operations.len { return default<blot_reuse_code_artifacts::Request>(), Error.declined; }
@@ -622,7 +622,7 @@ fn request<G>(self: Importer&, g: G&, old: blot_reuse_code_artifacts::Request, i
             for current, index in g.planning.runtime_operations.entries {
                 if current.foreign != operation.foreign || g.planning.runtime_operations.key(current) != operation.key { continue; }
                 let ty, import_error_29 = self.closedShape(g, payload.key.ty); if import_error_29 != Error.none { return default<blot_reuse_code_artifacts::Request>(), convert(import_error_29); }
-                return blot_reuse_code_artifacts::Request.operation { blot_reuse_code_artifacts::OperationKey { operation: (index + 1) as u32, ty: ty } }, Error.none;
+                return blot_reuse_code_artifacts::Request.operation { blot_reuse_code_artifacts::OperationKey { operation: (index + 1) as u32, ty: ty } , ..}, Error.none;
             }
             return default<blot_reuse_code_artifacts::Request>(), Error.declined;
         },
@@ -636,7 +636,7 @@ fn request<G>(self: Importer&, g: G&, old: blot_reuse_code_artifacts::Request, i
                 let input = g.representations.store.node(arrow.a).a;
                 if !g.representations.store.abi(input).present || g.representations.store.node(input).tag == LayoutTag.nominal { return default<blot_reuse_code_artifacts::Request>(), Error.declined; }
             }
-            return blot_reuse_code_artifacts::Request.host { blot_reuse_code_artifacts::HostKey { ty, payload.key.owned } }, Error.none;
+            return blot_reuse_code_artifacts::Request.host { blot_reuse_code_artifacts::HostKey { ty, payload.key.owned } , ..}, Error.none;
         },
         blot_reuse_code_artifacts::Request.constant, blot_reuse_code_artifacts::Request.runtime_global => { return default<blot_reuse_code_artifacts::Request>(), Error.declined; },
     }
@@ -649,9 +649,9 @@ fn deinit(self: EntryBuffer&) { blot_support_pooled_buffer::deinit(self, entry_b
 recursive fn mappingEvidence<G>(self: Importer&, g: G&, owner: u32, id: u32, depth: i64) -> u32, Error {
     if id == 0 { return 0, Error.none; } assert(self.old);
     if depth >= depth_limit || id >= self.old.evaluator.evidence.nodes.len { return 0, Error.declined; }
-    let key = EvidenceKey { id: id, owner: owner, mappings: true };
+    let key = EvidenceKey { id: id, owner: owner, mappings: true , ..};
     let known = self.semantic.get(key); if known { return known, Error.none; }
-    var words = blot_reuse_source_value_template::WordBuffer {};
+    var words = blot_reuse_source_value_template::WordBuffer {..};
     let result, error = self.mappingEvidenceInto(g, owner, id, depth, words);
     words.deinit(); return result, error;
 }
@@ -668,24 +668,24 @@ recursive fn mappingEvidenceInto<G>(self: Importer&, g: G&, owner: u32, id: u32,
     }
     { let import_error_6 = uniqueFields(words.items); if import_error_6 != Error.none { return 0, convert(import_error_6); } }
     let mapped, import_error_7 = g.evaluator.storage.evidence.intern(EvidenceTag.record, 0, 0, words.items); if import_error_7 != Error.none { return 0, convert(import_error_7); }
-    self.semantic.insert(EvidenceKey { id: id, owner: owner, mappings: true }, mapped);
+    self.semantic.insert(EvidenceKey { id: id, owner: owner, mappings: true , ..}, mapped);
     return mapped, Error.none;
 }
 recursive fn templateKey<G>(self: Importer&, g: G&, owner: u32, id: u32, depth: i64) -> u32, Error {
     if id == 0 { return 0, Error.none; }
     if depth >= depth_limit { return 0, Error.declined; }
-    let key = SubstitutionKey { id, owner }; let known = self.template_keys.get(key);
+    let key = SubstitutionKey { id, owner , ..}; let known = self.template_keys.get(key);
     if known { return known, Error.none; }
-    var imported = EntryBuffer {};
+    var imported = EntryBuffer {..};
     let result, error = self.substitutionInto(g, owner, id, depth, false, imported);
     imported.deinit(); return result, error;
 }
 recursive fn rowKey<G>(self: Importer&, g: G&, owner: u32, id: u32, depth: i64) -> u32, Error {
     if id == 0 { return 0, Error.none; }
     if depth >= depth_limit { return 0, Error.declined; }
-    let key = SubstitutionKey { id, owner }; let known = self.row_keys.get(key);
+    let key = SubstitutionKey { id, owner , ..}; let known = self.row_keys.get(key);
     if known { return known, Error.none; }
-    var imported = EntryBuffer {};
+    var imported = EntryBuffer {..};
     let result, error = self.substitutionInto(g, owner, id, depth, true, imported);
     imported.deinit(); return result, error;
 }
@@ -703,11 +703,11 @@ recursive fn substitutionInto<G>(self: Importer&, g: G&, owner: u32, id: u32, de
             if entry.variable == 0 || entry.variable >= module.bindings.len { return 0, Error.declined; }
             { let imported_11, import_error_11 = self.capture(g, entry.value, depth + 1); if import_error_11 != Error.none { return 0, convert(import_error_11); } value = imported_11; }
         }
-        { let import_error_12 = imported.push(blot_reuse_substitution_keys::Entry { entry.variable, value }); if import_error_12 != Error.none { return 0, convert(import_error_12); } }
+        { let import_error_12 = imported.push(blot_reuse_substitution_keys::Entry { entry.variable, value , ..}); if import_error_12 != Error.none { return 0, convert(import_error_12); } }
     }
     var mapped: u32 = 0;
-    if row_key { { let imported_13, import_error_13 = g.representations.row_keys.intern(imported.items); if import_error_13 != Error.none { return 0, convert(import_error_13); } mapped = imported_13; } self.row_keys.insert(SubstitutionKey { id, owner }, mapped); }
-    else { { let imported_14, import_error_14 = g.representations.template_keys.intern(imported.items); if import_error_14 != Error.none { return 0, convert(import_error_14); } mapped = imported_14; } self.template_keys.insert(SubstitutionKey { id, owner }, mapped); }
+    if row_key { { let imported_13, import_error_13 = g.representations.row_keys.intern(imported.items); if import_error_13 != Error.none { return 0, convert(import_error_13); } mapped = imported_13; } self.row_keys.insert(SubstitutionKey { id, owner , ..}, mapped); }
+    else { { let imported_14, import_error_14 = g.representations.template_keys.intern(imported.items); if import_error_14 != Error.none { return 0, convert(import_error_14); } mapped = imported_14; } self.template_keys.insert(SubstitutionKey { id, owner , ..}, mapped); }
     return mapped, Error.none;
 }
 recursive fn capture<G>(self: Importer&, g: G&, id: u32, depth: i64) -> u32, Error {
@@ -722,7 +722,7 @@ recursive fn capture<G>(self: Importer&, g: G&, id: u32, depth: i64) -> u32, Err
     let templates, import_error_17 = self.templateKey(g, old.unit, old.templates, depth + 1); if import_error_17 != Error.none { return 0, convert(import_error_17); }
     let evidence, import_error_18 = self.mappingEvidence(g, old.unit, old.evidence, depth + 1); if import_error_18 != Error.none { return 0, convert(import_error_18); }
     let rows, import_error_19 = self.rowKey(g, old.unit, old.rows, depth + 1); if import_error_19 != Error.none { return 0, convert(import_error_19); }
-    let imported = blot_reuse_code_artifacts::CapturedTemplate { unit: owner, node: old.node, captures: captures, templates: templates, has_environment: old.has_environment, scalar_environment: old.scalar_environment, computation: old.computation, evidence: evidence, rows: rows };
+    let imported = blot_reuse_code_artifacts::CapturedTemplate { unit: owner, node: old.node, captures: captures, templates: templates, has_environment: old.has_environment, scalar_environment: old.scalar_environment, computation: old.computation, evidence: evidence, rows: rows , ..};
     let closed, import_error_20 = self.knowledge.knownLayout(g.representations.store, imported.captures); if import_error_20 != Error.none { return 0, convert(import_error_20); }
     if !closed || (imported.scalar_environment && (!imported.has_environment || imported.templates != 0 || !g.representations.store.scalarEnvironment(imported.captures) || self.units[owner - 1].node(imported.node).tag != blot_check_core::Tag.closure)) { return 0, Error.declined; }
     var mapped: u32 = 0; let existing = g.planning.template_instances.get(imported);
@@ -736,7 +736,7 @@ recursive fn capture<G>(self: Importer&, g: G&, id: u32, depth: i64) -> u32, Err
 }
 fn staticKey<G>(self: Importer&, g: G&, id: u32) -> u32, Error {
     if id == 0 { return 0, Error.none; }
-    var entries = EntryBuffer {};
+    var entries = EntryBuffer {..};
     let result, error = self.staticKeyInto(g, id, entries);
     entries.deinit(); return result, error;
 }
@@ -745,7 +745,7 @@ fn staticKeyInto<G>(self: Importer&, g: G&, id: u32, entries: EntryBuffer&) -> u
     for old in source {
         var current: u32 = 0;
         if old.value != 0 { let known = self.value_anchors.get(old.value); if !known { return 0, Error.declined; } current = known; }
-        { let import_error_22 = entries.push(blot_reuse_substitution_keys::Entry { old.variable, current }); if import_error_22 != Error.none { return 0, convert(import_error_22); } }
+        { let import_error_22 = entries.push(blot_reuse_substitution_keys::Entry { old.variable, current , ..}); if import_error_22 != Error.none { return 0, convert(import_error_22); } }
     }
     let result, import_error_23 = g.representations.static_keys.intern(entries.items); if import_error_23 != Error.none { return 0, convert(import_error_23); }
     return result, Error.none;
@@ -777,7 +777,7 @@ fn importClosedEvidence<G>(self: Importer&, g: G&, id: u32) -> blot_support::Opt
     if error != Error.none || ordinary.present { return ordinary, error; }
     if !self.semantic_catalogs { return blot_support::none<u32>(), Error.none; }
     let bound = self.bind(g); if bound != Error.none { return optionalImported(0 as u32, bound); }
-    let key = EvidenceKey { id: id }; let known = self.semantic.get(key);
+    let key = EvidenceKey { id: id , ..}; let known = self.semantic.get(key);
     if known { return blot_support::some(known as u32), Error.none; }
     assert(self.old); let view = self.old.evaluator.evidence.view(); var remaining: i64 = 65536;
     if view.closed(id, 0, remaining) != Error.none { return blot_support::none<u32>(), Error.none; }
@@ -798,8 +798,8 @@ fn importResultTemplate<G>(self: Importer&, g: G&, id: u32) -> blot_support::Opt
 }
 
 struct StaticMatchScratch {
-    old_roots: blot_reuse_source_value_template::WordBuffer = blot_reuse_source_value_template::WordBuffer {},
-    current_roots: blot_reuse_source_value_template::WordBuffer = blot_reuse_source_value_template::WordBuffer {},
+    old_roots: blot_reuse_source_value_template::WordBuffer = blot_reuse_source_value_template::WordBuffer {..},
+    current_roots: blot_reuse_source_value_template::WordBuffer = blot_reuse_source_value_template::WordBuffer {..},
     temporary: blot_support::Option<blot_reuse_source_value_template::Plan>,
 }
 fn deinit(self: StaticMatchScratch&) {
@@ -807,7 +807,7 @@ fn deinit(self: StaticMatchScratch&) {
     if self.temporary.present { self.temporary.value.deinit(); self.temporary.present = false; }
 }
 fn matchStaticKey<G>(self: Importer&, g: G&, old_id: u32, current_id: u32) -> bool, Error {
-    var scratch = StaticMatchScratch {};
+    var scratch = StaticMatchScratch {..};
     let result, error = self.matchStaticKeyInto(g, old_id, current_id, scratch);
     scratch.deinit(); return result, error;
 }
@@ -837,7 +837,7 @@ fn matchStaticKeyInto<G>(self: Importer&, g: G&, old_id: u32, current_id: u32, t
         } else { plan .= temporary.temporary.value; }
     }
     assert(plan);
-    if !self.static_scratch.present { self.static_scratch = blot_support::some(blot_reuse_source_value_template::QueryScratch { allocation_owner: g.allocation_owner }); }
+    if !self.static_scratch.present { self.static_scratch = blot_support::some(blot_reuse_source_value_template::QueryScratch { allocation_owner: g.allocation_owner , ..}); }
     let scratch .= self.static_scratch.value;
     let anchors, begin_error = scratch.begin(plan, g);
     if begin_error != Error.none { if begin_error == Error.out_of_memory { return false, begin_error; } return false, Error.none; }
@@ -856,7 +856,7 @@ fn indexOperations(self: Importer&) -> Error {
     assert(self.old);
     let labels = unit_words.alloc_slice(self.old.operations.len); for &label in labels { label = 0; }
     let scopes = operation_scope_runs.alloc_slice(labels.len); for &scope in scopes { scope = OperationScope.unchecked; }
-    var symbols = TextMap {};
+    var symbols = TextMap {..};
     let error = self.indexOperationLabels(labels, symbols); symbols.deinit();
     if error != Error.none {
         if labels.len != 0 { unit_words.free_slice(labels); operation_scope_runs.free_slice(scopes); }
@@ -994,7 +994,7 @@ fn importPrincipalEvidence<G>(self: Importer&, g: G&, owner: u32, types: const b
     let bound = self.bind(g); if bound != Error.none { return optionalImported(default<blot_eval_core_eval::SolvedEvidence>(), bound); }
     let validated = self.validatePrincipalMappings(owner, types, rows);
     if validated != Error.none { return optionalImported(default<blot_eval_core_eval::SolvedEvidence>(), validated); }
-    var imported = blot_eval_core_eval::SolvedEvidence { blot_eval_core_eval::copySolvedTypes(types), blot_eval_core_eval::copySolvedRows(rows) };
+    var imported = blot_eval_core_eval::SolvedEvidence { blot_eval_core_eval::copySolvedTypes(types), blot_eval_core_eval::copySolvedRows(rows) , ..};
     let error = self.principalEvidenceInto(g, imported);
     if error != Error.none { imported.deinit(); return optionalImported(default<blot_eval_core_eval::SolvedEvidence>(), error); }
     return blot_support::some(imported), Error.none;
@@ -1030,7 +1030,7 @@ fn semanticSite<G>(self: Importer&, g: G&, site: blot_backend_wasm::SemanticSite
     let source, import_error_3 = self.oldModule(site.unit); if import_error_3 != Error.none { return default<blot_backend_wasm::SemanticSite>(), convert(import_error_3); } assert(source);
     if site.node >= source.nodes.len || site.root >= source.nodes.len || site.node >= self.units[unit - 1].nodes.len || site.root >= self.units[unit - 1].nodes.len { return default<blot_backend_wasm::SemanticSite>(), Error.declined; }
     if !self.stable[site.unit - 1] {
-        let key = ExpressionKey { site.unit, site.root };
+        let key = ExpressionKey { site.unit, site.root , ..};
         var nodes: const u32[:] = [];
         let known = self.expression_nodes.get(key);
         if known { nodes = known; }
@@ -1055,11 +1055,11 @@ fn deinit(self: Solved&) {
     if self.mappings.len != 0 { solved_layouts.free_slice(self.mappings); }
     if self.rows.len != 0 { solved_layout_rows.free_slice(self.rows); }
     if self.templates.len != 0 { solved_templates.free_slice(self.templates); }
-    self = Solved {};
+    self = Solved {..};
 }
 // Job tables retain typed ranges, so the source journal accompanies its header.
 fn importSolved<G>(self: Importer&, g: G&, job: const blot_reuse_code_artifacts::Job&, source: const blot_reuse_code_artifacts::Context&) -> blot_support::Option<Solved>, Error {
-    let bound = self.bind(g); if bound != Error.none { return optionalImported(Solved {}, bound); }
+    let bound = self.bind(g); if bound != Error.none { return optionalImported(Solved {..}, bound); }
     if !job.solved || job.state != blot_reuse_code_artifacts::State.complete { return blot_support::none<Solved>(), Error.none; }
     var owner: u32 = 0;
     match job.request {
@@ -1067,16 +1067,16 @@ fn importSolved<G>(self: Importer&, g: G&, job: const blot_reuse_code_artifacts:
         blot_reuse_code_artifacts::Request.closure key => { owner = key.key.unit; },
         _ => { return blot_support::none<Solved>(), Error.none; },
     }
-    let module, invalid = self.oldModule(owner); if invalid != Error.none { return optionalImported(Solved {}, invalid); } assert(module);
+    let module, invalid = self.oldModule(owner); if invalid != Error.none { return optionalImported(Solved {..}, invalid); } assert(module);
     let mappings, mapping_error = bounded(source.mappings[..], job.mappings.start, job.mappings.len);
-    if mapping_error != Error.none { return optionalImported(Solved {}, mapping_error); }
+    if mapping_error != Error.none { return optionalImported(Solved {..}, mapping_error); }
     let rows, row_error = bounded(source.rows[..], job.rows.start, job.rows.len);
-    if row_error != Error.none { return optionalImported(Solved {}, row_error); }
+    if row_error != Error.none { return optionalImported(Solved {..}, row_error); }
     let templates, template_error = bounded(source.templates[..], job.templates.start, job.templates.len);
-    if template_error != Error.none { return optionalImported(Solved {}, template_error); }
-    var result = Solved { solved_layouts.alloc_slice(mappings.len), solved_layout_rows.alloc_slice(rows.len), solved_templates.alloc_slice(templates.len) };
+    if template_error != Error.none { return optionalImported(Solved {..}, template_error); }
+    var result = Solved { solved_layouts.alloc_slice(mappings.len), solved_layout_rows.alloc_slice(rows.len), solved_templates.alloc_slice(templates.len) , ..};
     let error = self.importSolvedInto(g, module, mappings, rows, templates, result);
-    if error != Error.none { result.deinit(); return optionalImported(Solved {}, error); }
+    if error != Error.none { result.deinit(); return optionalImported(Solved {..}, error); }
     return blot_support::some(result), Error.none;
 }
 fn importSolvedInto<G>(self: Importer&, g: G&, module: const Module&, mappings: const blot_backend_layout::Mapping[:], rows: const blot_backend_layout::RowMapping[:], templates: const blot_reuse_substitution_keys::Entry[:], result: Solved&) -> Error {
@@ -1084,13 +1084,13 @@ fn importSolvedInto<G>(self: Importer&, g: G&, module: const Module&, mappings: 
         if from.variable == 0 || from.variable >= module.types.nodes.len { return Error.declined; }
         for prior in mappings[..index] { if prior.variable == from.variable { return Error.declined; } }
         let layout, error = self.closedShape(g, from.layout); if error != Error.none { return error; }
-        result.mappings[index] = blot_backend_layout::Mapping { variable: from.variable, layout: layout, instance: blot_check_types::NominalIdentity { 0, 0 } };
+        result.mappings[index] = blot_backend_layout::Mapping { variable: from.variable, layout: layout, instance: blot_check_types::NominalIdentity { 0, 0 , ..} , ..};
     }
     for from, index in rows {
         if from.variable >= module.types.effects.variable_count || from.row == blot_backend_layout::unknown_row { return Error.declined; }
         for prior in rows[..index] { if prior.variable == from.variable { return Error.declined; } }
         let row, error = self.row(g, Domain.layout, from.row, 0); if error != Error.none { return error; }
-        result.rows[index] = blot_backend_layout::RowMapping { from.variable, row };
+        result.rows[index] = blot_backend_layout::RowMapping { from.variable, row , ..};
         let known, failure = self.knowledge.knownRow(g.representations.store, row);
         if failure != Error.none { return failure; } if !known { return Error.declined; }
     }
@@ -1098,7 +1098,7 @@ fn importSolvedInto<G>(self: Importer&, g: G&, module: const Module&, mappings: 
         if from.variable == 0 || from.variable >= module.bindings.len { return Error.declined; }
         for prior in templates[..index] { if prior.variable == from.variable { return Error.declined; } }
         let value, error = self.capture(g, from.value, 0); if error != Error.none { return error; }
-        result.templates[index] = blot_reuse_substitution_keys::Entry { from.variable, value };
+        result.templates[index] = blot_reuse_substitution_keys::Entry { from.variable, value , ..};
     }
     return Error.none;
 }

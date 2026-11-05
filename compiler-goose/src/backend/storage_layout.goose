@@ -8,7 +8,7 @@ fn productBytes(fields: const u32[:]) -> u32,Error { var size: u32 = 0; for fiel
 fn variantBytes(payloads: const u32[:]) -> u32,Error { if payloads.len == 0 { return 0,Error.invalid_layout; } var payload: u32 = 0; for size in payloads { if size == 0 || (size & 3) != 0 { return 0,Error.invalid_layout; } payload = max(payload,size); } if payload > 4294967295 - alignment { return 0,Error.invalid_layout; } return alignment + payload,Error.none; }
 struct InlineFields {}
 fn children<V>(context: InlineFields,value: V) -> const V[:] { value.fields }
-recursive fn bytes<V>(value: V) -> u32,Error { bytes(InlineFields {},value) }
+recursive fn bytes<V>(value: V) -> u32,Error { bytes(InlineFields {..},value) }
 recursive fn bytes<C,V>(context: const C&,value: V) -> u32,Error {
     match value.tag {
         scalar=>{ return alignment,Error.none; },ref,link=>{ return 5 * alignment,Error.none; },view=>{ return 6 * alignment,Error.none; },

@@ -18,7 +18,7 @@ fn collect(entries: dictionary<const u8[:], Pair>&, module: const blot_check_cor
     for body in module.bodies {
         if body.binding == 0 { continue; }
         let spelling = name(module, body); if !spelling.present { continue; }
-        var pair = Pair {};
+        var pair = Pair {..};
         { let optional_source_1 .= entries.get(spelling.value); if optional_source_1 { let prior = optional_source_1; pair = prior;  } }
         if before {
             if pair.before != 0 { pair.ambiguous = true; }

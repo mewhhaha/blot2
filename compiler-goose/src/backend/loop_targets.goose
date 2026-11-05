@@ -44,7 +44,7 @@ recursive fn caseScope(self:Collector&,arm:blot_parse_ast::Node,body:u32,depth:i
  let mark=self.trail.len;let error=self.casePatterns(arm,body,depth);self.restore(mark);return error;
 }
 recursive fn casePatterns(self:Collector&,arm:blot_parse_ast::Node,body:u32,depth:i64)->Error {
- for row in self.tree.list(blot_parse_ast::List {arm.a,arm.b}) {for id in self.tree.children(row) {{ let propagated_error = self.pattern(id,depth+1); if propagated_error != Error.none { return propagated_error; } }}}return self.suite(body,depth+1);
+ for row in self.tree.list(blot_parse_ast::List {arm.a,arm.b, ..}) {for id in self.tree.children(row) {{ let propagated_error = self.pattern(id,depth+1); if propagated_error != Error.none { return propagated_error; } }}}return self.suite(body,depth+1);
 }
 recursive fn suite(self:Collector&,body:u32,depth:i64)->Error {
  if depth>=1024 {return Error.target_limit;}
@@ -56,8 +56,8 @@ recursive fn suite(self:Collector&,body:u32,depth:i64)->Error {
    blot_parse_ast::tag_use_stmt=>{{ let propagated_error = self.shadow(value.a); if propagated_error != Error.none { return propagated_error; } }},
    blot_parse_ast::tag_if_stmt=>{{ let propagated_error = self.scope(value.b,0,depth+1); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = self.scope(value.c,0,depth+1); if propagated_error != Error.none { return propagated_error; } }},
    blot_parse_ast::tag_if_let_stmt=>{let bodies=self.tree.extra.items[value.c..value.c+2];{ let propagated_error = self.scope(bodies[0],value.a,depth+1); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = self.scope(bodies[1],0,depth+1); if propagated_error != Error.none { return propagated_error; } }},
-   blot_parse_ast::tag_request_case=>{for id in self.tree.list(blot_parse_ast::List {value.b,value.c}) {let arm=self.tree.node(id);{ let propagated_error = self.scope(arm.c,arm.b,depth+1); if propagated_error != Error.none { return propagated_error; } }}},
-   blot_parse_ast::tag_case_expr=>{for id in self.tree.list(blot_parse_ast::List {value.b,value.c}) {let arm=self.tree.node(id);let arm_body=self.tree.extra.items[arm.c+1];if self.tree.node(arm_body).tag!=blot_parse_ast::tag_block||self.tree.node(arm_body).c!=0 {continue;}{ let propagated_error = self.caseScope(arm,arm_body,depth); if propagated_error != Error.none { return propagated_error; } }}},
+   blot_parse_ast::tag_request_case=>{for id in self.tree.list(blot_parse_ast::List {value.b,value.c, ..}) {let arm=self.tree.node(id);{ let propagated_error = self.scope(arm.c,arm.b,depth+1); if propagated_error != Error.none { return propagated_error; } }}},
+   blot_parse_ast::tag_case_expr=>{for id in self.tree.list(blot_parse_ast::List {value.b,value.c, ..}) {let arm=self.tree.node(id);let arm_body=self.tree.extra.items[arm.c+1];if self.tree.node(arm_body).tag!=blot_parse_ast::tag_block||self.tree.node(arm_body).c!=0 {continue;}{ let propagated_error = self.caseScope(arm,arm_body,depth); if propagated_error != Error.none { return propagated_error; } }}},
    blot_parse_ast::tag_for_stmt=>{{ let propagated_error = self.scope(self.tree.extra.items[value.c+1],value.a,depth+1); if propagated_error != Error.none { return propagated_error; } }},
    blot_parse_ast::tag_range_stmt=>{{ let propagated_error = self.scope(value.c,0,depth+1); if propagated_error != Error.none { return propagated_error; } }},
    blot_parse_ast::tag_forever_stmt=>{{ let propagated_error = self.scope(value.a,0,depth+1); if propagated_error != Error.none { return propagated_error; } }},
@@ -71,5 +71,5 @@ fn release(values:const Symbol[:]) {if values.len==0 {return;}let first:const Sy
 fn collect(tree:const Tree&,pool:const Pool&,iterator_pattern:u32,body:u32)->const Symbol[:],Error {
  // Owners stay in this nonrecursive wrapper, and the result owns a separate run.
  var shadowed:dictionary<Symbol,u32>=dictionary<Symbol,u32> {};var seen:dictionary<Symbol,bool>=dictionary<Symbol,bool> {};var trail:Symbol[>..<]=[];var targets:Symbol[>..<]=[];
- var collector=Collector {tree,pool,shadowed,seen,trail,targets};let error=collector.scope(body,iterator_pattern,0);if error!=Error.none {return [],error;}let result=returned.alloc_slice(targets.len);for value,index in targets {result[index]=value;}return result,Error.none;
+ var collector=Collector {tree,pool,shadowed,seen,trail,targets, ..};let error=collector.scope(body,iterator_pattern,0);if error!=Error.none {return [],error;}let result=returned.alloc_slice(targets.len);for value,index in targets {result[index]=value;}return result,Error.none;
 }

@@ -29,8 +29,8 @@ fn publicView(owner: const Interface&) -> Error {
     for family in owner.effect_families { abstraction = abstraction || family.private; }
     for contract in owner.contracts { abstraction = abstraction || contract.private; }
     if !abstraction { return Error.none; }
-    var context = PublicContext { owner };
-    let error = blot_reuse_module_visibility::withScan(blot_check_frozen_types::Source.frozen { owner.graph }, owner.nominals, owner.effect_families, owner.effect_templates, context, publicScan);
+    var context = PublicContext { owner , ..};
+    let error = blot_reuse_module_visibility::withScan(blot_check_frozen_types::Source.frozen { owner.graph , ..}, owner.nominals, owner.effect_families, owner.effect_templates, context, publicScan);
     if error == Error.type_limit { return Error.invalid_artifact; } return error;
 }
 fn publicScan(context: PublicContext&, scan: Scan&) -> Error {
@@ -95,15 +95,15 @@ fn requirement(scan: Scan&, owner: const Interface&, predicate: blot_check_types
     return Error.none;
 }
 fn coreGraph(module: const Module&) -> blot_check_frozen_types::Graph {
-    return blot_check_frozen_types::Graph { nodes: module.types.nodes, extra: module.types.extra, rows: module.types.effects.rows, labels: module.types.effects.labels, operations: module.types.operations, quantifier_goals: module.types.quantifier_goals, quantifier_obligations: module.types.quantifier_obligations, row_variable_count: module.types.effects.variable_count };
+    return blot_check_frozen_types::Graph { nodes: module.types.nodes, extra: module.types.extra, rows: module.types.effects.rows, labels: module.types.effects.labels, operations: module.types.operations, quantifier_goals: module.types.quantifier_goals, quantifier_obligations: module.types.quantifier_obligations, row_variable_count: module.types.effects.variable_count , ..};
 }
 fn storageContracts(owner: const Interface&, implementation: const Module&) -> Error {
     var entries: blot_backend_opaque_storage::AuthorityEntry[>..<] = [];
     for nominal in implementation.nominals {
         if nominal.identity.unit != implementation.unit { continue; }
-        entries.push(blot_backend_opaque_storage::AuthorityEntry { nominal.identity, blot_backend_opaque_storage::Authority { coreGraph(implementation), blot_check_types::List { nominal.parameters.start, nominal.parameters.len }, nominal.storage, nominal.is_opaque } });
+        entries.push(blot_backend_opaque_storage::AuthorityEntry { nominal.identity, blot_backend_opaque_storage::Authority { coreGraph(implementation), blot_check_types::List { nominal.parameters.start, nominal.parameters.len , ..}, nominal.storage, nominal.is_opaque , ..} , ..});
     }
-    return storageContractsResolved(owner, implementation, Resolver { entries });
+    return storageContractsResolved(owner, implementation, Resolver { entries , ..});
 }
 fn storageClosure(owners: const blot_reuse_frozen_dependency::Module[:], units: const ModuleRef[:]) -> Error {
     { let propagated_error = require(owners.len == units.len); if propagated_error != Error.none { return propagated_error; } }
@@ -115,14 +115,14 @@ fn storageClosure(owners: const blot_reuse_frozen_dependency::Module[:], units: 
         offsets.push(offsets[index] + module.nominals.len);
         var first_owner = true; for previous in units[..index] { if previous.value.unit == module.unit { first_owner = false; break; } }
         for nominal in module.nominals {
-            recipes.push(Storage {}); var at: i64 = -1;
+            recipes.push(Storage {..}); var at: i64 = -1;
             if first_owner && nominal.identity.unit == module.unit {
-                at = entries.len; entries.push(blot_backend_opaque_storage::AuthorityEntry { nominal.identity, blot_backend_opaque_storage::Authority { coreGraph(module), blot_check_types::List { nominal.parameters.start, nominal.parameters.len }, Storage {}, nominal.is_opaque } });
+                at = entries.len; entries.push(blot_backend_opaque_storage::AuthorityEntry { nominal.identity, blot_backend_opaque_storage::Authority { coreGraph(module), blot_check_types::List { nominal.parameters.start, nominal.parameters.len , ..}, Storage {..}, nominal.is_opaque , ..} , ..});
             }
             entry_indices.push(at);
         }
     }
-    let resolver = Resolver { entries }; var remaining: i64 = 1000000; var changed = true;
+    let resolver = Resolver { entries , ..}; var remaining: i64 = 1000000; var changed = true;
     while changed && remaining != 0 {
         changed = false;
         for ref, unit_index in units {
@@ -133,7 +133,7 @@ fn storageClosure(owners: const blot_reuse_frozen_dependency::Module[:], units: 
                 if recipes[index].kind != blot_backend_opaque_storage::Kind.unknown { continue; }
                 { let propagated_error = require(nominal.constructors.len == 1); if propagated_error != Error.none { return propagated_error; } }
                 let constructor = module.constructors[module.extra[nominal.constructors.start]];
-                let inferred = blot_backend_opaque_storage::inferPayloadAuthoritative(blot_check_frozen_types::Source.frozen { graph }, module.nominals, module.constructors, constructor.payload, blot_check_types::List { nominal.parameters.start, nominal.parameters.len }, module.unit, resolver, remaining);
+                let inferred = blot_backend_opaque_storage::inferPayloadAuthoritative(blot_check_frozen_types::Source.frozen { graph , ..}, module.nominals, module.constructors, constructor.payload, blot_check_types::List { nominal.parameters.start, nominal.parameters.len , ..}, module.unit, resolver, remaining);
                 if inferred.kind != blot_backend_opaque_storage::Kind.unknown {
                     recipes[index] = inferred; if entry_indices[index] >= 0 { entries[entry_indices[index]].authority.storage = inferred; }
                     changed = true;
@@ -182,7 +182,7 @@ fn storageContractsResolved(owner: const Interface&, implementation: const Modul
     for nominal in implementation.nominals {
         if !nominal.is_opaque || nominal.identity.unit != implementation.unit { continue; }
         { let propagated_error = require(nominal.constructors.len == 1); if propagated_error != Error.none { return propagated_error; } } let constructor = implementation.constructors[implementation.extra[nominal.constructors.start]];
-        let inferred = blot_backend_opaque_storage::inferPayloadAuthoritative(blot_check_frozen_types::Source.frozen { graph }, implementation.nominals, implementation.constructors, constructor.payload, blot_check_types::List { nominal.parameters.start, nominal.parameters.len }, implementation.unit, resolver, remaining);
+        let inferred = blot_backend_opaque_storage::inferPayloadAuthoritative(blot_check_frozen_types::Source.frozen { graph , ..}, implementation.nominals, implementation.constructors, constructor.payload, blot_check_types::List { nominal.parameters.start, nominal.parameters.len , ..}, implementation.unit, resolver, remaining);
         { let propagated_error = require(nominal.storage == inferred); if propagated_error != Error.none { return propagated_error; } }
     }
     for nominal in owner.nominals {

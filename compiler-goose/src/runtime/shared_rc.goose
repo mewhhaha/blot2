@@ -25,7 +25,7 @@ let next: u32 = blot_runtime_runtime_layout::ArenaHeader_next;
 let requested: u32 = blot_runtime_runtime_layout::ArenaHeader_requested;
 fn bump(c: Code&, global: u32) { c.globalGet(global); c.value(1); c.op(blot_backend_runtime_ir::OP_i32_add); c.globalSet(global); }
 fn dynamic(c: Code&, arena: Arena) -> Local {
-    let pointer = Local { 0 }; c.value(pointer); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.when(); c.ret(); c.end();
+    let pointer = Local { 0 , ..}; c.value(pointer); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.when(); c.ret(); c.end();
     return checkedHead(c, pointer);
 }
 fn checkedHead(c: Code&, pointer: Local) -> Local {
@@ -35,7 +35,7 @@ fn checkedHead(c: Code&, pointer: Local) -> Local {
     return head;
 }
 fn checkedHead(c: blot_backend_runtime_code::Code<Module>&, pointer: Local) -> Local, Error {
-    var emitter = Code { code: c }; let head = checkedHead(emitter, pointer); return head, emitter.failure;
+    var emitter = Code { code: c , ..}; let head = checkedHead(emitter, pointer); return head, emitter.failure;
 }
 fn narrowSlot(c: Code&, head: Local, word: Local) {
     c.value(word); c.value(31); c.op(blot_backend_runtime_ir::OP_i32_gt_u); c.when(); c.set(word, 31 as u32); c.end();
@@ -70,13 +70,13 @@ fn emit(module: Module&, arena: Arena) -> Error {
     { let propagated_error = emitOne(module, arena.retain, arena, retain); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.decrement, arena, decrement); if propagated_error != Error.none { return propagated_error; } }
     { let propagated_error = emitOne(module, arena.release, arena, release); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.release_lease, arena, releaseLease); if propagated_error != Error.none { return propagated_error; } }
     { let propagated_error = emitOne(module, arena.retire, arena, retire); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.store_word, arena, store); if propagated_error != Error.none { return propagated_error; } } { let propagated_error = emitOne(module, arena.copy_words, arena, copy); if propagated_error != Error.none { return propagated_error; } }
-    var recycle = blot_emitter::init(module, arena.recycle); let pointer = Local { 0 };
+    var recycle = blot_emitter::init(module, arena.recycle); let pointer = Local { 0 , ..};
     recycle.value(pointer); recycle.value(header); recycle.op(blot_backend_runtime_ir::OP_i32_sub); recycle.load(flags); recycle.value(counted); recycle.op(blot_backend_runtime_ir::OP_i32_and); recycle.when();
     recycle.value(pointer); recycle.call(arena.release_lease); recycle.op(blot_backend_runtime_ir::OP_else_);
     recycle.value(pointer); recycle.call(arena.free); recycle.end(); return recycle.failure;
 }
 fn allocate(c: Code&, arena: Arena) {
-    let bytes = Local { 0 }; let mask = Local { 1 }; let pointer = c.temp(); let head = c.temp();
+    let bytes = Local { 0 , ..}; let mask = Local { 1 , ..}; let pointer = c.temp(); let head = c.temp();
     c.value(bytes); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when(); c.value(0 as u32); c.ret(); c.end();
     c.globalGet(arena.rc_enabled); c.when(); c.value(bytes); c.value(3); c.op(blot_backend_runtime_ir::OP_i32_and); c.trap(); c.end();
     c.value(bytes); c.call(arena.allocate); c.set(pointer); c.value(pointer); c.value(header); c.op(blot_backend_runtime_ir::OP_i32_sub); c.set(head);
@@ -87,7 +87,7 @@ fn allocate(c: Code&, arena: Arena) {
     c.value(mask); c.when(); c.value(pointer); c.value(0); c.value(bytes); c.zero(); c.end(); c.value(pointer);
 }
 fn allocateShaped(c: Code&, arena: Arena) {
-    let bytes = Local { 0 }; let shape = Local { 1 }; let pointer = c.temp(); let head = c.temp();
+    let bytes = Local { 0 , ..}; let shape = Local { 1 , ..}; let pointer = c.temp(); let head = c.temp();
     c.value(shape); c.value(3); c.op(blot_backend_runtime_ir::OP_i32_and); c.value(shape); c.value(blot_runtime_arena_runtime::metadata_bytes); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.op(blot_backend_runtime_ir::OP_i32_or); c.trap();
     c.value(shape); c.globalGet(arena.static_end); c.value(4); c.op(blot_backend_runtime_ir::OP_i32_sub); c.op(blot_backend_runtime_ir::OP_i32_gt_u); c.trap();
     c.value(4); c.value(bytes); c.value(4); c.op(blot_backend_runtime_ir::OP_i32_div_u); c.value(31); c.op(blot_backend_runtime_ir::OP_i32_add); c.value(32); c.op(blot_backend_runtime_ir::OP_i32_div_u); c.value(4); c.op(blot_backend_runtime_ir::OP_i32_mul); c.op(blot_backend_runtime_ir::OP_i32_add); c.globalGet(arena.static_end); c.value(shape); c.op(blot_backend_runtime_ir::OP_i32_sub); c.op(blot_backend_runtime_ir::OP_i32_gt_u); c.trap();
@@ -103,7 +103,7 @@ fn retain(c: Code&, arena: Arena) {
     c.value(head); c.load(strong); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.trap(); c.value(head); c.load(strong); c.value(0xffffffff); c.op(blot_backend_runtime_ir::OP_i32_eq); c.trap();
     c.value(head); c.value(head); c.load(strong); c.value(1); c.op(blot_backend_runtime_ir::OP_i32_add); c.store(strong); bump(c, arena.rc_retains);
 }
-fn decrement(c: Code&, arena: Arena) { let pointer = Local { 0 }; let head = dynamic(c, arena); decrementKnown(c, arena, pointer, head); }
+fn decrement(c: Code&, arena: Arena) { let pointer = Local { 0 , ..}; let head = dynamic(c, arena); decrementKnown(c, arena, pointer, head); }
 fn decrementKnown(c: Code&, arena: Arena, pointer: Local, head: Local) { dropKnown(c, arena, pointer, head, false); }
 fn releaseKnown(c: Code&, arena: Arena, pointer: Local, head: Local) { dropKnown(c, arena, pointer, head, true); drain(c, arena); }
 fn dropKnown(c: Code&, arena: Arena, pointer: Local, head: Local, immediate: bool) {
@@ -117,14 +117,14 @@ fn dropKnown(c: Code&, arena: Arena, pointer: Local, head: Local, immediate: boo
     c.op(blot_backend_runtime_ir::OP_else_); c.value(head); c.load(layout); c.when();
     c.value(pointer); c.call(arena.cycle_enqueue); c.end(); c.end();
 }
-fn release(c: Code&, arena: Arena) { let pointer = Local { 0 }; c.value(pointer); c.call(arena.decrement); drain(c, arena); }
+fn release(c: Code&, arena: Arena) { let pointer = Local { 0 , ..}; c.value(pointer); c.call(arena.decrement); drain(c, arena); }
 fn drain(c: Code&, arena: Arena) {
     let pointer = c.temp(); c.loopStart(); c.value(queue); c.load(0); c.loopTest(); c.value(queue); c.load(0); c.set(pointer);
     c.value(queue); c.value(pointer); c.value(header); c.op(blot_backend_runtime_ir::OP_i32_sub); c.load(next); c.store(0);
     c.value(pointer); c.value(header); c.op(blot_backend_runtime_ir::OP_i32_sub); c.value(0); c.store(next); c.value(pointer); c.call(arena.retire); c.again();
 }
 fn releaseLease(c: Code&, arena: Arena) {
-    let pointer = Local { 0 }; let head = dynamic(c, arena);
+    let pointer = Local { 0 , ..}; let head = dynamic(c, arena);
     c.value(head); c.load(flags); c.value(lease); c.op(blot_backend_runtime_ir::OP_i32_and); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.trap();
     blot_runtime_root_runtime::detach(c, arena, head); consumeLease(c, arena, pointer, head); drain(c, arena);
 }
@@ -133,7 +133,7 @@ fn consumeLease(c: Code&, arena: Arena, pointer: Local, head: Local) {
     c.globalGet(arena.rc_leases); c.value(1); c.op(blot_backend_runtime_ir::OP_i32_sub); c.globalSet(arena.rc_leases); decrementKnown(c, arena, pointer, head);
 }
 fn retire(c: Code&, arena: Arena) {
-    let pointer = Local { 0 }; let head = dynamic(c, arena); let is_dead = c.temp(); let offset = c.temp(); let child = c.temp();
+    let pointer = Local { 0 , ..}; let head = dynamic(c, arena); let is_dead = c.temp(); let offset = c.temp(); let child = c.temp();
     c.value(head); c.load(flags); c.value(dead); c.op(blot_backend_runtime_ir::OP_i32_and); c.set(is_dead);
     c.value(is_dead); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.value(head); c.load(strong); c.op(blot_backend_runtime_ir::OP_i32_and); c.trap();
     c.value(head); c.load(flags); c.value(blot_runtime_cycles_runtime::queued); c.op(blot_backend_runtime_ir::OP_i32_and); c.when(); c.value(pointer); c.call(arena.cycle_unlink); c.end();
@@ -150,7 +150,7 @@ fn retire(c: Code&, arena: Arena) {
     c.op(blot_backend_runtime_ir::OP_resource_retire, pointer.id); c.value(pointer); c.call(arena.free);
 }
 fn store(c: Code&, arena: Arena) {
-    let parent = Local { 0 }; let address = Local { 1 }; let value = Local { 2 };
+    let parent = Local { 0 , ..}; let address = Local { 1 , ..}; let value = Local { 2 , ..};
     let head = c.temp(); let offset = c.temp(); let old = c.temp();
     c.globalGet(arena.rc_enabled); c.when(); c.value(parent); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.when();
     c.globalGet(arena.root_enabled); c.when(); let index = c.temp(); let field = c.temp(); let slot = c.temp(); c.set(index, 0 as u32);
@@ -177,9 +177,9 @@ fn copyWord<O,A,S>(c: Code&, arena: Arena, head: Local, offset: O, address: A, s
     c.value(old); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_ge_u); c.when(); c.value(old); c.call(arena.release); c.end(); c.end();
     c.op(blot_backend_runtime_ir::OP_else_); c.value(address); c.value(value); c.store(); c.end();
 }
-fn add(left: Local, right: Local) -> blot_backend_runtime_ir::Instruction[3] { return [blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, left.id }, blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, right.id }, blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_i32_add }]; }
+fn add(left: Local, right: Local) -> blot_backend_runtime_ir::Instruction[3] { return [blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, left.id , ..}, blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, right.id , ..}, blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_i32_add , ..}]; }
 fn copy(c: Code&, arena: Arena) {
-    let parent = Local { 0 }; let target = Local { 1 }; let source = Local { 2 }; let bytes = Local { 3 }; let index = c.temp();
+    let parent = Local { 0 , ..}; let target = Local { 1 , ..}; let source = Local { 2 , ..}; let bytes = Local { 3 , ..}; let index = c.temp();
     c.globalGet(arena.rc_enabled); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when(); c.value(target); c.value(source); c.value(bytes); c.copy(); c.ret(); c.end();
     c.value(bytes); c.value(3); c.op(blot_backend_runtime_ir::OP_i32_and); c.trap(); c.value(bytes); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when(); c.ret(); c.end();
     let head = c.temp(); let offset = c.temp(); c.value(parent); c.value(header); c.op(blot_backend_runtime_ir::OP_i32_sub); c.set(head); c.value(target); c.value(parent); c.op(blot_backend_runtime_ir::OP_i32_sub); c.set(offset);

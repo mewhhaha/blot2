@@ -54,9 +54,9 @@ recursive fn row(encoder: Encoder&, id: u32, depth: i64) -> blot_error::Error {
     let span = encoder.view.effects.rows[id]; if span.start > encoder.view.effects.labels.len || span.len > encoder.view.effects.labels.len - span.start { return blot_error::Error.invalid_operation; }
     var keys: blot_backend_runtime_ir::Range[>..<] = []; var bytes: u8[>..<] = [];
     for label in encoder.view.effects.rowLabels(id) {
-        var child_bytes: u8[>..<] = []; let child = Encoder { view: encoder.view, identity: encoder.identity, bytes: child_bytes };
+        var child_bytes: u8[>..<] = []; let child = Encoder { view: encoder.view, identity: encoder.identity, bytes: child_bytes , ..};
         let error = operation(child, label, depth + 1); if error != blot_error::Error.none { return error; }
-        keys.push(blot_backend_runtime_ir::Range { start: bytes.len, len: child_bytes.len }); bytes.append(child_bytes);
+        keys.push(blot_backend_runtime_ir::Range { start: bytes.len, len: child_bytes.len , ..}); bytes.append(child_bytes);
     }
     // Exact multiset order keeps duplicate operations.
     let key_count = keys.len;
@@ -98,7 +98,7 @@ recursive fn ty(encoder: Encoder&, id: u32, depth: i64) -> blot_error::Error {
     let fields = encoder.view.children(id);
     if encoder.identity.present {
         var ordered: Field[>..<] = [];
-        for index in 0..node.b { let name = blot_backend_runtime_identity::symbol(encoder.identity.value, fields[index * 2]); if !name.present { return blot_error::Error.invalid_operation; } ordered.push(Field { name: name.value, ty: fields[index * 2 + 1] }); }
+        for index in 0..node.b { let name = blot_backend_runtime_identity::symbol(encoder.identity.value, fields[index * 2]); if !name.present { return blot_error::Error.invalid_operation; } ordered.push(Field { name: name.value, ty: fields[index * 2 + 1] , ..}); }
         let length = ordered.len;
         for index in 1..length { let field = ordered[index]; var next = index; while next > 0 && lessBytes(field.name, ordered[next - 1].name) { ordered[next] = ordered[next - 1]; next--; } ordered[next] = field; }
         error = count(encoder, ordered.len); if error != blot_error::Error.none { return error; }
@@ -121,7 +121,7 @@ fn initProject(entries: Entry[>..<]&, key_bytes: u8[>..<]&, keys: dictionary<u64
 fn key(store: Store&, entry: Entry) -> const u8[:] { store.key_bytes[entry.key.start..entry.key.start + entry.key.len] }
 fn intern(store: Store&, view: blot_eval_type_evidence::View, label: blot_check_effect_evidence::Label) -> Id, blot_error::Error {
     if store.finalized { return 0, blot_error::Error.invalid_operation; }
-    var bytes: u8[>..<] = []; let encoder = Encoder { view: view, identity: store.identity, bytes: bytes };
+    var bytes: u8[>..<] = []; let encoder = Encoder { view: view, identity: store.identity, bytes: bytes , ..};
     var domain: u8 = 'S'; if store.identity.present { domain = 'P'; }
     var error = raw(encoder, [1, domain]); if error != blot_error::Error.none { return 0, error; }
     error = operation(encoder, label, 0); if error != blot_error::Error.none { return 0, error; }
@@ -146,21 +146,21 @@ fn internSymbol(store: Store&, bytes: const u8[:], foreign: bool) -> Id, blot_er
         var error = blot_reuse_artifact_emitter::operationSymbol(store.artifacts, id, bytes, foreign); if error != blot_error::Error.none { return 0, error; }
         error = blot_reuse_artifact_emitter::recordDemand(store.artifacts, blot_reuse_artifact_emitter::ResourceKind.operation, id, false); if error != blot_error::Error.none { return 0, error; }
     }
-    let range = blot_backend_runtime_ir::Range { start: store.key_bytes.len, len: bytes.len }; store.key_bytes.append(bytes);
+    let range = blot_backend_runtime_ir::Range { start: store.key_bytes.len, len: bytes.len , ..}; store.key_bytes.append(bytes);
     var previous: Id = 0; block { let found = store.keys.get(fingerprint); if found { previous = found; } }
-    store.entries.push(Entry { key: range, foreign: foreign, next: previous }); store.keys.insert(fingerprint, id); return id, blot_error::Error.none;
+    store.entries.push(Entry { key: range, foreign: foreign, next: previous , ..}); store.keys.insert(fingerprint, id); return id, blot_error::Error.none;
 }
 fn emit(store: Store&, module: blot_backend_wasm::Module&, function: u32, operation: Id) -> blot_error::Error {
     if store.finalized || operation == 0 || operation > store.entries.len || function >= module.functions.len { return blot_error::Error.invalid_operation; }
     let index = module.functions[function].instructions.len; if index > 4294967295 { return blot_error::Error.module_too_large; }
     let error = blot_backend_wasm::emitReference(module, function, blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const, operation), blot_reuse_artifact_emitter::Role.operation); if error != blot_error::Error.none { return error; }
     module.instructions[module.functions[function].instructions.start + index].operand = 0;
-    store.relocations.push(Relocation { operation: operation, location: Location { function: function, index: index as u32 } }); return blot_error::Error.none;
+    store.relocations.push(Relocation { operation: operation, location: Location { function: function, index: index as u32 , ..} , ..}); return blot_error::Error.none;
 }
 fn dataWord(store: Store&, module: blot_backend_wasm::Module&, address: u32, operation: Id) -> blot_error::Error {
     if store.finalized || operation == 0 || operation > store.entries.len || address % 4 != 0 || address > module.data.len || 4 > module.data.len - address { return blot_error::Error.invalid_operation; }
-    let error = blot_backend_wasm::dataReference(module, address, blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.operation, value: operation }); if error != blot_error::Error.none { return error; }
-    store.relocations.push(Relocation { operation: operation, location: Location { word: true, index: address } }); return blot_error::Error.none;
+    let error = blot_backend_wasm::dataReference(module, address, blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.operation, value: operation , ..}); if error != blot_error::Error.none { return error; }
+    store.relocations.push(Relocation { operation: operation, location: Location { word: true, index: address , ..} , ..}); return blot_error::Error.none;
 }
 fn finish(store: Store&, module: blot_backend_wasm::Module&) -> blot_error::Error {
     if store.finalized { return blot_error::Error.invalid_operation; }

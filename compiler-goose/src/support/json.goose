@@ -6,7 +6,7 @@ import .option;
 struct Options { emit_strings_as_arrays: bool = false,emit_nonportable_numbers_as_strings: bool = false }
 enum FrameKind { object,array }
 struct Frame { kind: FrameKind = FrameKind.object,first: bool = true }
-struct Writer { out: u8[>..]&,options: Options,frames: Frame[256] = [Frame {};256],depth: i64 = 0,failure: blot_error::Error = blot_error::Error.none }
+struct Writer { out: u8[>..]&,options: Options,frames: Frame[256] = [Frame {..};256],depth: i64 = 0,failure: blot_error::Error = blot_error::Error.none }
 struct Raw { bytes: const u8[:] }
 fn fail(writer: Writer&,error: blot_error::Error) -> blot_error::Error { if writer.failure == blot_error::Error.none { writer.failure = error; } return writer.failure; }
 fn quoted(writer: Writer&,text: const u8[:]) -> blot_error::Error {
@@ -18,9 +18,9 @@ fn quoted(writer: Writer&,text: const u8[:]) -> blot_error::Error {
     }
     writer.out.push('"'); return blot_error::Error.none;
 }
-fn beginObject(writer: Writer&) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } if writer.depth == 256 { return fail(writer,blot_error::Error.module_too_large); } writer.out.push('{'); writer.frames[writer.depth] = Frame { FrameKind.object,true }; writer.depth++; return blot_error::Error.none; }
+fn beginObject(writer: Writer&) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } if writer.depth == 256 { return fail(writer,blot_error::Error.module_too_large); } writer.out.push('{'); writer.frames[writer.depth] = Frame { FrameKind.object,true , ..}; writer.depth++; return blot_error::Error.none; }
 fn endObject(writer: Writer&) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } assert(writer.depth != 0 && writer.frames[writer.depth - 1].kind == FrameKind.object); writer.depth--; writer.out.push('}'); return blot_error::Error.none; }
-fn beginArray(writer: Writer&) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } if writer.depth == 256 { return fail(writer,blot_error::Error.module_too_large); } writer.out.push('['); writer.frames[writer.depth] = Frame { FrameKind.array,true }; writer.depth++; return blot_error::Error.none; }
+fn beginArray(writer: Writer&) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } if writer.depth == 256 { return fail(writer,blot_error::Error.module_too_large); } writer.out.push('['); writer.frames[writer.depth] = Frame { FrameKind.array,true , ..}; writer.depth++; return blot_error::Error.none; }
 fn endArray(writer: Writer&) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } assert(writer.depth != 0 && writer.frames[writer.depth - 1].kind == FrameKind.array); writer.depth--; writer.out.push(']'); return blot_error::Error.none; }
 fn separator(writer: Writer&,kind: FrameKind) -> blot_error::Error {
     if writer.failure != blot_error::Error.none { return writer.failure; } assert(writer.depth != 0 && writer.frames[writer.depth - 1].kind == kind);
@@ -83,7 +83,7 @@ fn jsonStringify<T>(value: T,writer: Writer&) -> blot_error::Error {
     let opened = beginObject(writer); if opened != blot_error::Error.none { return opened; }
     const for <N,A> in fields<T> { let error = field(writer,N,value.A); if error != blot_error::Error.none { return error; } } return endObject(writer);
 }
-fn toBytes<T>(value: T,out: u8[>..]&,options: Options = Options {}) -> blot_error::Error { var writer = Writer { out,options }; let error = write(writer,value); if error != blot_error::Error.none { return error; } return writer.failure; }
+fn toBytes<T>(value: T,out: u8[>..]&,options: Options = Options {..}) -> blot_error::Error { var writer = Writer { out,options , ..}; let error = write(writer,value); if error != blot_error::Error.none { return error; } return writer.failure; }
 fn unionValue<T>(writer: Writer&,value: T) -> blot_error::Error {
     match value {
         const for <N,V> in variants<T> {

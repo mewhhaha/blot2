@@ -51,6 +51,6 @@ fn releaseRecords(self: Adapter, items: const Record[:]) {
     records.free_slice(records[at..at + items.len]);
 }
 fn recordBytes(self: Adapter) -> i64 { blot_host_layout::principal_record }
-fn init(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_query_table::Limits {}) -> Table {
-    return blot_reuse_semantic_query_table::init<Key,Dependencies,Value,Adapter>(Adapter {}, limits);
+fn init(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_query_table::Limits {..}) -> Table {
+    return blot_reuse_semantic_query_table::init<Key,Dependencies,Value,Adapter>(Adapter {..}, limits);
 }

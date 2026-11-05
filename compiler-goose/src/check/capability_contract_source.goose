@@ -13,7 +13,7 @@ struct Functions { engine: const blot_check_check::Engine& }
 fn lookup(self: const Functions&, source: AstId) -> blot_support::Option<blot_check_capability_contracts::Recipe> { return self.engine.callbackFunction(source); }
 struct Entry { name: u32, value: Id }
 struct Environment { entries: Entry[128], len: i64 = 0 }
-fn bind(self: Environment&, name: u32, value: Id) -> Error { if self.len == self.entries.len { return Error.capability_analysis_limit; } self.entries[self.len] = Entry { name, value }; self.len += 1; return Error.none; }
+fn bind(self: Environment&, name: u32, value: Id) -> Error { if self.len == self.entries.len { return Error.capability_analysis_limit; } self.entries[self.len] = Entry { name, value , ..}; self.len += 1; return Error.none; }
 fn get(self: const Environment&, name: u32) -> blot_support::Option<Id> { var index = self.len; while index != 0 { index -= 1; if self.entries[index].name == name { return blot_support::some(self.entries[index].value); } } return blot_support::none<Id>(); }
 struct Builder {
     store: Store&, tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, remaining: i64 = 65536, operations: const u32[:] = [], lexical_captures: bool = false,
@@ -52,8 +52,8 @@ recursive fn expression(self: Builder&, source: AstId, environment: const Enviro
         },
         blot_parse_ast::tag_integer, blot_parse_ast::tag_float, blot_parse_ast::tag_boolean, blot_parse_ast::tag_unit => { return 0, Error.none; },
         blot_parse_ast::tag_string => { let count, error = textLength(self.pool.get(value.a)); if error != Error.none { return 0, error; } var children: u32[2048] = [0; 2048]; if count > children.len { return 0, Error.capability_analysis_limit; } return self.store.aggregate(Tag.product, children[..count]); },
-        blot_parse_ast::tag_constructor_ref => { return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped }); },
-        blot_parse_ast::tag_type_witness => { let id, error = expression(self, value.a, environment, depth + 1); if error != Error.none { return 0, error; } return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, id }); },
+        blot_parse_ast::tag_constructor_ref => { return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped , ..}); },
+        blot_parse_ast::tag_type_witness => { let id, error = expression(self, value.a, environment, depth + 1); if error != Error.none { return 0, error; } return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, id , ..}); },
         blot_parse_ast::tag_field => { if value.b == 0 { let found = environment.get(value.a); if !found.present { return 0, Error.unavailable; } return found.value, Error.none; } return expression(self, value.b, environment, depth + 1); },
         blot_parse_ast::tag_field_access => { let receiver, error = expression(self, value.a, environment, depth + 1); if error != Error.none { return 0, error; } if ungrouped < self.operations.len && self.operations[ungrouped] != 0 { let children: Id[1] = [receiver]; return self.store.aggregate(Tag.captures, children); } return self.store.project(receiver, value.b, blot_check_capability_contracts::Projection.field); },
         blot_parse_ast::tag_index_access => { return selectIndex(self, value.a, value.b, environment, depth + 1); },
@@ -63,7 +63,7 @@ recursive fn expression(self: Builder&, source: AstId, environment: const Enviro
         },
         blot_parse_ast::tag_record => { var fields: u32[4096]; let sources = self.tree.children(ungrouped); if sources.len > fields.len / 2 { return 0, Error.capability_analysis_limit; }
             for child, index in sources { let field = self.tree.node(child); fields[index * 2] = field.a; let id, error = expression(self, child, environment, depth + 1); if error != Error.none { return 0, error; } fields[index * 2 + 1] = id; }
-            let record, error = self.store.aggregate(Tag.record, fields[..sources.len * 2]); if error != Error.none { return 0, error; } if value.a != 0 { return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, record }); } return record, Error.none;
+            let record, error = self.store.aggregate(Tag.record, fields[..sources.len * 2]); if error != Error.none { return 0, error; } if value.a != 0 { return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, record , ..}); } return record, Error.none;
         },
         blot_parse_ast::tag_if_expr => { if self.lexical_captures { let ignored, error = expression(self, value.a, environment, depth + 1); if error != Error.none { return 0, error; } } let left, error = expression(self, value.b, environment, depth + 1); if error != Error.none { return 0, error; } let right, error = expression(self, value.c, environment, depth + 1); if error != Error.none { return 0, error; } let children: Id[2] = [left, right]; return self.store.aggregate(Tag.join, children); },
         blot_parse_ast::tag_block => { return blockValue(self, ungrouped, value, environment, depth); },
@@ -83,11 +83,11 @@ fn application(self: Builder&, ungrouped: AstId, value: blot_parse_ast::Node, en
             let ignored, error = expression(self, callee_source, environment, depth + 1); if error != Error.none { return 0, error; }
             let types .= self.input_types; if types { if ungrouped >= self.input_expr_types.len { return 0, Error.unavailable; }
                 match types.node(types.head(self.input_expr_types[ungrouped], 0)).tag { blot_check_types::Tag.unit, blot_check_types::Tag.boolean, blot_check_types::Tag.unsigned32, blot_check_types::Tag.floating32, blot_check_types::Tag.never => { return 0, Error.none; }, _ => {}, }
-            } return self.store.append(blot_check_capability_contracts::Term { Tag.unknown });
+            } return self.store.append(blot_check_capability_contracts::Term { Tag.unknown , ..});
         }
     }
     let call = blot_check_capability_flow::localSourceCall(self.tree, ungrouped);
-    if call.present { if environment.get(call.value.name).present { return 0, Error.unavailable; } var nested = Environment {};
+    if call.present { if environment.get(call.value.name).present { return 0, Error.unavailable; } var nested = Environment {..};
         for index in 0..call.value.len { let argument, error = expression(self, call.value.arguments[index], environment, depth + 1); if error != Error.none { return 0, error; } let error = nested.bind(call.value.parameters[index], argument); if error != Error.none { return 0, error; } } return expression(self, call.value.body, nested, depth + 1);
     }
     if self.lexical_captures { let functions .= self.functions; if functions { var callee = ungrouped; var reverse: AstId[16]; var count: i64 = 0;
@@ -99,12 +99,12 @@ fn application(self: Builder&, ungrouped: AstId, value: blot_parse_ast::Node, en
     let construction = blot_check_capability_flow::constructionSource(self.tree, self.pool, ungrouped);
     if construction.present { var children: Id[3]; for index in 0..construction.value.len { let id, error = expression(self, construction.value.inputs[index], environment, depth + 1); if error != Error.none { return 0, error; } children[index] = id; }
         for child in children[..construction.value.len] { let error = inputStore(self, child); if error != Error.none { return 0, error; } }
-        if construction.value.kind == blot_check_capability_flow::ConstructionKind.computation { return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, children[0] }); } return self.store.aggregate(Tag.captures, children[..construction.value.len]);
+        if construction.value.kind == blot_check_capability_flow::ConstructionKind.computation { return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, children[0] , ..}); } return self.store.aggregate(Tag.captures, children[..construction.value.len]);
     }
     let projection = blot_check_capability_flow::projectionSource(self.tree, self.pool, ungrouped); if projection.present { return selectIndex(self, projection.value.receiver, projection.value.index, environment, depth + 1); }
     let callee, error = self.node(value.a, depth + 1); if error != Error.none { return 0, error; }
     if callee.tag == blot_parse_ast::tag_intrinsic { let name = self.pool.get(callee.a); if name == "@usage.read" || name == "@usage.length" { if self.lexical_captures { let ignored, error = expression(self, value.b, environment, depth + 1); if error != Error.none { return 0, error; } } return 0, Error.none; } }
-    if callee.tag != blot_parse_ast::tag_constructor_ref { return 0, Error.unavailable; } let id, error = expression(self, value.b, environment, depth + 1); if error != Error.none { return 0, error; } return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, id });
+    if callee.tag != blot_parse_ast::tag_constructor_ref { return 0, Error.unavailable; } let id, error = expression(self, value.b, environment, depth + 1); if error != Error.none { return 0, error; } return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, id , ..});
 }
 fn blockValue(self: Builder&, source: AstId, value: blot_parse_ast::Node, environment: const Environment&, depth: i64) -> Id, Error {
     if value.c != 0 { return 0, Error.unavailable; } var nested = environment; let children = self.tree.children(source);
@@ -116,9 +116,9 @@ fn blockValue(self: Builder&, source: AstId, value: blot_parse_ast::Node, enviro
 }
 fn caseValue(self: Builder&, value: blot_parse_ast::Node, environment: const Environment&, depth: i64) -> Id, Error {
     let inputs = self.tree.extra.items[value.a..value.a + 2]; if inputs[1] > 16 || value.c > 4096 { return 0, Error.capability_analysis_limit; } var retained: Id[16];
-    for input, index in self.tree.list(blot_parse_ast::List { inputs[0], inputs[1] }) { let id, error = expression(self, input, environment, depth + 1); if error != Error.none { return 0, error; } retained[index] = id; }
-    var arms: Id[4096]; for arm_id, index in self.tree.list(blot_parse_ast::List { value.b, value.c }) { let arm = self.tree.node(arm_id); var nested = environment; let start = nested.len;
-        for row in self.tree.list(blot_parse_ast::List { arm.a, arm.b }) { let patterns = self.tree.children(row); if patterns.len != inputs[1] { return 0, Error.unavailable; }
+    for input, index in self.tree.list(blot_parse_ast::List { inputs[0], inputs[1] , ..}) { let id, error = expression(self, input, environment, depth + 1); if error != Error.none { return 0, error; } retained[index] = id; }
+    var arms: Id[4096]; for arm_id, index in self.tree.list(blot_parse_ast::List { value.b, value.c , ..}) { let arm = self.tree.node(arm_id); var nested = environment; let start = nested.len;
+        for row in self.tree.list(blot_parse_ast::List { arm.a, arm.b , ..}) { let patterns = self.tree.children(row); if patterns.len != inputs[1] { return 0, Error.unavailable; }
             for pattern, ordinal in patterns { let error = bindShapePattern(self, pattern, retained[ordinal], nested, start, depth + 1); if error != Error.none { return 0, error; } }
         }
         let details = self.tree.extra.items[arm.c..arm.c + 2]; if self.lexical_captures && details[0] != 0 { let ignored, error = expression(self, details[0], nested, depth + 1); if error != Error.none { return 0, error; } }
@@ -167,9 +167,9 @@ recursive fn capture(self: Builder&, source: AstId, environment: const Environme
             }
         },
         blot_parse_ast::tag_case_expr => { let inputs = self.tree.extra.items[value.a..value.a + 2]; if inputs[1] > 16 { return Error.unavailable; }
-            for input in self.tree.list(blot_parse_ast::List { inputs[0], inputs[1] }) { let error = capture(self, input, environment, captures, count, depth + 1); if error != Error.none { return error; } }
-            for arm_id in self.tree.list(blot_parse_ast::List { value.b, value.c }) { let arm = self.tree.node(arm_id); var nested = environment; let start = nested.len;
-                for row in self.tree.list(blot_parse_ast::List { arm.a, arm.b }) { let patterns = self.tree.children(row); if patterns.len != inputs[1] { return Error.unavailable; } for pattern in patterns { let error = bindShapePattern(self, pattern, 0, nested, start, depth + 1); if error != Error.none { return error; } } }
+            for input in self.tree.list(blot_parse_ast::List { inputs[0], inputs[1] , ..}) { let error = capture(self, input, environment, captures, count, depth + 1); if error != Error.none { return error; } }
+            for arm_id in self.tree.list(blot_parse_ast::List { value.b, value.c , ..}) { let arm = self.tree.node(arm_id); var nested = environment; let start = nested.len;
+                for row in self.tree.list(blot_parse_ast::List { arm.a, arm.b , ..}) { let patterns = self.tree.children(row); if patterns.len != inputs[1] { return Error.unavailable; } for pattern in patterns { let error = bindShapePattern(self, pattern, 0, nested, start, depth + 1); if error != Error.none { return error; } } }
                 let details = self.tree.extra.items[arm.c..arm.c + 2]; if details[0] != 0 { let error = capture(self, details[0], nested, captures, count, depth + 1); if error != Error.none { return error; } } let error = capture(self, details[1], nested, captures, count, depth + 1); if error != Error.none { return error; }
             }
         },
@@ -181,7 +181,7 @@ recursive fn capture(self: Builder&, source: AstId, environment: const Environme
 fn derive(store: Store&, tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, source: AstId, summary: blot_check_capability_flow::Parameters) -> blot_support::Option<Id>, Error { return deriveChecked(store, tree, pool, source, summary, []); }
 fn deriveChecked(store: Store&, tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, source: AstId, summary: blot_check_capability_flow::Parameters, operations: const u32[:]) -> blot_support::Option<Id>, Error {
     if !summary.valid() || !summary.present() || summary.invokes() { return blot_support::none<Id>(), Error.none; }
-    var builder = Builder { store, tree, pool, operations: operations }; return deriveBody(builder, source, summary.arity(), false);
+    var builder = Builder { store, tree, pool, operations: operations , ..}; return deriveBody(builder, source, summary.arity(), false);
 }
 fn deriveBody(builder: Builder&, source: AstId, arity: u32, require_names: bool) -> blot_support::Option<Id>, Error {
     let checkpoint = builder.store.mark(); let result, error = deriveBodyInner(builder, source, arity, require_names);
@@ -189,17 +189,17 @@ fn deriveBody(builder: Builder&, source: AstId, arity: u32, require_names: bool)
     let validation = builder.store.view().validate(result, arity, true); if validation != Error.none { builder.store.rollback(checkpoint); return blot_support::none<Id>(), Error.none; } return blot_support::some(result), Error.none;
 }
 fn deriveBodyInner(builder: Builder&, source: AstId, arity: u32, require_names: bool) -> Id, Error {
-    let empty, error = builder.store.append(blot_check_capability_contracts::Term { Tag.empty }); if error != Error.none { return 0, error; } var environment = Environment {}; var body = source;
+    let empty, error = builder.store.append(blot_check_capability_contracts::Term { Tag.empty , ..}); if error != Error.none { return 0, error; } var environment = Environment {..}; var body = source;
     for index in 0..arity { let lambda, error = builder.node(body, 0); if error != Error.none { return 0, error; } if lambda.tag != blot_parse_ast::tag_lambda { return 0, Error.unavailable; } let parameter = builder.tree.parameter(lambda.a);
         if require_names && parameter.name == 0 && !parameter.is_unit { return 0, Error.unavailable; }
-        if !require_names || parameter.name != 0 { let id, error = builder.store.append(blot_check_capability_contracts::Term { Tag.parameter, index as u32 }); if error != Error.none { return 0, error; } let error = environment.bind(parameter.name, id); if error != Error.none { return 0, error; } } body = lambda.b;
+        if !require_names || parameter.name != 0 { let id, error = builder.store.append(blot_check_capability_contracts::Term { Tag.parameter, index as u32 , ..}); if error != Error.none { return 0, error; } let error = environment.bind(parameter.name, id); if error != Error.none { return 0, error; } } body = lambda.b;
     } return expression(builder, body, environment, 0);
 }
 fn deriveClosure(store: Store&, tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, source: AstId, operations: const u32[:], types: const blot_check_types::Store&, expr_types: const u32[:]) -> blot_support::Option<Id>, Error { return deriveInputFunction(store, tree, pool, source, operations, types, expr_types, 1); }
 fn deriveInputFunction(store: Store&, tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, source: AstId, operations: const u32[:], types: const blot_check_types::Store&, expr_types: const u32[:], arity: u8) -> blot_support::Option<Id>, Error { return deriveInputFunctionWithFunctions(store, tree, pool, source, operations, types, expr_types, arity, null); }
 fn deriveInputFunctionWithFunctions(store: Store&, tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, source: AstId, operations: const u32[:], types: const blot_check_types::Store&, expr_types: const u32[:], arity: u8, functions: const Functions?) -> blot_support::Option<Id>, Error {
     if arity == 0 || arity > 16 { return blot_support::none<Id>(), Error.none; }
-    var builder = Builder { store, tree, pool, operations: operations, lexical_captures: true, input_types: types, input_expr_types: expr_types, functions: functions }; return deriveBody(builder, source, arity, true);
+    var builder = Builder { store, tree, pool, operations: operations, lexical_captures: true, input_types: types, input_expr_types: expr_types, functions: functions , ..}; return deriveBody(builder, source, arity, true);
 }
 struct InputCheck { tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, source: AstId, operations: const u32[:], types: const blot_check_types::Store&, expr_types: const u32[:], arity: u8, result: bool = false }
 fn inputCheck(context: InputCheck&, store: Store&) -> Error {
@@ -207,5 +207,5 @@ fn inputCheck(context: InputCheck&, store: Store&) -> Error {
     if store.view().validate(root.value, context.arity, true) != Error.none { return Error.none; } for node in store.nodes.items { if node.tag == Tag.unknown { return Error.none; } } context.result = true; return Error.none;
 }
 fn inputFunction(tree: const blot_parse_ast::Tree&, pool: blot_parse_symbols::Pool&, source: AstId, operations: const u32[:], types: const blot_check_types::Store&, expr_types: const u32[:], arity: u8) -> bool {
-    var context = InputCheck { tree, pool, source, operations, types, expr_types, arity }; let error = blot_check_capability_contracts::withStore<InputCheck,inputCheck>(context); return error == Error.none && context.result;
+    var context = InputCheck { tree, pool, source, operations, types, expr_types, arity , ..}; let error = blot_check_capability_contracts::withStore<InputCheck,inputCheck>(context); return error == Error.none && context.result;
 }

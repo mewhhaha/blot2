@@ -14,7 +14,7 @@ fn analyze(units: const blot_check_core::Module[:], owner: u32, id: blot_check_c
     let source .= units[found.value.target.unit - 1]; let root = source.node(found.value.body.root);
     if root.tag != blot_check_core::Tag.scalar || root.c != 0 || !(blot_backend_simd_intrinsics::literalLanes(root.op) || blot_backend_simd_intrinsics::pairs(root.op)) || root.b == 0 { return blot_support::none<Plan>(); }
     let parameters = source.bodyParameters(found.value.body); var used: u8 = 0;
-    var plan = Plan { target: found.value.target, op: root.op, count: call.value.count, arguments: [call.value.arguments[0], call.value.arguments[1], call.value.arguments[2]] };
+    var plan = Plan { target: found.value.target, op: root.op, count: call.value.count, arguments: [call.value.arguments[0], call.value.arguments[1], call.value.arguments[2]] , ..};
     var first_operand = root.a; var vector_operand = root.b;
     if root.op == blot_check_core::Op.broadcast { first_operand = root.b; vector_operand = root.a; }
     let first = blot_backend_known_call::parameterPosition(source, found.value.target.unit, parameters, first_operand, used); if !first.present { return blot_support::none<Plan>(); }

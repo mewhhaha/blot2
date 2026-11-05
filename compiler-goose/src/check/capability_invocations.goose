@@ -24,7 +24,7 @@ fn localStateStore(self: Scan&, scope: Id, call: Id, contract: Parameters) -> bo
     for item in self.scopes { let error = self.step(0); if error != Error.none { return false, error; } if item.root == scope { return stateReport(self, item.report, call, contract); } }
     let report, error = blot_check_capability_lifetimes::analyzeScope(self.module, self.owners, scope, self.remaining); var owned = blot_support::none<Report>();
     if error == Error.out_of_memory { return false, error; } if error != Error.none && error != Error.unsupported { return false, Error.invalid_artifact; } if error == Error.none { owned = blot_support::some(report); }
-    self.scopes += Scope { scope, owned }; return stateReport(self, owned, call, contract);
+    self.scopes += Scope { scope, owned , ..}; return stateReport(self, owned, call, contract);
 }
 recursive fn authority(self: Scan&, id: Id, scoped: bool, depth: i64) -> bool, Error {
     let error = self.step(depth); if error != Error.none { return false, error; } if id == 0 || id >= self.module.nodes.len { return false, Error.invalid_artifact; } let n = self.module.node(id); let ty = self.module.types.node(n.ty);
@@ -64,7 +64,7 @@ recursive fn noStore(self: Scan&, id: Id, arity: u8, depth: i64) -> bool, Error 
     }
     if n.tag == blot_check_core::Tag.if_value { let left, error = noStore(self, n.b, arity, depth + 1); if error != Error.none { return false, error; } let right, error = noStore(self, n.c, arity, depth + 1); if error != Error.none { return false, error; } return left && right, Error.none; }
     if n.tag == blot_check_core::Tag.closure && n.a >= self.module.closures.len { return false, Error.invalid_artifact; }
-    var context = CallableProof { self.module, self.owners, id, arity, self.remaining, depth, n.tag == blot_check_core::Tag.closure };
+    var context = CallableProof { self.module, self.owners, id, arity, self.remaining, depth, n.tag == blot_check_core::Tag.closure , ..};
     return blot_check_capability_contracts::withStoreValue<CallableProof,proveCallable,bool>(context);
 }
 recursive fn expression(self: Scan&, vertex: i64, scoped: bool, parent: Id, scope_root: Id, depth: i64) -> Error {
@@ -95,7 +95,7 @@ fn active(module: const Module&, owners: const ModuleRef[:]) -> bool {
     if !contracts { return false; } for node in module.types.nodes { if node.tag == blot_check_types::Tag.scoped { return true; } } return false;
 }
 fn validate(module: const Module&, owners: const ModuleRef[:]) -> Error {
-    if !active(module, owners) { return Error.none; } let graph, error = blot_check_frozen_core_validation::initGraph(module); if error != Error.none { return error; } var scopes: Scope[>..<] = []; var scan = Scan { module, owners, graph, scopes: scopes };
+    if !active(module, owners) { return Error.none; } let graph, error = blot_check_frozen_core_validation::initGraph(module); if error != Error.none { return error; } var scopes: Scope[>..<] = []; var scan = Scan { module, owners, graph, scopes: scopes , ..};
     let error = validateScan(scan); deinit(scan); return error;
 }
 fn validateScan(scan: Scan&) -> Error { for body in scan.module.bodies { if body.root != 0 { let error = expression(scan, scan.graph.vertex(blot_check_frozen_core_validation::Kind.node, body.root), false, 0, 0, 0); if error != Error.none { return error; } } } return Error.none; }

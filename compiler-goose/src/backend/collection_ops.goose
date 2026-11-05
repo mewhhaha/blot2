@@ -20,7 +20,7 @@ fn equal(left: const u8[:], right: const u8[:]) -> bool {
     if left.len != right.len { return false; } for byte, index in left { if byte != right[index] { return false; } } return true;
 }
 fn startsWith(value: const u8[:], prefix: const u8[:]) -> bool { value.len >= prefix.len && equal(value[..prefix.len], prefix) }
-fn primitive(op: Op, is_list: bool) -> blot_support::Option<Primitive> { blot_support::some(Primitive { op: op, arity: arity(op), is_list: is_list }) }
+fn primitive(op: Op, is_list: bool) -> blot_support::Option<Primitive> { blot_support::some(Primitive { op: op, arity: arity(op), is_list: is_list , ..}) }
 fn lookup(name: const u8[:]) -> blot_support::Option<Primitive> {
     if equal(name, "@cursor.has") { return primitive(Op.cursor_has, false); }
     if equal(name, "@cursor.value") { return primitive(Op.cursor_value, false); }

@@ -342,3 +342,36 @@ preserving reference-counted journal guards and partition/rollback additions.
 All migration edits remain isolated in compiler-goose. The Zig oracle source,
 installed release and default build remain intact. No Goose build, execution,
 checker, test, lint or formatter has run; the full source port remains incomplete.
+
+
+Project checker now has a full first production source pass across shared
+records, output ownership, live engine, lazy producer services, module-origin
+catalogs, imports/exports/diagnostic copying, complete ready-batch scheduling and
+public/deferred factories. Typed producer contexts preserve lazy lookups rather
+than eagerly copying all bindings per module. The static executor contract is
+runProjectChecks<executeProjectJob>(engine,orderedUnits,width,jobs)->Frontend,Error
+plus cancelProjectChecks(); it must copy the full immutable context, join all
+workers before return, decode owned Module/Cache/Diagnostic results into job
+slots and report real worker timing. That concrete driver/packet boundary is
+still unwritten. ModuleOrigins failures propagate explicitly through name().
+
+Payload now has header-only catalog runs for Core.Module, immutable path views,
+fixed source digests, runtime identity Names, entry import records, Owner and
+bool. All participate in last-reader cleanup and rollback. Core deep copies and
+worker decoding reconstruct derived package child lanes when package nodes
+exist; module partition transfers those derived runs with the module. Module
+wire/stamp schemas still exclude that derived lane.
+
+Backend publication hooks stage input journals before compilation and copy Core
+headers; public workspace owners retire after one publication. Driver teardown
+order is Result.deinit, dispose every canonical workspace context, then destroy
+its numeric publication owner and input pins. SourceCompletion attaches seed
+pins and rebinds the exact prefix before minting fresh entry receipts. Capture
+module pins can retarget only to identical copied headers; no proof grows.
+
+Source-writing constructor normalization exposed and corrected accidental
+control-block suffixes. The narrowed source writer recognizes expression-position
+constructors; backups for root repairs are in ignored build/goose-port. No
+Goose compiler, checker, test, lint, formatter or execution was invoked. This is
+not syntax qualification. All source passes and output lifetime changes remain
+unverified. Archive, backend, copied-worker and main/session work remains.

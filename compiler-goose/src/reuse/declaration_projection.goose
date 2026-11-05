@@ -20,12 +20,12 @@ struct Workspace {
     generation: u32 = 0, scans: i64 = 0, visits: i64 = 0, work: Work[:] = [], count: i64 = 0,
 }
 fn init(old: const Module&) -> Workspace {
-    var result = Workspace { nodes: owned_words.alloc_slice(old.nodes.len), bindings: owned_words.alloc_slice(old.bindings.len), patterns: owned_words.alloc_slice(old.patterns.len), projections: owned_words.alloc_slice(old.projections.len) };
+    var result = Workspace { nodes: owned_words.alloc_slice(old.nodes.len), bindings: owned_words.alloc_slice(old.bindings.len), patterns: owned_words.alloc_slice(old.patterns.len), projections: owned_words.alloc_slice(old.projections.len) , ..};
     result.clear(); return result;
 }
 fn clear(self: Workspace&) { for &v in self.nodes { v = 0; } for &v in self.bindings { v = 0; } for &v in self.patterns { v = 0; } for &v in self.projections { v = 0; } self.generation = 0; }
 fn capacityBytes(self: const Workspace&) -> i64 { return (self.nodes.len + self.bindings.len + self.patterns.len + self.projections.len) * 4 + self.work.len * 5; }
-fn deinit(self: Workspace&) { release(self.nodes); release(self.bindings); release(self.patterns); release(self.projections); release(self.work); self = Workspace {}; }
+fn deinit(self: Workspace&) { release(self.nodes); release(self.bindings); release(self.patterns); release(self.projections); release(self.work); self = Workspace {..}; }
 fn withWorkspace<C,F>(old: const Module&, context: C) { var workspace = init(old); let result = F(context, workspace); workspace.deinit(); return result; }
 fn definitionEqual(self: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]? = null, constant_types: bool = false) -> bool, Error { return self.run(old, current, binding, closures, constant_types, 0, null, []); }
 fn definitionEqualWithOrigins(self: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool, origins: const bool[:]) -> bool, Error {
@@ -35,7 +35,7 @@ fn run(self: Workspace&, old: const Module&, current: const Module&, binding: u3
     if binding == 0 && expression == 0 { return false, Error.none; }
     assert(self.nodes.len == old.nodes.len && self.bindings.len == old.bindings.len && self.patterns.len == old.patterns.len && self.projections.len == old.projections.len);
     if self.generation == 0xffffffff { self.clear(); } self.generation++; self.scans++; self.count = 0;
-    var scan = Scan { workspace: self, old: old, current: current, closures: closures, constant_types: constant_types, origins: origins };
+    var scan = Scan { workspace: self, old: old, current: current, closures: closures, constant_types: constant_types, origins: origins , ..};
     if origins.len != 0 { scan.source_shift = current.sourceNamePoint(binding) as i64 - old.sourceNamePoint(binding) as i64; }
     if expression != 0 { scan.node(expression); scan.drain(); } else { scan.run(binding); }
     self.visits += scan.visits;
@@ -88,10 +88,10 @@ fn enqueue(self: Scan&, item: Work) {
     }
     w.work[w.count] = item; w.count++; seen[id] = w.generation; self.visits++;
 }
-fn node(self: Scan&, id: u32) { self.enqueue(Work.node { id }); }
-fn binding(self: Scan&, id: u32) { self.enqueue(Work.binding { id }); }
-fn pattern(self: Scan&, id: u32) { self.enqueue(Work.pattern { id }); }
-fn projection(self: Scan&, id: u32) { self.enqueue(Work.projection { id }); }
+fn node(self: Scan&, id: u32) { self.enqueue(Work.node { id , ..}); }
+fn binding(self: Scan&, id: u32) { self.enqueue(Work.binding { id , ..}); }
+fn pattern(self: Scan&, id: u32) { self.enqueue(Work.pattern { id , ..}); }
+fn projection(self: Scan&, id: u32) { self.enqueue(Work.projection { id , ..}); }
 fn words(self: Scan&, list: List) -> const u32[:] { return self.projectedSlice(self.old.extra, self.current.extra, list); }
 fn children(self: Scan&, list: List) { for id in self.words(list) { self.node(id); } }
 fn bindingList(self: Scan&, list: List) { for id in self.words(list) { self.binding(id); } }
@@ -109,7 +109,7 @@ fn scanNode(self: Scan&, id: u32) {
     if self.old.merge_ranges.len != 0 || self.current.merge_ranges.len != 0 { let list = self.projectedItem(self.old.merge_ranges, self.current.merge_ranges, id); for merge in self.projectedSlice(self.old.merges, self.current.merges, list) { self.node(merge.node); self.binding(merge.result); self.binding(merge.then_binding); self.binding(merge.else_binding); } }
     self.erased(id); if self.failure != Error.none { return; }
     match n.tag {
-        blot_check_core::Tag.contract_method => { self.projectedItem(self.old.member_templates, self.current.member_templates, n.a); self.children(List { n.b, n.c }); },
+        blot_check_core::Tag.contract_method => { self.projectedItem(self.old.member_templates, self.current.member_templates, n.a); self.children(List { n.b, n.c , ..}); },
         blot_check_core::Tag.task, blot_check_core::Tag.resource_acquire, blot_check_core::Tag.resource_release, blot_check_core::Tag.usage_share, blot_check_core::Tag.resource_scope,
         blot_check_core::Tag.usage_read, blot_check_core::Tag.usage_borrow, blot_check_core::Tag.package_pack, blot_check_core::Tag.package_unpack, blot_check_core::Tag.invalid => { self.failure = Error.changed; },
         blot_check_core::Tag.constant, blot_check_core::Tag.panic, blot_check_core::Tag.constructor_function, blot_check_core::Tag.type_constructor => {},
@@ -118,9 +118,9 @@ fn scanNode(self: Scan&, id: u32) {
         blot_check_core::Tag.staging, blot_check_core::Tag.scalar, blot_check_core::Tag.logical, blot_check_core::Tag.associated, blot_check_core::Tag.record_merge,
         blot_check_core::Tag.type_same, blot_check_core::Tag.effect_provider, blot_check_core::Tag.proof_guard => { self.node(n.a); self.node(n.b); },
         blot_check_core::Tag.handle => { self.node(n.a); self.node(n.b); if n.c != 0 { let effects = self.projectedItem(self.old.handle_effects, self.current.handle_effects, n.c - 1); self.node(effects.node); } },
-        blot_check_core::Tag.call => { let call = self.projectedItem(self.old.calls, self.current.calls, n.a); self.reference(call.target); self.children(List { n.b, n.c }); },
-        blot_check_core::Tag.block_, blot_check_core::Tag.suite, blot_check_core::Tag.product, blot_check_core::Tag.array, blot_check_core::Tag.array_op, blot_check_core::Tag.storage => { self.children(List { n.a, n.b }); },
-        blot_check_core::Tag.record => { self.children(List { n.a, n.b }); self.words(List { n.c, n.b }); },
+        blot_check_core::Tag.call => { let call = self.projectedItem(self.old.calls, self.current.calls, n.a); self.reference(call.target); self.children(List { n.b, n.c , ..}); },
+        blot_check_core::Tag.block_, blot_check_core::Tag.suite, blot_check_core::Tag.product, blot_check_core::Tag.array, blot_check_core::Tag.array_op, blot_check_core::Tag.storage => { self.children(List { n.a, n.b , ..}); },
+        blot_check_core::Tag.record => { self.children(List { n.a, n.b , ..}); self.words(List { n.c, n.b , ..}); },
         blot_check_core::Tag.if_value, blot_check_core::Tag.if_stmt, blot_check_core::Tag.state_provider => { self.node(n.a); self.node(n.b); self.node(n.c); },
         blot_check_core::Tag.bind => { self.binding(n.a); self.node(n.b); },
         blot_check_core::Tag.return_ => { self.node(n.a); self.node(n.b); },
@@ -138,7 +138,7 @@ fn scanNode(self: Scan&, id: u32) {
         blot_check_core::Tag.match_ => { let value = self.projectedItem(self.old.matches, self.current.matches, n.a); if self.failure != Error.none { return; } self.children(value.inputs); for arm in self.projectedSlice(self.old.match_arms, self.current.match_arms, value.arms) { self.node(arm.body); self.node(arm.guard); for row in self.projectedSlice(self.old.pattern_rows, self.current.pattern_rows, arm.rows) { for pattern in self.words(row.patterns) { self.pattern(pattern); } } } },
         blot_check_core::Tag.update => { let value = self.projectedItem(self.old.updates, self.current.updates, n.a); if self.failure != Error.none { return; } self.node(value.root); self.node(value.value); self.binding(value.self_binding); for projection in self.words(value.path) { self.projection(projection); } for step in self.projectedSlice(self.old.update_steps, self.current.update_steps, value.selectors) { match step.kind { blot_check_core::UpdateKind.field => { self.projection(step.projection); }, blot_check_core::UpdateKind.index => { self.node(step.index); } } } },
         blot_check_core::Tag.loop_ => { let value = self.projectedItem(self.old.loops, self.current.loops, n.a); if self.failure != Error.none { return; } self.node(value.first); self.node(value.end); self.node(value.body); self.pattern(value.pattern); self.carries(value.carries); },
-        blot_check_core::Tag.break_ => { self.node(n.a); self.children(List { n.b, n.c }); },
+        blot_check_core::Tag.break_ => { self.node(n.a); self.children(List { n.b, n.c , ..}); },
     }
 }
 fn run(self: Scan&, binding_id: u32) {
@@ -162,7 +162,7 @@ fn drain(self: Scan&) {
             Work.pattern entry => { let p = self.projectedItem(self.old.patterns, self.current.patterns, entry.id); if self.failure != Error.none { return; } match p.tag {
                 blot_check_core::PatternTag.invalid => { self.failure = Error.changed; }, blot_check_core::PatternTag.wildcard, blot_check_core::PatternTag.constant => {},
                 blot_check_core::PatternTag.bind => { self.binding(p.a); }, blot_check_core::PatternTag.value => { self.node(p.a); },
-                blot_check_core::PatternTag.constructor, blot_check_core::PatternTag.record_payload => { self.pattern(p.b); }, blot_check_core::PatternTag.product => { for child in self.words(List { p.a, p.b }) { self.pattern(child); } },
+                blot_check_core::PatternTag.constructor, blot_check_core::PatternTag.record_payload => { self.pattern(p.b); }, blot_check_core::PatternTag.product => { for child in self.words(List { p.a, p.b , ..}) { self.pattern(child); } },
             } },
             Work.projection entry => { let p = self.projectedItem(self.old.projections, self.current.projections, entry.id); self.projectedSlice(self.old.projection_variants, self.current.projection_variants, p.variants); },
         }

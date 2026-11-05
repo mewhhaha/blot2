@@ -13,15 +13,15 @@ reusable[] var ordinal_slots: dictionary_slot<i64,i64>[>..] = [];
 struct Graph<V> { owners: Owners,ordinals: blot_support_pooled_map::Map<i64,i64>,remaining: i64 = 100000 }
 fn deinit<V>(graph: Graph<V>&) { blot_support_pooled_buffer::deinit(graph.owners,owner_runs); blot_support_pooled_map::deinit(graph.ordinals,ordinal_slots); graph.remaining = 0; }
 fn init<V,C,R>(context: const C&,roots: const R[:],arguments: const V[:]) -> Graph<V>,Error {
-    var graph = Graph<V> {};
+    var graph = Graph<V> {..};
     recursive fn build() -> Error { for argument in arguments { let error = visit(graph,context,argument,roots.len,false,0); if error != Error.none { return error; } } var at: i64 = 0; while at < graph.owners.items.len { let element = roots[graph.owners.items[at]].element; let error = visit(graph,context,element,roots.len,true,0); if error != Error.none { return error; } at++; } return Error.none; }
-    let error = build(); if error != Error.none { graph.deinit(); return Graph<V> {},error; } return graph,Error.none;
+    let error = build(); if error != Error.none { graph.deinit(); return Graph<V> {..},error; } return graph,Error.none;
 }
 fn result<V,C,R>(context: const C&,roots: const R[:],inputs: i64,output: V,fixed_region: u32) -> Graph<V>,Error {
-    var graph = Graph<V> {}; var donors = Owners {};
+    var graph = Graph<V> {..}; var donors = Owners {..};
     recursive fn build() -> Error { for index in 0..inputs { let error = add(graph,index,roots.len); if error != Error.none { return error; } } let visited = resultValue(graph,context,output,roots.len,inputs,false,donors,0); if visited != Error.none { return visited; }
         for index in graph.owners.items[inputs..] { let owner = roots[index]; if !owner.live || owner.persistent || owner.dedicated || owner.stack != fixed_region || !context.plainInlineValue(owner.element) { return Error.declined; } if !contains(donors.items,index) { return Error.declined; } } return Error.none;
-    } let error = build(); blot_support_pooled_buffer::deinit(donors,owner_runs); if error != Error.none { graph.deinit(); return Graph<V> {},error; } return graph,Error.none;
+    } let error = build(); blot_support_pooled_buffer::deinit(donors,owner_runs); if error != Error.none { graph.deinit(); return Graph<V> {..},error; } return graph,Error.none;
 }
 fn contains(values: const i64[:],value: i64) -> bool { for item in values { if item == value { return true; } } return false; }
 recursive fn resultValue<V,C>(graph: Graph<V>&,context: const C&,value: V,owner_count: i64,inputs: i64,conditional: bool,donors: Owners&,depth: i64) -> Error {

@@ -30,14 +30,14 @@ fn complete<M>(facts: Facts<M>&) -> bool {
 }
 struct Condition { after: i64 = 0, value: bool = false, result: u32 = 0 }
 fn condition<M>(facts: Facts<M>&, instructions: const blot_backend_runtime_ir::Instruction[:], start: i64) -> Condition, bool {
-    if start >= instructions.len { return Condition {}, false; }
+    if start >= instructions.len { return Condition {..}, false; }
     let initial, known = value(facts, instructions[start]);
-    if !known { return Condition {}, false; }
+    if !known { return Condition {..}, false; }
     var bits = initial; var at = start + 1;
     if at + 1 < instructions.len && instructions[at].op == blot_backend_runtime_ir::OP_i32_const && instructions[at + 1].op == blot_backend_runtime_ir::OP_i32_and { bits &= instructions[at].operand; at += 2; }
     if at < instructions.len && instructions[at].op == blot_backend_runtime_ir::OP_i32_eqz { if bits == 0 { bits = 1; } else { bits = 0; } at++; }
-    if at >= instructions.len || instructions[at].op != blot_backend_runtime_ir::OP_if_ { return Condition {}, false; }
-    return Condition { after: at + 1, value: bits != 0, result: instructions[at].operand }, true;
+    if at >= instructions.len || instructions[at].op != blot_backend_runtime_ir::OP_if_ { return Condition {..}, false; }
+    return Condition { after: at + 1, value: bits != 0, result: instructions[at].operand , ..}, true;
 }
 fn boundary(instructions: const blot_backend_runtime_ir::Instruction[:], start: i64, alternate: bool) -> i64, bool {
     var depth = 0;
@@ -60,7 +60,7 @@ fn opening(instructions: const blot_backend_runtime_ir::Instruction[:], alternat
 }
 struct Iterator<M> {
     facts: Facts<M>, instructions: const blot_backend_runtime_ir::Instruction[:], at: i64 = 0,
-    pending: blot_backend_runtime_ir::Instruction[18] = [blot_backend_runtime_ir::Instruction {}; 18], pending_at: i64 = 18,
+    pending: blot_backend_runtime_ir::Instruction[18] = [blot_backend_runtime_ir::Instruction {..}; 18], pending_at: i64 = 18,
 }
 fn next<M>(iterator: Iterator<M>&) -> blot_backend_runtime_ir::Instruction, bool {
     if iterator.pending_at < 18 { let inst = iterator.pending[iterator.pending_at]; iterator.pending_at++; return inst, true; }
@@ -117,5 +117,5 @@ fn next<M>(iterator: Iterator<M>&) -> blot_backend_runtime_ir::Instruction, bool
         if has_lowered { inst = blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const, lowered); }
         return inst, true;
     }
-    return blot_backend_runtime_ir::Instruction {}, false;
+    return blot_backend_runtime_ir::Instruction {..}, false;
 }

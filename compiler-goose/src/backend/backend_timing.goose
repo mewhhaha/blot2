@@ -16,7 +16,7 @@ struct Region {
 struct ThreadCpu { values: u64[21] = [0; 21] }
 struct RefinementCost { admission: u8 = 0, publication: u16 = 0, rejected_candidates: u16 = 0, record_rejections: u8 = 0, requests: u64 = 0, nodes: u64 = 0 }
 struct RefinementRequest { cost: RefinementCost, unit: u32 = 0, source: u32 = 0, closure: bool = false, expected: u32 = 0, seeds: i64 = 0, rows: i64 = 0 }
-struct RefinementCensus { groups: RefinementCost[32] = [RefinementCost {}; 32], overflow: RefinementCost, heaviest: RefinementRequest[8] = [RefinementRequest {}; 8] }
+struct RefinementCensus { groups: RefinementCost[32] = [RefinementCost {..}; 32], overflow: RefinementCost, heaviest: RefinementRequest[8] = [RefinementRequest {..}; 8] }
 fn saturatingAdd(left: u64, right: u64) -> u64 { if right > 18446744073709551615 - left { return 18446744073709551615; } return left + right; }
 fn add(census: RefinementCensus&, request: RefinementRequest) {
     let cost = request.cost; var slot = -1;
@@ -30,10 +30,10 @@ fn add(census: RefinementCensus&, request: RefinementRequest) {
 }
 struct RegionCaller { function: const u8[:] = "", line: u32 = 0 }
 struct RegionCost {
-    caller: RegionCaller, stage: blot_support::Option<blot_work_counters::InferenceStage> = blot_support::Option<blot_work_counters::InferenceStage> { present: true, value: blot_work_counters::InferenceStage.general }, regions: u64 = 0, inclusive_us: u64 = 0, scopes: u64 = 0, nodes: u64 = 0,
+    caller: RegionCaller, stage: blot_support::Option<blot_work_counters::InferenceStage> = blot_support::Option<blot_work_counters::InferenceStage> { present: true, value: blot_work_counters::InferenceStage.general , ..}, regions: u64 = 0, inclusive_us: u64 = 0, scopes: u64 = 0, nodes: u64 = 0,
     solver_bytes: u64 = 0, scratch_bytes: u64 = 0, solver_allocations: u64 = 0, scratch_allocations: u64 = 0,
 }
-struct RegionCensus { entries: RegionCost[32] = [RegionCost {}; 32], overflow: RegionCost = RegionCost { caller: RegionCaller { function: "overflow" }, stage: blot_support::Option<blot_work_counters::InferenceStage> { present: false } } }
+struct RegionCensus { entries: RegionCost[32] = [RegionCost {..}; 32], overflow: RegionCost = RegionCost { caller: RegionCaller { function: "overflow" , ..}, stage: blot_support::Option<blot_work_counters::InferenceStage> { present: false , ..} , ..} }
 fn sameBytes(left: const u8[:], right: const u8[:]) -> bool { if left.len != right.len { return false; } for byte, index in left { if byte != right[index] { return false; } } return true; }
 fn addCost(target: RegionCost&, cost: RegionCost) {
     target.regions = saturatingAdd(target.regions, cost.regions); target.inclusive_us = saturatingAdd(target.inclusive_us, cost.inclusive_us); target.scopes = saturatingAdd(target.scopes, cost.scopes); target.nodes = saturatingAdd(target.nodes, cost.nodes);
@@ -48,7 +48,7 @@ fn add(census: RegionCensus&, cost: RegionCost) {
     addCost(census.entries[slot], cost);
 }
 struct WorkStats {
-    regions: Region[8] = [Region {}; 8], region_callers: RegionCensus, refinements: RefinementCensus, thread_cpu_us: blot_support::Option<ThreadCpu>,
+    regions: Region[8] = [Region {..}; 8], region_callers: RegionCensus, refinements: RefinementCensus, thread_cpu_us: blot_support::Option<ThreadCpu>,
     lookup_us: u64 = 0,
     query_prepare_us: u64 = 0,
     query_scan_us: u64 = 0,
@@ -75,21 +75,21 @@ struct Stats { prepare_us: u64 = 0, generate_us: u64 = 0, initialize_us: u64 = 0
 struct Clock { enabled: bool = false, previous: u64 = 0, cpu: bool = false }
 fn now(clock: Clock) -> u64 { if clock.cpu { return blot_native::thread_cpu_ns(); } return blot_native::clock_ns(); }
 fn init(enabled: bool) -> Clock { initKind(enabled, false) }
-fn initKind(enabled: bool, cpu: bool) -> Clock { var clock = Clock { enabled: enabled, cpu: cpu }; if enabled { clock.previous = now(clock); } return clock; }
+fn initKind(enabled: bool, cpu: bool) -> Clock { var clock = Clock { enabled: enabled, cpu: cpu , ..}; if enabled { clock.previous = now(clock); } return clock; }
 fn lapNanos(clock: Clock&) -> u64 {
     if !clock.enabled { return 0; } let current = now(clock); var elapsed: u64 = 0; if current >= clock.previous { elapsed = current - clock.previous; } clock.previous = current; return elapsed;
 }
 fn lap(clock: Clock&) -> u64 { lapNanos(clock) / 1000 }
 struct Work {
-    clock: Clock, cpu_clock: Clock = Clock { cpu: true }, cpu_nanos: u64[21] = [0; 21], active: Phase = Phase.other,
-    regions: Region[8] = [Region {}; 8], region_callers: RegionCensus, refinements: RefinementCensus, nanos: u64[21] = [0; 21], semantic_job_nanos: u64 = 0,
+    clock: Clock, cpu_clock: Clock = Clock { cpu: true , ..}, cpu_nanos: u64[21] = [0; 21], active: Phase = Phase.other,
+    regions: Region[8] = [Region {..}; 8], region_callers: RegionCensus, refinements: RefinementCensus, nanos: u64[21] = [0; 21], semantic_job_nanos: u64 = 0,
 }
 struct Scope { owner: Work&, previous: Phase, started: u64 = 0 }
 fn elapsedUs(scope: Scope) -> u64 { if !scope.owner.clock.enabled { return 0; } let current = blot_native::clock_ns(); if current < scope.started { return 0; } return (current - scope.started) / 1000; }
 fn account(work: Work&) { let index = phaseIndex(work.active); work.nanos[index] += lapNanos(work.clock); work.cpu_nanos[index] += lapNanos(work.cpu_clock); }
 fn deinit(scope: Scope) { account(scope.owner); scope.owner.active = scope.previous; }
 fn change(scope: Scope, phase: Phase) { account(scope.owner); scope.owner.active = phase; }
-fn enter(work: Work&, phase: Phase) -> Scope { account(work); let scope = Scope { owner: work, previous: work.active, started: work.clock.previous }; work.active = phase; return scope; }
+fn enter(work: Work&, phase: Phase) -> Scope { account(work); let scope = Scope { owner: work, previous: work.active, started: work.clock.previous , ..}; work.active = phase; return scope; }
 fn copyUtf8Prefix(buffer: u8[:], name: const u8[:]) -> bool {
     var length = name.len; if length > buffer.len { length = buffer.len; }
     while length != 0 && length < name.len && (name[length] & 192) == 128 { length--; }
@@ -100,8 +100,8 @@ fn region(work: Work&, input: Region, name: const u8[:]) {
     if input.us <= work.regions[smallest].us { return; } work.regions[smallest] = input; work.regions[smallest].file_truncated = copyUtf8Prefix(work.regions[smallest].file_utf8, name);
 }
 fn snapshot(work: Work&) -> WorkStats {
-    var result = WorkStats { regions: work.regions, region_callers: work.region_callers, refinements: work.refinements, semantic_job_sum_us: work.semantic_job_nanos / 1000 };
-    if work.cpu_clock.enabled { var cpu = ThreadCpu {}; for nanos, index in work.cpu_nanos { cpu.values[index] = nanos / 1000; } result.thread_cpu_us = blot_support::some(cpu); }
+    var result = WorkStats { regions: work.regions, region_callers: work.region_callers, refinements: work.refinements, semantic_job_sum_us: work.semantic_job_nanos / 1000 , ..};
+    if work.cpu_clock.enabled { var cpu = ThreadCpu {..}; for nanos, index in work.cpu_nanos { cpu.values[index] = nanos / 1000; } result.thread_cpu_us = blot_support::some(cpu); }
     result.lookup_us = work.nanos[1] / 1000;
     result.query_prepare_us = work.nanos[2] / 1000;
     result.query_scan_us = work.nanos[3] / 1000;

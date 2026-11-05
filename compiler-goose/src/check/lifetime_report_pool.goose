@@ -5,7 +5,7 @@ import .capability_lifetimes;
 type Error = blot_error::Error;
 type Report = blot_check_capability_lifetimes::Report;
 struct Range { start: i64 = 0, len: i64 = 0 }
-struct Lease { live: bool = false, generation: u64 = 0, ranges: Range[13] = [Range {}; 13] }
+struct Lease { live: bool = false, generation: u64 = 0, ranges: Range[13] = [Range {..}; 13] }
 reusable var leases: Lease[>..] = [];
 var next_generation: u64 = 1;
 reusable[] var pool_nodes: blot_check_capability_lifetimes::Node[>..] = [];
@@ -23,58 +23,58 @@ reusable[] var pool_effect_rows: blot_check_effect_evidence::Row[>..] = [];
 reusable[] var pool_effect_labels: u32[>..] = [];
 fn own(source: Report) -> Report, Error {
     if next_generation == 0xffffffffffffffff || leases.len == 0xffffffff { return default<Report>(), Error.analysis_limit; }
-    let generation = next_generation; next_generation += 1; var lease = Lease { true, generation }; var result = source;
+    let generation = next_generation; next_generation += 1; var lease = Lease { true, generation , ..}; var result = source;
     if source.nodes.len != 0 {
         let run = pool_nodes.alloc_slice(source.nodes.len); for value, index in source.nodes { run[index] = value; }
-        let first: const blot_check_capability_lifetimes::Node& = run[0]; lease.ranges[0] = Range { pool_nodes.index_of(first), run.len }; result.nodes = run;
+        let first: const blot_check_capability_lifetimes::Node& = run[0]; lease.ranges[0] = Range { pool_nodes.index_of(first), run.len , ..}; result.nodes = run;
     }
     if source.edges.len != 0 {
         let run = pool_edges.alloc_slice(source.edges.len); for value, index in source.edges { run[index] = value; }
-        let first: const blot_check_capability_lifetimes::Edge& = run[0]; lease.ranges[1] = Range { pool_edges.index_of(first), run.len }; result.edges = run;
+        let first: const blot_check_capability_lifetimes::Edge& = run[0]; lease.ranges[1] = Range { pool_edges.index_of(first), run.len , ..}; result.edges = run;
     }
     if source.mappings.len != 0 {
         let run = pool_mappings.alloc_slice(source.mappings.len); for value, index in source.mappings { run[index] = value; }
-        let first: const blot_eval_type_evidence::Mapping& = run[0]; lease.ranges[2] = Range { pool_mappings.index_of(first), run.len }; result.mappings = run;
+        let first: const blot_eval_type_evidence::Mapping& = run[0]; lease.ranges[2] = Range { pool_mappings.index_of(first), run.len , ..}; result.mappings = run;
     }
     if source.boundaries.len != 0 {
         let run = pool_boundaries.alloc_slice(source.boundaries.len); for value, index in source.boundaries { run[index] = value; }
-        let first: const blot_check_capability_lifetimes::Boundary& = run[0]; lease.ranges[3] = Range { pool_boundaries.index_of(first), run.len }; result.boundaries = run;
+        let first: const blot_check_capability_lifetimes::Boundary& = run[0]; lease.ranges[3] = Range { pool_boundaries.index_of(first), run.len , ..}; result.boundaries = run;
     }
     if source.invocations.len != 0 {
         let run = pool_invocations.alloc_slice(source.invocations.len); for value, index in source.invocations { run[index] = value; }
-        let first: const blot_check_capability_lifetimes::Invocation& = run[0]; lease.ranges[4] = Range { pool_invocations.index_of(first), run.len }; result.invocations = run;
+        let first: const blot_check_capability_lifetimes::Invocation& = run[0]; lease.ranges[4] = Range { pool_invocations.index_of(first), run.len , ..}; result.invocations = run;
     }
     if source.evidence.nodes.len != 0 {
         let run = pool_evidence_nodes.alloc_slice(source.evidence.nodes.len); for value, index in source.evidence.nodes { run[index] = value; }
-        let first: const blot_eval_type_evidence::Node& = run[0]; lease.ranges[5] = Range { pool_evidence_nodes.index_of(first), run.len }; result.evidence.nodes = run;
+        let first: const blot_eval_type_evidence::Node& = run[0]; lease.ranges[5] = Range { pool_evidence_nodes.index_of(first), run.len , ..}; result.evidence.nodes = run;
     }
     if source.evidence.extra.len != 0 {
         let run = pool_evidence_extra.alloc_slice(source.evidence.extra.len); for value, index in source.evidence.extra { run[index] = value; }
-        let first: const u32& = run[0]; lease.ranges[6] = Range { pool_evidence_extra.index_of(first), run.len }; result.evidence.extra = run;
+        let first: const u32& = run[0]; lease.ranges[6] = Range { pool_evidence_extra.index_of(first), run.len , ..}; result.evidence.extra = run;
     }
     if source.evidence.quantifier_goals.len != 0 {
         let run = pool_evidence_goals.alloc_slice(source.evidence.quantifier_goals.len); for value, index in source.evidence.quantifier_goals { run[index] = value; }
-        let first: const blot_eval_type_evidence::QuantifierGoals& = run[0]; lease.ranges[7] = Range { pool_evidence_goals.index_of(first), run.len }; result.evidence.quantifier_goals = run;
+        let first: const blot_eval_type_evidence::QuantifierGoals& = run[0]; lease.ranges[7] = Range { pool_evidence_goals.index_of(first), run.len , ..}; result.evidence.quantifier_goals = run;
     }
     if source.evidence.quantifier_obligations.len != 0 {
         let run = pool_evidence_obligations.alloc_slice(source.evidence.quantifier_obligations.len); for value, index in source.evidence.quantifier_obligations { run[index] = value; }
-        let first: const blot_eval_type_evidence::Goal& = run[0]; lease.ranges[8] = Range { pool_evidence_obligations.index_of(first), run.len }; result.evidence.quantifier_obligations = run;
+        let first: const blot_eval_type_evidence::Goal& = run[0]; lease.ranges[8] = Range { pool_evidence_obligations.index_of(first), run.len , ..}; result.evidence.quantifier_obligations = run;
     }
     if source.evidence.effects.operations.len != 0 {
         let run = pool_effect_operations.alloc_slice(source.evidence.effects.operations.len); for value, index in source.evidence.effects.operations { run[index] = value; }
-        let first: const blot_check_effect_evidence::Operation& = run[0]; lease.ranges[9] = Range { pool_effect_operations.index_of(first), run.len }; result.evidence.effects.operations = run;
+        let first: const blot_check_effect_evidence::Operation& = run[0]; lease.ranges[9] = Range { pool_effect_operations.index_of(first), run.len , ..}; result.evidence.effects.operations = run;
     }
     if source.evidence.effects.arguments.len != 0 {
         let run = pool_effect_arguments.alloc_slice(source.evidence.effects.arguments.len); for value, index in source.evidence.effects.arguments { run[index] = value; }
-        let first: const u32& = run[0]; lease.ranges[10] = Range { pool_effect_arguments.index_of(first), run.len }; result.evidence.effects.arguments = run;
+        let first: const u32& = run[0]; lease.ranges[10] = Range { pool_effect_arguments.index_of(first), run.len , ..}; result.evidence.effects.arguments = run;
     }
     if source.evidence.effects.rows.len != 0 {
         let run = pool_effect_rows.alloc_slice(source.evidence.effects.rows.len); for value, index in source.evidence.effects.rows { run[index] = value; }
-        let first: const blot_check_effect_evidence::Row& = run[0]; lease.ranges[11] = Range { pool_effect_rows.index_of(first), run.len }; result.evidence.effects.rows = run;
+        let first: const blot_check_effect_evidence::Row& = run[0]; lease.ranges[11] = Range { pool_effect_rows.index_of(first), run.len , ..}; result.evidence.effects.rows = run;
     }
     if source.evidence.effects.labels.len != 0 {
         let run = pool_effect_labels.alloc_slice(source.evidence.effects.labels.len); for value, index in source.evidence.effects.labels { run[index] = value; }
-        let first: const u32& = run[0]; lease.ranges[12] = Range { pool_effect_labels.index_of(first), run.len }; result.evidence.effects.labels = run;
+        let first: const u32& = run[0]; lease.ranges[12] = Range { pool_effect_labels.index_of(first), run.len , ..}; result.evidence.effects.labels = run;
     }
     let index = leases.alloc_index(lease); result.lease_index = (index + 1) as u32; result.generation = generation; return result, Error.none;
 }

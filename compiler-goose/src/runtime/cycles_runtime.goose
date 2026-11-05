@@ -32,7 +32,7 @@ fn emit(module: Module&, arena: Arena) -> Error {
     return Error.none;
 }
 fn unlink(c: Code&, arena: Arena) {
-    let pointer = Local { 0 }; let block = head(c, pointer); let previous = c.temp(); let following = c.temp();
+    let pointer = Local { 0 , ..}; let block = head(c, pointer); let previous = c.temp(); let following = c.temp();
     c.value(block); c.load(flags); c.value(queued); c.op(blot_backend_runtime_ir::OP_i32_and); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when(); c.ret(); c.end();
     c.value(block); c.load(trial); c.set(previous); c.value(block); c.load(member); c.set(following);
     c.value(previous); c.when(); c.value(previous); c.value(header); c.op(blot_backend_runtime_ir::OP_i32_sub); c.value(following); c.store(member);
@@ -42,7 +42,7 @@ fn unlink(c: Code&, arena: Arena) {
     c.value(block); c.value(block); c.load(flags); c.value(~queued); c.op(blot_backend_runtime_ir::OP_i32_and); c.store(flags);
 }
 fn enqueue(c: Code&, arena: Arena) {
-    let pointer = Local { 0 }; let block = head(c, pointer);
+    let pointer = Local { 0 , ..}; let block = head(c, pointer);
     c.value(block); c.load(layout); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.value(block); c.load(flags); c.value(enqueue_guard); c.op(blot_backend_runtime_ir::OP_i32_and); c.op(blot_backend_runtime_ir::OP_i32_or); c.when(); c.ret(); c.end();
     c.value(block); c.load(flags); c.value(queued); c.op(blot_backend_runtime_ir::OP_i32_and); c.when(); c.ret(); c.end();
     c.globalGet(arena.cycle_removed); c.globalGet(arena.cycle_threshold); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.when();
@@ -56,7 +56,7 @@ fn enqueue(c: Code&, arena: Arena) {
     c.value(pointer); c.globalSet(arena.cycle_head); c.value(block); c.value(block); c.load(flags); c.value(queued); c.op(blot_backend_runtime_ir::OP_i32_or); c.store(flags);
 }
 fn visit(c: Code&, arena: Arena) {
-    let pointer = Local { 0 }; c.value(pointer); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.when(); c.ret(); c.end();
+    let pointer = Local { 0 , ..}; c.value(pointer); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.when(); c.ret(); c.end();
     let block = head(c, pointer); c.value(block); c.load(flags); c.value(visit_guard); c.op(blot_backend_runtime_ir::OP_i32_and); c.when(); c.ret(); c.end();
     c.value(block); c.load(requested); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.trap();
     c.value(block); c.load(flags); c.value(blot_runtime_shared_rc::counted); c.op(blot_backend_runtime_ir::OP_i32_and); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.trap();
@@ -127,7 +127,7 @@ fn collect(c: Code&, arena: Arena) {
     c.value(0 as u32); c.globalSet(arena.cycle_phase); blot_runtime_shared_rc::drain(c, arena);
 }
 fn safe(c: Code&, arena: Arena) {
-    c.globalGet(arena.cycle_head); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when(); c.ret(); c.end(); let force = Local { 0 };
+    c.globalGet(arena.cycle_head); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when(); c.ret(); c.end(); let force = Local { 0 , ..};
     c.value(force); c.globalGet(arena.cycle_removed); c.globalGet(arena.cycle_threshold); c.op(blot_backend_runtime_ir::OP_i32_ge_u); c.globalGet(arena.allocated); c.globalGet(arena.cycle_cadence); c.op(blot_backend_runtime_ir::OP_i32_sub); c.globalGet(arena.cycle_threshold); c.op(blot_backend_runtime_ir::OP_i32_ge_u); c.op(blot_backend_runtime_ir::OP_i32_or); c.op(blot_backend_runtime_ir::OP_i32_or); c.when();
     c.call(arena.cycle_collect); c.end();
 }

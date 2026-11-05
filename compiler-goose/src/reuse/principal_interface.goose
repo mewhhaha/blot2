@@ -16,26 +16,26 @@ struct ExternalTarget { unit: u32, binding: u32 }
 struct Nominal {
     affine: bool = false, has_usage: bool = false, closed_storage: bool = false,
     private: bool = false, is_opaque: bool = false,
-    storage: blot_backend_opaque_storage::Storage = blot_backend_opaque_storage::Storage {},
+    storage: blot_backend_opaque_storage::Storage = blot_backend_opaque_storage::Storage {..},
     declaration: u32 = 0, identity: Identity, name: u32, parameters: List,
-    variables: List, patterns: List = List {}, parameter_names: List = List {},
-    constructors: List = List {}, alias: Id = 0, alias_rows: List = List {},
+    variables: List, patterns: List = List {..}, parameter_names: List = List {..},
+    constructors: List = List {..}, alias: Id = 0, alias_rows: List = List {..},
 }
 struct Constructor {
     private: bool = false, identity: Identity, nominal: u32, tag: u32, name: u32,
-    scheme: blot_check_types::Scheme = blot_check_types::Scheme {}, payload: Id = 0,
+    scheme: blot_check_types::Scheme = blot_check_types::Scheme {..}, payload: Id = 0,
     declared_record: bool = false,
 }
 struct Associated { identity: Identity, member: u32, operator: blot_check_types::Operator, binding: u32 }
 struct EffectFamily {
     private: bool = false, identity: Identity, name: u32, callable: bool = false,
-    parameters: List = List {}, variables: List = List {}, patterns: List = List {},
-    parameter_names: List = List {}, operations: List = List {},
+    parameters: List = List {..}, variables: List = List {..}, patterns: List = List {..},
+    parameter_names: List = List {..}, operations: List = List {..},
 }
 struct EffectTemplate { identity: Identity, family: u32, name: u32, parameter: Id, result: Id }
 struct Binding {
     capability_flow: blot_check_capability_flow::Contract = blot_check_capability_flow::Contract.unknown,
-    capability_parameters: blot_check_capability_flow::Parameters = blot_check_capability_flow::Parameters {},
+    capability_parameters: blot_check_capability_flow::Parameters = blot_check_capability_flow::Parameters {..},
     private: bool = false, name: u32, kind: Kind, named_function: bool,
     ty: Id, scheme: blot_check_types::Scheme, external: blot_support::Option<ExternalTarget>,
 }
@@ -43,32 +43,32 @@ enum ContractMemberKind { defined_type, abstract_type, value }
 struct ContractMember { contract: Identity, name: u32, kind: ContractMemberKind, root: Id = 0 }
 struct Contract {
     declaration: u32 = 0, private: bool = false, identity: Identity, name: u32,
-    parameters: List = List {}, variables: List = List {}, patterns: List = List {},
-    parameter_names: List = List {}, row_variables: List = List {},
-    row_parameter_names: List = List {}, row_parameters: List = List {},
-    predicates: List = List {}, members: List = List {}, requires_implementation: bool = false,
+    parameters: List = List {..}, variables: List = List {..}, patterns: List = List {..},
+    parameter_names: List = List {..}, row_variables: List = List {..},
+    row_parameter_names: List = List {..}, row_parameters: List = List {..},
+    predicates: List = List {..}, members: List = List {..}, requires_implementation: bool = false,
 }
 struct Implementation {
     origin_span: blot_support::Option<blot_parse_ast::Span>, declaration: u32 = 0,
     private: bool = false, identity: Identity, name: u32, contract: Identity,
-    head: List = List {}, variables: List = List {}, parameter_names: List = List {},
-    row_variables: List = List {}, row_parameter_names: List = List {},
-    row_parameters: List = List {}, predicates: List = List {}, members: List = List {},
+    head: List = List {..}, variables: List = List {..}, parameter_names: List = List {..},
+    row_variables: List = List {..}, row_parameter_names: List = List {..},
+    row_parameters: List = List {..}, predicates: List = List {..}, members: List = List {..},
 }
 enum ImplementationMemberKind { type_, value }
 struct ImplementationMember {
     name: u32, kind: ImplementationMemberKind, root: Id = 0,
-    target: ExternalTarget = ExternalTarget { 0, 0 },
+    target: ExternalTarget = ExternalTarget { 0, 0 , ..},
 }
 struct MemberTemplate { binding: u32, contract: Identity, name: u32, arguments: List }
 struct SelectedUse { source: u32, proof: u32 }
 enum SelectedProofKind { implementation, predicate }
 struct SelectedProof {
-    predicate_target: ExternalTarget = ExternalTarget { 0, 0 }, context: u32 = 0,
+    predicate_target: ExternalTarget = ExternalTarget { 0, 0 , ..}, context: u32 = 0,
     kind: SelectedProofKind = SelectedProofKind.implementation,
     predicate: blot_check_types::Obligation = blot_check_types::Obligation {
         ty: 0, kind: blot_check_types::ObligationKind.type_rep, source: 0,
-    },
+     ..},
     implementation: Identity, contract: Identity, arguments: List, members: List, prerequisites: List,
 }
 struct Interface {

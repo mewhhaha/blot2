@@ -16,26 +16,26 @@ enum Action {
     revoke_effect { local: Local },
 }
 struct FrameKey { id: u32 = 0, generation: u64 = 0 }
-struct Frame { generation: u64 = 0, parent: FrameKey = FrameKey {}, run: Action[:] = [], len: i64 = 0 }
+struct Frame { generation: u64 = 0, parent: FrameKey = FrameKey {..}, run: Action[:] = [], len: i64 = 0 }
 enum Backing { empty, lexical { value: Action[>..<]& }, pooled { key: FrameKey } }
 struct Stack { parent: const Stack? = null, actions: Backing = Backing.empty }
 reusable[] var action_runs: Action[>..] = [];
 reusable[] var frames: Frame[>..] = [];
-fn init(actions: Action[>..<]&, parent: const Stack? = null) -> Stack { Stack { parent, Backing.lexical { actions } } }
+fn init(actions: Action[>..<]&, parent: const Stack? = null) -> Stack { Stack { parent, Backing.lexical { actions , ..} } }
 // Recursive emission links global typed frames by value. A child never retains
 // a reference into the recursive caller's local Owner or cleanup descriptor.
 fn initPooled(parent: const Stack? = null) -> Stack, Error {
-    var parent_key = FrameKey {};
+    var parent_key = FrameKey {..};
     if parent {
         match parent.actions {
             Backing.empty => {}, Backing.pooled value => { parent_key = value.key; },
-            Backing.lexical => { return Stack {}, Error.invalid_artifact; },
+            Backing.lexical => { return Stack {..}, Error.invalid_artifact; },
         }
     }
     let run = frames.alloc_slice(1); let first: const Frame& = run[0]; let at = frames.index_of(first);
-    if at >= 0xffffffff { frames.free_slice(run); return Stack {}, Error.out_of_memory; }
-    let generation = blot_native::fresh_owner_id(); run[0] = Frame { generation: generation, parent: parent_key };
-    return Stack { actions: Backing.pooled { FrameKey { (at + 1) as u32, generation } } }, Error.none;
+    if at >= 0xffffffff { frames.free_slice(run); return Stack {..}, Error.out_of_memory; }
+    let generation = blot_native::fresh_owner_id(); run[0] = Frame { generation: generation, parent: parent_key , ..};
+    return Stack { actions: Backing.pooled { FrameKey { (at + 1) as u32, generation } , ..} , ..}, Error.none;
 }
 fn frame(key: FrameKey) -> Frame& { assert(key.id != 0); let result: Frame& = frames[key.id - 1]; assert(result.generation == key.generation && key.generation != 0); return result; }
 fn release(run: const Action[:]) { if run.len != 0 { let first: const Action& = run[0]; let at = action_runs.index_of(first); assert(at >= 0); action_runs.free_slice(action_runs[at..at + run.len]); } }
@@ -136,41 +136,41 @@ fn emit(action: Action, module: Module&, function: u32, result: blot_support::Op
     var code: blot_backend_runtime_ir::Instruction[>..<] = [];
     match action {
         Action.task_group group => {
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, group.owner });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_i32_load, blot_runtime_runtime_layout::EffectAuthority_active });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, group.close });
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, group.owner , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_i32_load, blot_runtime_runtime_layout::EffectAuthority_active , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, group.close , ..});
         },
         Action.resource journal => {
             let drain, has_drain = module.taskImportNamed("drain");
-            if has_drain { code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, drain }); }
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, journal.token });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, journal.release });
+            if has_drain { code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, drain , ..}); }
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, journal.token , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call_import, journal.release , ..});
         },
         Action.revoke_effect local => {
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, local.local });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_i32_const, 0 });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_i32_store, blot_runtime_runtime_layout::EffectAuthority_active });
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, local.local , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_i32_const, 0 , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_i32_store, blot_runtime_runtime_layout::EffectAuthority_active , ..});
         },
         Action.root_scope => {
             var chunk: u32 = 1; var roles: u32 = 0;
             if result.present { chunk = 2; roles = result.value; }
             let scope = blot_backend_runtime_ir::Ownership {
                 kind: blot_backend_runtime_ir::OWN_scope, chunk: chunk as u8, roles: roles,
-            };
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_ownership, blot_backend_runtime_ir::pack(scope) });
+             ..};
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_ownership, blot_backend_runtime_ir::pack(scope) , ..});
         },
         Action.release local => {
             assert(module.arena.present);
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, local.local });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call, module.arena.value.recycle });
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, local.local , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call, module.arena.value.recycle , ..});
         },
         Action.release_if_nonzero local => {
             assert(module.arena.present);
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, local.local });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_if_, 0 });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, local.local });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call, module.arena.value.recycle });
-            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_end, 0 });
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, local.local , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_if_, 0 , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_local_get, local.local , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_call, module.arena.value.recycle , ..});
+            code.push(blot_backend_runtime_ir::Instruction { blot_backend_runtime_ir::OP_end, 0 , ..});
         },
     }
     for inst in code { let error = module.emit(function, inst); if error != Error.none { return error; } }

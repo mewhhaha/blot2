@@ -196,7 +196,7 @@ fn packed(value: Instruction) -> u64 {
 fn unpackInstruction(value: u64) -> Instruction {
     return Instruction { operand: value as! u32, op: (value >> 32) as! u8,
         table_reference: (value & (1 as u64 << 40)) != 0, table_kind: ((value >> 41) & 3) as u8,
-        origin: (value >> 43) as u32 };
+        origin: (value >> 43) as u32 , ..};
 }
 
 let words_per_chunk: i64 = 13;
@@ -212,7 +212,7 @@ fn pack(value: Ownership) -> u32 {
     return value.kind as u32 | (value.chunk as u32 << 2) | (value.roles << 6);
 }
 fn ownership(value: u32) -> Ownership {
-    return Ownership { kind: (value & 3) as u8, chunk: ((value >> 2) & 15) as u8, roles: value >> 6 };
+    return Ownership { kind: (value & 3) as u8, chunk: ((value >> 2) & 15) as u8, roles: value >> 6 , ..};
 }
 fn relocated(value: Ownership, base: u32) -> Ownership {
     var result = value;
@@ -237,7 +237,7 @@ fn wordRole(run: const Instruction[:], word: i64) -> Role {
     return ROLE_unknown;
 }
 fn callResult(value: Role) -> Instruction {
-    return instruction(OP_ownership, pack(Ownership { kind: OWN_call_result, roles: value }));
+    return instruction(OP_ownership, pack(Ownership { kind: OWN_call_result, roles: value , ..}));
 }
 fn indirectResult(instructions: const Instruction[:], at: i64) -> Role {
     if at == 0 || at >= instructions.len || instructions[at].op != OP_call_indirect || instructions[at - 1].op != OP_ownership { return ROLE_unknown; }
@@ -254,12 +254,12 @@ fn annotations(words: const Role[:], rest: Role, out: Instruction[17]&) -> i64 {
         var length = words.len - start; if length > words_per_chunk { length = words_per_chunk; }
         var roles: u32 = 0;
         for index in 0..length { roles |= words[start + index] as u32 << (index * 2); }
-        out[count] = instruction(OP_ownership, pack(Ownership { kind: OWN_words, chunk: chunk as u8, roles: roles }));
+        out[count] = instruction(OP_ownership, pack(Ownership { kind: OWN_words, chunk: chunk as u8, roles: roles , ..}));
         count++;
     }
     var explicit = words.len; if explicit > 16 * words_per_chunk { explicit = 16 * words_per_chunk; }
     var remaining = rest; if chunks > 16 { remaining = ROLE_unknown; }
-    out[count] = instruction(OP_ownership, pack(Ownership { kind: OWN_rest, roles: (explicit as u32 << 2) | remaining }));
+    out[count] = instruction(OP_ownership, pack(Ownership { kind: OWN_rest, roles: (explicit as u32 << 2) | remaining , ..}));
     return count + 1;
 }
 fn allocationAnnotations(instructions: const Instruction[:], at: i64) -> const Instruction[:] {
@@ -345,31 +345,31 @@ struct Contract {
     bytes: u8 = 0, may_trap: bool = false,
 }
 fn signature(inputs: const ValueType[:], result: ValueType, effect: Effect) -> Contract {
-    var value = Contract { arity: inputs.len, result: result, effect: effect };
+    var value = Contract { arity: inputs.len, result: result, effect: effect , ..};
     for ty, index in inputs { value.inputs[index] = ty; }
     return value;
 }
 fn memory(value: ValueType, store: bool) -> Contract {
     var result = Contract { inputs: [VT_i32, VT_none, VT_none], arity: 1, result: value,
-        effect: EFFECT_read, bytes: 4, may_trap: true };
+        effect: EFFECT_read, bytes: 4, may_trap: true , ..};
     if store { result.inputs[1] = value; result.arity = 2; result.result = VT_none; result.effect = EFFECT_write; }
     if value == VT_v128 { result.bytes = 16; }
     return result;
 }
 fn fixed(op: Op) -> Contract {
-    if op == OP_unreachable_ { return Contract { effect: EFFECT_trap, may_trap: true }; }
-    if op == OP_nop || op == OP_ownership { return Contract {}; }
-    if op == OP_resource_retire { return Contract { effect: EFFECT_host, may_trap: true }; }
-    if op == OP_block || op == OP_loop || op == OP_else_ || op == OP_end || op == OP_br || op == OP_return_ { return Contract { effect: EFFECT_control }; }
+    if op == OP_unreachable_ { return Contract { effect: EFFECT_trap, may_trap: true , ..}; }
+    if op == OP_nop || op == OP_ownership { return Contract {..}; }
+    if op == OP_resource_retire { return Contract { effect: EFFECT_host, may_trap: true , ..}; }
+    if op == OP_block || op == OP_loop || op == OP_else_ || op == OP_end || op == OP_br || op == OP_return_ { return Contract { effect: EFFECT_control , ..}; }
     if op == OP_if_ || op == OP_br_if { return signature([VT_i32], VT_none, EFFECT_control); }
-    if op == OP_call || op == OP_call_import || op == OP_call_indirect { return Contract { effect: EFFECT_call, may_trap: true }; }
-    if op == OP_local_get { return Contract { effect: EFFECT_local }; }
-    if op == OP_global_get { return Contract { effect: EFFECT_global }; }
-    if op == OP_local_set || op == OP_local_tee { return Contract { arity: 1, effect: EFFECT_local }; }
-    if op == OP_global_set { return Contract { arity: 1, effect: EFFECT_global }; }
-    if op == OP_drop { return Contract { arity: 1 }; }
-    if op == OP_host_ref_get { return Contract { inputs: [VT_i32, VT_none, VT_none], arity: 1, result: VT_externref, effect: EFFECT_host, may_trap: true }; }
-    if op == OP_host_ref_set { return Contract { inputs: [VT_i32, VT_externref, VT_none], arity: 2, effect: EFFECT_host, may_trap: true }; }
+    if op == OP_call || op == OP_call_import || op == OP_call_indirect { return Contract { effect: EFFECT_call, may_trap: true , ..}; }
+    if op == OP_local_get { return Contract { effect: EFFECT_local , ..}; }
+    if op == OP_global_get { return Contract { effect: EFFECT_global , ..}; }
+    if op == OP_local_set || op == OP_local_tee { return Contract { arity: 1, effect: EFFECT_local , ..}; }
+    if op == OP_global_set { return Contract { arity: 1, effect: EFFECT_global , ..}; }
+    if op == OP_drop { return Contract { arity: 1 , ..}; }
+    if op == OP_host_ref_get { return Contract { inputs: [VT_i32, VT_none, VT_none], arity: 1, result: VT_externref, effect: EFFECT_host, may_trap: true , ..}; }
+    if op == OP_host_ref_set { return Contract { inputs: [VT_i32, VT_externref, VT_none], arity: 2, effect: EFFECT_host, may_trap: true , ..}; }
     if op == OP_host_ref_grow { return signature([VT_externref, VT_i32], VT_i32, EFFECT_host); }
     if op == OP_host_ref_size { return signature([], VT_i32, EFFECT_host); }
     if op == OP_host_ref_null { return signature([], VT_externref, EFFECT_pure); }
@@ -382,7 +382,7 @@ fn fixed(op: Op) -> Contract {
     if op == OP_v128_store { return memory(VT_v128, true); }
     if op == OP_memory_size { return signature([], VT_i32, EFFECT_memory); }
     if op == OP_memory_grow { return signature([VT_i32], VT_i32, EFFECT_memory); }
-    if op == OP_memory_copy || op == OP_memory_fill { return Contract { inputs: [VT_i32, VT_i32, VT_i32], arity: 3, effect: EFFECT_write, may_trap: true }; }
+    if op == OP_memory_copy || op == OP_memory_fill { return Contract { inputs: [VT_i32, VT_i32, VT_i32], arity: 3, effect: EFFECT_write, may_trap: true , ..}; }
     if op == OP_i32_const || op == OP_wide_layouts { return signature([], VT_i32, EFFECT_pure); }
     if op == OP_f32_const { return signature([], VT_f32, EFFECT_pure); }
     if op == OP_i32_eqz || op == OP_i32_clz || op == OP_i32_ctz { return signature([VT_i32], VT_i32, EFFECT_pure); }
@@ -391,7 +391,7 @@ fn fixed(op: Op) -> Contract {
        op == OP_i32_add || op == OP_i32_sub || op == OP_i32_mul || op == OP_i32_and || op == OP_i32_or || op == OP_i32_xor || op == OP_i32_shl || op == OP_i32_shr_u {
         return signature([VT_i32, VT_i32], VT_i32, EFFECT_pure);
     }
-    if op == OP_i32_div_u || op == OP_i32_rem_u { return Contract { inputs: [VT_i32, VT_i32, VT_none], arity: 2, result: VT_i32, may_trap: true }; }
+    if op == OP_i32_div_u || op == OP_i32_rem_u { return Contract { inputs: [VT_i32, VT_i32, VT_none], arity: 2, result: VT_i32, may_trap: true , ..}; }
     if op == OP_f32_eq || op == OP_f32_ne || op == OP_f32_lt || op == OP_f32_gt || op == OP_f32_le || op == OP_f32_ge { return signature([VT_f32, VT_f32], VT_i32, EFFECT_pure); }
     if op == OP_f32_add || op == OP_f32_sub || op == OP_f32_mul || op == OP_f32_div || op == OP_f32_min || op == OP_f32_max { return signature([VT_f32, VT_f32], VT_f32, EFFECT_pure); }
     if op == OP_f32_abs || op == OP_f32_neg || op == OP_f32_ceil || op == OP_f32_floor || op == OP_f32_trunc || op == OP_f32_sqrt { return signature([VT_f32], VT_f32, EFFECT_pure); }
@@ -428,7 +428,7 @@ struct Call { parameters: Range, result: ValueType, selector: bool = false, owne
 fn call<M>(module: M&, inst: Instruction) -> Call {
     if inst.op == OP_call {
         let function = module.functions[callee(inst)];
-        var result = Call { parameters: function.parameters, result: function.result };
+        var result = Call { parameters: function.parameters, result: function.result , ..};
         if module.arena.present {
             let arena = module.arena.value;
             if inst.operand == arena.allocate { result.ownership = CALL_allocate; }
@@ -452,7 +452,7 @@ fn call<M>(module: M&, inst: Instruction) -> Call {
     var id = inst.operand;
     if inst.op == OP_call_import { id = module.imports[inst.operand].signature; }
     let callee = module.signatures[id];
-    return Call { parameters: callee.parameters, result: callee.result, selector: inst.op == OP_call_indirect };
+    return Call { parameters: callee.parameters, result: callee.result, selector: inst.op == OP_call_indirect , ..};
 }
 fn contract<M>(module: M&, function: Function, inst: Instruction) -> Contract {
     var result = fixed(inst.op);
@@ -493,7 +493,7 @@ fn lift(op: Op) -> Op, bool {
     if op == OP_i32_trunc_sat_f32_u { return OP_i32x4_trunc_sat_f32x4_u, true; }
     return OP_nop, false;
 }
-fn marker(chunk: u8, roles: u32) -> Instruction { instruction(OP_ownership, pack(Ownership { kind: OWN_rest, chunk: chunk, roles: roles })) }
+fn marker(chunk: u8, roles: u32) -> Instruction { instruction(OP_ownership, pack(Ownership { kind: OWN_rest, chunk: chunk, roles: roles , ..})) }
 fn nonzeroRead() -> Instruction { marker(14, 1) }
 fn hasNonzeroRead(code: const Instruction[:], at: i64) -> bool {
     return at != 0 && at < code.len && (code[at].op == OP_i32_load || code[at].op == OP_f32_load) && code[at - 1].op == OP_ownership && code[at - 1].operand == nonzeroRead().operand;

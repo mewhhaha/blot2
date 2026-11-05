@@ -134,7 +134,7 @@ struct Module {
 }
 fn init(types: ValueType[>..<]&, instructions: Instruction[>..<]&, names: u8[>..<]&, functions: Function[>..<]&, signatures: Signature[>..<]&, imports: Import[>..<]&, globals: Global[>..<]&, exports: Export[>..<]&, data: u8[>..<]&, static_fields: u32[>..<]&, table_functions: u32[>..<]&, table_origins: TableOrigin[>..<]&, semantic_sites: SemanticSite[>..<]&) -> Module {
     return Module { types: types, instructions: instructions, names: names, functions: functions, signatures: signatures, imports: imports, globals: globals, exports: exports, data: data,
-        static_fields: static_fields, table_functions: table_functions, table_origins: table_origins, semantic_sites: semantic_sites };
+        static_fields: static_fields, table_functions: table_functions, table_origins: table_origins, semantic_sites: semantic_sites , ..};
 }
 fn name(module: const Module&, range: Range) -> const u8[:] { module.names[range.start..range.start + range.len] }
 fn parameters(module: const Module&, function: Function) -> const ValueType[:] { module.types[function.parameters.start..function.parameters.start + function.parameters.len] }
@@ -142,7 +142,7 @@ fn locals(module: const Module&, function: Function) -> const ValueType[:] { if 
 fn instructions(module: const Module&, function: Function) -> const Instruction[:] { if function.borrowed_body { return function.borrowed_instructions; } return module.instructions[function.instructions.start..function.instructions.start + function.instructions.len]; }
 fn signatureParameters(module: const Module&, signature: Signature) -> const ValueType[:] { module.types[signature.parameters.start..signature.parameters.start + signature.parameters.len] }
 fn ownName(module: Module&, value: const u8[:]) -> Range {
-    let result = Range { start: module.names.len, len: value.len }; module.names.append(value); return result;
+    let result = Range { start: module.names.len, len: value.len , ..}; module.names.append(value); return result;
 }
 fn equal<T>(left: const T[:], right: const T[:]) -> bool {
     if left.len != right.len { return false; } for value, index in left { if value != right[index] { return false; } } return true;
@@ -164,7 +164,7 @@ fn tailCheckpoint(module: Module&) -> blot_support::Option<TailCheckpoint> {
         table_origins: module.table_origins.len, semantic_sites: module.semantic_sites.len, fixed_memory_bytes: module.fixed_memory_bytes,
         array_transport: module.array_transport, fixture_helpers_present: module.fixture_helpers_present, fixture_helpers: module.fixture_helpers,
         host_references: module.host_references, public_arena: module.public_arena, cleanup_data: module.cleanup_data,
-        defer_cycles: module.defer_cycles, mutable_static: module.mutable_static, indirect: module.indirect, start: module.start });
+        defer_cycles: module.defer_cycles, mutable_static: module.mutable_static, indirect: module.indirect, start: module.start , ..});
 }
 fn rollbackTail(module: Module&, mark: TailCheckpoint) {
     assert(mark.owner .== module && tailCheckpoint(module).present);
@@ -190,7 +190,7 @@ fn internType(module: Module&, parameters: const ValueType[:], result: ValueType
         let error = blot_reuse_artifact_emitter::signature(module.artifacts, id, parameters, result); if error != blot_error::Error.none { return 0, error; }
     }
     let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.signature, id, false); if error != blot_error::Error.none { return 0, error; }
-    let range = Range { start: module.types.len, len: parameters.len }; module.types.append(parameters); module.signatures.push(Signature { parameters: range, result: result });
+    let range = Range { start: module.types.len, len: parameters.len , ..}; module.types.append(parameters); module.signatures.push(Signature { parameters: range, result: result , ..});
     return id, blot_error::Error.none;
 }
 fn addFunction(module: Module&, parameters: const ValueType[:], result: ValueType) -> u32, blot_error::Error { addTypedFunction(module, parameters, result, blot_backend_runtime_ir::ROLE_unknown) }
@@ -206,7 +206,7 @@ fn addTypedFunctionForSignature(module: Module&, signature: u32, role: blot_back
     if module.artifacts { let error = blot_reuse_artifact_emitter::recordFunction(module.artifacts, id, signature, role); if error != blot_error::Error.none { return 0, error; } }
     let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.function, id, false); if error != blot_error::Error.none { return 0, error; }
     let signature_type = module.signatures[signature];
-    module.functions.push(Function { parameters: signature_type.parameters, result: signature_type.result, result_role: role, signature: signature });
+    module.functions.push(Function { parameters: signature_type.parameters, result: signature_type.result, result_role: role, signature: signature , ..});
     return id, blot_error::Error.none;
 }
 fn setParameterRoles(module: Module&, id: u32, roles: u64) -> blot_error::Error {
@@ -234,7 +234,7 @@ fn importFunction(module: Module&, namespace_name: const u8[:], imported_name: c
     if module.artifacts { let error = blot_reuse_artifact_emitter::importFunction(module.artifacts, index, namespace_name, imported_name, signature); if error != blot_error::Error.none { return 0, error; } }
     let demanded = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.import_, index, false); if demanded != blot_error::Error.none { return 0, demanded; }
     let owned_module = ownName(module, namespace_name); let owned_name = ownName(module, imported_name);
-    module.imports.push(Import { module: owned_module, name: owned_name, signature: signature }); return index, blot_error::Error.none;
+    module.imports.push(Import { module: owned_module, name: owned_name, signature: signature , ..}); return index, blot_error::Error.none;
 }
 fn appendType(module: Module&, range: Range, ty: ValueType) -> Range {
     var result = range;
@@ -291,7 +291,7 @@ fn emitReference(module: Module&, id: u32, instruction: Instruction, role: blot_
     let table = role == blot_reuse_artifact_emitter::Role.table_function || role == blot_reuse_artifact_emitter::Role.callable_function;
     assert(!table || instruction.op == blot_backend_runtime_ir::OP_i32_const);
     let error = recordTableReference(module, role, instruction.operand, blot_support::some(id), module.functions[id].instructions.len as u32); if error != blot_error::Error.none { return error; }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::appendInstruction(module.artifacts, id, instruction.op, blot_reuse_artifact_emitter::Operand { role: role, value: instruction.operand }); if error != blot_error::Error.none { return error; } }
+    if module.artifacts { let error = blot_reuse_artifact_emitter::appendInstruction(module.artifacts, id, instruction.op, blot_reuse_artifact_emitter::Operand { role: role, value: instruction.operand , ..}); if error != blot_error::Error.none { return error; } }
     var owned = instruction;
     if role == blot_reuse_artifact_emitter::Role.callable_layout {
         assert(instruction.op == blot_backend_runtime_ir::OP_ownership && instruction.operand != 0 && instruction.operand < 67108864);
@@ -313,7 +313,7 @@ fn demandResource(module: Module&, kind: blot_reuse_artifact_emitter::ResourceKi
 fn recordTableReference(module: Module&, role: blot_reuse_artifact_emitter::Role, target: u32, function: blot_support::Option<u32>, place: u32) -> blot_error::Error {
     if role != blot_reuse_artifact_emitter::Role.table_function && role != blot_reuse_artifact_emitter::Role.callable_function { return blot_error::Error.none; }
     var kind = blot_backend_runtime_ir::TABLE_unknown; if role == blot_reuse_artifact_emitter::Role.callable_function { kind = blot_backend_runtime_ir::TABLE_callable; }
-    module.table_functions.push(target); module.table_origins.push(TableOrigin { target: target, kind: kind, function: function, place: place }); return blot_error::Error.none;
+    module.table_functions.push(target); module.table_origins.push(TableOrigin { target: target, kind: kind, function: function, place: place , ..}); return blot_error::Error.none;
 }
 fn recordSemanticSite(module: Module&, site: SemanticSite) -> blot_error::Error {
     if module.artifacts { let error = blot_reuse_artifact_emitter::recordSemanticSite(module.artifacts, site); if error != blot_error::Error.none { return error; } }
@@ -350,9 +350,9 @@ fn staticField(module: Module&, address: u32, role: blot_backend_runtime_ir::Rol
 fn addGlobal(module: Module&, scalar: Scalar, bits: u32, mutable: bool) -> u32, blot_error::Error {
     if module.globals.len == 4294967295 { return 0, blot_error::Error.module_too_large; }
     let id = module.globals.len as u32;
-    if module.artifacts { let error = blot_reuse_artifact_emitter::recordGlobal(module.artifacts, id, scalar, blot_reuse_artifact_emitter::Operand { value: bits }, mutable); if error != blot_error::Error.none { return 0, error; } }
+    if module.artifacts { let error = blot_reuse_artifact_emitter::recordGlobal(module.artifacts, id, scalar, blot_reuse_artifact_emitter::Operand { value: bits , ..}, mutable); if error != blot_error::Error.none { return 0, error; } }
     let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.global, id, false); if error != blot_error::Error.none { return 0, error; }
-    module.globals.push(Global { scalar: scalar, bits: bits, mutable: mutable }); return id, blot_error::Error.none;
+    module.globals.push(Global { scalar: scalar, bits: bits, mutable: mutable , ..}); return id, blot_error::Error.none;
 }
 fn writeDataWord(module: Module&, address: i64, value: u32) {
     for index in 0..4 { module.data[address + index] = (value >> (index * 8)) as! u8; }
@@ -386,7 +386,7 @@ fn finishStaticData(module: Module&, address: u32) -> blot_error::Error {
     let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.static_data, address, false); if error != blot_error::Error.none { return error; }
     let end = module.data.len as u32; let arena = module.arena.value;
     for id in [arena.heap, arena.base, arena.static_end] {
-        if module.artifacts { let error = blot_reuse_artifact_emitter::recordGlobalBits(module.artifacts, id, blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.static_address, value: end }); if error != blot_error::Error.none { return error; } }
+        if module.artifacts { let error = blot_reuse_artifact_emitter::recordGlobalBits(module.artifacts, id, blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.static_address, value: end , ..}); if error != blot_error::Error.none { return error; } }
         module.globals[id].bits = end;
     }
     return blot_error::Error.none;
@@ -396,19 +396,19 @@ fn finishStaticFields(module: Module&) -> blot_error::Error {
     let arena = module.arena.value; var address: u32 = 0;
     if module.static_fields.len != 0 { let created, error = dataWords(module, module.static_fields[..]); if error != blot_error::Error.none { return error; } address = created; }
     for encoded, index in module.static_fields {
-        let error = dataReference(module, address + (index * 4) as u32, blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.static_address, value: encoded }); if error != blot_error::Error.none { return error; }
+        let error = dataReference(module, address + (index * 4) as u32, blot_reuse_artifact_emitter::Operand { role: blot_reuse_artifact_emitter::Role.static_address, value: encoded , ..}); if error != blot_error::Error.none { return error; }
     }
     let ids = [arena.root_static_map, arena.root_static_count, arena.root_global_count];
     let values = [address, module.static_fields.len as u32, module.globals.len as u32];
     for id, index in ids {
         var role = blot_reuse_artifact_emitter::Role.literal; if index == 0 { role = blot_reuse_artifact_emitter::Role.static_address; }
-        if module.artifacts { let error = blot_reuse_artifact_emitter::recordGlobalBits(module.artifacts, id, blot_reuse_artifact_emitter::Operand { role: role, value: values[index] }); if error != blot_error::Error.none { return error; } }
+        if module.artifacts { let error = blot_reuse_artifact_emitter::recordGlobalBits(module.artifacts, id, blot_reuse_artifact_emitter::Operand { role: role, value: values[index] , ..}); if error != blot_error::Error.none { return error; } }
         module.globals[id].bits = values[index];
     }
     return blot_error::Error.none;
 }
 fn ensureArena(module: Module&) -> Arena, blot_error::Error {
-    if module.fixed_memory_bytes != 0 { return Arena {}, blot_error::Error.module_too_large; }
+    if module.fixed_memory_bytes != 0 { return Arena {..}, blot_error::Error.module_too_large; }
     if module.arena.present { let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.arena, 0, true); return module.arena.value, error; }
     for index in 0..blot_runtime_arena_runtime::metadata_bytes { module.data.push(0); }
     writeDataWord(module, blot_runtime_arena_runtime::empty_list_address + blot_runtime_runtime_layout::ListDescriptor_immutable, 1);
@@ -422,143 +422,143 @@ fn ensureArena(module: Module&) -> Arena, blot_error::Error {
         writeDataWord(module, address + blot_runtime_runtime_layout::ListDescriptor_immutable, 1);
         writeDataWord(module, address + blot_runtime_runtime_layout::ListDescriptor_leaf_limit, blot_runtime_list_runtime::leafLimit(width as u32));
     }
-    if module.artifacts { let error = blot_reuse_artifact_emitter::data(module.artifacts, 0, module.data[..]); if error != blot_error::Error.none { return Arena {}, error; } }
-    var arena = Arena {};
+    if module.artifacts { let error = blot_reuse_artifact_emitter::data(module.artifacts, 0, module.data[..]); if error != blot_error::Error.none { return Arena {..}, error; } }
+    var arena = Arena {..};
     let heap, heap_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, blot_runtime_arena_runtime::metadata_bytes, true);
-    if heap_error != blot_error::Error.none { return Arena {}, heap_error; } arena.heap = heap;
+    if heap_error != blot_error::Error.none { return Arena {..}, heap_error; } arena.heap = heap;
     let base, base_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, blot_runtime_arena_runtime::metadata_bytes, true);
-    if base_error != blot_error::Error.none { return Arena {}, base_error; } arena.base = base;
+    if base_error != blot_error::Error.none { return Arena {..}, base_error; } arena.base = base;
     let static_end, static_end_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, blot_runtime_arena_runtime::metadata_bytes, false);
-    if static_end_error != blot_error::Error.none { return Arena {}, static_end_error; } arena.static_end = static_end;
+    if static_end_error != blot_error::Error.none { return Arena {..}, static_end_error; } arena.static_end = static_end;
     let allocated, allocated_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if allocated_error != blot_error::Error.none { return Arena {}, allocated_error; } arena.allocated = allocated;
+    if allocated_error != blot_error::Error.none { return Arena {..}, allocated_error; } arena.allocated = allocated;
     let rc_enabled, rc_enabled_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, false);
-    if rc_enabled_error != blot_error::Error.none { return Arena {}, rc_enabled_error; } arena.rc_enabled = rc_enabled;
+    if rc_enabled_error != blot_error::Error.none { return Arena {..}, rc_enabled_error; } arena.rc_enabled = rc_enabled;
     let rc_leases, rc_leases_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if rc_leases_error != blot_error::Error.none { return Arena {}, rc_leases_error; } arena.rc_leases = rc_leases;
+    if rc_leases_error != blot_error::Error.none { return Arena {..}, rc_leases_error; } arena.rc_leases = rc_leases;
     let rc_retains, rc_retains_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if rc_retains_error != blot_error::Error.none { return Arena {}, rc_retains_error; } arena.rc_retains = rc_retains;
+    if rc_retains_error != blot_error::Error.none { return Arena {..}, rc_retains_error; } arena.rc_retains = rc_retains;
     let rc_releases, rc_releases_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if rc_releases_error != blot_error::Error.none { return Arena {}, rc_releases_error; } arena.rc_releases = rc_releases;
+    if rc_releases_error != blot_error::Error.none { return Arena {..}, rc_releases_error; } arena.rc_releases = rc_releases;
     let rc_destroyed, rc_destroyed_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if rc_destroyed_error != blot_error::Error.none { return Arena {}, rc_destroyed_error; } arena.rc_destroyed = rc_destroyed;
+    if rc_destroyed_error != blot_error::Error.none { return Arena {..}, rc_destroyed_error; } arena.rc_destroyed = rc_destroyed;
     let root_enabled, root_enabled_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, false);
-    if root_enabled_error != blot_error::Error.none { return Arena {}, root_enabled_error; } arena.root_enabled = root_enabled;
+    if root_enabled_error != blot_error::Error.none { return Arena {..}, root_enabled_error; } arena.root_enabled = root_enabled;
     let root_page, root_page_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if root_page_error != blot_error::Error.none { return Arena {}, root_page_error; } arena.root_page = root_page;
+    if root_page_error != blot_error::Error.none { return Arena {..}, root_page_error; } arena.root_page = root_page;
     let root_top, root_top_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if root_top_error != blot_error::Error.none { return Arena {}, root_top_error; } arena.root_top = root_top;
+    if root_top_error != blot_error::Error.none { return Arena {..}, root_top_error; } arena.root_top = root_top;
     let root_frame, root_frame_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if root_frame_error != blot_error::Error.none { return Arena {}, root_frame_error; } arena.root_frame = root_frame;
+    if root_frame_error != blot_error::Error.none { return Arena {..}, root_frame_error; } arena.root_frame = root_frame;
     let root_active, root_active_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if root_active_error != blot_error::Error.none { return Arena {}, root_active_error; } arena.root_active = root_active;
+    if root_active_error != blot_error::Error.none { return Arena {..}, root_active_error; } arena.root_active = root_active;
     let root_external, root_external_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if root_external_error != blot_error::Error.none { return Arena {}, root_external_error; } arena.root_external = root_external;
+    if root_external_error != blot_error::Error.none { return Arena {..}, root_external_error; } arena.root_external = root_external;
     let root_count, root_count_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if root_count_error != blot_error::Error.none { return Arena {}, root_count_error; } arena.root_count = root_count;
+    if root_count_error != blot_error::Error.none { return Arena {..}, root_count_error; } arena.root_count = root_count;
     let root_globals, root_globals_error = addGlobal(module, blot_backend_runtime_ir::SC_pointer, 0, true);
-    if root_globals_error != blot_error::Error.none { return Arena {}, root_globals_error; } arena.root_globals = root_globals;
+    if root_globals_error != blot_error::Error.none { return Arena {..}, root_globals_error; } arena.root_globals = root_globals;
     let root_started, root_started_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if root_started_error != blot_error::Error.none { return Arena {}, root_started_error; } arena.root_started = root_started;
+    if root_started_error != blot_error::Error.none { return Arena {..}, root_started_error; } arena.root_started = root_started;
     let root_host_cursor, root_host_cursor_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if root_host_cursor_error != blot_error::Error.none { return Arena {}, root_host_cursor_error; } arena.root_host_cursor = root_host_cursor;
+    if root_host_cursor_error != blot_error::Error.none { return Arena {..}, root_host_cursor_error; } arena.root_host_cursor = root_host_cursor;
     let root_host_active, root_host_active_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if root_host_active_error != blot_error::Error.none { return Arena {}, root_host_active_error; } arena.root_host_active = root_host_active;
+    if root_host_active_error != blot_error::Error.none { return Arena {..}, root_host_active_error; } arena.root_host_active = root_host_active;
     let root_static_map, root_static_map_error = addGlobal(module, blot_backend_runtime_ir::SC_pointer, 0, false);
-    if root_static_map_error != blot_error::Error.none { return Arena {}, root_static_map_error; } arena.root_static_map = root_static_map;
+    if root_static_map_error != blot_error::Error.none { return Arena {..}, root_static_map_error; } arena.root_static_map = root_static_map;
     let root_static_count, root_static_count_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, false);
-    if root_static_count_error != blot_error::Error.none { return Arena {}, root_static_count_error; } arena.root_static_count = root_static_count;
+    if root_static_count_error != blot_error::Error.none { return Arena {..}, root_static_count_error; } arena.root_static_count = root_static_count;
     let root_global_count, root_global_count_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, false);
-    if root_global_count_error != blot_error::Error.none { return Arena {}, root_global_count_error; } arena.root_global_count = root_global_count;
+    if root_global_count_error != blot_error::Error.none { return Arena {..}, root_global_count_error; } arena.root_global_count = root_global_count;
     let cycle_head, cycle_head_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_head_error != blot_error::Error.none { return Arena {}, cycle_head_error; } arena.cycle_head = cycle_head;
+    if cycle_head_error != blot_error::Error.none { return Arena {..}, cycle_head_error; } arena.cycle_head = cycle_head;
     let cycle_members, cycle_members_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_members_error != blot_error::Error.none { return Arena {}, cycle_members_error; } arena.cycle_members = cycle_members;
+    if cycle_members_error != blot_error::Error.none { return Arena {..}, cycle_members_error; } arena.cycle_members = cycle_members;
     let cycle_work, cycle_work_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_work_error != blot_error::Error.none { return Arena {}, cycle_work_error; } arena.cycle_work = cycle_work;
+    if cycle_work_error != blot_error::Error.none { return Arena {..}, cycle_work_error; } arena.cycle_work = cycle_work;
     let cycle_phase, cycle_phase_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_phase_error != blot_error::Error.none { return Arena {}, cycle_phase_error; } arena.cycle_phase = cycle_phase;
+    if cycle_phase_error != blot_error::Error.none { return Arena {..}, cycle_phase_error; } arena.cycle_phase = cycle_phase;
     let cycle_removed, cycle_removed_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_removed_error != blot_error::Error.none { return Arena {}, cycle_removed_error; } arena.cycle_removed = cycle_removed;
+    if cycle_removed_error != blot_error::Error.none { return Arena {..}, cycle_removed_error; } arena.cycle_removed = cycle_removed;
     let cycle_cadence, cycle_cadence_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_cadence_error != blot_error::Error.none { return Arena {}, cycle_cadence_error; } arena.cycle_cadence = cycle_cadence;
+    if cycle_cadence_error != blot_error::Error.none { return Arena {..}, cycle_cadence_error; } arena.cycle_cadence = cycle_cadence;
     let cycle_passes, cycle_passes_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_passes_error != blot_error::Error.none { return Arena {}, cycle_passes_error; } arena.cycle_passes = cycle_passes;
+    if cycle_passes_error != blot_error::Error.none { return Arena {..}, cycle_passes_error; } arena.cycle_passes = cycle_passes;
     let cycle_vertices, cycle_vertices_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_vertices_error != blot_error::Error.none { return Arena {}, cycle_vertices_error; } arena.cycle_vertices = cycle_vertices;
+    if cycle_vertices_error != blot_error::Error.none { return Arena {..}, cycle_vertices_error; } arena.cycle_vertices = cycle_vertices;
     let cycle_edges, cycle_edges_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_edges_error != blot_error::Error.none { return Arena {}, cycle_edges_error; } arena.cycle_edges = cycle_edges;
+    if cycle_edges_error != blot_error::Error.none { return Arena {..}, cycle_edges_error; } arena.cycle_edges = cycle_edges;
     let cycle_bytes, cycle_bytes_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true);
-    if cycle_bytes_error != blot_error::Error.none { return Arena {}, cycle_bytes_error; } arena.cycle_bytes = cycle_bytes;
+    if cycle_bytes_error != blot_error::Error.none { return Arena {..}, cycle_bytes_error; } arena.cycle_bytes = cycle_bytes;
     let cycle_threshold, cycle_threshold_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, blot_runtime_cycles_runtime::minimum_traffic, true);
-    if cycle_threshold_error != blot_error::Error.none { return Arena {}, cycle_threshold_error; } arena.cycle_threshold = cycle_threshold;
+    if cycle_threshold_error != blot_error::Error.none { return Arena {..}, cycle_threshold_error; } arena.cycle_threshold = cycle_threshold;
     let allocate, allocate_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32);
-    if allocate_error != blot_error::Error.none { return Arena {}, allocate_error; } arena.allocate = allocate;
+    if allocate_error != blot_error::Error.none { return Arena {..}, allocate_error; } arena.allocate = allocate;
     let allocate_scalar, allocate_scalar_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32);
-    if allocate_scalar_error != blot_error::Error.none { return Arena {}, allocate_scalar_error; } arena.allocate_scalar = allocate_scalar;
+    if allocate_scalar_error != blot_error::Error.none { return Arena {..}, allocate_scalar_error; } arena.allocate_scalar = allocate_scalar;
     let recycle, recycle_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if recycle_error != blot_error::Error.none { return Arena {}, recycle_error; } arena.recycle = recycle;
+    if recycle_error != blot_error::Error.none { return Arena {..}, recycle_error; } arena.recycle = recycle;
     let reset, reset_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32);
-    if reset_error != blot_error::Error.none { return Arena {}, reset_error; } arena.reset = reset;
+    if reset_error != blot_error::Error.none { return Arena {..}, reset_error; } arena.reset = reset;
     let allocate_typed, allocate_typed_error = addFunction(module, [blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32);
-    if allocate_typed_error != blot_error::Error.none { return Arena {}, allocate_typed_error; } arena.allocate_typed = allocate_typed;
+    if allocate_typed_error != blot_error::Error.none { return Arena {..}, allocate_typed_error; } arena.allocate_typed = allocate_typed;
     let retain, retain_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if retain_error != blot_error::Error.none { return Arena {}, retain_error; } arena.retain = retain;
+    if retain_error != blot_error::Error.none { return Arena {..}, retain_error; } arena.retain = retain;
     let release, release_error = addTypedFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none, blot_backend_runtime_ir::ROLE_scalar);
-    if release_error != blot_error::Error.none { return Arena {}, release_error; } arena.release = release;
+    if release_error != blot_error::Error.none { return Arena {..}, release_error; } arena.release = release;
     let release_lease, release_lease_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if release_lease_error != blot_error::Error.none { return Arena {}, release_lease_error; } arena.release_lease = release_lease;
+    if release_lease_error != blot_error::Error.none { return Arena {..}, release_lease_error; } arena.release_lease = release_lease;
     let retire, retire_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if retire_error != blot_error::Error.none { return Arena {}, retire_error; } arena.retire = retire;
+    if retire_error != blot_error::Error.none { return Arena {..}, retire_error; } arena.retire = retire;
     let free, free_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if free_error != blot_error::Error.none { return Arena {}, free_error; } arena.free = free;
+    if free_error != blot_error::Error.none { return Arena {..}, free_error; } arena.free = free;
     let store_word, store_word_error = addFunction(module, [blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if store_word_error != blot_error::Error.none { return Arena {}, store_word_error; } arena.store_word = store_word;
+    if store_word_error != blot_error::Error.none { return Arena {..}, store_word_error; } arena.store_word = store_word;
     let copy_words, copy_words_error = addFunction(module, [blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if copy_words_error != blot_error::Error.none { return Arena {}, copy_words_error; } arena.copy_words = copy_words;
+    if copy_words_error != blot_error::Error.none { return Arena {..}, copy_words_error; } arena.copy_words = copy_words;
     let decrement, decrement_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if decrement_error != blot_error::Error.none { return Arena {}, decrement_error; } arena.decrement = decrement;
+    if decrement_error != blot_error::Error.none { return Arena {..}, decrement_error; } arena.decrement = decrement;
     let root_allocate, root_allocate_error = addFunction(module, [blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32);
-    if root_allocate_error != blot_error::Error.none { return Arena {}, root_allocate_error; } arena.root_allocate = root_allocate;
+    if root_allocate_error != blot_error::Error.none { return Arena {..}, root_allocate_error; } arena.root_allocate = root_allocate;
     let root_reserve, root_reserve_error = addFunction(module, [], blot_backend_runtime_ir::VT_i32);
-    if root_reserve_error != blot_error::Error.none { return Arena {}, root_reserve_error; } arena.root_reserve = root_reserve;
+    if root_reserve_error != blot_error::Error.none { return Arena {..}, root_reserve_error; } arena.root_reserve = root_reserve;
     let root_pop, root_pop_error = addFunction(module, [], blot_backend_runtime_ir::VT_i32);
-    if root_pop_error != blot_error::Error.none { return Arena {}, root_pop_error; } arena.root_pop = root_pop;
+    if root_pop_error != blot_error::Error.none { return Arena {..}, root_pop_error; } arena.root_pop = root_pop;
     let root_open, root_open_error = addFunction(module, [], blot_backend_runtime_ir::VT_i32);
-    if root_open_error != blot_error::Error.none { return Arena {}, root_open_error; } arena.root_open = root_open;
+    if root_open_error != blot_error::Error.none { return Arena {..}, root_open_error; } arena.root_open = root_open;
     let root_close, root_close_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if root_close_error != blot_error::Error.none { return Arena {}, root_close_error; } arena.root_close = root_close;
+    if root_close_error != blot_error::Error.none { return Arena {..}, root_close_error; } arena.root_close = root_close;
     let root_enter, root_enter_error = addFunction(module, [], blot_backend_runtime_ir::VT_none);
-    if root_enter_error != blot_error::Error.none { return Arena {}, root_enter_error; } arena.root_enter = root_enter;
+    if root_enter_error != blot_error::Error.none { return Arena {..}, root_enter_error; } arena.root_enter = root_enter;
     let root_leave, root_leave_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if root_leave_error != blot_error::Error.none { return Arena {}, root_leave_error; } arena.root_leave = root_leave;
+    if root_leave_error != blot_error::Error.none { return Arena {..}, root_leave_error; } arena.root_leave = root_leave;
     let root_store, root_store_error = addFunction(module, [blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if root_store_error != blot_error::Error.none { return Arena {}, root_store_error; } arena.root_store = root_store;
+    if root_store_error != blot_error::Error.none { return Arena {..}, root_store_error; } arena.root_store = root_store;
     let root_public_allocate, root_public_allocate_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32);
-    if root_public_allocate_error != blot_error::Error.none { return Arena {}, root_public_allocate_error; } arena.root_public_allocate = root_public_allocate;
+    if root_public_allocate_error != blot_error::Error.none { return Arena {..}, root_public_allocate_error; } arena.root_public_allocate = root_public_allocate;
     let root_authority, root_authority_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if root_authority_error != blot_error::Error.none { return Arena {}, root_authority_error; } arena.root_authority = root_authority;
+    if root_authority_error != blot_error::Error.none { return Arena {..}, root_authority_error; } arena.root_authority = root_authority;
     let root_public_reset, root_public_reset_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32);
-    if root_public_reset_error != blot_error::Error.none { return Arena {}, root_public_reset_error; } arena.root_public_reset = root_public_reset;
+    if root_public_reset_error != blot_error::Error.none { return Arena {..}, root_public_reset_error; } arena.root_public_reset = root_public_reset;
     let cycle_enqueue, cycle_enqueue_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if cycle_enqueue_error != blot_error::Error.none { return Arena {}, cycle_enqueue_error; } arena.cycle_enqueue = cycle_enqueue;
+    if cycle_enqueue_error != blot_error::Error.none { return Arena {..}, cycle_enqueue_error; } arena.cycle_enqueue = cycle_enqueue;
     let cycle_unlink, cycle_unlink_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if cycle_unlink_error != blot_error::Error.none { return Arena {}, cycle_unlink_error; } arena.cycle_unlink = cycle_unlink;
+    if cycle_unlink_error != blot_error::Error.none { return Arena {..}, cycle_unlink_error; } arena.cycle_unlink = cycle_unlink;
     let cycle_visit, cycle_visit_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if cycle_visit_error != blot_error::Error.none { return Arena {}, cycle_visit_error; } arena.cycle_visit = cycle_visit;
+    if cycle_visit_error != blot_error::Error.none { return Arena {..}, cycle_visit_error; } arena.cycle_visit = cycle_visit;
     let cycle_collect, cycle_collect_error = addFunction(module, [], blot_backend_runtime_ir::VT_none);
-    if cycle_collect_error != blot_error::Error.none { return Arena {}, cycle_collect_error; } arena.cycle_collect = cycle_collect;
+    if cycle_collect_error != blot_error::Error.none { return Arena {..}, cycle_collect_error; } arena.cycle_collect = cycle_collect;
     let cycle_safe, cycle_safe_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if cycle_safe_error != blot_error::Error.none { return Arena {}, cycle_safe_error; } arena.cycle_safe = cycle_safe;
+    if cycle_safe_error != blot_error::Error.none { return Arena {..}, cycle_safe_error; } arena.cycle_safe = cycle_safe;
     let mark_acyclic, mark_acyclic_error = addFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none);
-    if mark_acyclic_error != blot_error::Error.none { return Arena {}, mark_acyclic_error; } arena.mark_acyclic = mark_acyclic;
+    if mark_acyclic_error != blot_error::Error.none { return Arena {..}, mark_acyclic_error; } arena.mark_acyclic = mark_acyclic;
     let allocate_shaped, allocate_shaped_error = addFunction(module, [blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32);
-    if allocate_shaped_error != blot_error::Error.none { return Arena {}, allocate_shaped_error; } arena.allocate_shaped = allocate_shaped;
+    if allocate_shaped_error != blot_error::Error.none { return Arena {..}, allocate_shaped_error; } arena.allocate_shaped = allocate_shaped;
     let root_allocate_shaped, root_allocate_shaped_error = addFunction(module, [blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_i32);
-    if root_allocate_shaped_error != blot_error::Error.none { return Arena {}, root_allocate_shaped_error; } arena.root_allocate_shaped = root_allocate_shaped;
-    var error = blot_runtime_arena_runtime::emit(module, arena); if error != blot_error::Error.none { return Arena {}, error; }
-    if !module.defer_cycles { error = blot_runtime_cycles_runtime::emit(module, arena); if error != blot_error::Error.none { return Arena {}, error; } }
-    error = blot_runtime_root_runtime::emit(module, arena); if error != blot_error::Error.none { return Arena {}, error; }
+    if root_allocate_shaped_error != blot_error::Error.none { return Arena {..}, root_allocate_shaped_error; } arena.root_allocate_shaped = root_allocate_shaped;
+    var error = blot_runtime_arena_runtime::emit(module, arena); if error != blot_error::Error.none { return Arena {..}, error; }
+    if !module.defer_cycles { error = blot_runtime_cycles_runtime::emit(module, arena); if error != blot_error::Error.none { return Arena {..}, error; } }
+    error = blot_runtime_root_runtime::emit(module, arena); if error != blot_error::Error.none { return Arena {..}, error; }
     error = emitSlice(module, arena.reset, [
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_get, arena.cycle_head),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),
@@ -567,17 +567,17 @@ fn ensureArena(module: Module&) -> Arena, blot_error::Error {
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_get, arena.heap),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_return_),
-    ]); if error != blot_error::Error.none { return Arena {}, error; }
-    if module.artifacts { error = blot_reuse_artifact_emitter::recordArena(module.artifacts, arena); if error != blot_error::Error.none { return Arena {}, error; } }
+    ]); if error != blot_error::Error.none { return Arena {..}, error; }
+    if module.artifacts { error = blot_reuse_artifact_emitter::recordArena(module.artifacts, arena); if error != blot_error::Error.none { return Arena {..}, error; } }
     module.arena = blot_support::some(arena);
     error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.arena, 0, false); return arena, error;
 }
 fn ensureHostReferences(module: Module&) -> HostReferences, blot_error::Error {
     if module.host_references.present { let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.host_references, 0, true); return module.host_references.value, error; }
-    let cursor, cursor_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true); if cursor_error != blot_error::Error.none { return HostReferences {}, cursor_error; }
-    let active, active_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true); if active_error != blot_error::Error.none { return HostReferences {}, active_error; }
-    let retain, retain_error = addTypedFunction(module, [blot_backend_runtime_ir::VT_externref], blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::ROLE_scalar); if retain_error != blot_error::Error.none { return HostReferences {}, retain_error; }
-    let slot, slot_error = addLocal(module, retain, blot_backend_runtime_ir::VT_i32); if slot_error != blot_error::Error.none { return HostReferences {}, slot_error; }
+    let cursor, cursor_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true); if cursor_error != blot_error::Error.none { return HostReferences {..}, cursor_error; }
+    let active, active_error = addGlobal(module, blot_backend_runtime_ir::SC_u32, 0, true); if active_error != blot_error::Error.none { return HostReferences {..}, active_error; }
+    let retain, retain_error = addTypedFunction(module, [blot_backend_runtime_ir::VT_externref], blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::ROLE_scalar); if retain_error != blot_error::Error.none { return HostReferences {..}, retain_error; }
+    let slot, slot_error = addLocal(module, retain, blot_backend_runtime_ir::VT_i32); if slot_error != blot_error::Error.none { return HostReferences {..}, slot_error; }
     let retain_body_error = emitSlice(module, retain, [
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_get, cursor),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_tee, slot),
@@ -601,9 +601,9 @@ fn ensureHostReferences(module: Module&) -> HostReferences, blot_error::Error {
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_set, cursor),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, slot),
-    ]); if retain_body_error != blot_error::Error.none { return HostReferences {}, retain_body_error; }
-    let release, release_error = addTypedFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none, blot_backend_runtime_ir::ROLE_scalar); if release_error != blot_error::Error.none { return HostReferences {}, release_error; }
-    let current, current_error = addLocal(module, release, blot_backend_runtime_ir::VT_i32); if current_error != blot_error::Error.none { return HostReferences {}, current_error; }
+    ]); if retain_body_error != blot_error::Error.none { return HostReferences {..}, retain_body_error; }
+    let release, release_error = addTypedFunction(module, [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none, blot_backend_runtime_ir::ROLE_scalar); if release_error != blot_error::Error.none { return HostReferences {..}, release_error; }
+    let current, current_error = addLocal(module, release, blot_backend_runtime_ir::VT_i32); if current_error != blot_error::Error.none { return HostReferences {..}, current_error; }
     let release_body_error = emitSlice(module, release, [
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, 0),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_get, cursor),
@@ -631,7 +631,7 @@ fn ensureHostReferences(module: Module&) -> HostReferences, blot_error::Error {
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, 0),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_set, cursor),
-    ]); if release_body_error != blot_error::Error.none { return HostReferences {}, release_body_error; }
+    ]); if release_body_error != blot_error::Error.none { return HostReferences {..}, release_body_error; }
     var error = emitSlice(module, release, [
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get, 0),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eqz),
@@ -639,11 +639,11 @@ fn ensureHostReferences(module: Module&) -> HostReferences, blot_error::Error {
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_set, active),
         blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),
-    ]); if error != blot_error::Error.none { return HostReferences {}, error; }
-    let references = HostReferences { retain: retain, release: release, cursor: cursor, active: active };
-    if module.artifacts { error = blot_reuse_artifact_emitter::recordHostReferences(module.artifacts, references); if error != blot_error::Error.none { return HostReferences {}, error; } }
+    ]); if error != blot_error::Error.none { return HostReferences {..}, error; }
+    let references = HostReferences { retain: retain, release: release, cursor: cursor, active: active , ..};
+    if module.artifacts { error = blot_reuse_artifact_emitter::recordHostReferences(module.artifacts, references); if error != blot_error::Error.none { return HostReferences {..}, error; } }
     module.host_references = blot_support::some(references);
-    if module.arena.present { error = blot_runtime_root_runtime::hostCleanup(module, module.arena.value); if error != blot_error::Error.none { return HostReferences {}, error; } }
+    if module.arena.present { error = blot_runtime_root_runtime::hostCleanup(module, module.arena.value); if error != blot_error::Error.none { return HostReferences {..}, error; } }
     error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.host_references, 0, false); return references, error;
 }
 fn prepareCycles(module: Module&) -> blot_error::Error {
@@ -675,7 +675,7 @@ fn prepareCycles(module: Module&) -> blot_error::Error {
 }
 fn ensureLists(module: Module&) -> blot_runtime_list_runtime::Runtime, blot_error::Error {
     if module.lists.present { let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.lists, 0, true); return module.lists.value, error; }
-    let arena, error = ensureArena(module); if error != blot_error::Error.none { return blot_runtime_list_runtime::Runtime {}, error; }
+    let arena, error = ensureArena(module); if error != blot_error::Error.none { return blot_runtime_list_runtime::Runtime {..}, error; }
     let runtime, emitted = blot_runtime_list_runtime::emit(module, arena); if emitted != blot_error::Error.none { return runtime, emitted; }
     if module.artifacts { let error = blot_reuse_artifact_emitter::recordLists(module.artifacts, runtime); if error != blot_error::Error.none { return runtime, error; } }
     module.lists = blot_support::some(runtime);
@@ -723,7 +723,7 @@ fn exportOwnerFunction(module: Module&, id: u32, exported_name: const u8[:], par
         if !module.array_transport.present { let arena, error = ensureArena(module); if error != blot_error::Error.none { return error; } }
         let error = publicArena(module); if error != blot_error::Error.none { return error; }
     }
-    let item = Export { name: ownName(module, exported_name), index: id, parameter: parameter, result: result, once: once, parameter_owner: parameter_owner, result_owner: result_owner, owner_adapter: owner_adapter };
+    let item = Export { name: ownName(module, exported_name), index: id, parameter: parameter, result: result, once: once, parameter_owner: parameter_owner, result_owner: result_owner, owner_adapter: owner_adapter , ..};
     if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, true); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); module.functions[id].entry = true; return blot_error::Error.none;
 }
@@ -732,7 +732,7 @@ fn resourceCount(module: Module&) -> u32 {
 }
 struct ResourceTransfers { reserve: u32 = 0, register: u32 = 0, release: u32 = 0, retire: u32 = 0, drain: u32 = 0 }
 fn resourceTransferImports(module: Module&) -> ResourceTransfers, blot_error::Error {
-    var result = ResourceTransfers {}; let published = publicArena(module); if published != blot_error::Error.none { return result, published; }
+    var result = ResourceTransfers {..}; let published = publicArena(module); if published != blot_error::Error.none { return result, published; }
     let obsolete, error = importFunction(module, "blot:resource/1", "register", [blot_backend_runtime_ir::VT_i32; 5], blot_backend_runtime_ir::VT_none); if error != blot_error::Error.none { return result, error; }
     let reserve, reserve_error = importFunction(module, "blot:resource/1", "reserve", [], blot_backend_runtime_ir::VT_i32); if reserve_error != blot_error::Error.none { return result, reserve_error; } result.reserve = reserve;
     let release, release_error = importFunction(module, "blot:resource/1", "release", [blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none); if release_error != blot_error::Error.none { return result, release_error; } result.release = release;
@@ -772,12 +772,12 @@ fn resourceImport(module: Module&, id: i64) -> bool {
     return false;
 }
 fn exportResourceAdapter(module: Module&, id: u32, exported_name: const u8[:]) -> blot_error::Error {
-    let item = Export { name: ownName(module, exported_name), index: id };
+    let item = Export { name: ownName(module, exported_name), index: id , ..};
     if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, false); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); return blot_error::Error.none;
 }
 fn exportTaskAdapter(module: Module&, id: u32, exported_name: const u8[:], runtime: bool) -> blot_error::Error {
-    let item = Export { name: ownName(module, exported_name), index: id, task_adapter: true, task_runtime: runtime };
+    let item = Export { name: ownName(module, exported_name), index: id, task_adapter: true, task_runtime: runtime , ..};
     if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, false); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); return blot_error::Error.none;
 }
@@ -825,7 +825,7 @@ fn hostCallbackImport(module: const Module&, id: i64) -> blot_support::Option<Ca
         if item.signature >= module.signatures.len { return blot_support::none<Callback>(); }
         let signature = module.signatures[item.signature]; var handle = blot_backend_runtime_ir::VT_externref; if owned { handle = blot_backend_runtime_ir::VT_i32; }
         if !equal(name(module, item.name), "call_data_unit") || signature.result != blot_backend_runtime_ir::VT_i32 || !equal(signatureParameters(module, signature), [handle, blot_backend_runtime_ir::VT_i32, blot_backend_runtime_ir::VT_i32]) { return blot_support::none<Callback>(); }
-        return blot_support::some(Callback { parameter: blot_backend_runtime_ir::SC_u32, cleanup: true, owned: owned, data: true });
+        return blot_support::some(Callback { parameter: blot_backend_runtime_ir::SC_u32, cleanup: true, owned: owned, data: true , ..});
     }
     let owned = equal(namespace_name, "blot:cleanup/2"); let cleanup = owned || equal(namespace_name, "blot:cleanup/1");
     if (!cleanup && !equal(namespace_name, "blot:host/1")) || item.signature >= module.signatures.len { return blot_support::none<Callback>(); }
@@ -834,7 +834,7 @@ fn hostCallbackImport(module: const Module&, id: i64) -> blot_support::Option<Ca
         for result in callback_scalars {
             let expected = callbackSpelling(parameter, result);
             if (!cleanup || result == blot_backend_runtime_ir::SC_unit) && equal(name(module, item.name), expected) && signature.result == blot_backend_runtime_ir::machine(result) && equal(signatureParameters(module, signature), [handle, blot_backend_runtime_ir::machine(parameter)]) {
-                return blot_support::some(Callback { parameter: parameter, result: result, cleanup: cleanup, owned: owned });
+                return blot_support::some(Callback { parameter: parameter, result: result, cleanup: cleanup, owned: owned , ..});
             }
         }
     }
@@ -889,22 +889,22 @@ fn exportOwnerCallbackFunction(module: Module&, id: u32, exported_name: const u8
         if !module.array_transport.present { let arena, error = ensureArena(module); if error != blot_error::Error.none { return error; } }
         let error = publicArena(module); if error != blot_error::Error.none { return error; }
     }
-    let item = Export { name: ownName(module, exported_name), index: id, result: result, callback: blot_support::some(callback), once: once, result_owner: result_owner };
+    let item = Export { name: ownName(module, exported_name), index: id, result: result, callback: blot_support::some(callback), once: once, result_owner: result_owner , ..};
     if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, true); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); module.functions[id].entry = true; return blot_error::Error.none;
 }
 fn exportConstant(module: Module&, exported_name: const u8[:], scalar: Scalar, bits: u32) -> blot_error::Error {
-    let id = module.globals.len as u32; let item = Export { name: ownName(module, exported_name), index: id, result: scalar, global: true };
+    let id = module.globals.len as u32; let item = Export { name: ownName(module, exported_name), index: id, result: scalar, global: true , ..};
     if module.artifacts {
         var role = blot_reuse_artifact_emitter::Role.literal; if scalar == blot_backend_runtime_ir::SC_pointer || isArray(scalar) { role = blot_reuse_artifact_emitter::Role.static_address; }
-        var error = blot_reuse_artifact_emitter::recordGlobal(module.artifacts, id, scalar, blot_reuse_artifact_emitter::Operand { role: role, value: bits }, false); if error != blot_error::Error.none { return error; }
+        var error = blot_reuse_artifact_emitter::recordGlobal(module.artifacts, id, scalar, blot_reuse_artifact_emitter::Operand { role: role, value: bits , ..}, false); if error != blot_error::Error.none { return error; }
         error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, false); if error != blot_error::Error.none { return error; }
     }
-    module.globals.push(Global { scalar: scalar, bits: bits }); module.exports.push(item); return blot_error::Error.none;
+    module.globals.push(Global { scalar: scalar, bits: bits , ..}); module.exports.push(item); return blot_error::Error.none;
 }
 fn exportGlobal(module: Module&, id: u32, exported_name: const u8[:]) -> blot_error::Error {
     if id >= module.globals.len { return blot_error::Error.invalid_global_reference; }
-    let item = Export { name: ownName(module, exported_name), index: id, result: module.globals[id].scalar, global: true };
+    let item = Export { name: ownName(module, exported_name), index: id, result: module.globals[id].scalar, global: true , ..};
     if module.artifacts { let error = blot_reuse_artifact_emitter::exportItem(module.artifacts, module, item, false); if error != blot_error::Error.none { return error; } }
     module.exports.push(item); return blot_error::Error.none;
 }
@@ -921,9 +921,9 @@ fn abiValue(payload: Bytes&, scalar: Scalar, owner: blot_support::Option<OwnerBo
 }
 struct Prepared { body: blot_support::Option<blot_backend_runtime_ir::Body>, borrowed: bool = false }
 fn publishBody(module: Module&, locals: const ValueType[:], code: const Instruction[:]) -> blot_backend_runtime_ir::Body {
-    let local_range = Range { start: module.types.len, len: locals.len }; module.types.append(locals);
-    let code_range = Range { start: module.instructions.len, len: code.len }; module.instructions.append(code);
-    return blot_backend_runtime_ir::Body { locals: local_range, instructions: code_range };
+    let local_range = Range { start: module.types.len, len: locals.len , ..}; module.types.append(locals);
+    let code_range = Range { start: module.instructions.len, len: code.len , ..}; module.instructions.append(code);
+    return blot_backend_runtime_ir::Body { locals: local_range, instructions: code_range , ..};
 }
 fn clearBorrowed(function: Function&) { function.borrowed_body = false; function.borrowed_locals = []; function.borrowed_instructions = []; }
 fn materializeBody(module: Module&,id: u32) -> blot_error::Error {
@@ -934,7 +934,7 @@ fn publishFunctionBody(module: Module&,id: u32,locals: const ValueType[:],code: 
     if id >= module.functions.len { return blot_error::Error.invalid_function_reference; } let body = publishBody(module,locals,code); module.functions[id].locals = body.locals; module.functions[id].instructions = body.instructions; clearBorrowed(module.functions[id]); var annotations: u32 = 0; for instruction in code { if instruction.op == blot_backend_runtime_ir::OP_ownership { annotations++; } } module.functions[id].annotations = annotations; return blot_error::Error.none;
 }
 fn publishInstructions(module: Module&,id: u32,code: const Instruction[:]) -> blot_error::Error {
-    let materialized = materializeBody(module,id); if materialized != blot_error::Error.none { return materialized; } let range = Range { start: module.instructions.len,len: code.len }; module.instructions.append(code); module.functions[id].instructions = range; var annotations: u32 = 0; for instruction in code { if instruction.op == blot_backend_runtime_ir::OP_ownership { annotations++; } } module.functions[id].annotations = annotations; return blot_error::Error.none;
+    let materialized = materializeBody(module,id); if materialized != blot_error::Error.none { return materialized; } let range = Range { start: module.instructions.len,len: code.len , ..}; module.instructions.append(code); module.functions[id].instructions = range; var annotations: u32 = 0; for instruction in code { if instruction.op == blot_backend_runtime_ir::OP_ownership { annotations++; } } module.functions[id].annotations = annotations; return blot_error::Error.none;
 }
 fn preparedView(module: Module&, prepared: const Prepared[:], id: i64) -> Function {
     var result = module.functions[id];
@@ -946,7 +946,7 @@ fn deinit(module: Module&) {
     module.types.clear(); module.instructions.clear(); module.names.clear(); module.static_fields.clear(); module.table_functions.clear(); module.table_origins.clear(); module.semantic_sites.clear();
     module.fixed_memory_bytes = 0; module.array_transport = blot_support::none<ArrayTransport>(); module.arena = blot_support::none<Arena>(); module.fixture_helpers_present = false;
     module.lists = blot_support::none<blot_runtime_list_runtime::Runtime>(); module.cohorts = blot_support::none<blot_runtime_cohort_runtime::Runtime>(); module.regions = blot_support::none<blot_runtime_region_runtime::Prepared>();
-    module.host_references = blot_support::none<HostReferences>(); module.public_arena = false; module.cleanup_data = Range {}; module.defer_cycles = false; module.mutable_static = false; module.indirect = false; module.start = blot_support::none<u32>();
+    module.host_references = blot_support::none<HostReferences>(); module.public_arena = false; module.cleanup_data = Range {..}; module.defer_cycles = false; module.mutable_static = false; module.indirect = false; module.start = blot_support::none<u32>();
 }
 // Derived immutable import spelling view for safepoint classification.
 fn importName(module: const Module&, id: i64) -> const u8[:] { name(module, module.imports[id].name) }
@@ -959,4 +959,4 @@ fn parameters(module: const Module&,id: u32) -> const ValueType[:] { parameters(
 fn locals(module: const Module&,id: u32) -> const ValueType[:] { locals(module,module.functions[id]) }
 fn instructions(module: const Module&,id: u32) -> const Instruction[:] { instructions(module,module.functions[id]) }
 // Unpublished helper rewrites may replace the parameter view before reinterning.
-fn setFunctionParameters(module: Module&,id: u32,parameters: const ValueType[:]) -> blot_error::Error { if id >= module.functions.len { return blot_error::Error.invalid_function_reference; } let range = Range { start: module.types.len,len: parameters.len }; module.types.append(parameters); module.functions[id].parameters = range; return blot_error::Error.none; }
+fn setFunctionParameters(module: Module&,id: u32,parameters: const ValueType[:]) -> blot_error::Error { if id >= module.functions.len { return blot_error::Error.invalid_function_reference; } let range = Range { start: module.types.len,len: parameters.len , ..}; module.types.append(parameters); module.functions[id].parameters = range; return blot_error::Error.none; }

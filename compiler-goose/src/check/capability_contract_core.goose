@@ -14,14 +14,14 @@ type Store = blot_check_capability_contracts::Store;
 type Tag = blot_check_capability_contracts::Tag;
 struct Alias { binding: u32, value: Id, callable: blot_support::Option<i64> = blot_support::none<i64>() }
 struct Environment { values: Alias[128], len: i64 = 0 }
-fn bind(self: Environment&, binding: u32, value: Id) -> Error { if self.len == self.values.len { return Error.capability_analysis_limit; } self.values[self.len] = Alias { binding, value }; self.len += 1; return Error.none; }
+fn bind(self: Environment&, binding: u32, value: Id) -> Error { if self.len == self.values.len { return Error.capability_analysis_limit; } self.values[self.len] = Alias { binding, value , ..}; self.len += 1; return Error.none; }
 fn alias(self: const Environment&, binding: u32) -> blot_support::Option<Alias> { var index = self.len; while index != 0 { index -= 1; if self.values[index].binding == binding { return blot_support::some(self.values[index]); } } return blot_support::none<Alias>(); }
 fn get(self: const Environment&, binding: u32) -> blot_support::Option<Id> { let found = self.alias(binding); if !found.present { return blot_support::none<Id>(); } return blot_support::some(found.value.value); }
 struct CallableOrigin { source: u32, environment: Environment }
 struct Builder {
     store: Store&, module: const Module&, remaining: i64 = 65536, input_globals: bool = false, value_origins: bool = false,
-    owners: const ModuleRef[:] = [], closed_rows: blot_check_types::List = blot_check_types::List {}, callables: CallableOrigin[>..<]&,
-    callable_allocation: blot_check_logical_scratch_budget::ArrayBlock = blot_check_logical_scratch_budget::ArrayBlock {element_size:3088,alignment:8},
+    owners: const ModuleRef[:] = [], closed_rows: blot_check_types::List = blot_check_types::List {..}, callables: CallableOrigin[>..<]&,
+    callable_allocation: blot_check_logical_scratch_budget::ArrayBlock = blot_check_logical_scratch_budget::ArrayBlock {element_size:3088,alignment:8, ..},
 }
 fn node(self: Builder&, source: u32, depth: i64) -> blot_check_core::Node, Error { if depth >= 128 || self.remaining == 0 { return default<blot_check_core::Node>(), Error.capability_analysis_limit; } self.remaining -= 1; if source == 0 || source >= self.module.nodes.len { return default<blot_check_core::Node>(), Error.unavailable; } return self.module.nodes[source], Error.none; }
 fn callableOrigin(self: Builder&, source: u32, environment: const Environment&, depth: i64) -> blot_support::Option<i64>, Error {
@@ -29,7 +29,7 @@ fn callableOrigin(self: Builder&, source: u32, environment: const Environment&, 
     if value.tag == blot_check_core::Tag.reference { if value.a >= self.module.references.len { return blot_support::none<i64>(), Error.unavailable; } let reference = self.module.references[value.a]; if reference.unit != 0 && reference.unit != self.module.unit { return blot_support::none<i64>(), Error.none; }
         let found = environment.alias(reference.binding); if !found.present { return blot_support::none<i64>(), Error.none; } return found.value.callable, Error.none;
     }
-    if value.tag != blot_check_core::Tag.closure { return blot_support::none<i64>(), Error.none; } let index = self.callables.len; let growth = ensureCallables(self,index+1); if growth != Error.none {return blot_support::none<i64>(),growth;} self.callables += CallableOrigin { source, environment }; return blot_support::some(index), Error.none;
+    if value.tag != blot_check_core::Tag.closure { return blot_support::none<i64>(), Error.none; } let index = self.callables.len; let growth = ensureCallables(self,index+1); if growth != Error.none {return blot_support::none<i64>(),growth;} self.callables += CallableOrigin { source, environment , ..}; return blot_support::some(index), Error.none;
 }
 fn closureCall(self: Builder&, call: blot_check_capability_flow::LocalCoreCall, environment: const Environment&, depth: i64) -> blot_support::Option<Id>, Error {
     if call.len != 1 || (call.target.unit != 0 && call.target.unit != self.module.unit) { return blot_support::none<Id>(), Error.none; } let found = environment.alias(call.target.binding); if !found.present || !found.value.callable.present { return blot_support::none<Id>(), Error.none; }
@@ -58,20 +58,20 @@ fn namedFunction(self: Builder&, original: blot_check_core::BindingRef, actual: 
         if binding.capability_flow == blot_check_capability_flow::Contract.identity { if !blot_check_capability_flow::unaryCore(producer, body, blot_check_capability_flow::Contract.identity) { return blot_support::none<Id>(), Error.unavailable; } arity = 1; }
         else if binding.capability_flow != blot_check_capability_flow::Contract.input_shape && (binding.capability_flow != blot_check_capability_flow::Contract.unknown || binding.capability_parameters.kind != blot_check_capability_flow::ParameterResult.product || !binding.capability_parameters.valid() || !binding.capability_parameters.present()) { return blot_support::none<Id>(), Error.none; }
         if arity == 0 || arity > 16 || body.parameters.len != arity || body.parameters.start > producer.parameters.len || body.parameters.len > producer.parameters.len - body.parameters.start { return blot_support::none<Id>(), Error.unavailable; }
-        var callables: CallableOrigin[>..<] = []; var reader = Builder { self.store, producer, remaining: self.remaining, input_globals: true, owners: self.owners, closed_rows: body.closed_rows, callables };
+        var callables: CallableOrigin[>..<] = []; var reader = Builder { self.store, producer, remaining: self.remaining, input_globals: true, owners: self.owners, closed_rows: body.closed_rows, callables , ..};
         let result, error = namedBody(reader, producer, body, binding, arity, depth); releaseCallables(reader); self.remaining = reader.remaining; return result, error;
     } return blot_support::none<Id>(), Error.capability_analysis_limit;
 }
 fn namedBody(reader: Builder&, producer: const Module&, body: blot_check_core::Body, binding: blot_check_core::Binding, arity: u8, depth: i64) -> blot_support::Option<Id>, Error {
-    var parameters = Environment {};
+    var parameters = Environment {..};
     for parameter, index in producer.parameters[body.parameters.start..body.parameters.start + arity] {
         if parameter.binding == 0 { if index != 0 || parameter.ty != blot_check_types::unit { return blot_support::none<Id>(), Error.unavailable; } continue; }
         if parameter.binding >= producer.bindings.len || producer.bindings[parameter.binding].kind != blot_check_check::Kind.parameter { return blot_support::none<Id>(), Error.unavailable; }
-        let id, error = reader.store.append(blot_check_capability_contracts::Term { Tag.argument, index as u32 }); if error != Error.none { return blot_support::none<Id>(), error; } let error = parameters.bind(parameter.binding, id); if error != Error.none { return blot_support::none<Id>(), error; }
+        let id, error = reader.store.append(blot_check_capability_contracts::Term { Tag.argument, index as u32 , ..}); if error != Error.none { return blot_support::none<Id>(), error; } let error = parameters.bind(parameter.binding, id); if error != Error.none { return blot_support::none<Id>(), error; }
     }
     let result, error = expression(reader, body.root, parameters, depth + 1); if error != Error.none { return blot_support::none<Id>(), error; } var expected = binding.capability_parameters.result(); if binding.capability_flow == blot_check_capability_flow::Contract.identity { expected = 1; }
     let mask, error = reader.store.view().argumentMask(result, reader.remaining); if error != Error.none { return blot_support::none<Id>(), error; } if mask != expected { return blot_support::none<Id>(), Error.unavailable; }
-    let function, error = reader.store.append(blot_check_capability_contracts::Term { Tag.callable, arity, c: result }); return blot_support::some(function), error;
+    let function, error = reader.store.append(blot_check_capability_contracts::Term { Tag.callable, arity, c: result , ..}); return blot_support::some(function), error;
 }
 fn reference(self: Builder&, catalog: u32, actual: u32, environment: const Environment&, depth: i64) -> Id, Error {
     if catalog >= self.module.references.len { return 0, Error.unavailable; } let value = self.module.references[catalog];
@@ -89,7 +89,7 @@ recursive fn expression(self: Builder&, source: u32, environment: const Environm
     match value.tag {
         blot_check_core::Tag.call, blot_check_core::Tag.apply => { return application(self, source, value, environment, depth); },
         blot_check_core::Tag.reference => { return reference(self, value.a, value.ty, environment, depth + 1); },
-        blot_check_core::Tag.computation => { let child, error = expression(self, value.a, environment, depth + 1); if error != Error.none { return 0, error; } let error = inputStore(self, child); if error != Error.none { return 0, error; } return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, child }); },
+        blot_check_core::Tag.computation => { let child, error = expression(self, value.a, environment, depth + 1); if error != Error.none { return 0, error; } let error = inputStore(self, child); if error != Error.none { return 0, error; } return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, child , ..}); },
         blot_check_core::Tag.effect_provider, blot_check_core::Tag.state_provider => { var children: Id[3]; let a, error = expression(self, value.a, environment, depth + 1); if error != Error.none { return 0, error; } children[0] = a; let b, error = expression(self, value.b, environment, depth + 1); if error != Error.none { return 0, error; } children[1] = b; var count: i64 = 2;
             if value.tag == blot_check_core::Tag.state_provider { let c, error = expression(self, value.c, environment, depth + 1); if error != Error.none { return 0, error; } children[2] = c; count = 3; } for child in children[..count] { let error = inputStore(self, child); if error != Error.none { return 0, error; } } return self.store.aggregate(Tag.captures, children[..count]);
         },
@@ -104,7 +104,7 @@ recursive fn expression(self: Builder&, source: u32, environment: const Environm
             } return scalarValue(self, value.ty);
         },
         blot_check_core::Tag.constant => { return scalarValue(self, value.ty); },
-        blot_check_core::Tag.construct => { var child: Id = 0; if value.b != 0 { let id, error = expression(self, value.b, environment, depth + 1); if error != Error.none { return 0, error; } child = id; } return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, child }); },
+        blot_check_core::Tag.construct => { var child: Id = 0; if value.b != 0 { let id, error = expression(self, value.b, environment, depth + 1); if error != Error.none { return 0, error; } child = id; } return self.store.append(blot_check_capability_contracts::Term { Tag.wrapped, child , ..}); },
         blot_check_core::Tag.product, blot_check_core::Tag.array, blot_check_core::Tag.record => { return aggregateValue(self, value, environment, depth); },
         blot_check_core::Tag.array_op => {
             if value.c != blot_backend_collection_ops::opCode(blot_check_core::ArrayOp.get) || value.b != 2 || value.a > self.module.extra.len || value.b > self.module.extra.len - value.a { return 0, Error.unavailable; }
@@ -133,10 +133,10 @@ fn application(self: Builder&, source: u32, value: blot_check_core::Node, enviro
     let call = blot_check_capability_flow::coreCall(self.module, source); if call.present { let result, error = closureCall(self, call.value, environment, depth + 1); if error != Error.none { return 0, error; } if result.present { return result.value, Error.none; } }
     if self.input_globals && value.tag == blot_check_core::Tag.apply { let argument, error = self.node(value.b, depth + 1); if error != Error.none { return 0, error; } let callee, error = self.node(value.a, depth + 1); if error != Error.none { return 0, error; }
         if argument.tag == blot_check_core::Tag.constant && argument.ty == blot_check_types::unit && argument.a == 0 && callee.tag == blot_check_core::Tag.operation_value { if value.ty >= self.module.types.nodes.len { return 0, Error.unavailable; } let ignored, error = expression(self, value.a, environment, depth + 1); if error != Error.none { return 0, error; } let tag = self.module.types.node(value.ty).tag;
-            if tag == blot_check_types::Tag.unit || tag == blot_check_types::Tag.boolean || tag == blot_check_types::Tag.unsigned32 || tag == blot_check_types::Tag.floating32 || tag == blot_check_types::Tag.never { return 0, Error.none; } return self.store.append(blot_check_capability_contracts::Term { Tag.unknown });
+            if tag == blot_check_types::Tag.unit || tag == blot_check_types::Tag.boolean || tag == blot_check_types::Tag.unsigned32 || tag == blot_check_types::Tag.floating32 || tag == blot_check_types::Tag.never { return 0, Error.none; } return self.store.append(blot_check_capability_contracts::Term { Tag.unknown , ..});
         }
     }
-    let local = blot_check_capability_flow::localCoreCall(self.module, source); if local.present { var nested = Environment {}; for index in 0..local.value.len { let argument, error = expression(self, local.value.arguments[index], environment, depth + 1); if error != Error.none { return 0, error; } let error = nested.bind(local.value.bindings[index], argument); if error != Error.none { return 0, error; } } return expression(self, local.value.body, nested, depth + 1); }
+    let local = blot_check_capability_flow::localCoreCall(self.module, source); if local.present { var nested = Environment {..}; for index in 0..local.value.len { let argument, error = expression(self, local.value.arguments[index], environment, depth + 1); if error != Error.none { return 0, error; } let error = nested.bind(local.value.bindings[index], argument); if error != Error.none { return 0, error; } } return expression(self, local.value.body, nested, depth + 1); }
     if self.input_globals && call.present { let function, error = namedFunction(self, call.value.target, call.value.signature, FunctionUse.invocation, depth + 1); if error != Error.none { return 0, error; } if !function.present { return 0, Error.unavailable; } var arguments: Id[16];
         for index in 0..call.value.len { let argument, error = expression(self, call.value.arguments[index], environment, depth + 1); if error != Error.none { return 0, error; } arguments[index] = argument; } return self.store.invoke(function.value, arguments[..call.value.len]);
     } return 0, Error.unavailable;
@@ -265,12 +265,12 @@ fn deriveWithOwners(store: Store&, module: const Module&, body: blot_check_core:
     if body.parameters.len != arity || body.parameters.start > module.parameters.len || body.parameters.len > module.parameters.len - body.parameters.start { return blot_support::none<Id>(), Error.none; }
     let checkpoint = store.mark(); var callables: CallableOrigin[>..<] = []; var input_globals = false;
     if body.binding < module.bindings.len { input_globals = module.bindings[body.binding].capability_flow == blot_check_capability_flow::Contract.input_shape; }
-    var builder = Builder { store, module, owners: owners, input_globals: input_globals, closed_rows: body.closed_rows, callables: callables };
+    var builder = Builder { store, module, owners: owners, input_globals: input_globals, closed_rows: body.closed_rows, callables: callables , ..};
     let result, error = deriveBody(builder, body, summary); releaseCallables(builder); if error != Error.none { store.rollback(checkpoint); if error == Error.unavailable { return blot_support::none<Id>(), Error.none; } return blot_support::none<Id>(), error; } return blot_support::some(result), Error.none;
 }
 fn deriveBody(builder: Builder&, body: blot_check_core::Body, summary: blot_check_capability_flow::Parameters) -> Id, Error {
-    let empty, error = builder.store.append(blot_check_capability_contracts::Term { Tag.empty }); if error != Error.none { return 0, error; } var environment = Environment {};
-    for parameter, index in builder.module.parameters[body.parameters.start..body.parameters.start + summary.arity()] { let id, error = builder.store.append(blot_check_capability_contracts::Term { Tag.parameter, index as u32 }); if error != Error.none { return 0, error; } let error = environment.bind(parameter.binding, id); if error != Error.none { return 0, error; } }
+    let empty, error = builder.store.append(blot_check_capability_contracts::Term { Tag.empty , ..}); if error != Error.none { return 0, error; } var environment = Environment {..};
+    for parameter, index in builder.module.parameters[body.parameters.start..body.parameters.start + summary.arity()] { let id, error = builder.store.append(blot_check_capability_contracts::Term { Tag.parameter, index as u32 , ..}); if error != Error.none { return 0, error; } let error = environment.bind(parameter.binding, id); if error != Error.none { return 0, error; } }
     if summary.kind == blot_check_capability_flow::ParameterResult.member_closure_unit || summary.kind == blot_check_capability_flow::ParameterResult.captured_unit {
         let error = environment.bind(builder.module.parameters[body.parameters.start + summary.arity()].binding, 0); if error != Error.none { return 0, error; } var captures: Id[4096]; var count: i64 = 0;
         let error = capture(builder, body.root, environment, captures, count, 0); if error != Error.none { return 0, error; } return builder.store.aggregate(Tag.captures, captures[..count]);
@@ -280,30 +280,30 @@ struct InputBodyCheck { module: const Module&, body: blot_check_core::Body, summ
 fn inputBody(module: const Module&, body: blot_check_core::Body, summary: blot_check_capability_flow::Parameters) -> bool { return inputBodyWithOwners(module, body, summary, []); }
 fn inputBodyWithOwners(module: const Module&, body: blot_check_core::Body, summary: blot_check_capability_flow::Parameters, owners: const ModuleRef[:]) -> bool {
     if !summary.valid() || summary.kind != blot_check_capability_flow::ParameterResult.product || summary.arity() == 0 || body.scheme.generative.len != 0 || body.parameters.len != summary.arity() || body.parameters.start > module.parameters.len || body.parameters.len > module.parameters.len - body.parameters.start { return false; }
-    var context = InputBodyCheck { module, body, summary, owners }; let error = blot_check_capability_contracts::withStore<InputBodyCheck,inputBodyCheck>(context); return error == Error.none && context.result;
+    var context = InputBodyCheck { module, body, summary, owners , ..}; let error = blot_check_capability_contracts::withStore<InputBodyCheck,inputBodyCheck>(context); return error == Error.none && context.result;
 }
 fn inputBodyCheck(context: InputBodyCheck&, store: Store&) -> Error {
-    let empty, error = store.append(blot_check_capability_contracts::Term { Tag.empty }); if error != Error.none { return Error.none; } var callables: CallableOrigin[>..<] = [];
-    var builder = Builder { store, context.module, owners: context.owners, input_globals: true, closed_rows: context.body.closed_rows, callables: callables }; var environment = Environment {}; if !context.body.is_function { return Error.none; }
+    let empty, error = store.append(blot_check_capability_contracts::Term { Tag.empty , ..}); if error != Error.none { return Error.none; } var callables: CallableOrigin[>..<] = [];
+    var builder = Builder { store, context.module, owners: context.owners, input_globals: true, closed_rows: context.body.closed_rows, callables: callables , ..}; var environment = Environment {..}; if !context.body.is_function { return Error.none; }
     for parameter, index in context.module.parameters[context.body.parameters.start..context.body.parameters.start + context.body.parameters.len] {
         if parameter.binding == 0 { if index != 0 || parameter.ty != blot_check_types::unit { return Error.none; } continue; }
         if parameter.binding >= context.module.bindings.len || context.module.bindings[parameter.binding].kind != blot_check_check::Kind.parameter { return Error.none; }
-        let formal, error = store.append(blot_check_capability_contracts::Term { Tag.parameter, index as u32 }); if error != Error.none { return Error.none; } if environment.bind(parameter.binding, formal) != Error.none { return Error.none; }
+        let formal, error = store.append(blot_check_capability_contracts::Term { Tag.parameter, index as u32 , ..}); if error != Error.none { return Error.none; } if environment.bind(parameter.binding, formal) != Error.none { return Error.none; }
     }
     let root, error = expression(builder, context.body.root, environment, 0); if error != Error.none || store.view().validate(root, context.summary.arity(), true) != Error.none { return Error.none; } for node in store.nodes.items { if node.tag == Tag.unknown { return Error.none; } }
     let mask, error = store.view().parameterMask(root); context.result = error == Error.none && mask == context.summary.result(); return Error.none;
 }
 fn deriveInputFunctionClosure(store: Store&, module: const Module&, initial: blot_check_core::ClosureInfo, arity: u8) -> blot_support::Option<Id>, Error { return deriveInputFunctionClosureWithOwners(store, module, initial, arity, []); }
 fn deriveInputFunctionClosureWithOwners(store: Store&, module: const Module&, initial: blot_check_core::ClosureInfo, arity: u8, owners: const ModuleRef[:]) -> blot_support::Option<Id>, Error {
-    if arity == 0 || arity > 16 { return blot_support::none<Id>(), Error.none; } let checkpoint = store.mark(); var callables: CallableOrigin[>..<] = []; var builder = Builder { store, module, input_globals: true, owners: owners, callables: callables };
+    if arity == 0 || arity > 16 { return blot_support::none<Id>(), Error.none; } let checkpoint = store.mark(); var callables: CallableOrigin[>..<] = []; var builder = Builder { store, module, input_globals: true, owners: owners, callables: callables , ..};
     let root, error = inputFunctionBody(builder, initial, arity); if error != Error.none || !root.present { store.rollback(checkpoint); if error == Error.unavailable { return blot_support::none<Id>(), Error.none; } return root, error; } return root, Error.none;
 }
 fn inputFunctionBody(builder: Builder&, initial: blot_check_core::ClosureInfo, arity: u8) -> blot_support::Option<Id>, Error {
-    let empty, error = builder.store.append(blot_check_capability_contracts::Term { Tag.empty }); if error != Error.none { return blot_support::none<Id>(), error; } var environment = Environment {}; let module = builder.module;
+    let empty, error = builder.store.append(blot_check_capability_contracts::Term { Tag.empty , ..}); if error != Error.none { return blot_support::none<Id>(), error; } var environment = Environment {..}; let module = builder.module;
     if initial.captures.start > module.extra.len || initial.captures.len > module.extra.len - initial.captures.start { return blot_support::none<Id>(), Error.invalid_capability_contract; }
     for binding in module.extra[initial.captures.start..initial.captures.start + initial.captures.len] { let error = environment.bind(binding, 0); if error != Error.none { return blot_support::none<Id>(), error; } }
     var closure = initial;
-    for index in 0..arity { let formal, error = builder.store.append(blot_check_capability_contracts::Term { Tag.parameter, index as u32 }); if error != Error.none { return blot_support::none<Id>(), error; } let error = environment.bind(closure.parameter.binding, formal); if error != Error.none { return blot_support::none<Id>(), error; }
+    for index in 0..arity { let formal, error = builder.store.append(blot_check_capability_contracts::Term { Tag.parameter, index as u32 , ..}); if error != Error.none { return blot_support::none<Id>(), error; } let error = environment.bind(closure.parameter.binding, formal); if error != Error.none { return blot_support::none<Id>(), error; }
         if index + 1 == arity { let root, error = expression(builder, closure.body, environment, 0); if error != Error.none { if error == Error.unavailable { return blot_support::none<Id>(), Error.none; } return blot_support::none<Id>(), error; }
             if builder.store.view().validate(root, arity, false) != Error.none { return blot_support::none<Id>(), Error.none; } return blot_support::some(root), Error.none;
         }
@@ -316,17 +316,17 @@ fn deriveInputClosure(store: Store&, module: const Module&, closure: blot_check_
     if store.view().validate(root.value, 1, false) != Error.none { store.rollback(checkpoint); return blot_support::none<Id>(), Error.none; } return root, Error.none;
 }
 fn closureResult(store: Store&, module: const Module&, closure: blot_check_core::ClosureInfo, input_globals: bool) -> blot_support::Option<Id>, Error {
-    let checkpoint = store.mark(); var callables: CallableOrigin[>..<] = []; var builder = Builder { store, module, input_globals: input_globals, callables: callables };
+    let checkpoint = store.mark(); var callables: CallableOrigin[>..<] = []; var builder = Builder { store, module, input_globals: input_globals, callables: callables , ..};
     let result, error = closureBody(builder, closure); if error != Error.none { store.rollback(checkpoint); if error == Error.unavailable { return blot_support::none<Id>(), Error.none; } return blot_support::none<Id>(), error; } return blot_support::some(result), Error.none;
 }
 fn closureBody(builder: Builder&, closure: blot_check_core::ClosureInfo) -> Id, Error {
-    let empty, error = builder.store.append(blot_check_capability_contracts::Term { Tag.empty }); if error != Error.none { return 0, error; } var environment = Environment {};
+    let empty, error = builder.store.append(blot_check_capability_contracts::Term { Tag.empty , ..}); if error != Error.none { return 0, error; } var environment = Environment {..};
     for binding in builder.module.extra[closure.captures.start..closure.captures.start + closure.captures.len] { let error = environment.bind(binding, 0); if error != Error.none { return 0, error; } }
-    let formal, error = builder.store.append(blot_check_capability_contracts::Term { Tag.parameter }); if error != Error.none { return 0, error; } let error = environment.bind(closure.parameter.binding, formal); if error != Error.none { return 0, error; } return expression(builder, closure.body, environment, 0);
+    let formal, error = builder.store.append(blot_check_capability_contracts::Term { Tag.parameter , ..}); if error != Error.none { return 0, error; } let error = environment.bind(closure.parameter.binding, formal); if error != Error.none { return 0, error; } return expression(builder, closure.body, environment, 0);
 }
 fn callableValue(store: Store&, module: const Module&, source: u32, owners: const ModuleRef[:]) -> blot_support::Option<Id>, Error {
-    let checkpoint = store.mark(); let empty, error = store.append(blot_check_capability_contracts::Term { Tag.empty }); if error != Error.none { store.rollback(checkpoint); return blot_support::none<Id>(), error; }
-    var callables: CallableOrigin[>..<] = []; var reader = Builder { store, module, owners: owners, input_globals: true, value_origins: true, callables: callables }; let environment = Environment {};
+    let checkpoint = store.mark(); let empty, error = store.append(blot_check_capability_contracts::Term { Tag.empty , ..}); if error != Error.none { store.rollback(checkpoint); return blot_support::none<Id>(), error; }
+    var callables: CallableOrigin[>..<] = []; var reader = Builder { store, module, owners: owners, input_globals: true, value_origins: true, callables: callables , ..}; let environment = Environment {..};
     let result, error = expression(reader, source, environment, 0); if error != Error.none { store.rollback(checkpoint); if error == Error.unavailable { return blot_support::none<Id>(), Error.none; } return blot_support::none<Id>(), error; } return blot_support::some(result), Error.none;
 }
 
@@ -350,6 +350,6 @@ fn ensureCallables(self:Builder&,minimum:i64)->Error {let budget .= self.store.b
 fn releaseCallables(self:Builder&) {let budget .= self.store.budget;if budget {blot_check_logical_scratch_budget::release(budget,self.callable_allocation);}}
 fn deriveWithOwnersBudget(store:Store&,module:const Module&,body:blot_check_core::Body,summary:blot_check_capability_flow::Parameters,owners:const ModuleRef[:],limit:i64=1048576)->blot_support::Option<Id>,Error {
     if store.nodes.len!=0 || store.words.len!=0 || store.budget!=null {return blot_support::none<Id>(),Error.invalid_capability_contract;}
-    var budget=blot_check_logical_scratch_budget::Budget{limit:limit};store.node_allocation=blot_check_logical_scratch_budget::ArrayBlock{element_size:16,alignment:4};store.word_allocation=blot_check_logical_scratch_budget::ArrayBlock{element_size:4,alignment:4};store.budget .= budget;
+    var budget=blot_check_logical_scratch_budget::Budget{limit:limit, ..};store.node_allocation=blot_check_logical_scratch_budget::ArrayBlock{element_size:16,alignment:4, ..};store.word_allocation=blot_check_logical_scratch_budget::ArrayBlock{element_size:4,alignment:4, ..};store.budget .= budget;
     let result,error=deriveWithOwners(store,module,body,summary,owners);store.budget .= null;return result,error;
 }

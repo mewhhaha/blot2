@@ -64,8 +64,8 @@ fn releaseRecords(self: FragmentAdapter, source: const FragmentRecord[:]) {
 }
 // Request is its u8 tag plus max payload Key (151 packed bytes).
 fn recordBytes(self: FragmentAdapter) -> i64 { return 152 + 2 * 16 + 4 + 1 + 8; }
-fn initFragments(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_query_table::Limits { records: 16384, retained_capacity: 8388608 }) -> FragmentTable {
-    return blot_reuse_semantic_query_table::init<FragmentKey,FragmentDependencies,FragmentResult,FragmentAdapter>(FragmentAdapter {}, limits);
+fn initFragments(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_query_table::Limits { records: 16384, retained_capacity: 8388608 , ..}) -> FragmentTable {
+    return blot_reuse_semantic_query_table::init<FragmentKey,FragmentDependencies,FragmentResult,FragmentAdapter>(FragmentAdapter {..}, limits);
 }
 struct OptimizerKey { local_fingerprint: u64, tier: blot_compilation_tier::Tier }
 fn deinit(self: OptimizerKey&) {}
@@ -103,6 +103,6 @@ fn releaseRecords(self: OptimizerAdapter, source: const OptimizerRecord[:]) {
     if source.len == 0 { return; } let first: const OptimizerRecord& = source[0]; let at = optimizer_records.index_of(first); optimizer_records.free_slice(optimizer_records[at..at + source.len]);
 }
 fn recordBytes(self: OptimizerAdapter) -> i64 { return 8 + 1 + 2 * 16 + 1 + 5 + 1 + 4 + 1; }
-fn initOptimizer(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_query_table::Limits {}) -> OptimizerTable {
-    return blot_reuse_semantic_query_table::init<OptimizerKey,OptimizerDependencies,OptimizerResult,OptimizerAdapter>(OptimizerAdapter {}, limits);
+fn initOptimizer(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_query_table::Limits {..}) -> OptimizerTable {
+    return blot_reuse_semantic_query_table::init<OptimizerKey,OptimizerDependencies,OptimizerResult,OptimizerAdapter>(OptimizerAdapter {..}, limits);
 }

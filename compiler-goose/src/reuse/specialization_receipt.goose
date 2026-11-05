@@ -172,7 +172,7 @@ fn push(self: SourceBuffer&, value: blot_check_core::BindingRef) -> Error {
     self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
 }
 fn clear(self: SourceBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
-fn deinit(self: SourceBuffer&) { if self.storage.len != 0 { tape_sources.free_slice(self.storage); } self = SourceBuffer {}; }
+fn deinit(self: SourceBuffer&) { if self.storage.len != 0 { tape_sources.free_slice(self.storage); } self = SourceBuffer {..}; }
 struct ScalarBuffer { storage: ScalarRead[:] = [], items: ScalarRead[:] = [], len: i64 = 0, failure: Error = Error.none }
 reusable[] var tape_scalars: ScalarRead[>..] = [];
 fn push(self: ScalarBuffer&, value: ScalarRead) -> Error {
@@ -186,7 +186,7 @@ fn push(self: ScalarBuffer&, value: ScalarRead) -> Error {
     self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
 }
 fn clear(self: ScalarBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
-fn deinit(self: ScalarBuffer&) { if self.storage.len != 0 { tape_scalars.free_slice(self.storage); } self = ScalarBuffer {}; }
+fn deinit(self: ScalarBuffer&) { if self.storage.len != 0 { tape_scalars.free_slice(self.storage); } self = ScalarBuffer {..}; }
 struct CallBuffer { storage: CallRead[:] = [], items: CallRead[:] = [], len: i64 = 0, failure: Error = Error.none }
 reusable[] var tape_calls: CallRead[>..] = [];
 fn push(self: CallBuffer&, value: CallRead) -> Error {
@@ -200,7 +200,7 @@ fn push(self: CallBuffer&, value: CallRead) -> Error {
     self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
 }
 fn clear(self: CallBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
-fn deinit(self: CallBuffer&) { if self.storage.len != 0 { tape_calls.free_slice(self.storage); } self = CallBuffer {}; }
+fn deinit(self: CallBuffer&) { if self.storage.len != 0 { tape_calls.free_slice(self.storage); } self = CallBuffer {..}; }
 struct ViewBuffer { storage: ViewEffect[:] = [], items: ViewEffect[:] = [], len: i64 = 0, failure: Error = Error.none }
 reusable[] var tape_views: ViewEffect[>..] = [];
 fn push(self: ViewBuffer&, value: ViewEffect) -> Error {
@@ -214,7 +214,7 @@ fn push(self: ViewBuffer&, value: ViewEffect) -> Error {
     self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
 }
 fn clear(self: ViewBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
-fn deinit(self: ViewBuffer&) { if self.storage.len != 0 { tape_views.free_slice(self.storage); } self = ViewBuffer {}; }
+fn deinit(self: ViewBuffer&) { if self.storage.len != 0 { tape_views.free_slice(self.storage); } self = ViewBuffer {..}; }
 struct PlainBuffer { storage: PlainFact[:] = [], items: PlainFact[:] = [], len: i64 = 0, failure: Error = Error.none }
 reusable[] var tape_plains: PlainFact[>..] = [];
 fn push(self: PlainBuffer&, value: PlainFact) -> Error {
@@ -228,14 +228,14 @@ fn push(self: PlainBuffer&, value: PlainFact) -> Error {
     self.storage[self.len] = value; self.len++; self.items = self.storage[..self.len]; return Error.none;
 }
 fn clear(self: PlainBuffer&) { self.len = 0; self.items = self.storage[..0]; self.failure = Error.none; }
-fn deinit(self: PlainBuffer&) { if self.storage.len != 0 { tape_plains.free_slice(self.storage); } self = PlainBuffer {}; }
+fn deinit(self: PlainBuffer&) { if self.storage.len != 0 { tape_plains.free_slice(self.storage); } self = PlainBuffer {..}; }
 struct Tape {
-    sources: SourceBuffer = SourceBuffer {}, scalar_reads: ScalarBuffer = ScalarBuffer {},
-    call_reads: CallBuffer = CallBuffer {}, call_publications: CallBuffer = CallBuffer {},
-    views: ViewBuffer = ViewBuffer {}, plain_facts: PlainBuffer = PlainBuffer {},
+    sources: SourceBuffer = SourceBuffer {..}, scalar_reads: ScalarBuffer = ScalarBuffer {..},
+    call_reads: CallBuffer = CallBuffer {..}, call_publications: CallBuffer = CallBuffer {..},
+    views: ViewBuffer = ViewBuffer {..}, plain_facts: PlainBuffer = PlainBuffer {..},
     nested: bool = false, unknown: bool = false, collected: i64 = 0,
 }
-fn initPooled() -> Tape, Error { return Tape {}, Error.none; }
+fn initPooled() -> Tape, Error { return Tape {..}, Error.none; }
 fn deinit(self: Tape&) {
     self.sources.deinit(); self.scalar_reads.deinit(); self.call_reads.deinit();
     self.call_publications.deinit(); self.views.deinit(); self.plain_facts.deinit();
@@ -276,6 +276,6 @@ struct TapeOwner { lease: u32=0,generation: u64=0 }
 struct TapeOwnerState { value: Tape,generation: u64,live: bool=true }
 reusable var tape_owner_slots: TapeOwnerState[>..]=[];
 var next_tape_owner_slots_generation: u64=1;
-fn initTapeOwner() -> TapeOwner,Error { if next_tape_owner_slots_generation==0xffffffffffffffff||tape_owner_slots.len>=0xffffffff { return TapeOwner {},Error.out_of_memory; } let value,error=initPooled(); if error!=Error.none { return TapeOwner {},error; } let generation=next_tape_owner_slots_generation; next_tape_owner_slots_generation++; let at=tape_owner_slots.alloc_index(TapeOwnerState {value,generation,true}); return TapeOwner {(at+1) as u32,generation},Error.none; }
+fn initTapeOwner() -> TapeOwner,Error { if next_tape_owner_slots_generation==0xffffffffffffffff||tape_owner_slots.len>=0xffffffff { return TapeOwner {..},Error.out_of_memory; } let value,error=initPooled(); if error!=Error.none { return TapeOwner {..},error; } let generation=next_tape_owner_slots_generation; next_tape_owner_slots_generation++; let at=tape_owner_slots.alloc_index(TapeOwnerState {value,generation,true, ..}); return TapeOwner {(at+1) as u32,generation, ..},Error.none; }
 fn borrow(self: TapeOwner) -> Tape? { if self.lease==0||self.lease-1>=tape_owner_slots.len { return null; } let slot: TapeOwnerState&=tape_owner_slots[self.lease-1]; if !slot.live||slot.generation!=self.generation { return null; } return slot.value; }
-fn deinit(self: TapeOwner&) { if self.lease==0 { return; } let at=self.lease-1; assert(at<tape_owner_slots.len&&tape_owner_slots[at].live&&tape_owner_slots[at].generation==self.generation); let slot: TapeOwnerState&=tape_owner_slots[at]; slot.value.deinit(); slot.live=false; tape_owner_slots.free(at); self=TapeOwner {}; }
+fn deinit(self: TapeOwner&) { if self.lease==0 { return; } let at=self.lease-1; assert(at<tape_owner_slots.len&&tape_owner_slots[at].live&&tape_owner_slots[at].generation==self.generation); let slot: TapeOwnerState&=tape_owner_slots[at]; slot.value.deinit(); slot.live=false; tape_owner_slots.free(at); self=TapeOwner {..}; }

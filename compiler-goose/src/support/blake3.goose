@@ -80,7 +80,7 @@ fn chunk_output(chunk: Chunk) -> Output {
 fn parent_output(left: u32[8], right: u32[8], key: u32[8], flags: u32) -> Output {
     var block: u32[16] = default<u32[16]>();
     for index in 8 { block[index] = left[index]; block[index + 8] = right[index]; }
-    return Output { key, block, 0, 64, flags | PARENT };
+    return Output { key, block, 0, 64, flags | PARENT , ..};
 }
 fn make_chunk(key: u32[8], counter: u64, flags: u32) -> Chunk {
     Chunk { key, counter, default<u8[64]>(), 0, 0, flags }
@@ -89,7 +89,7 @@ fn init() -> State { State { iv, make_chunk(iv, 0, 0), default<u32[8][54]>(), 0,
 fn initKeyed(key: u8[32]) -> State {
     var words: u32[8] = default<u32[8]>();
     for index in 8 { words[index] = blot_bytes::get_u32(key, index * 4); }
-    return State { words, make_chunk(words, 0, KEYED), default<u32[8][54]>(), 0, KEYED };
+    return State { words, make_chunk(words, 0, KEYED), default<u32[8][54]>(), 0, KEYED , ..};
 }
 fn update_chunk(chunk: Chunk&, bytes: const u8[:]) {
     var at: i64 = 0;
@@ -155,5 +155,5 @@ fn initDerived(context: const u8[:]) -> State {
     let key = final(context_state);
     var words: u32[8] = default<u32[8]>();
     for index in 8 { words[index] = blot_bytes::get_u32(key, index * 4); }
-    return State { words, make_chunk(words, 0, DERIVE_MATERIAL), default<u32[8][54]>(), 0, DERIVE_MATERIAL };
+    return State { words, make_chunk(words, 0, DERIVE_MATERIAL), default<u32[8][54]>(), 0, DERIVE_MATERIAL , ..};
 }

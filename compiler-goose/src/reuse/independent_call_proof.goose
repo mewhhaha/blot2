@@ -35,11 +35,11 @@ fn scalarInput<G>(g: const G&, target: BindingRef) -> blot_support::Option<Scala
     let slot = g.evaluator.slots[g.evaluator.binding_offsets[target.unit - 1] + target.binding]; var actual: u32 = 0;
     if !body.runtime && slot.state == blot_eval_core_eval::State.complete && g.evaluator.valueInfo(slot.value).kind == blot_eval_core_eval::ValueKind.scalar { actual = g.evaluator.valueEvidence(slot.value); }
     if actual > 4 { return no; } var value = blot_support::none<blot_eval_core_eval::Value>(); if actual != 0 { value = g.evaluator.valueScalar(slot.value); }
-    return blot_support::some(ScalarInput { target, actual, value });
+    return blot_support::some(ScalarInput { target, actual, value , ..});
 }
 fn scalarMatches<G>(g: const G&, read: ScalarInput) -> bool { let actual = scalarInput(g, read.target); return actual.present && blot_structural::equal(actual.value, read); }
 fn acquire<S,G>(state: S&, g: G&, read: blot_reuse_specialization_receipt::CallRead, actual: u32) -> blot_support::Option<Record>, Error {
-    let target = BindingRef { read.unit, read.binding }; if !state.gate.admits(target) { return blot_support::none<Record>(), Error.none; }
+    let target = BindingRef { read.unit, read.binding , ..}; if !state.gate.admits(target) { return blot_support::none<Record>(), Error.none; }
     for record in state.completed_worker_proofs {
         if record.target != target || record.evidence != actual || record.depth != g.evaluator.depth || !blot_structural::equal(record.options, g.evaluator.options) { continue; }
         var valid = true; for source in record.sources { if !state.gate.admits(source) { valid = false; break; } }
@@ -52,7 +52,7 @@ fn acquire<S,G>(state: S&, g: G&, read: blot_reuse_specialization_receipt::CallR
         if valid { for input in record.scalar_reads { if !state.gate.admits(input.target) || !scalarMatches(g, input) { valid = false; break; } } }
         if !valid { continue; } var cloned, error = record.clone(); if error != Error.none { return blot_support::none<Record>(), error; } cloned.evidence = actual; state.stats.independent_reused++; return blot_support::some(cloned), Error.none;
     }
-    var context = Recheck<S,G> { state, g, read, actual }; let error = blot_eval_core_eval::withSharedSession<Recheck<S,G>,probeSession<S,G>>(g.evaluator, state.gate.allocation_owner, context);
+    var context = Recheck<S,G> { state, g, read, actual , ..}; let error = blot_eval_core_eval::withSharedSession<Recheck<S,G>,probeSession<S,G>>(g.evaluator, state.gate.allocation_owner, context);
     if error != Error.none { return blot_support::none<Record>(), error; }
     if context.result.present { state.stats.independent_rechecked++; } else { state.stats.independent_declined++; } return context.result, Error.none;
 }
@@ -61,7 +61,7 @@ struct Representations { store: blot_backend_layout::Store& }
 struct Probe { evaluator: blot_eval_core_eval::Session&, representations: Representations }
 struct ProbeContext<S,G> { query: Recheck<S,G>&, session: blot_eval_core_eval::Session& }
 fn probeSession<S,G>(context: Recheck<S,G>&, session: blot_eval_core_eval::Session&) -> Error {
-    var invocation = ProbeContext<S,G> { context, session };
+    var invocation = ProbeContext<S,G> { context, session , ..};
     let error = blot_backend_layout::withStore<ProbeContext<S,G>,probeLayout<S,G>>(invocation);
     context.state.stats.independent_regions += session.counters.inference_regions;
     context.state.stats.independent_nodes += session.counters.inference_general_nodes + session.counters.inference_specialization_nodes + session.counters.inference_preparation_nodes + session.counters.inference_lowering_nodes;
@@ -75,16 +75,16 @@ fn probeLayout<S,G>(context: ProbeContext<S,G>&, store: blot_backend_layout::Sto
     assert(query.state.old.metadata.pools.present);
     let prepared, error = blot_reuse_artifact_import::initIndependentQuery(query.state.gate.allocation_owner, query.state.old.metadata.pools.value, session.units, query.state.gate);
     if error != Error.none { return error; } if !prepared.present { query.result = reject(query.state, DeclineReason.imports); return Error.none; }
-    var maps = prepared.value; var probe = Probe { session, Representations { store } };
+    var maps = prepared.value; var probe = Probe { session, Representations { store , ..} , ..};
     let expected, imported = maps.importEvidence(probe, query.read.evidence);
     if imported != Error.none || !expected.present { maps.deinit(); if imported != Error.none { return imported; } query.result = reject(query.state, DeclineReason.imports); return Error.none; }
     var tape, tape_error = blot_reuse_specialization_receipt::initPooled(); if tape_error != Error.none { maps.deinit(); return tape_error; }
-    var observation = blot_reuse_refinement_receipt::Observation {}; session.receipt_tape .= tape; session.refinement_observation .= observation;
+    var observation = blot_reuse_refinement_receipt::Observation {..}; session.receipt_tape .= tape; session.refinement_observation .= observation;
     let failure = probeProof(query, probe, expected.value, tape, observation);
     session.receipt_tape .= null; session.refinement_observation .= null; tape.deinit(); maps.deinit(); return failure;
 }
 fn probeProof<S,G>(context: Recheck<S,G>&, probe: Probe&, expected: u32, tape: blot_reuse_specialization_receipt::Tape&, observation: blot_reuse_refinement_receipt::Observation&) -> Error {
-    let state .= context.state; let g .= context.generator; let target = BindingRef { context.read.unit, context.read.binding }; let session .= probe.evaluator;
+    let state .= context.state; let g .= context.generator; let target = BindingRef { context.read.unit, context.read.binding , ..}; let session .= probe.evaluator;
     let before_values = session.storage.values.len; let before_children = session.storage.children.len;
     let proved, error = session.recheckCallProof(target, expected);
     if error == Error.out_of_memory { return error; } if error != Error.none { context.result = reject(state, DeclineReason.query); return Error.none; }
@@ -110,5 +110,5 @@ fn probeProof<S,G>(context: Recheck<S,G>&, probe: Probe&, expected: u32, tape: b
     for source in tape.sources.items { if !state.gate.admits(source) { releaseScalars(scalars); context.result = reject(state, DeclineReason.source); return Error.none; } }
     let failures = [tape.sources.failure, tape.scalar_reads.failure, tape.call_reads.failure, tape.call_publications.failure, tape.views.failure, tape.plain_facts.failure];
     for failure in failures { if failure != Error.none { releaseScalars(scalars); return failure; } }
-    context.result = blot_support::some(Record { target: target, evidence: context.actual, options: g.evaluator.options, depth: g.evaluator.depth, sources: copySources(tape.sources.items), scalar_reads: scalars }); return Error.none;
+    context.result = blot_support::some(Record { target: target, evidence: context.actual, options: g.evaluator.options, depth: g.evaluator.depth, sources: copySources(tape.sources.items), scalar_reads: scalars , ..}); return Error.none;
 }

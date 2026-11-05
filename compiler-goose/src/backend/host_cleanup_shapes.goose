@@ -33,7 +33,7 @@ recursive fn add<C>(builder: Builder<C>&, id: u32, depth: i64) -> Error {
     let charged = charge(builder); if charged != Error.none { return charged; }
     if depth >= 128 || id == 0 || id >= builder.context.layouts.nodes.len { return Error.layout_limit; }
     if builder.seen.contains(id) { return Error.none; } if builder.nodes.len == 4096 { return Error.layout_limit; } builder.seen.insert(id,true);
-    let layout = builder.context.layouts.node(id); var node = Node { id, Tag.unit }; var published = false; 
+    let layout = builder.context.layouts.node(id); var node = Node { id, Tag.unit , ..}; var published = false; 
     recursive fn cleanup_continuation_2() -> Error {
 
     match layout.tag {
@@ -49,7 +49,7 @@ recursive fn add<C>(builder: Builder<C>&, id: u32, depth: i64) -> Error {
             for index in 0..layout.b {
                 let error = charge(builder); if error != Error.none { return error; }
                 let name = builder.context.layouts.record_names.map.get(children[index * 2]); if name == null { return Error.layout_limit; }
-                fields.push(Field { name, children[index * 2 + 1] });
+                fields.push(Field { name, children[index * 2 + 1] , ..});
             }
             node.fields = copyFields(fields);
         },
@@ -82,7 +82,7 @@ fn jsonNode(node: Node,out: u8[>..<]&) {
     out.append("],\"name\":"); blot_backend_backend_timing::jsonString(out,node.name); out.push('}');
 }
 fn build<C>(context: C,roots: const u32[:],out: u8[>..<]&) -> Error {
-    var nodes: Node[>..<] = []; var seen: dictionary<u32,bool>; var builder = Builder<C> { context,nodes,seen }; 
+    var nodes: Node[>..<] = []; var seen: dictionary<u32,bool>; var builder = Builder<C> { context,nodes,seen , ..}; 
     recursive fn cleanup_continuation_1() -> Error {
 
     for root in roots { let error = add(builder,root,0); if error != Error.none { return error; } }

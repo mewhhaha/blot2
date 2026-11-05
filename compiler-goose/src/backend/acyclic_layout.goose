@@ -26,8 +26,8 @@ recursive fn within(store: blot_backend_layout::Store&, units: const blot_check_
             let nominal = source.nominal(constructor.nominal); if nominal.identity.unit != node.a || nominal.identity.decl != node.b { continue; } found = true;
             if constructor.payload == 0 { continue; } let parameters = source.types.list(nominal.parameters); let arguments = store.children(ty);
             if parameters.len != arguments.len || parameters.len > 32 { return false, blot_error::Error.none; }
-            var mappings: blot_backend_layout::Mapping[32] = [blot_backend_layout::Mapping {}; 32];
-            for parameter, index in parameters { if source.types.node(parameter).tag != blot_check_types::Tag.variable { return false, blot_error::Error.none; } mappings[index] = blot_backend_layout::Mapping { variable: parameter, layout: arguments[index] }; }
+            var mappings: blot_backend_layout::Mapping[32] = [blot_backend_layout::Mapping {..}; 32];
+            for parameter, index in parameters { if source.types.node(parameter).tag != blot_check_types::Tag.variable { return false, blot_error::Error.none; } mappings[index] = blot_backend_layout::Mapping { variable: parameter, layout: arguments[index] , ..}; }
             let payload, payload_error = store.fromTypePartial(source, constructor.payload, mappings[..parameters.len]);
             if payload_error != blot_error::Error.none { if payload_error == blot_error::Error.out_of_memory { return false, payload_error; } return false, blot_error::Error.none; }
             let valid, error = within(store, units, payload, active, depth + 1, budget); if error != blot_error::Error.none || !valid { return false, error; }

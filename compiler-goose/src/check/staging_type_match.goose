@@ -58,7 +58,7 @@ recursive fn matchDepth(left: const blot_check_core::Module&, a: blot_check_type
         },
         product => {
             if first.b != second.b { return Error.invalid_artifact; }
-            let xs = left.types.list(blot_check_types::List { first.a, first.b }); let ys = right.types.list(blot_check_types::List { second.a, second.b });
+            let xs = left.types.list(blot_check_types::List { first.a, first.b , ..}); let ys = right.types.list(blot_check_types::List { second.a, second.b , ..});
             for x, i in xs { let error = matchDepth(left, x, right, ys[i], variables, substitutions, remaining, depth + 1); if error != Error.none { return error; } }
         },
         record => {
@@ -70,7 +70,7 @@ recursive fn matchDepth(left: const blot_check_core::Module&, a: blot_check_type
             }
         },
         nominal => {
-            if !sameIdentity(left, blot_check_types::NominalIdentity { first.a, first.b }, right, blot_check_types::NominalIdentity { second.a, second.b }) { return Error.invalid_artifact; }
+            if !sameIdentity(left, blot_check_types::NominalIdentity { first.a, first.b , ..}, right, blot_check_types::NominalIdentity { second.a, second.b , ..}) { return Error.invalid_artifact; }
             let xs = left.types.nominalArguments(first); let ys = right.types.nominalArguments(second); if xs.len != ys.len { return Error.invalid_artifact; }
             for x, i in xs { let error = matchDepth(left, x, right, ys[i], variables, substitutions, remaining, depth + 1); if error != Error.none { return error; } }
         },

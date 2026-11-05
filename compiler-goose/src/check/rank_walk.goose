@@ -6,7 +6,7 @@ struct Walker<C> {
     store: blot_check_types::Store, rigid_scope: u32, free_bound: bool,
     collected: C&, remaining: i64&,
     collecting: bool = false, budgeted: bool = false, quantifier: bool = false,
-    scopes: blot_check_types::List[128] = [blot_check_types::List {}; 128],
+    scopes: blot_check_types::List[128] = [blot_check_types::List {..}; 128],
     scope_depth: i64 = 0, steps: i64 = 0,
     excluded: const blot_check_types::Id[:] = [],
 }
@@ -42,7 +42,7 @@ recursive fn visit<C>(self: Walker<C>&, root: blot_check_types::Id, depth: i64) 
         forall, existential => {
             if self.quantifier { return true, blot_error::Error.none; }
             if self.scope_depth == self.scopes.len { return false, blot_error::Error.type_limit; }
-            self.scopes[self.scope_depth] = blot_check_types::List { node.b, node.c };
+            self.scopes[self.scope_depth] = blot_check_types::List { node.b, node.c , ..};
             self.scope_depth += 1;
             let result, error = visitQuantifier(self, id, node.a, depth);
             self.scope_depth -= 1;
@@ -119,29 +119,29 @@ recursive fn row<C>(self: Walker<C>&, root: blot_check_effects::Id, depth: i64) 
     return false, blot_error::Error.none;
 }
 fn contains(store: blot_check_types::Store&, root: blot_check_types::Id, rigid_scope: u32, free_bound: bool) -> bool, blot_error::Error {
-    var backing=blot_support_pooled_buffer::Buffer<u32>{};var collected=PooledCollector{backing,rigid_runs}; var remaining: i64 = 0;
-    var walker = Walker { store, rigid_scope, free_bound, collected, remaining };
+    var backing=blot_support_pooled_buffer::Buffer<u32>{..};var collected=PooledCollector{backing,rigid_runs, ..}; var remaining: i64 = 0;
+    var walker = Walker { store, rigid_scope, free_bound, collected, remaining , ..};
     let result,error=visit(walker,root,0);backing.deinit(rigid_runs);return result,error;
 }
 fn quantified(store: blot_check_types::Store&, root: blot_check_types::Id) -> bool, blot_error::Error {
-    var backing=blot_support_pooled_buffer::Buffer<u32>{};var collected=PooledCollector{backing,rigid_runs}; var remaining: i64 = 0;
-    var walker = Walker { store, 0, false, collected, remaining, quantifier: true };
+    var backing=blot_support_pooled_buffer::Buffer<u32>{..};var collected=PooledCollector{backing,rigid_runs, ..}; var remaining: i64 = 0;
+    var walker = Walker { store, 0, false, collected, remaining, quantifier: true , ..};
     let result,error=visit(walker,root,0);backing.deinit(rigid_runs);return result,error;
 }
 fn containsRow(store: blot_check_types::Store&, root: blot_check_effects::Id, rigid_scope: u32) -> bool, blot_error::Error {
-    var backing=blot_support_pooled_buffer::Buffer<u32>{};var collected=PooledCollector{backing,rigid_runs}; var remaining: i64 = 0;
-    var walker = Walker { store, rigid_scope, false, collected, remaining };
+    var backing=blot_support_pooled_buffer::Buffer<u32>{..};var collected=PooledCollector{backing,rigid_runs, ..}; var remaining: i64 = 0;
+    var walker = Walker { store, rigid_scope, false, collected, remaining , ..};
     let result,error=row(walker,root,0);backing.deinit(rigid_runs);return result,error;
 }
 fn containsExcept(store: blot_check_types::Store&, root: blot_check_types::Id, scope: u32,
                   excluded: const blot_check_types::Id[:], remaining: i64&) -> bool, blot_error::Error {
-    var backing=blot_support_pooled_buffer::Buffer<u32>{};var collected=PooledCollector{backing,rigid_runs};
-    var walker = Walker { store, scope, false, collected, remaining, excluded: excluded, budgeted: true };
+    var backing=blot_support_pooled_buffer::Buffer<u32>{..};var collected=PooledCollector{backing,rigid_runs, ..};
+    var walker = Walker { store, scope, false, collected, remaining, excluded: excluded, budgeted: true , ..};
     let result,error=visit(walker,root,0);backing.deinit(rigid_runs);return result,error;
 }
 fn collectRigids(store: blot_check_types::Store&, root: blot_check_types::Id, scope: u32,
                  collected: C&, remaining: i64&) -> blot_error::Error {
-    var destination=NativeCollector{collected};var walker = Walker { store, scope, false, destination, remaining, collecting: true, budgeted: true };
+    var destination=NativeCollector{collected, ..};var walker = Walker { store, scope, false, destination, remaining, collecting: true, budgeted: true , ..};
     let found, error = visit(walker, root, 0);
     return error;
 }
@@ -154,4 +154,4 @@ fn push(self:NativeCollector&,id:u32)->blot_error::Error {self.items.push(id);re
 struct PooledCollector {items:blot_support_pooled_buffer::Buffer<u32>&,pool:u32[>..]&}
 fn values(self:PooledCollector&)->const u32[:] {return self.items.items;}
 fn push(self:PooledCollector&,id:u32)->blot_error::Error {return blot_support_pooled_buffer::push(self.items,id,self.pool);}
-fn collectRigids(store:blot_check_types::Store&,root:u32,scope:u32,collected:blot_support_pooled_buffer::Buffer<u32>&,pool:u32[>..]&,remaining:i64&)->blot_error::Error {var destination=PooledCollector{collected,pool};var walker=Walker{store,scope,false,destination,remaining,collecting:true,budgeted:true};let found,error=visit(walker,root,0);return error;}
+fn collectRigids(store:blot_check_types::Store&,root:u32,scope:u32,collected:blot_support_pooled_buffer::Buffer<u32>&,pool:u32[>..]&,remaining:i64&)->blot_error::Error {var destination=PooledCollector{collected,pool, ..};var walker=Walker{store,scope,false,destination,remaining,collecting:true,budgeted:true, ..};let found,error=visit(walker,root,0);return error;}

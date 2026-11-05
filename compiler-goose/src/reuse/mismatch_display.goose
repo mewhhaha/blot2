@@ -76,7 +76,7 @@ recursive fn ty(self: Display&, id: u32, depth: u8) -> bool, Error {
             let shown, error = self.ty(value.a, depth - 1); if error != Error.none || !shown { return false, error; } self.text.push(')');
         },
         blot_check_types::Tag.product => {
-            self.text.push('('); for child, index in self.store.list(blot_check_types::List { value.a, value.b }) { if index != 0 { self.text.append(", "); } let shown, error = self.ty(child, depth - 1); if error != Error.none || !shown { return false, error; } } self.text.push(')');
+            self.text.push('('); for child, index in self.store.list(blot_check_types::List { value.a, value.b , ..}) { if index != 0 { self.text.append(", "); } let shown, error = self.ty(child, depth - 1); if error != Error.none || !shown { return false, error; } } self.text.push(')');
         },
         blot_check_types::Tag.nominal => {
             let named, error = self.nominal(value.a, value.b); if error != Error.none || !named { return false, error; }
@@ -86,7 +86,7 @@ recursive fn ty(self: Display&, id: u32, depth: u8) -> bool, Error {
     return true, Error.none;
 }
 fn render(store: const blot_check_types::Store&, context: Context, actual: u32, expected: u32, output: u8[>..<]&) -> bool, Error {
-    let start = output.len; var display = Display { store, context, output }; output.append("cannot unify ");
+    let start = output.len; var display = Display { store, context, output , ..}; output.append("cannot unify ");
     let left, first = display.ty(actual, 64); if first != Error.none || !left { output.resize(start); return false, first; }
     output.append(" with "); let right, second = display.ty(expected, 64); if second != Error.none || !right { output.resize(start); return false, second; }
     return true, Error.none;

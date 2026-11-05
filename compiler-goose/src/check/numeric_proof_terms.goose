@@ -82,18 +82,18 @@ fn validate(self: View, boundary: Boundary, limits: Limits) -> blot_error::Error
     return blot_error::Error.none;
 }
 struct Owned { terms: const Term[:], owner_id: u64 }
-fn view(self: Owned) -> View { return View { self.terms, self.owner_id }; }
+fn view(self: Owned) -> View { return View { self.terms, self.owner_id , ..}; }
 fn deinit(self: Owned&) { self.terms = []; self.owner_id = 0; }
 struct Substitution { formals: const Id[:] = [], captures: const Id[:] = [], versions: const Id[:] = [] }
 struct Store {
     terms: Term[>..<]&, index: dictionary<Term, Id>&,
-    limits: Limits = Limits {}, visits: i64 = 0, account: i64? = null, owner_id: u64,
+    limits: Limits = Limits {..}, visits: i64 = 0, account: i64? = null, owner_id: u64,
 }
 fn init(terms: Term[>..<]&, index: dictionary<Term, Id>&) -> Store {
-    return Store { terms, index, owner_id: blot_native::fresh_owner_id() };
+    return Store { terms, index, owner_id: blot_native::fresh_owner_id() , ..};
 }
 fn deinit(self: Store&) { self.terms.clear(); self.index.clear(); self.owner_id = 0; }
-fn view(self: const Store&) -> View { return View { self.terms, self.owner_id }; }
+fn view(self: const Store&) -> View { return View { self.terms, self.owner_id , ..}; }
 fn charge(self: Store&, amount: i64) -> blot_error::Error {
     var available: i64 = 0;
     if self.visits < self.limits.visits { available = self.limits.visits - self.visits; }
@@ -117,7 +117,7 @@ recursive fn intern(self: Store&, term: Term) -> Id, blot_error::Error {
             if term.kind != Kind.unsigned32 || term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; }
             let child, error = get(view(self), term.a); if error != blot_error::Error.none { return 0, error; }
             if child.kind != Kind.unsigned32 { return 0, blot_error::Error.invalid_proof_operand; }
-            if child.tag == Tag.literal { return intern(self, Term { Tag.literal, a: 0xffffffff - child.a }); }
+            if child.tag == Tag.literal { return intern(self, Term { Tag.literal, a: 0xffffffff - child.a , ..}); }
             if child.tag == Tag.complement { return child.a, blot_error::Error.none; }
         },
     }
@@ -130,7 +130,7 @@ recursive fn intern(self: Store&, term: Term) -> Id, blot_error::Error {
 }
 fn copyOwned(self: const Store&, destination: Term[>..]&) -> Owned, blot_error::Error {
     let start = destination.len; destination.append(self.terms);
-    return Owned { destination[start..], blot_native::fresh_owner_id() }, blot_error::Error.none;
+    return Owned { destination[start..], blot_native::fresh_owner_id() , ..}, blot_error::Error.none;
 }
 fn importProof(self: Store&, source: View, proof: Proposition, boundary: Boundary, substitution: Substitution) -> Proposition, blot_error::Error {
     var result: Proposition[1] = [default<Proposition>(); 1];
@@ -158,7 +158,7 @@ fn importInto(self: Store&, source: View, proofs: const Proposition[:], results:
     for proof in proofs { let validity = proposition(source, proof); if validity != blot_error::Error.none { return validity; } }
     let initial = self.terms.len;
     var map: Id[>..] = []; for term in source.terms { map.push(0); }
-    var context = Context { self, source, map, substitution };
+    var context = Context { self, source, map, substitution , ..};
     let error = importResults(context, proofs, results);
     if error != blot_error::Error.none {
         while self.terms.len > initial { let removed = self.terms.pop(); assert(self.index.remove(removed)); }
@@ -175,7 +175,7 @@ recursive fn importTerm(self: Context&, id: Id) -> Id, blot_error::Error {
         literal => { let saved, error = intern(self.target, input); if error != blot_error::Error.none { return 0, error; } output = saved; },
         length, complement => {
             let child, child_error = importTerm(self, input.a); if child_error != blot_error::Error.none { return 0, child_error; }
-            let saved, error = intern(self.target, Term { input.tag, a: child }); if error != blot_error::Error.none { return 0, error; }
+            let saved, error = intern(self.target, Term { input.tag, a: child , ..}); if error != blot_error::Error.none { return 0, error; }
             output = saved;
         },
         formal, capture, version => {
@@ -195,7 +195,7 @@ fn importResults(context: Context&, proofs: const Proposition[:], results: Propo
     for proof, i in proofs {
         let left, le = importTerm(context, proof.left); if le != blot_error::Error.none { return le; }
         let right, re = importTerm(context, proof.right); if re != blot_error::Error.none { return re; }
-        results[i] = Proposition { proof.relation, left, right };
+        results[i] = Proposition { proof.relation, left, right , ..};
     }
     return blot_error::Error.none;
 }

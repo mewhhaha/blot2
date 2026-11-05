@@ -39,15 +39,15 @@ resolver_loops:blot_check_check::ResolverLoop[:]=[],
 operation_uses:blot_check_check::OperationUse[:]=[],
 statement_arms:blot_check_check::StatementArm[:]=[],
 }
-struct Selection {predicate:blot_check_types::Obligation,arguments:List=List{},implementation:bool}
+struct Selection {predicate:blot_check_types::Obligation,arguments:List=List{..},implementation:bool}
 struct Index {node:u32,table:u32,value:u32}
 struct OperationBinding {binding:u32,operation:u32}
 struct Constructor {nominal:Identity,tag:u32}
 struct Iterator {node:u32,body:u32}
 struct Owner {
- tables:Tables=Tables{},extra:u32[:]=[],origins:u32[:]=[],binding_origins:u32[:]=[],dependencies:u32[:]=[],
+ tables:Tables=Tables{..},extra:u32[:]=[],origins:u32[:]=[],binding_origins:u32[:]=[],dependencies:u32[:]=[],
  iterators:Iterator[:]=[],constructors:Constructor[:]=[],indices:Index[:]=[],operation_bindings:OperationBinding[:]=[],selections:Selection[:]=[],
- numeric_body:blot_check_numeric_proof_bodies::Owned=blot_check_numeric_proof_bodies::Owned{},proof_parameters:u32[:]=[],proof_debit:blot_support::Option<blot_check_numeric_proof_bodies::Debit>=blot_support::none<blot_check_numeric_proof_bodies::Debit>(),live:bool=false,
+ numeric_body:blot_check_numeric_proof_bodies::Owned=blot_check_numeric_proof_bodies::Owned{..},proof_parameters:u32[:]=[],proof_debit:blot_support::Option<blot_check_numeric_proof_bodies::Debit>=blot_support::none<blot_check_numeric_proof_bodies::Debit>(),live:bool=false,
 }
 reusable var owners:Owner[>..]=[];
 reusable[] var pool_blot_check_check__UsageLoan:blot_check_check::UsageLoan[>..]=[];
@@ -179,8 +179,8 @@ releaseOwned(self.numeric_body.operands);
 releaseOwned(self.numeric_body.introductions);
 releaseOwned(self.numeric_body.parameters);
 releaseOwned(self.numeric_body.uses);
-let at=owners.index_of(self);assert(at>=0);self=Owner{};owners.free(at);}
-fn clone(source:const Owner&)->Owner?,Error {assert(source.live);let at=owners.alloc_index(Owner{live:true});let result:Owner&=owners[at];
+let at=owners.index_of(self);assert(at>=0);self=Owner{..};owners.free(at);}
+fn clone(source:const Owner&)->Owner?,Error {assert(source.live);let at=owners.alloc_index(Owner{live:true, ..});let result:Owner&=owners[at];
 result.tables.usage_loans=copyOwned(source.tables.usage_loans);
 result.tables.rank_implementations=copyOwned(source.tables.rank_implementations);
 result.tables.generative_bindings=copyOwned(source.tables.generative_bindings);
@@ -535,14 +535,14 @@ struct Capture {checked:const blot_check_check::Checked&,ids:const u32[:],extra:
 fn map_node(self:Capture&,value:u32)->u32,Error {return nodePosition(self.ids,value);}
 fn map_resolver_ops(self:Capture&,value:u32)->u32,Error {return index_resolver_ops(self.checked,self.ids,value);}
 fn map_resolver_completions(self:Capture&,value:u32)->u32,Error {return index_resolver_completions(self.checked,self.ids,value);}
-fn captureList(self:Capture&,value:List,arms:bool)->List,Error {let start=self.extra.len;let items=self.checked.types.list(value);if items.len>4096-start {return List{},Error.dependency_limit;}for item in items {var mapped=item;if arms {let result,error=index_request_arms(self.checked,self.ids,item+1);if error!=Error.none {return List{},error;}mapped=result;}self.extra.push(mapped);}return List{start as u32,value.len},Error.none;}
+fn captureList(self:Capture&,value:List,arms:bool)->List,Error {let start=self.extra.len;let items=self.checked.types.list(value);if items.len>4096-start {return List{..},Error.dependency_limit;}for item in items {var mapped=item;if arms {let result,error=index_request_arms(self.checked,self.ids,item+1);if error!=Error.none {return List{..},error;}mapped=result;}self.extra.push(mapped);}return List{start as u32,value.len, ..},Error.none;}
 fn map_types(self:Capture&,value:List)->List,Error {return captureList(self,value,false);}
 fn map_bindings(self:Capture&,value:List)->List,Error {return captureList(self,value,false);}
 fn map_request_arms(self:Capture&,value:List)->List,Error {return captureList(self,value,true);}
-fn map_carries(self:Capture&,value:List)->List,Error {if value.len==0 {return List{},Error.none;}if value.start>=self.checked.loop_carries.len {return List{},Error.dependency_limit;}let node=self.checked.loop_carries[value.start].node;if value!=self.checked.loop_ranges[node] {return List{},Error.dependency_limit;}let position,error=nodePosition(self.ids,node);return List{position,value.len},error;}
+fn map_carries(self:Capture&,value:List)->List,Error {if value.len==0 {return List{..},Error.none;}if value.start>=self.checked.loop_carries.len {return List{..},Error.dependency_limit;}let node=self.checked.loop_carries[value.start].node;if value!=self.checked.loop_ranges[node] {return List{..},Error.dependency_limit;}let position,error=nodePosition(self.ids,node);return List{position,value.len, ..},error;}
 recursive fn map_proof(self:Capture&,value:Proof)->Proof,Error {match value {
- Proof.given payload=>{if payload.value.goal>=self.checked.types.quantifierGoals(payload.value.quantifier).len {return default<Proof>(),Error.dependency_limit;}let mapped,error=mapRecord(payload.value,self);return Proof.given{value:mapped},error;},
- Proof.selected payload=>{if payload.value>=self.checked.selected_proofs.len || self.selections.len>=4096 {return default<Proof>(),Error.dependency_limit;}let old=self.checked.selected_proofs[payload.value];var predicate=old.predicate;let implementation=old.kind==blot_reuse_principal_interface::SelectedProofKind.implementation;if implementation {predicate=blot_check_types::Obligation{ty:0,kind:blot_check_types::ObligationKind.contract,identity:old.contract,source:self.source};}predicate.source=self.source;if predicate.qualification_span.present || predicate.qualification_unit!=0 {return default<Proof>(),Error.dependency_limit;}if predicate.kind!=blot_check_types::ObligationKind.contract && predicate.kind!=blot_check_types::ObligationKind.effect_operation && predicate.kind!=blot_check_types::ObligationKind.callee_use && (predicate.identity.unit!=0 || predicate.identity.decl!=0) {return default<Proof>(),Error.dependency_limit;}let saved,error=mapPredicate(predicate,self);if error!=Error.none {return default<Proof>(),error;}var arguments=List{};if implementation {let mapped,error=self.map_types(old.arguments);if error!=Error.none {return default<Proof>(),error;}arguments=mapped;}let slot=self.selections.len as u32;self.selections.push(Selection{saved,arguments,implementation});return Proof.selected{value:slot},Error.none;},
+ Proof.given payload=>{if payload.value.goal>=self.checked.types.quantifierGoals(payload.value.quantifier).len {return default<Proof>(),Error.dependency_limit;}let mapped,error=mapRecord(payload.value,self);return Proof.given{value:mapped, ..},error;},
+ Proof.selected payload=>{if payload.value>=self.checked.selected_proofs.len || self.selections.len>=4096 {return default<Proof>(),Error.dependency_limit;}let old=self.checked.selected_proofs[payload.value];var predicate=old.predicate;let implementation=old.kind==blot_reuse_principal_interface::SelectedProofKind.implementation;if implementation {predicate=blot_check_types::Obligation{ty:0,kind:blot_check_types::ObligationKind.contract,identity:old.contract,source:self.source, ..};}predicate.source=self.source;if predicate.qualification_span.present || predicate.qualification_unit!=0 {return default<Proof>(),Error.dependency_limit;}if predicate.kind!=blot_check_types::ObligationKind.contract && predicate.kind!=blot_check_types::ObligationKind.effect_operation && predicate.kind!=blot_check_types::ObligationKind.callee_use && (predicate.identity.unit!=0 || predicate.identity.decl!=0) {return default<Proof>(),Error.dependency_limit;}let saved,error=mapPredicate(predicate,self);if error!=Error.none {return default<Proof>(),error;}var arguments=List{..};if implementation {let mapped,error=self.map_types(old.arguments);if error!=Error.none {return default<Proof>(),error;}arguments=mapped;}let slot=self.selections.len as u32;self.selections.push(Selection{saved,arguments,implementation, ..});return Proof.selected{value:slot, ..},Error.none;},
 }}
 fn map_binding(self:Capture&,value:u32)->u32,Error {return value,Error.none;}
 fn map_ty(self:Capture&,value:u32)->u32,Error {return value,Error.none;}
@@ -560,12 +560,12 @@ fn map_callee_identity(self:Capture&,value:Identity)->Identity,Error {return val
 fn map_nodes_pair(self:Capture&,value:u32[2])->u32[2],Error {return value,Error.none;}
 fn map_proposition(self:Capture&,value:blot_check_numeric_proof_terms::Proposition)->blot_check_numeric_proof_terms::Proposition,Error {return value,Error.none;}
 struct Visitor<M> {owner:Owner&,mapper:M&}
-fn map_types<M>(self:Visitor<M>&,value:List)->List,Error {for index in value.len {let at=value.start+index;let mapped,error=self.mapper.map_ty(self.owner.extra[at]);if error!=Error.none {return List{},error;}self.owner.extra[at]=mapped;}return value,Error.none;}
-fn map_bindings<M>(self:Visitor<M>&,value:List)->List,Error {for index in value.len {let at=value.start+index;let mapped,error=self.mapper.map_binding(self.owner.extra[at]);if error!=Error.none {return List{},error;}self.owner.extra[at]=mapped;}return value,Error.none;}
-fn map_instance<M>(self:Visitor<M>&,value:Identity)->Identity,Error {if value.unit==0 && value.decl!=0 {let mapped,error=self.mapper.map_ty(value.decl);return Identity{0,mapped},error;}return self.mapper.map_instance(value);}
+fn map_types<M>(self:Visitor<M>&,value:List)->List,Error {for index in value.len {let at=value.start+index;let mapped,error=self.mapper.map_ty(self.owner.extra[at]);if error!=Error.none {return List{..},error;}self.owner.extra[at]=mapped;}return value,Error.none;}
+fn map_bindings<M>(self:Visitor<M>&,value:List)->List,Error {for index in value.len {let at=value.start+index;let mapped,error=self.mapper.map_binding(self.owner.extra[at]);if error!=Error.none {return List{..},error;}self.owner.extra[at]=mapped;}return value,Error.none;}
+fn map_instance<M>(self:Visitor<M>&,value:Identity)->Identity,Error {if value.unit==0 && value.decl!=0 {let mapped,error=self.mapper.map_ty(value.decl);return Identity{0,mapped, ..},error;}return self.mapper.map_instance(value);}
 fn map_proposition<M>(self:Visitor<M>&,value:blot_check_numeric_proof_terms::Proposition)->blot_check_numeric_proof_terms::Proposition,Error {return value,Error.none;}
 fn map_nodes_pair<M>(self:Visitor<M>&,value:u32[2])->u32[2],Error {var result=value;for item,index in value {let mapped,error=self.mapper.map_node(item);if error!=Error.none {return result,error;}result[index]=mapped;}return result,Error.none;}
-recursive fn map_proof<M>(self:Visitor<M>&,value:Proof)->Proof,Error {match value {Proof.given payload=>{let mapped,error=mapRecord(payload.value,self);return Proof.given{value:mapped},error;},Proof.selected=>{return self.mapper.map_proof(value);}}}
+recursive fn map_proof<M>(self:Visitor<M>&,value:Proof)->Proof,Error {match value {Proof.given payload=>{let mapped,error=mapRecord(payload.value,self);return Proof.given{value:mapped, ..},error;},Proof.selected=>{return self.mapper.map_proof(value);}}}
 fn map_binding<M>(self:Visitor<M>&,value:u32)->u32,Error {return self.mapper.map_binding(value);}
 fn map_ty<M>(self:Visitor<M>&,value:u32)->u32,Error {return self.mapper.map_ty(value);}
 fn map_row<M>(self:Visitor<M>&,value:u32)->u32,Error {return self.mapper.map_row(value);}
@@ -582,7 +582,7 @@ fn map_request_arms<M>(self:Visitor<M>&,value:List)->List,Error {return self.map
 fn map_resolver_ops<M>(self:Visitor<M>&,value:u32)->u32,Error {return self.mapper.map_resolver_ops(value);}
 fn map_resolver_completions<M>(self:Visitor<M>&,value:u32)->u32,Error {return self.mapper.map_resolver_completions(value);}
 fn map_carries<M>(self:Visitor<M>&,value:List)->List,Error {return self.mapper.map_carries(value);}
-fn transform<M>(self:Owner&,mapper:M&)->Error {var visitor=Visitor<M>{self,mapper};
+fn transform<M>(self:Owner&,mapper:M&)->Error {var visitor=Visitor<M>{self,mapper, ..};
 for entry,index in self.tables.usage_loans {let mapped,error=mapRecord(entry,visitor);if error!=Error.none {return error;}self.tables.usage_loans[index]=mapped;}
 for entry,index in self.tables.rank_implementations {let mapped,error=mapRecord(entry,visitor);if error!=Error.none {return error;}self.tables.rank_implementations[index]=mapped;}
 for entry,index in self.tables.generative_bindings {let mapped,error=mapRecord(entry,visitor);if error!=Error.none {return error;}self.tables.generative_bindings[index]=mapped;}
@@ -639,10 +639,10 @@ for id in ids {if id<checked.iterator_bodies.len && checked.iterator_bodies[id]!
  for contract in checked.proof_contracts {if contract.binding==global {count+=1;}}
  for debit in checked.proof_bodies.debits {if debit.binding==global {count+=1;}}
  if count==0 {return null,Error.none;}if count>4096 {return null,Error.dependency_limit;}
- let at=owners.alloc_index(Owner{live:true});let owner:Owner&=owners[at];let error=captureInto(owner,checked,ids,global);if error!=Error.none {owner.deinit();return null,error;}return owner,Error.none;
+ let at=owners.alloc_index(Owner{live:true, ..});let owner:Owner&=owners[at];let error=captureInto(owner,checked,ids,global);if error!=Error.none {owner.deinit();return null,error;}return owner,Error.none;
 }
 fn captureInto(owner:Owner&,checked:const blot_check_check::Checked&,ids:const u32[:],global:u32)->Error {
- var extra:u32[>..<]=[];var selections:Selection[>..<]=[];var mapper=Capture{checked,ids,extra,selections};
+ var extra:u32[>..<]=[];var selections:Selection[>..<]=[];var mapper=Capture{checked,ids,extra,selections, ..};
 {var entries:blot_check_check::UsageLoan[>..<]=[];for entry in checked.usage_loans {if !contains(ids,source(entry)) {continue;}mapper.source=source(entry);let mapped,error=mapRecord(entry,mapper);if error!=Error.none {return error;}entries.push(mapped);}owner.tables.usage_loans=copyOwned(entries[:]);}
 {var entries:blot_check_check::RankImplementation[>..<]=[];for entry in checked.rank_implementations {if !contains(ids,source(entry)) {continue;}mapper.source=source(entry);let mapped,error=mapRecord(entry,mapper);if error!=Error.none {return error;}entries.push(mapped);}owner.tables.rank_implementations=copyOwned(entries[:]);}
 {var entries:blot_check_generative_schemes::Binder[>..<]=[];for entry in checked.generative_bindings {if !contains(ids,source(entry)) {continue;}mapper.source=source(entry);let mapped,error=mapRecord(entry,mapper);if error!=Error.none {return error;}entries.push(mapped);}owner.tables.generative_bindings=copyOwned(entries[:]);}
@@ -663,16 +663,16 @@ fn captureInto(owner:Owner&,checked:const blot_check_check::Checked&,ids:const u
 {var entries:blot_check_check::ResolverLoop[>..<]=[];for entry in checked.resolver_loops {if !contains(ids,source(entry)) {continue;}mapper.source=source(entry);let mapped,error=mapRecord(entry,mapper);if error!=Error.none {return error;}entries.push(mapped);}owner.tables.resolver_loops=copyOwned(entries[:]);}
 {var entries:blot_check_check::OperationUse[>..<]=[];for entry in checked.operation_uses {if !contains(ids,source(entry)) {continue;}mapper.source=source(entry);let mapped,error=mapRecord(entry,mapper);if error!=Error.none {return error;}entries.push(mapped);}owner.tables.operation_uses=copyOwned(entries[:]);}
 {var entries:blot_check_check::StatementArm[>..<]=[];for entry in checked.statement_arms {if !contains(ids,source(entry)) {continue;}mapper.source=source(entry);let mapped,error=mapRecord(entry,mapper);if error!=Error.none {return error;}entries.push(mapped);}owner.tables.statement_arms=copyOwned(entries[:]);}
-var iterators:Iterator[>..<]=[];for id in ids {if id>=checked.iterator_bodies.len || checked.iterator_bodies[id]==0 {continue;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}let body,error=nodePosition(ids,checked.iterator_bodies[id]);if error!=Error.none {return error;}iterators.push(Iterator{node,body});}owner.iterators=copyOwned(iterators[:]);
+var iterators:Iterator[>..<]=[];for id in ids {if id>=checked.iterator_bodies.len || checked.iterator_bodies[id]==0 {continue;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}let body,error=nodePosition(ids,checked.iterator_bodies[id]);if error!=Error.none {return error;}iterators.push(Iterator{node,body, ..});}owner.iterators=copyOwned(iterators[:]);
  var indices:Index[>..<]=[];
-for id in ids {if id>=checked.effect_scope_ids.len || checked.effect_scope_ids[id]==0 {continue;}let target,error=index_effect_scopes(checked,ids,checked.effect_scope_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,0,target});}
-for id in ids {if id>=checked.effect_runner_ids.len || checked.effect_runner_ids[id]==0 {continue;}let target,error=index_effect_runners(checked,ids,checked.effect_runner_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,1,target});}
-for id in ids {if id>=checked.provider_block_ids.len || checked.provider_block_ids[id]==0 {continue;}let target,error=index_provider_blocks(checked,ids,checked.provider_block_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,2,target});}
-for id in ids {if id>=checked.resolver_block_ids.len || checked.resolver_block_ids[id]==0 {continue;}let target,error=index_resolver_blocks(checked,ids,checked.resolver_block_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,3,target});}
-for id in ids {if id>=checked.resolver_op_ids.len || checked.resolver_op_ids[id]==0 {continue;}let target,error=index_resolver_ops(checked,ids,checked.resolver_op_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,4,target});}
-for id in ids {if id>=checked.resolver_join_ids.len || checked.resolver_join_ids[id]==0 {continue;}let target,error=index_resolver_joins(checked,ids,checked.resolver_join_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,5,target});}
-for id in ids {if id>=checked.resolver_loop_ids.len || checked.resolver_loop_ids[id]==0 {continue;}let target,error=index_resolver_loops(checked,ids,checked.resolver_loop_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,6,target});}
-for id in ids {if id>=checked.operation_refs.len || checked.operation_refs[id]==0 {continue;}let target,error=index_operation_uses(checked,ids,checked.operation_refs[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,7,target});}
+for id in ids {if id>=checked.effect_scope_ids.len || checked.effect_scope_ids[id]==0 {continue;}let target,error=index_effect_scopes(checked,ids,checked.effect_scope_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,0,target, ..});}
+for id in ids {if id>=checked.effect_runner_ids.len || checked.effect_runner_ids[id]==0 {continue;}let target,error=index_effect_runners(checked,ids,checked.effect_runner_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,1,target, ..});}
+for id in ids {if id>=checked.provider_block_ids.len || checked.provider_block_ids[id]==0 {continue;}let target,error=index_provider_blocks(checked,ids,checked.provider_block_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,2,target, ..});}
+for id in ids {if id>=checked.resolver_block_ids.len || checked.resolver_block_ids[id]==0 {continue;}let target,error=index_resolver_blocks(checked,ids,checked.resolver_block_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,3,target, ..});}
+for id in ids {if id>=checked.resolver_op_ids.len || checked.resolver_op_ids[id]==0 {continue;}let target,error=index_resolver_ops(checked,ids,checked.resolver_op_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,4,target, ..});}
+for id in ids {if id>=checked.resolver_join_ids.len || checked.resolver_join_ids[id]==0 {continue;}let target,error=index_resolver_joins(checked,ids,checked.resolver_join_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,5,target, ..});}
+for id in ids {if id>=checked.resolver_loop_ids.len || checked.resolver_loop_ids[id]==0 {continue;}let target,error=index_resolver_loops(checked,ids,checked.resolver_loop_ids[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,6,target, ..});}
+for id in ids {if id>=checked.operation_refs.len || checked.operation_refs[id]==0 {continue;}let target,error=index_operation_uses(checked,ids,checked.operation_refs[id]);if error!=Error.none {return error;}let node,error=nodePosition(ids,id);if error!=Error.none {return error;}indices.push(Index{node,7,target, ..});}
 let numeric,error=captureNumeric(checked,ids,global);if error!=Error.none {return error;}owner.numeric_body=numeric;
  for debit in checked.proof_bodies.debits {if debit.binding!=global {continue;}if owner.proof_debit.present {return Error.dependency_limit;}var saved=debit;saved.binding=0;owner.proof_debit=blot_support::some(saved);}
  if (owner.numeric_body.operands.len!=0 || owner.numeric_body.parameters.len!=0) && !owner.proof_debit.present {return Error.dependency_limit;}
@@ -691,7 +691,7 @@ reusable[] var word_slots:dictionary_slot<u32,u32>[>..]=[];
 reusable[] var term_slots:dictionary_slot<Term,u32>[>..]=[];
 struct NumericCapture {
  checked:const blot_check_check::Checked&,ids:const u32[:],global:u32,
- mapped:WordMap=WordMap{},expressions:WordMap=WordMap{},interned:TermMap=TermMap{},
+ mapped:WordMap=WordMap{..},expressions:WordMap=WordMap{..},interned:TermMap=TermMap{..},
  terms:blot_support_pooled_buffer::Buffer<Term>=blot_support_pooled_buffer::Buffer<Term>{},
  introductions:blot_support_pooled_buffer::Buffer<NumericIntroduction>=blot_support_pooled_buffer::Buffer<NumericIntroduction>{},
  parameters:blot_support_pooled_buffer::Buffer<NumericParameter>=blot_support_pooled_buffer::Buffer<NumericParameter>{},
@@ -714,7 +714,7 @@ recursive fn intern(self:NumericCapture&,term:Term)->u32,Error {
  blot_check_numeric_proof_terms::Tag.length=>{if term.kind!=blot_check_numeric_proof_terms::Kind.unsigned32 || term.b!=0 || term.a==0 || term.a>self.terms.items.len {return 0,Error.invalid_proof_operand;}if self.terms.items[term.a-1].kind==blot_check_numeric_proof_terms::Kind.unsigned32 {return 0,Error.invalid_proof_operand;}},
  blot_check_numeric_proof_terms::Tag.complement=>{
   if term.kind!=blot_check_numeric_proof_terms::Kind.unsigned32 || term.b!=0 || term.a==0 || term.a>self.terms.items.len {return 0,Error.invalid_proof_operand;}let child=self.terms.items[term.a-1];if child.kind!=blot_check_numeric_proof_terms::Kind.unsigned32 {return 0,Error.invalid_proof_operand;}
-  if child.tag==blot_check_numeric_proof_terms::Tag.literal {return self.intern(Term{tag:blot_check_numeric_proof_terms::Tag.literal,a:0xffffffff-child.a});}if child.tag==blot_check_numeric_proof_terms::Tag.complement {return child.a,Error.none;}
+  if child.tag==blot_check_numeric_proof_terms::Tag.literal {return self.intern(Term{tag:blot_check_numeric_proof_terms::Tag.literal,a:0xffffffff-child.a, ..});}if child.tag==blot_check_numeric_proof_terms::Tag.complement {return child.a,Error.none;}
  },
  }
  let saved .= blot_support_pooled_map::get(self.interned,term);if saved {return saved,Error.none;}
@@ -741,36 +741,36 @@ recursive fn term(self:NumericCapture&,id:u32,depth:i64)->u32,Error {
  }
  let mapped,error=self.intern(value);if error!=Error.none {return 0,error;}blot_support_pooled_map::insert(self.mapped,id,mapped,word_slots);return mapped,Error.none;
 }
-fn proposition(self:NumericCapture&,value:Proposition)->Proposition,Error {let left,error=self.term(value.left,0);if error!=Error.none {return default<Proposition>(),error;}let right,error=self.term(value.right,0);if error!=Error.none {return default<Proposition>(),error;}return Proposition{value.relation,left,right},Error.none;}
-fn validate(self:NumericCapture&,value:Proposition)->Error {return blot_check_numeric_proof_terms::proposition(blot_check_numeric_proof_terms::View{terms:self.terms.items},value);}
+fn proposition(self:NumericCapture&,value:Proposition)->Proposition,Error {let left,error=self.term(value.left,0);if error!=Error.none {return default<Proposition>(),error;}let right,error=self.term(value.right,0);if error!=Error.none {return default<Proposition>(),error;}return Proposition{value.relation,left,right, ..},Error.none;}
+fn validate(self:NumericCapture&,value:Proposition)->Error {return blot_check_numeric_proof_terms::proposition(blot_check_numeric_proof_terms::View{terms:self.terms.items, ..},value);}
 fn captureNumeric(checked:const blot_check_check::Checked&,ids:const u32[:],global:u32)->NumericOwned,Error {
- var work=NumericCapture{checked,ids,global};let result,error=numericInto(work);work.deinit();return result,error;
+ var work=NumericCapture{checked,ids,global, ..};let result,error=numericInto(work);work.deinit();return result,error;
 }
 fn numericInto(self:NumericCapture&)->NumericOwned,Error {
  for entry in self.checked.proof_bodies.introductions {
   if !contains(self.ids,entry.source) {continue;}var mapped=entry;
-  let proposition,error=self.proposition(entry.proposition);if error!=Error.none {return NumericOwned{},error;}mapped.proposition=proposition;
-  let source,error=nodePosition(self.ids,entry.source);if error!=Error.none {return NumericOwned{},error;}mapped.source=source;
-  let owner,error=nodePosition(self.ids,entry.owner);if error!=Error.none {return NumericOwned{},error;}mapped.owner=owner;
-  for node,index in entry.arguments {let position,error=nodePosition(self.ids,node);if error!=Error.none {return NumericOwned{},error;}mapped.arguments[index]=position;}
-  let error=self.charge();if error!=Error.none {return NumericOwned{},error;}let error=self.validate(mapped.proposition);if error!=Error.none {return NumericOwned{},error;}
-  if self.introductions.items.len>=4096 {return NumericOwned{},Error.proof_analysis_limit;}
-  let slot .= blot_support_pooled_map::get(self.expressions,mapped.source);if slot {if !blot_structural::equal(self.introductions.items[slot],mapped) {return NumericOwned{},Error.invalid_proof_operand;}continue;}
-  blot_support_pooled_map::insert(self.expressions,mapped.source,self.introductions.items.len as u32,word_slots);let error=blot_support_pooled_buffer::push(self.introductions,mapped,pool_blot_check_numeric_proof_bodies__Introduction);if error!=Error.none {return NumericOwned{},error;}
+  let proposition,error=self.proposition(entry.proposition);if error!=Error.none {return NumericOwned{..},error;}mapped.proposition=proposition;
+  let source,error=nodePosition(self.ids,entry.source);if error!=Error.none {return NumericOwned{..},error;}mapped.source=source;
+  let owner,error=nodePosition(self.ids,entry.owner);if error!=Error.none {return NumericOwned{..},error;}mapped.owner=owner;
+  for node,index in entry.arguments {let position,error=nodePosition(self.ids,node);if error!=Error.none {return NumericOwned{..},error;}mapped.arguments[index]=position;}
+  let error=self.charge();if error!=Error.none {return NumericOwned{..},error;}let error=self.validate(mapped.proposition);if error!=Error.none {return NumericOwned{..},error;}
+  if self.introductions.items.len>=4096 {return NumericOwned{..},Error.proof_analysis_limit;}
+  let slot .= blot_support_pooled_map::get(self.expressions,mapped.source);if slot {if !blot_structural::equal(self.introductions.items[slot],mapped) {return NumericOwned{..},Error.invalid_proof_operand;}continue;}
+  blot_support_pooled_map::insert(self.expressions,mapped.source,self.introductions.items.len as u32,word_slots);let error=blot_support_pooled_buffer::push(self.introductions,mapped,pool_blot_check_numeric_proof_bodies__Introduction);if error!=Error.none {return NumericOwned{..},error;}
  }
  for entry in self.checked.proof_bodies.parameters {
-  if entry.contract!=self.global {continue;}var mapped=entry;mapped.contract=0;let proposition,error=self.proposition(entry.proposition);if error!=Error.none {return NumericOwned{},error;}mapped.proposition=proposition;
-  let error=self.charge();if error!=Error.none {return NumericOwned{},error;}let error=self.validate(mapped.proposition);if error!=Error.none {return NumericOwned{},error;}if self.parameters.items.len>=4096 {return NumericOwned{},Error.proof_analysis_limit;}
-  let error=blot_support_pooled_buffer::push(self.parameters,mapped,pool_blot_check_numeric_proof_bodies__Parameter);if error!=Error.none {return NumericOwned{},error;}
+  if entry.contract!=self.global {continue;}var mapped=entry;mapped.contract=0;let proposition,error=self.proposition(entry.proposition);if error!=Error.none {return NumericOwned{..},error;}mapped.proposition=proposition;
+  let error=self.charge();if error!=Error.none {return NumericOwned{..},error;}let error=self.validate(mapped.proposition);if error!=Error.none {return NumericOwned{..},error;}if self.parameters.items.len>=4096 {return NumericOwned{..},Error.proof_analysis_limit;}
+  let error=blot_support_pooled_buffer::push(self.parameters,mapped,pool_blot_check_numeric_proof_bodies__Parameter);if error!=Error.none {return NumericOwned{..},error;}
  }
  for entry in self.checked.proof_bodies.uses {
   if !contains(self.ids,entry.source) {continue;}var mapped=entry;
-  let source,error=nodePosition(self.ids,entry.source);if error!=Error.none {return NumericOwned{},error;}mapped.source=source;let witness,error=nodePosition(self.ids,entry.witness);if error!=Error.none {return NumericOwned{},error;}mapped.witness=witness;
-  let proposition,error=self.proposition(entry.proposition);if error!=Error.none {return NumericOwned{},error;}mapped.proposition=proposition;
-  let error=self.charge();if error!=Error.none {return NumericOwned{},error;}let error=self.validate(mapped.proposition);if error!=Error.none {return NumericOwned{},error;}if self.uses.items.len>=4096 {return NumericOwned{},Error.proof_analysis_limit;}
-  let error=blot_support_pooled_buffer::push(self.uses,mapped,pool_blot_check_numeric_proof_bodies__Use);if error!=Error.none {return NumericOwned{},error;}
+  let source,error=nodePosition(self.ids,entry.source);if error!=Error.none {return NumericOwned{..},error;}mapped.source=source;let witness,error=nodePosition(self.ids,entry.witness);if error!=Error.none {return NumericOwned{..},error;}mapped.witness=witness;
+  let proposition,error=self.proposition(entry.proposition);if error!=Error.none {return NumericOwned{..},error;}mapped.proposition=proposition;
+  let error=self.charge();if error!=Error.none {return NumericOwned{..},error;}let error=self.validate(mapped.proposition);if error!=Error.none {return NumericOwned{..},error;}if self.uses.items.len>=4096 {return NumericOwned{..},Error.proof_analysis_limit;}
+  let error=blot_support_pooled_buffer::push(self.uses,mapped,pool_blot_check_numeric_proof_bodies__Use);if error!=Error.none {return NumericOwned{..},error;}
  }
- for debit in self.checked.proof_bodies.debits {if debit.binding!=self.global {continue;}if debit.output.terms>self.checked.proof_bodies.operands.len || debit.frontier.terms>debit.output.terms {return NumericOwned{},Error.dependency_limit;}for index in debit.output.terms-debit.frontier.terms {let ignored,error=self.term(debit.frontier.terms+index+1,0);if error==Error.out_of_memory {return NumericOwned{},error;}}}
- let operands=copyOwned(self.terms.items);for operand,index in operands {if operand.tag==blot_check_numeric_proof_terms::Tag.version && operand.b==2 {let position,error=nodePosition(self.ids,operand.a);if error!=Error.none {releaseOwned(operands);return NumericOwned{},error;}operands[index].a=position;}}
- return NumericOwned{operands:operands,introductions:copyOwned(self.introductions.items),parameters:copyOwned(self.parameters.items),uses:copyOwned(self.uses.items)},Error.none;
+ for debit in self.checked.proof_bodies.debits {if debit.binding!=self.global {continue;}if debit.output.terms>self.checked.proof_bodies.operands.len || debit.frontier.terms>debit.output.terms {return NumericOwned{..},Error.dependency_limit;}for index in debit.output.terms-debit.frontier.terms {let ignored,error=self.term(debit.frontier.terms+index+1,0);if error==Error.out_of_memory {return NumericOwned{..},error;}}}
+ let operands=copyOwned(self.terms.items);for operand,index in operands {if operand.tag==blot_check_numeric_proof_terms::Tag.version && operand.b==2 {let position,error=nodePosition(self.ids,operand.a);if error!=Error.none {releaseOwned(operands);return NumericOwned{..},error;}operands[index].a=position;}}
+ return NumericOwned{operands:operands,introductions:copyOwned(self.introductions.items),parameters:copyOwned(self.parameters.items),uses:copyOwned(self.uses.items), ..},Error.none;
 }

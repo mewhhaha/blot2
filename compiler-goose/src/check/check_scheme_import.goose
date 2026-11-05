@@ -17,18 +17,18 @@ struct Copier {
     fresh_variables: bool = false, fresh_rows: bool = false, source: blot_check_frozen_types::Source, destination: blot_check_types::Store,
     associated: bool = false, mapping: WordMap&, row_variables: WordMap&, rows: WordMap&, labels: WordMap&,
 }
-fn init(source: blot_check_frozen_types::Source, destination: blot_check_types::Store&, tables: Tables) -> Copier { return Copier { private_scopes: tables.private_scopes, source, destination, mapping: tables.mapping, row_variables: tables.row_variables, rows: tables.rows, labels: tables.labels }; }
+fn init(source: blot_check_frozen_types::Source, destination: blot_check_types::Store&, tables: Tables) -> Copier { return Copier { private_scopes: tables.private_scopes, source, destination, mapping: tables.mapping, row_variables: tables.row_variables, rows: tables.rows, labels: tables.labels , ..}; }
 fn deinit(self: Copier&) { self.private_scopes.deinit(); self.mapping.deinit(); self.row_variables.deinit(); self.rows.deinit(); self.labels.deinit(); }
 fn copyPhysical(self: Copier&, identity: Identity) -> Identity, Error {
-    if self.private_namespace == 0 || identity.unit != self.private_namespace || identity.decl == 0 || identity.decl > self.private_nodes.len { return Identity {}, Error.type_limit; }
-    return Identity { self.private_unit, self.private_nodes[identity.decl - 1] }, Error.none;
+    if self.private_namespace == 0 || identity.unit != self.private_namespace || identity.decl == 0 || identity.decl > self.private_nodes.len { return Identity {..}, Error.type_limit; }
+    return Identity { self.private_unit, self.private_nodes[identity.decl - 1] , ..}, Error.none;
 }
 fn copyVersion(self: Copier&, node: blot_check_types::Node) -> Id, Error {
-    if self.private_namespace == 0 { return self.destination.instanceVersion(Identity { node.a, node.b }, node.c); }
+    if self.private_namespace == 0 { return self.destination.instanceVersion(Identity { node.a, node.b , ..}, node.c); }
     if (node.a & 0x7fffffff) != self.private_namespace || node.b == 0 { return 0, Error.type_limit; } var declaration: u32 = 0;
     if node.a & 0x80000000 != 0 { if node.b > self.private_bindings.len { return 0, Error.type_limit; } declaration = self.private_bindings[node.b - 1]; }
     else { if node.b > self.private_nodes.len { return 0, Error.type_limit; } { let optional_binding_60 .= self.private_tree; if optional_binding_60 { let tree .= optional_binding_60; let end = tree.span(self.private_nodes[node.b - 1]).end; if end == 0xffffffff { return 0, Error.type_limit; } declaration = end + 1;  } else { return 0, Error.type_limit; } } }
-    return self.destination.instanceVersion(Identity { self.private_unit, declaration }, node.c);
+    return self.destination.instanceVersion(Identity { self.private_unit, declaration , ..}, node.c);
 }
 fn copyScope(self: Copier&, source: u32) -> u32, Error {
     if self.private_namespace == 0 || source == 0 { return 0, Error.type_limit; } { let optional_binding_59 .= self.private_scopes.get(source); if optional_binding_59 { let known .= optional_binding_59; return known, Error.none;  } }
@@ -40,14 +40,14 @@ fn rowVariable(self: Copier&, source: u32) -> blot_check_effects::Id, Error {
 fn variableOf(self: Copier&, row: blot_check_effects::Id) -> u32, Error { match self.destination.effects.node(row).tail { blot_check_effects::Tail.variable match_payload_26 => { let value = match_payload_26.value;  return value, Error.none; }, _ => { return 0, Error.type_limit; }, } }
 fn relocatedRows(self: Copier&, source: const u32[:]) -> List, Error {
     var rows: u32[>..] = []; for old in source { let formal = blot_check_types::rowKeyFormal(old);
-        if formal.present { let copied, error = copy(self, formal.value, 0); if error != Error.none { return List {}, error; } let key, error = blot_check_types::formalRowKey(copied); if error != Error.none { return List {}, error; } rows += key; continue; }
-        let fresh, error = rowVariable(self, old); if error != Error.none { return List {}, error; } let variable, error = variableOf(self, fresh); if error != Error.none { return List {}, error; } rows += variable;
+        if formal.present { let copied, error = copy(self, formal.value, 0); if error != Error.none { return List {..}, error; } let key, error = blot_check_types::formalRowKey(copied); if error != Error.none { return List {..}, error; } rows += key; continue; }
+        let fresh, error = rowVariable(self, old); if error != Error.none { return List {..}, error; } let variable, error = variableOf(self, fresh); if error != Error.none { return List {..}, error; } rows += variable;
     } return self.destination.saveList(rows);
 }
 fn quantifiedRows(self: Copier&, values: List) -> List, Error {
-    var variables: u32[>..] = []; for index in self.source.list(values) { let fresh, error = self.destination.freshEffects(); if error != Error.none { return List {}, error; } self.row_variables.insert(index, fresh); let variable, error = variableOf(self, fresh); if error != Error.none { return List {}, error; } variables += variable; } return self.destination.saveList(variables);
+    var variables: u32[>..] = []; for index in self.source.list(values) { let fresh, error = self.destination.freshEffects(); if error != Error.none { return List {..}, error; } self.row_variables.insert(index, fresh); let variable, error = variableOf(self, fresh); if error != Error.none { return List {..}, error; } variables += variable; } return self.destination.saveList(variables);
 }
-fn copyGenerative(self: Copier&, source: List) -> List, Error { if source.len > 32 || source.len % 2 != 0 { return List {}, Error.type_limit; } var roots: Id[>..] = []; for root in self.source.list(source) { let id, error = copy(self, root, 0); if error != Error.none { return List {}, error; } roots += id; } return self.destination.saveList(roots); }
+fn copyGenerative(self: Copier&, source: List) -> List, Error { if source.len > 32 || source.len % 2 != 0 { return List {..}, Error.type_limit; } var roots: Id[>..] = []; for root in self.source.list(source) { let id, error = copy(self, root, 0); if error != Error.none { return List {..}, error; } roots += id; } return self.destination.saveList(roots); }
 recursive fn copyLabel(self: Copier&, label: blot_check_effects::Label, depth: i64) -> blot_check_effects::Label, Error {
     if depth >= 1024 || label == 0 || label >= self.source.operationCount() { return 0, Error.type_limit; } { let optional_binding_57 .= self.labels.get(label); if optional_binding_57 { let known .= optional_binding_57; return known, Error.none;  } }
     if self.associated { let error = self.destination.chargeProjection(); if error != Error.none { return 0, error; } }
@@ -65,8 +65,8 @@ recursive fn copyRow(self: Copier&, source_row: blot_check_effects::Id, depth: i
     var tail = blot_check_effects::Tail.closed;
     match row.tail {
         blot_check_effects::Tail.closed => {},
-        blot_check_effects::Tail.parameter match_payload_23 => { let value = match_payload_23.value;  tail = blot_check_effects::Tail.parameter { value }; },
-        blot_check_effects::Tail.formal match_payload_24 => { let value = match_payload_24.value;  let copied, error = copy(self, value, depth + 1); if error != Error.none { return 0, error; } tail = blot_check_effects::Tail.formal { copied }; },
+        blot_check_effects::Tail.parameter match_payload_23 => { let value = match_payload_23.value;  tail = blot_check_effects::Tail.parameter { value , ..}; },
+        blot_check_effects::Tail.formal match_payload_24 => { let value = match_payload_24.value;  let copied, error = copy(self, value, depth + 1); if error != Error.none { return 0, error; } tail = blot_check_effects::Tail.formal { copied , ..}; },
         blot_check_effects::Tail.variable match_payload_25 => { let value = match_payload_25.value; 
             var mapped = blot_support::none<u32>(); { let optional_binding_53 .= self.row_variables.get(value); if optional_binding_53 { let known .= optional_binding_53; mapped = blot_support::some(known);  } }
             if !mapped.present && self.fresh_rows { let fresh, error = self.destination.freshEffects(); if error != Error.none { return 0, error; } self.row_variables.insert(value, fresh); mapped = blot_support::some(fresh); }
@@ -80,7 +80,7 @@ recursive fn copyRow(self: Copier&, source_row: blot_check_effects::Id, depth: i
     let result, error = self.destination.effects.row(labels, tail); if error != Error.none { return 0, blot_check_types::effectError(error); } self.rows.insert(source_row, result); return result, Error.none;
 }
 fn quantifier(self: Copier&, node: blot_check_types::Node, depth: i64, id: Id) -> Id, Error {
-    var binders: Id[>..] = []; for original in self.source.list(List { node.b, node.c }) { let leaf = self.source.node(original); if leaf.tag != Tag.bound { return 0, Error.type_limit; }
+    var binders: Id[>..] = []; for original in self.source.list(List { node.b, node.c , ..}) { let leaf = self.source.node(original); if leaf.tag != Tag.bound { return 0, Error.type_limit; }
         var binder: Id = 0; { let optional_binding_52 .= self.mapping.get(original); if optional_binding_52 { let known .= optional_binding_52; binder = known;  } else { let fresh, error = self.destination.boundType(leaf.a, leaf.b); if error != Error.none { return 0, error; } binder = fresh; } } self.mapping.insert(original, binder); binders += binder;
     }
     let body, error = copy(self, node.a, depth + 1); if error != Error.none { return 0, error; } var goals: blot_check_types::Obligation[>..] = []; goals += self.source.quantifierGoals(id);
@@ -95,7 +95,7 @@ fn quantifier(self: Copier&, node: blot_check_types::Node, depth: i64, id: Id) -
 }
 fn nominal(self: Copier&, node: blot_check_types::Node, depth: i64) -> Id, Error {
     var args: Id[>..] = []; for arg in self.source.nominalArguments(node) { let copied, error = copy(self, arg, depth + 1); if error != Error.none { return 0, error; } args += copied; }
-    var identity = Identity { node.a, node.b }; let arity = blot_check_types::compilerNominalArity(identity);
+    var identity = Identity { node.a, node.b , ..}; let arity = blot_check_types::compilerNominalArity(identity);
     if !arity.present { { let optional_binding_47 .= self.nominal_mapping; if optional_binding_47 { let mapping .= optional_binding_47; { let optional_binding_46 .= mapping.get(identity); if optional_binding_46 { let relocated .= optional_binding_46; identity = relocated;  }
         else { { let optional_binding_45 .= self.operation_mapping; if optional_binding_45 { let operations .= optional_binding_45; { let optional_binding_44 .= operations.get(identity); if optional_binding_44 { let relocated .= optional_binding_44; identity = relocated;  } else { return 0, Error.type_limit; } }  } else { return 0, Error.type_limit; } } } }
      } } }
@@ -116,13 +116,13 @@ fn copyDepth(self: Copier&, source_id: Id, depth: i64) -> Id, Error {
         Tag.forall, Tag.existential => { let value, error = quantifier(self, node, depth, id); result = value; failure = error; },
         Tag.instance_version => { let value, error = copyVersion(self, node); result = value; failure = error; },
         Tag.instance_selection => { var choices: Id[>..] = []; let original = self.source.nominalArguments(node); if original.len != 2 && original.len != 3 { return 0, Error.type_limit; }
-            for choice in original { let value, error = copy(self, choice, depth + 1); if error != Error.none { return 0, error; } choices += value; } var identity = Identity { node.a, node.b };
+            for choice in original { let value, error = copy(self, choice, depth + 1); if error != Error.none { return 0, error; } choices += value; } var identity = Identity { node.a, node.b , ..};
             if self.private_namespace != 0 { let value, error = copyPhysical(self, identity); if error != Error.none { return 0, error; } identity = value; } let value, error = self.destination.instanceSelection(identity, choices); result = value; failure = error;
         },
         Tag.usage => { let payload, error = copy(self, node.a, depth + 1); if error != Error.none { return 0, error; } var region: Id = 0; if node.c != 0 { let value, error = copy(self, node.c, depth + 1); if error != Error.none { return 0, error; } region = value; } let kind, error = blot_check_types::usageFromCode(node.b); if error != Error.none { return 0, error; } let value, error = self.destination.usage(payload, kind, region); result = value; failure = error; },
         Tag.erased_proof => { let value, error = self.destination.proofKind(); result = value; failure = error; },
-        Tag.scoped => { let payload, error = copy(self, node.a, depth + 1); if error != Error.none { return 0, error; } var identity = Identity { node.b, node.c };
-            if node.b == 0 { let value, error = copy(self, node.c, depth + 1); if error != Error.none { return 0, error; } identity = Identity { 0, value }; }
+        Tag.scoped => { let payload, error = copy(self, node.a, depth + 1); if error != Error.none { return 0, error; } var identity = Identity { node.b, node.c , ..};
+            if node.b == 0 { let value, error = copy(self, node.c, depth + 1); if error != Error.none { return 0, error; } identity = Identity { 0, value , ..}; }
             else { let value, error = copyPhysical(self, identity); if error != Error.none { return 0, error; } identity = value; } let value, error = self.destination.scoped(payload, identity); result = value; failure = error;
         },
         Tag.absent, Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32, Tag.never => { result = id; },
@@ -130,18 +130,18 @@ fn copyDepth(self: Copier&, source_id: Id, depth: i64) -> Id, Error {
         Tag.provider => { let payload, error = copy(self, node.a, depth + 1); if error != Error.none { return 0, error; } let row, error = copyRow(self, node.c, depth + 1); if error != Error.none { return 0, error; } let value, error = self.destination.provider(payload, row); result = value; failure = error; },
         Tag.state_provider => { let a, error = copy(self, node.a, depth + 1); if error != Error.none { return 0, error; } let b, error = copy(self, node.b, depth + 1); if error != Error.none { return 0, error; } let c, error = copy(self, node.c, depth + 1); if error != Error.none { return 0, error; } let value, error = self.destination.stateProvider(a, b, c); result = value; failure = error; },
         Tag.resolver => { let a, error = copy(self, node.a, depth + 1); if error != Error.none { return 0, error; } let value, error = self.destination.resolver(a); result = value; failure = error; },
-        Tag.type_constructor => { var identity = Identity { node.a, node.b }; { let optional_binding_42 .= self.nominal_mapping; if optional_binding_42 { let mapping .= optional_binding_42; { let optional_binding_41 .= mapping.get(identity); if optional_binding_41 { let value .= optional_binding_41; identity = value;  } else { return 0, Error.type_limit; } }  } } let value, error = self.destination.typeConstructor(identity); result = value; failure = error; },
-        Tag.record => { var fields: blot_check_types::Field[>..] = []; for i in 0..node.b { let field = self.source.recordField(node, i); var name = field.name; if self.has_field_mapping { name = self.field_mapping[field.name]; } let ty, error = copy(self, field.ty, depth + 1); if error != Error.none { return 0, error; } fields += blot_check_types::Field { name, ty }; } let value, error = self.destination.record(fields); result = value; failure = error; },
+        Tag.type_constructor => { var identity = Identity { node.a, node.b , ..}; { let optional_binding_42 .= self.nominal_mapping; if optional_binding_42 { let mapping .= optional_binding_42; { let optional_binding_41 .= mapping.get(identity); if optional_binding_41 { let value .= optional_binding_41; identity = value;  } else { return 0, Error.type_limit; } }  } } let value, error = self.destination.typeConstructor(identity); result = value; failure = error; },
+        Tag.record => { var fields: blot_check_types::Field[>..] = []; for i in 0..node.b { let field = self.source.recordField(node, i); var name = field.name; if self.has_field_mapping { name = self.field_mapping[field.name]; } let ty, error = copy(self, field.ty, depth + 1); if error != Error.none { return 0, error; } fields += blot_check_types::Field { name, ty , ..}; } let value, error = self.destination.record(fields); result = value; failure = error; },
         Tag.nominal, Tag.projection => { let value, error = nominal(self, node, depth); result = value; failure = error; },
         Tag.variable => { if !self.fresh_variables { return 0, Error.type_limit; } let value, error = self.destination.fresh(); result = value; failure = error; },
         Tag.function => { let a, error = copy(self, node.a, depth + 1); if error != Error.none { return 0, error; } let b, error = copy(self, node.b, depth + 1); if error != Error.none { return 0, error; } let c, error = copyRow(self, node.c, depth + 1); if error != Error.none { return 0, error; } let value, error = self.destination.functionWithEffects(a, b, c); result = value; failure = error; },
-        Tag.product => { var fields: Id[>..] = []; for child in self.source.list(List { node.a, node.b }) { let value, error = copy(self, child, depth + 1); if error != Error.none { return 0, error; } fields += value; } let value, error = self.destination.product(fields); result = value; failure = error; },
+        Tag.product => { var fields: Id[>..] = []; for child in self.source.list(List { node.a, node.b , ..}) { let value, error = copy(self, child, depth + 1); if error != Error.none { return 0, error; } fields += value; } let value, error = self.destination.product(fields); result = value; failure = error; },
     }
     if failure != Error.none { return 0, failure; } self.mapping.insert(id, result); return result, Error.none;
 }
 fn withCopier<C,F>(source: blot_check_frozen_types::Source, destination: blot_check_types::Store&, context: C&) -> Error {
-    var scopes: WordMap = WordMap {}; var mapping: WordMap = WordMap {}; var row_variables: WordMap = WordMap {}; var rows: WordMap = WordMap {}; var labels: WordMap = WordMap {};
-    var copier = init(source, destination, Tables { scopes, mapping, row_variables, rows, labels }); let error = F(context, copier); deinit(copier); return error;
+    var scopes: WordMap = WordMap {..}; var mapping: WordMap = WordMap {..}; var row_variables: WordMap = WordMap {..}; var rows: WordMap = WordMap {..}; var labels: WordMap = WordMap {..};
+    var copier = init(source, destination, Tables { scopes, mapping, row_variables, rows, labels , ..}); let error = F(context, copier); deinit(copier); return error;
 }
 
 struct WordMap { count: i64 = 0, failure:Error=Error.none, slots: dictionary_slot<u32,u32>[:] = [] }
@@ -169,7 +169,7 @@ fn remove(map: WordMap&,key: u32) -> bool {
 }
 fn clear(map: WordMap&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
 fn deinit(map: WordMap&) { release(map.slots); map.slots = []; map.count = 0;map.failure=Error.none; }
-fn clone(map: const WordMap&) -> WordMap { var copy = WordMap {}; if map.slots.len != 0 { let slots = pool_WordMap.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn clone(map: const WordMap&) -> WordMap { var copy = WordMap {..}; if map.slots.len != 0 { let slots = pool_WordMap.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
 fn each<F>(map: WordMap&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
 
 reusable[] var pool_WordMap:dictionary_slot<u32,u32>[>..];
@@ -199,7 +199,7 @@ fn remove(map: IdentityMap&,key: Identity) -> bool {
 }
 fn clear(map: IdentityMap&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
 fn deinit(map: IdentityMap&) { release(map.slots); map.slots = []; map.count = 0;map.failure=Error.none; }
-fn clone(map: const IdentityMap&) -> IdentityMap { var copy = IdentityMap {}; if map.slots.len != 0 { let slots = pool_IdentityMap.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn clone(map: const IdentityMap&) -> IdentityMap { var copy = IdentityMap {..}; if map.slots.len != 0 { let slots = pool_IdentityMap.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
 fn each<F>(map: IdentityMap&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
 
 reusable[] var pool_IdentityMap:dictionary_slot<Identity,Identity>[>..];

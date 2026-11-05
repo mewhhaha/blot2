@@ -23,7 +23,7 @@ fn mix(left: u64, right: u64) -> u64 {
 }
 fn init(seed: u64) -> Wyhash {
     let initial = seed ^ mix(seed ^ secret[0], secret[1]);
-    return Wyhash { 0, 0, [initial, initial, initial], 0, default<u8[48]>(), 0 };
+    return Wyhash { 0, 0, [initial, initial, initial], 0, default<u8[48]>(), 0 , ..};
 }
 fn round(hash: Wyhash&, bytes: const u8[:]) {
     for index in 3 {

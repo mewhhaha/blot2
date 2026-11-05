@@ -24,13 +24,13 @@ fn check(module: blot_backend_wasm::Module&, body: blot_backend_runtime_ir::Func
 }
 struct Frame { entry: u64 = 0, conditional: bool = false, alternate: u64 = 0, has_alternate: bool = false }
 fn zeroes(module: blot_backend_wasm::Module&, body: blot_backend_runtime_ir::Function) -> u64 {
-    var frames: Frame[96] = [Frame {}; 96]; var depth = 0; var defined: u64 = 0;
+    var frames: Frame[96] = [Frame {..}; 96]; var depth = 0; var defined: u64 = 0;
     for index in 0..body.parameters.len { defined |= 1 as u64 << index; }
     let parameters = defined; var required: u64 = 0;
     for inst in blot_backend_wasm::instructions(module, body) {
         if inst.op == blot_backend_runtime_ir::OP_local_get { let bit = 1 as u64 << inst.operand; if (defined & bit) == 0 { required |= bit; } }
         else if inst.op == blot_backend_runtime_ir::OP_local_set || inst.op == blot_backend_runtime_ir::OP_local_tee { defined |= 1 as u64 << inst.operand; }
-        else if inst.op == blot_backend_runtime_ir::OP_block || inst.op == blot_backend_runtime_ir::OP_if_ { frames[depth] = Frame { entry: defined, conditional: inst.op == blot_backend_runtime_ir::OP_if_ }; depth++; }
+        else if inst.op == blot_backend_runtime_ir::OP_block || inst.op == blot_backend_runtime_ir::OP_if_ { frames[depth] = Frame { entry: defined, conditional: inst.op == blot_backend_runtime_ir::OP_if_ , ..}; depth++; }
         else if inst.op == blot_backend_runtime_ir::OP_else_ { frames[depth - 1].alternate = defined; frames[depth - 1].has_alternate = true; defined = frames[depth - 1].entry; }
         else if inst.op == blot_backend_runtime_ir::OP_end { depth--; let frame = frames[depth]; var both: u64 = 0; if frame.conditional && frame.has_alternate { both = defined & frame.alternate; } defined = frame.entry | both; }
         else if inst.op == blot_backend_runtime_ir::OP_br || inst.op == blot_backend_runtime_ir::OP_br_if || inst.op == blot_backend_runtime_ir::OP_unreachable_ { defined = parameters; }

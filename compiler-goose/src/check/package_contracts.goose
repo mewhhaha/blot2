@@ -48,13 +48,13 @@ recursive fn quantifiedDepth(types: const blot_check_core::Types&, root: Id, rem
         function => { let first, error = quantifiedDepth(types, node.a, remaining, depth + 1); if error != Error.none || first { return first, error; } return quantifiedDepth(types, node.b, remaining, depth + 1); },
         array, list, cursor, usage, resolver, provider, scoped => { return quantifiedDepth(types, node.a, remaining, depth + 1); },
         state_provider => { for child in [node.a, node.b, node.c] { let found, error = quantifiedDepth(types, child, remaining, depth + 1); if error != Error.none || found { return found, error; } } },
-        product => { let children, error = span(types, List { node.a, node.b }); if error != Error.none { return false, error; } for child in children { let found, error = quantifiedDepth(types, child, remaining, depth + 1); if error != Error.none || found { return found, error; } } },
+        product => { let children, error = span(types, List { node.a, node.b , ..}); if error != Error.none { return false, error; } for child in children { let found, error = quantifiedDepth(types, child, remaining, depth + 1); if error != Error.none || found { return found, error; } } },
         record => {
-            if node.b > 0x7fffffff { return false, Error.invalid_artifact; } let words, error = span(types, List { node.a, node.b * 2 }); if error != Error.none { return false, error; }
+            if node.b > 0x7fffffff { return false, Error.invalid_artifact; } let words, error = span(types, List { node.a, node.b * 2 , ..}); if error != Error.none { return false, error; }
             for index in node.b { let found, error = quantifiedDepth(types, types.recordField(node, index).ty, remaining, depth + 1); if error != Error.none || found { return found, error; } }
         },
         nominal => {
-            if node.c >= types.extra.len { return false, Error.invalid_artifact; } let children, error = span(types, List { node.c + 1, types.extra[node.c] }); if error != Error.none { return false, error; }
+            if node.c >= types.extra.len { return false, Error.invalid_artifact; } let children, error = span(types, List { node.c + 1, types.extra[node.c] , ..}); if error != Error.none { return false, error; }
             for child in children { let found, error = quantifiedDepth(types, child, remaining, depth + 1); if error != Error.none || found { return found, error; } }
         }, _ => {},
     }
@@ -66,16 +66,16 @@ type PrincipalProjectionResolver = blot_check_scheme_projection::Resolver;
 struct Context {
     owner_id: u64 = 0,
     types: const blot_check_core::Types&, remaining: i64&, solver: blot_check_scheme_equations::Solver? = null,
-    owners: Id[4096] = [0; 4096], pure_rows: blot_check_package_row_facts::Facts = blot_check_package_row_facts::Facts {},
-    closed_rows: blot_check_package_row_facts::Facts = blot_check_package_row_facts::Facts {}, source_instances: bool = false,
-    instance_variables: blot_check_package_row_facts::Facts = blot_check_package_row_facts::Facts {},
-    instance_rows: blot_check_package_row_facts::Facts = blot_check_package_row_facts::Facts {},
-    formal: blot_support::Option<Id> = blot_support::Option<Id> { false, 0 }, generic_variables: List = List {}, generic_rows: List = List {},
+    owners: Id[4096] = [0; 4096], pure_rows: blot_check_package_row_facts::Facts = blot_check_package_row_facts::Facts {..},
+    closed_rows: blot_check_package_row_facts::Facts = blot_check_package_row_facts::Facts {..}, source_instances: bool = false,
+    instance_variables: blot_check_package_row_facts::Facts = blot_check_package_row_facts::Facts {..},
+    instance_rows: blot_check_package_row_facts::Facts = blot_check_package_row_facts::Facts {..},
+    formal: blot_support::Option<Id> = blot_support::Option<Id> { false, 0 , ..}, generic_variables: List = List {..}, generic_rows: List = List {..},
     obligations: const blot_check_core::Obligation[:] = [], source_obligations: const blot_check_types::Obligation[:] = [],
-    schemes: Scheme[128] = [Scheme {}; 128], scheme_count: i64 = 0,
+    schemes: Scheme[128] = [Scheme {..}; 128], scheme_count: i64 = 0,
     scheme_variables_sorted: bool[128] = [false; 128], scheme_rows_sorted: bool[128] = [false; 128],
     formals: Id[128] = [0; 128], formal_count: i64 = 0, introductions: blot_check_core::Id[128] = [0; 128], witness: bool = false,
-    representation_floor: blot_support::Option<i64> = blot_support::Option<i64> { false, 0 }, executable: bool = false, large_plain_graph: bool = false,
+    representation_floor: blot_support::Option<i64> = blot_support::Option<i64> { false, 0 , ..}, executable: bool = false, large_plain_graph: bool = false,
     openings: Opening[128] = [default<Opening>(); 128], projection_resolver: ProjectionResolver? = null, opening_count: i64 = 0,
 }
 fn initialize(self: Context&) -> Error {
@@ -85,7 +85,7 @@ fn initialize(self: Context&) -> Error {
     for node, id in self.types.nodes {
         if node.tag != blot_check_types::Tag.forall && node.tag != blot_check_types::Tag.existential { continue; }
         if id == 0 || node.c == 0 || node.c > 128 { return Error.invalid_artifact; }
-        let binders, error = span(self.types, List { node.b, node.c }); if error != Error.none { return error; }
+        let binders, error = span(self.types, List { node.b, node.c , ..}); if error != Error.none { return error; }
         for binder, ordinal in binders {
             if binder >= self.types.nodes.len || binder >= self.owners.len { return Error.invalid_artifact; }
             let leaf = self.types.node(binder);
@@ -97,8 +97,8 @@ fn initialize(self: Context&) -> Error {
     return Error.none;
 }
 fn generic(self: Context&, scheme: Scheme) -> Error {
-    self.instance_variables = blot_check_package_row_facts::Facts {}; self.instance_rows = blot_check_package_row_facts::Facts {};
-    self.generic_variables = List {}; self.generic_rows = List {}; self.scheme_count = 0; return pushGeneric(self, scheme);
+    self.instance_variables = blot_check_package_row_facts::Facts {..}; self.instance_rows = blot_check_package_row_facts::Facts {..};
+    self.generic_variables = List {..}; self.generic_rows = List {..}; self.scheme_count = 0; return pushGeneric(self, scheme);
 }
 fn pushGeneric(self: Context&, scheme: Scheme) -> Error {
     if self.scheme_count >= self.schemes.len { return Error.invalid_artifact; }
@@ -113,7 +113,7 @@ fn pushGeneric(self: Context&, scheme: Scheme) -> Error {
     self.generic_variables = scheme.variables; self.generic_rows = scheme.row_variables; return Error.none;
 }
 fn popGeneric(self: Context&) {
-    self.scheme_count -= 1; self.generic_variables = List {}; self.generic_rows = List {};
+    self.scheme_count -= 1; self.generic_variables = List {..}; self.generic_rows = List {..};
     if self.scheme_count != 0 { let scheme = self.schemes[self.scheme_count - 1]; if self.types.node(scheme.root).tag != blot_check_types::Tag.forall { self.generic_variables = scheme.variables; self.generic_rows = scheme.row_variables; } }
 }
 fn step(self: Context&, depth: i64) -> Error { if depth >= 128 || self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; return Error.none; }
@@ -175,7 +175,7 @@ recursive fn sourceInstance(self: Context&, root: Id, depth: i64) -> Error {
     match node.tag {
         variable => { return self.instance_variables.set(root); }, array, list, cursor, resolver, usage => { return sourceInstance(self, node.a, depth + 1); },
         function => { let parameter = sourceInstance(self, node.a, depth + 1); if parameter != Error.none { return parameter; } return sourceInstance(self, node.b, depth + 1); },
-        product => { let children, error = span(self.types, List { node.a, node.b }); if error != Error.none { return error; } for child in children { let error = sourceInstance(self, child, depth + 1); if error != Error.none { return error; } } },
+        product => { let children, error = span(self.types, List { node.a, node.b , ..}); if error != Error.none { return error; } for child in children { let error = sourceInstance(self, child, depth + 1); if error != Error.none { return error; } } },
         record => { for index in node.b { let error = sourceInstance(self, self.types.recordField(node, index).ty, depth + 1); if error != Error.none { return error; } } },
         nominal => { for child in self.types.nominalArguments(node) { let error = sourceInstance(self, child, depth + 1); if error != Error.none { return error; } } }, _ => {},
     }
@@ -188,9 +188,9 @@ fn schemeGoals(self: Context&, scheme: Scheme) -> const blot_check_core::Obligat
 fn enter(self: Context&, owner: Id) -> Error {
     if self.formal_count >= self.formals.len || owner >= self.types.nodes.len { return Error.invalid_artifact; } let node = self.types.node(owner);
     if node.tag != blot_check_types::Tag.forall && node.tag != blot_check_types::Tag.existential { return Error.invalid_artifact; }
-    self.formals[self.formal_count] = owner; self.introductions[self.formal_count] = 0; self.formal_count += 1; self.formal = blot_support::Option<Id> { true, owner }; return Error.none;
+    self.formals[self.formal_count] = owner; self.introductions[self.formal_count] = 0; self.formal_count += 1; self.formal = blot_support::Option<Id> { true, owner , ..}; return Error.none;
 }
-fn leave(self: Context&) { self.formal_count -= 1; self.formal.present = false; if self.formal_count != 0 { self.formal = blot_support::Option<Id> { true, self.formals[self.formal_count - 1] }; } }
+fn leave(self: Context&) { self.formal_count -= 1; self.formal.present = false; if self.formal_count != 0 { self.formal = blot_support::Option<Id> { true, self.formals[self.formal_count - 1] , ..}; } }
 fn ownsFormal(self: const Context&, leaf: Id) -> bool { if leaf >= self.owners.len { return false; } for owner in self.formals[..self.formal_count] { if self.owners[leaf] == owner { return true; } } return false; }
 fn representationBinder(self: const Context&, root: Id) -> Error {
     if !self.representation_floor.present { return Error.none; } let node = self.types.node(root);
@@ -204,7 +204,7 @@ fn region(self: Context&, id: Id, depth: i64) -> Error {
     if leaf.c == 0 && !ownsFormal(self, id) { return Error.invalid_artifact; } return Error.none;
 }
 fn visit(self: Context&, root: Id) -> Error { return walk(self, root, 0); }
-fn representation(self: Context&, root: Id) -> Error { let prior = self.representation_floor; self.representation_floor = blot_support::Option<i64> { true, self.formal_count }; let error = walk(self, root, 0); self.representation_floor = prior; return error; }
+fn representation(self: Context&, root: Id) -> Error { let prior = self.representation_floor; self.representation_floor = blot_support::Option<i64> { true, self.formal_count , ..}; let error = walk(self, root, 0); self.representation_floor = prior; return error; }
 fn isForeign(self: const Context&, id: blot_check_effects::Id) -> bool {
     if foreign(self.types, id) { return true; } if id >= self.types.effects.rows.len || !self.closed_rows.contains(id) { return false; }
     let row = self.types.row(id); if row.labels.len == 0 { return false; } match row.tail { variable => {}, _ => { return false; }, }
@@ -240,7 +240,7 @@ recursive fn validateRow(self: Context&, id: blot_check_effects::Id, depth: i64)
 recursive fn goalFootprint(self: Context&, root: Id, owner: Id, opened: List, sealed: const Bits4096&, depth: i64) -> bool, Error {
     let charged = step(self, depth); if charged != Error.none { return false, charged; } let node = self.types.node(root);
     if node.tag == blot_check_types::Tag.bound {
-        let quantifier = self.types.node(owner); let formals, error = span(self.types, List { quantifier.b, quantifier.c }); if error != Error.none { return false, error; }
+        let quantifier = self.types.node(owner); let formals, error = span(self.types, List { quantifier.b, quantifier.c , ..}); if error != Error.none { return false, error; }
         if formals.len != opened.len { return false, Error.invalid_artifact; } let witnesses = self.types.list(opened);
         for formal, i in formals { if formal == root { return !sealed.isSet(witnesses[i]), Error.none; } } return false, Error.none;
     }
@@ -258,7 +258,7 @@ recursive fn goalFootprint(self: Context&, root: Id, owner: Id, opened: List, se
         array, list, cursor, resolver => { return goalFootprint(self, node.a, owner, opened, sealed, depth + 1); },
         state_provider => { for child in [node.a, node.b, node.c] { let found, error = goalFootprint(self, child, owner, opened, sealed, depth + 1); if error != Error.none || found { return found, error; } } },
         scoped => { let found, error = goalFootprint(self, node.a, owner, opened, sealed, depth + 1); if error != Error.none || found { return found, error; } if node.b == 0 && node.c != 0 { return goalFootprint(self, node.c, owner, opened, sealed, depth + 1); } },
-        product => { for child in self.types.list(List { node.a, node.b }) { let found, error = goalFootprint(self, child, owner, opened, sealed, depth + 1); if error != Error.none || found { return found, error; } } },
+        product => { for child in self.types.list(List { node.a, node.b , ..}) { let found, error = goalFootprint(self, child, owner, opened, sealed, depth + 1); if error != Error.none || found { return found, error; } } },
         record => { for index in node.b { let found, error = goalFootprint(self, self.types.recordField(node, index).ty, owner, opened, sealed, depth + 1); if error != Error.none || found { return found, error; } } },
         projection, nominal, instance_selection => { for child in self.types.nominalArguments(node) { let found, error = goalFootprint(self, child, owner, opened, sealed, depth + 1); if error != Error.none || found { return found, error; } } }, _ => {},
     }
@@ -281,16 +281,16 @@ fn projectionGoals(self: Context&, root: Id, goals, formals: List, opened: blot_
         let charged = step(self, depth); if charged != Error.none { return false, charged; }
         if goal.kind != blot_check_types::ObligationKind.contract || goal.identity.unit != projection_.a || goal.identity.decl != projection_.b { continue; }
         let tuple = self.types.node(goal.ty); if tuple.tag != blot_check_types::Tag.product || tuple.b != arguments.len { continue; }
-        var proof = Principal { left: self.types, right: self.types, remaining: self.remaining, views: self };
+        var proof = Principal { left: self.types, right: self.types, remaining: self.remaining, views: self , ..};
         if opened.present { proof.instance = formals; for witness, index in self.types.list(opened.value) { proof.witnesses[index] = witness; } }
-        var matches = true; let required = self.types.list(List { tuple.a, tuple.b });
+        var matches = true; let required = self.types.list(List { tuple.a, tuple.b , ..});
         for expected, index in required { let error = matchPrincipal(proof, expected, arguments[index], depth + 1); if error != Error.none { if self.remaining == 0 { return false, error; } matches = false; break; } }
         if matches { return true, Error.none; }
     }
     return false, Error.none;
 }
 fn projectionGoal(self: Context&, root: Id, owner: Id, opened: blot_support::Option<List>, depth: i64) -> bool, Error {
-    let quantifier = self.types.node(owner); return projectionGoals(self, root, self.types.quantifierGoals(owner), List { quantifier.b, quantifier.c }, opened, depth);
+    let quantifier = self.types.node(owner); return projectionGoals(self, root, self.types.quantifierGoals(owner), List { quantifier.b, quantifier.c , ..}, opened, depth);
 }
 fn projection(self: Context&, root: Id, depth: i64) -> Error {
     let member, error = projectionMember(self.types, self.types.node(root)); if error != Error.none { return error; }
@@ -300,17 +300,17 @@ fn projection(self: Context&, root: Id, depth: i64) -> Error {
         scheme -= 1; let owner = self.schemes[scheme]; if owner.obligations.len == 0 { continue; }
         if self.source_obligations.len != 0 {
             if owner.obligations.start > self.source_obligations.len || owner.obligations.len > self.source_obligations.len - owner.obligations.start { return Error.invalid_artifact; }
-            let found, error = projectionGoals(self, root, self.source_obligations[owner.obligations.start..owner.obligations.start + owner.obligations.len], List {}, blot_support::Option<List> { false, List {} }, depth + 1);
+            let found, error = projectionGoals(self, root, self.source_obligations[owner.obligations.start..owner.obligations.start + owner.obligations.len], List {..}, blot_support::Option<List> { false, List {..} , ..}, depth + 1);
             if error != Error.none { return error; } if found { return Error.none; }
         } else {
             let goals, error = schemeGoals(self, owner); if error != Error.none { return error; }
-            let found, error = projectionGoals(self, root, goals, List {}, blot_support::Option<List> { false, List {} }, depth + 1); if error != Error.none { return error; } if found { return Error.none; }
+            let found, error = projectionGoals(self, root, goals, List {..}, blot_support::Option<List> { false, List {..} , ..}, depth + 1); if error != Error.none { return error; } if found { return Error.none; }
         }
     }
     var scope = self.formal_count;
-    while scope != 0 { scope -= 1; let found, error = projectionGoal(self, root, self.formals[scope], blot_support::Option<List> { false, List {} }, depth + 1); if error != Error.none { return error; } if found { return Error.none; } }
+    while scope != 0 { scope -= 1; let found, error = projectionGoal(self, root, self.formals[scope], blot_support::Option<List> { false, List {..} , ..}, depth + 1); if error != Error.none { return error; } if found { return Error.none; } }
     scope = self.opening_count;
-    while scope != 0 { scope -= 1; let opening = self.openings[scope]; let found, error = projectionGoal(self, root, opening.quantifier, blot_support::Option<List> { true, opening.binders }, depth + 1); if error != Error.none { return error; } if found { return Error.none; } }
+    while scope != 0 { scope -= 1; let opening = self.openings[scope]; let found, error = projectionGoal(self, root, opening.quantifier, blot_support::Option<List> { true, opening.binders , ..}, depth + 1); if error != Error.none { return error; } if found { return Error.none; } }
     return Error.invalid_artifact;
 }
 recursive fn walk(self: Context&, root: Id, depth: i64) -> Error {
@@ -359,13 +359,13 @@ recursive fn walk(self: Context&, root: Id, depth: i64) -> Error {
         array, list, cursor, resolver => { return walk(self, node.a, depth + 1); },
         provider => { if self.witness { return Error.invalid_artifact; } let row = validateRow(self, node.c, depth + 1); if row != Error.none { return row; } return walk(self, node.a, depth + 1); },
         state_provider => { if self.witness { return Error.invalid_artifact; } for child in [node.a, node.b, node.c] { let error = walk(self, child, depth + 1); if error != Error.none { return error; } } },
-        product => { let children, error = span(self.types, List { node.a, node.b }); if error != Error.none { return error; } for child in children { let error = walk(self, child, depth + 1); if error != Error.none { return error; } } },
-        record => { if node.b > 0x7fffffff { return Error.invalid_artifact; } let fields, error = span(self.types, List { node.a, node.b * 2 }); if error != Error.none { return error; } for index in node.b { let error = walk(self, self.types.recordField(node, index).ty, depth + 1); if error != Error.none { return error; } } },
+        product => { let children, error = span(self.types, List { node.a, node.b , ..}); if error != Error.none { return error; } for child in children { let error = walk(self, child, depth + 1); if error != Error.none { return error; } } },
+        record => { if node.b > 0x7fffffff { return Error.invalid_artifact; } let fields, error = span(self.types, List { node.a, node.b * 2 , ..}); if error != Error.none { return error; } for index in node.b { let error = walk(self, self.types.recordField(node, index).ty, depth + 1); if error != Error.none { return error; } } },
         nominal => {
             if blot_check_typed_staging::isIdentity(node.a, node.b) && (self.formal.present || self.witness) { return Error.invalid_artifact; }
             let code_ = blot_check_typed_staging::codeInfo(self.types, root);
             if code_.present { let row = validateRow(self, code_.value.effects, depth + 1); if row != Error.none { return row; } return walk(self, code_.value.result, depth + 1); }
-            if node.c >= self.types.extra.len { return Error.invalid_artifact; } let children, error = span(self.types, List { node.c + 1, self.types.extra[node.c] }); if error != Error.none { return error; }
+            if node.c >= self.types.extra.len { return Error.invalid_artifact; } let children, error = span(self.types, List { node.c + 1, self.types.extra[node.c] , ..}); if error != Error.none { return error; }
             for child in children { let error = walk(self, child, depth + 1); if error != Error.none { return error; } }
         },
         _ => { return Error.invalid_artifact; },
@@ -384,9 +384,9 @@ fn open(self: Context&, package: Id, binding: blot_check_core::BindingId, binder
     let witnesses, error = span(self.types, binders); if error != Error.none { return error; }
     for binder, ordinal in witnesses { if binder >= self.types.nodes.len { return Error.invalid_artifact; } let leaf = self.types.node(binder);
         if leaf.tag != blot_check_types::Tag.bound || leaf.a != ordinal || leaf.b != 0 || leaf.c != binding { return Error.invalid_artifact; } }
-    self.openings[self.opening_count] = Opening { binding, binders, package }; self.opening_count += 1;
+    self.openings[self.opening_count] = Opening { binding, binders, package , ..}; self.opening_count += 1;
     let visited = visit(self, payload); if visited != Error.none { self.opening_count -= 1; return visited; }
-    let proof = Substitution { self.types, List { quantifier.b, quantifier.c }, witnesses, self.remaining, views: self };
+    let proof = Substitution { self.types, List { quantifier.b, quantifier.c , ..}, witnesses, self.remaining, views: self , ..};
     let error = validate(proof, quantifier.a, payload); if error != Error.none { self.opening_count -= 1; } return error;
 }
 fn pack(self: Context&, package: Id, payload: Id, witnesses: const Id[:]) -> Error {
@@ -397,7 +397,7 @@ fn pack(self: Context&, package: Id, payload: Id, witnesses: const Id[:]) -> Err
 }
 fn packWitnesses(self: Context&, quantifier: blot_check_types::Node, payload: Id, witnesses: const Id[:]) -> Error {
     for witness in witnesses { let error = visit(self, witness); if error != Error.none { return error; } }
-    let proof = Substitution { self.types, List { quantifier.b, quantifier.c }, witnesses, self.remaining, views: self, projection_resolver: self.projection_resolver };
+    let proof = Substitution { self.types, List { quantifier.b, quantifier.c , ..}, witnesses, self.remaining, views: self, projection_resolver: self.projection_resolver , ..};
     return validate(proof, quantifier.a, payload);
 }
 fn close(self: Context&) { self.opening_count -= 1; }
@@ -444,11 +444,11 @@ recursive fn matchSubstitution(self: const Substitution&, expected: Id, actual: 
             if left.c == 0 { { let optional_binding_28 .= self.views; if optional_binding_28 { let views .= optional_binding_28; if views.types.owner_id != self.types.owner_id || !views.ownsFormal(expected) { return Error.invalid_artifact; }  } else { return Error.invalid_artifact; } } }
         },
         blot_check_types::Tag.forall, blot_check_types::Tag.existential => {
-            var proof = Principal { left: self.types, right: self.types, remaining: self.remaining, views: self.views, instance: self.formal };
+            var proof = Principal { left: self.types, right: self.types, remaining: self.remaining, views: self.views, instance: self.formal , ..};
             for witness, index in self.witnesses { proof.witnesses[index] = witness; } return validate(proof, expected, actual);
         },
         blot_check_types::Tag.function => {
-            var proof = Principal { left: self.types, right: self.types, remaining: self.remaining, views: self.views };
+            var proof = Principal { left: self.types, right: self.types, remaining: self.remaining, views: self.views , ..};
             if replace { proof.instance = self.formal; for witness, index in self.witnesses { proof.witnesses[index] = witness; } }
             let error = matchRow(proof, left.c, right.c, depth + 1); if error != Error.none { return error; }
             let error = matchSubstitution(self, left.a, right.a, replace, depth + 1); if error != Error.none { return error; }
@@ -462,14 +462,14 @@ recursive fn matchSubstitution(self: const Substitution&, expected: Id, actual: 
         blot_check_types::Tag.array, blot_check_types::Tag.list, blot_check_types::Tag.cursor => { return matchSubstitution(self, left.a, right.a, replace, depth + 1); },
         blot_check_types::Tag.product => {
             if left.b != right.b { return Error.invalid_artifact; }
-            let a, error = span(self.types, List { left.a, left.b }); if error != Error.none { return error; }
-            let b, error = span(self.types, List { right.a, right.b }); if error != Error.none { return error; }
+            let a, error = span(self.types, List { left.a, left.b , ..}); if error != Error.none { return error; }
+            let b, error = span(self.types, List { right.a, right.b , ..}); if error != Error.none { return error; }
             for x, index in a { let error = matchSubstitution(self, x, b[index], replace, depth + 1); if error != Error.none { return error; } }
         },
         blot_check_types::Tag.record => {
             if left.b != right.b || left.b > 0x7fffffff { return Error.invalid_artifact; }
-            let a, error = span(self.types, List { left.a, left.b * 2 }); if error != Error.none { return error; }
-            let b, error = span(self.types, List { right.a, right.b * 2 }); if error != Error.none { return error; }
+            let a, error = span(self.types, List { left.a, left.b * 2 , ..}); if error != Error.none { return error; }
+            let b, error = span(self.types, List { right.a, right.b * 2 , ..}); if error != Error.none { return error; }
             for index in 0..left.b {
                 let field = self.types.recordField(left, index); var matched = false;
                 for other in 0..right.b { let error = step(self, depth); if error != Error.none { return error; } let candidate = self.types.recordField(right, other); if field.name != candidate.name { continue; }
@@ -481,8 +481,8 @@ recursive fn matchSubstitution(self: const Substitution&, expected: Id, actual: 
             if left.a != right.a || left.b != right.b { return Error.invalid_artifact; }
             if left.tag == blot_check_types::Tag.projection { let a, error = projectionMember(self.types, left); if error != Error.none { return error; } let b, error = projectionMember(self.types, right); if error != Error.none || a != b { return Error.invalid_artifact; } }
             if left.c >= self.types.extra.len || right.c >= self.types.extra.len { return Error.invalid_artifact; }
-            let a, error = span(self.types, List { left.c + 1, self.types.extra[left.c] }); if error != Error.none { return error; }
-            let b, error = span(self.types, List { right.c + 1, self.types.extra[right.c] }); if error != Error.none || a.len != b.len { return Error.invalid_artifact; }
+            let a, error = span(self.types, List { left.c + 1, self.types.extra[left.c] , ..}); if error != Error.none { return error; }
+            let b, error = span(self.types, List { right.c + 1, self.types.extra[right.c] , ..}); if error != Error.none || a.len != b.len { return Error.invalid_artifact; }
             for x, index in a { let error = matchSubstitution(self, x, b[index], replace, depth + 1); if error != Error.none { return error; } }
         },
         _ => { return Error.invalid_artifact; },
@@ -490,14 +490,14 @@ recursive fn matchSubstitution(self: const Substitution&, expected: Id, actual: 
 }
 struct FormalPair { left: List, right: List }
 struct VersionPair { left: blot_check_types::Node, right: blot_check_types::Node }
-struct RowWitness { row: blot_check_effects::Id, excluded: Bits256 = Bits256 {} }
-struct CertificatePairs { left: List, right: List, seen_left: Bits4096 = Bits4096 {}, seen_right: Bits4096 = Bits4096 {} }
+struct RowWitness { row: blot_check_effects::Id, excluded: Bits256 = Bits256 {..} }
+struct CertificatePairs { left: List, right: List, seen_left: Bits4096 = Bits4096 {..}, seen_right: Bits4096 = Bits4096 {..} }
 struct Principal {
     left: const blot_check_core::Types&, right: const blot_check_core::Types&, remaining: i64&,
-    formals: FormalPair[128], formal_count: i64 = 0, instance: List = List {}, witnesses: Id[256] = [0; 256],
-    row_witnesses: blot_support::Option<RowWitness>[128] = [blot_support::none<RowWitness>(); 128], secondary: List = List {}, secondary_witnesses: Id[256] = [0; 256],
+    formals: FormalPair[128], formal_count: i64 = 0, instance: List = List {..}, witnesses: Id[256] = [0; 256],
+    row_witnesses: blot_support::Option<RowWitness>[128] = [blot_support::none<RowWitness>(); 128], secondary: List = List {..}, secondary_witnesses: Id[256] = [0; 256],
     views: Context? = null, pending: blot_check_effects::Id[128], pending_count: i64 = 0, foreign_views: bool = false,
-    left_rows: List = List {}, instance_rows: List = List {}, scheme_row_witnesses: blot_support::Option<RowWitness>[128] = [blot_support::none<RowWitness>(); 128],
+    left_rows: List = List {..}, instance_rows: List = List {..}, scheme_row_witnesses: blot_support::Option<RowWitness>[128] = [blot_support::none<RowWitness>(); 128],
     row_search_depth: i64 = 0, projection_resolver: PrincipalProjectionResolver? = null, projection_depth: i64 = 0,
     certificate_pairs: CertificatePairs? = null, version_pairs: const VersionPair[:] = [],
 }
@@ -512,18 +512,18 @@ fn certificateRow(self: Principal&, left: blot_check_effects::Id, right: blot_ch
 }
 fn certifiedScheme<L,R>(self: Principal&, expected: Scheme, actual: Scheme, left_goals: L, right_goals: R) -> Error {
     if expected.closed_rows.len != actual.closed_rows.len || expected.closed_rows.len > 4096 { return Error.invalid_artifact; }
-    var pairs = CertificatePairs { expected.closed_rows, actual.closed_rows }; self.certificate_pairs .= pairs;
+    var pairs = CertificatePairs { expected.closed_rows, actual.closed_rows , ..}; self.certificate_pairs .= pairs;
     let error = schemeGoals(self, expected, actual, left_goals, right_goals); self.certificate_pairs .= null; if error != Error.none { return error; }
     if pairs.seen_left.count() != pairs.seen_right.count() { return Error.invalid_artifact; } return Error.none;
 }
 fn substituted(self: Principal&, formals: List, replacements: const Id[:], expected: Id, actual: Id) -> Error {
     if formals.len != replacements.len || formals.len > 128 { return Error.invalid_artifact; } self.instance = formals;
-    for replacement, index in replacements { self.witnesses[index] = replacement; } let error = validate(self, expected, actual); self.instance = List {}; return error;
+    for replacement, index in replacements { self.witnesses[index] = replacement; } let error = validate(self, expected, actual); self.instance = List {..}; return error;
 }
 fn composed(self: Principal&, formals: List, replacements: const Id[:], secondary: List, secondary_replacements: const Id[:], expected: Id, actual: Id) -> Error {
     if secondary.len != secondary_replacements.len || secondary.len > 128 { return Error.invalid_artifact; } self.secondary = secondary;
     for replacement, index in secondary_replacements { self.secondary_witnesses[index] = replacement; }
-    let error = substituted(self, formals, replacements, expected, actual); self.secondary = List {}; return error;
+    let error = substituted(self, formals, replacements, expected, actual); self.secondary = List {..}; return error;
 }
 fn goalEndpoints<G>(self: Principal&, left: G, right: G) -> Error {
     if left.kind != right.kind || left.name != right.name || left.operator != right.operator || left.identity.unit != right.identity.unit || left.identity.decl != right.identity.decl { return Error.invalid_artifact; }
@@ -537,19 +537,19 @@ fn schemeGoals<L,R>(self: Principal&, expected: Scheme, actual: Scheme, left_goa
     if paired {
         let error = validate(self, expected.root, actual.root); if error != Error.none { return error; }
         if left_owner.c != right_owner.c || self.formal_count >= self.formals.len { return Error.invalid_artifact; }
-        self.formals[self.formal_count] = FormalPair { List { left_owner.b, left_owner.c }, List { right_owner.b, right_owner.c } }; self.formal_count += 1;
+        self.formals[self.formal_count] = FormalPair { List { left_owner.b, left_owner.c }, List { right_owner.b, right_owner.c , ..} , ..}; self.formal_count += 1;
     } else { if expected.variables.len != actual.variables.len { return Error.invalid_artifact; } let error = instantiateScheme(self, expected, actual.root); if error != Error.none { return error; } }
-    let error = schemeGoalBody(self, expected, actual, left_goals, right_goals, paired); if paired { self.formal_count -= 1; } self.instance = List {}; self.instance_rows = List {}; return error;
+    let error = schemeGoalBody(self, expected, actual, left_goals, right_goals, paired); if paired { self.formal_count -= 1; } self.instance = List {..}; self.instance_rows = List {..}; return error;
 }
 fn schemeGoalBody<L,R>(self: Principal&, expected: Scheme, actual: Scheme, left_goals: L, right_goals: R, paired: bool) -> Error {
     if expected.variables.len > typeLimit(self, expected.root) || expected.row_variables.len > 128 { return Error.invalid_artifact; }
-    self.instance = expected.variables; self.instance_rows = expected.row_variables; if paired { self.instance = List {}; }
+    self.instance = expected.variables; self.instance_rows = expected.row_variables; if paired { self.instance = List {..}; }
     for left, index in left_goals { let error = goalEndpoints(self, left, right_goals[index]); if error != Error.none { return error; } }
-    if paired { return Error.none; } var variables = Bits256 {};
+    if paired { return Error.none; } var variables = Bits256 {..};
     for ordinal in 0..expected.variables.len { let witness = self.witnesses[ordinal]; if witness == 0 { continue; } var found = false;
         for variable, index in self.right.list(actual.variables) { if variable != witness { continue; } if variables.isSet(index) { return Error.invalid_artifact; } variables.set(index); found = true; break; } if !found { return Error.invalid_artifact; }
     }
-    var rows = Bits256 {};
+    var rows = Bits256 {..};
     for ordinal in 0..expected.row_variables.len { let witness = self.scheme_row_witnesses[ordinal]; if !witness.present { continue; } let row = self.right.row(witness.value.row);
         if witness.value.excluded.count() != row.labels.len { return Error.invalid_artifact; } var variable: u32 = 0;
         match row.tail { blot_check_effects::Tail.variable match_payload_19 => { let value = match_payload_19.value;  variable = value; }, _ => { return Error.invalid_artifact; }, }
@@ -561,7 +561,7 @@ fn typeLimit(self: const Principal&, root: Id) -> i64 { if root >= self.left.nod
 fn publicArguments(self: Principal&, variables: List, rows: List, arguments: const Id[:]) -> Error {
     var maximum: i64 = 128; if sourceTypes(self) { maximum = ordinary_source_type_limit; }
     if arguments.len != variables.len + rows.len || self.instance.len > maximum || self.instance_rows.len > 128 { return Error.invalid_artifact; }
-    var proof = Principal { left: self.right, right: self.right, remaining: self.remaining, views: self.views };
+    var proof = Principal { left: self.right, right: self.right, remaining: self.remaining, views: self.views , ..};
     let binders, error = span(self.left, variables); if error != Error.none { return error; } let instances, error = span(self.left, self.instance); if error != Error.none { return error; }
     for formal, index in binders { var ordinal: i64 = -1; for instance, j in instances { if instance == formal { ordinal = j; break; } }
         if ordinal < 0 || ordinal >= self.witnesses.len || self.witnesses[ordinal] == 0 { return Error.invalid_artifact; }
@@ -572,7 +572,7 @@ fn publicArguments(self: Principal&, variables: List, rows: List, arguments: con
         let actual = arguments[variables.len + index]; if ordinal < 0 || ordinal >= self.scheme_row_witnesses.len || actual >= self.right.nodes.len { return Error.invalid_artifact; }
         let witness = self.scheme_row_witnesses[ordinal]; if !witness.present { return Error.invalid_artifact; } let carrier = self.right.node(actual);
         if carrier.tag != blot_check_types::Tag.function || carrier.a != blot_check_types::unit || carrier.b != blot_check_types::unit { return Error.invalid_artifact; }
-        let error = structuredRow(proof, witness.value.row, carrier.c, witness.value.excluded, Bits256 {}, false, 0); if error != Error.none { return error; }
+        let error = structuredRow(proof, witness.value.row, carrier.c, witness.value.excluded, Bits256 {..}, false, 0); if error != Error.none { return error; }
     } return publishPending(proof);
 }
 fn rows(self: Principal&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error { return matchRow(self, left, right, 0); }
@@ -580,17 +580,17 @@ fn instantiateScheme(self: Principal&, scheme: Scheme, actual: Id) -> Error {
     if scheme.variables.len > typeLimit(self, scheme.root) || scheme.row_variables.len > 128 { return Error.invalid_artifact; }
     self.instance = scheme.variables; self.instance_rows = scheme.row_variables; self.witnesses = [0; 256]; for &witness in self.scheme_row_witnesses { witness.present = false; }
     var endpoint = actual; let quantified_actual = self.right.node(actual).tag == blot_check_types::Tag.forall;
-    if quantified_actual { { let optional_binding_25 .= self.views; if optional_binding_25 { let views .= optional_binding_25; if !sameTypes(views.types, self.right) || self.right.node(actual).c > 128 { self.instance = List {}; self.instance_rows = List {}; return Error.invalid_artifact; }
-        let error = enter(views, actual); if error != Error.none { self.instance = List {}; self.instance_rows = List {}; return error; } endpoint = self.right.node(actual).a;
-     } else { self.instance = List {}; self.instance_rows = List {}; return Error.invalid_artifact; } } }
-    let error = validate(self, scheme.root, endpoint); if quantified_actual { { let optional_binding_24 .= self.views; if optional_binding_24 { let views .= optional_binding_24; leave(views);  } } } self.instance = List {}; self.instance_rows = List {}; return error;
+    if quantified_actual { { let optional_binding_25 .= self.views; if optional_binding_25 { let views .= optional_binding_25; if !sameTypes(views.types, self.right) || self.right.node(actual).c > 128 { self.instance = List {..}; self.instance_rows = List {..}; return Error.invalid_artifact; }
+        let error = enter(views, actual); if error != Error.none { self.instance = List {..}; self.instance_rows = List {..}; return error; } endpoint = self.right.node(actual).a;
+     } else { self.instance = List {..}; self.instance_rows = List {..}; return Error.invalid_artifact; } } }
+    let error = validate(self, scheme.root, endpoint); if quantified_actual { { let optional_binding_24 .= self.views; if optional_binding_24 { let views .= optional_binding_24; leave(views);  } } } self.instance = List {..}; self.instance_rows = List {..}; return error;
 }
 fn instantiate(self: Principal&, owner: Id, actual: Id) -> Error { if self.left.quantifierGoals(owner).len != 0 { return Error.invalid_artifact; } return instantiateTypes(self, owner, actual); }
 fn instantiateTypes(self: Principal&, owner: Id, actual: Id) -> Error {
     if owner >= self.left.nodes.len { return Error.invalid_artifact; } let quantifier = self.left.node(owner);
     if quantifier.tag != blot_check_types::Tag.forall || quantifier.c == 0 || quantifier.c > 128 { return Error.invalid_artifact; }
-    self.instance = List { quantifier.b, quantifier.c }; self.witnesses = [0; 256]; for &witness in self.row_witnesses { witness.present = false; }
-    let error = validate(self, quantifier.a, actual); self.instance = List {}; return error;
+    self.instance = List { quantifier.b, quantifier.c , ..}; self.witnesses = [0; 256]; for &witness in self.row_witnesses { witness.present = false; }
+    let error = validate(self, quantifier.a, actual); self.instance = List {..}; return error;
 }
 fn publishPending(self: Principal&) -> Error { { let optional_binding_23 .= self.views; if optional_binding_23 { let views .= optional_binding_23; for index in 0..self.pending_count { let row = self.pending[index]; let error = views.closed_rows.set(row); if error != Error.none { return error; } if views.types.row(row).labels.len == 0 { let error = views.pure_rows.set(row); if error != Error.none { return error; } } }  } } return Error.none; }
 fn validate(self: Principal&, left: Id, right: Id) -> Error { self.pending_count = 0; let error = matchPrincipal(self, left, right, 0); if error != Error.none { return error; } return publishPending(self); }
@@ -644,8 +644,8 @@ fn searchRowLabels(self: Principal&, left: blot_check_effects::Id, right: blot_c
 }
 fn mergePending(self: Principal&, proof: const Principal&) -> Error { if self.pending_count + proof.pending_count > self.pending.len { return Error.invalid_artifact; } for index in 0..proof.pending_count { self.pending[self.pending_count + index] = proof.pending[index]; } self.pending_count += proof.pending_count; return Error.none; }
 fn rowWitness(self: Principal&, prior: blot_support::Option<RowWitness>&, right: blot_check_effects::Id, used: Bits256, depth: i64) -> Error {
-    if prior.present { var proof = Principal { left: self.right, right: self.right, remaining: self.remaining, views: self.views }; let error = structuredRow(proof, prior.value.row, right, prior.value.excluded, used, false, depth + 1); if error != Error.none { return error; } return mergePending(self, proof); }
-    prior = blot_support::Option<RowWitness> { true, RowWitness { right, used } }; return Error.none;
+    if prior.present { var proof = Principal { left: self.right, right: self.right, remaining: self.remaining, views: self.views , ..}; let error = structuredRow(proof, prior.value.row, right, prior.value.excluded, used, false, depth + 1); if error != Error.none { return error; } return mergePending(self, proof); }
+    prior = blot_support::Option<RowWitness> { true, RowWitness { right, used , ..} , ..}; return Error.none;
 }
 fn rowTail(self: Principal&, left: blot_check_effects::Id, right: blot_check_effects::Id, used: Bits256, subset: bool, depth: i64) -> Error {
     let a = self.left.row(left); let b = self.right.row(right); let ys = self.right.rowLabels(right);
@@ -669,8 +669,8 @@ fn rowTail(self: Principal&, left: blot_check_effects::Id, right: blot_check_eff
     }
     if !subset { for index in 0..ys.len { if !used.isSet(index) { return Error.invalid_artifact; } } } return Error.none;
 }
-fn subsetRow(self: Principal&, actual: blot_check_effects::Id, declared: blot_check_effects::Id) -> Error { return structuredRow(self, actual, declared, Bits256 {}, Bits256 {}, true, 0); }
-fn handledRow(self: Principal&, actual: blot_check_effects::Id, declared: blot_check_effects::Id, excluded: Bits256, subset: bool) -> Error { return structuredRow(self, actual, declared, excluded, Bits256 {}, subset, 0); }
+fn subsetRow(self: Principal&, actual: blot_check_effects::Id, declared: blot_check_effects::Id) -> Error { return structuredRow(self, actual, declared, Bits256 {..}, Bits256 {..}, true, 0); }
+fn handledRow(self: Principal&, actual: blot_check_effects::Id, declared: blot_check_effects::Id, excluded: Bits256, subset: bool) -> Error { return structuredRow(self, actual, declared, excluded, Bits256 {..}, subset, 0); }
 recursive fn matchRow(self: Principal&, left: blot_check_effects::Id, right: blot_check_effects::Id, depth: i64) -> Error {
     { let optional_binding_15 .= self.views; if optional_binding_15 { let views .= optional_binding_15; { let optional_binding_14 .= views.solver; if optional_binding_14 { let solver .= optional_binding_14; if sameTypes(self.left, views.types) && sameTypes(self.right, views.types) {
         let l, error = solver.resolveRow(left); if error != Error.none { return solver.readerError(error); } let r, error = solver.resolveRow(right); if error != Error.none { return solver.readerError(error); }
@@ -679,7 +679,7 @@ recursive fn matchRow(self: Principal&, left: blot_check_effects::Id, right: blo
         if variable { let error = solver.rows(l, r); if error != Error.none { return solver.readerError(error); } return Error.none; }
     }  } }  } }
     let error = certificateRow(self, left, right); if error != Error.none { return error; }
-    if left < self.left.effects.rows.len { let source = self.left.row(left); match source.tail { blot_check_effects::Tail.variable match_payload_8 => { let value = match_payload_8.value;  if hasVariable(self.left, self.instance_rows, value) { return structuredRow(self, left, right, Bits256 {}, Bits256 {}, false, depth + 1); } }, _ => {}, } }
+    if left < self.left.effects.rows.len { let source = self.left.row(left); match source.tail { blot_check_effects::Tail.variable match_payload_8 => { let value = match_payload_8.value;  if hasVariable(self.left, self.instance_rows, value) { return structuredRow(self, left, right, Bits256 {..}, Bits256 {..}, false, depth + 1); } }, _ => {}, } }
     if left < self.left.effects.rows.len && right < self.right.effects.rows.len {
         let a = self.left.row(left); let b = self.right.row(right);
         if sameTypes(self.left, self.right) && a.labels.len == 0 && b.labels.len == 0 && blot_structural::equal(a.tail, b.tail) && a.cursor == b.cursor {
@@ -711,7 +711,7 @@ recursive fn matchRow(self: Principal&, left: blot_check_effects::Id, right: blo
                     if !owned { var exact = a.labels.len == b.labels.len; for label in self.right.rowLabels(right) { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; if label != blot_check_types::foreign_operation { exact = false; } } if exact { subset = false; } }
                  } else { return Error.invalid_artifact; } }
             }, _ => {}, } }
-            return structuredRow(self, left, right, Bits256 {}, Bits256 {}, subset, depth + 1);
+            return structuredRow(self, left, right, Bits256 {..}, Bits256 {..}, subset, depth + 1);
         }
     }
     if rowForeign(self, self.left, left) { if !rowForeign(self, self.right, right) || self.left.row(left).labels.len != self.right.row(right).labels.len { return Error.invalid_artifact; } return Error.none; }
@@ -751,11 +751,11 @@ recursive fn matchPrincipal(self: Principal&, left: Id, right: Id, depth: i64) -
         let binders, error = span(self.left, self.instance); if error != Error.none { return error; }
         for binder, ordinal in binders { if binder != left { continue; } var maximum: i64 = ordinary_source_type_limit; if a.tag == blot_check_types::Tag.bound || !sourceTypes(self) { maximum = 128; } if ordinal >= maximum { return Error.invalid_artifact; }
             if a.tag == blot_check_types::Tag.bound {
-                if a.b == 0 { var work = blot_check_usage_check::Work { remaining: self.remaining }; let contains, error = blot_check_usage_check::containsNominalWork(self.right, [], right, work); self.remaining = work.remaining; if error != Error.none || contains { return Error.invalid_artifact; } }
+                if a.b == 0 { var work = blot_check_usage_check::Work { remaining: self.remaining , ..}; let contains, error = blot_check_usage_check::containsNominalWork(self.right, [], right, work); self.remaining = work.remaining; if error != Error.none || contains { return Error.invalid_artifact; } }
                 else if a.b != 2 || b.tag != blot_check_types::Tag.bound || b.b != 2 { return Error.invalid_artifact; }
             }
             if self.witnesses[ordinal] == 0 { self.witnesses[ordinal] = right; return Error.none; }
-            var proof = Principal { left: self.right, right: self.right, remaining: self.remaining, views: self.views, instance: self.secondary, witnesses: self.secondary_witnesses };
+            var proof = Principal { left: self.right, right: self.right, remaining: self.remaining, views: self.views, instance: self.secondary, witnesses: self.secondary_witnesses , ..};
             let error = matchPrincipal(proof, self.witnesses[ordinal], right, depth + 1); if error != Error.none { return error; } return mergePending(self, proof);
         }
     }
@@ -780,9 +780,9 @@ recursive fn matchPrincipal(self: Principal&, left: Id, right: Id, depth: i64) -
         },
         blot_check_types::Tag.forall, blot_check_types::Tag.existential => {
             if a.c != b.c || a.c > 128 || self.formal_count >= self.formals.len { return Error.invalid_artifact; }
-            let xs, error = span(self.left, List { a.b, a.c }); if error != Error.none { return error; } let ys, error = span(self.right, List { b.b, b.c }); if error != Error.none { return error; }
+            let xs, error = span(self.left, List { a.b, a.c , ..}); if error != Error.none { return error; } let ys, error = span(self.right, List { b.b, b.c , ..}); if error != Error.none { return error; }
             for x, index in xs { if self.left.node(x).b != self.right.node(ys[index]).b { return Error.invalid_artifact; } }
-            self.formals[self.formal_count] = FormalPair { List { a.b, a.c }, List { b.b, b.c } }; self.formal_count += 1;
+            self.formals[self.formal_count] = FormalPair { List { a.b, a.c }, List { b.b, b.c , ..} , ..}; self.formal_count += 1;
             let error = matchQuantified(self, left, right, a, b, depth); self.formal_count -= 1; return error;
         },
         blot_check_types::Tag.function => {
@@ -803,9 +803,9 @@ recursive fn matchPrincipal(self: Principal&, left: Id, right: Id, depth: i64) -
         blot_check_types::Tag.provider => { if a.b != 0 || b.b != 0 { return Error.invalid_artifact; } let error = matchRow(self, a.c, b.c, depth + 1); if error != Error.none { return error; } return matchPrincipal(self, a.a, b.a, depth + 1); },
         blot_check_types::Tag.type_constructor => { if a.a != b.a || a.b != b.b || a.c != 0 || b.c != 0 { return Error.invalid_artifact; } },
         blot_check_types::Tag.state_provider => { let error = matchPrincipal(self, a.a, b.a, depth + 1); if error != Error.none { return error; } let error = matchPrincipal(self, a.b, b.b, depth + 1); if error != Error.none { return error; } return matchPrincipal(self, a.c, b.c, depth + 1); },
-        blot_check_types::Tag.product => { if a.b != b.b { return Error.invalid_artifact; } let xs, error = span(self.left, List { a.a, a.b }); if error != Error.none { return error; } let ys, error = span(self.right, List { b.a, b.b }); if error != Error.none { return error; } for x, index in xs { let error = matchPrincipal(self, x, ys[index], depth + 1); if error != Error.none { return error; } } },
+        blot_check_types::Tag.product => { if a.b != b.b { return Error.invalid_artifact; } let xs, error = span(self.left, List { a.a, a.b , ..}); if error != Error.none { return error; } let ys, error = span(self.right, List { b.a, b.b , ..}); if error != Error.none { return error; } for x, index in xs { let error = matchPrincipal(self, x, ys[index], depth + 1); if error != Error.none { return error; } } },
         blot_check_types::Tag.record => {
-            if a.b != b.b || a.b > 0x7fffffff { return Error.invalid_artifact; } let xs, error = span(self.left, List { a.a, a.b * 2 }); if error != Error.none { return error; } let ys, error = span(self.right, List { b.a, b.b * 2 }); if error != Error.none { return error; }
+            if a.b != b.b || a.b > 0x7fffffff { return Error.invalid_artifact; } let xs, error = span(self.left, List { a.a, a.b * 2 , ..}); if error != Error.none { return error; } let ys, error = span(self.right, List { b.a, b.b * 2 , ..}); if error != Error.none { return error; }
             let indexed, error = matchIndexedRecord(self, a, b, depth); if error != Error.none || indexed { return error; }
             for index in 0..a.b { let field = self.left.recordField(a, index); var found = false;
                 for other in 0..b.b { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; let candidate = self.right.recordField(b, other); if field.name != candidate.name { continue; } let error = matchPrincipal(self, field.ty, candidate.ty, depth + 1); if error != Error.none { return error; } found = true; break; }
@@ -815,7 +815,7 @@ recursive fn matchPrincipal(self: Principal&, left: Id, right: Id, depth: i64) -
         blot_check_types::Tag.nominal, blot_check_types::Tag.projection => {
             if a.a != b.a || a.b != b.b || a.c >= self.left.extra.len || b.c >= self.right.extra.len { return Error.invalid_artifact; }
             if a.tag == blot_check_types::Tag.projection { let x, error = projectionMember(self.left, a); if error != Error.none { return error; } let y, error = projectionMember(self.right, b); if error != Error.none || x != y { return Error.invalid_artifact; } }
-            let xs, error = span(self.left, List { a.c + 1, self.left.extra[a.c] }); if error != Error.none { return error; } let ys, error = span(self.right, List { b.c + 1, self.right.extra[b.c] }); if error != Error.none || xs.len != ys.len { return Error.invalid_artifact; }
+            let xs, error = span(self.left, List { a.c + 1, self.left.extra[a.c] , ..}); if error != Error.none { return error; } let ys, error = span(self.right, List { b.c + 1, self.right.extra[b.c] , ..}); if error != Error.none || xs.len != ys.len { return Error.invalid_artifact; }
             for x, index in xs { let error = matchPrincipal(self, x, ys[index], depth + 1); if error != Error.none { return error; } }
         },
         _ => { return Error.invalid_artifact; },

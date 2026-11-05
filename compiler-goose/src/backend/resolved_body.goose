@@ -23,28 +23,28 @@ fn create<E>(store: Store<E>&,unit: u32,root: u32,mappings: const blot_backend_l
     if store.headers.len >= 4294967295 { return 0,blot_error::Error.module_too_large; }
     var copied_mappings: const blot_backend_layout::Mapping[:] = []; if mappings.len != 0 { let out = owned_mappings.alloc_slice(mappings.len); for value,index in mappings { out[index] = value; } copied_mappings = out; }
     var copied_rows: const blot_backend_layout::RowMapping[:] = []; if rows.len != 0 { let out = owned_rows.alloc_slice(rows.len); for value,index in rows { out[index] = value; } copied_rows = out; }
-    store.headers.push(Header { unit: unit,root: root,mappings: copied_mappings,rows: copied_rows }); return store.headers.len as u32,blot_error::Error.none;
+    store.headers.push(Header { unit: unit,root: root,mappings: copied_mappings,rows: copied_rows , ..}); return store.headers.len as u32,blot_error::Error.none;
 }
 fn header<E>(store: Store<E>&,id: u32) -> Header { assert(id != 0 && id <= store.headers.len && store.headers[id - 1].active); return store.headers[id - 1]; }
 fn entryCount<E>(store: const Store<E>&,body: u32) -> i64 { var count: i64 = 0; var cursor = store.headers[body - 1].first; while cursor != 0 { count++; cursor = store.slots[cursor - 1].next; } return count; }
 fn sinkCount<E>(store: Store<E>&,body: u32) -> i64 { var count: i64 = 0; store.sinks.each() { key,value=>{ if key.body == body { count++; } } } return count; }
 fn put<E>(store: Store<E>&,body: u32,node: u32,entry: E) -> blot_error::Error {
-    assert(body != 0 && body <= store.headers.len && store.headers[body - 1].active); let key = NodeKey { body,node }; assert(!store.entries.contains(key));
+    assert(body != 0 && body <= store.headers.len && store.headers[body - 1].active); let key = NodeKey { body,node , ..}; assert(!store.entries.contains(key));
     if store.slots.len >= 4294967295 { return blot_error::Error.module_too_large; }
-    let payload .= store.payloads.push(entry); let next = (store.slots.len + 1) as u32; store.slots.push(Slot<E> { node,payload });
+    let payload .= store.payloads.push(entry); let next = (store.slots.len + 1) as u32; store.slots.push(Slot<E> { node,payload , ..});
     let previous = store.headers[body - 1].last; if previous != 0 { store.slots[previous - 1].next = next; } else { store.headers[body - 1].first = next; }
     store.headers[body - 1].last = next; store.entries.insert(key,payload); return blot_error::Error.none;
 }
-fn getRef<E>(store: Store<E>&,body: u32,node: u32) -> E..& { let found = store.entries.get(NodeKey { body,node }); assert(found); return found; }
+fn getRef<E>(store: Store<E>&,body: u32,node: u32) -> E..& { let found = store.entries.get(NodeKey { body,node , ..}); assert(found); return found; }
 fn get<E>(store: Store<E>&,body: u32,node: u32) -> E { getRef(store,body,node) }
-fn contains<E>(store: Store<E>&,body: u32,node: u32) -> bool { store.entries.contains(NodeKey { body,node }) }
-fn sink<E>(store: Store<E>&,body: u32,binding: u32) -> blot_support::Option<u32> { let value = store.sinks.get(SinkKey { body,binding }); if value { return blot_support::some(value); } return blot_support::none<u32>(); }
-fn setSink<E>(store: Store<E>&,body: u32,binding: u32,node: u32) { store.sinks.insert(SinkKey { body,binding },node); }
+fn contains<E>(store: Store<E>&,body: u32,node: u32) -> bool { store.entries.contains(NodeKey { body,node , ..}) }
+fn sink<E>(store: Store<E>&,body: u32,binding: u32) -> blot_support::Option<u32> { let value = store.sinks.get(SinkKey { body,binding , ..}); if value { return blot_support::some(value); } return blot_support::none<u32>(); }
+fn setSink<E>(store: Store<E>&,body: u32,binding: u32,node: u32) { store.sinks.insert(SinkKey { body,binding , ..},node); }
 recursive fn release<E>(store: Store<E>&,body: u32) {
     assert(body != 0 && body <= store.headers.len); if !store.headers[body - 1].active { return; } let snapshot = store.headers[body - 1]; store.headers[body - 1].active = false;
     if snapshot.numeric.present { snapshot.numeric.value.deinit(); } var cursor = snapshot.first;
     while cursor != 0 {
-        let slot = store.slots[cursor - 1]; var entry: E = slot.payload; entry.deinit(store); store.entries.remove(NodeKey { body,slot.node }); cursor = slot.next;
+        let slot = store.slots[cursor - 1]; var entry: E = slot.payload; entry.deinit(store); store.entries.remove(NodeKey { body,slot.node , ..}); cursor = slot.next;
     }
     if snapshot.mappings.len != 0 { let first: const blot_backend_layout::Mapping& = snapshot.mappings[0]; let at = owned_mappings.index_of(first); owned_mappings.free_slice(owned_mappings[at..at + snapshot.mappings.len]); }
     if snapshot.rows.len != 0 { let first: const blot_backend_layout::RowMapping& = snapshot.rows[0]; let at = owned_rows.index_of(first); owned_rows.free_slice(owned_rows[at..at + snapshot.rows.len]); }

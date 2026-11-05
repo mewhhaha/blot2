@@ -46,7 +46,7 @@ fn internHashed(store: Store&, values: const Entry[:], fingerprint: u64) -> Id, 
     if store.spans.len >= 4294967294 || values.len > 4294967295 ||
         store.entries.len > 4294967295 - values.len { return 0, Error.key_limit; }
     let id = (store.spans.len + 1) as Id;
-    store.spans.push(Span { store.entries.len as u32, values.len as u32 });
+    store.spans.push(Span { store.entries.len as u32, values.len as u32 , ..});
     store.entries.append(values); store.next.push(head); store.buckets.insert(fingerprint, id);
     return id, Error.none;
 }

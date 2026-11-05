@@ -5,23 +5,23 @@ import std;
 import support.option;
 enum Op { ref, at, link, view, load, write, length, read, push, pop, truncate, freeze, copy, reserve }
 fn lookup(name: const u8[:]) -> blot_support::Option<Op> {
-    if !starts_with(name, "@storage.") { return blot_support::Option<Op> { false, Op.ref }; }
+    if !starts_with(name, "@storage.") { return blot_support::Option<Op> { false, Op.ref , ..}; }
     let tail = name[9..];
-    if tail == "ref" { return blot_support::Option<Op> { true, Op.ref }; }
-    if tail == "at" { return blot_support::Option<Op> { true, Op.at }; }
-    if tail == "link" { return blot_support::Option<Op> { true, Op.link }; }
-    if tail == "view" { return blot_support::Option<Op> { true, Op.view }; }
-    if tail == "load" { return blot_support::Option<Op> { true, Op.load }; }
-    if tail == "write" { return blot_support::Option<Op> { true, Op.write }; }
-    if tail == "length" { return blot_support::Option<Op> { true, Op.length }; }
-    if tail == "read" { return blot_support::Option<Op> { true, Op.read }; }
-    if tail == "push" { return blot_support::Option<Op> { true, Op.push }; }
-    if tail == "pop" { return blot_support::Option<Op> { true, Op.pop }; }
-    if tail == "truncate" { return blot_support::Option<Op> { true, Op.truncate }; }
-    if tail == "freeze" { return blot_support::Option<Op> { true, Op.freeze }; }
-    if tail == "copy" { return blot_support::Option<Op> { true, Op.copy }; }
-    if tail == "reserve" { return blot_support::Option<Op> { true, Op.reserve }; }
-    return blot_support::Option<Op> { false, Op.ref };
+    if tail == "ref" { return blot_support::Option<Op> { true, Op.ref , ..}; }
+    if tail == "at" { return blot_support::Option<Op> { true, Op.at , ..}; }
+    if tail == "link" { return blot_support::Option<Op> { true, Op.link , ..}; }
+    if tail == "view" { return blot_support::Option<Op> { true, Op.view , ..}; }
+    if tail == "load" { return blot_support::Option<Op> { true, Op.load , ..}; }
+    if tail == "write" { return blot_support::Option<Op> { true, Op.write , ..}; }
+    if tail == "length" { return blot_support::Option<Op> { true, Op.length , ..}; }
+    if tail == "read" { return blot_support::Option<Op> { true, Op.read , ..}; }
+    if tail == "push" { return blot_support::Option<Op> { true, Op.push , ..}; }
+    if tail == "pop" { return blot_support::Option<Op> { true, Op.pop , ..}; }
+    if tail == "truncate" { return blot_support::Option<Op> { true, Op.truncate , ..}; }
+    if tail == "freeze" { return blot_support::Option<Op> { true, Op.freeze , ..}; }
+    if tail == "copy" { return blot_support::Option<Op> { true, Op.copy , ..}; }
+    if tail == "reserve" { return blot_support::Option<Op> { true, Op.reserve , ..}; }
+    return blot_support::Option<Op> { false, Op.ref , ..};
 }
 fn arity(op: Op) -> u32 {
     match op {

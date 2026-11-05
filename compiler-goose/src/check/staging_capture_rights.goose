@@ -28,7 +28,7 @@ fn Checker::report(self: Checker&, root: u32) -> const Report?, Error {
     var result, err = blot_check_capability_lifetimes::analyzeScope(self.module, self.units, root, self.remaining);
     if err != Error.none { if err != Error.out_of_memory { err = Error.invalid_artifact; } return null, err; }
     if !result.complete { blot_check_capability_lifetimes::deinit(result); return null, Error.invalid_artifact; }
-    self.reports.append(Entry { root, result }); return self.reports[self.reports.len - 1].report, Error.none;
+    self.reports.append(Entry { root, result , ..}); return self.reports[self.reports.len - 1].report, Error.none;
 }
 fn Checker::confined(self: Checker&, image: const Report&, value: u32, scopes: const u32[:]) -> Error {
     if !self.allocating { return Error.invalid_artifact; } var work: u32[>..<]; var seen: dictionary<u32,bool>;

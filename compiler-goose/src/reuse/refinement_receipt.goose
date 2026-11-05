@@ -108,8 +108,8 @@ fn releaseRecords(self: Adapter, source: const Record[:]) {
     assert(at >= 0); owned_records.free_slice(owned_records[at..at + source.len]);
 }
 fn recordBytes(self: Adapter) -> i64 { blot_host_layout::refinement_record }
-fn init(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_query_table::Limits { records: 8192, retained_capacity: 8388608 }) -> Table {
-    return blot_reuse_semantic_query_table::init<Key,Dependencies,Value,Adapter>(Adapter {}, limits);
+fn init(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_query_table::Limits { records: 8192, retained_capacity: 8388608 , ..}) -> Table {
+    return blot_reuse_semantic_query_table::init<Key,Dependencies,Value,Adapter>(Adapter {..}, limits);
 }
 enum Reason { mode, root, source, shape, seed, scalar, call, plain, import_ }
 enum RecordDecline { owner, source, generative, incomplete, capacity }
@@ -142,7 +142,7 @@ fn scalarEvidence<S>(session: const S&, target: blot_check_core::BindingRef) -> 
     return 0;
 }
 fn callKey(read: blot_reuse_specialization_receipt::CallRead, evidence: u32) -> blot_eval_core_eval::CallProofKey {
-    return blot_eval_core_eval::CallProofKey { target: blot_check_core::BindingRef { read.unit - 1, read.binding }, evidence: evidence };
+    return blot_eval_core_eval::CallProofKey { target: blot_check_core::BindingRef { read.unit - 1, read.binding , ..}, evidence: evidence , ..};
 }
 fn lookupLocal<G>(g: G&, root: Root, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:],
     rows: const blot_eval_type_evidence::RowMapping[:]) -> blot_support::Option<Value>, Error {
@@ -211,9 +211,9 @@ fn recordOwned<G>(g: G&, table: Table&, root: Root, expected: u32, seeds: const 
             g.evaluator.storage.values.len == before_values && g.evaluator.storage.children.len == before_children &&
             g.evaluator.steps == before_steps && tape.views.len == 0,
         sources: [], scalar_reads: [], call_reads: [], call_publications: [], views: [], plain_facts: [],
-    });
+     ..});
     if error != Error.none { return error; }
-    var builder = table.begin(Key { root, expected, copySeeds(seeds), copyRows(rows), facts.options, facts.depth });
+    var builder = table.begin(Key { root, expected, copySeeds(seeds), copyRows(rows), facts.options, facts.depth , ..});
     builder.read(facts);
     let output, error = copyResult(result); if error != Error.none { builder.abort(); return error; }
     builder.stage(output); var candidate = builder.complete(); builder.abort();
@@ -269,14 +269,14 @@ fn lookup<G>(g: G&, root: Root, shape: blot_reuse_code_expectation::View, expect
 }
 fn lookupOwned<G,S>(g: G&, state: S&, destination: Table&, root: Root, shape: blot_reuse_code_expectation::View,
     expected: u32, seeds: const blot_eval_type_evidence::Mapping[:], rows: const blot_eval_type_evidence::RowMapping[:]) -> blot_support::Option<Value>, Error {
-    let gate = state.gate; let ordinary = blot_eval_core_eval::Options { trace_runtime_dependencies: true };
+    let gate = state.gate; let ordinary = blot_eval_core_eval::Options { trace_runtime_dependencies: true , ..};
     if !gate.enabled || g.evaluator.receipt_tape != null || g.evaluator.options != ordinary || g.evaluator.depth != 0 ||
         !blot_support::same_slice_identity(gate.units, g.evaluator.units) || g.allocation_owner == 0 || state.allocation_owner != g.allocation_owner {
         decline(g, Reason.mode); return blot_support::none<Value>(), Error.none;
     }
     assert(state.old.metadata.pools.present); let pools = state.old.metadata.pools.value;
     if !pools.bridge.present { return blot_support::none<Value>(), Error.none; }
-    let bridge = pools.bridge.value; let before_shape = blot_reuse_code_expectation::View { bridge.nodes, bridge.extra };
+    let bridge = pools.bridge.value; let before_shape = blot_reuse_code_expectation::View { bridge.nodes, bridge.extra , ..};
     let table = state.old.metadata.refinement_queries;
     var cursor = table.candidates(rootFingerprint(root), blot_reuse_semantic_query_table::Order.oldest_first);
     loop {
@@ -369,7 +369,7 @@ fn lookupOwned<G,S>(g: G&, state: S&, destination: Table&, root: Root, shape: bl
         let mapped, error = mapReplay(g, maps, next_facts, output);
         if error != Error.none { next_facts.deinit(); output.deinit(); return blot_support::none<Value>(), error; }
         if !mapped { next_facts.deinit(); output.deinit(); decline(g, Reason.import_); continue; }
-        var builder = destination.begin(Key { root, expected, copySeeds(seeds), copyRows(rows), next_facts.options, next_facts.depth });
+        var builder = destination.begin(Key { root, expected, copySeeds(seeds), copyRows(rows), next_facts.options, next_facts.depth , ..});
         next_facts.values_before = g.evaluator.storage.values.len; next_facts.children_before = g.evaluator.storage.children.len;
         builder.read(next_facts);
         let owned_output, error = copyResult(output);
@@ -427,6 +427,6 @@ struct ObservationOwner { lease: u32=0,generation: u64=0 }
 struct ObservationOwnerState { value: Observation,generation: u64,live: bool=true }
 reusable var observation_owner_slots: ObservationOwnerState[>..]=[];
 var next_observation_owner_slots_generation: u64=1;
-fn initObservationOwner() -> ObservationOwner,Error { if next_observation_owner_slots_generation==0xffffffffffffffff||observation_owner_slots.len>=0xffffffff { return ObservationOwner {},Error.out_of_memory; } let value=Observation {}; let generation=next_observation_owner_slots_generation; next_observation_owner_slots_generation++; let at=observation_owner_slots.alloc_index(ObservationOwnerState {value,generation,true}); return ObservationOwner {(at+1) as u32,generation},Error.none; }
+fn initObservationOwner() -> ObservationOwner,Error { if next_observation_owner_slots_generation==0xffffffffffffffff||observation_owner_slots.len>=0xffffffff { return ObservationOwner {..},Error.out_of_memory; } let value=Observation {..}; let generation=next_observation_owner_slots_generation; next_observation_owner_slots_generation++; let at=observation_owner_slots.alloc_index(ObservationOwnerState {value,generation,true, ..}); return ObservationOwner {(at+1) as u32,generation, ..},Error.none; }
 fn borrow(self: ObservationOwner) -> Observation? { if self.lease==0||self.lease-1>=observation_owner_slots.len { return null; } let slot: ObservationOwnerState&=observation_owner_slots[self.lease-1]; if !slot.live||slot.generation!=self.generation { return null; } return slot.value; }
-fn deinit(self: ObservationOwner&) { if self.lease==0 { return; } let at=self.lease-1; assert(at<observation_owner_slots.len&&observation_owner_slots[at].live&&observation_owner_slots[at].generation==self.generation); let slot: ObservationOwnerState&=observation_owner_slots[at]; slot.value=Observation {}; slot.live=false; observation_owner_slots.free(at); self=ObservationOwner {}; }
+fn deinit(self: ObservationOwner&) { if self.lease==0 { return; } let at=self.lease-1; assert(at<observation_owner_slots.len&&observation_owner_slots[at].live&&observation_owner_slots[at].generation==self.generation); let slot: ObservationOwnerState&=observation_owner_slots[at]; slot.value=Observation {..}; slot.live=false; observation_owner_slots.free(at); self=ObservationOwner {..}; }

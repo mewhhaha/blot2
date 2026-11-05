@@ -69,12 +69,12 @@ fn validate(owner:const Interface&,symbol_count:i64,unit_count:i64)->Error {
  for node in owner.graph.nodes {
   match node.tag {
    Tag.bound=>{if node.b==0 {{ let propagated_error = require(owner.has_rank_contracts&&node.a<128&&node.c==0); if propagated_error != Error.none { return propagated_error; } }}else if node.c==0 {{ let propagated_error = require(owner.has_rank_contracts&&node.a<128&&(node.b==1||(owner.has_usage_contracts&&node.b==2))); if propagated_error != Error.none { return propagated_error; } }}else {{ let propagated_error = require(owner.has_usage_contracts&&node.a==0&&node.b==2&&node.c<owner.bindings.len); if propagated_error != Error.none { return propagated_error; } }}},
-   Tag.forall,Tag.existential=>{{ let propagated_error = require(owner.has_rank_contracts); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = ty(owner,node.a); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = typeList(owner,List {node.b,node.c}); if propagated_error != Error.none { return propagated_error; } }},
+   Tag.forall,Tag.existential=>{{ let propagated_error = require(owner.has_rank_contracts); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = ty(owner,node.a); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = typeList(owner,List {node.b,node.c, ..}); if propagated_error != Error.none { return propagated_error; } }},
    Tag.rigid=>{return Error.invalid_artifact;},
    Tag.instance_version=>{{ let propagated_error = units(node.a,unit_count); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = require(node.a!=0&&node.b!=0&&node.b<0x04000000&&node.c<16); if propagated_error != Error.none { return propagated_error; } }},
    Tag.instance_selection=>{
     { let propagated_error = units(node.a,unit_count); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = require(node.a!=0&&node.b!=0&&node.c<owner.graph.extra.len&&owner.graph.extra[node.c]==3); if propagated_error != Error.none { return propagated_error; } }
-    { let propagated_error = require(node.c!=0xffffffff); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = typeList(owner,List {node.c+1,3}); if propagated_error != Error.none { return propagated_error; } }let children=owner.graph.extra[node.c+1..node.c+4];
+    { let propagated_error = require(node.c!=0xffffffff); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = typeList(owner,List {node.c+1,3, ..}); if propagated_error != Error.none { return propagated_error; } }let children=owner.graph.extra[node.c+1..node.c+4];
     { let propagated_error = require(owner.graph.nodes[children[0]].tag==Tag.scoped&&owner.graph.nodes[children[1]].tag==Tag.scoped&&owner.graph.nodes[children[2]].tag==Tag.instance_version); if propagated_error != Error.none { return propagated_error; } }
    },
    Tag.usage=>{{ let propagated_error = ty(owner,node.a); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = require(owner.has_usage_contracts&&node.b<=6); if propagated_error != Error.none { return propagated_error; } }if node.c!=0 {{ let propagated_error = ty(owner,node.c); if propagated_error != Error.none { return propagated_error; } }}},
@@ -83,21 +83,21 @@ fn validate(owner:const Interface&,symbol_count:i64,unit_count:i64)->Error {
    Tag.absent,Tag.unit,Tag.boolean,Tag.unsigned32,Tag.floating32,Tag.never=>{},
    Tag.variable=>{{ let propagated_error = require(node.b==0&&node.c==0); if propagated_error != Error.none { return propagated_error; } }},
    Tag.function=>{{ let propagated_error = ty(owner,node.a); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = ty(owner,node.b); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = require(node.c<owner.graph.rows.len); if propagated_error != Error.none { return propagated_error; } }},
-   Tag.product=>{{ let propagated_error = typeList(owner,List {node.a,node.b}); if propagated_error != Error.none { return propagated_error; } }},
+   Tag.product=>{{ let propagated_error = typeList(owner,List {node.a,node.b, ..}); if propagated_error != Error.none { return propagated_error; } }},
    Tag.record=>{
     { let propagated_error = require(node.b<=0x7fffffff); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = range(node.a,node.b*2,owner.graph.extra.len); if propagated_error != Error.none { return propagated_error; } }
     for index in 0..node.b {let name=owner.graph.extra[node.a+index*2];{ let propagated_error = require(name!=0&&name<symbol_count); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = ty(owner,owner.graph.extra[node.a+index*2+1]); if propagated_error != Error.none { return propagated_error; } }}
    },
    Tag.nominal,Tag.projection=>{
-    { let propagated_error = identity(blot_check_types::NominalIdentity {node.a,node.b},symbol_count,unit_count); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = require(node.c<owner.graph.extra.len&&node.c!=0xffffffff); if propagated_error != Error.none { return propagated_error; } }
-    let count=owner.graph.extra[node.c];let start=node.c+1;{ let propagated_error = typeList(owner,List {start,count}); if propagated_error != Error.none { return propagated_error; } }
+    { let propagated_error = identity(blot_check_types::NominalIdentity {node.a,node.b, ..},symbol_count,unit_count); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = require(node.c<owner.graph.extra.len&&node.c!=0xffffffff); if propagated_error != Error.none { return propagated_error; } }
+    let count=owner.graph.extra[node.c];let start=node.c+1;{ let propagated_error = typeList(owner,List {start,count, ..}); if propagated_error != Error.none { return propagated_error; } }
     if node.tag==Tag.projection {
      { let propagated_error = require(count<=0xffffffff-start); if propagated_error != Error.none { return propagated_error; } }let slot=start+count;{ let propagated_error = require(slot<owner.graph.extra.len); if propagated_error != Error.none { return propagated_error; } }let member_name=owner.graph.extra[slot];{ let propagated_error = require(member_name!=0&&member_name<symbol_count); if propagated_error != Error.none { return propagated_error; } }
      var declared=false;for member in owner.contract_members {if member.contract.unit==node.a&&member.contract.decl==node.b&&member.name==member_name&&member.kind!=blot_reuse_principal_interface::ContractMemberKind.value {declared=true;}}{ let propagated_error = require(declared); if propagated_error != Error.none { return propagated_error; } }
      var selected=false;for candidate in owner.contracts {if candidate.identity.unit==node.a&&candidate.identity.decl==node.b {{ let propagated_error = require(count==candidate.parameters.len); if propagated_error != Error.none { return propagated_error; } }selected=true;break;}}{ let propagated_error = require(selected); if propagated_error != Error.none { return propagated_error; } }
     }
    },
-   Tag.type_constructor=>{{ let propagated_error = identity(blot_check_types::NominalIdentity {node.a,node.b},symbol_count,unit_count); if propagated_error != Error.none { return propagated_error; } }},
+   Tag.type_constructor=>{{ let propagated_error = identity(blot_check_types::NominalIdentity {node.a,node.b, ..},symbol_count,unit_count); if propagated_error != Error.none { return propagated_error; } }},
    Tag.array,Tag.list,Tag.cursor,Tag.resolver=>{{ let propagated_error = ty(owner,node.a); if propagated_error != Error.none { return propagated_error; } }},
    Tag.provider=>{{ let propagated_error = ty(owner,node.a); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = require(node.c<owner.graph.rows.len); if propagated_error != Error.none { return propagated_error; } }},
    Tag.state_provider=>{{ let propagated_error = ty(owner,node.a); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = ty(owner,node.b); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = ty(owner,node.c); if propagated_error != Error.none { return propagated_error; } }},
@@ -122,7 +122,7 @@ fn validate(owner:const Interface&,symbol_count:i64,unit_count:i64)->Error {
  for node in owner.patterns.nodes {
   match node.kind {
    blot_check_parameter_patterns::Kind.binding=>{{ let propagated_error = ty(owner,node.a); if propagated_error != Error.none { return propagated_error; } }},
-   blot_check_parameter_patterns::Kind.tuple,blot_check_parameter_patterns::Kind.array=>{{ let propagated_error = patternList(owner,List {node.a,node.b}); if propagated_error != Error.none { return propagated_error; } }},
+   blot_check_parameter_patterns::Kind.tuple,blot_check_parameter_patterns::Kind.array=>{{ let propagated_error = patternList(owner,List {node.a,node.b, ..}); if propagated_error != Error.none { return propagated_error; } }},
    blot_check_parameter_patterns::Kind.record=>{
     { let propagated_error = require(node.b<=0x7fffffff); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = range(node.a,node.b*2,owner.patterns.extra.len); if propagated_error != Error.none { return propagated_error; } }
     for index in 0..node.b {{ let propagated_error = require(owner.patterns.extra[node.a+index*2]<symbol_count); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = require(owner.patterns.extra[node.a+index*2+1]<owner.patterns.nodes.len); if propagated_error != Error.none { return propagated_error; } }}
@@ -246,7 +246,7 @@ fn child(self:GraphEdges,key:i64,index:i64)->blot_support::Option<i64> {
 struct Frame {key:i64=0,next:i64=0}
 fn validateGraph(owner:const Interface&)->Error {var remaining:i64=1000000;return validateGraphWithBudget(owner,remaining);}
 fn validateGraphWithBudget(owner:const Interface&,remaining:i64&)->Error {
- if owner.has_numeric_proofs {{ let propagated_error = blot_check_numeric_proof_core::dataTypes(blot_check_frozen_types::Source.frozen {owner.graph},owner.graph.nodes); if propagated_error != Error.none { return propagated_error; } }}
+ if owner.has_numeric_proofs {{ let propagated_error = blot_check_numeric_proof_core::dataTypes(blot_check_frozen_types::Source.frozen {owner.graph, ..},owner.graph.nodes); if propagated_error != Error.none { return propagated_error; } }}
  { let propagated_error = require(owner.has_numeric_proofs||owner.proof_contracts.len==0); if propagated_error != Error.none { return propagated_error; } }
  // All growing owners below stay outside the recursive proof/checker cycles.
  var terms:blot_check_numeric_proof_terms::Term[>..<]=[];var term_index:dictionary<blot_check_numeric_proof_terms::Term,u32>=dictionary<blot_check_numeric_proof_terms::Term,u32> {};
@@ -255,7 +255,7 @@ fn validateGraphWithBudget(owner:const Interface&,remaining:i64&)->Error {
  for value in owner.proof_contracts {
   { let propagated_error = require(value.binding!=0&&value.binding<owner.bindings.len); if propagated_error != Error.none { return propagated_error; } }{ let propagated_error = require(!proof_bindings.contains(value.binding)); if propagated_error != Error.none { return propagated_error; } }proof_bindings.insert(value.binding,true);
   let signature_error=value.header.signature().validateInto(proof_budget);if signature_error==Error.out_of_memory {return signature_error;}if signature_error!=Error.none {return Error.invalid_artifact;}
-  { let propagated_error = blot_check_numeric_proof_core::signatureTypes(blot_check_frozen_types::Source.frozen {owner.graph},owner.bindings[value.binding].ty,value.header); if propagated_error != Error.none { return propagated_error; } }
+  { let propagated_error = blot_check_numeric_proof_core::signatureTypes(blot_check_frozen_types::Source.frozen {owner.graph, ..},owner.bindings[value.binding].ty,value.header); if propagated_error != Error.none { return propagated_error; } }
  }
  remaining-=min(remaining,proof_budget.visits);proof_budget.deinit();
  { let propagated_error = blot_check_associated_admission::interfaceWithBudget(owner,remaining); if propagated_error != Error.none { return propagated_error; } }let source=blot_check_associated_admission::typesView(owner.graph);
@@ -267,14 +267,14 @@ fn validateGraphWithBudget(owner:const Interface&,remaining:i64&)->Error {
   if n.tag!=Tag.record {continue;}if generation==0xffffffff {return Error.invalid_artifact;}generation++;
   for index in 0..n.b {let name=owner.graph.extra[n.a+index*2];if stamps[name]==generation {return Error.invalid_artifact;}stamps[name]=generation;}
  }
- let graph=GraphEdges {owner};let count=graph.total();var colors:u8[>..<]=[];colors.resize(count,0);var frames:Frame[>..<]=[];frames.resize(count,Frame {});
+ let graph=GraphEdges {owner, ..};let count=graph.total();var colors:u8[>..<]=[];colors.resize(count,0);var frames:Frame[>..<]=[];frames.resize(count,Frame {..});
  for root in 0..count {
-  if colors[root]!=0 {continue;}var depth:i64=1;frames[0]=Frame {key:root};colors[root]=1;
+  if colors[root]!=0 {continue;}var depth:i64=1;frames[0]=Frame {key:root, ..};colors[root]=1;
   while depth!=0 {
    let current:Frame&=frames[depth-1];let next=graph.child(current.key,current.next);
    if !next.present {colors[current.key]=2;depth--;continue;}current.next++;
    let child=next.value;if colors[child]==1 {return Error.invalid_artifact;}if colors[child]==2 {continue;}
-   colors[child]=1;frames[depth]=Frame {key:child};depth++;
+   colors[child]=1;frames[depth]=Frame {key:child, ..};depth++;
   }
  }
  return blot_check_rank_portable::interface(owner);

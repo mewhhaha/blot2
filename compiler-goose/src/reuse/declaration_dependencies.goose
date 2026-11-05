@@ -24,11 +24,11 @@ struct Capture {
 fn withCapture<C,F>(module: const Module&, context: C, selection: bool = false, watched: u32 = 0) {
     var work: Work[>..<] = []; var references: BindingRef[>..<] = []; var locations: u32[>..<] = []; var members: Member[>..<] = [];
     var schemes: dictionary<u32,bool> = default<dictionary<u32,bool>>();
-    var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: schemes, watched_binding: watched, selection: selection };
+    var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: schemes, watched_binding: watched, selection: selection , ..};
     return F(scan, context);
 }
-fn node(self: Capture&, id: u32) { if self.failure == Error.none && id != 0 { self.work.push(Work.node { id }); } }
-fn pattern(self: Capture&, id: u32) { if self.failure == Error.none && id != 0 { self.work.push(Work.pattern { id }); } }
+fn node(self: Capture&, id: u32) { if self.failure == Error.none && id != 0 { self.work.push(Work.node { id , ..}); } }
+fn pattern(self: Capture&, id: u32) { if self.failure == Error.none && id != 0 { self.work.push(Work.pattern { id , ..}); } }
 fn nodes(self: Capture&, ids: const u32[:]) { var index = ids.len; while index != 0 { index--; self.node(ids[index]); } }
 fn reference(self: Capture&, target: BindingRef, source: u32) {
     if self.failure != Error.none { return; } if target.binding == 0 { self.failure = Error.core_limit; return; }
@@ -39,11 +39,11 @@ fn reference(self: Capture&, target: BindingRef, source: u32) {
     }
     self.references.push(target); self.locations.push(source);
 }
-fn member(self: Capture&, name: u32, op: blot_check_types::Operator) { if self.failure == Error.none && (name != 0 || op != blot_check_types::Operator.none) { self.members.push(Member { name, op }); } }
+fn member(self: Capture&, name: u32, op: blot_check_types::Operator) { if self.failure == Error.none && (name != 0 || op != blot_check_types::Operator.none) { self.members.push(Member { name, op , ..}); } }
 fn member(self: Capture&, name: u32) { self.member(name, blot_check_types::Operator.none); }
 fn scheme(self: Capture&, value: blot_check_types::Scheme) {
     if self.failure != Error.none || value.obligations.len == 0 { return; }
-    var pending: SchemeFrame[>..<] = []; pending.push(SchemeFrame { value }); var remaining = scan_limit;
+    var pending: SchemeFrame[>..<] = []; pending.push(SchemeFrame { value , ..}); var remaining = scan_limit;
     while pending.len != 0 {
         let last = pending.len - 1; let frame = pending[last]; if frame.next == frame.scheme.obligations.len { pending.pop(); continue; }
         if remaining == 0 { self.failure = Error.core_limit; return; } remaining--; pending[last].next++;
@@ -51,7 +51,7 @@ fn scheme(self: Capture&, value: blot_check_types::Scheme) {
         if obligation.kind == blot_check_types::ObligationKind.callee_use {
             if obligation.identity.unit != 0 && obligation.identity.unit != self.module.unit { self.failure = Error.core_limit; return; }
             let binding = obligation.identity.decl; if binding == 0 || binding >= self.module.bindings.len { self.failure = Error.core_limit; return; }
-            if !self.schemes_seen.contains(binding) { self.schemes_seen.insert(binding, true); pending.push(SchemeFrame { self.module.binding(binding).scheme }); } continue;
+            if !self.schemes_seen.contains(binding) { self.schemes_seen.insert(binding, true); pending.push(SchemeFrame { self.module.binding(binding).scheme , ..}); } continue;
         }
         if self.selection { self.member(obligation.name, obligation.operator); continue; } if !obligation.explicit { continue; }
         match obligation.kind {
@@ -65,15 +65,15 @@ fn scan(self: Capture&, body: blot_check_core::Body) -> Recipe, Error {
     let first_reference = self.references.len; let first_member = self.members.len;
     self.schemes_seen.clear(); self.runtime_metadata = 0; self.scheme(body.scheme); self.node(body.root); var remaining = scan_limit;
     while self.work.len != 0 {
-        if self.failure != Error.none { return Recipe {}, self.failure; } if remaining == 0 { return Recipe {}, Error.core_limit; } remaining--;
+        if self.failure != Error.none { return Recipe {..}, self.failure; } if remaining == 0 { return Recipe {..}, Error.core_limit; } remaining--;
         let item = self.work.pop(); match item {
             Work.node entry => { self.scanNode(entry.id); },
             Work.pattern entry => { self.scanPattern(entry.id); },
         }
     }
-    if self.failure != Error.none { return Recipe {}, self.failure; }
-    if self.references.len > 0xffffffff || self.members.len > 0xffffffff { return Recipe {}, Error.core_limit; }
-    return Recipe { references: blot_check_core::List { first_reference as u32, (self.references.len - first_reference) as u32 }, members: blot_check_core::List { first_member as u32, (self.members.len - first_member) as u32 }, runtime_metadata: self.runtime_metadata }, Error.none;
+    if self.failure != Error.none { return Recipe {..}, self.failure; }
+    if self.references.len > 0xffffffff || self.members.len > 0xffffffff { return Recipe {..}, Error.core_limit; }
+    return Recipe { references: blot_check_core::List { first_reference as u32, (self.references.len - first_reference) as u32 , ..}, members: blot_check_core::List { first_member as u32, (self.members.len - first_member) as u32 , ..}, runtime_metadata: self.runtime_metadata , ..}, Error.none;
 }
 fn scanNode(self: Capture&, id: u32) {
     if id >= self.module.nodes.len { self.failure = Error.core_limit; return; }
@@ -89,7 +89,7 @@ fn scanNode(self: Capture&, id: u32) {
             self.nodes(m.children(id)); let template = m.member_templates[n.a];
             for implementation in m.implementations {
                 if !blot_structural::equal(implementation.contract, template.contract) { continue; }
-                for method in m.implementation_members[implementation.members.start..implementation.members.start + implementation.members.len] { if method.kind == blot_check_core::ImplementationMemberKind.value && method.name == template.name { self.reference(BindingRef { method.target.unit, method.target.binding }, id); } }
+                for method in m.implementation_members[implementation.members.start..implementation.members.start + implementation.members.len] { if method.kind == blot_check_core::ImplementationMemberKind.value && method.name == template.name { self.reference(BindingRef { method.target.unit, method.target.binding , ..}, id); } }
             }
         },
         blot_check_core::Tag.constant, blot_check_core::Tag.primitive_function, blot_check_core::Tag.panic, blot_check_core::Tag.constructor_function, blot_check_core::Tag.type_constructor => {},
@@ -169,13 +169,13 @@ fn operator(op: blot_check_core::Op) -> blot_support::Option<blot_check_types::O
 fn capture(module: Module&, declarations: Recipe[>..<]&, references: BindingRef[>..<]&, members: Member[>..<]&) -> Error {
     assert(module.declaration_dependencies.len == 0); assert(declarations.len == 0 && references.len == 0 && members.len == 0);
     var work: Work[>..<] = []; var locations: u32[>..<] = []; var seen: dictionary<u32,bool> = default<dictionary<u32,bool>>();
-    var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: seen };
-    for index in module.bodies.len { declarations.push(Recipe {}); }
+    var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: seen , ..};
+    for index in module.bodies.len { declarations.push(Recipe {..}); }
     for body, offset in module.bodies[1..] { let recipe, error = scan.scan(body); if error != Error.none { declarations.clear(); references.clear(); members.clear(); return error; } declarations[offset + 1] = recipe; }
     module.declaration_dependencies = declarations[..]; module.dependency_references = references[..]; module.dependency_members = members[..]; return Error.none;
 }
 struct Selection { body: blot_check_core::Body, output: Member[>..<]& }
-fn selectionMembers(module: const Module&, body: blot_check_core::Body, output: Member[>..<]&) -> Error { return withCapture(module, Selection { body, output }, true, 0, select); }
+fn selectionMembers(module: const Module&, body: blot_check_core::Body, output: Member[>..<]&) -> Error { return withCapture(module, Selection { body, output , ..}, true, 0, select); }
 fn select(scan: Capture&, context: Selection) -> Error { let recipe, error = scan.scan(context.body); if error != Error.none { return error; } context.output.append(scan.members[..]); return Error.none; }
 reusable[] var owned_references: BindingRef[>..] = [];
 reusable[] var owned_locations: u32[>..] = [];
@@ -184,10 +184,10 @@ fn copyLocations(source: const u32[:]) -> u32[:] { if source.len == 0 { return [
 fn releaseReferences(source: const BindingRef[:]) { if source.len != 0 { let first: const BindingRef& = source[0]; let at = owned_references.index_of(first); assert(at >= 0); owned_references.free_slice(owned_references[at..at + source.len]); } }
 fn releaseLocations(source: const u32[:]) { if source.len != 0 { let first: const u32& = source[0]; let at = owned_locations.index_of(first); assert(at >= 0); owned_locations.free_slice(owned_locations[at..at + source.len]); } }
 struct Expression { references: BindingRef[:] = [], locations: u32[:] = [], runtime_metadata: u32 = 0 }
-fn deinit(self: Expression&) { releaseReferences(self.references); releaseLocations(self.locations); self = Expression {}; }
+fn deinit(self: Expression&) { releaseReferences(self.references); releaseLocations(self.locations); self = Expression {..}; }
 fn expression(module: const Module&, root: u32) -> Expression, Error { return withCapture(module, root, false, 0, captureExpression); }
-fn captureExpression(scan: Capture&, root: u32) -> Expression, Error { let recipe, error = scan.scan(blot_check_core::Body { root: root }); if error != Error.none { return Expression {}, error; } return Expression { copyReferences(scan.references[..]), copyLocations(scan.locations[..]), recipe.runtime_metadata }, Error.none; }
+fn captureExpression(scan: Capture&, root: u32) -> Expression, Error { let recipe, error = scan.scan(blot_check_core::Body { root: root , ..}); if error != Error.none { return Expression {..}, error; } return Expression { copyReferences(scan.references[..]), copyLocations(scan.locations[..]), recipe.runtime_metadata , ..}, Error.none; }
 fn expressionReferences(module: const Module&, root: u32) -> BindingRef[:], Error { return withCapture(module, root, false, 0, captureReferences); }
-fn captureReferences(scan: Capture&, root: u32) -> BindingRef[:], Error { let recipe, error = scan.scan(blot_check_core::Body { root: root }); if error != Error.none { return [], error; } return copyReferences(scan.references[..]), Error.none; }
+fn captureReferences(scan: Capture&, root: u32) -> BindingRef[:], Error { let recipe, error = scan.scan(blot_check_core::Body { root: root , ..}); if error != Error.none { return [], error; } return copyReferences(scan.references[..]), Error.none; }
 fn usesBinding(module: const Module&, root: u32, binding: u32) -> bool, Error { return withCapture(module, root, false, binding, checkBinding); }
-fn checkBinding(scan: Capture&, root: u32) -> bool, Error { let recipe, error = scan.scan(blot_check_core::Body { root: root }); return scan.watched_used, error; }
+fn checkBinding(scan: Capture&, root: u32) -> bool, Error { let recipe, error = scan.scan(blot_check_core::Body { root: root , ..}); return scan.watched_used, error; }

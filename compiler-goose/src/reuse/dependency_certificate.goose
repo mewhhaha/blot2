@@ -24,7 +24,7 @@ struct Certificate { record: Record, reused_images: i64 = 0 }
 struct Stats {
     dependency_validations: i64 = 0, reused_dependency_validations: i64 = 0,
     projection_scans: i64 = 0, projection_visits: i64 = 0, projection_workspace_peak_bytes: i64 = 0,
-    retained: blot_reuse_semantic_query_table::Storage = blot_reuse_semantic_query_table::Storage {}, reused_images: i64 = 0,
+    retained: blot_reuse_semantic_query_table::Storage = blot_reuse_semantic_query_table::Storage {..}, reused_images: i64 = 0,
 }
 fn observe<G>(self: Stats&, gate: const G&) {
     self.dependency_validations += gate.dependency_validations; self.reused_dependency_validations += gate.reused_dependency_validations;
@@ -58,7 +58,7 @@ fn captureReusingWithBudget(context: Context, pins: const Pin[:], names: View, p
     if context.units.len > remaining / image_owner_bytes { return no, Error.none; } remaining -= context.units.len * image_owner_bytes;
     for ref in context.units { if ref.value.nominals.len > remaining / nominal_fact_bytes { return no, Error.none; } remaining -= ref.value.nominals.len * nominal_fact_bytes; }
     let image, captured = blot_check_frozen_core_validation::capture(context, context.units); if captured != Error.none { return no, captured; }
-    var result = Certificate { record: Record { key: image, dependencies: Dependencies { namespace: Image {} }, value: Checked {} } };
+    var result = Certificate { record: Record { key: image, dependencies: Dependencies { namespace: Image {..} , ..}, value: Checked {..} , ..} , ..};
     let namespace, names_error = blot_reuse_validation_image::capture(names, remaining);
     if names_error != Error.none || !namespace.present { result.deinit(); return no, names_error; } result.record.dependencies.namespace = namespace.value;
     let run = module_images.alloc_slice(pins.len); var initialized: i64 = 0;
@@ -74,7 +74,7 @@ fn captureModules(result: Certificate&, context: Context, pins: const Pin[:], na
     for pin, ordinal in pins {
         let unit .= context.units[ordinal].value; let owner = names.owner((ordinal + 1) as u32);
         if !owner.present || pin.module .!= unit || pin.unit != ordinal + 1 || pin.canonical_path != owner.value || pin.canonical_path.len > remaining { return Error.none; }
-        remaining -= pin.canonical_path.len; let path = ownPath(pin.canonical_path); var graph = Image {};
+        remaining -= pin.canonical_path.len; let path = ownPath(pin.canonical_path); var graph = Image {..};
         let shared = reusedImage(previous, reusable, ordinal, pin);
         if shared.present {
             if shared.value.bytes.len > remaining { releasePath(path); return Error.none; } remaining -= shared.value.bytes.len;
@@ -83,14 +83,14 @@ fn captureModules(result: Certificate&, context: Context, pins: const Pin[:], na
             let captured, error = blot_reuse_validation_image::capture(unit, remaining);
             if error != Error.none || !captured.present { releasePath(path); return error; } graph = captured.value;
         }
-        run[ordinal] = ModuleImage { pin.unit, path, pin.token, graph }; initialized++;
+        run[ordinal] = ModuleImage { pin.unit, path, pin.token, graph , ..}; initialized++;
     }
     return Error.none;
 }
 fn storage(self: const Certificate&) -> blot_reuse_semantic_query_table::Storage {
     let dependencies = self.record.dependencies;
     var bytes = dependencies.namespace.bytes.len + dependencies.modules.len * module_image_bytes + self.record.key.owners.len * image_owner_bytes + self.record.key.nominal_facts.len * nominal_fact_bytes;
-    for module in dependencies.modules { bytes += module.path.len + module.graph.bytes.len; } return blot_reuse_semantic_query_table::Storage { records: 1, payload_bytes: bytes };
+    for module in dependencies.modules { bytes += module.path.len + module.graph.bytes.len; } return blot_reuse_semantic_query_table::Storage { records: 1, payload_bytes: bytes , ..};
 }
 fn matches(self: const Certificate&, context: Context, names: View, callers: const ModuleRef[:]) -> bool { return self.record.dependencies.modules.len == context.units.len && self.record.key.matches(context, callers) && self.record.dependencies.namespace.matches(names); }
 fn sameContext(self: const Certificate&, context: Context, names: View, pins: const Pin[:]) -> bool {

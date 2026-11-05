@@ -3,8 +3,8 @@ namespace blot_check_typed_staging;
 import support.structural;
 import support.error;
 import support.option;
-let code_identity = blot_check_types::NominalIdentity { 0xffffffff, 8 };
-let descriptor_identity = blot_check_types::NominalIdentity { 0xffffffff, 9 };
+let code_identity = blot_check_types::NominalIdentity { 0xffffffff, 8 , ..};
+let descriptor_identity = blot_check_types::NominalIdentity { 0xffffffff, 9 , ..};
 enum Op { quote, splice, lift, emit, run, describe, same, fields, evaluate }
 fn lookup(name: const u8[:]) -> Op, bool {
     if name == "@code.evaluate" { return Op.evaluate, true; }
@@ -31,19 +31,19 @@ fn descriptor(store: blot_check_types::Store&, target: blot_check_types::Id) -> 
 struct Code { result: blot_check_types::Id, effects: blot_check_effects::Id }
 fn codeInfo(source, id: blot_check_types::Id) -> blot_support::Option<Code> {
     let node = source.node(id);
-    if node.tag != blot_check_types::Tag.nominal || node.a != code_identity.unit || node.b != code_identity.decl { return blot_support::Option<Code> { false, default<Code>() }; }
+    if node.tag != blot_check_types::Tag.nominal || node.a != code_identity.unit || node.b != code_identity.decl { return blot_support::Option<Code> { false, default<Code>() , ..}; }
     let arguments = source.nominalArguments(node);
-    if arguments.len != 2 { return blot_support::Option<Code> { false, default<Code>() }; }
+    if arguments.len != 2 { return blot_support::Option<Code> { false, default<Code>() , ..}; }
     let latent = source.node(arguments[1]);
-    if latent.tag != blot_check_types::Tag.function || latent.a != blot_check_types::unit || latent.b != blot_check_types::unit { return blot_support::Option<Code> { false, default<Code>() }; }
-    return blot_support::Option<Code> { true, Code { arguments[0], latent.c } };
+    if latent.tag != blot_check_types::Tag.function || latent.a != blot_check_types::unit || latent.b != blot_check_types::unit { return blot_support::Option<Code> { false, default<Code>() , ..}; }
+    return blot_support::Option<Code> { true, Code { arguments[0], latent.c , ..} , ..};
 }
 fn descriptorInfo(source, id: blot_check_types::Id) -> blot_support::Option<blot_check_types::Id> {
     let node = source.node(id);
-    if node.tag != blot_check_types::Tag.nominal || node.a != descriptor_identity.unit || node.b != descriptor_identity.decl { return blot_support::Option<blot_check_types::Id> { false, 0 }; }
+    if node.tag != blot_check_types::Tag.nominal || node.a != descriptor_identity.unit || node.b != descriptor_identity.decl { return blot_support::Option<blot_check_types::Id> { false, 0 , ..}; }
     let arguments = source.nominalArguments(node);
-    if arguments.len != 1 { return blot_support::Option<blot_check_types::Id> { false, 0 }; }
-    return blot_support::Option<blot_check_types::Id> { true, arguments[0] };
+    if arguments.len != 1 { return blot_support::Option<blot_check_types::Id> { false, 0 , ..}; }
+    return blot_support::Option<blot_check_types::Id> { true, arguments[0] , ..};
 }
 fn liftable(source, id: blot_check_types::Id) -> bool, blot_error::Error {
     var remaining: i64 = 4096; return liftableDepth(source, id, 0, remaining);
@@ -64,7 +64,7 @@ recursive fn compileOnlyDepth(source, raw: blot_check_types::Id, depth: i64, rem
             }
         },
         product => {
-            for child in source.list(blot_check_types::List { node.a, node.b }) {
+            for child in source.list(blot_check_types::List { node.a, node.b , ..}) {
                 let found, error = compileOnlyDepth(source, child, depth + 1, remaining);
                 if error != blot_error::Error.none || found { return found, error; }
             }
@@ -92,7 +92,7 @@ recursive fn liftableDepth(source, raw: blot_check_types::Id, depth: i64, remain
     match node.tag {
         unit, boolean, unsigned32, floating32 => { return true, blot_error::Error.none; },
         product => {
-            for child in source.list(blot_check_types::List { node.a, node.b }) {
+            for child in source.list(blot_check_types::List { node.a, node.b , ..}) {
                 let accepted, error = liftableDepth(source, child, depth + 1, remaining);
                 if error != blot_error::Error.none || !accepted { return accepted, error; }
             }

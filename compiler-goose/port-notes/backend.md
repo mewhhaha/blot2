@@ -289,3 +289,32 @@ Added full storage_result_alias production pass with exact write/annotation
 rejection and typed run cleanup. Wasm also has u32 function-ID overloads for its
 immutable parameters/locals/instructions views. Demand rewriting and final plan
 publication still await writing before constructFunctionPlan can be completed.
+Result publication ownership is source-written in result_publication and core
+hooks. Result defaults are inert empty views. A canonical driver binds a numeric
+workspace Owner before compile; the facade stamps its result, and four-argument
+pinResult retains catalog/unit/seed journals, copies Core headers and rebinds
+Capture ModulePins before publication. Public pinning revokes workspace reuse.
+Result.deinit cleans output contexts then marks the lease released; the driver
+must destroy all workspace contexts before result_publication.destroy(ownerKey)
+releases Core/header/input pins. The canonical driver factory is root-owned and
+still pending; these hooks alone do not complete public emission integration.
+array_cost_explanation now has the complete production report/snapshot/JSON pass,
+using the same owned_arrays proof, entry-first site order, UTF-8 truncation,
+16384-site cap and explicit clone/deinit. owned_arrays itself remains pending.
+addressed_input_demand, direct_input_demand and packed_input_demand now have
+complete production passes against Module/function-ID views. They stage full
+replacements, preserve instruction origins/logical locals, retain exact read
+masks and release typed scratch/returned masks. Scoped construction demand
+validation and rewriting is written through the machine-bound checks (source
+around 4995); final summary publication and constructFunctionPlan orchestration
+remain the immediate frontier, before later reusable-call and main lowering.
+Publication inputs are held until canonical driver workspace teardown, with
+only numeric owner/epoch state in Result; driver factory integration remains
+pending and no end-to-end ownership or compilation qualification is claimed.
+The full constructFunctionPlan algorithm is now source-written through final
+summary/counter publication (source around 5050), split into fixed construction
+stages with explicit cleanup. This includes addressed/direct/packed demand,
+parameter promotion and alias retry, recursive access contracts, fresh result
+owner summaries, retained event/region/schema runs and exact publication order.
+Later prepared/reusable-call emission, bundle snapshots, scalar/source lowering
+and scoped compile construction remain. No verification has run.

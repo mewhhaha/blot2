@@ -42,7 +42,7 @@ fn implementations<T,M>(storage:Owner&,owner:T&,map:M) {
  for &value in storage.mutable(owner.selected_proofs) {target(map,value.predicate_target);value.context=map.unit(value.context);identity(map,value.implementation);identity(map,value.contract);identity(map,value.predicate.identity);value.predicate.name=map.symbol(value.predicate.name);value.predicate.qualification_unit=map.unit(value.predicate.qualification_unit);}
 }
 fn predicate<M,P>(map:M,value:P&) {value.name=map.symbol(value.name);identity(map,value.identity);value.qualification_unit=map.unit(value.qualification_unit);}
-fn interfaceUnits(storage:Owner&,owner:Interface&,units:const u32[:])->Error {var rejected=false;interfaceWith(storage,owner,Retained {units,rejected});if rejected {return Error.invalid_artifact;}return Error.none;}
+fn interfaceUnits(storage:Owner&,owner:Interface&,units:const u32[:])->Error {var rejected=false;interfaceWith(storage,owner,Retained {units,rejected, ..});if rejected {return Error.invalid_artifact;}return Error.none;}
 fn interfaceWith<M>(storage:Owner&,owner:Interface&,map:M) {
  capabilityNodes(storage.mutable(owner.capability_contracts.nodes),map);implementations(storage,owner,map);owner.unit=map.unit(owner.unit);typeUnits(storage.mutable(owner.graph.nodes),map);
  for &goal in storage.mutable(owner.graph.quantifier_obligations) {predicate(map,goal);}
@@ -62,9 +62,9 @@ struct FieldOrder {values:blot_check_core::FieldName[:]}
 fn lessThan(self:FieldOrder,left:i64,right:i64)->bool {return self.values[left].symbol<self.values[right].symbol;}
 fn swap(self:FieldOrder,left:i64,right:i64) {let saved=self.values[left];self.values[left]=self.values[right];self.values[right]=saved;}
 fn module(storage:Owner&,owner:Module&,names:const u32[:],units:const u32[:]) {
- let fields=storage.mutable(owner.field_names);for &field in fields {field.symbol=names[field.symbol];}blot_check_source_sort::pdqContext(0,fields.len,FieldOrder {fields});moduleWith(storage,owner,Dictionary {names,units});
+ let fields=storage.mutable(owner.field_names);for &field in fields {field.symbol=names[field.symbol];}blot_check_source_sort::pdqContext(0,fields.len,FieldOrder {fields, ..});moduleWith(storage,owner,Dictionary {names,units, ..});
 }
-fn moduleUnits(storage:Owner&,owner:Module&,units:const u32[:])->Error {var rejected=false;moduleWith(storage,owner,Retained {units,rejected});if rejected {return Error.invalid_artifact;}return Error.none;}
+fn moduleUnits(storage:Owner&,owner:Module&,units:const u32[:])->Error {var rejected=false;moduleWith(storage,owner,Retained {units,rejected, ..});if rejected {return Error.invalid_artifact;}return Error.none;}
 fn moduleWith<M>(storage:Owner&,owner:Module&,map:M) {
  capabilityNodes(storage.mutable(owner.capability_contracts.nodes),map);implementations(storage,owner,map);owner.unit=map.unit(owner.unit);typeUnits(storage.mutable(owner.types.nodes),map);
  for &goal in storage.mutable(owner.types.quantifier_obligations) {predicate(map,goal);}
@@ -101,7 +101,7 @@ fn relink(storage:Owner&,value:blot_reuse_frozen_dependency::FrozenDependency&,p
  var candidate,error=blot_parse_symbols::initPooled();if error!=Error.none {return error;}var names:u32[>..<]=[];var roles:Slots[>..<]=[];
  let admitted=prepare(value,pool,candidate,names,roles);
  if admitted!=Error.none {for &entry in roles {entry.deinit();}candidate.deinit();return admitted;}
- let previous=copy(pool);pool=candidate;candidate=previous;let map=Dictionary {names,units};
+ let previous=copy(pool);pool=candidate;candidate=previous;let map=Dictionary {names,units, ..};
  for &owner,index in value.modules {
   let entry=roles[index];blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.interface.graph.extra),entry.interface_types,names);blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.interface.patterns.extra),entry.patterns,names);blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.core.types.extra),entry.core_types,names);
   blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.interface.capability_contracts.words),entry.interface_capabilities,names);blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.core.capability_contracts.words),entry.core_capabilities,names);

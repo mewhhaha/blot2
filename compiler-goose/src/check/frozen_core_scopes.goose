@@ -21,7 +21,7 @@ fn equationError(error: Error,workspace: blot_check_scheme_equations::Workspace?
 fn stagingScopes(graph: Graph,context: Context,scratch: Scratch,allocating: bool,workspace: blot_check_scheme_equations::Workspace?) -> Error {
     if stagingBindingCount(graph.m) == 0 { return Error.none; }
     var remaining: i64=1000000; var reports: blot_check_staging_capture_rights::Entry[>..<]=[];
-    var capture_rights=blot_check_staging_capture_rights::Checker{allocating,graph.m,context.units,remaining,reports};
+    var capture_rights=blot_check_staging_capture_rights::Checker{allocating,graph.m,context.units,remaining,reports, ..};
     let error=stagingWalk(graph,context,scratch,workspace,remaining,capture_rights); capture_rights.deinit(); return error;
 }
 fn stagingWalk(graph: Graph,context: Context,scratch: Scratch,workspace: blot_check_scheme_equations::Workspace?,remaining: i64&,capture_rights: blot_check_staging_capture_rights::Checker&) -> Error {
@@ -32,7 +32,7 @@ fn stagingWalk(graph: Graph,context: Context,scratch: Scratch,workspace: blot_ch
     for body in m.bodies[1..] {
         for parameter in m.parameters[body.parameters.start..body.parameters.start+body.parameters.len] { { let propagated_error = stageBinding(bindings,parameter.binding,0); if propagated_error != Error.none { return propagated_error; } } }
         let root=graph.vertex(Kind.node,body.root); if scratch.colors[root] != 0 { { let propagated_error = require(scratch.colors[root] == 1); if propagated_error != Error.none { return propagated_error; } } continue; }
-        scratch.colors[root]=1; var depth: i64=1; scratch.path[0]=Frame{root};
+        scratch.colors[root]=1; var depth: i64=1; scratch.path[0]=Frame{root, ..};
         while depth != 0 {
             let top: Frame&=scratch.path[depth-1]; let current_stage=scratch.colors[top.vertex]-1; let is_node=top.vertex >= node_start && top.vertex < node_end;
             if top.edge == 0 {
@@ -83,7 +83,7 @@ fn stagingWalk(graph: Graph,context: Context,scratch: Scratch,workspace: blot_ch
                 top.edge++; if child.value == node_start || (m.patterns.len != 0 && child.value == graph.vertex(Kind.pattern,0)) { continue; }
                 var stage=current_stage;
                 if is_node { let n=m.nodes[top.vertex-node_start]; if n.tag == CoreTag.staging { if n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.quote) { { let propagated_error = require(stage < 128); if propagated_error != Error.none { return propagated_error; } } stage++; } else if n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.lift) || n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.splice) { { let propagated_error = require(stage != 0); if propagated_error != Error.none { return propagated_error; } } stage--; } } }
-                if scratch.colors[child.value] != 0 { { let propagated_error = require(scratch.colors[child.value] == stage+1); if propagated_error != Error.none { return propagated_error; } } continue; } scratch.colors[child.value]=stage+1; scratch.path[depth]=Frame{child.value}; depth++;
+                if scratch.colors[child.value] != 0 { { let propagated_error = require(scratch.colors[child.value] == stage+1); if propagated_error != Error.none { return propagated_error; } } continue; } scratch.colors[child.value]=stage+1; scratch.path[depth]=Frame{child.value, ..}; depth++;
             } else { depth--; }
         }
     }
@@ -97,7 +97,7 @@ fn stagingWalk(graph: Graph,context: Context,scratch: Scratch,workspace: blot_ch
 fn associatedCharge(remaining: i64&) -> Error { { let propagated_error = require(remaining != 0); if propagated_error != Error.none { return propagated_error; } } remaining--; return Error.none; }
 fn associatedScope(graph: Graph,contract: blot_check_core::Contract,root: u32,member: bool,scratch: Scratch,remaining: i64&) -> Error {
     let type_count=graph.starts[kindCode(Kind.row)]; let row_start=type_count; let operation_start=graph.starts[kindCode(Kind.operation)]; let count=graph.starts[kindCode(Kind.node)];
-    for &color in scratch.colors[..count] { color=0; } var depth: i64=1; scratch.path[0]=Frame{root};
+    for &color in scratch.colors[..count] { color=0; } var depth: i64=1; scratch.path[0]=Frame{root, ..};
     while depth != 0 {
         let top: Frame&=scratch.path[depth-1];
         if scratch.colors[top.vertex] == 0 {
@@ -110,7 +110,7 @@ fn associatedScope(graph: Graph,contract: blot_check_core::Contract,root: u32,me
         }
         let recipe_edge=top.vertex < type_count && graph.m.types.nodes[top.vertex].tag == TypeTag.projection && top.edge == graph.m.types.extra[graph.m.types.nodes[top.vertex].c];
         var child=blot_support::none<i64>(); if !recipe_edge { child=graph.edge(top.vertex,top.edge); }
-        if child.present { top.edge++; if scratch.colors[child.value] == 0 {scratch.path[depth]=Frame{child.value}; depth++;} } else {depth--;}
+        if child.present { top.edge++; if scratch.colors[child.value] == 0 {scratch.path[depth]=Frame{child.value, ..}; depth++;} } else {depth--;}
     } return Error.none;
 }
 fn associatedScopes(graph: Graph,scratch: Scratch,remaining: i64&) -> Error {
@@ -140,9 +140,9 @@ fn validate(module: const Module&,context: Context) -> Error {var remaining: i64
 fn validateWithBudget(module: const Module&,context: Context,remaining: i64&) -> Error {return validateBatchWithBudget(module,context,remaining,null);}
 fn validateBatchWithBudget(module: const Module&,context: Context,remaining: i64&,batch: const Batch?) -> Error {
     { let propagated_error = validateBounds(module,context); if propagated_error != Error.none { return propagated_error; } } let graph,error=initGraph(module); { let propagated_error = error; if propagated_error != Error.none { return propagated_error; } } let needed,requirements_error=scratchRequirements(module); { let propagated_error = requirements_error; if propagated_error != Error.none { return propagated_error; } }
-    let scratch=Scratch{validation_colors.alloc_slice(needed.colors),validation_path.alloc_slice(needed.path)};
+    let scratch=Scratch{validation_colors.alloc_slice(needed.colors),validation_path.alloc_slice(needed.path), ..};
     var bounds_units: ModuleRef[>..<]=[]; var bounds_receipts: blot_check_scheme_equations::BoundsReceipt[>..<]=[];
-    var equations=blot_check_scheme_equations::initWorkspace(blot_check_scheme_equations::WorkspaceTables{bounds_units,bounds_receipts});
+    var equations=blot_check_scheme_equations::initWorkspace(blot_check_scheme_equations::WorkspaceTables{bounds_units,bounds_receipts, ..});
     let failure=validateAllocated(graph,context,scratch,remaining,batch,equations); equations.deinit(); releaseScratch(scratch); return failure;
 }
 fn validateAllocated(graph: Graph,context: Context,scratch: Scratch,remaining: i64&,batch: const Batch?,equations: blot_check_scheme_equations::Workspace&) -> Error {

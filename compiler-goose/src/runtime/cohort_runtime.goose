@@ -27,13 +27,13 @@ fn complete(c: Code&, arena: Arena) {
 }
 fn checked(c: Code&, arena: Arena, pointer: Local) -> Local {
     c.value(pointer); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.trap();
-    if c.failure != Error.none { return Local {}; }
+    if c.failure != Error.none { return Local {..}; }
     let head, error = blot_runtime_shared_rc::checkedHead(c.code, pointer);
     c.failure = error; return head;
 }
 fn excluded() -> u32 { return blot_runtime_cycles_runtime::queued | blot_runtime_shared_rc::dead | blot_runtime_shared_rc::resource_owner; }
 fn begin(c: Code&, arena: Arena) -> Error {
-    let pointer = Local { 0 }; complete(c, arena); let head = checked(c, arena, pointer);
+    let pointer = Local { 0 , ..}; complete(c, arena); let head = checked(c, arena, pointer);
     c.value(head); c.load(flags); c.value(excluded() | member | owner); c.op(blot_backend_runtime_ir::OP_i32_and); c.trap();
     c.value(head); c.load(flags); c.value(blot_runtime_shared_rc::lease); c.op(blot_backend_runtime_ir::OP_i32_and); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.trap();
     c.value(head); c.load(strong); c.value(1); c.op(blot_backend_runtime_ir::OP_i32_ne); c.trap();
@@ -42,7 +42,7 @@ fn begin(c: Code&, arena: Arena) -> Error {
     return c.failure;
 }
 fn allocate(c: Code&, arena: Arena) -> Error {
-    let bytes = Local { 0 }; let mask = Local { 1 }; let parent = Local { 2 };
+    let bytes = Local { 0 , ..}; let mask = Local { 1 , ..}; let parent = Local { 2 , ..};
     complete(c, arena); let head = checked(c, arena, parent);
     c.value(bytes); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.trap();
     c.value(head); c.load(flags); c.value(excluded() | member); c.op(blot_backend_runtime_ir::OP_i32_and); c.trap();
@@ -63,7 +63,7 @@ fn allocate(c: Code&, arena: Arena) -> Error {
     c.value(value); return c.failure;
 }
 fn retire(c: Code&, arena: Arena) -> Error {
-    let pointer = Local { 0 };
+    let pointer = Local { 0 , ..};
     c.value(pointer); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_lt_u); c.when(); c.ret(); c.end();
     let head = checked(c, arena, pointer);
     c.value(head); c.load(flags); c.value(member); c.op(blot_backend_runtime_ir::OP_i32_and); c.when();
@@ -103,7 +103,7 @@ fn install(module: Module&) -> Runtime, Error {
     if allocate_error != Error.none { return default<Runtime>(), allocate_error; }
     let retire_id, retire_error = module.addTypedFunction([blot_backend_runtime_ir::VT_i32], blot_backend_runtime_ir::VT_none, blot_backend_runtime_ir::ROLE_scalar);
     if retire_error != Error.none { return default<Runtime>(), retire_error; }
-    let runtime = Runtime { begin_id, allocate_id, retire_id };
+    let runtime = Runtime { begin_id, allocate_id, retire_id , ..};
     let reference = blot_backend_runtime_ir::ROLE_reference;
     let scalar = blot_backend_runtime_ir::ROLE_scalar;
     { let propagated_error = module.setParameterRoles(runtime.begin, blot_backend_runtime_ir::packParameterRoles([reference])); if propagated_error != Error.none { return default<Runtime>(), propagated_error; } }

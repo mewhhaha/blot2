@@ -14,7 +14,7 @@ struct Header {flow:blot_check_capability_flow::Contract,parameters:blot_check_c
 // Static generic read handles the two concrete owners without function pointers.
 struct Context {before:const blot_check_core::Module&,after:const blot_check_check::Checked&,names:const blot_parse_symbols::Pool&,remaining:i64=4096}
 struct Sources {context:Context?=null}
-fn view(self:Context&)->Sources {return Sources {self};}
+fn view(self:Context&)->Sources {return Sources {self, ..};}
 fn before(self:Sources,role:Role,binding:u32)->blot_support::Option<Header> {let context=self.context;if !context {return blot_support::none<Header>();}return read(context,context.before,role,binding,false);}
 fn after(self:Sources,role:Role,binding:u32)->blot_support::Option<Header> {let context=self.context;if !context {return blot_support::none<Header>();}return read(context,context.after,role,binding,true);}
 fn work(self:Context&)->bool {if self.remaining==0 {return false;}self.remaining--;return true;}
@@ -34,5 +34,5 @@ fn read<O>(self:Context&,owner:const O&,role:Role,binding:u32,current:bool)->blo
   let name=self.names.get(source.name);let implementation=self.names.get(role.implementation.decl&~blot_check_types::opaque_name_bit);let member=self.names.get(role.member);
   if name.len!=implementation.len+1+member.len||name[..implementation.len]!=implementation||name[implementation.len]!='.'||name[implementation.len+1..]!=member {return blot_support::none<Header>();}
  }
- return blot_support::some(Header {source.capability_flow,source.capability_parameters,owner.capability_contracts.header(binding,source.capability_parameters.arity() as u32)});
+ return blot_support::some(Header {source.capability_flow,source.capability_parameters,owner.capability_contracts.header(binding,source.capability_parameters.arity() as u32), ..});
 }

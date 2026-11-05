@@ -4,11 +4,11 @@ import support.error;
 import support.option;
 enum Owner { quantified { value: blot_check_types::Id }, scheme { value: blot_check_core::BindingId } }
 fn forBinding(module: const blot_check_core::Module&, binding: blot_check_core::BindingId) -> blot_support::Option<Owner> {
-    if binding == 0 || binding >= module.bindings.len { return blot_support::Option<Owner> { false, default<Owner>() }; }
-    let principal = module.bindings[binding]; if principal.ty == 0 { return blot_support::Option<Owner> { false, default<Owner>() }; }
-    var owner = Owner.scheme { binding }; if module.types.node(principal.ty).tag == blot_check_types::Tag.forall { owner = Owner.quantified { principal.ty }; }
-    for ordinal in count(owner, module) { if goal(owner, module, ordinal).kind == blot_check_types::ObligationKind.contract { return blot_support::Option<Owner> { true, owner }; } }
-    return blot_support::Option<Owner> { false, default<Owner>() };
+    if binding == 0 || binding >= module.bindings.len { return blot_support::Option<Owner> { false, default<Owner>() , ..}; }
+    let principal = module.bindings[binding]; if principal.ty == 0 { return blot_support::Option<Owner> { false, default<Owner>() , ..}; }
+    var owner = Owner.scheme { binding , ..}; if module.types.node(principal.ty).tag == blot_check_types::Tag.forall { owner = Owner.quantified { principal.ty , ..}; }
+    for ordinal in count(owner, module) { if goal(owner, module, ordinal).kind == blot_check_types::ObligationKind.contract { return blot_support::Option<Owner> { true, owner , ..}; } }
+    return blot_support::Option<Owner> { false, default<Owner>() , ..};
 }
 fn count(self: Owner, module: const blot_check_core::Module&) -> i64 {
     match self { quantified v => { return module.types.quantifierGoals(v.value).len; }, scheme v => { return module.bindings[v.value].scheme.obligations.len; }, }
@@ -17,15 +17,15 @@ fn goal(self: Owner, module: const blot_check_core::Module&, ordinal: i64) -> bl
     match self {
         quantified v => {
             let value = module.types.quantifierGoals(v.value)[ordinal];
-            return blot_check_core::Obligation { value.ty, value.kind, blot_check_core::Span { 0, 0 },
+            return blot_check_core::Obligation { value.ty, value.kind, blot_check_core::Span { 0, 0 , ..},
                 name: value.name, result: value.result, other: value.other, signature: value.signature,
-                operator: value.operator, identity: value.identity, explicit: value.explicit };
+                operator: value.operator, identity: value.identity, explicit: value.explicit , ..};
         },
         scheme v => { let range = module.bindings[v.value].scheme.obligations; return module.obligations[range.start + ordinal]; },
     }
 }
 fn formals(self: Owner, module: const blot_check_core::Module&) -> blot_check_types::List {
-    match self { quantified v => { let node = module.types.node(v.value); return blot_check_types::List { node.b, node.c }; }, scheme v => { return module.bindings[v.value].scheme.variables; }, }
+    match self { quantified v => { let node = module.types.node(v.value); return blot_check_types::List { node.b, node.c , ..}; }, scheme v => { return module.bindings[v.value].scheme.variables; }, }
 }
 fn enter(self: Owner, module: const blot_check_core::Module&, scopes: blot_check_package_contracts::Context&) -> blot_error::Error {
     match self { quantified v => { return scopes.enter(v.value); }, scheme v => { return scopes.generic(module.bindings[v.value].scheme); }, }
@@ -49,7 +49,7 @@ fn canonicalGoal(self: Owner, module: const blot_check_core::Module&, ordinal: i
         let charged = step(scopes.remaining); if charged != blot_error::Error.none { return 0, charged; }
         let candidate = goal(self, module, prior);
         if candidate.kind != blot_check_types::ObligationKind.contract || candidate.identity.unit != value.identity.unit || candidate.identity.decl != value.identity.decl { continue; }
-        var proof = blot_check_package_contracts::Principal { left: module.types, right: module.types, views: scopes, remaining: scopes.remaining };
+        var proof = blot_check_package_contracts::Principal { left: module.types, right: module.types, views: scopes, remaining: scopes.remaining , ..};
         let error = proof.validate(value.ty, candidate.ty);
         if error != blot_error::Error.none { if scopes.remaining == 0 { return 0, blot_error::Error.invalid_artifact; } continue; }
         return prior, blot_error::Error.none;

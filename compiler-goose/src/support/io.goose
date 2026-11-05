@@ -42,7 +42,7 @@ fn read_file(path: const u8[:], out: u8[>..<]&, maximum: i64) -> Error {
     let start = out.len;
     if size > 9223372036854775807 - start { blot_native::close(fd); return Error.overflow; }
     out.resize(start + size, 0);
-    let error = read_all(Reader { fd }, out[start..]);
+    let error = read_all(Reader { fd , ..}, out[start..]);
     let closed = blot_native::close(fd);
     if error != Error.none { out.resize(start, 0); return error; }
     if closed < 0 { out.resize(start, 0); return Error.io; }
@@ -52,7 +52,7 @@ fn write_file(path: const u8[:], bytes: const u8[:]) -> Error {
     var terminated: u8[>..] = []; terminated.append(path); terminated.push(0);
     let fd = blot_native::open_write(terminated[0], false);
     if fd < 0 { return Error.io; }
-    let error = write_all(Writer { fd }, bytes);
+    let error = write_all(Writer { fd , ..}, bytes);
     let closed = blot_native::close(fd);
     if error != Error.none { return error; }
     if closed < 0 { return Error.io; }

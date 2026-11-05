@@ -20,14 +20,14 @@ fn rewrite<O,T>(owner:O&,value:T&,targets:Targets)->Error {var remaining:i64=655
 
 fn relocate(value:blot_check_core::BindingRef&,targets:Targets,changed:bool&)->Error {
 
-if value.binding==0 {return Error.none;}let mapped=targets.target(blot_reuse_principal_interface::ExternalTarget {value.unit,value.binding});if !mapped.present||mapped.value.unit!=value.unit {return Error.declined;}changed=changed||mapped.value.binding!=value.binding;value.binding=mapped.value.binding;
+if value.binding==0 {return Error.none;}let mapped=targets.target(blot_reuse_principal_interface::ExternalTarget {value.unit,value.binding, ..});if !mapped.present||mapped.value.unit!=value.unit {return Error.declined;}changed=changed||mapped.value.binding!=value.binding;value.binding=mapped.value.binding;
 
 return Error.none;
 }
 
 fn relocate(value:blot_reuse_principal_interface::ExternalTarget&,targets:Targets,changed:bool&)->Error {
 
-if value.binding==0 {return Error.none;}let mapped=targets.target(blot_reuse_principal_interface::ExternalTarget {value.unit,value.binding});if !mapped.present||mapped.value.unit!=value.unit {return Error.declined;}changed=changed||mapped.value.binding!=value.binding;value.binding=mapped.value.binding;
+if value.binding==0 {return Error.none;}let mapped=targets.target(blot_reuse_principal_interface::ExternalTarget {value.unit,value.binding, ..});if !mapped.present||mapped.value.unit!=value.unit {return Error.declined;}changed=changed||mapped.value.binding!=value.binding;value.binding=mapped.value.binding;
 
 return Error.none;
 }
@@ -35,7 +35,7 @@ return Error.none;
 fn relocate(value:blot_check_types::Obligation&,targets:Targets,changed:bool&)->Error {
 
 if value.qualification_span.present {let before=value.qualification_span.value;let after=targets.qualification(value.qualification_unit,before);changed=changed||before!=after;value.qualification_span=blot_support::some(after);}
-if value.kind==blot_check_types::ObligationKind.callee_use&&value.identity.decl!=0 {let mapped=targets.target(blot_reuse_principal_interface::ExternalTarget {value.identity.unit,value.identity.decl});if !mapped.present||mapped.value.unit!=value.identity.unit {return Error.declined;}changed=changed||mapped.value.binding!=value.identity.decl;value.identity.decl=mapped.value.binding;}
+if value.kind==blot_check_types::ObligationKind.callee_use&&value.identity.decl!=0 {let mapped=targets.target(blot_reuse_principal_interface::ExternalTarget {value.identity.unit,value.identity.decl, ..});if !mapped.present||mapped.value.unit!=value.identity.unit {return Error.declined;}changed=changed||mapped.value.binding!=value.identity.decl;value.identity.decl=mapped.value.binding;}
 
 return Error.none;
 }
@@ -43,7 +43,7 @@ return Error.none;
 fn relocate(value:blot_check_core::Obligation&,targets:Targets,changed:bool&)->Error {
 
 if value.qualification_span.present {let before=value.qualification_span.value;let after=targets.qualification(value.qualification_unit,before);changed=changed||before!=after;value.qualification_span=blot_support::some(after);}
-if value.kind==blot_check_types::ObligationKind.callee_use&&value.identity.decl!=0 {let mapped=targets.target(blot_reuse_principal_interface::ExternalTarget {value.identity.unit,value.identity.decl});if !mapped.present||mapped.value.unit!=value.identity.unit {return Error.declined;}changed=changed||mapped.value.binding!=value.identity.decl;value.identity.decl=mapped.value.binding;}
+if value.kind==blot_check_types::ObligationKind.callee_use&&value.identity.decl!=0 {let mapped=targets.target(blot_reuse_principal_interface::ExternalTarget {value.identity.unit,value.identity.decl, ..});if !mapped.present||mapped.value.unit!=value.identity.unit {return Error.declined;}changed=changed||mapped.value.binding!=value.identity.decl;value.identity.decl=mapped.value.binding;}
 
 return Error.none;
 }

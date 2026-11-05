@@ -14,7 +14,7 @@ let formal_key_bit: u32 = 0x80000000;
 let none: u32 = 0xffffffff;
 struct List { start: u32 = 0, len: u32 = 0 }
 enum Tail { closed, variable { value: u32 }, parameter { value: u32 }, formal { value: u32 } }
-struct Row { labels: List = List {}, tail: Tail = Tail.closed, cursor: Cursor = 0 }
+struct Row { labels: List = List {..}, tail: Tail = Tail.closed, cursor: Cursor = 0 }
 struct Variable { first: u32 = none, last: u32 = none }
 struct Version {
     variable: u32, replacement: Id, position: Cursor, previous: u32,
@@ -22,11 +22,11 @@ struct Version {
     shortcut_birth: u32 = none,
 }
 struct Mark { rows: i64, labels: i64, variables: i64, versions: i64, next_position: Cursor }
-struct Extraction { remaining: Id, expanded: blot_support::Option<u32> = blot_support::Option<u32> { false, 0 } }
+struct Extraction { remaining: Id, expanded: blot_support::Option<u32> = blot_support::Option<u32> { false, 0 , ..} }
 struct ExtractionView {
     remaining: Row,
-    expanded: blot_support::Option<u32> = blot_support::Option<u32> { false, 0 },
-    saved: blot_support::Option<Id> = blot_support::Option<Id> { false, 0 },
+    expanded: blot_support::Option<u32> = blot_support::Option<u32> { false, 0 , ..},
+    saved: blot_support::Option<Id> = blot_support::Option<Id> { false, 0 , ..},
 }
 struct Options { resolution_cache: bool = true }
 // All table owners live in the compilation/session driver.
@@ -51,7 +51,7 @@ fn list(self: const Store&, span: List) -> const Label[:] {
     return self.labels.items[span.start..span.start + span.len];
 }
 fn mark(self: const Store&) -> Mark {
-    return Mark { self.rows.len, self.labels.len, self.variables.len, self.versions.len, self.next_position };
+    return Mark { self.rows.len, self.labels.len, self.variables.len, self.versions.len, self.next_position , ..};
 }
 fn tick(self: Store&) { if self.mutation_epoch != 0xffffffffffffffff { self.mutation_epoch += 1; } }
 fn rollback(self: Store&, point: Mark) {
@@ -79,13 +79,13 @@ fn row(self: Store&, labels: const Label[:], tail: Tail) -> Id, Error {
     if labels.len > 0 {
         let start = self.labels.index_of(labels[0]);
         if start >= 0 && labels.len <= self.labels.len - start {
-            return add(self, Row { List { start as u32, labels.len as u32 }, tail });
+            return add(self, Row { List { start as u32, labels.len as u32 }, tail , ..});
         }
     }
     if labels.len > none - self.labels.len { return 0, Error.effect_limit; }
     let start = self.labels.len;
     self.labels.append(labels);if self.labels.failure!=Error.none {return 0,self.labels.failure;}
-    let result, error = add(self, Row { List { start as u32, labels.len as u32 }, tail });
+    let result, error = add(self, Row { List { start as u32, labels.len as u32 }, tail , ..});
     if error != Error.none { self.labels.pop_n(self.labels.len - start); }
     return result, error;
 }
@@ -109,8 +109,8 @@ fn freeVariables(self: Store&, root: Id) -> u32[>..], Error {
 fn fresh(self: Store&) -> Id, Error {
     if self.variables.len >= formal_key_bit { return 0, Error.effect_limit; }
     let index = self.variables.len as u32;
-    self.variables.push(Variable {});if self.variables.failure!=Error.none {return 0,self.variables.failure;}
-    let result, error = row(self, [], Tail.variable { index });
+    self.variables.push(Variable {..});if self.variables.failure!=Error.none {return 0,self.variables.failure;}
+    let result, error = row(self, [], Tail.variable { index , ..});
     if error != Error.none { self.variables.pop(); }
     return result, error;
 }
@@ -125,7 +125,7 @@ fn appendVersionAt(self: Store&, variable: u32, replacement_id: Id, position: Cu
     let index = self.versions.len as u32;
     var birth = none;
     if self.physical_epoch < none { birth = self.physical_epoch as u32; }
-    self.versions.push(Version { variable, replacement_id, position, old.last, birth: birth });if self.versions.failure!=Error.none {return self.versions.failure;}
+    self.versions.push(Version { variable, replacement_id, position, old.last, birth: birth , ..});if self.versions.failure!=Error.none {return self.versions.failure;}
     if old.last == none { self.variables.items[variable].first = index; }
     else { self.versions.items[old.last].next = index; }
     self.variables.items[variable].last = index;
@@ -200,7 +200,7 @@ fn resolveUncached(self: Store&, root: Id, at: Cursor) -> Id, Error {
     var position = max(at, original.cursor);
     var current = original;
     var labels: Label[>..] = [];
-    var single = List {};
+    var single = List {..};
     var fragments: i64 = 0;
     var changed = false;
     let cache_versions = self.use_resolution_cache && self.physical_epoch < none && self.mutation_epoch < none;
@@ -233,7 +233,7 @@ fn resolveUncached(self: Store&, root: Id, at: Cursor) -> Id, Error {
     }
     if !changed {
         if position == original.cursor { return root, Error.none; }
-        return add(self, Row { original.labels, original.tail, position });
+        return add(self, Row { original.labels, original.tail, position , ..});
     }
     if current.labels.len != 0 {
         if fragments == 0 { single = current.labels; }
@@ -245,7 +245,7 @@ fn resolveUncached(self: Store&, root: Id, at: Cursor) -> Id, Error {
     }
     if fragments <= 1 {
         if single.len == 0 && current.tail == Tail.closed { return 0, Error.none; }
-        return add(self, Row { single, current.tail, position });
+        return add(self, Row { single, current.tail, position , ..});
     }
     let result, error = row(self, labels, current.tail);
     if error != Error.none { return 0, error; }
@@ -274,7 +274,7 @@ fn extractInner(self: Store&, root: Id, label: Label) -> Extraction, Error {
         if added != Error.none { return default<Extraction>(), added; }
         remaining = result;
     }
-    return Extraction { remaining, view.expanded }, Error.none;
+    return Extraction { remaining, view.expanded , ..}, Error.none;
 }
 fn extract(self: Store&, root: Id, label: Label) -> Extraction, Error {
     let point = mark(self);
@@ -302,13 +302,13 @@ fn extractView(self: Store&, value: Row, label: Label) -> ExtractionView, Error 
         if index == 0 || index + 1 == labels.len {
             var start = value.labels.start;
             if index == 0 { start += 1; }
-            return ExtractionView { Row { List { start, value.labels.len - 1 }, value.tail } }, Error.none;
+            return ExtractionView { Row { List { start, value.labels.len - 1 }, value.tail } , ..}, Error.none;
         }
         var remaining: Label[>..] = [];
         remaining.append(labels[..index]); remaining.append(labels[index + 1..]);
         let saved, error = row(self, remaining, value.tail);
         if error != Error.none { return default<ExtractionView>(), error; }
-        return ExtractionView { node(self, saved), saved: blot_support::Option<Id> { true, saved } }, Error.none;
+        return ExtractionView { node(self, saved), saved: blot_support::Option<Id> { true, saved , ..} , ..}, Error.none;
     }
     var variable: u32 = 0;
     match value.tail {
@@ -322,7 +322,7 @@ fn extractView(self: Store&, value: Row, label: Label) -> ExtractionView, Error 
     let written = appendVersion(self, variable, replacement_id);
     if written != Error.none { return default<ExtractionView>(), written; }
     return ExtractionView { Row { value.labels, node(self, tail).tail, value.cursor },
-        expanded: blot_support::Option<u32> { true, variable } }, Error.none;
+        expanded: blot_support::Option<u32> { true, variable , ..} , ..}, Error.none;
 }
 fn unify(self: Store&, left: Id, right: Id) -> Error {
     let point = mark(self);
@@ -361,7 +361,7 @@ fn unifyInner(self: Store&, left: Id, right: Id) -> Error {
                 if v.value == selected.expanded.value { return Error.infinite_effect; }
             }, _ => {}, }
         }
-        let advanced, first_advance = resolveView(self, Row { List { a.labels.start + 1, a.labels.len - 1 }, a.tail, a.cursor });
+        let advanced, first_advance = resolveView(self, Row { List { a.labels.start + 1, a.labels.len - 1 }, a.tail, a.cursor , ..});
         if first_advance != Error.none { return first_advance; }
         a = advanced;
         let selected_row, second_advance = resolveView(self, selected.remaining);
@@ -411,7 +411,7 @@ fn operationSet(self: const Store&, root: Id) -> Label[>..], Error {
 }
 fn tailCode(value: Tail) -> u32 { match value { closed => { return 0; }, variable => { return 1; }, parameter => { return 2; }, formal => { return 3; }, } }
 fn tailFromCode(code: u32, value: u32) -> Tail, Error {
-    match code { 0 => { return Tail.closed, Error.none; }, 1 => { return Tail.variable { value }, Error.none; }, 2 => { return Tail.parameter { value }, Error.none; }, 3 => { return Tail.formal { value }, Error.none; }, _ => { return Tail.closed, Error.invalid_artifact; }, }
+    match code { 0 => { return Tail.closed, Error.none; }, 1 => { return Tail.variable { value , ..}, Error.none; }, 2 => { return Tail.parameter { value , ..}, Error.none; }, 3 => { return Tail.formal { value , ..}, Error.none; }, _ => { return Tail.closed, Error.invalid_artifact; }, }
 }
 fn blot_structural::equal(left: blot_check_effects::Tail, right: blot_check_effects::Tail) -> bool { return left == right; }
 fn blot_structural::hash<S>(sink: S&, value: blot_check_effects::Tail) {
@@ -428,13 +428,13 @@ resolved_high_water:u32=0,
 use_resolution_cache:bool=true,
 next_position:Cursor=0,
 }
-var inactive_scalars=ScalarDefaults{};
+var inactive_scalars=ScalarDefaults{..};
 struct OwnerState {generation:u64=0,live:bool=false,
-rows:Table_rows=Table_rows{},
-labels:Table_labels=Table_labels{},
-variables:Table_variables=Table_variables{},
-versions:Table_versions=Table_versions{},
-resolved:Map_resolved=Map_resolved{},
+rows:Table_rows=Table_rows{..},
+labels:Table_labels=Table_labels{..},
+variables:Table_variables=Table_variables{..},
+versions:Table_versions=Table_versions{..},
+resolved:Map_resolved=Map_resolved{..},
 physical_epoch:u64=0,
 mutation_epoch:u64=0,
 resolved_physical:u64=0xffffffffffffffff,
@@ -442,11 +442,11 @@ resolved_high_water:u32=0,
 use_resolution_cache:bool=true,
 next_position:Cursor=0,
 }
-var inactive_rows=Table_rows{};
-var inactive_labels=Table_labels{};
-var inactive_variables=Table_variables{};
-var inactive_versions=Table_versions{};
-var inactive_resolved=Map_resolved{};
+var inactive_rows=Table_rows{..};
+var inactive_labels=Table_labels{..};
+var inactive_variables=Table_variables{..};
+var inactive_versions=Table_versions{..};
+var inactive_resolved=Map_resolved{..};
 
 
 
@@ -540,15 +540,15 @@ fn remove(map: Map_resolved&,key: Id) -> bool {
 }
 fn clear(map: Map_resolved&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
 fn deinit(map: Map_resolved&) { release(map.slots); map.slots = []; map.count = 0;map.failure=Error.none; }
-fn clone(map: const Map_resolved&) -> Map_resolved { var copy = Map_resolved {}; if map.slots.len != 0 { let slots = pool_Map_resolved.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn clone(map: const Map_resolved&) -> Map_resolved { var copy = Map_resolved {..}; if map.slots.len != 0 { let slots = pool_Map_resolved.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
 fn each<F>(map: Map_resolved&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
 
 reusable[] var pool_Map_resolved:dictionary_slot<Id,Id>[>..];
 fn restore(map:Map_resolved&,slots:const dictionary_slot<Id,Id>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return Error.invalid_artifact;}return Error.none;}let run=pool_Map_resolved.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return Error.none;}
 fn valid(self:const Store&)->bool {return self.lease!=0 && self.lease-1<owner_states.len && owner_states[self.lease-1].live && owner_states[self.lease-1].generation==self.owner_generation;}
-fn initPooled(options:Options=Options{})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{},Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true});let state:OwnerState&=owner_states[index];var self=Store{lease:(index+1) as u32,owner_generation:generation,rows:state.rows,labels:state.labels,variables:state.variables,versions:state.versions,resolved:state.resolved,physical_epoch:state.physical_epoch,mutation_epoch:state.mutation_epoch,resolved_physical:state.resolved_physical,resolved_high_water:state.resolved_high_water,use_resolution_cache:state.use_resolution_cache,next_position:state.next_position,};self.use_resolution_cache=options.resolution_cache;self.rows.push(Row{});if self.rows.failure!=Error.none {let error=self.rows.failure;self.deinit();return Store{},error;}return self,Error.none;}
+fn initPooled(options:Options=Options{..})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{..},Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true, ..});let state:OwnerState&=owner_states[index];var self=Store{lease:(index+1) as u32,owner_generation:generation,rows:state.rows,labels:state.labels,variables:state.variables,versions:state.versions,resolved:state.resolved,physical_epoch:state.physical_epoch,mutation_epoch:state.mutation_epoch,resolved_physical:state.resolved_physical,resolved_high_water:state.resolved_high_water,use_resolution_cache:state.use_resolution_cache,next_position:state.next_position, ..};self.use_resolution_cache=options.resolution_cache;self.rows.push(Row{..});if self.rows.failure!=Error.none {let error=self.rows.failure;self.deinit();return Store{..},error;}return self,Error.none;, ..}
 fn init()->Store,Error {return initPooled();}
 fn initWithOptions(options:Options)->Store,Error {return initPooled(options);}
-fn deinit(self:Store&) {if self.lease==0 {return;}assert(valid(self));self.rows.deinit();self.labels.deinit();self.variables.deinit();self.versions.deinit();self.resolved.deinit();let index=self.lease-1;owner_states[index].live=false;owner_states.free(index);self=Store{};}
+fn deinit(self:Store&) {if self.lease==0 {return;}assert(valid(self));self.rows.deinit();self.labels.deinit();self.variables.deinit();self.versions.deinit();self.resolved.deinit();let index=self.lease-1;owner_states[index].live=false;owner_states.free(index);self=Store{..};}
 fn withStore<C,F>(context:C&)->Error {let initialized,error=initPooled();if error!=Error.none {return error;}var store=initialized;let result=F(context,store);store.deinit();return result;}
 fn withStoreValue<C,F,R>(context:C&)->R,Error {let initialized,error=initPooled();if error!=Error.none {return default<R>(),error;}var store=initialized;let result,failure=F(context,store);store.deinit();return result,failure;}

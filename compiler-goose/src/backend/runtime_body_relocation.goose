@@ -21,14 +21,14 @@ struct Walk {
 fn clear(walk: Walk&) { walk.targets.clear(); walk.reverse.clear(); walk.pending.clear(); }
 fn spend(walk: Walk&, amount: i64) -> bool { if amount > walk.remaining { walk.remaining = 0; return false; } walk.remaining -= amount; return true; }
 fn get(walk: Walk&, kind: Kind, before: u32) -> blot_support::Option<u32> {
-    let found = walk.targets.get(Key { kind: kind, index: before }); if found { return blot_support::some(found); } return blot_support::none<u32>();
+    let found = walk.targets.get(Key { kind: kind, index: before , ..}); if found { return blot_support::some(found); } return blot_support::none<u32>();
 }
 fn add(walk: Walk&, kind: Kind, before: u32, after: u32) -> bool {
     if !spend(walk, 1) { return false; }
     let known = get(walk, kind, before); if known.present { return known.value == after; }
     if walk.reverse.contains(Key { kind: kind, index: after }) || walk.targets.count >= 4096 { return false; }
-    walk.targets.insert(Key { kind: kind, index: before }, after); walk.reverse.insert(Key { kind: kind, index: after }, before);
-    if kind == Kind.function { walk.pending.push(Pair { before: before, after: after }); } return true;
+    walk.targets.insert(Key { kind: kind, index: before , ..}, after); walk.reverse.insert(Key { kind: kind, index: after , ..}, before);
+    if kind == Kind.function { walk.pending.push(Pair { before: before, after: after , ..}); } return true;
 }
 fn reference(inst: blot_backend_runtime_ir::Instruction) -> bool {
     return inst.table_reference || inst.op == blot_backend_runtime_ir::OP_call || inst.op == blot_backend_runtime_ir::OP_call_import || inst.op == blot_backend_runtime_ir::OP_call_indirect || inst.op == blot_backend_runtime_ir::OP_global_get || inst.op == blot_backend_runtime_ir::OP_global_set;

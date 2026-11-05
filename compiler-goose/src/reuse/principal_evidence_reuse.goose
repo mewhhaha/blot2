@@ -25,7 +25,7 @@ type Inputs = blot_reuse_principal_inputs::Key;
 type Gate = blot_reuse_principal_reuse_gate::Gate;
 enum SourceReason { none, disabled, constant_types, incomplete, identity, changed_source, module_image, missing_root }
 struct SourceDecline {
-    target: BindingRef = BindingRef { 0, 0 }, source: BindingRef = BindingRef { 0, 0 }, reason: SourceReason = SourceReason.none,
+    target: BindingRef = BindingRef { 0, 0 , ..}, source: BindingRef = BindingRef { 0, 0 , ..}, reason: SourceReason = SourceReason.none,
     identity_failure: blot_reuse_principal_reuse_gate::IdentityFailure = blot_reuse_principal_reuse_gate::IdentityFailure.none,
     source_name_utf8: u8[96] = [0; 96], source_name_truncated: bool = false, source_point: u32 = 0,
     interface_observation: bool = false, binding_requirements: u32 = 0, inferred_requirements: u32 = 0, callee_requirements: u32 = 0, body_requirements: u32 = 0,
@@ -73,17 +73,17 @@ struct Stats {
     call_publications_declined: i64 = 0,
     summary_publications_replayed: i64 = 0,
     summary_publications_declined: i64 = 0,
-    source_declines: SourceDecline[8] = [SourceDecline {}; 8],
+    source_declines: SourceDecline[8] = [SourceDecline {..}; 8],
 }
 struct State {
     allocation_owner: u64 = 0, old: const blot_reuse_artifact_capture::Capture? = null,
-    gate: Gate = Gate {}, names: blot_support::Option<blot_backend_runtime_identity::View>,
+    gate: Gate = Gate {..}, names: blot_support::Option<blot_backend_runtime_identity::View>,
     graphs: blot_support::Option<blot_reuse_artifact_import::Importer>, input_image_equal: blot_support::Option<bool>,
-    last_inputs: const Inputs? = null, imported_inputs: blot_support::Option<Inputs>, stats: Stats = Stats {},
+    last_inputs: const Inputs? = null, imported_inputs: blot_support::Option<Inputs>, stats: Stats = Stats {..},
 }
 enum PrimitiveResult { fallback, declined, solved { value: SolvedEvidence } }
 fn init(allocation_owner: u64, old: const blot_reuse_artifact_capture::Capture&, units: const blot_check_core::Module[:], names: blot_support::Option<blot_backend_runtime_identity::View>, stamps: blot_reuse_code_artifacts::ModuleStamps?) -> State, Error {
-    var result = State {};
+    var result = State {..};
     let error = initInto(result, old, units, names, stamps, allocation_owner, blot_support::none<Gate>());
     return result, error;
 }
@@ -99,7 +99,7 @@ fn initInto(result: State&, old: const blot_reuse_artifact_capture::Capture&, un
         reused_dependency_validations: admission.value.reused_dependency_validations,
         projection_scans: admission.value.projection_scans, projection_visits: admission.value.projection_visits,
         projection_workspace_peak_bytes: admission.value.projection_workspace_peak_bytes,
-    } };
+     ..} , ..};
     return Error.none;
 }
 fn deinit(self: State&) {
@@ -126,7 +126,7 @@ fn ensureGraphs(self: State&) -> bool, Error {
 fn canonicalPrefix(view: blot_eval_type_evidence::View) -> bool {
     let tags = [blot_eval_type_evidence::Tag.absent, blot_eval_type_evidence::Tag.unit, blot_eval_type_evidence::Tag.boolean, blot_eval_type_evidence::Tag.unsigned32, blot_eval_type_evidence::Tag.floating32, blot_eval_type_evidence::Tag.never];
     if view.nodes.len < tags.len || view.effects.rows.len == 0 || view.effects.rows[0].start != 0 || view.effects.rows[0].len != 0 { return false; }
-    for tag, index in tags { if view.nodes[index] != (blot_eval_type_evidence::Node { tag: tag }) { return false; } }
+    for tag, index in tags { if view.nodes[index] != (blot_eval_type_evidence::Node { tag: tag , ..}) { return false; } }
     return true;
 }
 fn sourceU32(module: const blot_check_core::Module&) -> bool {
@@ -151,10 +151,10 @@ fn primitiveEvidence<G>(self: const State&, g: G&, owner: u32, types: const blot
     for mapping in types { if mapping.evidence != blot_check_types::u32_type { return PrimitiveResult.fallback, Error.none; } }
     let current_u32, error = g.evaluator.storage.evidence.intern(blot_eval_type_evidence::Tag.unsigned32, 0, 0, []);
     if error == Error.out_of_memory { return PrimitiveResult.fallback, error; }
-    if error != Error.none || current_u32 >= current_view.nodes.len || current_view.nodes[current_u32] != (blot_eval_type_evidence::Node { blot_eval_type_evidence::Tag.unsigned32 }) { return PrimitiveResult.fallback, Error.none; }
+    if error != Error.none || current_u32 >= current_view.nodes.len || current_view.nodes[current_u32] != (blot_eval_type_evidence::Node { blot_eval_type_evidence::Tag.unsigned32 , ..}) { return PrimitiveResult.fallback, Error.none; }
     let copied = blot_eval_core_eval::copySolvedTypes(types);
     for &mapping in copied { mapping.evidence = current_u32; }
-    return PrimitiveResult.solved { SolvedEvidence { copied, [] } }, Error.none;
+    return PrimitiveResult.solved { SolvedEvidence { copied, [] } , ..}, Error.none;
 }
 fn inputImageEqual(self: State&) -> bool {
     if self.input_image_equal.present { return self.input_image_equal.value; }
@@ -201,24 +201,24 @@ fn sourceReason(self: const State&, source: BindingRef) -> SourceReason {
     return SourceReason.identity;
 }
 fn sourcesEqual(self: State&, target: BindingRef, inputs: const Inputs&) -> bool, Error {
-    if !self.gate.enabled { return self.sourceDeclined(SourceDecline { target: target, reason: SourceReason.disabled }), Error.none; }
-    if self.gate.constant_types { return self.sourceDeclined(SourceDecline { target: target, reason: SourceReason.constant_types }), Error.none; }
-    if !inputs.source_complete { return self.sourceDeclined(SourceDecline { target: target, reason: SourceReason.incomplete }), Error.none; }
+    if !self.gate.enabled { return self.sourceDeclined(SourceDecline { target: target, reason: SourceReason.disabled , ..}), Error.none; }
+    if self.gate.constant_types { return self.sourceDeclined(SourceDecline { target: target, reason: SourceReason.constant_types , ..}), Error.none; }
+    if !inputs.source_complete { return self.sourceDeclined(SourceDecline { target: target, reason: SourceReason.incomplete , ..}), Error.none; }
     assert(self.old);
     for unit in inputs.source_units {
-        if unit == 0 || unit > self.gate.units.len || !blot_reuse_principal_input_image::moduleEqual(self.old.metadata.pools.value.modules[unit - 1].module, self.gate.units[unit - 1]) { return self.sourceDeclined(SourceDecline { target: target, source: BindingRef { unit, 0 }, reason: SourceReason.module_image }), Error.none; }
+        if unit == 0 || unit > self.gate.units.len || !blot_reuse_principal_input_image::moduleEqual(self.old.metadata.pools.value.modules[unit - 1].module, self.gate.units[unit - 1]) { return self.sourceDeclined(SourceDecline { target: target, source: BindingRef { unit, 0 , ..}, reason: SourceReason.module_image , ..}), Error.none; }
     }
     for source in inputs.interfaces {
         let admitted, error = self.gate.admitsCompletedInterface(source); if error != Error.none { return false, error; }
-        if !admitted { return self.sourceDeclined(SourceDecline { target: target, source: source, interface_observation: true, reason: self.sourceReason(source) }), Error.none; }
+        if !admitted { return self.sourceDeclined(SourceDecline { target: target, source: source, interface_observation: true, reason: self.sourceReason(source) , ..}), Error.none; }
     }
     var root = false;
     for source in inputs.sources {
-        if !self.gate.admitsLocalSource(source) { return self.sourceDeclined(SourceDecline { target: target, source: source, reason: self.sourceReason(source) }), Error.none; }
+        if !self.gate.admitsLocalSource(source) { return self.sourceDeclined(SourceDecline { target: target, source: source, reason: self.sourceReason(source) , ..}), Error.none; }
         root = root || source == target;
     }
     if root { return true, Error.none; }
-    return self.sourceDeclined(SourceDecline { target: target, reason: SourceReason.missing_root }), Error.none;
+    return self.sourceDeclined(SourceDecline { target: target, reason: SourceReason.missing_root , ..}), Error.none;
 }
 fn currentInputs<G>(self: State&, g: G&, target: BindingRef, inputs: const Inputs&) -> const Inputs?, Error {
     if inputs.call_publications.len == 0 && inputs.call_reads.len == 0 && inputs.summary_reads.len == 0 && inputs.summary_publications.len == 0 { return inputs, Error.none; }
@@ -253,7 +253,7 @@ fn translateInputs<G>(self: State&, g: G&, translated: Inputs&) -> bool, Error {
         let actual, error = graphs.importPrincipalCall(g, call.target, call.evidence);
         if error != Error.none { return false, error; }
         if !actual.present { self.stats.call_publications_declined++; continue; }
-        translated.call_publications[kept] = blot_reuse_principal_inputs::CallPublication { call.target, actual.value }; kept++;
+        translated.call_publications[kept] = blot_reuse_principal_inputs::CallPublication { call.target, actual.value , ..}; kept++;
     }
     translated.shrinkCallPublications(kept); kept = 0;
     for summary in translated.summary_publications {
@@ -263,7 +263,7 @@ fn translateInputs<G>(self: State&, g: G&, translated: Inputs&) -> bool, Error {
         let result, failure = graphs.importPrincipalCall(g, summary.key.target, summary.result);
         if failure != Error.none { return false, failure; }
         if !result.present { self.stats.summary_publications_declined++; continue; }
-        translated.summary_publications[kept] = blot_reuse_principal_inputs::Summary { blot_reuse_principal_inputs::SummaryKey { summary.key.target, actual_inputs.value, summary.key.deferred_member }, result.value }; kept++;
+        translated.summary_publications[kept] = blot_reuse_principal_inputs::Summary { blot_reuse_principal_inputs::SummaryKey { summary.key.target, actual_inputs.value, summary.key.deferred_member }, result.value , ..}; kept++;
     }
     translated.shrinkSummaryPublications(kept); return true, Error.none;
 }
@@ -294,7 +294,7 @@ fn lookup<G>(self: State&, g: G&, target: BindingRef, options: blot_eval_core_ev
         let empty = proof.value.types.len == 0 && proof.value.rows.len == 0;
         if !exact { return self.projectedLookup(g, target, proof, empty); }
         if !empty { self.stats.nonempty_requests++; }
-        var solved = SolvedEvidence { [], [] };
+        var solved = SolvedEvidence { [], [] , ..};
         if !empty {
             let primitive, error = self.primitiveEvidence(g, target.unit, proof.value.types, proof.value.rows);
             if error != Error.none { return no, error; }
@@ -342,7 +342,7 @@ fn projectedLookup<G>(self: State&, g: G&, target: BindingRef, proof: const blot
     }
     let current, error = self.currentInputs(g, target, inputs); if error != Error.none { return no, error; }
     if !current { self.stats.projected_import_declines++; self.stats.projected_empty_declines++; return no, Error.none; }
-    var solved = SolvedEvidence { [], [] };
+    var solved = SolvedEvidence { [], [] , ..};
     if !empty {
         let ready, failure = self.ensureGraphs(); if failure != Error.none { return no, failure; }
         if !ready { self.stats.projected_result_declines++; self.stats.projected_empty_declines++; return no, Error.none; }

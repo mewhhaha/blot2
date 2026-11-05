@@ -20,13 +20,13 @@ struct SourceFailure { unit: u32, span: blot_check_core::Span }
 struct Body { module: Module, binding: u32 }
 struct SourceRows { module: Module, rows: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
 struct SourceDefinitions { module: Module, values: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
-struct AdmissionTables { bodies: BodyBuffer=BodyBuffer{}, body_index: BodyMap=BodyMap{}, source_rows: SourceRowsBuffer=SourceRowsBuffer{}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{} }
+struct AdmissionTables { bodies: BodyBuffer=BodyBuffer{..}, body_index: BodyMap=BodyMap{..}, source_rows: SourceRowsBuffer=SourceRowsBuffer{..}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{..} }
 struct Admission {
     workspace: Workspace? = null, remaining: i64&, units: (const Module?)[128] = [null;128], count: i64 = 0, source_bodies: bool = false,
-    bodies: BodyBuffer=BodyBuffer{}, body_index: BodyMap=BodyMap{}, source_rows: SourceRowsBuffer=SourceRowsBuffer{}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{},
+    bodies: BodyBuffer=BodyBuffer{..}, body_index: BodyMap=BodyMap{..}, source_rows: SourceRowsBuffer=SourceRowsBuffer{..}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{..},
     source_failure: blot_support::Option<SourceFailure>? = null,
 }
-fn initAdmission(remaining: i64&, tables: AdmissionTables) -> Admission { return Admission { remaining, bodies: tables.bodies, body_index: tables.body_index, source_rows: tables.source_rows, source_definitions: tables.source_definitions }; }
+fn initAdmission(remaining: i64&, tables: AdmissionTables) -> Admission { return Admission { remaining, bodies: tables.bodies, body_index: tables.body_index, source_rows: tables.source_rows, source_definitions: tables.source_definitions , ..}; }
 fn deinitBodies(self: Admission&) { self.body_index.clear(); self.bodies.clear(); }
 fn rollbackBodies(self: Admission&, before: i64) { for body in self.bodies.items[before..] { let removed = self.body_index.remove(body); assert(removed); } self.bodies.resize(before); }
 fn deinit(self: Admission&) {
@@ -34,12 +34,12 @@ fn deinit(self: Admission&) {
     for entry in self.source_definitions.items { let error = blot_check_scheme_dependencies::releaseSnapshot(entry.lease); assert(error == Error.none); } self.source_definitions.deinit();self.bodies.deinit();self.body_index.deinit();
 }
 struct BoundsReceipt { module: Module, symbol_count: blot_support::Option<i64>, source_length: blot_support::Option<u32>, forbidden_owner: blot_support::Option<u32> }
-struct WorkspaceTables { bounds_units: ModuleBuffer=ModuleBuffer{}, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{} }
+struct WorkspaceTables { bounds_units: ModuleBuffer=ModuleBuffer{..}, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{..} }
 struct Workspace {
     oom: bool = false, admission: Admission? = null, modules: (const Module?)[128] = [null;128], module_count: i64 = 0,
-    bounds_units: ModuleBuffer=ModuleBuffer{}, has_bounds_units: bool = false, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{},
+    bounds_units: ModuleBuffer=ModuleBuffer{..}, has_bounds_units: bool = false, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{..},
 }
-fn initWorkspace(tables: WorkspaceTables) -> Workspace { return Workspace { bounds_units: tables.bounds_units, bounds_receipts: tables.bounds_receipts }; }
+fn initWorkspace(tables: WorkspaceTables) -> Workspace { return Workspace { bounds_units: tables.bounds_units, bounds_receipts: tables.bounds_receipts , ..}; }
 fn deinit(self: Workspace&) { self.bounds_units.deinit(); self.bounds_receipts.deinit(); self.has_bounds_units = false; self.module_count = 0; self.admission .= null; }
 fn proved(self: const Workspace&, module: const Module&) -> bool { if module.owner_id == 0 { return false; } for index in 0..self.module_count { let entry .= self.modules[index]; if entry && entry.owner_id == module.owner_id { return true; } } return false; }
 fn convert(error: Error) -> Error { if error == Error.none || error == Error.out_of_memory { return error; } return Error.invalid_artifact; }
@@ -49,7 +49,7 @@ struct SharedGoal {
 }
 struct SharedAuthority {
     context: u64, pure_rows: Facts, closed_rows: Facts, instance_variables: Facts, instance_rows: Facts,
-    schemes: blot_check_types::Scheme[128] = [blot_check_types::Scheme {}; 128], scheme_count: i64,
+    schemes: blot_check_types::Scheme[128] = [blot_check_types::Scheme {..}; 128], scheme_count: i64,
     generic_variables: List, generic_rows: List, obligations: const blot_check_core::Obligation[:], source_obligations: const blot_check_types::Obligation[:],
     source_instances: bool, executable: bool, large_plain_graph: bool,
 }
@@ -57,7 +57,7 @@ fn eligible(views: const Views&) -> bool { return views.owner_id != 0 && !views.
 fn captureAuthority(views: const Views&) -> SharedAuthority {
     var result = SharedAuthority { views.owner_id, views.pure_rows, views.closed_rows, views.instance_variables, views.instance_rows, scheme_count: views.scheme_count,
         generic_variables: views.generic_variables, generic_rows: views.generic_rows, obligations: views.obligations, source_obligations: views.source_obligations,
-        source_instances: views.source_instances, executable: views.executable, large_plain_graph: views.large_plain_graph };
+        source_instances: views.source_instances, executable: views.executable, large_plain_graph: views.large_plain_graph , ..};
     for index in 0..views.scheme_count { result.schemes[index] = views.schemes[index]; } return result;
 }
 fn matches(self: const SharedAuthority&, views: const Views&) -> bool {
@@ -65,15 +65,15 @@ fn matches(self: const SharedAuthority&, views: const Views&) -> bool {
     for index in 0..self.scheme_count { if self.schemes[index] != views.schemes[index] { return false; } }
     return self.pure_rows.eql(views.pure_rows) && self.closed_rows.eql(views.closed_rows) && self.instance_variables.eql(views.instance_variables) && self.instance_rows.eql(views.instance_rows);
 }
-struct SolverTables { rigid_type_overflow: IdMap=IdMap{}, rigid_rows: IdMap=IdMap{}, shared_goals: GoalMap=GoalMap{} }
+struct SolverTables { rigid_type_overflow: IdMap=IdMap{..}, rigid_rows: IdMap=IdMap{..}, shared_goals: GoalMap=GoalMap{..} }
 struct Solver {
     store: blot_check_types::Store, graph: blot_check_core::Types, view: blot_check_core::Types? = null, scope: u32 = 0, oom: bool = false,
-    rigid_types: blot_check_package_contracts::Bits4096 = blot_check_package_contracts::Bits4096 {}, rigid_type_overflow: IdMap=IdMap{}, rigid_rows: IdMap=IdMap{},
+    rigid_types: blot_check_package_contracts::Bits4096 = blot_check_package_contracts::Bits4096 {..}, rigid_type_overflow: IdMap=IdMap{..}, rigid_rows: IdMap=IdMap{..},
     remaining: i64&, prefix_nodes: i64 = 0, prefix_rows: i64 = 0, prefix_operations: i64 = 0, prefix_extra: i64 = 0, prefix_row_variables: i64 = 0,
-    shared_authority: blot_support::Option<SharedAuthority> = blot_support::none<SharedAuthority>(), shared_goals: GoalMap=GoalMap{}, shared_goal_hits: i64 = 0,
+    shared_authority: blot_support::Option<SharedAuthority> = blot_support::none<SharedAuthority>(), shared_goals: GoalMap=GoalMap{..}, shared_goal_hits: i64 = 0,
 }
 fn init(store: blot_check_types::Store, module: const Module&, views: Views&, remaining: i64&, tables: SolverTables) -> Solver, Error {
-    var result = Solver { store, graph: blot_check_core::Types { nodes: [], extra: [] }, rigid_type_overflow: tables.rigid_type_overflow, rigid_rows: tables.rigid_rows, remaining, shared_goals: tables.shared_goals };
+    var result = Solver { store, graph: blot_check_core::Types { nodes: [], extra: [] , ..}, rigid_type_overflow: tables.rigid_type_overflow, rigid_rows: tables.rigid_rows, remaining, shared_goals: tables.shared_goals , ..};
     let error = initialize(result, module, views); if error != Error.none { deinit(result); return result, error; } return result, Error.none;
 }
 fn initialize(self: Solver&, module: const Module&, views: Views&) -> Error {
@@ -87,12 +87,12 @@ fn initialize(self: Solver&, module: const Module&, views: Views&) -> Error {
         for formal in module.types.list(scheme.row_variables) { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; self.rigid_rows.insert(formal, true); }
     }
     for &node, id in store.nodes.items { node.closed_height = 0; node.closed_generation = 0;
-        if node.tag == blot_check_types::Tag.variable { if views.source_instances && views.instance_variables.contains(id) { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; if id < 4096 { self.rigid_types.set(id); } else { self.rigid_type_overflow.insert(id as u32, true); } } node = blot_check_types::Node { blot_check_types::Tag.rigid, a: scope, b: id as u32 }; }
+        if node.tag == blot_check_types::Tag.variable { if views.source_instances && views.instance_variables.contains(id) { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; if id < 4096 { self.rigid_types.set(id); } else { self.rigid_type_overflow.insert(id as u32, true); } } node = blot_check_types::Node { blot_check_types::Tag.rigid, a: scope, b: id as u32 , ..}; }
     }
     for index in 0..module.types.effects.rows.len { let row = store.effects.rows.items[index]; match row.tail { blot_check_effects::Tail.variable match_payload_34 => { let value = match_payload_34.value; 
         if views.closed_rows.contains(index) { store.effects.rows.items[index].tail = blot_check_effects::Tail.closed; }
         else { if views.source_instances && views.instance_rows.contains(value) && !self.rigid_rows.contains(value) { if self.remaining == 0 || value >= module.types.effects.variable_count { return Error.invalid_artifact; } self.remaining -= 1; self.rigid_rows.insert(value, true); }
-            let rigid, error = store.rigid(scope, value, 1); if error != Error.none { return convert(error); } store.effects.rows.items[index].tail = blot_check_effects::Tail.formal { rigid };
+            let rigid, error = store.rigid(scope, value, 1); if error != Error.none { return convert(error); } store.effects.rows.items[index].tail = blot_check_effects::Tail.formal { rigid , ..};
         }
     }, _ => {}, } }
     store.has_projections = true; store.has_rank_types = true; store.has_usage_types = true;
@@ -117,7 +117,7 @@ fn rememberSharedGoal(self: Solver&, key: SharedGoal, depth: i64) -> Error {
 }
 fn deinit(self: Solver&) { self.shared_authority.present = false; self.shared_goals.deinit(); self.rigid_type_overflow.deinit(); self.rigid_rows.deinit(); self.store.deinit(); }
 fn refresh(self: Solver&) {
-    self.graph = blot_check_core::Types { owner_id: self.store.owner_id, nodes: self.store.nodes.items[:], extra: self.store.extra.items[:], effects: blot_check_core::EffectRows { self.store.effects.rows.items[:], self.store.effects.labels.items[:], self.store.effects.variables.len as u32 }, operations: self.store.operations.items[:], quantifier_goals: self.store.quantifier_goals.items[:], quantifier_obligations: self.store.quantifier_obligations.items[:] };
+    self.graph = blot_check_core::Types { owner_id: self.store.owner_id, nodes: self.store.nodes.items[:], extra: self.store.extra.items[:], effects: blot_check_core::EffectRows { self.store.effects.rows.items[:], self.store.effects.labels.items[:], self.store.effects.variables.len as u32 , ..}, operations: self.store.operations.items[:], quantifier_goals: self.store.quantifier_goals.items[:], quantifier_obligations: self.store.quantifier_obligations.items[:] , ..};
     { let optional_binding_76 .= self.view; if optional_binding_76 { let view .= optional_binding_76; view = self.graph;  } }
 }
 fn step(self: Solver&) -> Error { if self.remaining == 0 { return Error.invalid_artifact; } self.remaining -= 1; return Error.none; }
@@ -129,7 +129,7 @@ fn resolve(self: Solver&, id: Id) -> Id, Error { let error = step(self); if erro
 fn resolveRow(self: Solver&, id: u32) -> u32, Error { let error = step(self); if error != Error.none { return 0, error; } beginWork(self); let value, error = self.store.resolveEffects(id, 0); endWork(self); return value, convert(error); }
 fn rollback(self: Solver&, mark: blot_check_types::Mark) { self.store.rollback(mark); refresh(self); }
 fn importer(self: Solver&, module: const Module&, frozen: blot_check_frozen_types::Graph&, scheme: blot_check_types::Scheme, tables: blot_check_check_scheme_import::Tables) -> Import, Error {
-    frozen = blot_check_associated_admission::graphView(module.types); var copier = blot_check_check_scheme_import::init(blot_check_frozen_types::Source.frozen { frozen }, self.store, tables); copier.associated = true;
+    frozen = blot_check_associated_admission::graphView(module.types); var copier = blot_check_check_scheme_import::init(blot_check_frozen_types::Source.frozen { frozen , ..}, self.store, tables); copier.associated = true;
     for formal in module.types.list(scheme.variables) { let fresh, error = self.store.fresh(); if error != Error.none { copier.deinit(); return copier, convert(error); } copier.mapping.insert(formal, fresh); }
     for formal in module.types.list(scheme.row_variables) { let fresh, error = self.store.freshEffects(); if error != Error.none { copier.deinit(); return copier, convert(error); } copier.row_variables.insert(formal, fresh); }
     for formal in module.types.list(scheme.closed_rows) { copier.row_variables.insert(formal, 0); } refresh(self); return copier, Error.none;
@@ -141,16 +141,16 @@ fn bounds(workspace: Workspace?, module: const Module&, context: blot_check_froz
         if same_context { for receipt in owner.bounds_receipts.items { if receipt.module.owner_id != 0 && receipt.module.owner_id == module.owner_id && receipt.symbol_count == context.symbol_count && receipt.source_length == context.source_length && receipt.forbidden_owner == context.forbidden_owner { return Error.none; } } }
         let error = blot_check_frozen_core_validation::validateBounds(module, context); if error != Error.none { return error; } if !same_context { return Error.none; }
         if !owner.has_bounds_units { for reference in context.units { owner.bounds_units.push(reference.value); } owner.has_bounds_units = true; }
-        owner.bounds_receipts.push(BoundsReceipt { module, context.symbol_count, context.source_length, context.forbidden_owner }); return Error.none;
+        owner.bounds_receipts.push(BoundsReceipt { module, context.symbol_count, context.source_length, context.forbidden_owner , ..}); return Error.none;
      } } return blot_check_frozen_core_validation::validateBounds(module, context);
 }
 fn sameUnits(left:const Module[:],right:const ModuleRef[:])->bool {if left.len!=right.len {return false;}for unit,index in left {let other=right[index].value;if unit.owner_id==0 || unit.owner_id!=other.owner_id || unit!=other {return false;}}return true;}
-fn withSolver<C,F>(module:const Module&,views:Views&,remaining:i64&,context:C&)->Error {let initialized,error=blot_check_types::initPooled();if error!=Error.none {return error;}var solver,error=init(initialized,module,views,remaining,SolverTables{});if error!=Error.none {return error;}let failure=F(context,solver);deinit(solver);return failure;}
+fn withSolver<C,F>(module:const Module&,views:Views&,remaining:i64&,context:C&)->Error {let initialized,error=blot_check_types::initPooled();if error!=Error.none {return error;}var solver,error=init(initialized,module,views,remaining,SolverTables{..});if error!=Error.none {return error;}let failure=F(context,solver);deinit(solver);return failure;}
 fn saveSourceRows(self: Admission&, module: const Module&, rows: const u32[:]) -> Error {
-    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != Error.none { return error; } self.source_rows.push(SourceRows { module, copied, lease }); return Error.none;
+    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != Error.none { return error; } self.source_rows.push(SourceRows { module, copied, lease , ..});if self.source_rows.failure!=Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==Error.none);return self.source_rows.failure;}return Error.none;
 }
 fn saveSourceDefinitions(self: Admission&, module: const Module&, values: const u32[:]) -> Error {
-    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(values); if error != Error.none { return error; } self.source_definitions.push(SourceDefinitions { module, copied, lease }); return Error.none;
+    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(values); if error != Error.none { return error; } self.source_definitions.push(SourceDefinitions { module, copied, lease , ..});if self.source_definitions.failure!=Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==Error.none);return self.source_definitions.failure;}return Error.none;
 }
 
 struct BodyBuffer {storage:Body[:]=[],items:Body[:]=[],len:i64=0,failure:Error=Error.none}
@@ -212,5 +212,5 @@ fn insert(self:GoalMap&,key:SharedGoal,value:i64)->bool {if self.count>=0x155555
 fn remove(self:GoalMap&,key:SharedGoal)->bool {return blot_support_pooled_map::remove(self,key);}
 fn clear(self:GoalMap&) {blot_support_pooled_map::clear(self);self.failure=Error.none;}
 fn deinit(self:GoalMap&) {blot_support_pooled_map::deinit(self,goalmap_slots);self.failure=Error.none;}
-fn initPooledAdmission(remaining:i64&)->Admission,Error {return Admission{remaining:remaining},Error.none;}
-fn initPooledWorkspace()->Workspace,Error {return Workspace{},Error.none;}
+fn initPooledAdmission(remaining:i64&)->Admission,Error {return Admission{remaining:remaining, ..},Error.none;}
+fn initPooledWorkspace()->Workspace,Error {return Workspace{..},Error.none;}

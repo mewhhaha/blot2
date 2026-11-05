@@ -101,13 +101,13 @@ fn function(module: Module&, parameters: i64, result: blot_backend_runtime_ir::V
 }
 fn reference(c: Code&, address: u32) {
     if c.failure != Error.none { return; }
-    c.failure = c.code.module.emitReference(c.code.function, Instruction { blot_backend_runtime_ir::OP_i32_const, address }, blot_reuse_artifact_emitter::Role.static_address);
+    c.failure = c.code.module.emitReference(c.code.function, Instruction { blot_backend_runtime_ir::OP_i32_const, address , ..}, blot_reuse_artifact_emitter::Role.static_address);
 }
 fn proof(descriptor: Local) -> Instruction[7] {
-    return [Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id }, Instruction { blot_backend_runtime_ir::OP_i32_load, d_scalar_elements }, Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id }, Instruction { blot_backend_runtime_ir::OP_i32_load, d_immutable }, Instruction { blot_backend_runtime_ir::OP_i32_const, acyclic_elements }, Instruction { blot_backend_runtime_ir::OP_i32_and }, Instruction { blot_backend_runtime_ir::OP_i32_or }];
+    return [Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id , ..}, Instruction { blot_backend_runtime_ir::OP_i32_load, d_scalar_elements , ..}, Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id , ..}, Instruction { blot_backend_runtime_ir::OP_i32_load, d_immutable , ..}, Instruction { blot_backend_runtime_ir::OP_i32_const, acyclic_elements , ..}, Instruction { blot_backend_runtime_ir::OP_i32_and , ..}, Instruction { blot_backend_runtime_ir::OP_i32_or , ..}];
 }
 fn kindOf(descriptor: Local) -> Instruction[9] {
-    return [Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id }, Instruction { blot_backend_runtime_ir::OP_i32_load, d_scalar_elements }, Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id }, Instruction { blot_backend_runtime_ir::OP_i32_load, d_immutable }, Instruction { blot_backend_runtime_ir::OP_i32_const, acyclic_elements }, Instruction { blot_backend_runtime_ir::OP_i32_and }, Instruction { blot_backend_runtime_ir::OP_i32_const, 7 }, Instruction { blot_backend_runtime_ir::OP_i32_shl }, Instruction { blot_backend_runtime_ir::OP_i32_or }];
+    return [Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id , ..}, Instruction { blot_backend_runtime_ir::OP_i32_load, d_scalar_elements , ..}, Instruction { blot_backend_runtime_ir::OP_local_get, descriptor.id , ..}, Instruction { blot_backend_runtime_ir::OP_i32_load, d_immutable , ..}, Instruction { blot_backend_runtime_ir::OP_i32_const, acyclic_elements , ..}, Instruction { blot_backend_runtime_ir::OP_i32_and , ..}, Instruction { blot_backend_runtime_ir::OP_i32_const, 7 , ..}, Instruction { blot_backend_runtime_ir::OP_i32_shl , ..}, Instruction { blot_backend_runtime_ir::OP_i32_or , ..}];
 }
 fn acyclic(c: Code&, arena: Arena, value: Local, proven: const Instruction[:]) {
     c.globalGet(arena.rc_enabled); c.when(); c.value(proven); c.when();
@@ -168,8 +168,8 @@ fn emit(module: Module&, arena: Arena) -> Runtime, Error {
     return r, Error.none;
 }
 fn emitNode(c: Code&, r: Runtime, arena: Arena) {
-    let count = Local { 0 };
-    let owner = Local { 1 };
+    let count = Local { 0 , ..};
+    let owner = Local { 1 , ..};
     let node = c.temp();
     let bucket = c.temp();
     let left = c.temp();
@@ -227,9 +227,9 @@ fn emitNode(c: Code&, r: Runtime, arena: Arena) {
 /// Freezing keeps the element proof bit.
 
 fn emitBranch(c: Code&, r: Runtime, arena: Arena) {
-    let left = Local { 0 };
-    let right = Local { 1 };
-    let owner = Local { 2 };
+    let left = Local { 0 , ..};
+    let right = Local { 1 , ..};
+    let owner = Local { 2 , ..};
     let node = c.temp();
     c.value(24); c.value(0x30); c.call(arena.allocate_typed); c.set(node);
     acyclic(c, arena, node, proof(owner));
@@ -240,7 +240,7 @@ fn emitBranch(c: Code&, r: Runtime, arena: Arena) {
     c.value(node); c.call(r.refresh);
 }
 fn emitRefresh(c: Code&) {
-    let node = Local { 0 };
+    let node = Local { 0 , ..};
     let left = c.temp();
     let right = c.temp();
     let height = c.temp();
@@ -255,8 +255,8 @@ fn emitRefresh(c: Code&) {
     c.value(node);
 }
 fn emitOwn(c: Code&, arena: Arena) {
-    let node = Local { 0 };
-    let owner = Local { 1 };
+    let node = Local { 0 , ..};
+    let owner = Local { 1 , ..};
     let result = c.temp();
     let bytes = c.temp();
     c.value(node); c.load(n_owner_token); c.value(owner); c.value(1); c.op(blot_backend_runtime_ir::OP_i32_add); c.op(blot_backend_runtime_ir::OP_i32_eq); c.when();
@@ -280,8 +280,8 @@ fn emitOwn(c: Code&, arena: Arena) {
     c.value(result);
 }
 fn emitRotate(c: Code&, r: Runtime, leftward: bool) {
-    let node = Local { 0 };
-    let owner = Local { 1 };
+    let node = Local { 0 , ..};
+    let owner = Local { 1 , ..};
     let pivot = c.temp();
     var side = n_left; if leftward { side = n_right; }
     var opposite = n_right; if leftward { opposite = n_left; }
@@ -293,8 +293,8 @@ fn emitRotate(c: Code&, r: Runtime, leftward: bool) {
     c.value(pivot); c.call(r.refresh);
 }
 fn emitBalance(c: Code&, r: Runtime) {
-    let node = Local { 0 };
-    let owner = Local { 1 };
+    let node = Local { 0 , ..};
+    let owner = Local { 1 , ..};
     let child = c.temp();
     c.value(node); c.call(r.refresh); c.set(node);
     for left_heavy in [true, false] {
@@ -312,10 +312,10 @@ fn emitBalance(c: Code&, r: Runtime) {
     c.value(node);
 }
 fn emitInsert(c: Code&, r: Runtime) {
-    let node = Local { 0 };
-    let value = Local { 1 };
-    let front = Local { 2 };
-    let owner = Local { 3 };
+    let node = Local { 0 , ..};
+    let value = Local { 1 , ..};
+    let front = Local { 2 , ..};
+    let owner = Local { 3 , ..};
     let count = c.temp();
     let added = c.temp();
     let child_height = c.temp();
@@ -372,10 +372,10 @@ fn emitInsert(c: Code&, r: Runtime) {
     c.value(node); c.value(owner); c.call(r.balance);
 }
 fn emitReplace(c: Code&, r: Runtime) {
-    let node = Local { 0 };
-    let index = Local { 1 };
-    let value = Local { 2 };
-    let owner = Local { 3 };
+    let node = Local { 0 , ..};
+    let index = Local { 1 , ..};
+    let value = Local { 2 , ..};
+    let owner = Local { 3 , ..};
     let left_count = c.temp();
     c.value(node); c.value(owner); c.call(r.own); c.set(node);
     c.value(node); c.load(n_height); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when();
@@ -391,9 +391,9 @@ fn emitReplace(c: Code&, r: Runtime) {
     c.value(node);
 }
 fn emitNew(c: Code&, r: Runtime, arena: Arena) {
-    let count = Local { 0 };
-    let kind = Local { 1 };
-    let leaf_limit = Local { 2 };
+    let count = Local { 0 , ..};
+    let kind = Local { 1 , ..};
+    let leaf_limit = Local { 2 , ..};
     let row_words = c.temp();
     let result = c.temp();
     c.value(count); c.value(limit); c.op(blot_backend_runtime_ir::OP_i32_gt_u); c.trap();
@@ -457,7 +457,7 @@ fn emitNew(c: Code&, r: Runtime, arena: Arena) {
 // The directory owns scalar addresses, not leaf edges. Its descriptor keeps
 // the immutable tree alive; traversal holders also root uncached static cases.
 fn emitLeafCount(c: Code&, r: Runtime) {
-    let node = Local { 0 };
+    let node = Local { 0 , ..};
     c.value(node); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when();
     c.value(0); c.ret();
     c.end();
@@ -467,9 +467,9 @@ fn emitLeafCount(c: Code&, r: Runtime) {
     c.value(1);
 }
 fn emitWriteLeaves(c: Code&, r: Runtime) {
-    let node = Local { 0 };
-    let array = Local { 1 };
-    let index = Local { 2 };
+    let node = Local { 0 , ..};
+    let array = Local { 1 , ..};
+    let index = Local { 2 , ..};
     c.value(node); c.load(n_height); c.when();
     c.value(node); c.load(n_left); c.value(array); c.value(index); c.call(r.write_leaves); c.set(index);
     c.value(node); c.load(n_right); c.value(array); c.value(index); c.call(r.write_leaves); c.ret();
@@ -478,7 +478,7 @@ fn emitWriteLeaves(c: Code&, r: Runtime) {
     c.value(index); c.value(1); c.op(blot_backend_runtime_ir::OP_i32_add);
 }
 fn emitDirectory(c: Code&, r: Runtime, arena: Arena) {
-    let sequence = Local { 0 };
+    let sequence = Local { 0 , ..};
     let array = c.temp();
     let count = c.temp();
     c.value(sequence); c.load(d_directory); c.set(array);
@@ -518,8 +518,8 @@ fn emitUncheckedSet(module: Module&, runtime: Runtime) -> u32, Error {
     var c = blot_emitter::init(module, id); emitSet(c, runtime, false); return id, c.failure;
 }
 fn emitAddress(c: Code&, checked: bool) {
-    let sequence = Local { 0 };
-    let index = Local { 1 };
+    let sequence = Local { 0 , ..};
+    let index = Local { 1 , ..};
     let node = c.temp();
     let base = c.temp();
     let left = c.temp();
@@ -573,8 +573,8 @@ fn emitAddress(c: Code&, checked: bool) {
     c.value(node); c.value(index); c.value(base); c.op(blot_backend_runtime_ir::OP_i32_sub); c.value(4); c.op(blot_backend_runtime_ir::OP_i32_mul); c.op(blot_backend_runtime_ir::OP_i32_add); c.value(header); c.op(blot_backend_runtime_ir::OP_i32_add);
 }
 fn emitCopy(c: Code&, r: Runtime) {
-    let sequence = Local { 0 };
-    let count = Local { 1 };
+    let sequence = Local { 0 , ..};
+    let count = Local { 1 , ..};
     let result = c.temp();
     let index = c.temp();
     let from = c.temp();
@@ -603,7 +603,7 @@ fn emitCopy(c: Code&, r: Runtime) {
 fn emitSnapshot(module: Module&) -> u32, Error {
     let id, error = function(module, 1, blot_backend_runtime_ir::VT_i32); if error != Error.none { return 0, error; }
     var c = blot_emitter::init(module, id);
-    let sequence = Local { 0 };
+    let sequence = Local { 0 , ..};
     freeze(c, sequence);
     c.value(sequence); c.load(d_root); c.when();
     c.value(sequence); c.load(d_root); c.value(sequence); c.load(d_root); c.value(n_owner_token); c.op(blot_backend_runtime_ir::OP_i32_add); c.value(0); c.call(c.code.module.arena.value.store_word);
@@ -612,8 +612,8 @@ fn emitSnapshot(module: Module&) -> u32, Error {
     return id, c.failure;
 }
 fn emitEdit(c: Code&, arena: Arena) {
-    let sequence = Local { 0 };
-    let owned = Local { 1 };
+    let sequence = Local { 0 , ..};
+    let owned = Local { 1 , ..};
     let result = c.temp();
     c.value(owned); c.value(sequence); c.load(d_immutable); c.value(frozen); c.op(blot_backend_runtime_ir::OP_i32_and); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.op(blot_backend_runtime_ir::OP_i32_and); c.when();
     c.value(sequence); c.ret();
@@ -632,10 +632,10 @@ fn emitEdit(c: Code&, arena: Arena) {
     c.value(result);
 }
 fn emitPush(c: Code&, r: Runtime) {
-    let sequence = Local { 0 };
-    let value = Local { 1 };
-    let front = Local { 2 };
-    let owned = Local { 3 };
+    let sequence = Local { 0 , ..};
+    let value = Local { 1 , ..};
+    let front = Local { 2 , ..};
+    let owned = Local { 3 , ..};
     c.value(sequence); c.load(d_length); c.value(limit); c.op(blot_backend_runtime_ir::OP_i32_ge_u); c.trap();
     c.value(sequence); c.value(owned); c.call(r.edit); c.set(sequence);
     // Borrowed leaf bases are valid only while this exact tree is retained.
@@ -646,10 +646,10 @@ fn emitPush(c: Code&, r: Runtime) {
     c.value(sequence);
 }
 fn emitSet(c: Code&, r: Runtime, checked: bool) {
-    let sequence = Local { 0 };
-    let index = Local { 1 };
-    let value = Local { 2 };
-    let owned = Local { 3 };
+    let sequence = Local { 0 , ..};
+    let index = Local { 1 , ..};
+    let value = Local { 2 , ..};
+    let owned = Local { 3 , ..};
     if checked { c.value(index); c.value(sequence); c.load(d_length); c.op(blot_backend_runtime_ir::OP_i32_ge_u); c.trap(); }
     // Compare stored bits, not language equality: this is also sound for NaNs,
     // signed zero and reference-valued elements. A borrowed no-op may create
@@ -670,7 +670,7 @@ fn emitSet(c: Code&, r: Runtime, checked: bool) {
     c.value(sequence);
 }
 fn emitConversion(c: Code&, r: Runtime, arena: Arena, to_list: bool) {
-    let source = Local { 0 };
+    let source = Local { 0 , ..};
     let result = c.temp();
     let count = c.temp();
     let index = c.temp();
@@ -682,7 +682,7 @@ fn emitConversion(c: Code&, r: Runtime, arena: Arena, to_list: bool) {
         // Zero denotes reference words; positive values are the checked number
         // of scalar words per logical Array element. The tree stores words.
         // `new` checks and keeps the acyclic element bit of the kind.
-        let kind = Local { 1 };
+        let kind = Local { 1 , ..};
         let width = c.temp();
         c.value(kind); c.value(width_bits); c.op(blot_backend_runtime_ir::OP_i32_and); c.set(width);
         c.value(width); c.value(1); c.op(blot_backend_runtime_ir::OP_i32_gt_u); c.when();
@@ -718,9 +718,9 @@ fn emitConversion(c: Code&, r: Runtime, arena: Arena, to_list: bool) {
 // Join retains covered subtrees and only rebuilds the taller boundary spine.
 // Small adjacent leaves coalesce with bounded copying to avoid tiny packets.
 fn emitJoin(c: Code&, r: Runtime) {
-    let left = Local { 0 };
-    let right = Local { 1 };
-    let owner = Local { 2 };
+    let left = Local { 0 , ..};
+    let right = Local { 1 , ..};
+    let owner = Local { 2 , ..};
     let node = c.temp();
     let count = c.temp();
     c.value(left); c.when();
@@ -759,10 +759,10 @@ fn emitJoin(c: Code&, r: Runtime) {
     c.value(left); c.value(right); c.value(owner); c.call(r.branch);
 }
 fn emitCut(c: Code&, r: Runtime) {
-    let node = Local { 0 };
-    let start = Local { 1 };
-    let count = Local { 2 };
-    let owner = Local { 3 };
+    let node = Local { 0 , ..};
+    let start = Local { 1 , ..};
+    let count = Local { 2 , ..};
+    let owner = Local { 3 , ..};
     let left = c.temp();
     let split = c.temp();
     let result = c.temp();
@@ -790,8 +790,8 @@ fn emitCut(c: Code&, r: Runtime) {
     c.value(left); c.value(start); c.value(split); c.value(owner); c.call(r.cut); c.value(node); c.load(n_right); c.value(0); c.value(count); c.value(split); c.op(blot_backend_runtime_ir::OP_i32_sub); c.value(owner); c.call(r.cut); c.value(owner); c.call(r.join);
 }
 fn emitConcat(c: Code&, r: Runtime, arena: Arena) {
-    let left = Local { 0 };
-    let right = Local { 1 };
+    let left = Local { 0 , ..};
+    let right = Local { 1 , ..};
     let count = c.temp();
     let result = c.temp();
     let leaf_limit = c.temp();
@@ -824,9 +824,9 @@ fn emitConcat(c: Code&, r: Runtime, arena: Arena) {
     c.value(result);
 }
 fn emitSlice(c: Code&, r: Runtime, arena: Arena) {
-    let source = Local { 0 };
-    let start = Local { 1 };
-    let count = Local { 2 };
+    let source = Local { 0 , ..};
+    let start = Local { 1 , ..};
+    let count = Local { 2 , ..};
     let result = c.temp();
     c.value(start); c.value(source); c.load(d_length); c.op(blot_backend_runtime_ir::OP_i32_gt_u); c.trap();
     c.value(count); c.value(source); c.load(d_length); c.value(start); c.op(blot_backend_runtime_ir::OP_i32_sub); c.op(blot_backend_runtime_ir::OP_i32_gt_u); c.trap();
@@ -858,18 +858,18 @@ fn staticChunk(module: Module&, words: const u32[:]) -> u32, Error {
 }
 struct StaticNode { address: u32, height: u32, count: u32 }
 recursive fn staticTree(module: Module&, leaves: const u32[:]) -> StaticNode, Error {
-    if leaves.len == 0 { return StaticNode { 0, 0, 0 }, Error.none; }
-    if leaves.len == 1 { return StaticNode { leaves[0], 0, module.readDataWord(leaves[0] + n_length) }, Error.none; }
+    if leaves.len == 0 { return StaticNode { 0, 0, 0 , ..}, Error.none; }
+    if leaves.len == 1 { return StaticNode { leaves[0], 0, module.readDataWord(leaves[0] + n_length) , ..}, Error.none; }
     let left, left_error = staticTree(module, leaves[..leaves.len / 2]); if left_error != Error.none { return default<StaticNode>(), left_error; }
     let right, right_error = staticTree(module, leaves[leaves.len / 2..]); if right_error != Error.none { return default<StaticNode>(), right_error; }
     let height = max(left.height, right.height) + 1;
     let address, error = module.dataObject([0 as u32, height, left.count + right.count, 0 as u32, left.address, right.address]);
     if error != Error.none { return default<StaticNode>(), error; }
-    let left_reference = module.dataReference(address + n_left, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, left.address });
+    let left_reference = module.dataReference(address + n_left, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, left.address , ..});
     if left_reference != Error.none { return default<StaticNode>(), left_reference; }
-    let right_reference = module.dataReference(address + n_right, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, right.address });
+    let right_reference = module.dataReference(address + n_right, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, right.address , ..});
     if right_reference != Error.none { return default<StaticNode>(), right_reference; }
-    return StaticNode { address, height, left.count + right.count }, Error.none;
+    return StaticNode { address, height, left.count + right.count , ..}, Error.none;
 }
 fn staticDescriptor(module: Module&, length: u32, leaves: const u32[:]) -> u32, Error { return staticDescriptorKind(module, length, leaves, 0, capacity); }
 fn staticScalarDescriptor(module: Module&, length: u32, leaves: const u32[:], row_words: u32) -> u32, Error { return staticDescriptorKind(module, length, leaves, row_words, leafLimit(row_words)); }
@@ -880,7 +880,7 @@ fn staticDescriptorKind(module: Module&, length: u32, leaves: const u32[:], row_
         var words: u32[>..<] = []; words.push(leaves.len as u32); words.append(leaves);
         let data, failure = module.dataWords(words); if failure != Error.none { return 0, failure; } directory = data;
         for leaf, index in leaves {
-            let reference = module.dataReference(directory + ((index + 1) * 4) as u32, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, leaf });
+            let reference = module.dataReference(directory + ((index + 1) * 4) as u32, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, leaf , ..});
             if reference != Error.none { return 0, reference; }
         }
     }
@@ -890,7 +890,7 @@ fn staticDescriptorKind(module: Module&, length: u32, leaves: const u32[:], row_
     let cached_base = module.staticField(address + d_cached_base, blot_backend_runtime_ir::ROLE_scalar); if cached_base != Error.none { return 0, cached_base; }
     let immutable = module.staticField(address + d_immutable, blot_backend_runtime_ir::ROLE_scalar); if immutable != Error.none { return 0, immutable; }
     let directory_field = module.staticField(address + d_directory, blot_backend_runtime_ir::ROLE_reference); if directory_field != Error.none { return 0, directory_field; }
-    if directory != 0 { let reference = module.dataReference(address + d_directory, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, directory }); if reference != Error.none { return 0, reference; } }
-    if root.address != 0 { let reference = module.dataReference(address + d_root, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, root.address }); if reference != Error.none { return 0, reference; } }
+    if directory != 0 { let reference = module.dataReference(address + d_directory, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, directory , ..}); if reference != Error.none { return 0, reference; } }
+    if root.address != 0 { let reference = module.dataReference(address + d_root, blot_reuse_artifact_emitter::Operand { blot_reuse_artifact_emitter::Role.static_address, root.address , ..}); if reference != Error.none { return 0, reference; } }
     return address, Error.none;
 }

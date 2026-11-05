@@ -48,7 +48,7 @@ fn reserve(c: Code&, arena: Arena) {
     c.globalGet(arena.root_top); c.value(slot_bytes); c.op(blot_backend_runtime_ir::OP_i32_add); c.globalSet(arena.root_top); c.value(slot);
 }
 fn allocate(c: Code&, arena: Arena, allocator: u32) {
-    let bytes = Local { 0 }; let mask = Local { 1 }; let slot = c.temp(); let value = c.temp();
+    let bytes = Local { 0 , ..}; let mask = Local { 1 , ..}; let slot = c.temp(); let value = c.temp();
     c.globalGet(arena.root_enabled); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when(); c.value(bytes); c.value(mask); c.call(allocator); c.ret(); c.end();
     c.call(arena.root_reserve); c.set(slot); c.value(bytes); c.value(mask); c.call(allocator); c.set(value);
     c.value(value); c.when(); c.value(slot); c.value(value); c.store(0); c.value(value); c.value(head_bytes); c.op(blot_backend_runtime_ir::OP_i32_sub); c.value(slot); c.store(owner_slot);
@@ -72,7 +72,7 @@ fn pop(c: Code&, arena: Arena) {
 }
 fn open(c: Code&, arena: Arena) { let frame = c.temp(); c.call(arena.root_reserve); c.set(frame); c.value(frame); c.globalSet(arena.root_frame); c.value(frame); }
 fn close(c: Code&, arena: Arena) {
-    let value = Local { 0 }; let frame = c.temp(); let parent = c.temp(); let owner = c.temp(); let slot = c.temp();
+    let value = Local { 0 , ..}; let frame = c.temp(); let parent = c.temp(); let owner = c.temp(); let slot = c.temp();
     c.globalGet(arena.root_frame); c.set(frame); c.value(frame); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.trap(); c.value(frame); c.load(4); c.set(parent);
     c.value(value); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_ge_u); c.when();
     c.value(value); c.value(head_bytes); c.op(blot_backend_runtime_ir::OP_i32_sub); c.load(flags); c.value(blot_runtime_shared_rc::lease); c.op(blot_backend_runtime_ir::OP_i32_and); c.when();
@@ -103,7 +103,7 @@ fn enter(c: Code&, arena: Arena) {
     c.value(1 as u32); c.globalSet(arena.root_external); c.value(0 as u32); c.globalSet(arena.root_started);
 }
 fn leave(c: Code&, arena: Arena) {
-    let outcome = Local { 0 }; c.value(outcome); c.value(2); c.op(blot_backend_runtime_ir::OP_i32_gt_u); c.trap(); c.value(outcome); c.value(2); c.op(blot_backend_runtime_ir::OP_i32_eq); c.when();
+    let outcome = Local { 0 , ..}; c.value(outcome); c.value(2); c.op(blot_backend_runtime_ir::OP_i32_gt_u); c.trap(); c.value(outcome); c.value(2); c.op(blot_backend_runtime_ir::OP_i32_eq); c.when();
     c.globalGet(arena.root_active); c.globalGet(arena.root_frame); c.op(blot_backend_runtime_ir::OP_i32_or); c.trap(); let page = c.temp();
     c.loopStart(); c.globalGet(arena.root_page); c.loopTest(); c.globalGet(arena.root_top); c.value(first_slot); c.op(blot_backend_runtime_ir::OP_i32_eq); c.when();
     c.globalGet(arena.root_page); c.set(page); c.value(page); c.load(0); c.globalSet(arena.root_page);
@@ -131,13 +131,13 @@ fn retainBorrow(c: Code&, arena: Arena, value: Local) {
     c.call(arena.root_reserve); c.value(value); c.call(arena.root_store); c.end(); c.end(); c.end();
 }
 fn store(c: Code&, arena: Arena) {
-    let slot = Local { 0 }; let value = Local { 1 }; let old = c.temp(); c.value(slot); c.load(0); c.set(old);
+    let slot = Local { 0 , ..}; let value = Local { 1 , ..}; let old = c.temp(); c.value(slot); c.load(0); c.set(old);
     c.value(value); c.globalGet(arena.static_end); c.op(blot_backend_runtime_ir::OP_i32_ge_u); c.when(); c.value(old); c.value(value); c.op(blot_backend_runtime_ir::OP_i32_eq); c.when(); c.ret(); c.end();
     c.value(value); c.call(arena.retain); c.value(slot); c.value(value); c.store(0); count(c, arena, true); c.op(blot_backend_runtime_ir::OP_else_);
     c.value(slot); c.value(0); c.store(0); c.end(); c.value(old); c.when(); count(c, arena, false); c.value(old); c.call(arena.release); c.end();
 }
 fn publicAllocate(c: Code&, arena: Arena) {
-    let bytes = Local { 0 }; c.globalGet(arena.root_enabled); c.when(); c.globalGet(arena.root_active); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when();
+    let bytes = Local { 0 , ..}; c.globalGet(arena.root_enabled); c.when(); c.globalGet(arena.root_active); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when();
     c.call(arena.root_enter); c.value(0 as u32); c.globalSet(arena.root_external); c.end();
     c.value(bytes); c.value(0); c.call(arena.root_allocate); c.ret(); c.end(); c.value(bytes); c.call(arena.allocate);
 }
@@ -154,7 +154,7 @@ fn hostCleanup(module: Module&, arena: Arena) -> Error {
     exit.globalGet(arena.root_host_active); exit.globalSet(references.active); return exit.failure;
 }
 fn authority(c: Code&, arena: Arena) {
-    let value = Local { 0 }; let slot = c.temp(); c.globalGet(arena.root_enabled); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when(); c.ret(); c.end();
+    let value = Local { 0 , ..}; let slot = c.temp(); c.globalGet(arena.root_enabled); c.op(blot_backend_runtime_ir::OP_i32_eqz); c.when(); c.ret(); c.end();
     c.call(arena.root_reserve); c.set(slot); c.value(slot); c.value(value); c.call(arena.root_store);
     c.value(slot); c.value(slot); c.load(4); c.value(2); c.op(blot_backend_runtime_ir::OP_i32_or); c.store(4);
     c.globalGet(arena.root_active); c.value(2); c.op(blot_backend_runtime_ir::OP_i32_or); c.globalSet(arena.root_active);

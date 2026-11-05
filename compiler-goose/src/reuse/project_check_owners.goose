@@ -38,14 +38,14 @@ reusable[] var owned_blot_reuse_dependency_payload__Owner:blot_reuse_dependency_
 fn copyOwned(values:const blot_reuse_dependency_payload::Owner[:])->blot_reuse_dependency_payload::Owner[:] {if values.len==0 {return [];}let run=owned_blot_reuse_dependency_payload__Owner.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
 fn releaseOwned(values:const blot_reuse_dependency_payload::Owner[:]) {if values.len==0 {return;}let first:const blot_reuse_dependency_payload::Owner&=values[0];let at=owned_blot_reuse_dependency_payload__Owner.index_of(first);assert(at>=0);owned_blot_reuse_dependency_payload__Owner.free_slice(owned_blot_reuse_dependency_payload__Owner[at..at+values.len]);}
 fn valid(self:ResultOwner)->bool {return self.slot!=0 && self.slot-1<result_states.len && result_states[self.slot-1].live && result_states[self.slot-1].generation==self.generation;}
-fn initResult()->CheckedProject,Error {if result_states.len>=0xffffffff {return CheckedProject{},Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=result_states.alloc_index(ResultState{generation:generation,live:true});return CheckedProject{owner:ResultOwner{(at+1) as u32,generation}},Error.none;}
-fn allocateModules(self:CheckedProject&,count:i64,retain_bodies:bool)->Error {assert(self.owner.valid());self.modules=owned_blot_support__Option_Module_.alloc_slice(count);for &value in self.modules {value=blot_support::none<Module>();}if retain_bodies {self.body_caches=owned_blot_reuse_body_check_cache__Cache.alloc_slice(count);for &cache in self.body_caches {cache=blot_reuse_body_check_cache::Cache{};}}return Error.none;}
+fn initResult()->CheckedProject,Error {if result_states.len>=0xffffffff {return CheckedProject{..},Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=result_states.alloc_index(ResultState{generation:generation,live:true, ..});return CheckedProject{owner:ResultOwner{(at+1) as u32,generation, ..}, ..},Error.none;}
+fn allocateModules(self:CheckedProject&,count:i64,retain_bodies:bool)->Error {assert(self.owner.valid());self.modules=owned_blot_support__Option_Module_.alloc_slice(count);for &value in self.modules {value=blot_support::none<Module>();}if retain_bodies {self.body_caches=owned_blot_reuse_body_check_cache__Cache.alloc_slice(count);for &cache in self.body_caches {cache=blot_reuse_body_check_cache::Cache{..};}}return Error.none;}
 fn allocateReuse(self:CheckedProject&,count:i64)->Error {
  assert(self.owner.valid());self.reused_modules=owned_bool.alloc_slice(count);for &value in self.reused_modules {value=false;}
  self.interface_colors=owned_blot_reuse_entry_frontend_cutoff__Color.alloc_slice(count);for &value in self.interface_colors {value=blot_reuse_entry_frontend_cutoff::Color.unknown;}
  self.binding_maps=owned_blot_support__Option_BindingMap_.alloc_slice(count);for &value in self.binding_maps {value=blot_support::none<BindingMap>();}
  self.relocated_modules=owned_blot_support__Option_FrozenModule_.alloc_slice(count);for &value in self.relocated_modules {value=blot_support::none<FrozenModule>();}
- let owners=owned_blot_reuse_dependency_payload__Owner.alloc_slice(count);for &value in owners {value=blot_reuse_dependency_payload::Owner{};}result_states[self.owner.slot-1].relocated=owners;return Error.none;
+ let owners=owned_blot_reuse_dependency_payload__Owner.alloc_slice(count);for &value in owners {value=blot_reuse_dependency_payload::Owner{..};}result_states[self.owner.slot-1].relocated=owners;return Error.none;
 }
 fn deinit(self:Module&) {self.checked.deinit();releaseOwned(self.exports);self.exports=[];self.valid=false;}
 fn takeBodyCaches(self:CheckedProject&)->blot_reuse_body_check_cache::Cache[:],Error {assert(self.owner.valid());let value=self.body_caches;self.body_caches=[];return value,Error.none;}
@@ -56,5 +56,5 @@ fn deinit(self:CheckedProject&) {
  for &cache in self.body_caches {cache.deinit();}releaseOwned(self.body_caches);for &item in self.modules {if item.present {item.value.deinit();}}releaseOwned(self.modules);
  releaseOwned(self.reused_modules);releaseOwned(self.interface_colors);for &item in self.binding_maps {if item.present {item.value.deinit();}}releaseOwned(self.binding_maps);
  let state:ResultState&=result_states[self.owner.slot-1];for &owner in state.relocated {owner.deinit();}releaseOwned(state.relocated);releaseOwned(self.relocated_modules);
- for &diagnostic in self.diagnostics {diagnostic.deinit();}releaseOwned(self.diagnostics);let at=self.owner.slot-1;state=ResultState{};result_states.free(at);self=CheckedProject{};
+ for &diagnostic in self.diagnostics {diagnostic.deinit();}releaseOwned(self.diagnostics);let at=self.owner.slot-1;state=ResultState{..};result_states.free(at);self=CheckedProject{..};
 }
