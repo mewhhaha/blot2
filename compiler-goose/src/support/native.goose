@@ -56,3 +56,9 @@ extern fn fork_process()->i64="blot_fork";
 extern fn detach_session()->i32="blot_detach_session";
 extern fn wait_success(pid:u32)->bool="blot_wait_success";
 extern fn null_standard_io()="blot_null_standard_io";
+
+extern fn path_kind(path:const u8&)->i32="blot_path_kind";
+extern fn directory_open(path:const u8&)->i64="blot_directory_open";
+extern fn directory_next(handle:i64,out:u8&,capacity:u64)->i64="blot_directory_next";
+extern fn directory_close(handle:i64)->i32="blot_directory_close";
+extern fn last_errno()->i32="blot_last_errno";

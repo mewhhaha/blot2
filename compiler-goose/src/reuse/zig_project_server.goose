@@ -33,6 +33,7 @@ import support.option;
 import support.native;
 import support.io;
 import support.json;
+import support.json_adapters;
 import driver.project_executor;
 import .zig_project_server_inputs;
 import .zig_project_server_lifecycle;

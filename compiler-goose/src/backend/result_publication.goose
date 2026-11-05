@@ -71,3 +71,7 @@ fn releaseResult(owner: Owner,epoch: u64,pinned: bool) {
 fn canReclaim(owner: Owner) -> bool { if !valid(owner) { return false; } let state = states[owner.slot - 1]; return !state.compiling && !state.result_live && !state.leased; }
 // The canonical driver calls this after destroying every workspace context.
 fn destroy(owner: Owner&) -> Error { if owner.slot == 0 { return Error.none; } if !canReclaim(owner) { return Error.invalid_artifact; } let at = owner.slot - 1; states[at].pins.deinit(); states[at].live = false; states.free(at); owner = Owner {..}; return Error.none; }
+
+// Failed error-union calls publish no Result lease; staged inputs stay pinned
+// until the ordinary workspace destruction boundary.
+fn abortCompile(owner: Owner,epoch: u64) { if owner.slot == 0 { assert(epoch == 0); return; } assert(valid(owner)); let state: State& = states[owner.slot - 1]; assert(state.compiling && state.epoch == epoch && !state.result_live && !state.leased); state.compiling = false; }

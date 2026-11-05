@@ -5,6 +5,7 @@ import driver.cli_workers;
 import inference_limits;
 import source_identity;
 import support.error;
+import support.json_adapters;
 import support.io;
 import support.native;
 import support.blake3;

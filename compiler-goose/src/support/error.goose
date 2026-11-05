@@ -331,6 +331,8 @@ enum Error {
     unsupported_version,
     version_mismatch,
     missing_field,
+    invalid_character,
+    overflow,
 }
 
 fn error_name(code: Error) -> const u8[:] {
@@ -664,6 +666,8 @@ fn error_name(code: Error) -> const u8[:] {
         Error.unsupported_version => "UnsupportedVersion",
         Error.version_mismatch => "VersionMismatch",
         Error.missing_field => "MissingField",
+        Error.invalid_character => "InvalidCharacter",
+        Error.overflow => "Overflow",
     }
 }
 

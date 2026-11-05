@@ -496,7 +496,7 @@ fn blockBody(self: Scan&, module: const Module&, source: CoreId, n: blot_check_c
     if len == 0 { return blot_support::none<Id>(), Error.none; } if len == 1 { return blot_support::some(results[0]), Error.none; } let result, error = self.aggregate(module, source, Kind.selection, results[..len]); return blot_support::some(result), error;
 }
 fn takeReport(scan: Scan&, initial: i64) -> Report, Error {
-    let evidence = blot_eval_type_evidence::Snapshot { owner_id: scan.evidence.owner_id, nodes: scan.evidence.nodes[:], extra: scan.evidence.extra[:], effects: blot_check_effect_evidence::Snapshot { scan.evidence.effects.operations[:], scan.evidence.effects.arguments[:], scan.evidence.effects.rows[:], scan.evidence.effects.labels[:], scan.evidence.effects.owner_id , ..}, quantifier_goals: scan.evidence.quantifier_goals[:], quantifier_obligations: scan.evidence.quantifier_obligations[:] , ..};
+    let evidence = blot_eval_type_evidence::Snapshot { owner_id: scan.evidence.owner_id, nodes: scan.evidence.nodes.items, extra: scan.evidence.extra.items, effects: blot_check_effect_evidence::Snapshot { scan.evidence.effects.operations.items, scan.evidence.effects.arguments.items, scan.evidence.effects.rows.items, scan.evidence.effects.labels.items, scan.evidence.effects.owner_id , ..}, quantifier_goals: scan.evidence.quantifier_goals.items, quantifier_obligations: scan.evidence.quantifier_obligations.items , ..};
     return blot_check_lifetime_report_pool::own(Report { scan.nodes[:], scan.edges[:], evidence, scan.type_mappings[:], scan.boundaries[:], scan.invocations[:], scan.complete, initial - scan.remaining , ..});
 }
 fn deinit(self: Report&) { let error = blot_check_lifetime_report_pool::deinit(self); assert(error == Error.none); }
@@ -507,12 +507,12 @@ fn scanScope<C,F>(scope: ScanScope<C,F>&, evidence: Evidence&) -> Error {
     var scan = init(scope.module, scope.owners, evidence, Tables { type_mappings, nodes, edges, boundaries, invocations, callables, operations, providers, frames, exits, controls, checked_owners , ..}); let error = F(scope.context, scan); deinit(scan); return error;
 }
 struct Analysis { boundary: blot_check_core::BindingRef, remaining: i64 = 65536, scope: CoreId = 0, scope_only: bool = false, report: blot_support::Option<Report> = blot_support::none<Report>() }
-fn ownerContext(module: const Module&, owners: const ModuleRef[:], all: (const Module&)[>..]&, remaining: i64&) -> Error {
-    all += module;
-    for owner_owner_ref in owners { let owner: const blot_check_core::Module& = owner_owner_ref.value; if owner.owner_id != 0 && owner.owner_id == module.owner_id { continue; } for prior in all { let error = reportStep(remaining); if error != Error.none { return error; } if prior.unit == owner.unit { return Error.invalid_artifact; } } all += owner; } return Error.none;
+fn ownerContext(module: const Module&, owners: const ModuleRef[:], all: ModuleRef[>..]&, remaining: i64&) -> Error {
+    all.push(ModuleRef{value:module});
+    for owner_owner_ref in owners { let owner: const blot_check_core::Module& = owner_owner_ref.value; if owner.owner_id != 0 && owner.owner_id == module.owner_id { continue; } for prior in all { let error = reportStep(remaining); if error != Error.none { return error; } if prior.value.unit == owner.unit { return Error.invalid_artifact; } } all.push(ModuleRef{value:owner}); } return Error.none;
 }
 fn analyze(module: const Module&, owners: const ModuleRef[:], boundary: blot_check_core::BindingRef) -> Report, Error {
-    var all: (const Module&)[>..] = []; var context = Analysis { boundary , ..}; let error = ownerContext(module, owners, all, context.remaining); if error != Error.none { return default<Report>(), error; }
+    var all: ModuleRef[>..] = []; var context = Analysis { boundary , ..}; let error = ownerContext(module, owners, all, context.remaining); if error != Error.none { return default<Report>(), error; }
     let error = blot_check_frozen_core_validation::validateBounds(module, blot_check_frozen_core_validation::Context { units: all , ..}); if error != Error.none { return default<Report>(), error; }
     let error = withScan<Analysis,analyzeScan>(module, all, context); if error != Error.none { return default<Report>(), error; } if !context.report.present { return default<Report>(), Error.invalid_artifact; } return context.report.value, Error.none;
 }
@@ -537,7 +537,7 @@ fn executeAnalysis(context: Analysis&, scan: Scan&) -> Error {
 }
 fn analyzeScope(module: const Module&, owners: const ModuleRef[:], root: CoreId, remaining: i64&) -> Report, Error {
     if root == 0 || root >= module.nodes.len || !isScope(module.node(root)) { return default<Report>(), Error.invalid_artifact; }
-    var all: (const Module&)[>..] = []; let error = ownerContext(module, owners, all, remaining); if error != Error.none { return default<Report>(), error; }
+    var all: ModuleRef[>..] = []; let error = ownerContext(module, owners, all, remaining); if error != Error.none { return default<Report>(), error; }
     let error = blot_check_frozen_core_validation::validateBounds(module, blot_check_frozen_core_validation::Context { units: all , ..}); if error != Error.none { return default<Report>(), error; }
     var context = Analysis { boundary: blot_check_core::BindingRef {..}, remaining, scope: root, scope_only: true , ..}; let error = withScan<Analysis,analyzeScan>(module, all, context); remaining = context.remaining; if error != Error.none { return default<Report>(), error; }
     if !context.report.present { return default<Report>(), Error.invalid_artifact; } return context.report.value, Error.none;
@@ -545,7 +545,7 @@ fn analyzeScope(module: const Module&, owners: const ModuleRef[:], root: CoreId,
 struct RejectContext { remaining: i64 }
 fn rejectSupportedEscapes(module: const Module&, owners: const ModuleRef[:]) -> Error {
     var active = false; for node in module.nodes { if isScope(node) { active = true; break; } } if !active { return Error.none; }
-    var all: (const Module&)[>..] = []; var context = RejectContext { 65536 , ..}; let error = ownerContext(module, owners, all, context.remaining); if error != Error.none { return Error.invalid_artifact; }
+    var all: ModuleRef[>..] = []; var context = RejectContext { 65536 , ..}; let error = ownerContext(module, owners, all, context.remaining); if error != Error.none { return Error.invalid_artifact; }
     let error = blot_check_frozen_core_validation::validateBounds(module, blot_check_frozen_core_validation::Context { units: all , ..}); if error != Error.none { return error; } let error = withScan<RejectContext,rejectScan>(module, all, context); if error == Error.out_of_memory { return error; } if error != Error.none { return Error.invalid_artifact; } return Error.none;
 }
 fn rejectScan(context: RejectContext&, scan: Scan&) -> Error {

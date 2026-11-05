@@ -3,20 +3,22 @@
   "verification_started": false,
   "whole_production_port_written": false,
   "oracle_commit": "156f84b4810f630dff7e5efb7014b2194e3160f7",
-  "scope": "Every pinned compiler/src Zig file; oracle tests remain in Zig. Source-module classification is an inventory aid, not an import-closure proof.",
+  "scope": "Every pinned compiler/src Zig file is inventoried. Production compiler behavior is the port scope; native test runners, fault-sweep support, fixtures and benchmark executables remain in the Zig oracle. This classification is not an import-closure proof or a parity result.",
   "status_rule": "Only explicit writing-owner reports establish written_unverified; file presence alone is in_progress. No status proves parity.",
   "modules": [
     {
       "zig": "compiler/src/allocation_failure_profile.zig",
       "goose": "compiler-goose/src/allocation_failure_profile.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_support",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Zig-only opt-in fault-sweep profiler; retains test_options and std.testing evidence."
     },
     {
       "zig": "compiler/src/allocation_failures.zig",
       "goose": "compiler-goose/src/allocation_failures.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_support",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Zig-only deterministic std.testing allocator-fault driver; Goose recoverable allocation-fault parity remains pending."
     },
     {
       "zig": "compiler/src/allocation_failures_tests.zig",
@@ -28,19 +30,19 @@
       "zig": "compiler/src/backend/activation_graph.zig",
       "goose": "compiler-goose/src/backend/activation_graph.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/activation_intersection.zig",
       "goose": "compiler-goose/src/backend/activation_intersection.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/activation_model.zig",
       "goose": "compiler-goose/src/backend/activation_model.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/acyclic_layout.zig",
@@ -730,7 +732,7 @@
       "zig": "compiler/src/backend/startup_occurrence_flow.zig",
       "goose": "compiler-goose/src/backend/startup_occurrence_flow.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/startup_occurrence_flow_tests.zig",
@@ -1227,20 +1229,23 @@
     {
       "zig": "compiler/src/backend_suite.zig",
       "goose": "compiler-goose/src/backend_suite.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_suite",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native comptime test inventory wrapper; tests and qualification records remain in the Zig oracle."
     },
     {
       "zig": "compiler/src/bench_declaration_demand.zig",
       "goose": "compiler-goose/src/bench_declaration_demand.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_benchmark",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native oracle benchmark executable; preserve source and use it for later differential/performance comparisons."
     },
     {
       "zig": "compiler/src/bench_outline.zig",
       "goose": "compiler-goose/src/bench_outline.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_benchmark",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native oracle benchmark executable; preserve source and use it for later differential/performance comparisons."
     },
     {
       "zig": "compiler/src/check/associated_admission.zig",
@@ -1964,8 +1969,9 @@
     {
       "zig": "compiler/src/checker_suite.zig",
       "goose": "compiler-goose/src/checker_suite.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_suite",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native comptime test inventory wrapper; tests and qualification records remain in the Zig oracle."
     },
     {
       "zig": "compiler/src/compilation_tier.zig",
@@ -2324,8 +2330,9 @@
     {
       "zig": "compiler/src/evaluator_suite.zig",
       "goose": "compiler-goose/src/evaluator_suite.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_suite",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native comptime test inventory wrapper; tests and qualification records remain in the Zig oracle."
     },
     {
       "zig": "compiler/src/execution_policy.zig",
@@ -2336,8 +2343,9 @@
     {
       "zig": "compiler/src/fixture_main.zig",
       "goose": "compiler-goose/src/fixture_main.goose",
-      "role": "oracle_test",
-      "write_state": "not_written"
+      "role": "oracle_fixture",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native fixture executable; preserve its source and expected outputs for differential qualification."
     },
     {
       "zig": "compiler/src/inference_limits.zig",
@@ -2349,7 +2357,7 @@
       "zig": "compiler/src/main.zig",
       "goose": "compiler-goose/src/main.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/native_test_policy.zig",
@@ -2462,14 +2470,16 @@
     {
       "zig": "compiler/src/production_suite.zig",
       "goose": "compiler-goose/src/production_suite.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_suite",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native comptime test inventory wrapper; tests and qualification records remain in the Zig oracle."
     },
     {
       "zig": "compiler/src/retained_suite.zig",
       "goose": "compiler-goose/src/retained_suite.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_suite",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native comptime test inventory wrapper; tests and qualification records remain in the Zig oracle."
     },
     {
       "zig": "compiler/src/reuse/alias_project_pipeline.zig",
@@ -2739,7 +2749,7 @@
       "zig": "compiler/src/reuse/dependency_format.zig",
       "goose": "compiler-goose/src/reuse/dependency_format.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/dependency_format_tests.zig",
@@ -3273,7 +3283,7 @@
       "zig": "compiler/src/reuse/row_projection_uses.zig",
       "goose": "compiler-goose/src/reuse/row_projection_uses.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/selection_cutoff_tests.zig",
@@ -3489,7 +3499,7 @@
       "zig": "compiler/src/runtime/memory.zig",
       "goose": "compiler-goose/src/runtime/memory.goose",
       "role": "source_module",
-      "write_state": "in_progress"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/runtime/packed_layout_fixture.zig",
@@ -3553,9 +3563,10 @@
     },
     {
       "zig": "compiler/src/runtime/session_heap.zig",
-      "goose": "compiler-goose/src/runtime/session_heap.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "goose": "compiler-goose/src/runtime/memory.goose",
+      "role": "host_allocator_replaced",
+      "write_state": "idiomatic_replacement_written_unverified",
+      "scope_note": "Typed reusable Goose pools replace the Zig allocator vtable. Class statistics, allocator locking, retention bounds and recoverable OOM remain unqualified; see port-notes/runtime-adaptation.md. No allocator/fault parity is claimed."
     },
     {
       "zig": "compiler/src/runtime/shared_rc.zig",
@@ -3614,8 +3625,9 @@
     {
       "zig": "compiler/src/runtime_suite.zig",
       "goose": "compiler-goose/src/runtime_suite.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_suite",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native comptime test inventory wrapper; tests and qualification records remain in the Zig oracle."
     },
     {
       "zig": "compiler/src/structural.zig",
@@ -3626,8 +3638,9 @@
     {
       "zig": "compiler/src/syntax_suite.zig",
       "goose": "compiler-goose/src/syntax_suite.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_suite",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native comptime test inventory wrapper; tests and qualification records remain in the Zig oracle."
     },
     {
       "zig": "compiler/src/test_prelude_producers.zig",
@@ -3650,8 +3663,9 @@
     {
       "zig": "compiler/src/types_suite.zig",
       "goose": "compiler-goose/src/types_suite.goose",
-      "role": "source_module",
-      "write_state": "not_written"
+      "role": "oracle_test_suite",
+      "write_state": "retained_in_oracle",
+      "scope_note": "Native comptime test inventory wrapper; tests and qualification records remain in the Zig oracle."
     },
     {
       "zig": "compiler/src/work_counters.zig",

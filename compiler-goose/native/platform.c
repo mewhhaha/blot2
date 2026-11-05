@@ -19,6 +19,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/file.h>
+#include <dirent.h>
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
@@ -361,3 +362,59 @@ void blot_null_standard_io(void) {
     for (int fd = 0; fd < 3; ++fd) dup2(sink, fd);
     if (sink > 2) close(sink);
 }
+
+/* Opaque OS directory cursors. Selection and source generation stay in Goose. */
+struct blot_directory { DIR *stream; struct dirent *pending; };
+int32_t blot_path_kind(const uint8_t *path) {
+    struct stat info;
+    int result;
+    do { result = stat((const char *)path, &info); } while (result < 0 && errno == EINTR);
+    if (result < 0) { if (errno == ENOENT) return 0; return -1; }
+    if (S_ISREG(info.st_mode)) return 1;
+    if (S_ISDIR(info.st_mode)) return 2;
+    return -1;
+}
+int64_t blot_directory_open(const uint8_t *path) {
+    DIR *stream = opendir((const char *)path);
+    if (!stream) { if (errno == ENOENT) return 0; return -1; }
+    int descriptor = dirfd(stream);
+    if (descriptor < 0 || fcntl(descriptor, F_SETFD, FD_CLOEXEC) < 0) { closedir(stream); return -1; }
+    struct blot_directory *cursor = malloc(sizeof *cursor);
+    if (!cursor) { closedir(stream); return -1; }
+    *cursor = (struct blot_directory){stream, NULL};
+    return (int64_t)(uintptr_t)cursor;
+}
+int64_t blot_directory_next(int64_t handle, uint8_t *out, uint64_t capacity) {
+    if (handle <= 0) return -1;
+    struct blot_directory *cursor = (struct blot_directory *)(uintptr_t)handle;
+    for (;;) {
+        struct dirent *entry = cursor->pending;
+        if (!entry) {
+            errno = 0;
+            entry = readdir(cursor->stream);
+            if (!entry) { if (errno) return -1; return 0; }
+            struct stat info;
+            int result;
+            do { result = fstatat(dirfd(cursor->stream), entry->d_name, &info, AT_SYMLINK_NOFOLLOW); }
+            while (result < 0 && errno == EINTR);
+            if (result < 0) { if (errno == ENOENT) continue; return -1; }
+            if (!S_ISREG(info.st_mode)) continue;
+            cursor->pending = entry;
+        }
+        size_t length = strlen(entry->d_name);
+        if (length > INT64_MAX) return -1;
+        if (length > capacity) return (int64_t)length;
+        if (length) memcpy(out, entry->d_name, length);
+        cursor->pending = NULL;
+        return (int64_t)length;
+    }
+}
+int32_t blot_directory_close(int64_t handle) {
+    if (handle <= 0) return -1;
+    struct blot_directory *cursor = (struct blot_directory *)(uintptr_t)handle;
+    int result = closedir(cursor->stream);
+    free(cursor);
+    if (result < 0) return -1;
+    return 0;
+}
+int32_t blot_last_errno(void) { return errno; }

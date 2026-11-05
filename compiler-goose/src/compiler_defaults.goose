@@ -1,4 +1,4 @@
-// Matches the ordinary compiler/build.zig default. Explicit compile options
-// select the private replay/dump gate independently.
+// Immutable executable defaults are included in the generated source identity.
 namespace blot_compiler_defaults;
-let artifact_replay: bool = false;
+import source_identity;
+let artifact_replay:bool=blot_source_identity::artifact_replay;

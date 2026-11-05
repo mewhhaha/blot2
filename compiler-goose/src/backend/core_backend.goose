@@ -2127,6 +2127,7 @@ fn compileWithOptions(workspace: CompileWorkspace&,source_units: const blot_chec
     }
     var cleanup_result_5_0,cleanup_result_5_1 = cleanup_continuation_5();
      trace_space.restore();
+    if cleanup_result_5_1 != blot_error::Error.none { cleanup_result_5_0.deinit(); blot_backend_result_publication::abortCompile(workspace.publication_owner,publication_epoch); return Result {..},cleanup_result_5_1; }
     blot_backend_result_publication::finishCompile(workspace.publication_owner,publication_epoch); cleanup_result_5_0.active = true; cleanup_result_5_0.publication_owner = workspace.publication_owner; cleanup_result_5_0.publication_epoch = publication_epoch; cleanup_result_5_0.publication_units = units; cleanup_result_5_0.message_source = workspace.message[:];
     return cleanup_result_5_0,cleanup_result_5_1;
 }

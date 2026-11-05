@@ -78,7 +78,7 @@ fn enumName(writer: Writer&,name: const u8[:]) -> blot_error::Error { quoted(wri
 fn enumValue<T>(writer: Writer&,value: T) -> blot_error::Error {
     match value { const for <N,V> in variants<T> { V payload => { return enumName(writer,N); }, } }
 }
-fn write<T>(writer: Writer&,value: T) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } let error = value.jsonStringify(writer); if error != blot_error::Error.none { return fail(writer,error); } return blot_error::Error.none; }
+fn write<T>(writer: Writer&,value: T) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } let error = jsonStringify(value,writer); if error != blot_error::Error.none { return fail(writer,error); } return blot_error::Error.none; }
 fn jsonStringify<T>(value: T,writer: Writer&) -> blot_error::Error {
     let opened = beginObject(writer); if opened != blot_error::Error.none { return opened; }
     const for <N,A> in fields<T> { let error = field(writer,N,value.A); if error != blot_error::Error.none { return error; } } return endObject(writer);
@@ -95,3 +95,5 @@ fn unionValue<T>(writer: Writer&,value: T) -> blot_error::Error {
         }
     }
 }
+
+fn objectField(writer: Writer&,name: const u8[:]) -> blot_error::Error { return key(writer,name); }
