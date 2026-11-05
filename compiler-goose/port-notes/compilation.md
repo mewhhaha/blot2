@@ -4,8 +4,8 @@ The user explicitly requested fixing and recompiling the port. Verification is
 active; there is no remaining approval or source-writing barrier. Keep the Zig
 compiler, normal toolchain, saved oracle and siblings unchanged.
 
-Checkpoint `19615dbbf029b1eada6ac7f8139045f2227ef03a` is pushed to main. It repairs
-parsing and many ownership APIs; it is not a successful full compiler build.
+Checkpoint `7e0864f9c3ec39eab189056d0d8fe6dff339c2f1` is pushed to main. It repairs
+optimizer ownership and bounds failed checks; it is not a full compiler build.
 Upstream Goose parses roughly 35,700 declarations across 435 files in about
 1.1 seconds. Whole-program type checking has not completed successfully.
 
@@ -21,18 +21,28 @@ The actual build entry remains `compiler-goose/build.py`, with explicit Goose
 binary, standard-library directory and 30-second stage caps. Do not claim a
 working compiler until C emission, linking and execution have succeeded.
 
-The latest official check advanced past the optimizer to semantic worker slice
-defaults (check31, 2.669 seconds). Optimizer growing instruction views now pass
-through analysis helpers rather than being stored in analysis records; module
+The official repair loop has advanced through semantic worker packet handling
+into capability validation (check40). Optimizer growing instruction views pass
+through helpers rather than being stored in analysis records; module
 copy-coalescing inputs use numeric tape ranges. Whole-program parsing passes
-after this batch (35,775 declarations, 435 files, 1.102 seconds).
+after the dependency cuts (35,797 declarations, 436 files, 0.952 seconds).
 Scoped tests pass for lexer, interning, graph
 SCCs, arena ownership, byte/hash/JSON helpers, maps and buffers, wire/IR emission,
 native JSON and WGSL fixtures. A fresh exact C-host startup probe passes with
-the unchanged native shim and official runtime. The newer coalescing executable
-probe hit its 30-second emission cap with no diagnostics; execution is pending.
+the unchanged native shim and official runtime.
 Saved probe sources/commands/logs are under
 ignored `build/goose-port/`; these do not qualify the whole compiler.
+
+Focused iteration no longer loads the entire compiler for two engine laws.
+Copy coalescing accepts its actual type/tape inputs: the import closure falls
+from 431 files to nine and official C emission, native compilation and executed
+forwarding/ownership/invalidation/reuse laws finish below 0.2 seconds. The
+import-free type-evidence schema preserves the exact original namespace and
+declarations, cutting interning laws from 431 files to seven: checking takes
+0.064 seconds and native growth/interning/quantifier/reuse laws pass. A separate
+global Store.view execution passes in 0.047 seconds. Evidence is in
+`coalesce-leaf-*-03.log` and `expectation-schema-check/` under the ignored build
+directory. These are measured leaf improvements, not whole-build timings.
 
 Canonical ownership repairs include explicit typed empty slices, finite lazy
 JSON/packet adapters, enum aliases qualified to original definitions, safe

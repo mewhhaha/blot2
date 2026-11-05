@@ -1,5 +1,6 @@
 // Interned semantic types. Exact owner-local evidence; never a machine layout.
 namespace blot_eval_type_evidence;
+import eval.type_evidence_schema;
 import check.effect_evidence;
 import check.effects;
 import check.types;
@@ -16,16 +17,9 @@ import support.option;
 type Id=u32;
 type Error=blot_error::Error;
 type Identity=blot_check_types::NominalIdentity;
-enum Tag { absent,unit,boolean,unsigned32,floating32,never,function,product,record,nominal,array,list,cursor,type_constructor,resolver,provider,state_provider,erased_proof,bound,usage,scoped,forall,existential,projection }
-fn tagCode(tag: Tag) -> u8 {
- match tag {
-  absent=>0,unit=>1,boolean=>2,unsigned32=>3,floating32=>4,never=>5,function=>6,product=>7,record=>8,nominal=>9,array=>10,list=>11,cursor=>12,type_constructor=>13,resolver=>14,provider=>15,state_provider=>16,erased_proof=>17,bound=>20,usage=>21,scoped=>23,forall=>24,existential=>25,projection=>26,
- }
-}
 fn tagFromCode(code: u8) -> Tag,bool {
  if code==0 { return Tag.absent,true; } if code==1 { return Tag.unit,true; } if code==2 { return Tag.boolean,true; } if code==3 { return Tag.unsigned32,true; } if code==4 { return Tag.floating32,true; } if code==5 { return Tag.never,true; } if code==6 { return Tag.function,true; } if code==7 { return Tag.product,true; } if code==8 { return Tag.record,true; } if code==9 { return Tag.nominal,true; } if code==10 { return Tag.array,true; } if code==11 { return Tag.list,true; } if code==12 { return Tag.cursor,true; } if code==13 { return Tag.type_constructor,true; } if code==14 { return Tag.resolver,true; } if code==15 { return Tag.provider,true; } if code==16 { return Tag.state_provider,true; } if code==17 { return Tag.erased_proof,true; } if code==20 { return Tag.bound,true; } if code==21 { return Tag.usage,true; } if code==23 { return Tag.scoped,true; } if code==24 { return Tag.forall,true; } if code==25 { return Tag.existential,true; } if code==26 { return Tag.projection,true; } return Tag.absent,false;
 }
-struct Node { tag: Tag,a: u32=0,b: u32=0,c: u32=0 }
 struct Mapping { variable: u32,evidence: Id }
 struct RowMapping { variable: u32,evidence: u32 }
 struct Goal { ty: Id,kind: blot_check_types::ObligationKind,name: u32=0,result: Id=0,other: Id=0,signature: Id=0,operator: blot_check_types::Operator=blot_check_types::Operator.none,identity: Identity=Identity {0,0},explicit: bool=false }

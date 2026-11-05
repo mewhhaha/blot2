@@ -5111,6 +5111,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_artifacts::Va
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_code_artifacts::ValueResult) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_body_validity::Gate)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_code_body_validity::Gate) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_expectation::Ids)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_code_expectation::Ids) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_expectation::Nodes)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_code_expectation::Nodes) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_expectation::Store)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_code_expectation::Store) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_expectation::View)->bool {return equalFields(left,right);}

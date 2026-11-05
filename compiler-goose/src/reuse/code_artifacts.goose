@@ -764,7 +764,7 @@ fn capture(store: const blot_reuse_substitution_keys::Store&) -> Substitutions {
 }
 fn deinit(self_: Substitutions&) { releaseOwned(self_.entries); releaseOwned(self_.spans); self_ = Substitutions {..}; }
 fn captureBridge<C>(store: const C&) -> Bridge {
-    return Bridge { copyOwned(store.partial.nodes), copyOwned(store.partial.extra),
+    return Bridge { copyOwned(store.partial.nodes.items), copyOwned(store.partial.extra.items),
         copyOwned(store.to), copyOwned(store.from), copyOwned(store.row_to), copyOwned(store.row_from), copyOwned(store.shapes) , ..};
 }
 fn deinit(self_: Bridge&) {
