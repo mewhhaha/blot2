@@ -2,6 +2,8 @@
 namespace blot_reuse_constant_receipt;
 import std;
 import dictionary;
+import support.pooled_buffer;
+import support.pooled_map;
 import check.core;
 import check.types;
 import eval.core_eval;
@@ -282,17 +284,17 @@ fn admittedGraph<S>(snapshot: const S&, value: u32) -> bool {
 
 struct ViewKey { value: u32, evidence: u32 }
 struct RecorderTables {
-    events: Event[>..<]&, sources: Source[>..<]&, view_inputs: dictionary<u32,bool>&,
-    ready_reads: dictionary<BindingRef,u32>&, cached_views: dictionary<ViewKey,u32>&,
-    owned_children: Span[>..<]&, buffers: BufferEffect[>..<]&,
+    events: RecorderEventsBuffer&, sources: RecorderSourcesBuffer&, view_inputs: RecorderViewInputsMap&,
+    ready_reads: RecorderReadyReadsMap&, cached_views: RecorderCachedViewsMap&,
+    owned_children: RecorderOwnedChildrenBuffer&, buffers: RecorderBuffersBuffer&,
 }
 struct Recorder {
-    events: Event[>..<]&, sources: Source[>..<]&, view_inputs: dictionary<u32,bool>&,
-    ready_reads: dictionary<BindingRef,u32>&, cached_views: dictionary<ViewKey,u32>&,
+    events: RecorderEventsBuffer&, sources: RecorderSourcesBuffer&, view_inputs: RecorderViewInputsMap&,
+    ready_reads: RecorderReadyReadsMap&, cached_views: RecorderCachedViewsMap&,
     inputs: Inputs = Inputs {}, owns_inputs: bool = false, mark: Resources,
     values_before: i64, base_depth: i64, base_calls: i64, inference_serial: u64,
-    collection_serial: u64, child_mark: i64, owned_children: Span[>..<]&,
-    growth_mutations: u64 = 0, buffers: BufferEffect[>..<]&, summary_transitions: i64,
+    collection_serial: u64, child_mark: i64, owned_children: RecorderOwnedChildrenBuffer&,
+    growth_mutations: u64 = 0, buffers: RecorderBuffersBuffer&, summary_transitions: i64,
     summary_work: i64, summary_exhausted: bool, query_budgets: i64[8],
     depth: i64 = 0, call_depth: i64 = 0, eligible: bool = true,
 }
@@ -312,7 +314,7 @@ fn captureInputs(self: Recorder&, inputs: Inputs) -> Error {
 }
 fn deinit(self: Recorder&) {
     if self.owns_inputs { self.inputs.deinit(); self.owns_inputs = false; }
-    for &event in self.events { event.deinit(); } self.events.clear(); self.sources.clear();
+    for &event in self.events.items { event.deinit(); } self.events.clear(); self.sources.clear();
     self.view_inputs.clear(); self.ready_reads.clear(); self.cached_views.clear(); self.owned_children.clear(); self.buffers.clear();
 }
 fn view(self: Recorder&, input: u32) -> Error {
@@ -345,13 +347,13 @@ fn cacheView(self: Recorder&, session: const Session&, effect: ViewEffect) -> Er
 fn ownsChildren(self: const Recorder&, session: const Session&, span: Span) -> bool {
     let end = span.start as i64 + span.len;
     if span.start >= self.child_mark && end <= session.storage.children.len { return true; }
-    for owned in self.owned_children { if span.start >= owned.start && end <= owned.start as i64 + owned.len { return true; } }
+    for owned in self.owned_children.items { if span.start >= owned.start && end <= owned.start as i64 + owned.len { return true; } }
     return false;
 }
 fn viewsEscape(self: Recorder&, session: const Session&, result: u32) -> bool, Error {
     if self.view_inputs.count == 0 && self.growth_mutations == 0 { return false, Error.none; }
     var pending: u32[>..<] = []; var seen = dictionary<u32,bool> {}; pending.push(result);
-    for event in self.events {
+    for event in self.events.items {
         match event {
             Event.read dependency => { pending.push(dependency.value.value); },
             Event.query query => { if query.value.input != 0 { pending.push(query.value.input); } if query.value.selected != 0 { pending.push(query.value.selected); } },
@@ -368,7 +370,7 @@ fn viewsEscape(self: Recorder&, session: const Session&, result: u32) -> bool, E
             { let optional_source_44 .= session.storage.collection_buffers.buffers.get(Span { info.start, info.len }); if optional_source_44 { let buffer = optional_source_44;
                 if self.ownsChildren(session, buffer) {
                     var duplicate = false;
-                    for effect in self.buffers { let prior = session.valueInfo(effect.value); if prior.start == info.start && prior.len == info.len { duplicate = true; } }
+                    for effect in self.buffers.items { let prior = session.valueInfo(effect.value); if prior.start == info.start && prior.len == info.len { duplicate = true; } }
                     if !duplicate { self.buffers.push(BufferEffect { id, Frontier { info.start - buffer.start, buffer.len } }); }
                 }
              } }
@@ -379,9 +381,9 @@ fn viewsEscape(self: Recorder&, session: const Session&, result: u32) -> bool, E
     }
     var count: i64 = 0; let length = self.events.len;
     for index in length {
-        let event = self.events[index]; var keep = true;
+        let event = self.events.items[index]; var keep = true;
         match event { Event.view view => { keep = seen.contains(view.value.value); }, _ => {} }
-        if keep { self.events[count] = event; count++; }
+        if keep { self.events.items[count] = event; count++; }
     }
     self.events.resize(count); return false, Error.none;
 }
@@ -403,7 +405,7 @@ fn source(self: Recorder&, target: BindingRef) -> Error { self.observed(Source.n
 fn closure(self: Recorder&, unit: u32, catalog: u32) -> Error { self.observed(Source.anonymous { unit, catalog }) }
 fn observed(self: Recorder&, target: Source) -> Error {
     if !self.eligible { return Error.none; }
-    for old in self.sources { if old == target { return Error.none; } }
+    for old in self.sources.items { if old == target { return Error.none; } }
     if self.sources.len >= 4096 { self.eligible = false; return Error.none; }
     self.sources.push(target); return Error.none;
 }
@@ -419,11 +421,11 @@ fn flush(self: Recorder&, session: const Session&) -> Error {
     var appended = false;
     if self.events.len != 0 {
         let index = self.events.len - 1;
-        match self.events[index] {
+        match self.events.items[index] {
             Event.work previous => {
                 var combined = previous.value; combined.steps += work.steps; combined.values += work.values; combined.children += work.children;
                 if work.depth > combined.depth { combined.depth = work.depth; } if work.call_depth > combined.call_depth { combined.call_depth = work.call_depth; }
-                self.events[index] = Event.work { combined }; appended = true;
+                self.events.items[index] = Event.work { combined }; appended = true;
             },
             _ => {},
         }
@@ -461,18 +463,18 @@ fn query(self: Recorder&, session: const Session&, observation: Query) -> Error 
     self.query_budgets = queryBudgets(session); self.collection_serial = session.storage.collection_buffers.mutation_serial;
     self.reset(session); return Error.none;
 }
-fn finish(self: Recorder&, session: const Session&, target: BindingRef, value: ValueId, outputs: Inputs) -> blot_support::Option<Record>, Error {
+fn finish(self: Recorder&, session: const Session&, target: BindingRef, value: ValueId, outputs: Inputs) -> blot_support::Option<Record>, Error { let allocation_error=self.failure(); if allocation_error!=Error.none { return blot_support::none<Record>(),allocation_error; }
     let error = self.flush(session); if error != Error.none { return blot_support::none<Record>(), error; }
     if !self.eligible || self.collection_serial == 0xffffffffffffffff || session.storage.collection_buffers.mutation_serial != self.collection_serial ||
         session.constant_inference_serial == 0xffffffffffffffff || session.constant_inference_serial != self.inference_serial ||
         session.summary_transitions != self.summary_transitions || session.summary_graph_work != self.summary_work || session.summary_exhausted != self.summary_exhausted ||
         self.query_budgets != queryBudgets(session) { return blot_support::none<Record>(), Error.none; }
     var steps: i64 = 0;
-    for event in self.events { match event { Event.work work => { steps += work.value.steps; }, _ => {} } }
+    for event in self.events.items { match event { Event.work work => { steps += work.value.steps; }, _ => {} } }
     if steps < session.minimum_constant_steps { return blot_support::none<Record>(), Error.none; }
-    if steps < minimum_query_steps { for event in self.events { match event { Event.query => { return blot_support::none<Record>(), Error.none; }, _ => {} } } }
+    if steps < minimum_query_steps { for event in self.events.items { match event { Event.query => { return blot_support::none<Record>(), Error.none; }, _ => {} } } }
     if !admittedGraph(session.snapshot(), value) { return blot_support::none<Record>(), Error.none; }
-    for event in self.events {
+    for event in self.events.items {
         match event { Event.read dependency => { if !admittedGraph(session.snapshot(), dependency.value.value) { return blot_support::none<Record>(), Error.none; } }, _ => {} }
     }
     let info = session.valueInfo(value);
@@ -481,20 +483,20 @@ fn finish(self: Recorder&, session: const Session&, target: BindingRef, value: V
     if escaping { return blot_support::none<Record>(), Error.none; }
     if self.growth_mutations != 0 {
         var growth = Growth { mutations: self.growth_mutations }; var plain = true;
-        for event in self.events { match event { Event.read, Event.view, Event.query => { plain = false; }, _ => {} } }
-        if plain && self.buffers.len == 1 && self.buffers[0].value == value &&
+        for event in self.events.items { match event { Event.read, Event.view, Event.query => { plain = false; }, _ => {} } }
+        if plain && self.buffers.len == 1 && self.buffers.items[0].value == value &&
             (info.kind == blot_eval_core_eval::ValueKind.array || info.kind == blot_eval_core_eval::ValueKind.list) {
             var primitive = true;
             for child in session.valueChildren(value) { if session.valueInfo(child).kind != blot_eval_core_eval::ValueKind.scalar { primitive = false; } }
-            if primitive { growth.frontier = blot_support::some(self.buffers[0].frontier); self.buffers.clear(); }
+            if primitive { growth.frontier = blot_support::some(self.buffers.items[0].frontier); self.buffers.clear(); }
         }
         self.events.push(Event.growth { growth });
     }
     // Transfer Event ownership to persistent typed runs. Query objects already
     // belong to their reusable pool; no borrowed lexical reference is retained.
     var result = Record {
-        buffers: copyOwned(self.buffers), ordered_reads: true, values_before: self.values_before,
-        target: target, value: value, options: session.options, events: copyOwned(self.events), sources: copyOwned(self.sources),
+        buffers: copyOwned(self.buffers.items), ordered_reads: true, values_before: self.values_before,
+        target: target, value: value, options: session.options, events: copyOwned(self.events.items), sources: copyOwned(self.sources.items),
     };
     self.buffers.clear(); self.events.clear(); self.sources.clear();
     let inputs, error = self.inputs.clone(); if error != Error.none { result.deinit(); return blot_support::none<Record>(), error; }
@@ -505,10 +507,72 @@ fn finish(self: Recorder&, session: const Session&, target: BindingRef, value: V
     }
     return blot_support::some(result), Error.none;
 }
-fn withRecorder<C,F>(session: const Session&, context: C&) -> Error {
-    var events: Event[>..<] = []; var sources: Source[>..<] = [];
-    var view_inputs = dictionary<u32,bool> {}; var ready_reads = dictionary<BindingRef,u32> {};
-    var cached_views = dictionary<ViewKey,u32> {}; var children: Span[>..<] = []; var buffers: BufferEffect[>..<] = [];
-    var recorder = init(session, RecorderTables { events, sources, view_inputs, ready_reads, cached_views, children, buffers });
-    let error = F(context, recorder); recorder.deinit(); return error;
-}
+fn withRecorder<C,F>(session: const Session&,context: C&) -> Error { var owner,error=initRecorderOwner(session); if error!=Error.none { return error; } let recorder=owner.borrow(); assert(recorder); let result=F(context,recorder); let allocation_error=recorder.failure(); owner.deinit(); if result!=Error.none { return result; } return allocation_error; }
+
+struct RecorderEventsBuffer { storage: Event[:]=[],items: Event[:]=[],len: i64=0,failure: Error=Error.none }
+reusable[] var pool_RecorderEventsBuffer: Event[>..]=[];
+fn ensure(self: RecorderEventsBuffer&,minimum: i64) -> Error { if self.failure!=Error.none { return self.failure; } let error=blot_support_pooled_buffer::ensure(self,minimum,pool_RecorderEventsBuffer); if error!=Error.none { self.failure=error; } return error; }
+fn push(self: RecorderEventsBuffer&,value: Event) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,pool_RecorderEventsBuffer); self.len=self.items.len; }
+fn append(self: RecorderEventsBuffer&,values: const Event[:]) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,pool_RecorderEventsBuffer); self.len=self.items.len; }
+fn resize(self: RecorderEventsBuffer&,length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
+fn clear(self: RecorderEventsBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
+fn deinit(self: RecorderEventsBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderEventsBuffer); self.len=0; self.failure=Error.none; }
+struct RecorderSourcesBuffer { storage: Source[:]=[],items: Source[:]=[],len: i64=0,failure: Error=Error.none }
+reusable[] var pool_RecorderSourcesBuffer: Source[>..]=[];
+fn ensure(self: RecorderSourcesBuffer&,minimum: i64) -> Error { if self.failure!=Error.none { return self.failure; } let error=blot_support_pooled_buffer::ensure(self,minimum,pool_RecorderSourcesBuffer); if error!=Error.none { self.failure=error; } return error; }
+fn push(self: RecorderSourcesBuffer&,value: Source) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,pool_RecorderSourcesBuffer); self.len=self.items.len; }
+fn append(self: RecorderSourcesBuffer&,values: const Source[:]) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,pool_RecorderSourcesBuffer); self.len=self.items.len; }
+fn resize(self: RecorderSourcesBuffer&,length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
+fn clear(self: RecorderSourcesBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
+fn deinit(self: RecorderSourcesBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderSourcesBuffer); self.len=0; self.failure=Error.none; }
+struct RecorderViewInputsMap { count: i64=0,slots: dictionary_slot<u32,bool>[:]=[] }
+reusable[] var pool_RecorderViewInputsMap: dictionary_slot<u32,bool>[>..]=[];
+fn get(self: const RecorderViewInputsMap&,key: u32) -> bool? { let view=blot_support_pooled_map::Map<u32,bool> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn contains(self: const RecorderViewInputsMap&,key: u32) -> bool { return self.get(key)!=null; }
+fn insert(self: RecorderViewInputsMap&,key: u32,value: bool) { var view=blot_support_pooled_map::Map<u32,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderViewInputsMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderViewInputsMap&,key: u32) { var view=blot_support_pooled_map::Map<u32,bool> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn clear(self: RecorderViewInputsMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
+fn release(self: RecorderViewInputsMap&) { if self.slots.len!=0 { pool_RecorderViewInputsMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
+struct RecorderReadyReadsMap { count: i64=0,slots: dictionary_slot<BindingRef,u32>[:]=[] }
+reusable[] var pool_RecorderReadyReadsMap: dictionary_slot<BindingRef,u32>[>..]=[];
+fn get(self: const RecorderReadyReadsMap&,key: BindingRef) -> u32? { let view=blot_support_pooled_map::Map<BindingRef,u32> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn contains(self: const RecorderReadyReadsMap&,key: BindingRef) -> bool { return self.get(key)!=null; }
+fn insert(self: RecorderReadyReadsMap&,key: BindingRef,value: u32) { var view=blot_support_pooled_map::Map<BindingRef,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderReadyReadsMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderReadyReadsMap&,key: BindingRef) { var view=blot_support_pooled_map::Map<BindingRef,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn clear(self: RecorderReadyReadsMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
+fn release(self: RecorderReadyReadsMap&) { if self.slots.len!=0 { pool_RecorderReadyReadsMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
+struct RecorderCachedViewsMap { count: i64=0,slots: dictionary_slot<ViewKey,u32>[:]=[] }
+reusable[] var pool_RecorderCachedViewsMap: dictionary_slot<ViewKey,u32>[>..]=[];
+fn get(self: const RecorderCachedViewsMap&,key: ViewKey) -> u32? { let view=blot_support_pooled_map::Map<ViewKey,u32> {count:self.count,slots:self.slots}; return blot_support_pooled_map::get(view,key); }
+fn contains(self: const RecorderCachedViewsMap&,key: ViewKey) -> bool { return self.get(key)!=null; }
+fn insert(self: RecorderCachedViewsMap&,key: ViewKey,value: u32) { var view=blot_support_pooled_map::Map<ViewKey,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecorderCachedViewsMap); self.count=view.count; self.slots=view.slots; }
+fn remove(self: RecorderCachedViewsMap&,key: ViewKey) { var view=blot_support_pooled_map::Map<ViewKey,u32> {count:self.count,slots:self.slots}; blot_support_pooled_map::remove(view,key); self.count=view.count; self.slots=view.slots; }
+fn clear(self: RecorderCachedViewsMap&) { for &slot in self.slots { slot.tag=0; } self.count=0; }
+fn release(self: RecorderCachedViewsMap&) { if self.slots.len!=0 { pool_RecorderCachedViewsMap.free_slice(self.slots); } self.slots=[]; self.count=0; }
+struct RecorderOwnedChildrenBuffer { storage: Span[:]=[],items: Span[:]=[],len: i64=0,failure: Error=Error.none }
+reusable[] var pool_RecorderOwnedChildrenBuffer: Span[>..]=[];
+fn ensure(self: RecorderOwnedChildrenBuffer&,minimum: i64) -> Error { if self.failure!=Error.none { return self.failure; } let error=blot_support_pooled_buffer::ensure(self,minimum,pool_RecorderOwnedChildrenBuffer); if error!=Error.none { self.failure=error; } return error; }
+fn push(self: RecorderOwnedChildrenBuffer&,value: Span) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,pool_RecorderOwnedChildrenBuffer); self.len=self.items.len; }
+fn append(self: RecorderOwnedChildrenBuffer&,values: const Span[:]) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,pool_RecorderOwnedChildrenBuffer); self.len=self.items.len; }
+fn resize(self: RecorderOwnedChildrenBuffer&,length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
+fn clear(self: RecorderOwnedChildrenBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
+fn deinit(self: RecorderOwnedChildrenBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderOwnedChildrenBuffer); self.len=0; self.failure=Error.none; }
+struct RecorderBuffersBuffer { storage: BufferEffect[:]=[],items: BufferEffect[:]=[],len: i64=0,failure: Error=Error.none }
+reusable[] var pool_RecorderBuffersBuffer: BufferEffect[>..]=[];
+fn ensure(self: RecorderBuffersBuffer&,minimum: i64) -> Error { if self.failure!=Error.none { return self.failure; } let error=blot_support_pooled_buffer::ensure(self,minimum,pool_RecorderBuffersBuffer); if error!=Error.none { self.failure=error; } return error; }
+fn push(self: RecorderBuffersBuffer&,value: BufferEffect) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::push(self,value,pool_RecorderBuffersBuffer); self.len=self.items.len; }
+fn append(self: RecorderBuffersBuffer&,values: const BufferEffect[:]) { if self.failure!=Error.none { return; } self.failure=blot_support_pooled_buffer::append(self,values,pool_RecorderBuffersBuffer); self.len=self.items.len; }
+fn resize(self: RecorderBuffersBuffer&,length: i64) { blot_support_pooled_buffer::resize(self,length); self.len=length; }
+fn clear(self: RecorderBuffersBuffer&) { blot_support_pooled_buffer::clear(self); self.len=0; self.failure=Error.none; }
+fn deinit(self: RecorderBuffersBuffer&) { blot_support_pooled_buffer::deinit(self,pool_RecorderBuffersBuffer); self.len=0; self.failure=Error.none; }
+
+struct RecorderBacking { events: RecorderEventsBuffer=RecorderEventsBuffer {},sources: RecorderSourcesBuffer=RecorderSourcesBuffer {},view_inputs: RecorderViewInputsMap=RecorderViewInputsMap {},ready_reads: RecorderReadyReadsMap=RecorderReadyReadsMap {},cached_views: RecorderCachedViewsMap=RecorderCachedViewsMap {},owned_children: RecorderOwnedChildrenBuffer=RecorderOwnedChildrenBuffer {},buffers: RecorderBuffersBuffer=RecorderBuffersBuffer {} }
+reusable var recorder_backings: RecorderBacking[>..]=[];
+struct RecorderOwnerState { value: Recorder,backing: u32,generation: u64,live: bool=true }
+struct RecorderOwner { lease: u32=0,generation: u64=0 }
+reusable var recorder_owners: RecorderOwnerState[>..]=[];
+var next_recorder_generation: u64=1;
+fn initRecorderOwner(session: const Session&) -> RecorderOwner,Error { if next_recorder_generation==0xffffffffffffffff||recorder_owners.len>=0xffffffff||recorder_backings.len>=0xffffffff { return RecorderOwner {},Error.out_of_memory; } let generation=next_recorder_generation; next_recorder_generation++; let at=recorder_backings.alloc_index(RecorderBacking {}); let backing: RecorderBacking&=recorder_backings[at]; let tables=RecorderTables {events:backing.events,sources:backing.sources,view_inputs:backing.view_inputs,ready_reads:backing.ready_reads,cached_views:backing.cached_views,owned_children:backing.owned_children,buffers:backing.buffers}; let value=init(session,tables); let owner=recorder_owners.alloc_index(RecorderOwnerState {value,at as u32,generation,true}); return RecorderOwner {(owner+1) as u32,generation},Error.none; }
+fn borrow(self: RecorderOwner) -> Recorder? { if self.lease==0||self.lease-1>=recorder_owners.len { return null; } let owner: RecorderOwnerState&=recorder_owners[self.lease-1]; if !owner.live||owner.generation!=self.generation { return null; } return owner.value; }
+fn deinit(self: RecorderOwner&) { if self.lease==0 { return; } let at=self.lease-1; assert(at<recorder_owners.len&&recorder_owners[at].live&&recorder_owners[at].generation==self.generation); let owner: RecorderOwnerState&=recorder_owners[at]; owner.value.deinit(); let backing: RecorderBacking&=recorder_backings[owner.backing]; backing.events.deinit(); backing.sources.deinit(); release(backing.view_inputs); release(backing.ready_reads); release(backing.cached_views); backing.owned_children.deinit(); backing.buffers.deinit(); recorder_backings.free(owner.backing); owner.live=false; recorder_owners.free(at); self=RecorderOwner {}; }
+fn failure(self: const Recorder&) -> Error { if self.events.failure!=Error.none { return self.events.failure; } if self.sources.failure!=Error.none { return self.sources.failure; } if self.owned_children.failure!=Error.none { return self.owned_children.failure; } if self.buffers.failure!=Error.none { return self.buffers.failure; } return Error.none; }

@@ -199,3 +199,62 @@ SIMD loads/stores and all supported collection/cursor builders are written.
 New recursion paths use fixed local descriptors and explicit cleanup. Reusable
 call admission/emission, remaining source dispatch/control and scoped compile
 construction remain unwritten; the full backend is still incomplete/unverified.
+Scoped type/member refinement, primitive callable construction and application,
+selected-data admission, symbolic getter/partial/call/closure/product/record
+planning and owner-graph reads are now written through planValue (source around
+2820). Captured callable vectors and environments publish immutable ranges into
+compile-wide Metadata; no recursive-local descriptor references are retained.
+MethodSelector uses core_eval.initOwnedSession/deinitOwnedSession. Source-shaped
+metadata default/constructor alignment and later engine sections remain pending.
+The complete storage_field_plan cache is also written, including negative
+recipes, saturation, and exact spelling probes. No checks have run.
+The storage_transport production Index is now written in full: immutable Core
+merge/carry indexes, bounded whole-value canonicalization, exact field-lane
+identities through record merges/updates, all break/continue edge checks and
+building/changed/invariant memoization. create(Module&) returns a stable typed
+pooled Index handle; deinit reclaims every map, exit run and metadata slot.
+Scoped native map wrappers now alias the exact pooled_map.Map instantiations,
+matching nominal Goose types. Earlier custom map wrappers elsewhere still need
+that source API alignment. No verification has run.
+Refinement recording now obtains canonical global TapeOwner/ObservationOwner
+borrows, restores prior Session references, then releases Observation and Tape
+owners. The selected-type key Builder now owns fixed typed pooled word/node/map
+descriptors; init(remaining:i64,options={}) stores the private budget by value,
+all descriptor/DAG/height/collision/word-work algorithms and SDK1 encoding stay
+explicit. Words.toOwned/release transfer exact typed runs and deinit releases
+capacity. No recursive-local Grow/budget reference is stored by this builder.
+Scoped callback admission, concrete/nominal inline evidence and structural-field
+ambient handling are now source-written through source around 2990. Later
+admission/evidence/call generation/control/compile sections remain pending.
+Scoped admission now includes descriptor/plain evidence selection, cached exact
+height receipts and saturating hit/publication counters, numeric body admission,
+primitive/reference aliases, associated partial callbacks, and selected-call
+substitution/goal/binding rollback through source around 3180. numericExpression
+and subsequent call/evidence/emission/compile sections remain pending. All work
+in this note is an unverified source-writing pass; no build, test, formatter or
+compiler invocation has run.
+Scoped numericExpression now has its full production admission walk (source
+through roughly 3485), with explicit terminal-result handling for direct getter,
+partial-call and associated-call proofs. Added full storage_parameter_fields
+production pass, including bounded field footprints, nominal projection catalog
+checks and pooled canonical Walk contexts. Scoped helper writing now extends
+through readerWordParameter (source roughly 3820): context counters, small
+return-register ABI, inline/reader word schemas, barrier traces, reader argument
+admission, exact layout-evidence encoding and physical parameter rebinding.
+Remaining scoped sections begin readerParameter and include descriptor graphs,
+call generation, source expression/control emission and compile construction.
+No verification has run.
+Scoped writing now reaches readerCallEvidence (source around 4035): child
+parameter roots, immutable environment graph retention with completed-copy memo,
+reader-result provenance retention/remapping, masked ABI slot stores, aliased
+loads and exact call evidence are written. All child Generators share the
+compile-attempt Metadata owner; independent immutable vectors publish fresh
+ranges, so retained compile-local plans do not borrow a child descriptor.
+Cross-attempt retained artifacts still require the existing portable projections.
+The remaining scoped source begins descriptorType and continues through owner
+graph summaries, reusable-call emission, main lowering and compile construction.
+Scoped descriptorType/body/value evidence, closure qualifier checks, optional
+shared-evidence rollback and retained descriptor schemas now reach source around
+4185. Metadata also owns copied spelling bytes used by compile-local schemas.
+Next source section is optionalWriterEvidence / writer owner-graph key encoding.
+The engine's later reusable-call emission and top-level compile are unfinished.

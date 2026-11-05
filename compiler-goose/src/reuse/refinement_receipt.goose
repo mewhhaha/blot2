@@ -422,3 +422,11 @@ fn mapReplay<G,M>(g: G&, maps: M&, facts: Dependencies&, output: Value&) -> bool
     }
     return true, Error.none;
 }
+
+struct ObservationOwner { lease: u32=0,generation: u64=0 }
+struct ObservationOwnerState { value: Observation,generation: u64,live: bool=true }
+reusable var observation_owner_slots: ObservationOwnerState[>..]=[];
+var next_observation_owner_slots_generation: u64=1;
+fn initObservationOwner() -> ObservationOwner,Error { if next_observation_owner_slots_generation==0xffffffffffffffff||observation_owner_slots.len>=0xffffffff { return ObservationOwner {},Error.out_of_memory; } let value=Observation {}; let generation=next_observation_owner_slots_generation; next_observation_owner_slots_generation++; let at=observation_owner_slots.alloc_index(ObservationOwnerState {value,generation,true}); return ObservationOwner {(at+1) as u32,generation},Error.none; }
+fn borrow(self: ObservationOwner) -> Observation? { if self.lease==0||self.lease-1>=observation_owner_slots.len { return null; } let slot: ObservationOwnerState&=observation_owner_slots[self.lease-1]; if !slot.live||slot.generation!=self.generation { return null; } return slot.value; }
+fn deinit(self: ObservationOwner&) { if self.lease==0 { return; } let at=self.lease-1; assert(at<observation_owner_slots.len&&observation_owner_slots[at].live&&observation_owner_slots[at].generation==self.generation); let slot: ObservationOwnerState&=observation_owner_slots[at]; slot.value=Observation {}; slot.live=false; observation_owner_slots.free(at); self=ObservationOwner {}; }

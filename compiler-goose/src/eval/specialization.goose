@@ -398,10 +398,10 @@ struct RefinementCall {
 fn refineFresh(self: Service&, call: RefinementCall) -> blot_eval_core_eval::SolvedEvidence, Error {
     let before_nodes = self.evaluator.counters.inference_specialization_nodes; let before_recorded = self.refinement_stats.recorded; let before_record_declines = self.refinement_stats.record_declines;
     self.refinement_regions++;
-    let tape,tape_error = blot_reuse_specialization_receipt::initPooled(); if tape_error != Error.none { return default<blot_eval_core_eval::SolvedEvidence>(),tape_error; } 
+    var tape_owner,tape_error = blot_reuse_specialization_receipt::initTapeOwner(); if tape_error != Error.none { return default<blot_eval_core_eval::SolvedEvidence>(),tape_error; } let tape .= tape_owner.borrow(); assert(tape); 
     recursive fn cleanup_continuation_8() -> blot_eval_core_eval::SolvedEvidence, Error {
 
-    var observation = blot_reuse_refinement_receipt::Observation {};
+    var observation_owner,observation_error = blot_reuse_refinement_receipt::initObservationOwner(); if observation_error != Error.none { return default<blot_eval_core_eval::SolvedEvidence>(),observation_error; } let observation .= observation_owner.borrow(); assert(observation);
     let old_tape .= self.evaluator.receipt_tape; let old_observation .= self.evaluator.refinement_observation;
     if call.enabled { self.evaluator.receipt_tape .= tape; self.evaluator.refinement_observation .= observation; }
     
@@ -440,12 +440,12 @@ fn refineFresh(self: Service&, call: RefinementCall) -> blot_eval_core_eval::Sol
 
     }
     let cleanup_result_7_0,cleanup_result_7_1 = cleanup_continuation_7();
-     self.evaluator.receipt_tape .= old_tape; self.evaluator.refinement_observation .= old_observation; 
+     self.evaluator.receipt_tape .= old_tape; self.evaluator.refinement_observation .= old_observation; observation_owner.deinit(); 
     return cleanup_result_7_0,cleanup_result_7_1;
 
     }
     let cleanup_result_8_0,cleanup_result_8_1 = cleanup_continuation_8();
-     tape.deinit(); 
+     tape_owner.deinit(); 
     return cleanup_result_8_0,cleanup_result_8_1;
 }
 fn refineMappingsCaptures(self: Service&,unit_id: u32,root: EvidenceRoot,expected: u32,mappings: Mapping[>..<]&,rows: RowMapping[>..<]&,span: blot_check_core::Span,captures: const blot_eval_core_eval::RetainedCapture[:]) -> Error { return refineMappingsCapturesSink(self,unit_id,root,expected,MappingSink.lexical { mappings },RowSink.lexical { rows },span,captures); }

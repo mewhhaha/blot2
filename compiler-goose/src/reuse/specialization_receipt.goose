@@ -251,10 +251,8 @@ fn finish(self: Tape&, base: Record) -> Record, Error {
     result.complete = result.complete && !self.nested && !self.unknown;
     self.deinit(); return result, Error.none;
 }
-fn withTape<C,F>(context: C&) -> Error {
-    var tape, error = initPooled(); if error != Error.none { return error; }
-    let failure = F(context, tape); tape.deinit(); return failure;
-}
+fn withTape<C,F>(context: C&) -> Error { var owner,error=initTapeOwner(); if error!=Error.none { return error; } let tape=owner.borrow(); assert(tape); let result=F(context,tape); owner.deinit(); return result; }
+
 fn principalOutcomeCode(value: PrincipalOutcome) -> u8 {
     match value { PrincipalOutcome.missing => 0, PrincipalOutcome.declined => 1, PrincipalOutcome.graph => 2 }
 }
@@ -273,3 +271,11 @@ fn resize(self: ViewBuffer&, length: i64) { assert(length >= 0 && length <= self
 
 fn append(self: PlainBuffer&, values: const PlainFact[:]) -> Error { for value in values { let error = self.push(value); if error != Error.none { return error; } } return self.failure; }
 fn resize(self: PlainBuffer&, length: i64) { assert(length >= 0 && length <= self.len); self.len = length; self.items = self.storage[..length]; }
+
+struct TapeOwner { lease: u32=0,generation: u64=0 }
+struct TapeOwnerState { value: Tape,generation: u64,live: bool=true }
+reusable var tape_owner_slots: TapeOwnerState[>..]=[];
+var next_tape_owner_slots_generation: u64=1;
+fn initTapeOwner() -> TapeOwner,Error { if next_tape_owner_slots_generation==0xffffffffffffffff||tape_owner_slots.len>=0xffffffff { return TapeOwner {},Error.out_of_memory; } let value,error=initPooled(); if error!=Error.none { return TapeOwner {},error; } let generation=next_tape_owner_slots_generation; next_tape_owner_slots_generation++; let at=tape_owner_slots.alloc_index(TapeOwnerState {value,generation,true}); return TapeOwner {(at+1) as u32,generation},Error.none; }
+fn borrow(self: TapeOwner) -> Tape? { if self.lease==0||self.lease-1>=tape_owner_slots.len { return null; } let slot: TapeOwnerState&=tape_owner_slots[self.lease-1]; if !slot.live||slot.generation!=self.generation { return null; } return slot.value; }
+fn deinit(self: TapeOwner&) { if self.lease==0 { return; } let at=self.lease-1; assert(at<tape_owner_slots.len&&tape_owner_slots[at].live&&tape_owner_slots[at].generation==self.generation); let slot: TapeOwnerState&=tape_owner_slots[at]; slot.value.deinit(); slot.live=false; tape_owner_slots.free(at); self=TapeOwner {}; }

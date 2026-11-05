@@ -140,6 +140,11 @@ type WordMap=blot_support_pooled_map::Map<u32,u32>;
 reusable[] var copy_map_slots:dictionary_slot<u32,u32>[>..]=[];
 fn get(self:const WordMap&,key:u32)->u32? {return blot_support_pooled_map::get(self,key);}
 fn insert(self:WordMap&,key:u32,value:u32) {blot_support_pooled_map::insert(self,key,value,copy_map_slots);}
+fn restore(self:WordMap&,slots:const dictionary_slot<u32,u32>[:],count:i64) {
+ blot_support_pooled_map::deinit(self,copy_map_slots);
+ if slots.len!=0 {self.slots=copy_map_slots.alloc_slice(slots.len);for slot,index in slots {self.slots[index]=slot;}}
+ self.count=count;
+}
 fn clear(self:WordMap&) {blot_support_pooled_map::clear(self);}
 struct CopyMaps {live:bool=false,generation:u64=0,types:WordMap=WordMap {},variables:WordMap=WordMap {},rows:WordMap=WordMap {},row_variables:WordMap=WordMap {},labels:WordMap=WordMap {}}
 reusable var map_owners:CopyMaps[>..]=[];

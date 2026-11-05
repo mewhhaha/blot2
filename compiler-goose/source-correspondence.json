@@ -898,7 +898,7 @@
       "zig": "compiler/src/backend/storage_owner_graph.zig",
       "goose": "compiler-goose/src/backend/storage_owner_graph.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/backend/storage_owner_graph_tests.zig",
@@ -916,7 +916,7 @@
       "zig": "compiler/src/backend/storage_parameter_fields.zig",
       "goose": "compiler-goose/src/backend/storage_parameter_fields.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/storage_parameter_fields_tests.zig",
@@ -976,7 +976,7 @@
       "zig": "compiler/src/backend/storage_transport.zig",
       "goose": "compiler-goose/src/backend/storage_transport.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/backend/storage_type_arguments.zig",
@@ -2535,13 +2535,13 @@
       "zig": "compiler/src/reuse/body_auxiliary.zig",
       "goose": "compiler-goose/src/reuse/body_auxiliary.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/body_check_cache.zig",
       "goose": "compiler-goose/src/reuse/body_check_cache.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "in_progress"
     },
     {
       "zig": "compiler/src/reuse/body_check_cache_tests.zig",

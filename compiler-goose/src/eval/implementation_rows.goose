@@ -18,17 +18,13 @@ fn convert(error: Error) -> Error { if error==Error.out_of_memory { return error
 fn syncBudget(store: Store&,observed: i64&,remaining: i64&) -> Error { let spent=store.projection_steps-observed; if spent>remaining { return Error.evidence_limit; } remaining-=spent; observed=store.projection_steps; store.projection_limit=store.projection_steps+remaining; return Error.none; }
 fn unifyRows(store: Store&,left: u32,right: u32) -> Error { let e=store.chargeProjection(); if e!=Error.none { return convert(e); } for label in store.rowLabels(left) { let error=store.chargeProjection(); if error!=Error.none { return convert(error); } } for label in store.rowLabels(right) { let error=store.chargeProjection(); if error!=Error.none { return convert(error); } } let error=store.unifyEffects(left,right); if error!=Error.none { return convert(error); } return Error.none; }
 struct Context<S,R,M,B> { evidence: blot_eval_type_evidence::Store,source: S,clauses: const blot_check_core::Obligation[:],certificates: const u32[:],variables: const u32[:],mappings: M,rows: B,resolver: blot_eval_type_evidence::ProjectionResolver<R> }
-struct CopyContext<S,R,M,B> { outer: Context<S,R,M,B>,scratch: Store,observed: i64=0 }
+struct CopyContext<S,R,M,B> { outer: Context<S,R,M,B>,scratch: Store,observed: i64& }
 fn withSourceCopy<R,M,B>(context: CopyContext<Store,R,M,B>&) -> Error { let source=blot_check_frozen_types::Source.store {value:context.outer.source}; return blot_reuse_principal_type_graph::withCopy<CopyContext<Store,R,M,B>,solve<Store,R,M,B>>(source,context.scratch,256,1000000,context.outer.resolver.remaining,context.observed,context); }
 fn withSourceCopy<R,M,B>(context: CopyContext<blot_check_core::Types,R,M,B>&) -> Error {
  let s=context.outer.source; let graph=blot_check_frozen_types::Graph {s.nodes,s.extra,s.effects.rows,s.effects.labels,s.operations,s.effects.variable_count,s.quantifier_goals,s.quantifier_obligations}; let source=blot_check_frozen_types::Source.frozen {value:graph};
  return blot_reuse_principal_type_graph::withFrozenCopy<CopyContext<blot_check_core::Types,R,M,B>,solve<blot_check_core::Types,R,M,B>>(source,context.scratch,256,1000000,context.outer.resolver.remaining,context.observed,context);
 }
-fn scratch<S,R,M,B>(context: Context<S,R,M,B>&,store: Store&) -> Error {
- store.resolution_depth_limit=256; store.projection_limit=context.resolver.remaining; store.has_projections=true; 
- 
- var copy=CopyContext<S,R,M,B> {context,store,0}; let __cleanup_result_483_0: Error = withSourceCopy(copy); { let spent=store.projection_steps-copy.observed; if spent>context.resolver.remaining { context.resolver.remaining=0; } else { context.resolver.remaining-=spent; } } return __cleanup_result_483_0;
- { let spent=store.projection_steps-copy.observed; if spent>context.resolver.remaining { context.resolver.remaining=0; } else { context.resolver.remaining-=spent; } } }
+fn scratch<S,R,M,B>(context: Context<S,R,M,B>&,store: Store&) -> Error { store.resolution_depth_limit=256; store.projection_limit=context.resolver.remaining; store.has_projections=true; let at=projection_observations.alloc_index(0); var copy=CopyContext<S,R,M,B> {context,store,projection_observations[at]}; let result=withSourceCopy(copy); let spent=store.projection_steps-copy.observed; if spent>context.resolver.remaining { context.resolver.remaining=0; } else { context.resolver.remaining-=spent; } projection_observations.free(at); return result; }
 fn solve<S,R,M,B>(context: CopyContext<S,R,M,B>&,copy: blot_reuse_principal_type_graph::Copier&) -> Error {
  let c=context.outer; let store=context.scratch; let evidence=c.evidence;
  var closed=blot_eval_closed_evidence_import::initPooled(evidence.view(),store); 
@@ -76,3 +72,5 @@ fn reconstructInner<S,R,M,B>(evidence: blot_eval_type_evidence::Store,source: co
 
 fn reconstruct<S,R>(evidence: blot_eval_type_evidence::Store,source: const S&,clauses: const blot_check_core::Obligation[:],certificates: const u32[:],variables: const u32[:],mappings: Mapping[>..<]&,rows: RowMapping[>..<]&,resolver: blot_eval_type_evidence::ProjectionResolver<R>&) -> Error { return reconstructInner<S,R,Mapping[>..<]&,RowMapping[>..<]&>(evidence,source,clauses,certificates,variables,mappings,rows,resolver); }
 fn reconstruct<S,R>(evidence: blot_eval_type_evidence::Store,source: const S&,clauses: const blot_check_core::Obligation[:],certificates: const u32[:],variables: const u32[:],mappings: blot_eval_type_evidence::PooledMappings&,rows: blot_eval_type_evidence::PooledRows&,resolver: blot_eval_type_evidence::ProjectionResolver<R>&) -> Error { let first=blot_eval_type_evidence::activate(mappings); if first!=Error.none { return first; } let second=blot_eval_type_evidence::activate(rows); if second!=Error.none { return second; } return reconstructInner<S,R,blot_eval_type_evidence::PooledMappings,blot_eval_type_evidence::PooledRows>(evidence,source,clauses,certificates,variables,mappings,rows,resolver); }
+
+reusable var projection_observations: i64[>..]=[];

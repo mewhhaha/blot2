@@ -62,14 +62,10 @@ fn sameRoot(left: Copier&, right: Copier&, l: Id, r: Id, remaining: i64&) -> Err
     let equal, error = left.destination.equalSymbolic(first, second); remaining -= min(remaining, left.destination.projection_steps - before);
     if error != Error.none { return convert(error); } if !equal { return Error.invalid_artifact; } return Error.none;
 }
-fn withCopiers<C,F>(first: const Types&, second: const Types&, destination: blot_check_types::Store&, remaining: i64&, context: C&) -> Error {
-    var lt: dictionary<Id,Id> = dictionary<Id,Id> {}; var lv: dictionary<u32,Id> = dictionary<u32,Id> {}; var lr: dictionary<Id,Id> = dictionary<Id,Id> {}; var lrv: dictionary<u32,Id> = dictionary<u32,Id> {}; var ll: dictionary<Id,Id> = dictionary<Id,Id> {};
-    var rt: dictionary<Id,Id> = dictionary<Id,Id> {}; var rv: dictionary<u32,Id> = dictionary<u32,Id> {}; var rr: dictionary<Id,Id> = dictionary<Id,Id> {}; var rrv: dictionary<u32,Id> = dictionary<u32,Id> {}; var rl: dictionary<Id,Id> = dictionary<Id,Id> {};
-    let a = graphView(first); let b = graphView(second);
-    var left = Copier { source: Source.frozen { a }, destination, max_depth: 256, max_nodes: 1000000, frozen: true, remaining, types: lt, variables: lv, rows: lr, row_variables: lrv, labels: ll };
-    var right = Copier { source: Source.frozen { b }, destination, max_depth: 256, max_nodes: 1000000, frozen: true, remaining, types: rt, variables: rv, rows: rr, row_variables: rrv, labels: rl };
-    let error = F(context, destination, left, right); left.deinit(); right.deinit(); return error;
+fn withCopiers<C,F>(first:const Types&,second:const Types&,destination:blot_check_types::Store&,remaining:i64&,context:C&)->Error {
+ let a=graphView(first);let b=graphView(second);let initialized,error=blot_reuse_principal_type_graph::initPooled(Source.frozen{a},destination,256,1000000,true,remaining);if error!=Error.none {return error;}var left=initialized;let initialized,error=blot_reuse_principal_type_graph::initPooled(Source.frozen{b},destination,256,1000000,true,remaining);if error!=Error.none {left.deinit();return error;}var right=initialized;let error=F(context,destination,left,right);left.deinit();right.deinit();return error;
 }
+
 struct Equivalence<L,R,LP,RP> {
     first: const Types&, second: const Types&, left_contract: L, right_contract: R,
     left_members: const blot_reuse_principal_interface::ContractMember[:], right_members: const blot_reuse_principal_interface::ContractMember[:],

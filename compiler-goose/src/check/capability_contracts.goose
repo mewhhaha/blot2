@@ -274,14 +274,14 @@ recursive fn equivalentDepth(left: View, left_root: Id, right: View, right_root:
         },
     }
 }
-fn digest(recipe: Recipe, pool: blot_parse_symbols::Pool&) -> blot_support::Option<u8[32]> {
+fn digest(recipe: Recipe, pool: const blot_parse_symbols::Pool&) -> blot_support::Option<u8[32]> {
     if recipe.view().validate(recipe.root, recipe.arity, true) != Error.none { return blot_support::none<u8[32]>(); }
     var hash = blot_support_blake3::init(); word(hash, 0x43565001); word(hash, recipe.arity); var remaining: i64 = 65536;
     if !digestTerm(recipe.view(), recipe.root, pool, hash, remaining, 0) { return blot_support::none<u8[32]>(); } return blot_support::some(hash.final());
 }
 fn word(hash: blot_support_blake3::State&, value: u32) { var bytes: u8[4]; for index in 0..4 { bytes[index] = (value >> (index * 8)) as! u8; } hash.update(bytes); }
-fn fieldDigest(hash: blot_support_blake3::State&, pool: blot_parse_symbols::Pool&, symbol: u32) -> bool { if symbol == 0 || symbol > pool.entries.len { return false; } let text = pool.get(symbol); word(hash, text.len as u32); hash.update(text); return true; }
-recursive fn digestTerm(view: View, root: Id, pool: blot_parse_symbols::Pool&, hash: blot_support_blake3::State&, remaining: i64&, depth: i64) -> bool {
+fn fieldDigest(hash: blot_support_blake3::State&, pool: const blot_parse_symbols::Pool&, symbol: u32) -> bool { if symbol == 0 || symbol > pool.entries.len { return false; } let text = pool.get(symbol); word(hash, text.len as u32); hash.update(text); return true; }
+recursive fn digestTerm(view: View, root: Id, pool: const blot_parse_symbols::Pool&, hash: blot_support_blake3::State&, remaining: i64&, depth: i64) -> bool {
     if depth >= 128 || remaining == 0 { return false; } remaining -= 1; let term = view.nodes[root]; word(hash, tagCode(term.tag));
     match term.tag {
         Tag.empty, Tag.unknown => {},

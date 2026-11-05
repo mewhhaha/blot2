@@ -269,5 +269,27 @@ slots, copies the durable destination Store descriptor, and uses fixed typed
 buffers for every recursive binder/goal/record/word scratch. Continuations free
 scratch on all Error returns. Native live budget coupling remains; callback
 callers are moving local scalar budgets/context headers into their own global
-scratch. Associated admission's direct Copier constructors are being adapted.
+scratch. Associated admission now uses the pooled Copier factory. Exact saved copier map slots have a restore helper.
 All of these remain unverified writing passes. The source port is incomplete.
+
+
+Body auxiliary records now have a full first production source pass: all twenty
+checked tables, explicit typed field routes, capture, numeric DAG projection,
+clone, transform, byte accounting and teardown. Named Route methods keep
+polymorphic return types static. Numeric versions retain checked binding/AST
+roles and exact work/term limits.
+
+Body checking cache remains in progress. Shared Catalog/receipt records,
+generation-checked memo owners, immutable typed run teardown, lease retention,
+compaction, packed payload accounting, syntax fingerprints, body capture and
+binding/read helpers are written. Digest source is being written separately;
+freeze/projection and publication integration remain. Presence is not completion.
+
+Canonical recorder descriptors now have generation-checked typed owners,
+including Tape, Observation and constant/principal Recorders. Session and
+specialization consumers borrow these stable descriptors. Global fixed pool
+headers solve recursive-local storage, but do not establish Goose worker
+program flatness: spec11.2 prohibits reference-bearing mutable globals in thread
+programs. The driver must preserve copied packets using explicit flat worker
+contexts or independent Goose worker processes. That driver is not yet written.
+No port build, execution, checker, test, lint or formatter has run.
