@@ -16,7 +16,8 @@ Production writing passes completed, all unverified:
   artifact_emitter, artifact_capture, executable_query, shared_query_gate,
   dispatch_explanation, principal_reuse_gate, declaration_dependencies,
   declaration_projection, dependency_certificate, validation_image,
-  mismatch_display.
+  mismatch_display, code_body_validity, completed_core_validation,
+  frozen_dependency, independent_call_proof and source_value_template.
 - Check frozen_core_validation, with bounds, mixed graph and staging/scope
   helpers in frozen_core_bounds, frozen_core_graph and frozen_core_scopes.
 - Support explicit error labels, fixed Option, byte codecs, exact Wyhash,
@@ -121,3 +122,17 @@ journal. Module and Types owner IDs and package_payloads are derived locally,
 never sent as thread identities. Decoding checks data shape and enum ordinals;
 the complete foreign Context must still pass frozen validation before evaluation.
 Worker transport integration and packet costs remain unmeasured.
+
+Source value transport owns fixed pooled visit pages, sparse anchor/position
+buffers and output runs. It preserves multi-root aliases, source operation and
+closure ownership, collection buffer frontiers, cumulative quotas and precharged
+debts. All representation imports and reservation occur before value publication.
+Non-scratch mapped outputs use releaseMapped; scratch outputs remain borrowed.
+Independent call rechecking uses withSharedSession and layout.withStore, records
+only source/scalar premises and publishes through its enclosing query. The
+shared copied-worker adapters are being written by the evaluator owner.
+
+Importer, remaining retained/project/session modules and runtime collectors are
+still required. Constructor and callback alignment is unfinished throughout the
+port. The normal Zig compiler is preserved under remote tag
+goose-port-oracle-156f84b; writing checkpoints do not select Goose for builds.

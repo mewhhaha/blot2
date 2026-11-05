@@ -2583,7 +2583,7 @@
       "zig": "compiler/src/reuse/code_body_validity.zig",
       "goose": "compiler-goose/src/reuse/code_body_validity.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/code_expectation.zig",
@@ -2595,7 +2595,7 @@
       "zig": "compiler/src/reuse/completed_core_validation.zig",
       "goose": "compiler-goose/src/reuse/completed_core_validation.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/completion_check_tests.zig",
@@ -2913,7 +2913,7 @@
       "zig": "compiler/src/reuse/frozen_dependency.zig",
       "goose": "compiler-goose/src/reuse/frozen_dependency.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/global_references.zig",
@@ -2931,7 +2931,7 @@
       "zig": "compiler/src/reuse/independent_call_proof.zig",
       "goose": "compiler-goose/src/reuse/independent_call_proof.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/initializer_purity_tests.zig",
@@ -3339,7 +3339,7 @@
       "zig": "compiler/src/reuse/source_value_template.zig",
       "goose": "compiler-goose/src/reuse/source_value_template.goose",
       "role": "source_module",
-      "write_state": "not_written"
+      "write_state": "written_unverified"
     },
     {
       "zig": "compiler/src/reuse/source_value_template_tests.zig",
