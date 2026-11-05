@@ -4346,3 +4346,3499 @@ fn clone(value:const blot_reuse_frozen_dependency::FrozenDependency&)->Owned<blo
  var owner,error=init();if error!=Error.none {return default<Owned<blot_reuse_frozen_dependency::FrozenDependency>>(),error;}
  let result,error=cloneValue(owner,value);if error!=Error.none {owner.deinit();return default<Owned<blot_reuse_frozen_dependency::FrozenDependency>>(),error;}return Owned<blot_reuse_frozen_dependency::FrozenDependency> {result,owner},Error.none;
 }
+
+// Split existing registered runs without copying a retained module.
+struct Mark {owner:u32,generation:u64,head:u32}
+fn mark(self:const Owner&)->Mark {assert(valid(self));return Mark {self.lease,self.generation,leases[self.lease-1].head};}
+fn rollback(self:Owner&,mark:Mark) {
+ assert(valid(self)&&self.lease==mark.owner&&self.generation==mark.generation);
+ var check=leases[self.lease-1].head;while check!=mark.head {assert(check!=0);check=links[check-1].next;}
+ while leases[self.lease-1].head!=mark.head {let head=leases[self.lease-1].head;let link=links[head-1];leases[self.lease-1].head=link.next;match link.value {
+
+Run.run_u32 run=>{pool_u32.free_slice(run.values);},
+
+Run.run_blot_check_numeric_proof_terms__Kind run=>{pool_blot_check_numeric_proof_terms__Kind.free_slice(run.values);},
+
+Run.run_blot_check_numeric_proof_terms__Term run=>{pool_blot_check_numeric_proof_terms__Term.free_slice(run.values);},
+
+Run.run_blot_check_numeric_proof_contracts__Requirement run=>{pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run.values);},
+
+Run.run_blot_check_numeric_proof_headers__Named run=>{pool_blot_check_numeric_proof_headers__Named.free_slice(run.values);},
+
+Run.run_blot_check_capability_contracts__Term run=>{pool_blot_check_capability_contracts__Term.free_slice(run.values);},
+
+Run.run_blot_check_capability_contracts__Binding run=>{pool_blot_check_capability_contracts__Binding.free_slice(run.values);},
+
+Run.run_blot_check_core__FieldName run=>{pool_blot_check_core__FieldName.free_slice(run.values);},
+
+Run.run_blot_check_core__RuntimeName run=>{pool_blot_check_core__RuntimeName.free_slice(run.values);},
+
+Run.run_blot_check_core__DeclarationDependencies run=>{pool_blot_check_core__DeclarationDependencies.free_slice(run.values);},
+
+Run.run_blot_check_core__BindingRef run=>{pool_blot_check_core__BindingRef.free_slice(run.values);},
+
+Run.run_blot_check_core__DependencyMember run=>{pool_blot_check_core__DependencyMember.free_slice(run.values);},
+
+Run.run_blot_check_core__ErasedDeclarationReference run=>{pool_blot_check_core__ErasedDeclarationReference.free_slice(run.values);},
+
+Run.run_blot_check_core__RequestLoopInfo run=>{pool_blot_check_core__RequestLoopInfo.free_slice(run.values);},
+
+Run.run_blot_check_core__RequestArm run=>{pool_blot_check_core__RequestArm.free_slice(run.values);},
+
+Run.run_blot_check_types__Node run=>{pool_blot_check_types__Node.free_slice(run.values);},
+
+Run.run_blot_check_effects__Row run=>{pool_blot_check_effects__Row.free_slice(run.values);},
+
+Run.run_blot_check_types__Operation run=>{pool_blot_check_types__Operation.free_slice(run.values);},
+
+Run.run_blot_check_types__QuantifierGoals run=>{pool_blot_check_types__QuantifierGoals.free_slice(run.values);},
+
+Run.run_blot_check_types__Obligation run=>{pool_blot_check_types__Obligation.free_slice(run.values);},
+
+Run.run_blot_check_core__Node run=>{pool_blot_check_core__Node.free_slice(run.values);},
+
+Run.run_blot_parse_ast__Span run=>{pool_blot_parse_ast__Span.free_slice(run.values);},
+
+Run.run_blot_check_core__Binding run=>{pool_blot_check_core__Binding.free_slice(run.values);},
+
+Run.run_blot_check_core__Body run=>{pool_blot_check_core__Body.free_slice(run.values);},
+
+Run.run_blot_check_core__Parameter run=>{pool_blot_check_core__Parameter.free_slice(run.values);},
+
+Run.run_blot_check_core__CallInfo run=>{pool_blot_check_core__CallInfo.free_slice(run.values);},
+
+Run.run_blot_check_core__Merge run=>{pool_blot_check_core__Merge.free_slice(run.values);},
+
+Run.run_blot_check_core__List run=>{pool_blot_check_core__List.free_slice(run.values);},
+
+Run.run_u8 run=>{pool_u8.free_slice(run.values);},
+
+Run.run_blot_check_core__Obligation run=>{pool_blot_check_core__Obligation.free_slice(run.values);},
+
+Run.run_blot_check_core__Nominal run=>{pool_blot_check_core__Nominal.free_slice(run.values);},
+
+Run.run_blot_check_core__OperationName run=>{pool_blot_check_core__OperationName.free_slice(run.values);},
+
+Run.run_blot_check_core__Constructor run=>{pool_blot_check_core__Constructor.free_slice(run.values);},
+
+Run.run_blot_check_core__Projection run=>{pool_blot_check_core__Projection.free_slice(run.values);},
+
+Run.run_blot_check_core__ProjectionVariant run=>{pool_blot_check_core__ProjectionVariant.free_slice(run.values);},
+
+Run.run_blot_check_core__Pattern run=>{pool_blot_check_core__Pattern.free_slice(run.values);},
+
+Run.run_blot_check_core__PatternRow run=>{pool_blot_check_core__PatternRow.free_slice(run.values);},
+
+Run.run_blot_check_core__MatchArm run=>{pool_blot_check_core__MatchArm.free_slice(run.values);},
+
+Run.run_blot_check_core__MatchInfo run=>{pool_blot_check_core__MatchInfo.free_slice(run.values);},
+
+Run.run_blot_check_core__UpdateInfo run=>{pool_blot_check_core__UpdateInfo.free_slice(run.values);},
+
+Run.run_blot_check_core__UpdateStep run=>{pool_blot_check_core__UpdateStep.free_slice(run.values);},
+
+Run.run_blot_check_core__ClosureInfo run=>{pool_blot_check_core__ClosureInfo.free_slice(run.values);},
+
+Run.run_blot_check_core__Associated run=>{pool_blot_check_core__Associated.free_slice(run.values);},
+
+Run.run_blot_check_core__Contract run=>{pool_blot_check_core__Contract.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__ContractMember run=>{pool_blot_reuse_principal_interface__ContractMember.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__Implementation run=>{pool_blot_reuse_principal_interface__Implementation.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__ImplementationMember run=>{pool_blot_reuse_principal_interface__ImplementationMember.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__MemberTemplate run=>{pool_blot_reuse_principal_interface__MemberTemplate.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__SelectedProof run=>{pool_blot_reuse_principal_interface__SelectedProof.free_slice(run.values);},
+
+Run.run_blot_check_core__SelectedUse run=>{pool_blot_check_core__SelectedUse.free_slice(run.values);},
+
+Run.run_blot_check_core__DictionarySelection run=>{pool_blot_check_core__DictionarySelection.free_slice(run.values);},
+
+Run.run_blot_check_core__DictionaryUse run=>{pool_blot_check_core__DictionaryUse.free_slice(run.values);},
+
+Run.run_blot_check_core__Primitive run=>{pool_blot_check_core__Primitive.free_slice(run.values);},
+
+Run.run_blot_check_core__LoopInfo run=>{pool_blot_check_core__LoopInfo.free_slice(run.values);},
+
+Run.run_blot_check_core__LoopCarry run=>{pool_blot_check_core__LoopCarry.free_slice(run.values);},
+
+Run.run_blot_check_core__ResolverInfo run=>{pool_blot_check_core__ResolverInfo.free_slice(run.values);},
+
+Run.run_blot_check_core__OperationValue run=>{pool_blot_check_core__OperationValue.free_slice(run.values);},
+
+Run.run_blot_check_core__HandleEffects run=>{pool_blot_check_core__HandleEffects.free_slice(run.values);},
+
+Run.run_blot_check_core__Diagnostic run=>{pool_blot_check_core__Diagnostic.free_slice(run.values);},
+
+Run.run_blot_check_parameter_patterns__Node run=>{pool_blot_check_parameter_patterns__Node.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__Binding run=>{pool_blot_reuse_principal_interface__Binding.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__Nominal run=>{pool_blot_reuse_principal_interface__Nominal.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__Constructor run=>{pool_blot_reuse_principal_interface__Constructor.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__EffectFamily run=>{pool_blot_reuse_principal_interface__EffectFamily.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__EffectTemplate run=>{pool_blot_reuse_principal_interface__EffectTemplate.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__Associated run=>{pool_blot_reuse_principal_interface__Associated.free_slice(run.values);},
+
+Run.run_blot_reuse_principal_interface__Contract run=>{pool_blot_reuse_principal_interface__Contract.free_slice(run.values);},
+
+Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{pool_blot_reuse_frozen_dependency__ImportResolution.free_slice(run.values);},
+
+Run.run_blot_reuse_frozen_dependency__Export run=>{pool_blot_reuse_frozen_dependency__Export.free_slice(run.values);},
+
+Run.run_blot_reuse_frozen_dependency__Fixity run=>{pool_blot_reuse_frozen_dependency__Fixity.free_slice(run.values);},
+
+Run.run_blot_reuse_frozen_dependency__Symbol run=>{pool_blot_reuse_frozen_dependency__Symbol.free_slice(run.values);},
+
+Run.run_blot_reuse_frozen_dependency__Module run=>{pool_blot_reuse_frozen_dependency__Module.free_slice(run.values);},
+
+}links.free(head-1);}
+}
+
+fn detach(self:Owner&,destination:Owner&,values:const u32[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u32 run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_u32 run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const u32[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Kind run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_numeric_proof_terms__Kind run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_terms__Term run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_numeric_proof_terms__Term run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_contracts__Requirement run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_numeric_proof_contracts__Requirement run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_numeric_proof_headers__Named run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_numeric_proof_headers__Named run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Term run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_capability_contracts__Term run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_capability_contracts__Binding run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_capability_contracts__Binding run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__FieldName run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__FieldName run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RuntimeName[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RuntimeName run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__RuntimeName run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::RuntimeName[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DeclarationDependencies[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DeclarationDependencies run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__DeclarationDependencies run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DeclarationDependencies[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::BindingRef[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__BindingRef run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__BindingRef run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::BindingRef[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DependencyMember[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DependencyMember run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__DependencyMember run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DependencyMember[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ErasedDeclarationReference[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ErasedDeclarationReference run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__ErasedDeclarationReference run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ErasedDeclarationReference[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RequestLoopInfo[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestLoopInfo run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__RequestLoopInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::RequestLoopInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::RequestArm[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__RequestArm run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__RequestArm run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::RequestArm[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Node[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Node run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_types__Node run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::Node[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_effects::Row[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_effects__Row run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_effects__Row run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_effects::Row[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Operation[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Operation run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_types__Operation run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::Operation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__QuantifierGoals run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_types__QuantifierGoals run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_types::Obligation[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_types__Obligation run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_types__Obligation run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_types::Obligation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Node[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Node run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Node run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Node[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_parse_ast__Span run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_parse_ast__Span run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Binding[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Binding run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Binding run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Binding[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Body[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Body run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Body run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Body[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Parameter[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Parameter run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Parameter run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Parameter[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::CallInfo[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__CallInfo run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__CallInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::CallInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Merge[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Merge run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Merge run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Merge[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::List[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__List run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__List run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::List[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const u8[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_u8 run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_u8 run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const u8[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Obligation[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Obligation run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Obligation run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Obligation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Nominal[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Nominal run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Nominal run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Nominal[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::OperationName[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationName run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__OperationName run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::OperationName[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Constructor[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Constructor run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Constructor run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Constructor[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Projection[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Projection run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Projection run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Projection[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ProjectionVariant[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ProjectionVariant run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__ProjectionVariant run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ProjectionVariant[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Pattern[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Pattern run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Pattern run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Pattern[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::PatternRow[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__PatternRow run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__PatternRow run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::PatternRow[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::MatchArm[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchArm run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__MatchArm run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::MatchArm[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::MatchInfo[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__MatchInfo run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__MatchInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::MatchInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateInfo[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateInfo run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__UpdateInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateStep[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__UpdateStep run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__UpdateStep run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::UpdateStep[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ClosureInfo[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ClosureInfo run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__ClosureInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ClosureInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Associated[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Associated run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Associated run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Associated[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Contract[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Contract run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Contract run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Contract[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ContractMember[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ContractMember run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__ContractMember run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ContractMember[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Implementation[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Implementation run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Implementation run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Implementation[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__ImplementationMember run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__ImplementationMember run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::ImplementationMember[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__MemberTemplate run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__MemberTemplate run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::MemberTemplate[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__SelectedProof run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__SelectedProof run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::SelectedProof[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::SelectedUse[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__SelectedUse run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__SelectedUse run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::SelectedUse[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionarySelection run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__DictionarySelection run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__DictionaryUse run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__DictionaryUse run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Primitive[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Primitive run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Primitive run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Primitive[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopInfo run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__LoopInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::LoopCarry[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__LoopCarry run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__LoopCarry run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::LoopCarry[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::ResolverInfo[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__ResolverInfo run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__ResolverInfo run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::ResolverInfo[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::OperationValue[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__OperationValue run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__OperationValue run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::OperationValue[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::HandleEffects[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__HandleEffects run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__HandleEffects run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::HandleEffects[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_core::Diagnostic[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_core__Diagnostic run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_core__Diagnostic run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_core::Diagnostic[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_check_parameter_patterns::Node[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_check_parameter_patterns__Node run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_check_parameter_patterns__Node run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_check_parameter_patterns::Node[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Binding[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Binding run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Binding run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Binding[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Nominal[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Nominal run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Nominal run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Nominal[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Constructor[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Constructor run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Constructor run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Constructor[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectFamily run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__EffectFamily run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectFamily[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__EffectTemplate run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__EffectTemplate run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::EffectTemplate[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Associated[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Associated run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Associated run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Associated[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Contract[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_principal_interface__Contract run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_principal_interface__Contract run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_principal_interface::Contract[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__ImportResolution run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::ImportResolution[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Export[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Export run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__Export run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Export[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Fixity run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__Fixity run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Fixity[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Symbol run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__Symbol run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Symbol[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn detach(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Module[:]) {
+ assert(valid(self)&&valid(destination)&&self.lease!=destination.lease);if values.len==0 {return;}
+ // An alias already transferred to this module keeps the same one owner.
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_blot_reuse_frozen_dependency__Module run=>{if run.values .== values {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {Run.run_blot_reuse_frozen_dependency__Module run=>{found=run.values .== values;},_=>{}}
+ if found {if previous==0 {leases[self.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self:Owner&,destination:Owner&,values:const blot_reuse_frozen_dependency::Module[:]) {self.detach(destination,values);for value in values {partitionInto(self,destination,value);}}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:bool) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:f32) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:f64) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:i16) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:i32) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:i64) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:i8) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:u16) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:u32) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:u64) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:u8) {}
+
+fn partitionInto(self:Owner&,destination:Owner&,values:u8[32]) {for value in values {partitionInto(self,destination,value);}}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_support::Option<blot_check_numeric_proof_terms::Proposition>) {if value.present {partitionInto(self,destination,value.value);}}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_support::Option<blot_parse_ast::Span>) {if value.present {partitionInto(self,destination,value.value);}}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_support::Option<blot_reuse_principal_interface::ExternalTarget>) {if value.present {partitionInto(self,destination,value.value);}}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Module) {
+
+partitionInto(self,destination,value.has_rank_contracts);
+
+partitionInto(self,destination,value.has_usage_contracts);
+
+partitionInto(self,destination,value.has_numeric_proofs);
+
+partitionInto(self,destination,value.proof_contracts);
+
+partitionInto(self,destination,value.capability_contracts);
+
+partitionInto(self,destination,value.field_names);
+
+partitionInto(self,destination,value.runtime_names);
+
+partitionInto(self,destination,value.source_names);
+
+partitionInto(self,destination,value.declaration_dependencies);
+
+partitionInto(self,destination,value.dependency_references);
+
+partitionInto(self,destination,value.dependency_members);
+
+partitionInto(self,destination,value.erased_declaration_references);
+
+partitionInto(self,destination,value.request_loops);
+
+partitionInto(self,destination,value.request_arms);
+
+partitionInto(self,destination,value.tag_calls);
+
+partitionInto(self,destination,value.unit);
+
+partitionInto(self,destination,value.types);
+
+partitionInto(self,destination,value.nodes);
+
+partitionInto(self,destination,value.spans);
+
+partitionInto(self,destination,value.extra);
+
+partitionInto(self,destination,value.bindings);
+
+partitionInto(self,destination,value.bodies);
+
+partitionInto(self,destination,value.parameters);
+
+partitionInto(self,destination,value.references);
+
+partitionInto(self,destination,value.calls);
+
+partitionInto(self,destination,value.merges);
+
+partitionInto(self,destination,value.merge_ranges);
+
+partitionInto(self,destination,value.names);
+
+partitionInto(self,destination,value.obligations);
+
+partitionInto(self,destination,value.nominals);
+
+partitionInto(self,destination,value.operation_names);
+
+partitionInto(self,destination,value.constructors);
+
+partitionInto(self,destination,value.projections);
+
+partitionInto(self,destination,value.projection_variants);
+
+partitionInto(self,destination,value.patterns);
+
+partitionInto(self,destination,value.pattern_rows);
+
+partitionInto(self,destination,value.match_arms);
+
+partitionInto(self,destination,value.matches);
+
+partitionInto(self,destination,value.updates);
+
+partitionInto(self,destination,value.update_steps);
+
+partitionInto(self,destination,value.closures);
+
+partitionInto(self,destination,value.associated);
+
+partitionInto(self,destination,value.contracts);
+
+partitionInto(self,destination,value.contract_members);
+
+partitionInto(self,destination,value.implementations);
+
+partitionInto(self,destination,value.implementation_members);
+
+partitionInto(self,destination,value.member_templates);
+
+partitionInto(self,destination,value.selected_proofs);
+
+partitionInto(self,destination,value.selected_members);
+
+partitionInto(self,destination,value.selected_edges);
+
+partitionInto(self,destination,value.selected_uses);
+
+partitionInto(self,destination,value.dictionary_selections);
+
+partitionInto(self,destination,value.dictionary_uses);
+
+partitionInto(self,destination,value.primitives);
+
+partitionInto(self,destination,value.loops);
+
+partitionInto(self,destination,value.loop_carries);
+
+partitionInto(self,destination,value.resolver_ops);
+
+partitionInto(self,destination,value.operation_values);
+
+partitionInto(self,destination,value.handle_effects);
+
+partitionInto(self,destination,value.dispatch_signatures);
+
+partitionInto(self,destination,value.diagnostics);
+
+partitionInto(self,destination,value.body_lowerings);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_headers::Named) {
+
+partitionInto(self,destination,value.binding);
+
+partitionInto(self,destination,value.header);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_headers::Owned) {
+
+partitionInto(self,destination,value.arity);
+
+partitionInto(self,destination,value.value_slots);
+
+partitionInto(self,destination,value.proof_slots);
+
+partitionInto(self,destination,value.values);
+
+partitionInto(self,destination,value.operands);
+
+partitionInto(self,destination,value.requirements);
+
+partitionInto(self,destination,value.result);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Kind) {
+
+match value {
+
+blot_check_numeric_proof_terms::Kind.unsigned32=>{
+},
+
+blot_check_numeric_proof_terms::Kind.array=>{
+},
+
+blot_check_numeric_proof_terms::Kind.list=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Term) {
+
+partitionInto(self,destination,value.tag);
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.a);
+
+partitionInto(self,destination,value.b);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Tag) {
+
+match value {
+
+blot_check_numeric_proof_terms::Tag.literal=>{
+},
+
+blot_check_numeric_proof_terms::Tag.formal=>{
+},
+
+blot_check_numeric_proof_terms::Tag.capture=>{
+},
+
+blot_check_numeric_proof_terms::Tag.version=>{
+},
+
+blot_check_numeric_proof_terms::Tag.length=>{
+},
+
+blot_check_numeric_proof_terms::Tag.complement=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_contracts::Requirement) {
+
+partitionInto(self,destination,value.before);
+
+partitionInto(self,destination,value.proposition);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Proposition) {
+
+partitionInto(self,destination,value.relation);
+
+partitionInto(self,destination,value.left);
+
+partitionInto(self,destination,value.right);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Relation) {
+
+match value {
+
+blot_check_numeric_proof_terms::Relation.eq=>{
+},
+
+blot_check_numeric_proof_terms::Relation.lt=>{
+},
+
+blot_check_numeric_proof_terms::Relation.le=>{
+},
+
+blot_check_numeric_proof_terms::Relation.add_fits=>{
+},
+
+blot_check_numeric_proof_terms::Relation.sub_fits=>{
+},
+
+blot_check_numeric_proof_terms::Relation.index=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_contracts::Collection) {
+
+partitionInto(self,destination,value.nodes);
+
+partitionInto(self,destination,value.words);
+
+partitionInto(self,destination,value.bindings);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_contracts::Term) {
+
+partitionInto(self,destination,value.tag);
+
+partitionInto(self,destination,value.a);
+
+partitionInto(self,destination,value.b);
+
+partitionInto(self,destination,value.c);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_contracts::Tag) {
+
+match value {
+
+blot_check_capability_contracts::Tag.empty=>{
+},
+
+blot_check_capability_contracts::Tag.unknown=>{
+},
+
+blot_check_capability_contracts::Tag.parameter=>{
+},
+
+blot_check_capability_contracts::Tag.authority=>{
+},
+
+blot_check_capability_contracts::Tag.captures=>{
+},
+
+blot_check_capability_contracts::Tag.product=>{
+},
+
+blot_check_capability_contracts::Tag.record=>{
+},
+
+blot_check_capability_contracts::Tag.wrapped=>{
+},
+
+blot_check_capability_contracts::Tag.join=>{
+},
+
+blot_check_capability_contracts::Tag.project=>{
+},
+
+blot_check_capability_contracts::Tag.elements=>{
+},
+
+blot_check_capability_contracts::Tag.argument=>{
+},
+
+blot_check_capability_contracts::Tag.callable=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_contracts::Binding) {
+
+partitionInto(self,destination,value.binding);
+
+partitionInto(self,destination,value.root);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::FieldName) {
+
+partitionInto(self,destination,value.symbol);
+
+partitionInto(self,destination,value.spelling);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Name) {
+
+partitionInto(self,destination,value.start);
+
+partitionInto(self,destination,value.len);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::RuntimeName) {
+
+partitionInto(self,destination,value.binding);
+
+partitionInto(self,destination,value.point);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DeclarationDependencies) {
+
+partitionInto(self,destination,value.references);
+
+partitionInto(self,destination,value.members);
+
+partitionInto(self,destination,value.runtime_metadata);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::List) {
+
+partitionInto(self,destination,value.start);
+
+partitionInto(self,destination,value.len);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::BindingRef) {
+
+partitionInto(self,destination,value.unit);
+
+partitionInto(self,destination,value.binding);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DependencyMember) {
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.operator);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Operator) {
+
+match value {
+
+blot_check_types::Operator.none=>{
+},
+
+blot_check_types::Operator.add=>{
+},
+
+blot_check_types::Operator.sub=>{
+},
+
+blot_check_types::Operator.mul=>{
+},
+
+blot_check_types::Operator.div=>{
+},
+
+blot_check_types::Operator.rem=>{
+},
+
+blot_check_types::Operator.equal=>{
+},
+
+blot_check_types::Operator.not_equal=>{
+},
+
+blot_check_types::Operator.less=>{
+},
+
+blot_check_types::Operator.less_equal=>{
+},
+
+blot_check_types::Operator.greater=>{
+},
+
+blot_check_types::Operator.greater_equal=>{
+},
+
+blot_check_types::Operator.bit_and=>{
+},
+
+blot_check_types::Operator.bit_or=>{
+},
+
+blot_check_types::Operator.bit_xor=>{
+},
+
+blot_check_types::Operator.shift_left=>{
+},
+
+blot_check_types::Operator.shift_right=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ErasedDeclarationReference) {
+
+partitionInto(self,destination,value.node);
+
+partitionInto(self,destination,value.target);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::RequestLoopInfo) {
+
+partitionInto(self,destination,value.computation);
+
+partitionInto(self,destination,value.action_type);
+
+partitionInto(self,destination,value.value_type);
+
+partitionInto(self,destination,value.result_type);
+
+partitionInto(self,destination,value.state_type);
+
+partitionInto(self,destination,value.arms);
+
+partitionInto(self,destination,value.completion_pattern);
+
+partitionInto(self,destination,value.completion_body);
+
+partitionInto(self,destination,value.completion_state_bindings);
+
+partitionInto(self,destination,value.carries);
+
+partitionInto(self,destination,value.return_target);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::RequestArm) {
+
+partitionInto(self,destination,value.operation);
+
+partitionInto(self,destination,value.callback);
+
+partitionInto(self,destination,value.selector);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Types) {
+
+partitionInto(self,destination,value.nodes);
+
+partitionInto(self,destination,value.extra);
+
+partitionInto(self,destination,value.effects);
+
+partitionInto(self,destination,value.operations);
+
+partitionInto(self,destination,value.quantifier_goals);
+
+partitionInto(self,destination,value.quantifier_obligations);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Node) {
+
+partitionInto(self,destination,value.tag);
+
+partitionInto(self,destination,value.closed_height);
+
+partitionInto(self,destination,value.closed_generation);
+
+partitionInto(self,destination,value.a);
+
+partitionInto(self,destination,value.b);
+
+partitionInto(self,destination,value.c);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Tag) {
+
+match value {
+
+blot_check_types::Tag.absent=>{
+},
+
+blot_check_types::Tag.unit=>{
+},
+
+blot_check_types::Tag.boolean=>{
+},
+
+blot_check_types::Tag.unsigned32=>{
+},
+
+blot_check_types::Tag.floating32=>{
+},
+
+blot_check_types::Tag.never=>{
+},
+
+blot_check_types::Tag.variable=>{
+},
+
+blot_check_types::Tag.function=>{
+},
+
+blot_check_types::Tag.product=>{
+},
+
+blot_check_types::Tag.record=>{
+},
+
+blot_check_types::Tag.nominal=>{
+},
+
+blot_check_types::Tag.array=>{
+},
+
+blot_check_types::Tag.list=>{
+},
+
+blot_check_types::Tag.cursor=>{
+},
+
+blot_check_types::Tag.type_constructor=>{
+},
+
+blot_check_types::Tag.resolver=>{
+},
+
+blot_check_types::Tag.provider=>{
+},
+
+blot_check_types::Tag.state_provider=>{
+},
+
+blot_check_types::Tag.projection=>{
+},
+
+blot_check_types::Tag.scoped=>{
+},
+
+blot_check_types::Tag.instance_selection=>{
+},
+
+blot_check_types::Tag.erased_proof=>{
+},
+
+blot_check_types::Tag.forall=>{
+},
+
+blot_check_types::Tag.existential=>{
+},
+
+blot_check_types::Tag.bound=>{
+},
+
+blot_check_types::Tag.rigid=>{
+},
+
+blot_check_types::Tag.usage=>{
+},
+
+blot_check_types::Tag.instance_version=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::EffectRows) {
+
+partitionInto(self,destination,value.rows);
+
+partitionInto(self,destination,value.labels);
+
+partitionInto(self,destination,value.variable_count);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_effects::Row) {
+
+partitionInto(self,destination,value.labels);
+
+partitionInto(self,destination,value.tail);
+
+partitionInto(self,destination,value.cursor);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_effects::List) {
+
+partitionInto(self,destination,value.start);
+
+partitionInto(self,destination,value.len);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_effects::Tail) {
+
+match value {
+
+blot_check_effects::Tail.closed=>{
+},
+
+blot_check_effects::Tail.variable payload=>{
+partitionInto(self,destination,payload.value);
+},
+
+blot_check_effects::Tail.parameter payload=>{
+partitionInto(self,destination,payload.value);
+},
+
+blot_check_effects::Tail.formal payload=>{
+partitionInto(self,destination,payload.value);
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Operation) {
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.arguments);
+
+partitionInto(self,destination,value.instance);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::NominalIdentity) {
+
+partitionInto(self,destination,value.unit);
+
+partitionInto(self,destination,value.decl);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::List) {
+
+partitionInto(self,destination,value.start);
+
+partitionInto(self,destination,value.len);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::QuantifierGoals) {
+
+partitionInto(self,destination,value.owner);
+
+partitionInto(self,destination,value.goals);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Obligation) {
+
+partitionInto(self,destination,value.ty);
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.source);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.result);
+
+partitionInto(self,destination,value.other);
+
+partitionInto(self,destination,value.signature);
+
+partitionInto(self,destination,value.operator);
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.explicit);
+
+partitionInto(self,destination,value.qualification_span);
+
+partitionInto(self,destination,value.qualification_unit);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::ObligationKind) {
+
+match value {
+
+blot_check_types::ObligationKind.arithmetic=>{
+},
+
+blot_check_types::ObligationKind.ordered=>{
+},
+
+blot_check_types::ObligationKind.equality=>{
+},
+
+blot_check_types::ObligationKind.integer=>{
+},
+
+blot_check_types::ObligationKind.field=>{
+},
+
+blot_check_types::ObligationKind.writable_field=>{
+},
+
+blot_check_types::ObligationKind.dispatch=>{
+},
+
+blot_check_types::ObligationKind.result_dispatch=>{
+},
+
+blot_check_types::ObligationKind.monad_factory=>{
+},
+
+blot_check_types::ObligationKind.resolver_dispatch=>{
+},
+
+blot_check_types::ObligationKind.resolver_shape=>{
+},
+
+blot_check_types::ObligationKind.effect_operation=>{
+},
+
+blot_check_types::ObligationKind.effect_handler=>{
+},
+
+blot_check_types::ObligationKind.receiver=>{
+},
+
+blot_check_types::ObligationKind.update=>{
+},
+
+blot_check_types::ObligationKind.type_rep=>{
+},
+
+blot_check_types::ObligationKind.effect_rep=>{
+},
+
+blot_check_types::ObligationKind.type_head=>{
+},
+
+blot_check_types::ObligationKind.collection=>{
+},
+
+blot_check_types::ObligationKind.record_merge=>{
+},
+
+blot_check_types::ObligationKind.callee_use=>{
+},
+
+blot_check_types::ObligationKind.type_eq=>{
+},
+
+blot_check_types::ObligationKind.contract=>{
+},
+
+blot_check_types::ObligationKind.task_receive=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_parse_ast::Span) {
+
+partitionInto(self,destination,value.start);
+
+partitionInto(self,destination,value.end);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Node) {
+
+partitionInto(self,destination,value.tag);
+
+partitionInto(self,destination,value.op);
+
+partitionInto(self,destination,value.ty);
+
+partitionInto(self,destination,value.a);
+
+partitionInto(self,destination,value.b);
+
+partitionInto(self,destination,value.c);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Tag) {
+
+match value {
+
+blot_check_core::Tag.invalid=>{
+},
+
+blot_check_core::Tag.constant=>{
+},
+
+blot_check_core::Tag.reference=>{
+},
+
+blot_check_core::Tag.scalar=>{
+},
+
+blot_check_core::Tag.logical=>{
+},
+
+blot_check_core::Tag.call=>{
+},
+
+blot_check_core::Tag.if_value=>{
+},
+
+blot_check_core::Tag.block_=>{
+},
+
+blot_check_core::Tag.suite=>{
+},
+
+blot_check_core::Tag.bind=>{
+},
+
+blot_check_core::Tag.return_=>{
+},
+
+blot_check_core::Tag.if_stmt=>{
+},
+
+blot_check_core::Tag.product=>{
+},
+
+blot_check_core::Tag.record=>{
+},
+
+blot_check_core::Tag.construct=>{
+},
+
+blot_check_core::Tag.project=>{
+},
+
+blot_check_core::Tag.match_=>{
+},
+
+blot_check_core::Tag.pattern_bind=>{
+},
+
+blot_check_core::Tag.update=>{
+},
+
+blot_check_core::Tag.array=>{
+},
+
+blot_check_core::Tag.array_op=>{
+},
+
+blot_check_core::Tag.closure=>{
+},
+
+blot_check_core::Tag.apply=>{
+},
+
+blot_check_core::Tag.constructor_function=>{
+},
+
+blot_check_core::Tag.associated=>{
+},
+
+blot_check_core::Tag.primitive_function=>{
+},
+
+blot_check_core::Tag.panic=>{
+},
+
+blot_check_core::Tag.loop_=>{
+},
+
+blot_check_core::Tag.break_=>{
+},
+
+blot_check_core::Tag.type_same=>{
+},
+
+blot_check_core::Tag.result_associated=>{
+},
+
+blot_check_core::Tag.type_constructor=>{
+},
+
+blot_check_core::Tag.resolver_op=>{
+},
+
+blot_check_core::Tag.operation_value=>{
+},
+
+blot_check_core::Tag.effect_provider=>{
+},
+
+blot_check_core::Tag.state_provider=>{
+},
+
+blot_check_core::Tag.handle=>{
+},
+
+blot_check_core::Tag.effect_reflection=>{
+},
+
+blot_check_core::Tag.computation=>{
+},
+
+blot_check_core::Tag.request_loop=>{
+},
+
+blot_check_core::Tag.request_decision=>{
+},
+
+blot_check_core::Tag.record_merge=>{
+},
+
+blot_check_core::Tag.contract_method=>{
+},
+
+blot_check_core::Tag.effect_scope=>{
+},
+
+blot_check_core::Tag.proof_guard=>{
+},
+
+blot_check_core::Tag.package_pack=>{
+},
+
+blot_check_core::Tag.package_unpack=>{
+},
+
+blot_check_core::Tag.staging=>{
+},
+
+blot_check_core::Tag.usage_borrow=>{
+},
+
+blot_check_core::Tag.usage_read=>{
+},
+
+blot_check_core::Tag.resource_scope=>{
+},
+
+blot_check_core::Tag.usage_share=>{
+},
+
+blot_check_core::Tag.resource_acquire=>{
+},
+
+blot_check_core::Tag.resource_release=>{
+},
+
+blot_check_core::Tag.task=>{
+},
+
+blot_check_core::Tag.storage=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Op) {
+
+match value {
+
+blot_check_core::Op.none=>{
+},
+
+blot_check_core::Op.add=>{
+},
+
+blot_check_core::Op.sub=>{
+},
+
+blot_check_core::Op.mul=>{
+},
+
+blot_check_core::Op.div=>{
+},
+
+blot_check_core::Op.rem=>{
+},
+
+blot_check_core::Op.equal=>{
+},
+
+blot_check_core::Op.not_equal=>{
+},
+
+blot_check_core::Op.less=>{
+},
+
+blot_check_core::Op.less_equal=>{
+},
+
+blot_check_core::Op.greater=>{
+},
+
+blot_check_core::Op.greater_equal=>{
+},
+
+blot_check_core::Op.bit_and=>{
+},
+
+blot_check_core::Op.bit_or=>{
+},
+
+blot_check_core::Op.bit_xor=>{
+},
+
+blot_check_core::Op.shift_left=>{
+},
+
+blot_check_core::Op.shift_right=>{
+},
+
+blot_check_core::Op.and_=>{
+},
+
+blot_check_core::Op.or_=>{
+},
+
+blot_check_core::Op.neg=>{
+},
+
+blot_check_core::Op.abs=>{
+},
+
+blot_check_core::Op.ceil=>{
+},
+
+blot_check_core::Op.floor=>{
+},
+
+blot_check_core::Op.trunc=>{
+},
+
+blot_check_core::Op.sqrt=>{
+},
+
+blot_check_core::Op.convert_u32_f32=>{
+},
+
+blot_check_core::Op.convert_f32_u32=>{
+},
+
+blot_check_core::Op.shift_right_signed=>{
+},
+
+blot_check_core::Op.min=>{
+},
+
+blot_check_core::Op.max=>{
+},
+
+blot_check_core::Op.bit_not=>{
+},
+
+blot_check_core::Op.bit_andnot=>{
+},
+
+blot_check_core::Op.any_true=>{
+},
+
+blot_check_core::Op.all_true=>{
+},
+
+blot_check_core::Op.select=>{
+},
+
+blot_check_core::Op.shuffle=>{
+},
+
+blot_check_core::Op.swizzle=>{
+},
+
+blot_check_core::Op.broadcast=>{
+},
+
+blot_check_core::Op.bits=>{
+},
+
+blot_check_core::Op.from_bits=>{
+},
+
+blot_check_core::Op.relaxed_madd=>{
+},
+
+blot_check_core::Op.relaxed_nmadd=>{
+},
+
+blot_check_core::Op.convert_i32_f32=>{
+},
+
+blot_check_core::Op.convert_f32_i32=>{
+},
+
+blot_check_core::Op.continue_=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Binding) {
+
+partitionInto(self,destination,value.capability_flow);
+
+partitionInto(self,destination,value.capability_parameters);
+
+partitionInto(self,destination,value.private);
+
+partitionInto(self,destination,value.initializer);
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.ty);
+
+partitionInto(self,destination,value.scheme);
+
+partitionInto(self,destination,value.public_variables);
+
+partitionInto(self,destination,value.public_rows);
+
+partitionInto(self,destination,value.has_explicit);
+
+partitionInto(self,destination,value.body_id);
+
+partitionInto(self,destination,value.target);
+
+partitionInto(self,destination,value.span);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_flow::Contract) {
+
+match value {
+
+blot_check_capability_flow::Contract.unknown=>{
+},
+
+blot_check_capability_flow::Contract.identity=>{
+},
+
+blot_check_capability_flow::Contract.invoke_unit=>{
+},
+
+blot_check_capability_flow::Contract.member_unit=>{
+},
+
+blot_check_capability_flow::Contract.invoke_with_capability=>{
+},
+
+blot_check_capability_flow::Contract.member_first_unit=>{
+},
+
+blot_check_capability_flow::Contract.member_second_unit=>{
+},
+
+blot_check_capability_flow::Contract.input_shape=>{
+},
+
+blot_check_capability_flow::Contract.consume_task=>{
+},
+
+blot_check_capability_flow::Contract.scope_task=>{
+},
+
+blot_check_capability_flow::Contract.spawn_task=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_flow::Parameters) {
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.mask);
+
+partitionInto(self,destination,value.inputs);
+
+partitionInto(self,destination,value.invocation_arguments);
+
+partitionInto(self,destination,value.invocation_count);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_capability_flow::ParameterResult) {
+
+match value {
+
+blot_check_capability_flow::ParameterResult.product=>{
+},
+
+blot_check_capability_flow::ParameterResult.invoke_unit=>{
+},
+
+blot_check_capability_flow::ParameterResult.invalid=>{
+},
+
+blot_check_capability_flow::ParameterResult.member_closure_unit=>{
+},
+
+blot_check_capability_flow::ParameterResult.captured_unit=>{
+},
+
+blot_check_capability_flow::ParameterResult.invoke_input=>{
+},
+
+blot_check_capability_flow::ParameterResult.invoke_inputs=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Kind) {
+
+match value {
+
+blot_reuse_principal_interface::Kind.global=>{
+},
+
+blot_reuse_principal_interface::Kind.local=>{
+},
+
+blot_reuse_principal_interface::Kind.parameter=>{
+},
+
+blot_reuse_principal_interface::Kind.external=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_types::Scheme) {
+
+partitionInto(self,destination,value.root);
+
+partitionInto(self,destination,value.variables);
+
+partitionInto(self,destination,value.row_variables);
+
+partitionInto(self,destination,value.closed_rows);
+
+partitionInto(self,destination,value.obligations);
+
+partitionInto(self,destination,value.generative);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Body) {
+
+partitionInto(self,destination,value.binding);
+
+partitionInto(self,destination,value.root);
+
+partitionInto(self,destination,value.parameters);
+
+partitionInto(self,destination,value.scheme);
+
+partitionInto(self,destination,value.closed_rows);
+
+partitionInto(self,destination,value.span);
+
+partitionInto(self,destination,value.declaration_name);
+
+partitionInto(self,destination,value.export_name);
+
+partitionInto(self,destination,value.exported);
+
+partitionInto(self,destination,value.runtime);
+
+partitionInto(self,destination,value.is_function);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Parameter) {
+
+partitionInto(self,destination,value.binding);
+
+partitionInto(self,destination,value.ty);
+
+partitionInto(self,destination,value.span);
+
+partitionInto(self,destination,value.inferred);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::CallInfo) {
+
+partitionInto(self,destination,value.target);
+
+partitionInto(self,destination,value.callee_type);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Merge) {
+
+partitionInto(self,destination,value.node);
+
+partitionInto(self,destination,value.result);
+
+partitionInto(self,destination,value.then_binding);
+
+partitionInto(self,destination,value.else_binding);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Obligation) {
+
+partitionInto(self,destination,value.ty);
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.span);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.result);
+
+partitionInto(self,destination,value.other);
+
+partitionInto(self,destination,value.signature);
+
+partitionInto(self,destination,value.operator);
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.explicit);
+
+partitionInto(self,destination,value.qualification_span);
+
+partitionInto(self,destination,value.qualification_unit);
+
+partitionInto(self,destination,value.diagnostic_name);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Nominal) {
+
+partitionInto(self,destination,value.affine);
+
+partitionInto(self,destination,value.has_usage);
+
+partitionInto(self,destination,value.closed_storage);
+
+partitionInto(self,destination,value.private);
+
+partitionInto(self,destination,value.is_opaque);
+
+partitionInto(self,destination,value.storage);
+
+partitionInto(self,destination,value.diagnostic_name);
+
+partitionInto(self,destination,value.diagnostic_origin);
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.parameters);
+
+partitionInto(self,destination,value.variables);
+
+partitionInto(self,destination,value.constructors);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_backend_opaque_storage::Storage) {
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.parameter);
+
+partitionInto(self,destination,value.selector);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_backend_opaque_storage::Kind) {
+
+match value {
+
+blot_backend_opaque_storage::Kind.unknown=>{
+},
+
+blot_backend_opaque_storage::Kind.unit=>{
+},
+
+blot_backend_opaque_storage::Kind.boolean=>{
+},
+
+blot_backend_opaque_storage::Kind.unsigned32=>{
+},
+
+blot_backend_opaque_storage::Kind.floating32=>{
+},
+
+blot_backend_opaque_storage::Kind.reference=>{
+},
+
+blot_backend_opaque_storage::Kind.parameter=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::OperationName) {
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.diagnostic_name);
+
+partitionInto(self,destination,value.diagnostic_origin);
+
+partitionInto(self,destination,value.variables);
+
+partitionInto(self,destination,value.parameters);
+
+partitionInto(self,destination,value.parameter);
+
+partitionInto(self,destination,value.result);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Constructor) {
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.nominal);
+
+partitionInto(self,destination,value.tag);
+
+partitionInto(self,destination,value.scheme);
+
+partitionInto(self,destination,value.payload);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Projection) {
+
+partitionInto(self,destination,value.nominal);
+
+partitionInto(self,destination,value.field);
+
+partitionInto(self,destination,value.source_type);
+
+partitionInto(self,destination,value.result_type);
+
+partitionInto(self,destination,value.variants);
+
+partitionInto(self,destination,value.diagnostic_point);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ProjectionVariant) {
+
+partitionInto(self,destination,value.tag);
+
+partitionInto(self,destination,value.field);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Pattern) {
+
+partitionInto(self,destination,value.tag);
+
+partitionInto(self,destination,value.ty);
+
+partitionInto(self,destination,value.a);
+
+partitionInto(self,destination,value.b);
+
+partitionInto(self,destination,value.c);
+
+partitionInto(self,destination,value.span);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::PatternTag) {
+
+match value {
+
+blot_check_core::PatternTag.invalid=>{
+},
+
+blot_check_core::PatternTag.wildcard=>{
+},
+
+blot_check_core::PatternTag.bind=>{
+},
+
+blot_check_core::PatternTag.constant=>{
+},
+
+blot_check_core::PatternTag.value=>{
+},
+
+blot_check_core::PatternTag.product=>{
+},
+
+blot_check_core::PatternTag.constructor=>{
+},
+
+blot_check_core::PatternTag.record_payload=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::PatternRow) {
+
+partitionInto(self,destination,value.patterns);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::MatchArm) {
+
+partitionInto(self,destination,value.rows);
+
+partitionInto(self,destination,value.guard);
+
+partitionInto(self,destination,value.body);
+
+partitionInto(self,destination,value.span);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::MatchInfo) {
+
+partitionInto(self,destination,value.inputs);
+
+partitionInto(self,destination,value.arms);
+
+partitionInto(self,destination,value.statement);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::UpdateInfo) {
+
+partitionInto(self,destination,value.root);
+
+partitionInto(self,destination,value.path);
+
+partitionInto(self,destination,value.value);
+
+partitionInto(self,destination,value.self_binding);
+
+partitionInto(self,destination,value.selectors);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::UpdateStep) {
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.projection);
+
+partitionInto(self,destination,value.index);
+
+partitionInto(self,destination,value.source_type);
+
+partitionInto(self,destination,value.result_type);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::UpdateKind) {
+
+match value {
+
+blot_check_core::UpdateKind.field=>{
+},
+
+blot_check_core::UpdateKind.index=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ClosureInfo) {
+
+partitionInto(self,destination,value.qualifier);
+
+partitionInto(self,destination,value.body);
+
+partitionInto(self,destination,value.parameter);
+
+partitionInto(self,destination,value.captures);
+
+partitionInto(self,destination,value.function_type);
+
+partitionInto(self,destination,value.closed_rows);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Associated) {
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.member);
+
+partitionInto(self,destination,value.operator);
+
+partitionInto(self,destination,value.target);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Contract) {
+
+partitionInto(self,destination,value.private);
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.parameters);
+
+partitionInto(self,destination,value.variables);
+
+partitionInto(self,destination,value.row_variables);
+
+partitionInto(self,destination,value.predicates);
+
+partitionInto(self,destination,value.members);
+
+partitionInto(self,destination,value.requires_implementation);
+
+partitionInto(self,destination,value.row_parameter_names);
+
+partitionInto(self,destination,value.row_parameters);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ContractMember) {
+
+partitionInto(self,destination,value.contract);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.root);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ContractMemberKind) {
+
+match value {
+
+blot_reuse_principal_interface::ContractMemberKind.defined_type=>{
+},
+
+blot_reuse_principal_interface::ContractMemberKind.abstract_type=>{
+},
+
+blot_reuse_principal_interface::ContractMemberKind.value=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Implementation) {
+
+partitionInto(self,destination,value.origin_span);
+
+partitionInto(self,destination,value.declaration);
+
+partitionInto(self,destination,value.private);
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.contract);
+
+partitionInto(self,destination,value.head);
+
+partitionInto(self,destination,value.variables);
+
+partitionInto(self,destination,value.parameter_names);
+
+partitionInto(self,destination,value.row_variables);
+
+partitionInto(self,destination,value.row_parameter_names);
+
+partitionInto(self,destination,value.row_parameters);
+
+partitionInto(self,destination,value.predicates);
+
+partitionInto(self,destination,value.members);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ImplementationMember) {
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.root);
+
+partitionInto(self,destination,value.target);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ImplementationMemberKind) {
+
+match value {
+
+blot_reuse_principal_interface::ImplementationMemberKind.type_=>{
+},
+
+blot_reuse_principal_interface::ImplementationMemberKind.value=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::ExternalTarget) {
+
+partitionInto(self,destination,value.unit);
+
+partitionInto(self,destination,value.binding);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::MemberTemplate) {
+
+partitionInto(self,destination,value.binding);
+
+partitionInto(self,destination,value.contract);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.arguments);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::SelectedProof) {
+
+partitionInto(self,destination,value.predicate_target);
+
+partitionInto(self,destination,value.context);
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.predicate);
+
+partitionInto(self,destination,value.implementation);
+
+partitionInto(self,destination,value.contract);
+
+partitionInto(self,destination,value.arguments);
+
+partitionInto(self,destination,value.members);
+
+partitionInto(self,destination,value.prerequisites);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::SelectedProofKind) {
+
+match value {
+
+blot_reuse_principal_interface::SelectedProofKind.implementation=>{
+},
+
+blot_reuse_principal_interface::SelectedProofKind.predicate=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::SelectedUse) {
+
+partitionInto(self,destination,value.node);
+
+partitionInto(self,destination,value.proof);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DictionarySelection) {
+
+partitionInto(self,destination,value.owner);
+
+partitionInto(self,destination,value.quantifier);
+
+partitionInto(self,destination,value.goal);
+
+partitionInto(self,destination,value.proof);
+
+partitionInto(self,destination,value.members);
+
+partitionInto(self,destination,value.contents);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DictionaryProof) {
+
+match value {
+
+blot_check_core::DictionaryProof.selected payload=>{
+partitionInto(self,destination,payload.value);
+},
+
+blot_check_core::DictionaryProof.given payload=>{
+partitionInto(self,destination,payload.value);
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DictionaryGiven) {
+
+partitionInto(self,destination,value.opening);
+
+partitionInto(self,destination,value.introduction);
+
+partitionInto(self,destination,value.quantifier);
+
+partitionInto(self,destination,value.goal);
+
+partitionInto(self,destination,value.arguments);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::DictionaryUse) {
+
+partitionInto(self,destination,value.node);
+
+partitionInto(self,destination,value.binding);
+
+partitionInto(self,destination,value.opening);
+
+partitionInto(self,destination,value.introduction);
+
+partitionInto(self,destination,value.quantifier);
+
+partitionInto(self,destination,value.goal);
+
+partitionInto(self,destination,value.member);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Primitive) {
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.op);
+
+partitionInto(self,destination,value.array_op);
+
+partitionInto(self,destination,value.arity);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::PrimitiveKind) {
+
+match value {
+
+blot_check_core::PrimitiveKind.scalar=>{
+},
+
+blot_check_core::PrimitiveKind.array=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_backend_collection_ops::Op) {
+
+match value {
+
+blot_backend_collection_ops::Op.length=>{
+},
+
+blot_backend_collection_ops::Op.get=>{
+},
+
+blot_backend_collection_ops::Op.set=>{
+},
+
+blot_backend_collection_ops::Op.fill=>{
+},
+
+blot_backend_collection_ops::Op.generate=>{
+},
+
+blot_backend_collection_ops::Op.append=>{
+},
+
+blot_backend_collection_ops::Op.prepend=>{
+},
+
+blot_backend_collection_ops::Op.identity=>{
+},
+
+blot_backend_collection_ops::Op.convert=>{
+},
+
+blot_backend_collection_ops::Op.cursor=>{
+},
+
+blot_backend_collection_ops::Op.cursor_has=>{
+},
+
+blot_backend_collection_ops::Op.cursor_value=>{
+},
+
+blot_backend_collection_ops::Op.cursor_advance=>{
+},
+
+blot_backend_collection_ops::Op.concat=>{
+},
+
+blot_backend_collection_ops::Op.slice=>{
+},
+
+blot_backend_collection_ops::Op.simd_load=>{
+},
+
+blot_backend_collection_ops::Op.simd_store=>{
+},
+
+blot_backend_collection_ops::Op.flatten=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::LoopInfo) {
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.first);
+
+partitionInto(self,destination,value.end);
+
+partitionInto(self,destination,value.pattern);
+
+partitionInto(self,destination,value.body);
+
+partitionInto(self,destination,value.carries);
+
+partitionInto(self,destination,value.can_exit);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::LoopKind) {
+
+match value {
+
+blot_check_core::LoopKind.forever=>{
+},
+
+blot_check_core::LoopKind.range=>{
+},
+
+blot_check_core::LoopKind.array=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::LoopCarry) {
+
+partitionInto(self,destination,value.incoming);
+
+partitionInto(self,destination,value.iteration);
+
+partitionInto(self,destination,value.backedge);
+
+partitionInto(self,destination,value.outgoing);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ResolverInfo) {
+
+partitionInto(self,destination,value.operation);
+
+partitionInto(self,destination,value.resolver);
+
+partitionInto(self,destination,value.arguments);
+
+partitionInto(self,destination,value.member);
+
+partitionInto(self,destination,value.method);
+
+partitionInto(self,destination,value.method_type);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::ResolverOperation) {
+
+match value {
+
+blot_check_core::ResolverOperation.monad=>{
+},
+
+blot_check_core::ResolverOperation.pure=>{
+},
+
+blot_check_core::ResolverOperation.bind=>{
+},
+
+blot_check_core::ResolverOperation.forward=>{
+},
+
+blot_check_core::ResolverOperation.iterate=>{
+},
+
+blot_check_core::ResolverOperation.run=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::OperationValue) {
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.arguments);
+
+partitionInto(self,destination,value.signature);
+
+partitionInto(self,destination,value.witness);
+
+partitionInto(self,destination,value.witness_result);
+
+partitionInto(self,destination,value.instance);
+
+partitionInto(self,destination,value.capability);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::HandleEffects) {
+
+partitionInto(self,destination,value.node);
+
+partitionInto(self,destination,value.first);
+
+partitionInto(self,destination,value.second);
+
+partitionInto(self,destination,value.extended);
+
+partitionInto(self,destination,value.residual);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Diagnostic) {
+
+partitionInto(self,destination,value.code);
+
+partitionInto(self,destination,value.span);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_core::Code) {
+
+match value {
+
+blot_check_core::Code.unchecked=>{
+},
+
+blot_check_core::Code.unsupported=>{
+},
+
+blot_check_core::Code.unresolved_binding=>{
+},
+
+blot_check_core::Code.invalid_call=>{
+},
+
+blot_check_core::Code.complexity=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Interface) {
+
+partitionInto(self,destination,value.has_rank_contracts);
+
+partitionInto(self,destination,value.has_usage_contracts);
+
+partitionInto(self,destination,value.has_numeric_proofs);
+
+partitionInto(self,destination,value.proof_contracts);
+
+partitionInto(self,destination,value.capability_contracts);
+
+partitionInto(self,destination,value.unit);
+
+partitionInto(self,destination,value.graph);
+
+partitionInto(self,destination,value.patterns);
+
+partitionInto(self,destination,value.bindings);
+
+partitionInto(self,destination,value.obligations);
+
+partitionInto(self,destination,value.obligation_spans);
+
+partitionInto(self,destination,value.nominals);
+
+partitionInto(self,destination,value.constructors);
+
+partitionInto(self,destination,value.effect_families);
+
+partitionInto(self,destination,value.effect_templates);
+
+partitionInto(self,destination,value.associated);
+
+partitionInto(self,destination,value.contracts);
+
+partitionInto(self,destination,value.contract_predicates);
+
+partitionInto(self,destination,value.contract_members);
+
+partitionInto(self,destination,value.implementations);
+
+partitionInto(self,destination,value.implementation_predicates);
+
+partitionInto(self,destination,value.implementation_members);
+
+partitionInto(self,destination,value.member_templates);
+
+partitionInto(self,destination,value.selected_proofs);
+
+partitionInto(self,destination,value.selected_members);
+
+partitionInto(self,destination,value.selected_edges);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_frozen_types::Graph) {
+
+partitionInto(self,destination,value.nodes);
+
+partitionInto(self,destination,value.extra);
+
+partitionInto(self,destination,value.rows);
+
+partitionInto(self,destination,value.labels);
+
+partitionInto(self,destination,value.operations);
+
+partitionInto(self,destination,value.row_variable_count);
+
+partitionInto(self,destination,value.quantifier_goals);
+
+partitionInto(self,destination,value.quantifier_obligations);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_frozen_types::PatternGraph) {
+
+partitionInto(self,destination,value.nodes);
+
+partitionInto(self,destination,value.extra);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_parameter_patterns::Node) {
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.a);
+
+partitionInto(self,destination,value.b);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_check_parameter_patterns::Kind) {
+
+match value {
+
+blot_check_parameter_patterns::Kind.binding=>{
+},
+
+blot_check_parameter_patterns::Kind.tuple=>{
+},
+
+blot_check_parameter_patterns::Kind.array=>{
+},
+
+blot_check_parameter_patterns::Kind.record=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Binding) {
+
+partitionInto(self,destination,value.capability_flow);
+
+partitionInto(self,destination,value.capability_parameters);
+
+partitionInto(self,destination,value.private);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.named_function);
+
+partitionInto(self,destination,value.ty);
+
+partitionInto(self,destination,value.scheme);
+
+partitionInto(self,destination,value.external);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Nominal) {
+
+partitionInto(self,destination,value.affine);
+
+partitionInto(self,destination,value.has_usage);
+
+partitionInto(self,destination,value.closed_storage);
+
+partitionInto(self,destination,value.private);
+
+partitionInto(self,destination,value.is_opaque);
+
+partitionInto(self,destination,value.storage);
+
+partitionInto(self,destination,value.declaration);
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.parameters);
+
+partitionInto(self,destination,value.variables);
+
+partitionInto(self,destination,value.patterns);
+
+partitionInto(self,destination,value.parameter_names);
+
+partitionInto(self,destination,value.constructors);
+
+partitionInto(self,destination,value.alias);
+
+partitionInto(self,destination,value.alias_rows);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Constructor) {
+
+partitionInto(self,destination,value.private);
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.nominal);
+
+partitionInto(self,destination,value.tag);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.scheme);
+
+partitionInto(self,destination,value.payload);
+
+partitionInto(self,destination,value.declared_record);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::EffectFamily) {
+
+partitionInto(self,destination,value.private);
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.callable);
+
+partitionInto(self,destination,value.parameters);
+
+partitionInto(self,destination,value.variables);
+
+partitionInto(self,destination,value.patterns);
+
+partitionInto(self,destination,value.parameter_names);
+
+partitionInto(self,destination,value.operations);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::EffectTemplate) {
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.family);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.parameter);
+
+partitionInto(self,destination,value.result);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Associated) {
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.member);
+
+partitionInto(self,destination,value.operator);
+
+partitionInto(self,destination,value.binding);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Contract) {
+
+partitionInto(self,destination,value.declaration);
+
+partitionInto(self,destination,value.private);
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.parameters);
+
+partitionInto(self,destination,value.variables);
+
+partitionInto(self,destination,value.patterns);
+
+partitionInto(self,destination,value.parameter_names);
+
+partitionInto(self,destination,value.row_variables);
+
+partitionInto(self,destination,value.row_parameter_names);
+
+partitionInto(self,destination,value.row_parameters);
+
+partitionInto(self,destination,value.predicates);
+
+partitionInto(self,destination,value.members);
+
+partitionInto(self,destination,value.requires_implementation);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Module) {
+
+partitionInto(self,destination,value.identity);
+
+partitionInto(self,destination,value.imports);
+
+partitionInto(self,destination,value.implicit_prelude);
+
+partitionInto(self,destination,value.source_imports);
+
+partitionInto(self,destination,value.core);
+
+partitionInto(self,destination,value.interface);
+
+partitionInto(self,destination,value.exports);
+
+partitionInto(self,destination,value.fixities);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Identity) {
+
+partitionInto(self,destination,value.normalized_path);
+
+partitionInto(self,destination,value.source_digest);
+
+partitionInto(self,destination,value.source_bytes);
+
+partitionInto(self,destination,value.prelude);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::ImportResolution) {
+
+partitionInto(self,destination,value.path);
+
+partitionInto(self,destination,value.target);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Export) {
+
+partitionInto(self,destination,value.name);
+
+partitionInto(self,destination,value.target);
+
+partitionInto(self,destination,value.kind);
+
+partitionInto(self,destination,value.catalog);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::ExportKind) {
+
+match value {
+
+blot_reuse_frozen_dependency::ExportKind.value=>{
+},
+
+blot_reuse_frozen_dependency::ExportKind.nominal=>{
+},
+
+blot_reuse_frozen_dependency::ExportKind.constructor=>{
+},
+
+blot_reuse_frozen_dependency::ExportKind.effect_family=>{
+},
+
+blot_reuse_frozen_dependency::ExportKind.contract=>{
+},
+
+blot_reuse_frozen_dependency::ExportKind.implementation=>{
+},
+
+}
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Fixity) {
+
+partitionInto(self,destination,value.operator);
+
+partitionInto(self,destination,value.target);
+
+partitionInto(self,destination,value.precedence);
+
+partitionInto(self,destination,value.association);
+
+partitionInto(self,destination,value.named);
+
+partitionInto(self,destination,value.producer);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::FrozenDependency) {
+
+partitionInto(self,destination,value.symbols);
+
+partitionInto(self,destination,value.modules);
+
+}
+
+fn partitionInto(self:Owner&,destination:Owner&,value:blot_reuse_frozen_dependency::Symbol) {
+
+partitionInto(self,destination,value.text);
+
+}

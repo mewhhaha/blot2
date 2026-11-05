@@ -2210,3 +2210,30 @@ fn initWithOptions(options:Options)->Store,Error {return initPooled(options);}
 fn deinit(self:Store&) {if self.lease==0 {return;}assert(valid(self));self.nodes.deinit();self.extra.deinit();self.variables.deinit();self.versions.deinit();self.operations.deinit();self.operation_links.deinit();self.quantifier_goals.deinit();self.quantifier_obligations.deinit();self.occurs_seen.deinit();self.closed_row_index.deinit();self.closed_operation_index.deinit();self.variable_views.deinit();self.associated_equations.deinit();self.projection_resolutions.deinit();self.operation_chains.deinit();self.effects.deinit();self.resolved.deinit();self.composites.deinit();let index=self.lease-1;owner_states[index].live=false;owner_states.free(index);self=Store{};}
 fn withStore<C,F>(context:C&)->Error {let initialized,error=initPooled();if error!=Error.none {return error;}var store=initialized;let result=F(context,store);store.deinit();return result;}
 fn withStoreValue<C,F,R>(context:C&)->R,Error {let initialized,error=initPooled();if error!=Error.none {return default<R>(),error;}var store=initialized;let result,failure=F(context,store);store.deinit();return result,failure;}
+
+fn obligationKindName(kind:ObligationKind)->const u8[:] {match kind {
+ObligationKind.arithmetic=>{return "arithmetic";},
+ObligationKind.ordered=>{return "ordered";},
+ObligationKind.equality=>{return "equality";},
+ObligationKind.integer=>{return "integer";},
+ObligationKind.field=>{return "field";},
+ObligationKind.writable_field=>{return "writable_field";},
+ObligationKind.dispatch=>{return "dispatch";},
+ObligationKind.result_dispatch=>{return "result_dispatch";},
+ObligationKind.monad_factory=>{return "monad_factory";},
+ObligationKind.resolver_dispatch=>{return "resolver_dispatch";},
+ObligationKind.resolver_shape=>{return "resolver_shape";},
+ObligationKind.effect_operation=>{return "effect_operation";},
+ObligationKind.effect_handler=>{return "effect_handler";},
+ObligationKind.receiver=>{return "receiver";},
+ObligationKind.update=>{return "update";},
+ObligationKind.type_rep=>{return "type_rep";},
+ObligationKind.effect_rep=>{return "effect_rep";},
+ObligationKind.type_head=>{return "type_head";},
+ObligationKind.collection=>{return "collection";},
+ObligationKind.record_merge=>{return "record_merge";},
+ObligationKind.callee_use=>{return "callee_use";},
+ObligationKind.type_eq=>{return "type_eq";},
+ObligationKind.contract=>{return "contract";},
+ObligationKind.task_receive=>{return "task_receive";},
+}}

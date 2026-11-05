@@ -8,17 +8,17 @@ type Id = blot_check_types::Id;
 type Identity = blot_check_types::NominalIdentity;
 type List = blot_check_types::List;
 type Tag = blot_check_types::Tag;
-struct Tables { private_scopes: dictionary<u32,u32>&, mapping: dictionary<Id,Id>&, row_variables: dictionary<u32,u32>&, rows: dictionary<u32,u32>&, labels: dictionary<u32,u32>& }
+struct Tables { private_scopes: WordMap&, mapping: WordMap&, row_variables: WordMap&, rows: WordMap&, labels: WordMap& }
 struct Copier {
     private_namespace: u32 = 0, private_qualifications: const blot_parse_ast::Span[:] = [], private_unit: u32 = 0,
     private_nodes: const blot_parse_ast::Id[:] = [], private_bindings: const u32[:] = [], private_tree: const blot_parse_ast::Tree? = null,
-    private_scopes: dictionary<u32,u32>&, operation_mapping: const dictionary<Identity,Identity>? = null,
-    field_mapping: const u32[:] = [], has_field_mapping: bool = false, nominal_mapping: const dictionary<Identity,Identity>? = null,
+    private_scopes: WordMap&, operation_mapping: const IdentityMap? = null,
+    field_mapping: const u32[:] = [], has_field_mapping: bool = false, nominal_mapping: const IdentityMap? = null,
     fresh_variables: bool = false, fresh_rows: bool = false, source: blot_check_frozen_types::Source, destination: blot_check_types::Store,
-    associated: bool = false, mapping: dictionary<Id,Id>&, row_variables: dictionary<u32,u32>&, rows: dictionary<u32,u32>&, labels: dictionary<u32,u32>&,
+    associated: bool = false, mapping: WordMap&, row_variables: WordMap&, rows: WordMap&, labels: WordMap&,
 }
 fn init(source: blot_check_frozen_types::Source, destination: blot_check_types::Store&, tables: Tables) -> Copier { return Copier { private_scopes: tables.private_scopes, source, destination, mapping: tables.mapping, row_variables: tables.row_variables, rows: tables.rows, labels: tables.labels }; }
-fn deinit(self: Copier&) { self.private_scopes.clear(); self.mapping.clear(); self.row_variables.clear(); self.rows.clear(); self.labels.clear(); }
+fn deinit(self: Copier&) { self.private_scopes.deinit(); self.mapping.deinit(); self.row_variables.deinit(); self.rows.deinit(); self.labels.deinit(); }
 fn copyPhysical(self: Copier&, identity: Identity) -> Identity, Error {
     if self.private_namespace == 0 || identity.unit != self.private_namespace || identity.decl == 0 || identity.decl > self.private_nodes.len { return Identity {}, Error.type_limit; }
     return Identity { self.private_unit, self.private_nodes[identity.decl - 1] }, Error.none;
@@ -140,6 +140,67 @@ fn copyDepth(self: Copier&, source_id: Id, depth: i64) -> Id, Error {
     if failure != Error.none { return 0, failure; } self.mapping.insert(id, result); return result, Error.none;
 }
 fn withCopier<C,F>(source: blot_check_frozen_types::Source, destination: blot_check_types::Store&, context: C&) -> Error {
-    var scopes: dictionary<u32,u32> = dictionary<u32,u32> {}; var mapping: dictionary<Id,Id> = dictionary<Id,Id> {}; var row_variables: dictionary<u32,u32> = dictionary<u32,u32> {}; var rows: dictionary<u32,u32> = dictionary<u32,u32> {}; var labels: dictionary<u32,u32> = dictionary<u32,u32> {};
+    var scopes: WordMap = WordMap {}; var mapping: WordMap = WordMap {}; var row_variables: WordMap = WordMap {}; var rows: WordMap = WordMap {}; var labels: WordMap = WordMap {};
     var copier = init(source, destination, Tables { scopes, mapping, row_variables, rows, labels }); let error = F(context, copier); deinit(copier); return error;
 }
+
+struct WordMap { count: i64 = 0, failure:Error=Error.none, slots: dictionary_slot<u32,u32>[:] = [] }
+fn probe(map: const WordMap&,key: u32) -> i64 {
+    if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key == key { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
+}
+fn get(map: const WordMap&,key: u32) -> u32? { let index = probe(map,key); if index < 0 { return null; } return map.slots[index].val; }
+fn contains(map: const WordMap&,key: u32) -> bool { return probe(map,key) >= 0; }
+fn release(slots: dictionary_slot<u32,u32>[:]) { if slots.len != 0 { pool_WordMap.free_slice(slots); } }
+fn grow(map: WordMap&,capacity: i64) {
+    let replacement = pool_WordMap.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<u32,u32> { default<u32>(),default<u32>(),0 }; }
+    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
+    release(map.slots); map.slots = replacement;
+}
+fn insert(map: WordMap&,key: u32,value: u32) -> bool {
+    if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
+    let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<u32,u32> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<u32,u32> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+}
+fn remove(map: WordMap&,key: u32) -> bool {
+    var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
+    loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
+    map.slots[hole] = dictionary_slot<u32,u32> { default<u32>(),default<u32>(),0 }; map.count--; return true;
+}
+fn clear(map: WordMap&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
+fn deinit(map: WordMap&) { release(map.slots); map.slots = []; map.count = 0;map.failure=Error.none; }
+fn clone(map: const WordMap&) -> WordMap { var copy = WordMap {}; if map.slots.len != 0 { let slots = pool_WordMap.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn each<F>(map: WordMap&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
+
+reusable[] var pool_WordMap:dictionary_slot<u32,u32>[>..];
+fn restore(map:WordMap&,slots:const dictionary_slot<u32,u32>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return Error.invalid_artifact;}return Error.none;}let run=pool_WordMap.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return Error.none;}
+struct IdentityMap { count: i64 = 0, failure:Error=Error.none, slots: dictionary_slot<Identity,Identity>[:] = [] }
+fn probe(map: const IdentityMap&,key: Identity) -> i64 {
+    if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key == key { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
+}
+fn get(map: const IdentityMap&,key: Identity) -> Identity? { let index = probe(map,key); if index < 0 { return null; } return map.slots[index].val; }
+fn contains(map: const IdentityMap&,key: Identity) -> bool { return probe(map,key) >= 0; }
+fn release(slots: dictionary_slot<Identity,Identity>[:]) { if slots.len != 0 { pool_IdentityMap.free_slice(slots); } }
+fn grow(map: IdentityMap&,capacity: i64) {
+    let replacement = pool_IdentityMap.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<Identity,Identity> { default<Identity>(),default<Identity>(),0 }; }
+    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
+    release(map.slots); map.slots = replacement;
+}
+fn insert(map: IdentityMap&,key: Identity,value: Identity) -> bool {
+    if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
+    let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
+    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<Identity,Identity> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<Identity,Identity> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+}
+fn remove(map: IdentityMap&,key: Identity) -> bool {
+    var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
+    loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
+    map.slots[hole] = dictionary_slot<Identity,Identity> { default<Identity>(),default<Identity>(),0 }; map.count--; return true;
+}
+fn clear(map: IdentityMap&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
+fn deinit(map: IdentityMap&) { release(map.slots); map.slots = []; map.count = 0;map.failure=Error.none; }
+fn clone(map: const IdentityMap&) -> IdentityMap { var copy = IdentityMap {}; if map.slots.len != 0 { let slots = pool_IdentityMap.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+fn each<F>(map: IdentityMap&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
+
+reusable[] var pool_IdentityMap:dictionary_slot<Identity,Identity>[>..];
+fn restore(map:IdentityMap&,slots:const dictionary_slot<Identity,Identity>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return Error.invalid_artifact;}return Error.none;}let run=pool_IdentityMap.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return Error.none;}

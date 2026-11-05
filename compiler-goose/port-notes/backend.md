@@ -180,3 +180,22 @@ stored request fields. Cycle-local Tape/Observation borrowing is still pending.
 The complete production storage_deferred_join algorithm is also source-written,
 with real typed lane/hole runs and explicit physical deinit; scoped controls must
 release those runs during their corresponding lifetime cleanup. No checks run.
+
+Scoped writing now includes compile-wide Metadata ranges/IDs, durable method
+selection sessions, descriptor-call stores, fixed pooled generator containers,
+binding/transport snapshots, root cleanup, semantic type-environment capture and
+resolution, complete structural type mapping, fixed layout construction and
+opaque nominal producer lookup, storage shape/variant joins, and inline payload
+loads/stores. It is still an incomplete engine: storage element/read-frame,
+transport, calls/control/task emission and its public compile entry remain.
+The standalone storage_layout and storage_collections production passes are
+written. storage_span_dominance now owns fixed typed pooled active/stack runs
+and returns explicit errors from scope scans. No verification has run.
+Scoped production writing now reaches collection dispatch (source around 2215):
+fixed/grow/resize owner reservation, scalar literal payload copies, complete
+packet conversion and host callback calls, persistent application initialization
+with retry handles and final global publication, every storage operation,
+SIMD loads/stores and all supported collection/cursor builders are written.
+New recursion paths use fixed local descriptors and explicit cleanup. Reusable
+call admission/emission, remaining source dispatch/control and scoped compile
+construction remain unwritten; the full backend is still incomplete/unverified.

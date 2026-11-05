@@ -103,9 +103,9 @@ fn interfaceMatches<C>(source:const Project&,checked:C&,unit:u32,stats:Stats&)->
 }
 fn compareInterface<C>(source:const Project&,checked:C&,unit:u32,stats:Stats&,storage_changed:bool&)->bool,Error {
  let old .= source.compiled_modules[unit-1];let current .= checked.modules[unit-1];if !current.present||!current.value.valid||current.value.checked.diagnostics.len!=0 {return false,Error.none;}
- let tree .= source.unit(unit).tree;var published,error=blot_reuse_dependency_snapshot::freezePrincipal(tree,current.value.checked);if error!=Error.none {if error==Error.out_of_memory {return false,error;}return false,Error.none;}
- stats.compared++;var mapping=blot_support::none<Map>();let same,error=comparePublished(source,checked,unit,old,current.value,published,mapping,stats,storage_changed);
- if mapping.present {mapping.value.deinit();}blot_reuse_dependency_snapshot::deinit(published);return same,error;
+ let tree .= source.unit(unit).tree;var principal,error=blot_reuse_dependency_snapshot::freezePrincipal(tree,current.value.checked);if error!=Error.none {if error==Error.out_of_memory {return false,error;}return false,Error.none;}
+ stats.compared++;var mapping=blot_support::none<Map>();let same,error=comparePublished(source,checked,unit,old,current.value,principal.value,mapping,stats,storage_changed);
+ if mapping.present {mapping.value.deinit();}principal.deinit();return same,error;
 }
 fn comparePublished<C,M>(source:const Project&,checked:C&,unit:u32,old:const blot_reuse_frozen_dependency::Module&,current:const M&,published:const Interface&,mapping:blot_support::Option<Map>&,stats:Stats&,storage_changed:bool&)->bool,Error {
  if !interfaceEqual(old.interface,published,source.symbols.entries.len+1,source.units.len) {

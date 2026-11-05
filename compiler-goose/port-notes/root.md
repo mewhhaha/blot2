@@ -251,3 +251,23 @@ The dependency decoder, snapshots, archive/session/CLI integration and remaining
 engines are still required. Loop target collection now owns a separate returned
 run while recursive scope walks borrow the nonrecursive wrapper's scratch.
 No compilation, execution or other verification has run for the port.
+
+Retained dependency snapshots now have complete first production source passes:
+create/adopt/appendOwned/appendShared and teardown. Each module keeps its own
+reference-counted typed Owner, so retaining one module retains no old snapshot.
+Owner.partitionInto splits existing run links without copying payloads; adopt
+allocates every bookkeeping owner before consuming the caller's journal.
+Unpublished allocation marks/rollback are also implemented. Cross-module owned
+run aliasing remains forbidden, as required by the native independent teardown.
+
+Runtime identity Metadata now follows the native simple immutable slice shape,
+with typed owned byte/name runs, capture/copy/view/deinit. It no longer retains
+lexical grower headers. UTF8/duplicate-path and exact namespace checks remain.
+
+Principal graph copying now keeps five map headers in generation-checked global
+slots, copies the durable destination Store descriptor, and uses fixed typed
+buffers for every recursive binder/goal/record/word scratch. Continuations free
+scratch on all Error returns. Native live budget coupling remains; callback
+callers are moving local scalar budgets/context headers into their own global
+scratch. Associated admission's direct Copier constructors are being adapted.
+All of these remain unverified writing passes. The source port is incomplete.

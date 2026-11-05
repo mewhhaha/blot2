@@ -51,7 +51,7 @@ fn rowLabels(self: Source, span: blot_check_effects::List) -> const blot_check_e
     match self { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.effects.list(span); }, frozen s => { return s.value.labels[span.start..span.start + span.len]; }, }
 }
 struct PatternGraph { nodes: const blot_check_parameter_patterns::Node[:], extra: const u32[:] }
-enum Patterns { inactive, store { value: const blot_check_parameter_patterns::Store& }, frozen { value: PatternGraph } }
+enum Patterns { inactive, store { value: blot_check_parameter_patterns::Store }, frozen { value: PatternGraph } }
 fn node(self: Patterns, id: blot_check_parameter_patterns::Id) -> blot_check_parameter_patterns::Node {
     match self { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.node(id); }, frozen s => { return s.value.nodes[id]; }, }
 }
