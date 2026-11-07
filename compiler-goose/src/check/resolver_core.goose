@@ -21,7 +21,7 @@ fn owner(m: const Module&, units: const ModuleRef[:], target: BindingRef) -> con
 fn ownerWorkspace(m: const Module&, units: const ModuleRef[:], target: BindingRef, workspace: Workspace?) -> const Module?, Error {
     if target.unit == 0 || target.unit == m.unit { if target.binding >= m.bindings.len { return null, blot_error::Error.invalid_artifact; } return m, blot_error::Error.none; }
     var found: const Module? = null; for candidate_owner_ref in units { let candidate: const blot_check_core::Module&  = candidate_owner_ref.value; if candidate.unit != target.unit { continue; } if found != null || target.binding >= candidate.bindings.len { return null, blot_error::Error.invalid_artifact; }
-        let error = blot_check_scheme_equations::bounds(workspace, candidate, blot_check_frozen_core_validation::Context { units , ..}); if error != blot_error::Error.none { return null, error; } found .= candidate;
+        let error = blot_check_scheme_equations::bounds( candidate, blot_check_frozen_core_validation::Context { units , ..}); if error != blot_error::Error.none { return null, error; } found .= candidate;
     } if found == null { return null, blot_error::Error.invalid_artifact; } return found, blot_error::Error.none;
 }
 fn family(m: const Module&, id: Id) -> Identity, Error {
@@ -55,7 +55,7 @@ fn methodWorkspace(m: const Module&, units: const ModuleRef[:], identity: Identi
     if identity.unit != 0 && identity.unit != m.unit && !storage.present {
         var found: const Module? = null; for unit_owner_ref in units { let unit: const blot_check_core::Module&  = unit_owner_ref.value; if unit.unit == identity.unit { if found != null { return BindingRef {..}, blot_error::Error.invalid_artifact; } found .= unit; } }
         { let optional_binding_40 .= found; if optional_binding_40 { let found .= optional_binding_40; nominal_owner .= found;  } else { return BindingRef {..}, blot_error::Error.invalid_artifact; } }
-        let error = blot_check_scheme_equations::bounds(workspace, nominal_owner, blot_check_frozen_core_validation::Context { units , ..}); if error != blot_error::Error.none { return BindingRef {..}, error; }
+        let error = blot_check_scheme_equations::bounds( nominal_owner, blot_check_frozen_core_validation::Context { units , ..}); if error != blot_error::Error.none { return BindingRef {..}, error; }
     }
     var target = blot_support::none<BindingRef>(); let catalogs: (const Module&)[2] = [m, nominal_owner];
     for catalog, index in catalogs { if index == 1 && catalog.owner_id == m.owner_id { continue; }
@@ -85,7 +85,7 @@ fn nominal(m: const Module&, units: const ModuleRef[:], family: Identity, remain
     var producer: const Module&  = m;
     if family.unit != 0 && family.unit != m.unit { var found: const Module? = null; for unit_owner_ref in units { let unit: const blot_check_core::Module&  = unit_owner_ref.value; if unit.unit == family.unit { if found != null { return default<blot_check_core::Nominal>(), blot_error::Error.invalid_artifact; } found .= unit; } }
         { let optional_binding_38 .= found; if optional_binding_38 { let found .= optional_binding_38; producer .= found;  } else { return default<blot_check_core::Nominal>(), blot_error::Error.invalid_artifact; } }
-        let error = blot_check_scheme_equations::bounds(workspace, producer, blot_check_frozen_core_validation::Context { units , ..}); if error != blot_error::Error.none { return default<blot_check_core::Nominal>(), error; }
+        let error = blot_check_scheme_equations::bounds( producer, blot_check_frozen_core_validation::Context { units , ..}); if error != blot_error::Error.none { return default<blot_check_core::Nominal>(), error; }
     }
     var found .= blot_support::none<blot_check_core::Nominal>();
     for entry in producer.nominals { if remaining == 0 { return default<blot_check_core::Nominal>(), blot_error::Error.invalid_artifact; } remaining -= 1;

@@ -16,7 +16,6 @@ import support.pooled_buffer;
 import support.pooled_map;
 
 import .frozen_core_validation;
-type ModuleRef = blot_check_frozen_core_validation::ModuleRef;
 import support.structural;
 type Error = blot_error::Error;
 type Id = blot_check_types::Id;
@@ -27,8 +26,8 @@ type Views = blot_check_package_contracts::Context;
 type Import = blot_check_check_scheme_import::Copier;
 struct SourceFailure { unit: u32, span: blot_check_core::Span }
 struct Body { module: Module, binding: u32 }
-struct SourceRows { module: Module, rows: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
-struct SourceDefinitions { module: Module, values: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
+struct SourceRows { module_owner: u64, rows: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
+struct SourceDefinitions { module_owner: u64, values: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
 struct AdmissionTables { bodies: BodyBuffer=BodyBuffer{..}, body_index: BodyMap=BodyMap{..}, source_rows: SourceRowsBuffer=SourceRowsBuffer{..}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{..} }
 struct Admission {
     workspace: Workspace? = null, remaining: i64&, units: u64[128] = [0;128], count: i64 = 0, source_bodies: bool = false,
@@ -42,14 +41,11 @@ fn deinit(self_: Admission&) {
     deinitBodies(self_); for entry in self_.source_rows.items { let error = blot_check_scheme_dependencies::releaseSnapshot(entry.lease); assert(error == blot_error::Error.none); } self_.source_rows.deinit();
     for entry in self_.source_definitions.items { let error = blot_check_scheme_dependencies::releaseSnapshot(entry.lease); assert(error == blot_error::Error.none); } self_.source_definitions.deinit();self_.bodies.deinit();self_.body_index.deinit();
 }
-struct BoundsReceipt { module: Module, symbol_count: blot_support::Option<i64>, source_length: blot_support::Option<u32>, forbidden_owner: blot_support::Option<u32> }
-struct WorkspaceTables { bounds_units: ModuleBuffer=ModuleBuffer{..}, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{..} }
 struct Workspace {
     oom: bool = false, admission: Admission? = null, modules: u64[128] = [0;128], module_count: i64 = 0,
-    bounds_units: ModuleBuffer=ModuleBuffer{..}, has_bounds_units: bool = false, bounds_receipts: BoundsReceiptBuffer=BoundsReceiptBuffer{..},
 }
-fn initWorkspace(tables: WorkspaceTables) -> Workspace { return Workspace { bounds_units: tables.bounds_units, bounds_receipts: tables.bounds_receipts , ..}; }
-fn deinit(self_: Workspace&) { self_.bounds_units.deinit(); self_.bounds_receipts.deinit(); self_.has_bounds_units = false; self_.module_count = 0; self_.admission .= null; }
+fn initWorkspace() -> Workspace { return Workspace {..}; }
+fn deinit(self_: Workspace&) { self_.module_count = 0; self_.admission .= null; }
 fn proved(self_: const Workspace&, module: const Module&) -> bool {return provedOwner(self_,module.owner_id);}
 fn provedOwner(self_:const Workspace&,owner_id:u64)->bool {if owner_id==0 {return false;}for index in 0..self_.module_count {if self_.modules[index]==owner_id {return true;}}return false;}
 fn convert(error: Error) -> Error { if error == blot_error::Error.none || error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.invalid_artifact; }
@@ -153,22 +149,17 @@ fn importer(self_: Solver&, module: const Module&, frozen: blot_check_frozen_typ
     for formal in module.types.list(scheme.closed_rows) { copier.row_variables.insert(formal, 0); } refresh(self_); return copier, blot_error::Error.none;
 }
 fn copy(self_: Solver&, copier: Import&, root: Id) -> Id, Error { let error = step(self_); if error != blot_error::Error.none { return 0, error; } beginWork(self_); let value, error = copier.copy(root, 0); endWork(self_); return value, convert(error); }
-fn bounds(workspace: Workspace?, module: const Module&, context: blot_check_frozen_core_validation::Context) -> Error {
-    { let optional_binding_75 .= workspace; if optional_binding_75 { let owner .= optional_binding_75;
-        var same_context = true; if owner.has_bounds_units { same_context = sameUnits(owner.bounds_units.items, context.units); }
-        if same_context { for receipt in owner.bounds_receipts.items { if receipt.module.owner_id != 0 && receipt.module.owner_id == module.owner_id && receipt.symbol_count == context.symbol_count && receipt.source_length == context.source_length && receipt.forbidden_owner == context.forbidden_owner { return blot_error::Error.none; } } }
-        let error = blot_check_frozen_core_validation::validateBounds(module, context); if error != blot_error::Error.none { return error; } if !same_context { return blot_error::Error.none; }
-        if !owner.has_bounds_units { for reference in context.units { owner.bounds_units.push(reference.value); } owner.has_bounds_units = true; }
-        owner.bounds_receipts.push(BoundsReceipt { module, context.symbol_count, context.source_length, context.forbidden_owner , ..}); return blot_error::Error.none;
-     } } return blot_check_frozen_core_validation::validateBounds(module, context);
+// Revalidate bounds directly: retaining caller-owned Module headers in a
+// process-wide metadata pool would extend their borrowed slice lifetimes.
+fn bounds(module: const Module&, context: blot_check_frozen_core_validation::Context) -> Error {
+    return blot_check_frozen_core_validation::validateBounds(module, context);
 }
-fn sameUnits(left:const Module[:],right:const ModuleRef[:])->bool {if left.len!=right.len {return false;}for unit,index in left {let other=right[index].value;if unit.owner_id==0 || unit.owner_id!=other.owner_id || unit!=other {return false;}}return true;}
 fn withSolver<C,F>(module:const Module&,views:Views&,remaining:i64&,context:C&)->Error {let initialized,error=blot_check_types::initPooled();if error!=blot_error::Error.none {return error;}var solver,error=init(initialized,module,views,remaining,SolverTables{..});if error!=blot_error::Error.none {return error;}let failure=F(context,solver);deinit(solver);return failure;}
 fn saveSourceRows(self_: Admission&, module: const Module&, rows: const u32[:]) -> Error {
-    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != blot_error::Error.none { return error; } self_.source_rows.push(SourceRows { module, copied, lease , ..});if self_.source_rows.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_rows.failure;}return blot_error::Error.none;
+    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != blot_error::Error.none { return error; } self_.source_rows.push(SourceRows { module.owner_id, copied, lease , ..});if self_.source_rows.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_rows.failure;}return blot_error::Error.none;
 }
 fn saveSourceDefinitions(self_: Admission&, module: const Module&, values: const u32[:]) -> Error {
-    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(values); if error != blot_error::Error.none { return error; } self_.source_definitions.push(SourceDefinitions { module, copied, lease , ..});if self_.source_definitions.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_definitions.failure;}return blot_error::Error.none;
+    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(values); if error != blot_error::Error.none { return error; } self_.source_definitions.push(SourceDefinitions { module.owner_id, copied, lease , ..});if self_.source_definitions.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_definitions.failure;}return blot_error::Error.none;
 }
 
 struct BodyBuffer {storage:Body[:]=default<Body[:]>(),items:Body[:]=default<Body[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
@@ -192,20 +183,6 @@ fn append(self_:SourceDefinitionsBuffer&,values:const SourceDefinitions[:]) {let
 fn resize(self_:SourceDefinitionsBuffer&,length:i64) {assert(length<=self_.items.len);self_.items=self_.storage[..length];self_.len=length;}
 fn clear(self_:SourceDefinitionsBuffer&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=blot_error::Error.none;}
 fn deinit(self_:SourceDefinitionsBuffer&) {blot_support_pooled_buffer::deinit(self_,sourcedefinitionsbuffer_runs);self_.len=0;self_.failure=blot_error::Error.none;}
-struct ModuleBuffer {storage:Module[:]=default<Module[:]>(),items:Module[:]=default<Module[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
-reusable[] var modulebuffer_runs:Module[>..];
-fn push(self_:ModuleBuffer&,value:Module) {let error=blot_support_pooled_buffer::push(self_,value,modulebuffer_runs);if error!=blot_error::Error.none {self_.failure=error;}self_.len=self_.items.len;}
-fn append(self_:ModuleBuffer&,values:const Module[:]) {let error=blot_support_pooled_buffer::append(self_,values,modulebuffer_runs);if error!=blot_error::Error.none {self_.failure=error;}self_.len=self_.items.len;}
-fn resize(self_:ModuleBuffer&,length:i64) {assert(length<=self_.items.len);self_.items=self_.storage[..length];self_.len=length;}
-fn clear(self_:ModuleBuffer&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=blot_error::Error.none;}
-fn deinit(self_:ModuleBuffer&) {blot_support_pooled_buffer::deinit(self_,modulebuffer_runs);self_.len=0;self_.failure=blot_error::Error.none;}
-struct BoundsReceiptBuffer {storage:BoundsReceipt[:]=default<BoundsReceipt[:]>(),items:BoundsReceipt[:]=default<BoundsReceipt[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
-reusable[] var boundsreceiptbuffer_runs:BoundsReceipt[>..];
-fn push(self_:BoundsReceiptBuffer&,value:BoundsReceipt) {let error=blot_support_pooled_buffer::push(self_,value,boundsreceiptbuffer_runs);if error!=blot_error::Error.none {self_.failure=error;}self_.len=self_.items.len;}
-fn append(self_:BoundsReceiptBuffer&,values:const BoundsReceipt[:]) {let error=blot_support_pooled_buffer::append(self_,values,boundsreceiptbuffer_runs);if error!=blot_error::Error.none {self_.failure=error;}self_.len=self_.items.len;}
-fn resize(self_:BoundsReceiptBuffer&,length:i64) {assert(length<=self_.items.len);self_.items=self_.storage[..length];self_.len=length;}
-fn clear(self_:BoundsReceiptBuffer&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=blot_error::Error.none;}
-fn deinit(self_:BoundsReceiptBuffer&) {blot_support_pooled_buffer::deinit(self_,boundsreceiptbuffer_runs);self_.len=0;self_.failure=blot_error::Error.none;}
 struct BodyMap {count:i64=0,slots:dictionary_slot<Body,bool>[:]=default<dictionary_slot<Body,bool>[:]>(),failure:Error=blot_error::Error.none}
 reusable[] var bodymap_slots:dictionary_slot<Body,bool>[>..];
 fn contains(self_:const BodyMap&,key:Body)->bool {return blot_support_pooled_map::contains(self_,key);}

@@ -524,8 +524,8 @@ struct Principal {
     certificate_pairs: CertificatePairs? = null, version_pairs: const VersionPair[:] = default<const VersionPair[:]>(),
 }
 fn sameTypes(left: const blot_check_core::Types&, right: const blot_check_core::Types&) -> bool { return left.owner_id != 0 && left.owner_id == right.owner_id; }
-fn certificateRow(self_: Principal&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error { return certificateRowMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, left, right); }
-fn certificateRowMode<P>(self_: P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {
+fn certificateRow(self_: Principal&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error { return certificateRowMode(self_.left, self_.right, self_.remaining, self_.certificate_pairs, left, right); }
+fn certificateRowMode(left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, certificates: CertificatePairs?, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {
     { let optional_binding_27 .= certificates; if optional_binding_27 { let pairs .= optional_binding_27;
         let a = left_types.row(left); let b = right_types.row(right); var x: i64 = -1; var y: i64 = -1;
         for variable, ordinal in left_types.list(pairs.left) { if budget == 0 { return blot_error::Error.invalid_artifact; } budget -= 1; match a.tail { variable match_payload_21 => { let value = match_payload_21.value;  if value == variable { x = ordinal; } }, _ => {}, } }
@@ -539,6 +539,16 @@ fn certifiedScheme<L,R>(self_: Principal&, expected: Scheme, actual: Scheme, lef
     let error = schemeGoals(self_, expected, actual, left_goals, right_goals); self_.certificate_pairs .= null; if error != blot_error::Error.none { return error; }
     if pairs.seen_left.count() != pairs.seen_right.count() { return blot_error::Error.invalid_artifact; } return blot_error::Error.none;
 }
+// Fresh certified endpoints keep borrowed roots outside their scalar proof state.
+fn certifiedEndpoint<L,R>(left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, remaining: i64&, views: Context?, expected: Scheme, actual: Scheme, left_goals: L, right_goals: R) -> Error {
+    if expected.closed_rows.len != actual.closed_rows.len || expected.closed_rows.len > 4096 { return blot_error::Error.invalid_artifact; }
+    var endpoint = PrincipalState { left_rows: expected.closed_rows, ..};
+    var pairs = CertificatePairs { expected.closed_rows, actual.closed_rows, ..};
+    let error = schemeGoalsMode(endpoint, left_types, right_types, remaining, views, pairs, default<const VersionPair[:]>(), expected, actual, left_goals, right_goals, rejectPrincipalProjection);
+    if error != blot_error::Error.none { return error; }
+    if pairs.seen_left.count() != pairs.seen_right.count() { return blot_error::Error.invalid_artifact; }
+    return blot_error::Error.none;
+}
 fn substituted(self_: Principal&, formals: List, replacements: const Id[:], expected: Id, actual: Id) -> Error {
     if formals.len != replacements.len || formals.len > 128 { return blot_error::Error.invalid_artifact; } self_.instance = formals;
     for replacement, index in replacements { self_.witnesses[index] = replacement; } let error = validate(self_, expected, actual); self_.instance = List {..}; return error;
@@ -548,40 +558,44 @@ fn composed(self_: Principal&, formals: List, replacements: const Id[:], seconda
     for replacement, index in secondary_replacements { self_.secondary_witnesses[index] = replacement; }
     let error = substituted(self_, formals, replacements, expected, actual); self_.secondary = List {..}; return error;
 }
-fn goalEndpoints<G>(self_: Principal&, left: G, right: G) -> Error {
+fn goalEndpoints<G>(self_: Principal&, left: G, right: G) -> Error { return goalEndpointsMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, left, right, resolvePrincipalProjection); }
+fn goalEndpointsMode<P,G,F>(self_: P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], left: G, right: G) -> Error {
     if left.kind != right.kind || left.name != right.name || left.operator != right.operator || left.identity.unit != right.identity.unit || left.identity.decl != right.identity.decl { return blot_error::Error.invalid_artifact; }
     let xs: Id[4] = [left.ty, left.other, left.result, left.signature]; let ys: Id[4] = [right.ty, right.other, right.result, right.signature];
-    for x, index in xs { let y = ys[index]; if x == 0 || y == 0 { if x != y { return blot_error::Error.invalid_artifact; } } else { let error = validate(self_, x, y); if error != blot_error::Error.none { return error; } } } return blot_error::Error.none;
+    for x, index in xs { let y = ys[index]; if x == 0 || y == 0 { if x != y { return blot_error::Error.invalid_artifact; } } else { let error = validateMode(self_, left_types, right_types, budget, context, certificates, versions, x, y, F); if error != blot_error::Error.none { return error; } } } return blot_error::Error.none;
 }
-fn schemeGoals<L,R>(self_: Principal&, expected: Scheme, actual: Scheme, left_goals: L, right_goals: R) -> Error {
+fn schemeGoals<L,R>(self_: Principal&, expected: Scheme, actual: Scheme, left_goals: L, right_goals: R) -> Error { return schemeGoalsMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, expected, actual, left_goals, right_goals, resolvePrincipalProjection); }
+fn schemeGoalsMode<P,L,R,F>(self_: P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], expected: Scheme, actual: Scheme, left_goals: L, right_goals: R) -> Error {
     if left_goals.len != right_goals.len || expected.row_variables.len != actual.row_variables.len { return blot_error::Error.invalid_artifact; }
-    let left_owner = self_.left.node(expected.root); let right_owner = self_.right.node(actual.root); let paired = left_owner.tag == blot_check_types::Tag.forall && right_owner.tag == blot_check_types::Tag.forall;
+    let left_owner = left_types.node(expected.root); let right_owner = right_types.node(actual.root); let paired = left_owner.tag == blot_check_types::Tag.forall && right_owner.tag == blot_check_types::Tag.forall;
     if left_owner.tag != right_owner.tag { return blot_error::Error.invalid_artifact; }
     if paired {
-        let error = validate(self_, expected.root, actual.root); if error != blot_error::Error.none { return error; }
+        let error = validateMode(self_, left_types, right_types, budget, context, certificates, versions, expected.root, actual.root, F); if error != blot_error::Error.none { return error; }
         if left_owner.c != right_owner.c || self_.formal_count >= self_.formals.len { return blot_error::Error.invalid_artifact; }
         self_.formals[self_.formal_count] = FormalPair { List { left_owner.b, left_owner.c }, List { right_owner.b, right_owner.c , ..} , ..}; self_.formal_count += 1;
-    } else { if expected.variables.len != actual.variables.len { return blot_error::Error.invalid_artifact; } let error = instantiateScheme(self_, expected, actual.root); if error != blot_error::Error.none { return error; } }
-    let error = schemeGoalBody(self_, expected, actual, left_goals, right_goals, paired); if paired { self_.formal_count -= 1; } self_.instance = List {..}; self_.instance_rows = List {..}; return error;
+    } else { if expected.variables.len != actual.variables.len { return blot_error::Error.invalid_artifact; } let error = instantiateSchemeMode(self_, left_types, right_types, budget, context, certificates, versions, expected, actual.root, F); if error != blot_error::Error.none { return error; } }
+    let error = schemeGoalBodyMode(self_, left_types, right_types, budget, context, certificates, versions, expected, actual, left_goals, right_goals, paired, F); if paired { self_.formal_count -= 1; } self_.instance = List {..}; self_.instance_rows = List {..}; return error;
 }
-fn schemeGoalBody<L,R>(self_: Principal&, expected: Scheme, actual: Scheme, left_goals: L, right_goals: R, paired: bool) -> Error {
-    if expected.variables.len > typeLimit(self_, expected.root) || expected.row_variables.len > 128 { return blot_error::Error.invalid_artifact; }
+fn schemeGoalBody<L,R>(self_: Principal&, expected: Scheme, actual: Scheme, left_goals: L, right_goals: R, paired: bool) -> Error { return schemeGoalBodyMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, expected, actual, left_goals, right_goals, paired, resolvePrincipalProjection); }
+fn schemeGoalBodyMode<P,L,R,F>(self_: P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], expected: Scheme, actual: Scheme, left_goals: L, right_goals: R, paired: bool) -> Error {
+    if expected.variables.len > typeLimitMode(left_types, context, expected.root) || expected.row_variables.len > 128 { return blot_error::Error.invalid_artifact; }
     self_.instance = expected.variables; self_.instance_rows = expected.row_variables; if paired { self_.instance = List {..}; }
-    for left, index in left_goals { let error = goalEndpoints(self_, left, right_goals[index]); if error != blot_error::Error.none { return error; } }
+    for left, index in left_goals { let error = goalEndpointsMode(self_, left_types, right_types, budget, context, certificates, versions, left, right_goals[index], F); if error != blot_error::Error.none { return error; } }
     if paired { return blot_error::Error.none; } var variables = Bits256 {..};
     for ordinal in 0..expected.variables.len { let witness = self_.witnesses[ordinal]; if witness == 0 { continue; } var found = false;
-        for variable, index in self_.right.list(actual.variables) { if variable != witness { continue; } if variables.isSet(index) { return blot_error::Error.invalid_artifact; } variables.set(index); found = true; break; } if !found { return blot_error::Error.invalid_artifact; }
+        for variable, index in right_types.list(actual.variables) { if variable != witness { continue; } if variables.isSet(index) { return blot_error::Error.invalid_artifact; } variables.set(index); found = true; break; } if !found { return blot_error::Error.invalid_artifact; }
     }
     var rows = Bits256 {..};
-    for ordinal in 0..expected.row_variables.len { let witness = self_.scheme_row_witnesses[ordinal]; if !witness.present { continue; } let row = self_.right.row(witness.value.row);
+    for ordinal in 0..expected.row_variables.len { let witness = self_.scheme_row_witnesses[ordinal]; if !witness.present { continue; } let row = right_types.row(witness.value.row);
         if witness.value.excluded.count() != row.labels.len { return blot_error::Error.invalid_artifact; } var variable: u32 = 0;
         match row.tail { variable match_payload_19 => { let value = match_payload_19.value;  variable = value; }, _ => { return blot_error::Error.invalid_artifact; }, }
-        var found = false; for other, index in self_.right.list(actual.row_variables) { if other != variable { continue; } if rows.isSet(index) { return blot_error::Error.invalid_artifact; } rows.set(index); found = true; break; } if !found { return blot_error::Error.invalid_artifact; }
+        var found = false; for other, index in right_types.list(actual.row_variables) { if other != variable { continue; } if rows.isSet(index) { return blot_error::Error.invalid_artifact; } rows.set(index); found = true; break; } if !found { return blot_error::Error.invalid_artifact; }
     } return blot_error::Error.none;
 }
-fn sourceTypes(self_: const Principal&) -> bool { return sourceTypesMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs); }
-fn sourceTypesMode<P>(self_: const P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:]) -> bool { { let optional_binding_26 .= context; if optional_binding_26 { let views .= optional_binding_26; return views.source_instances && views.large_plain_graph;  } } return false; }
-fn typeLimit(self_: const Principal&, root: Id) -> i64 { if root >= self_.left.nodes.len { return 128; } let tag = self_.left.node(root).tag; if tag != blot_check_types::Tag.forall && tag != blot_check_types::Tag.existential && sourceTypes(self_) { return ordinary_source_type_limit; } return 128; }
+fn sourceTypes(self_: const Principal&) -> bool { return sourceTypesMode(self_.views); }
+fn sourceTypesMode(context: Context?) -> bool { { let optional_binding_26 .= context; if optional_binding_26 { let views .= optional_binding_26; return views.source_instances && views.large_plain_graph;  } } return false; }
+fn typeLimit(self_: const Principal&, root: Id) -> i64 { return typeLimitMode(self_.left, self_.views, root); }
+fn typeLimitMode(left_types: const blot_check_core::Types&, context: Context?, root: Id) -> i64 { if root >= left_types.nodes.len { return 128; } let tag = left_types.node(root).tag; if tag != blot_check_types::Tag.forall && tag != blot_check_types::Tag.existential && sourceTypesMode(context) { return ordinary_source_type_limit; } return 128; }
 fn publicArguments(self_: Principal&, variables: List, rows: List, arguments: const Id[:]) -> Error {
     var maximum: i64 = 128; if sourceTypes(self_) { maximum = ordinary_source_type_limit; }
     if arguments.len != variables.len + rows.len || self_.instance.len > maximum || self_.instance_rows.len > 128 { return blot_error::Error.invalid_artifact; }
@@ -600,14 +614,15 @@ fn publicArguments(self_: Principal&, variables: List, rows: List, arguments: co
     } return publishPending(proof);
 }
 fn rows(self_: Principal&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error { return matchRow(self_, left, right, 0); }
-fn instantiateScheme(self_: Principal&, scheme: Scheme, actual: Id) -> Error {
-    if scheme.variables.len > typeLimit(self_, scheme.root) || scheme.row_variables.len > 128 { return blot_error::Error.invalid_artifact; }
+fn instantiateScheme(self_: Principal&, scheme: Scheme, actual: Id) -> Error { return instantiateSchemeMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, scheme, actual, resolvePrincipalProjection); }
+fn instantiateSchemeMode<P,F>(self_: P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], scheme: Scheme, actual: Id) -> Error {
+    if scheme.variables.len > typeLimitMode(left_types, context, scheme.root) || scheme.row_variables.len > 128 { return blot_error::Error.invalid_artifact; }
     self_.instance = scheme.variables; self_.instance_rows = scheme.row_variables; self_.witnesses = [0; 256]; for &witness in self_.scheme_row_witnesses { witness.present = false; }
-    var endpoint = actual; let quantified_actual = self_.right.node(actual).tag == blot_check_types::Tag.forall;
-    if quantified_actual { { let optional_binding_25 .= self_.views; if optional_binding_25 { let views .= optional_binding_25; if !sameTypes(views.types, self_.right) || self_.right.node(actual).c > 128 { self_.instance = List {..}; self_.instance_rows = List {..}; return blot_error::Error.invalid_artifact; }
-        let error = enter(views, actual); if error != blot_error::Error.none { self_.instance = List {..}; self_.instance_rows = List {..}; return error; } endpoint = self_.right.node(actual).a;
+    var endpoint = actual; let quantified_actual = right_types.node(actual).tag == blot_check_types::Tag.forall;
+    if quantified_actual { { let optional_binding_25 .= context; if optional_binding_25 { let views .= optional_binding_25; if !sameTypes(views.types, right_types) || right_types.node(actual).c > 128 { self_.instance = List {..}; self_.instance_rows = List {..}; return blot_error::Error.invalid_artifact; }
+        let error = enter(views, actual); if error != blot_error::Error.none { self_.instance = List {..}; self_.instance_rows = List {..}; return error; } endpoint = right_types.node(actual).a;
      } else { self_.instance = List {..}; self_.instance_rows = List {..}; return blot_error::Error.invalid_artifact; } } }
-    let error = validate(self_, scheme.root, endpoint); if quantified_actual { { let optional_binding_24 .= self_.views; if optional_binding_24 { let views .= optional_binding_24; leave(views);  } } } self_.instance = List {..}; self_.instance_rows = List {..}; return error;
+    let error = validateMode(self_, left_types, right_types, budget, context, certificates, versions, scheme.root, endpoint, F); if quantified_actual { { let optional_binding_24 .= context; if optional_binding_24 { let views .= optional_binding_24; leave(views);  } } } self_.instance = List {..}; self_.instance_rows = List {..}; return error;
 }
 fn instantiate(self_: Principal&, owner: Id, actual: Id) -> Error { if self_.left.quantifierGoals(owner).len != 0 { return blot_error::Error.invalid_artifact; } return instantiateTypes(self_, owner, actual); }
 fn instantiateTypes(self_: Principal&, owner: Id, actual: Id) -> Error {
@@ -616,16 +631,14 @@ fn instantiateTypes(self_: Principal&, owner: Id, actual: Id) -> Error {
     self_.instance = List { quantifier.b, quantifier.c , ..}; self_.witnesses = [0; 256]; for &witness in self_.row_witnesses { witness.present = false; }
     let error = validate(self_, quantifier.a, actual); self_.instance = List {..}; return error;
 }
-fn publishPending(self_: Principal&) -> Error { return publishPendingMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs); }
-fn publishPendingMode<P>(self_: P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:]) -> Error { { let optional_binding_23 .= context; if optional_binding_23 { let views .= optional_binding_23; for index in 0..self_.pending_count { let row = self_.pending[index]; let error = views.closed_rows.set(row); if error != blot_error::Error.none { return error; } if views.types.row(row).labels.len == 0 { let error = views.pure_rows.set(row); if error != blot_error::Error.none { return error; } } }  } } return blot_error::Error.none; }
-recursive fn validate(self_: Principal&, left: Id, right: Id) -> Error { self_.pending_count = 0; let error = matchPrincipal(self_, left, right, 0); if error != blot_error::Error.none { return error; } return publishPending(self_); }
+fn publishPending(self_: Principal&) -> Error { return publishPendingMode(self_, self_.views); }
+fn publishPendingMode<P>(self_: P&, context: Context?) -> Error { { let optional_binding_23 .= context; if optional_binding_23 { let views .= optional_binding_23; for index in 0..self_.pending_count { let row = self_.pending[index]; let error = views.closed_rows.set(row); if error != blot_error::Error.none { return error; } if views.types.row(row).labels.len == 0 { let error = views.pure_rows.set(row); if error != blot_error::Error.none { return error; } } }  } } return blot_error::Error.none; }
+recursive fn validate(self_: Principal&, left: Id, right: Id) -> Error { return validateMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, left, right, resolvePrincipalProjection); }
+recursive fn validateMode<P,F>(self_: P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], left: Id, right: Id) -> Error { self_.pending_count = 0; let error = matchPrincipalMode(self_, left_types, right_types, budget, context, certificates, versions, left, right, 0, F); if error != blot_error::Error.none { return error; } return publishPendingMode(self_, context); }
 // A fresh endpoint has no projection resolver; its static policy excludes that backedge.
 fn validateEndpoint(types: const blot_check_core::Types&, remaining: i64&, views: Context?, left: Id, right: Id) -> Error {
     var endpoint = PrincipalState {..};
-    endpoint.pending_count = 0;
-    let error = matchPrincipalMode(endpoint, types, types, remaining, views, null, default<const VersionPair[:]>(), left, right, 0, rejectPrincipalProjection);
-    if error != blot_error::Error.none { return error; }
-    return publishPendingMode(endpoint, types, types, remaining, views, null, default<const VersionPair[:]>());
+    return validateMode(endpoint, types, types, remaining, views, null, default<const VersionPair[:]>(), left, right, rejectPrincipalProjection);
 }
 recursive fn resolvePrincipalProjection(self_: Principal&, left: Id, right: Id) -> Error {
     { let resolver .= self_.projection_resolver; if resolver {
@@ -640,13 +653,13 @@ recursive fn resolvePrincipalProjection(self_: Principal&, left: Id, right: Id) 
 fn rejectPrincipalProjection<P>(self_: P&, left: Id, right: Id) -> Error { return blot_error::Error.invalid_artifact; }
 
 fn hasVariable(types: const blot_check_core::Types&, variables: List, sought: u32) -> bool { for variable in types.list(variables) { if variable == sought { return true; } } return false; }
-fn rowPure(self_: const Principal&, types: const blot_check_core::Types&, row: blot_check_effects::Id) -> bool { return rowPureMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, types, row); }
-fn rowPureMode<P>(self_: const P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], types: const blot_check_core::Types&, row: blot_check_effects::Id) -> bool {
+fn rowPure(self_: const Principal&, types: const blot_check_core::Types&, row: blot_check_effects::Id) -> bool { return rowPureMode(self_, self_.left, self_.views, types, row); }
+fn rowPureMode<P>(self_: const P&, left_types: const blot_check_core::Types&, context: Context?, types: const blot_check_core::Types&, row: blot_check_effects::Id) -> bool {
     if sameTypes(types, left_types) && row < types.effects.rows.len { let value = types.row(row); if value.labels.len == 0 { match value.tail { variable match_payload_18 => { let value = match_payload_18.value;  if hasVariable(types, self_.left_rows, value) { return true; } }, _ => {}, } } }
     { let optional_binding_22 .= context; if optional_binding_22 { let views .= optional_binding_22; if sameTypes(views.types, types) { return views.isPure(row); }  } } return pure(types, row);
 }
-fn rowForeign(self_: const Principal&, types: const blot_check_core::Types&, id: blot_check_effects::Id) -> bool { return rowForeignMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, types, id); }
-fn rowForeignMode<P>(self_: const P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], types: const blot_check_core::Types&, id: blot_check_effects::Id) -> bool {
+fn rowForeign(self_: const Principal&, types: const blot_check_core::Types&, id: blot_check_effects::Id) -> bool { return rowForeignMode(self_, self_.left, self_.views, types, id); }
+fn rowForeignMode<P>(self_: const P&, left_types: const blot_check_core::Types&, context: Context?, types: const blot_check_core::Types&, id: blot_check_effects::Id) -> bool {
     if foreign(types, id) { return true; } { let optional_binding_21 .= context; if optional_binding_21 { let views .= optional_binding_21; if sameTypes(views.types, types) && views.isForeign(id) { return true; }  } }
     if !sameTypes(types, left_types) || id >= types.effects.rows.len { return false; } let row = types.row(id); if row.labels.len == 0 { return false; }
     match row.tail { variable match_payload_17 => { let value = match_payload_17.value;  if !hasVariable(types, self_.left_rows, value) { return false; } }, _ => { return false; }, }
@@ -662,8 +675,8 @@ recursive fn operationMode<P,F>(self_: P&, left_types: const blot_check_core::Ty
     let xs, error = span(left_types, a.arguments); if error != blot_error::Error.none { return error; } let ys, error = span(right_types, b.arguments); if error != blot_error::Error.none { return error; }
     for x, index in xs { let error = matchPrincipalMode(self_, left_types, right_types, budget, context, certificates, versions, x, ys[index], depth + 1, F); if error != blot_error::Error.none { return error; } } return blot_error::Error.none;
 }
-fn closedRow(self_: Principal&, types: const blot_check_core::Types&, id: blot_check_effects::Id) -> bool { return closedRowMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, types, id); }
-fn closedRowMode<P>(self_: P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], types: const blot_check_core::Types&, id: blot_check_effects::Id) -> bool {
+fn closedRow(self_: Principal&, types: const blot_check_core::Types&, id: blot_check_effects::Id) -> bool { return closedRowMode(self_, self_.left, self_.views, types, id); }
+fn closedRowMode<P>(self_: P&, left_types: const blot_check_core::Types&, context: Context?, types: const blot_check_core::Types&, id: blot_check_effects::Id) -> bool {
     if id >= types.effects.rows.len { return false; } let row = types.row(id); if row.tail == blot_check_effects::Tail.closed { return true; }
     { let optional_binding_20 .= context; if optional_binding_20 { let views .= optional_binding_20; if sameTypes(views.types, types) && views.closed_rows.contains(id) { return true; }  } }
     if sameTypes(types, left_types) { match row.tail { variable match_payload_16 => { let value = match_payload_16.value;  return hasVariable(types, self_.left_rows, value); }, _ => {}, } } return false;
@@ -695,8 +708,8 @@ recursive fn searchRowLabelsMode<P,F>(self_: P&, left_types: const blot_check_co
     } return blot_error::Error.invalid_artifact;
 }
 fn mergePending<P,Q>(self_: P&, proof: const Q&) -> Error { if self_.pending_count + proof.pending_count > self_.pending.len { return blot_error::Error.invalid_artifact; } for index in 0..proof.pending_count { self_.pending[self_.pending_count + index] = proof.pending[index]; } self_.pending_count += proof.pending_count; return blot_error::Error.none; }
-recursive fn rowWitness(self_: Principal&, prior: blot_support::Option<RowWitness>&, right: blot_check_effects::Id, used: Bits256, depth: i64) -> Error { return rowWitnessMode(self_, self_.left, self_.right, self_.remaining, self_.views, self_.certificate_pairs, self_.version_pairs, prior, right, used, depth); }
-recursive fn rowWitnessMode<P>(self_: P&, left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, certificates: CertificatePairs?, versions: const VersionPair[:], prior: blot_support::Option<RowWitness>&, right: blot_check_effects::Id, used: Bits256, depth: i64) -> Error {
+recursive fn rowWitness(self_: Principal&, prior: blot_support::Option<RowWitness>&, right: blot_check_effects::Id, used: Bits256, depth: i64) -> Error { return rowWitnessMode(self_, self_.right, self_.remaining, self_.views, prior, right, used, depth); }
+recursive fn rowWitnessMode<P>(self_: P&, right_types: const blot_check_core::Types&, budget: i64&, context: Context?, prior: blot_support::Option<RowWitness>&, right: blot_check_effects::Id, used: Bits256, depth: i64) -> Error {
     if prior.present { var proof = PrincipalState {..}; let error = structuredRowMode(proof, right_types, right_types, budget, context, null, default<const VersionPair[:]>(), prior.value.row, right, prior.value.excluded, used, false, depth + 1, rejectPrincipalProjection); if error != blot_error::Error.none { return error; } return mergePending(self_, proof); }
     prior = blot_support::Option<RowWitness> { true, RowWitness { right, used , ..} , ..}; return blot_error::Error.none;
 }
@@ -705,16 +718,16 @@ recursive fn rowTailMode<P,F>(self_: P&, left_types: const blot_check_core::Type
     let a = left_types.row(left); let b = right_types.row(right); let ys = right_types.rowLabels(right);
     if !subset {
         match a.tail {
-            variable match_payload_14 => { let value = match_payload_14.value;  if self_.instance_rows.len != 0 { let variables, error = span(left_types, self_.instance_rows); if error != blot_error::Error.none { return error; } for variable, ordinal in variables { if variable == value { return rowWitnessMode(self_, left_types, right_types, budget, context, certificates, versions, self_.scheme_row_witnesses[ordinal], right, used, depth); } } } },
-            formal match_payload_15 => { let value = match_payload_15.value;  if self_.instance.len != 0 { let binders, error = span(left_types, self_.instance); if error != blot_error::Error.none { return error; } for binder, ordinal in binders { if binder != value { continue; } let node = left_types.node(binder); if node.tag != blot_check_types::Tag.bound || node.b != 1 || ordinal >= self_.row_witnesses.len { return blot_error::Error.invalid_artifact; } return rowWitnessMode(self_, left_types, right_types, budget, context, certificates, versions, self_.row_witnesses[ordinal], right, used, depth); } } },
+            variable match_payload_14 => { let value = match_payload_14.value;  if self_.instance_rows.len != 0 { let variables, error = span(left_types, self_.instance_rows); if error != blot_error::Error.none { return error; } for variable, ordinal in variables { if variable == value { return rowWitnessMode(self_, right_types, budget, context, self_.scheme_row_witnesses[ordinal], right, used, depth); } } } },
+            formal match_payload_15 => { let value = match_payload_15.value;  if self_.instance.len != 0 { let binders, error = span(left_types, self_.instance); if error != blot_error::Error.none { return error; } for binder, ordinal in binders { if binder != value { continue; } let node = left_types.node(binder); if node.tag != blot_check_types::Tag.bound || node.b != 1 || ordinal >= self_.row_witnesses.len { return blot_error::Error.invalid_artifact; } return rowWitnessMode(self_, right_types, budget, context, self_.row_witnesses[ordinal], right, used, depth); } } },
             _ => {},
         }
     }
     match a.tail {
         formal match_payload_13 => { let value = match_payload_13.value;  match b.tail { formal match_payload_12 => { let other = match_payload_12.value;  let error = matchPrincipalMode(self_, left_types, right_types, budget, context, certificates, versions, value, other, depth + 1, F); if error != blot_error::Error.none { return error; } }, _ => { return blot_error::Error.invalid_artifact; }, } },
         _ => { if !subset || a.tail != blot_check_effects::Tail.closed {
-            if !(closedRowMode(self_, left_types, right_types, budget, context, certificates, versions, left_types, left) && closedRowMode(self_, left_types, right_types, budget, context, certificates, versions, right_types, right)) && !blot_structural::equal(a.tail, b.tail) {
-                { let optional_binding_16 .= context; if optional_binding_16 { let views .= optional_binding_16; if subset || !closedRowMode(self_, left_types, right_types, budget, context, certificates, versions, left_types, left) || !sameTypes(views.types, right_types) { return blot_error::Error.invalid_artifact; }
+            if !(closedRowMode(self_, left_types, context, left_types, left) && closedRowMode(self_, left_types, context, right_types, right)) && !blot_structural::equal(a.tail, b.tail) {
+                { let optional_binding_16 .= context; if optional_binding_16 { let views .= optional_binding_16; if subset || !closedRowMode(self_, left_types, context, left_types, left) || !sameTypes(views.types, right_types) { return blot_error::Error.invalid_artifact; }
                     match b.tail { variable match_payload_11 => { let value = match_payload_11.value; }, _ => { return blot_error::Error.invalid_artifact; }, }
                     if self_.pending_count >= self_.pending.len { return blot_error::Error.invalid_artifact; } self_.pending[self_.pending_count] = right; self_.pending_count += 1;
                  } else { return blot_error::Error.invalid_artifact; } }
@@ -733,7 +746,7 @@ recursive fn matchRowMode<P,F>(self_: P&, left_types: const blot_check_core::Typ
         var variable = false; match solver.store.effects.node(l).tail { variable match_payload_10 => { let value = match_payload_10.value;  variable = true; }, _ => {}, } match solver.store.effects.node(r).tail { variable match_payload_9 => { let value = match_payload_9.value;  variable = true; }, _ => {}, }
         if variable { let error = solver.rows(l, r); if error != blot_error::Error.none { return solver.readerError(error); } return blot_error::Error.none; }
     }  } }  } }
-    let error = certificateRowMode(self_, left_types, right_types, budget, context, certificates, versions, left, right); if error != blot_error::Error.none { return error; }
+    let error = certificateRowMode(left_types, right_types, budget, certificates, left, right); if error != blot_error::Error.none { return error; }
     if left < left_types.effects.rows.len { let source = left_types.row(left); match source.tail { variable match_payload_8 => { let value = match_payload_8.value;  if hasVariable(left_types, self_.instance_rows, value) { return structuredRowMode(self_, left_types, right_types, budget, context, certificates, versions, left, right, Bits256 {..}, Bits256 {..}, false, depth + 1, F); } }, _ => {}, } }
     if left < left_types.effects.rows.len && right < right_types.effects.rows.len {
         let a = left_types.row(left); let b = right_types.row(right);
@@ -743,10 +756,10 @@ recursive fn matchRowMode<P,F>(self_: P&, left_types: const blot_check_core::Typ
                 { let optional_binding_13 .= context; if optional_binding_13 { let views .= optional_binding_13; if sameTypes(views.types, left_types) && views.isPure(right) {
                     if views.isPure(left) { return blot_error::Error.none; } if self_.pending_count >= self_.pending.len { return blot_error::Error.invalid_artifact; } self_.pending[self_.pending_count] = left; self_.pending_count += 1; return blot_error::Error.none;
                 }  } }
-                if !rowPureMode(self_, left_types, right_types, budget, context, certificates, versions, left_types, left) { return blot_error::Error.none; }
+                if !rowPureMode(self_, left_types, context, left_types, left) { return blot_error::Error.none; }
             }, _ => {}, }
         }
-        if self_.foreign_views && rowPureMode(self_, left_types, right_types, budget, context, certificates, versions, left_types, left) {
+        if self_.foreign_views && rowPureMode(self_, left_types, context, left_types, left) {
             match b.tail { formal match_payload_6 => { let value = match_payload_6.value;
                 { let optional_binding_12 .= context; if optional_binding_12 { let views .= optional_binding_12; if !sameTypes(views.types, right_types) { return blot_error::Error.invalid_artifact; } let leaf = right_types.node(value);
                     if leaf.tag == blot_check_types::Tag.rigid { { let optional_binding_11 .= views.solver; if optional_binding_11 { let solver .= optional_binding_11; if !solver.ownsRigid(leaf) || leaf.c != 1 { return blot_error::Error.invalid_artifact; }  } else { return blot_error::Error.invalid_artifact; } } }
@@ -758,9 +771,9 @@ recursive fn matchRowMode<P,F>(self_: P&, left_types: const blot_check_core::Typ
         var a_formal = false; var b_formal = false; var a_variable = false;
         match a.tail { formal match_payload_4 => { let value = match_payload_4.value;  a_formal = true; }, variable match_payload_5 => { let value = match_payload_5.value;  a_variable = true; }, _ => {}, }
         match b.tail { formal match_payload_3 => { let value = match_payload_3.value;  b_formal = true; }, _ => {}, }
-        if generic_row || a_formal || b_formal || (a_variable && self_.instance_rows.len != 0) || (a.labels.len != 0 && (b.tail != blot_check_effects::Tail.closed || !rowForeignMode(self_, left_types, right_types, budget, context, certificates, versions, left_types, left))) {
-            var subset = self_.foreign_views && closedRowMode(self_, left_types, right_types, budget, context, certificates, versions, left_types, left);
-            if subset && rowForeignMode(self_, left_types, right_types, budget, context, certificates, versions, left_types, left) { match b.tail { variable match_payload_2 => { let value = match_payload_2.value;
+        if generic_row || a_formal || b_formal || (a_variable && self_.instance_rows.len != 0) || (a.labels.len != 0 && (b.tail != blot_check_effects::Tail.closed || !rowForeignMode(self_, left_types, context, left_types, left))) {
+            var subset = self_.foreign_views && closedRowMode(self_, left_types, context, left_types, left);
+            if subset && rowForeignMode(self_, left_types, context, left_types, left) { match b.tail { variable match_payload_2 => { let value = match_payload_2.value;
                 { let optional_binding_9 .= context; if optional_binding_9 { let views .= optional_binding_9; if !sameTypes(views.types, right_types) || value >= right_types.effects.variable_count { return blot_error::Error.invalid_artifact; }
                     let owned, error = views.ownsRow(value); if error != blot_error::Error.none { return error; }
                     if !owned { var exact = a.labels.len == b.labels.len; for label in right_types.rowLabels(right) { if budget == 0 { return blot_error::Error.invalid_artifact; } budget -= 1; if label != blot_check_types::foreign_operation { exact = false; } } if exact { subset = false; } }
@@ -769,9 +782,9 @@ recursive fn matchRowMode<P,F>(self_: P&, left_types: const blot_check_core::Typ
             return structuredRowMode(self_, left_types, right_types, budget, context, certificates, versions, left, right, Bits256 {..}, Bits256 {..}, subset, depth + 1, F);
         }
     }
-    if rowForeignMode(self_, left_types, right_types, budget, context, certificates, versions, left_types, left) { if !rowForeignMode(self_, left_types, right_types, budget, context, certificates, versions, right_types, right) || left_types.row(left).labels.len != right_types.row(right).labels.len { return blot_error::Error.invalid_artifact; } return blot_error::Error.none; }
-    if !rowPureMode(self_, left_types, right_types, budget, context, certificates, versions, left_types, left) { return blot_error::Error.invalid_artifact; }
-    if self_.foreign_views && rowForeignMode(self_, left_types, right_types, budget, context, certificates, versions, right_types, right) { return blot_error::Error.none; } if rowPureMode(self_, left_types, right_types, budget, context, certificates, versions, right_types, right) { return blot_error::Error.none; }
+    if rowForeignMode(self_, left_types, context, left_types, left) { if !rowForeignMode(self_, left_types, context, right_types, right) || left_types.row(left).labels.len != right_types.row(right).labels.len { return blot_error::Error.invalid_artifact; } return blot_error::Error.none; }
+    if !rowPureMode(self_, left_types, context, left_types, left) { return blot_error::Error.invalid_artifact; }
+    if self_.foreign_views && rowForeignMode(self_, left_types, context, right_types, right) { return blot_error::Error.none; } if rowPureMode(self_, left_types, context, right_types, right) { return blot_error::Error.none; }
     if self_.foreign_views && right_types.row(right).labels.len != 0 { { let optional_binding_8 .= context; if optional_binding_8 { let views .= optional_binding_8; if !sameTypes(views.types, right_types) { return blot_error::Error.invalid_artifact; } return views.validateRow(right, depth + 1);  } } return blot_error::Error.invalid_artifact; }
     { let optional_binding_7 .= context; if optional_binding_7 { let views .= optional_binding_7;
         if !sameTypes(views.types, right_types) || right >= right_types.effects.rows.len { return blot_error::Error.invalid_artifact; } let actual = right_types.row(right);
@@ -806,7 +819,7 @@ recursive fn matchPrincipalMode<P,F>(self_: P&, left_types: const blot_check_cor
     let a = left_types.node(left); let b = right_types.node(right);
     if (a.tag == blot_check_types::Tag.variable || (a.tag == blot_check_types::Tag.bound && a.c == 0)) && self_.instance.len != 0 {
         let binders, error = span(left_types, self_.instance); if error != blot_error::Error.none { return error; }
-        for binder, ordinal in binders { if binder != left { continue; } var maximum: i64 = ordinary_source_type_limit; if a.tag == blot_check_types::Tag.bound || !sourceTypesMode(self_, left_types, right_types, budget, context, certificates, versions) { maximum = 128; } if ordinal >= maximum { return blot_error::Error.invalid_artifact; }
+        for binder, ordinal in binders { if binder != left { continue; } var maximum: i64 = ordinary_source_type_limit; if a.tag == blot_check_types::Tag.bound || !sourceTypesMode(context) { maximum = 128; } if ordinal >= maximum { return blot_error::Error.invalid_artifact; }
             if a.tag == blot_check_types::Tag.bound {
                 if a.b == 0 { var work = blot_check_usage_check::Work { remaining: budget , ..}; let contains, error = blot_check_usage_check::containsNominalWork(right_types, default<const blot_check_core::Nominal[:]>(), right, work); budget = work.remaining; if error != blot_error::Error.none || contains { return blot_error::Error.invalid_artifact; } }
                 else if a.b != 2 || b.tag != blot_check_types::Tag.bound || b.b != 2 { return blot_error::Error.invalid_artifact; }

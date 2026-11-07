@@ -149,7 +149,7 @@ fn validateWithBudget(module: const Module&,context: Context,remaining: i64&) ->
 fn validateBatchWithBudget(module: const Module&,context: Context,remaining: i64&,batch: const Batch?) -> Error {
     { let propagated_error = validateBounds(module,context); if propagated_error != blot_error::Error.none { return propagated_error; } } let graph,error=initGraph(module); { let propagated_error = error; if propagated_error != blot_error::Error.none { return propagated_error; } } let needed,requirements_error=scratchRequirements(module); { let propagated_error = requirements_error; if propagated_error != blot_error::Error.none { return propagated_error; } }
     let scratch=Scratch{validation_colors.alloc_slice(needed.colors),validation_path.alloc_slice(needed.path), ..};
-    var equations=blot_check_scheme_equations::initWorkspace(blot_check_scheme_equations::WorkspaceTables{..});
+    var equations=blot_check_scheme_equations::initWorkspace();
     let failure=validateAllocated(graph,context,scratch,remaining,batch,equations); equations.deinit(); releaseScratch(scratch); return failure;
 }
 fn validateAllocated(graph: Graph,context: Context,scratch: Scratch,remaining: i64&,batch: const Batch?,equations: blot_check_scheme_equations::Workspace&) -> Error {

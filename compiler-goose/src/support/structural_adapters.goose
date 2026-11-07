@@ -3000,16 +3000,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::BodyBuffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::BodyMap)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::BodyMap) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::BoundsReceipt)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::BoundsReceipt) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::BoundsReceiptBuffer)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::BoundsReceiptBuffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::GoalMap)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::GoalMap) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::IdMap)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::IdMap) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::ModuleBuffer)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::ModuleBuffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::SharedAuthority)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::SharedAuthority) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::SharedGoal)->bool {return equalFields(left,right);}
@@ -3030,8 +3024,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::SourceRowsBuffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::Workspace)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::Workspace) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_equations::WorkspaceTables)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_equations::WorkspaceTables) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_scheme_projection::Resolver)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_scheme_projection::Resolver) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_solver_worklist::Entry)->bool {return equalFields(left,right);}

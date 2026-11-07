@@ -4,11 +4,11 @@ The user explicitly requested fixing and recompiling the port. Verification is
 active; there is no remaining approval or source-writing barrier. Keep the Zig
 compiler, normal toolchain, saved oracle and siblings unchanged.
 
-Checkpoint `25a8da6b6f32d48bf2a11f096d2e5e9f334614a7` is pushed to main. It preserves
-unification scratch and mutable rank-state repairs; no successful whole compiler
-executable exists yet.
-Upstream Goose parses roughly 35,700 declarations across 435 files in about
-1.1 seconds. Whole-program type checking has not completed successfully.
+Checkpoint `bd7e5ac93d423a860e03e00891a2269ca7752225` is pushed to main. It preserves
+scalar projection/staging state and unification scratch repairs. No successful
+whole compiler executable exists yet. Upstream Goose parses roughly 35,800
+declarations across 436 files in about one second. Whole-program type checking
+has not completed successfully.
 
 Use `python3 compiler-goose/tools/check_source.py --phase check --log NAME`.
 The runner caps and kills the process group and saves full diagnostics under
@@ -17,11 +17,13 @@ JSON diagnostics buffer until completion and hid errors in capped runs.
 Check mode stops the process group after the first error. The later source
 frontier now takes about 60–65 seconds to reach; current checks use a bounded
 90-second cap. A no-error timeout is not a pass. Exactly one coordinator runs
-whole-program checks. Checker currently owns package admission's owner-ID cache
-frontier after staging variable ranges and row frames (check128).
+whole-program checks. The coordinator now runs actual C-emission/link attempts
+with first-error interruption, saving `build-N.log`, `build-N.json` and the exact
+source/toolchain manifest under the same evidence directory.
 
 The actual build entry remains `compiler-goose/build.py`, with explicit Goose
-binary, standard-library directory and 30-second stage caps. Do not claim a
+binary and standard-library directory. Repair attempts currently use a bounded
+90-second stage cap; the default remains 30 seconds. Do not claim a
 working compiler until C emission, linking and execution have succeeded.
 
 The official repair loop has advanced through solver, projection and staging
@@ -31,7 +33,9 @@ policies preserve real projection behavior. Staging variables use their original
 same-module graph ranges; scalar row/scope frames preserve parent lifetimes,
 charges and cleanup. Astra's static comparisons found no introduced regression;
 these are not runtime qualification. Whole-program parsing passes in about one
-second. The new scalar admission representation remains under implementation.
+second. Admission and successful-module receipts use scalar owner IDs; source
+row/definition indexes retain their existing nonzero identity predicate and
+snapshot leases without keeping whole borrowed Module headers.
 Scoped tests pass for lexer, interning, graph
 SCCs, arena ownership, byte/hash/JSON helpers, maps and buffers, wire/IR emission,
 native JSON and WGSL fixtures. A fresh exact C-host startup probe passes with
@@ -86,6 +90,42 @@ The hot composite cache now accesses its canonical generation-checked state
 directly. Baseline/candidate focused execution laws match, including snapshots,
 aliases and reuse; both take about 0.15 seconds. This has no demonstrated whole
 compile-time win (both whole attempts hit their caps). Keep that distinction.
+
+The optional bounds-result cache was removed after check131 rejected keeping
+caller-owned Module headers in a global metadata pool. An ID-only replacement
+would weaken the current port's structural context guard; mutable header copies
+do not have an enforced revision identity. Bounds checks now run directly, with
+the same local work cap and no caller-fuel or diagnostic changes. Repeated usage
+walks can add transient pooled allocations, failure opportunities and runtime
+cost. Those differences require measurement after a runnable compiler exists.
+
+Fresh certified-scheme comparisons use scalar PrincipalState and explicit roots;
+existing Principal layout/API and normalized comparison bodies remain unchanged.
+Build133 stopped at a precise local Views lifetime error after 62.479 seconds.
+The setup now lives in a helper that returns only Error after the recursive
+admission call, preserving its ordering and direct budget borrow. Hoisting the
+pure Walker constructor advanced the next attempt to the indexed-row lookup;
+that lookup now passes each slice directly instead of rebinding across roots.
+Nine reassigned reference bindings are mutable. Four affected helpers have
+verified identical token streams after formatting.
+
+Build138 hit its 120-second cap without a diagnostic or C output: incomplete.
+Frozen profile139 (snapshot `92c2dfb06c98ed50a9f0514b9bd6024848bdbca12d3f2bf3ca662e1a38db7bde`)
+shows schemeGoalBodyMode at 90 seconds and projectionGoals at 110 seconds, both
+under RootCandidates/store-summary application. The checker is progressing;
+these samples do not show completed checking or code generation. Eight small
+Mode helpers now omit unused inputs: 29 calls pass 122 fewer borrowed roots.
+Token normalization preserves all other helper logic; parsing passes. The
+compile-time effect remains unmeasured. Full C output, linking and executed
+compiler/Wasm smoke tests remain pending.
+
+The unchanged Zig oracle's full gate was rerun with a 120-second total cap
+(`build/goose-port/oracle-gate-139/timings.json`). Smoke, harness, release build
+and the complete no-LLVM native compilation pass; execution stops on the budget
+after 60 native passes and 30 completed full allocation sweeps. No failing law
+was emitted, but the full gate remains incomplete. Both tracked Goose engine
+execution laws pass in 0.304/0.239 seconds. Neither result qualifies the full
+Goose compiler.
 
 Runtime recoverable physical OOM and retention parity remain separate known
 production requirements; null/unavailable metrics do not close them.
