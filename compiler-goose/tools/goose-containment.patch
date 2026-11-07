@@ -1,6 +1,6 @@
 --- a/src/type_queries.h
 +++ b/src/type_queries.h
-@@ -58,0 +59,83 @@
+@@ -58,0 +59,93 @@
 +// CanContain observes type identity and by-value fields, never a referent's
 +// fields. This gate is deliberately separate from full reachability queries.
 +// As in StableTypeGraph, no walk constructs, resolves or validates a type.
@@ -33,7 +33,7 @@
 +            return true;
 +        seen.push_back(t);
 +        auto all = [&](const vector<TypeExpr *> &ts) {
-+            for (auto x : ts) if (x && !IdentityVisit(x, seen)) return false;
++            for (auto x : ts) if (!x || !IdentityVisit(x, seen)) return false;
 +            return true;
 +        };
 +        switch (t->kind) {
@@ -49,12 +49,16 @@
 +                if (t->arr->sizeexpr && t->arr->size < 0) return false;
 +                return IdentityVisit(t->arr->sub, seen);
 +            case TY_STRUCT: {
-+                auto i = t->struc->inst;
-+                return i && i->validated && !i->failed && all(t->struc->args);
++                // Nominal equality observes the declaration and closed args,
++                // not this node's lazily attached instance cache.
++                auto s = t->struc->st;
++                return s && !s->unknown && !s->broken &&
++                       t->struc->args.size() == s->generics.size() && all(t->struc->args);
 +            }
 +            case TY_ENUM: {
-+                auto i = t->enu->inst;
-+                return i && i->validated && !i->failed && all(t->enu->args);
++                auto e = t->enu->en;
++                return e && !e->broken && t->enu->args.size() == e->generics.size() &&
++                       all(t->enu->args);
 +            }
 +            case TY_VARIANT:
 +                return t->var->variant && IdentityVisit(t->var->adt, seen);
@@ -73,10 +77,16 @@
 +        };
 +        switch (t->kind) {
 +            case TY_ARRAY: return Visit(t->arr->sub, seen);
-+            case TY_STRUCT: return all(t->struc->inst->ftypes);
-+            case TY_ENUM:
-+                for (auto &fs : t->enu->inst->vftypes) if (!all(fs)) return false;
++            case TY_STRUCT: {
++                auto i = t->struc->inst;
++                return i && i->validated && !i->failed && all(i->ftypes);
++            }
++            case TY_ENUM: {
++                auto i = t->enu->inst;
++                if (!i || !i->validated || i->failed) return false;
++                for (auto &fs : i->vftypes) if (!all(fs)) return false;
 +                return true;
++            }
 +            // More conservative than the query: require every variant's fields.
 +            case TY_VARIANT: return Visit(t->var->adt, seen);
 +            default: return true; // Identity proved primitives and view identities.

@@ -1,0 +1,393 @@
+{
+  "qualification": "private checker acceptance for port iteration, not whole Goose compiler qualification",
+  "reason": "closed nominal identity is independent of per-node instance attachment; by-value field traversal still requires validated, nonfailed instances",
+  "candidate": {
+    "authorization": "one bounded nominal identity refinement trial after actual counts, mutation audit and laws; not adoption",
+    "original_binary_sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7",
+    "original_source_sha256": "e286156f62346c01d91f1c417e7bc742bb5d8e2260bd4250d90902b723bb5586",
+    "source_files": 108,
+    "patch_sha256": "dedb2edc22c05976d0418252a3a176db9c1083b0ed89ef07c54ed9bd16ef5d8c",
+    "installed_binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+    "cxx_version": "clang version 23.1.4\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "cxx_sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
+    "link_inputs": {
+      "/home/jacobt/src/goose-to-wasm/build/native/CMakeFiles/goose.dir/src/process.cpp.o": "165aacdf7efbc42d53bdc4a0730cc5fbe2934f88141f4604a35355f568a78eb9",
+      "/home/jacobt/src/goose-to-wasm/build/native/CMakeFiles/goose.dir/src/progress.cpp.o": "17604e2ab092d3ed6ff1623848f662825a6602d7f55f6cb529cbf8430635d18f",
+      "/home/jacobt/src/goose-to-wasm/build/native/libgoose_shaderc.a": "b92edef61cfa6822388552bac58347b2510c76d64ae6ca89f85028522989e259",
+      "/home/jacobt/src/goose-to-wasm/build/native/libtcc.a": "25bf43b5098e259167e87d565ee1a77c170d8b26291b6e98ad260e2d94fe7d55"
+    },
+    "resource_inputs": {
+      "/home/jacobt/src/goose-to-wasm/build/native/generated": "e9c56aed9a3c4484478986e77258b149c97e05fdbfd350d0d39d1f59cf615c60",
+      "/home/jacobt/src/goose-to-wasm/build/native/tcc/api": "9df20384121bf60f5bfc00905d35324becd41692bc25d0b1b30c1c4e92f1a04e",
+      "/home/jacobt/src/goose-to-wasm/build/native/tcclib": "642782bf4a16d2e75b8692e79828c73fff7118c40ce91d297f527f9c2b0946a5",
+      "/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess": "1608874d188b73ca2a811b054a44f7c6dd2ae0643e061f84d5d14d6c9da48cd3"
+    },
+    "stages": [
+      {
+        "stage": "patch",
+        "command": [
+          "patch",
+          "--batch",
+          "--forward",
+          "--fuzz=0",
+          "-p1",
+          "-d",
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/source",
+          "-i",
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/candidate.patch"
+        ],
+        "cap_seconds": 5,
+        "exit": 0,
+        "seconds": 0.015829344003577717
+      },
+      {
+        "stage": "compile",
+        "command": [
+          "/usr/bin/clang++",
+          "-O3",
+          "-DNDEBUG",
+          "-std=gnu++20",
+          "-Wall",
+          "-Wextra",
+          "-Wno-missing-field-initializers",
+          "-DGOOSE_TCC_LIB_PATH=\"/home/jacobt/src/goose-to-wasm/build/native/tcclib\"",
+          "-I/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess",
+          "-I/home/jacobt/src/goose-to-wasm/build/native/generated",
+          "-isystem",
+          "/home/jacobt/src/goose-to-wasm/build/native/tcc/api",
+          "-c",
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/source/src/main.cpp",
+          "-o",
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/main.cpp.o"
+        ],
+        "cap_seconds": 90,
+        "exit": 0,
+        "seconds": 65.98418277400197
+      },
+      {
+        "stage": "link",
+        "command": [
+          "/usr/bin/clang++",
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/main.cpp.o",
+          "/home/jacobt/src/goose-to-wasm/build/native/CMakeFiles/goose.dir/src/process.cpp.o",
+          "/home/jacobt/src/goose-to-wasm/build/native/CMakeFiles/goose.dir/src/progress.cpp.o",
+          "/home/jacobt/src/goose-to-wasm/build/native/libgoose_shaderc.a",
+          "/home/jacobt/src/goose-to-wasm/build/native/libtcc.a",
+          "-ldl",
+          "-lm",
+          "-o",
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose"
+        ],
+        "cap_seconds": 15,
+        "exit": 0,
+        "seconds": 0.2641612699953839
+      }
+    ],
+    "complete": true,
+    "candidate_source_sha256": "77fa5568e94a7c1fc08d94fb946ea4d6afc9b1005d01114ca8a823761909983b",
+    "candidate_header_sha256": "b208f80b37381846b15c5070b7740e365c746da726b1bff183a29aff4e61a7b0",
+    "originals_unchanged": true,
+    "link_inputs_unchanged": true,
+    "resource_inputs_unchanged": true,
+    "binary_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+    "qualification": {
+      "actual_ast_laws": 53,
+      "ordinary_graph_cases": 178,
+      "frontend_exact": 201,
+      "runtime_exact": 8,
+      "macro": "accepted: three pairs,37.380percent median first-diagnostic gain",
+      "baseline_retained": false,
+      "original_baseline_preserved": true
+    },
+    "adoption": {
+      "decision": "accepted for private port iteration",
+      "scope": "first diagnostic latency on one frozen failing prefix; not completed compiler timing",
+      "source_sha256": "34552df56f4fc04a27803981f9e39a65e55f394b6ce85163c5714dccbeb9a37e",
+      "stdlib_sha256": "46df43caee7d394ff0cd10c118a5a500e8afe61a2cdb30682d8c183a6b1ad29a",
+      "binaries": {
+        "baseline": {
+          "path": "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+          "sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7"
+        },
+        "candidate": {
+          "path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b"
+        }
+      },
+      "pairs": 3,
+      "paired_gains": [
+        0.3625359534057143,
+        0.40050204472899265,
+        0.37380162214153745
+      ],
+      "median_baseline_seconds": 87.4304260659992,
+      "median_candidate_seconds": 54.748790978002944,
+      "median_gain": 0.37380162214153745,
+      "required_gain": 0.2,
+      "same_first_two_diagnostic_lines": true,
+      "natural_exit_codes": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "forced_exit_codes": [
+        -15,
+        -15,
+        -15,
+        -15,
+        -15,
+        -15
+      ],
+      "evidence_sha256": "e73ada13712541a7b75954021d14ef3f2c3fa7d140e24931aeae3bd5f1945e7c",
+      "selected_binary_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+      "original_baseline_preserved": true,
+      "tracked_recipe_updated": true,
+      "combined_patch_sha256": "06a8e595057d89e734b5a5e153b8d930cfd031de9f463fbe62d3186ab7818b91",
+      "whole_compiler_completion": "not established by this prefix measurement"
+    }
+  },
+  "macro": {
+    "scope": "first diagnostic latency on one frozen failing prefix; not completed compiler timing",
+    "source": "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src",
+    "source_sha256": "34552df56f4fc04a27803981f9e39a65e55f394b6ce85163c5714dccbeb9a37e",
+    "binaries": {
+      "baseline": {
+        "path": "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+        "sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7"
+      },
+      "candidate": {
+        "path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+        "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b"
+      }
+    },
+    "runs": [
+      {
+        "label": "candidate",
+        "pair": 1,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 55.638325833002455,
+        "elapsed_seconds": 55.85485033800069,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/prefix-pairs/1-candidate.log",
+        "host_load": "4.90 3.29 2.86 5/1876 1588820"
+      },
+      {
+        "label": "baseline",
+        "pair": 1,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 87.28072764300305,
+        "elapsed_seconds": 87.49668738699984,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/prefix-pairs/1-baseline.log",
+        "host_load": "4.11 3.46 2.97 3/1878 1589502"
+      },
+      {
+        "label": "baseline",
+        "pair": 2,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 88.50975268299953,
+        "elapsed_seconds": 88.72579594200215,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/prefix-pairs/2-baseline.log",
+        "host_load": "3.58 3.42 3.00 3/1883 1590499"
+      },
+      {
+        "label": "candidate",
+        "pair": 2,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 53.06141575500078,
+        "elapsed_seconds": 53.27748044699547,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/prefix-pairs/2-candidate.log",
+        "host_load": "3.89 3.58 3.08 4/1887 1591253"
+      },
+      {
+        "label": "candidate",
+        "pair": 3,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 54.748790978002944,
+        "elapsed_seconds": 55.01493091600423,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/prefix-pairs/3-candidate.log",
+        "host_load": "4.46 3.78 3.18 5/1888 1598539"
+      },
+      {
+        "label": "baseline",
+        "pair": 3,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 87.4304260659992,
+        "elapsed_seconds": 87.69690382500266,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/prefix-pairs/3-baseline.log",
+        "host_load": "4.11 3.82 3.25 4/1955 1599130"
+      }
+    ],
+    "stdlib_sha256": "46df43caee7d394ff0cd10c118a5a500e8afe61a2cdb30682d8c183a6b1ad29a",
+    "paired_gains": [
+      0.3625359534057143,
+      0.40050204472899265,
+      0.37380162214153745
+    ],
+    "median_baseline_seconds": 87.4304260659992,
+    "median_candidate_seconds": 54.748790978002944,
+    "median_gain": 0.37380162214153745,
+    "decision": "passes macro threshold"
+  },
+  "recipe": {
+    "status": "accepted; tracked recipe updated",
+    "original_recipe_source_sha256": "1c7388a6c15f4429fef83f9d8377524123c231a2df20ddad91542ea31ff4bd39",
+    "combined_patch_sha256": "06a8e595057d89e734b5a5e153b8d930cfd031de9f463fbe62d3186ab7818b91",
+    "patched_recipe_source_sha256": "6c3d5bcfba8ef629f4df78b545074357b3f279685e32e5e82c91d6c9cae6d8cf",
+    "candidate_trial_source_sha256": "77fa5568e94a7c1fc08d94fb946ea4d6afc9b1005d01114ca8a823761909983b",
+    "candidate_headers": {
+      "src/type_queries.h": "b208f80b37381846b15c5070b7740e365c746da726b1bff183a29aff4e61a7b0",
+      "src/typecheck.h": "f7d15db05a495ec865b52fa73dba922716ca0be5fb3d6d51b4564e59d9c3d8bb",
+      "src/typecheck_types.h": "1b2504f80d3ec8d9f87dbb8d795bb75dc95674514ff8ba418983dc85d868caad"
+    },
+    "changed_files": [
+      "src/type_queries.h",
+      "src/typecheck.h",
+      "src/typecheck_types.h"
+    ],
+    "files": 108,
+    "exact_manifest_match": true,
+    "patch_exit": 0,
+    "compiled_again": false,
+    "originals_unchanged": true,
+    "tracked_files_before": {
+      "build_goose_checker.py": "b09a74ad31efd664e2adf0e07fe31d9de84d718bbbdab5f9c5a0d1862aaa803a",
+      "goose-containment.patch": "b055e45bcb43f15cb7f8a136b3ea7511c1f714004c7f4f80cb150eafe4a423fe"
+    },
+    "staged_builder_sha256": "fb4d157c88789aae24d8d123a7feb0623ef68de2894a8746b261ba6e99d66d60",
+    "previous_combined_patch_sha256": "c0f405d50aaf848f416829fbd802a35d2f5eb16920a2fce6afb54bc7b259ee46",
+    "patch_context_lines": 0,
+    "tracked_builder_sha256": "fb4d157c88789aae24d8d123a7feb0623ef68de2894a8746b261ba6e99d66d60",
+    "zero_context_verified_manifest_sha256": "6c3d5bcfba8ef629f4df78b545074357b3f279685e32e5e82c91d6c9cae6d8cf",
+    "zero_context_apply_exit": 0
+  },
+  "latest_whole_build": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/build/goose-port/verification/build-189-inputs/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--stage-timeout",
+      "120"
+    ],
+    "exit": 1,
+    "seconds": 120.223,
+    "stop_reason": null,
+    "error_grace_seconds": 5.0,
+    "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-189.log",
+    "capture_seconds": 0.228,
+    "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-189-inputs/compiler-goose",
+    "live_matches_frozen": true,
+    "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-189-inputs/compiler-goose/build/blotc-goose",
+    "executable_exists": false
+  },
+  "source_checkpoint": "0e84f55bea07a49cf3fb74957923779ff717ada7",
+  "limits": [
+    "prefix timings are to the same first error, not completed checks",
+    "all six macro runs were terminated after that diagnostic",
+    "whole build189 reached120s without source diagnostics or programC",
+    "original installed Goose and Zig oracle remain unchanged",
+    "shared StableTypeGraph and reference-reachability gate are unchanged by this accepted candidate"
+  ]
+}

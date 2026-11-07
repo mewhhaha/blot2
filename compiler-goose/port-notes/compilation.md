@@ -9,6 +9,9 @@ unchanged. Source checkpoints are unverified whole-compiler work.
 The [scope checkpoint evidence](../../benchmarks/evidence/qualification/2026-11-07-goose-scope-checkpoint.json)
 preserves individual component receipts and rejected checker trials. Each
 receipt's reduced adapters and source identity limit its qualification.
+The [accepted checker evidence](../../benchmarks/evidence/qualification/2026-11-07-goose-identity-checker.json)
+pins the nominal-identity candidate, recipe, paired prefix runs and incomplete
+whole build189.
 
 Main checkpoint `30f03db34c8fdd4eee94fe63d3c5caffe5eef6bd` preserves the scalar
 cache indexes, snapshot leases and scoped proof repairs through frozen176.
@@ -34,25 +37,21 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator collects five seconds of diagnostics after the first error,
 then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen176 reaches the local temporary Module being assigned into its caller's
-Solver view after 57.152 seconds. Solver and pack-projection views now share
-their local owner's scope; returned Principals are rebuilt from explicit caller
-roots and owned state. Frozen184 reaches a local call frame assigned into its
-caller's staging checker after 100.944 seconds. The staging repair applies the
-same scope boundary across call, local, loop, decision, loan and handler frames.
-Frozen185 stops after 92.411 seconds (including five seconds of diagnostic
-collection): a post-call reference restoration inside that recursive staging
-cycle is rejected. Local-only dead restores can be removed; necessary setters
-must retain their original ordering outside the recursive store restriction.
-The next batch removes 26 dead restores and keeps live restoration behind
-explicit boundaries. Frozen186 reaches a separate empty-slice selection after
-107.002 seconds. That selection reuses the existing pure `exitCarries` helper.
-Frozen187 reaches its 120-second cap without a source diagnostic or program C;
-this is incomplete verification. Eleven debugger samples over its first 55
-seconds repeatedly show root-candidate enumeration and type queries during
-callee-store replay; they are sparse samples, not compiler phase totals.
+Checkpoint `0e84f55bea07a49cf3fb74957923779ff717ada7` contains the current
+frame, recursive-scratch, constructor and slice-selection repairs. Whole parsing
+passes: 36,060 declarations and 439 files in 0.952 seconds. Frozen189 selects the
+nominal-identity checker below and reaches its 120-second stage cap without a
+source diagnostic or program C. This is incomplete verification, not acceptance.
 No successful whole type check, C program, link, CLI execution, Wasm comparison
 or Gdev run exists for the Goose compiler.
+
+The selected checker improves the earlier frozen185 failing prefix; it does not
+establish a full-build timing. A fresh 11-sample profile of frozen189 still shows
+root-candidate enumeration, containment cache lookups and reference-reachability
+queries during callee-store replay. These are sparse samples, not phase totals.
+The next private experiment narrows only the reachability query's readiness gate;
+its acceptance is pending. Superseded diagnostics remain pinned in checkpoint
+history and the individual evidence receipts.
 
 The independent CLI/Wasm smoke runner is prepared under
 `build/goose-port/compiler-smoke/`. Its oracle-against-itself control passes;
@@ -167,22 +166,33 @@ its diagnostics qualify its recorded input tree only.
 
 The installed upstream Goose remains unchanged, SHA256
 `b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2`.
-Repair attempts explicitly select the optional private containment-query checker,
-SHA256 `f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7`.
+Repair attempts explicitly select the optional private nominal-identity checker,
+SHA256 `58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b`.
 `tools/build_goose_checker.py` and `tools/goose-containment.patch` preserve its
-reproducible recipe without modifying the sibling installation. It matches 201
-frontend diagnostics and eight runtime fixtures; three expected-acceptance
-mismatches occur in both baseline and candidate. Three older frozen-prefix pairs
-measure median 7.601 -> 4.379 seconds to the identical diagnostic. This is not a
-whole compiler or Gdev timing. Earlier O0/unmatched checker experiments remain
-rejected; do not rebuild them without a new measured hypothesis.
+reproducible recipe without modifying the sibling installation. A zero-context
+patch applies without fuzz and reproduces all 108 candidate source hashes;
+patch, full-source and three resulting-header pins are checked before compilation.
+
+Nominal equality needs the declaration and closed arguments, independently of
+whether this equal type node has an attached instance cache. The identity proof
+checks declaration validity, exact generic arity and closed arguments; the
+by-value walk separately requires validated, nonfailed instances before fields.
+This passes 53 actual-AST laws, 178 graph controls, 201 exact frontend controls
+and eight runtime controls. Three frozen185 pairs measure 87.430 -> 54.749 seconds
+median to the identical diagnostic, a 37.38% reduction. All six runs are stopped
+after that error. This is not a completed compiler or Gdev timing.
+
+The previous f211 checker matches the earlier 201/eight controls, with three
+expected-acceptance mismatches shared by baseline and candidate. Its older
+failing-prefix median is 7.601 -> 4.379 seconds; those frozen inputs differ from
+the current measurements. Earlier O0/unmatched experiments remain rejected.
 
 A subsequent exact-pointer visited-set experiment passes 201 frontend and eight
 runtime parity cases, but fails its small-case performance gate. One explicitly
 approved whole-prefix trial measures 71.738 -> 70.735 seconds to the identical
 frozen181 diagnostic (1.4%, below the required 20%). Both runs are terminated
 after that error; neither is a completed check. The experiment is rejected and
-the selected checker and tracked build recipe remain unchanged.
+the selected checker at that point remained f211; these experiments were not adopted.
 
 Bulk successful-subgraph publication also passes the semantic controls but
 measures only 84.273 -> 83.872 seconds to the same frozen185 error (0.48%).

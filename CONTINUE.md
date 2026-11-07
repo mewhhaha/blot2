@@ -21,10 +21,13 @@ tracked AST/fixity/recovery/depth laws pass. Four isolated engine suites pass.
 The current package repairs keep recursive state scalar, construct borrowed
 views through explicit boundaries, and share nested admission using local
 workspace copies. Whole-program C emission and linking are still pending.
-An explicitly selected private checker patch matches 201 frontend fixtures and
-eight runtime cases; three older-prefix pairs measure 7.601 -> 4.379s to the
-identical diagnostic. This is a failing-prefix gain, not completed compiler
-timing. Removing the optional bounds cache may add allocation/runtime cost.
+The selected private checker separates closed nominal identity from instance
+attachment. It passes 53 AST laws, 178 graph controls, 201 frontend controls and
+eight runtime cases. Three frozen-prefix pairs measure 87.430 -> 54.749s to the
+identical diagnostic (37.38%). This is a failing-prefix gain; the repaired whole
+port still reaches its 120s cap without program C. Reference-reachability queries
+and root enumeration remain iteration costs. Removing the optional bounds cache
+may add allocation/runtime cost.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
 Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.

@@ -17,7 +17,14 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_SHA256 = "1c7388a6c15f4429fef83f9d8377524123c231a2df20ddad91542ea31ff4bd39"
-PATCH_SHA256 = "b055e45bcb43f15cb7f8a136b3ea7511c1f714004c7f4f80cb150eafe4a423fe"
+PATCH_SHA256 = "06a8e595057d89e734b5a5e153b8d930cfd031de9f463fbe62d3186ab7818b91"
+PATCHED_SOURCE_SHA256 = "6c3d5bcfba8ef629f4df78b545074357b3f279685e32e5e82c91d6c9cae6d8cf"
+PATCHED_HEADERS = {
+    "src/type_queries.h": "b208f80b37381846b15c5070b7740e365c746da726b1bff183a29aff4e61a7b0",
+    "src/typecheck.h": "f7d15db05a495ec865b52fa73dba922716ca0be5fb3d6d51b4564e59d9c3d8bb",
+    "src/typecheck_types.h": "1b2504f80d3ec8d9f87dbb8d795bb75dc95674514ff8ba418983dc85d868caad",
+}
+
 LINK_INPUTS = (
     "CMakeFiles/goose.dir/src/process.cpp.o",
     "CMakeFiles/goose.dir/src/progress.cpp.o",
@@ -48,15 +55,15 @@ def tree_digest(path):
     return json_digest(files)
 
 
-def checked_source(source):
+def checked_source(source, expected=SOURCE_SHA256):
     # Paths include src/ to match the frozen 108-file upstream manifest.
     files = {}
     for item in sorted((source / "src").rglob("*")):
         if item.is_file():
             files[str(item.relative_to(source))] = digest(item)
     actual = json_digest(files)
-    if len(files) != 108 or actual != SOURCE_SHA256:
-        raise RuntimeError(f"upstream source/src changed: {len(files)} files, sha256 {actual}")
+    if len(files) != 108 or actual != expected:
+        raise RuntimeError(f"source/src differs from expected pin: {len(files)} files, sha256 {actual}")
     return actual
 
 
@@ -79,6 +86,8 @@ def fingerprints(goose_build, patch, cxx, flags):
         "recipe_sha256": digest(Path(__file__)),
         "source_sha256": source_sha256,
         "patch_sha256": PATCH_SHA256,
+        "patched_source_sha256": PATCHED_SOURCE_SHA256,
+        "patched_headers": PATCHED_HEADERS,
         "cxx": str(cxx),
         "cxx_sha256": digest(cxx),
         "cxx_version": version.strip(),
@@ -145,6 +154,10 @@ def build(args):
                 "patch", "--batch", "--forward", "--fuzz=0", "-p1",
                 "-d", str(work / "source"), "-i", str(patch),
             ], work, 5)]
+            patched_source_sha256 = checked_source(work / "source", PATCHED_SOURCE_SHA256)
+            for name, expected in PATCHED_HEADERS.items():
+                if digest(work / "source" / name) != expected:
+                    raise RuntimeError(f"patched header differs from candidate: {name}")
             stages.append(run_stage("compile", [
                 str(cxx), *flags, "-c", str(work / "source/src/main.cpp"),
                 "-o", str(work / "main.cpp.o"),
@@ -158,7 +171,7 @@ def build(args):
                 raise RuntimeError("build inputs changed during compilation; refusing publication")
             receipt = {
                 "identity": identity, "binary_sha256": digest(work / "goose"),
-                "stages": stages,
+                "stages": stages, "patched_source_sha256": patched_source_sha256,
             }
             (work / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
             work.rename(completed)

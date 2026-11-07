@@ -1,7 +1,7 @@
 {
   "algorithm": "sha256",
-  "build_selected": false,
-  "cc": null,
+  "build_selected": true,
+  "cc": "/usr/bin/clang-23",
   "configuration": {
     "artifact_replay": false,
     "c_flags": [
@@ -10,20 +10,20 @@
       "-O0",
       "-pthread"
     ],
-    "cc_sha256": null,
+    "cc_sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
     "entry": "src/main.goose",
     "goose_inline": "-O0",
-    "goose_sha256": null,
+    "goose_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
     "host": "linux",
     "host_entry": "blot_goose_main",
     "inference_budget": 1000000,
     "machine": "x86_64",
-    "runtime_sha256": null,
+    "runtime_sha256": "ec00bc6de5c6bc015cc409d4a74fb36522e72e08ed535c1dde389ea1746d1ab0",
     "schema": 1,
     "stdlib": "/home/jacobt/src/goose-to-wasm/build/source/stdlib"
   },
-  "digest": "4b7d8907b0b0d82c67afc8be2bc77496e149539aec47ade2859c7baea279a689",
-  "goose": null,
+  "digest": "db129188af69f4920cfe96ec7ff4a069922883b40436251e37f3fe505eea6c53",
+  "goose": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
     "/home/jacobt/src/goose-to-wasm/build/source/stdlib"
