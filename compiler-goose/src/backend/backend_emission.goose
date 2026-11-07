@@ -112,10 +112,10 @@ struct FactRange { start: i64 = 0,len: i64 = 0 }
 struct InstanceDecision { statement: u32,count: i64 = 0,layouts: u32[4],facts: FactRange[4] = [FactRange {..};4],rows: FactRange[4] = [FactRange {..};4],reads: InstanceReads }
 struct InstanceDecisions { decisions: DecisionBuffer,facts: MappingBuffer,rows: RowBuffer }
 fn deinit(decisions: InstanceDecisions&) { decisions.decisions.deinit(); decisions.facts.deinit(); decisions.rows.deinit(); }
-fn find(decisions: const InstanceDecisions&,statement: u32) -> const InstanceDecision&? { for decision in decisions.decisions.items { if decision.statement == statement { return decision; } } return null; }
+fn find(decisions: const InstanceDecisions&,statement: u32) -> const InstanceDecision&? { for &decision in decisions.decisions.items { if decision.statement == statement { return decision; } } return null; }
 fn factsAt(decisions: const InstanceDecisions&,decision: const InstanceDecision&,index: i64) -> const Mapping[:] { let range = decision.facts[index]; return decisions.facts.items[range.start..range.start + range.len]; }
 fn rowsAt(decisions: const InstanceDecisions&,decision: const InstanceDecision&,index: i64) -> const RowMapping[:] { let range = decision.rows[index]; return decisions.rows.items[range.start..range.start + range.len]; }
-fn reader(decisions: const InstanceDecisions&,node: u32) -> const InstanceDecision&? { for decision in decisions.decisions.items { for read in decision.reads.nodes[..decision.reads.len] { if read == node { return decision; } } } return null; }
+fn reader(decisions: const InstanceDecisions&,node: u32) -> const InstanceDecision&? { for &decision in decisions.decisions.items { for read in decision.reads.nodes[..decision.reads.len] { if read == node { return decision; } } } return null; }
 struct InstanceLocals { count: i64 = 0,layouts: u32[4],locals: u32[4] }
 struct RowView { binding: u32,row: u32,address: u32,limit_address: u32 }
 struct ListDirectory { storage: u32,array: u32,offset: u32 }

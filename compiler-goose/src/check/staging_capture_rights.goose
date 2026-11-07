@@ -26,7 +26,7 @@ fn require(value: bool) -> Error { if !value { return blot_error::Error.invalid_
 fn deinit(self_: Checker&) { for entry in self_.reports { blot_check_capability_lifetimes::deinit(entry.report); } self_.reports.clear(); }
 fn step(self_: Checker&) -> Error { if self_.remaining == 0 { return blot_error::Error.invalid_artifact; } self_.remaining -= 1; return blot_error::Error.none; }
 fn report(self_: Checker&, root: u32) -> const Report?, Error {
-    for entry in self_.reports { let err = self_.step(); if err != blot_error::Error.none { return null, err; } if entry.scope == root { return entry.report, blot_error::Error.none; } }
+    for &entry in self_.reports { let err = self_.step(); if err != blot_error::Error.none { return null, err; } if entry.scope == root { return entry.report, blot_error::Error.none; } }
     if !self_.allocating { return null, blot_error::Error.invalid_artifact; }
     var result, err = blot_check_capability_lifetimes::analyzeScope(self_.module, self_.units, root, self_.remaining);
     if err != blot_error::Error.none { if err != blot_error::Error.out_of_memory { err = blot_error::Error.invalid_artifact; } return null, err; }

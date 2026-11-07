@@ -1,6 +1,6 @@
 --- a/src/type_queries.h
 +++ b/src/type_queries.h
-@@ -58,0 +59,93 @@
+@@ -58,0 +59,139 @@
 +// CanContain observes type identity and by-value fields, never a referent's
 +// fields. This gate is deliberately separate from full reachability queries.
 +// As in StableTypeGraph, no walk constructs, resolves or validates a type.
@@ -94,10 +94,57 @@
 +    }
 +};
 +
++// Reference reachability observes nominal arguments only for identity, but
++// follows every field and referent. Include relative referents too: loading
++// a relative reference through a plain reference makes it plain.
++struct StableReachesGraph {
++    unordered_set<TypeExpr *> known;
++
++    bool Ready(TypeExpr *t, StableCanContainGraph &identity) {
++        if (!t) return false;
++        if (known.count(t)) return true;
++        vector<TypeExpr *> seen;
++        if (!Visit(t, seen, identity)) return false;
++        // A cycle can depend on an ancestor that fails later. Publish only
++        // the root after the entire reachable closure succeeds.
++        known.insert(t);
++        return true;
++    }
++
++private:
++    bool Visit(TypeExpr *t, vector<TypeExpr *> &seen, StableCanContainGraph &identity) {
++        if (!t || !identity.Identity(t)) return false;
++        if (known.count(t) || find(seen.begin(), seen.end(), t) != seen.end()) return true;
++        seen.push_back(t);
++        auto all = [&](const vector<TypeExpr *> &ts) {
++            for (auto x : ts) if (x && !Visit(x, seen, identity)) return false;
++            return true;
++        };
++        switch (t->kind) {
++            case TY_REF: return Visit(t->ref->sub, seen, identity);
++            case TY_SLICE: return Visit(t->sub, seen, identity);
++            case TY_ARRAY: return Visit(t->arr->sub, seen, identity);
++            case TY_STRUCT: {
++                auto i = t->struc->inst;
++                return i && i->validated && !i->failed && all(i->ftypes);
++            }
++            case TY_ENUM: {
++                auto i = t->enu->inst;
++                if (!i || !i->validated || i->failed) return false;
++                for (auto &fs : i->vftypes) if (!all(fs)) return false;
++                return true;
++            }
++            case TY_VARIANT: return Visit(t->var->adt, seen, identity);
++            default: return true; // Identity already rejected unresolved kinds.
++        }
++    }
++};
++
 --- a/src/typecheck.h
 +++ b/src/typecheck.h
-@@ -104,0 +105 @@
+@@ -104,0 +105,2 @@
 +    StableCanContainGraph stablecontainment;
++    StableReachesGraph stablereaches;
 --- a/src/typecheck_types.h
 +++ b/src/typecheck_types.h
 @@ -1110,2 +1110,12 @@
@@ -115,3 +162,19 @@
 +            cancontain[key] = result;
 +            return result;
 +        }
+@@ -1226 +1236 @@
+-    return StableTypeQuery(reachesthrough, t, of, [&]() {
++    auto walk = [&]() {
+@@ -1232 +1242,11 @@
+-    });
++    };
++    pair key { t, of };
++    if (auto known = reachesthrough.find(key)) {
++        assert(*known == walk());
++        return *known;
++    }
++    if (typesbuilding || !stablereaches.Ready(t, stablecontainment) ||
++        !stablecontainment.Identity(of)) return walk();
++    auto result = walk();
++    reachesthrough[key] = result;
++    return result;

@@ -28,22 +28,22 @@ fn boundRow<C>(source: Source, contract: C, variable: u32, member: bool) -> bool
     for id in source.list(contract.row_variables) { if id == variable { return true; } } return false;
 }
 fn scope<C>(source: Source, contract: C, root: Id, member: bool, remaining: i64&) -> Error {
-    var work: Work[>..<] = []; var seen: dictionary<ScopeKey,bool>   = dictionary<ScopeKey,bool> {}; work += Work { root , ..};
+    var work: Work[>..<] = []; var seen: dictionary<ScopeKey,bool>   = dictionary<ScopeKey,bool> {}; work.push(Work { root , ..});
     while work.len != 0 { let item = work[work.len - 1]; work.resize(work.len - 1); let error = charge(remaining); if error != blot_error::Error.none { return error; } if item.depth >= 256 { return blot_error::Error.invalid_artifact; }
         let key = ScopeKey { item.id, item.row , ..}; if seen.contains(key) { continue; } seen.insert(key, true);
         if item.row { let row = source.row(item.id); match row.tail { variable match_payload_27 => { let value = match_payload_27.value;  if !boundRow(source, contract, value, member) { return blot_error::Error.invalid_artifact; } }, parameter match_payload_28 => { let value = match_payload_28.value;  return blot_error::Error.invalid_artifact; }, _ => {}, }
-            for label in source.rowLabels(row.labels) { let error = charge(remaining); if error != blot_error::Error.none { return error; } for argument in source.list(source.operation(label).arguments) { work += Work { id: argument, depth: item.depth + 1 , ..}; } } continue;
+            for label in source.rowLabels(row.labels) { let error = charge(remaining); if error != blot_error::Error.none { return error; } for argument in source.list(source.operation(label).arguments) { work.push(Work { id: argument, depth: item.depth + 1 , ..}); } } continue;
         }
         let n = source.node(item.id); let depth = item.depth + 1;
         match n.tag {
             variable => { if !boundType(source, contract.variables, n.a) { return blot_error::Error.invalid_artifact; } },
-            function => { work += Work { id: n.a, depth: depth , ..}; work += Work { id: n.b, depth: depth , ..}; work += Work { n.c, true, depth , ..}; },
-            provider => { work += Work { id: n.a, depth: depth , ..}; work += Work { n.c, true, depth , ..}; },
-            usage, array, list, cursor, resolver => { work += Work { id: n.a, depth: depth , ..}; },
-            state_provider => { work += Work { id: n.a, depth: depth , ..}; work += Work { id: n.b, depth: depth , ..}; work += Work { id: n.c, depth: depth , ..}; },
-            product => { for id in source.list(List { n.a, n.b , ..}) { work += Work { id: id, depth: depth , ..}; } },
-            record => { for index in 0..n.b { work += Work { id: source.recordField(n, index).ty, depth: depth , ..}; } },
-            nominal, projection => { for id in source.nominalArguments(n) { work += Work { id: id, depth: depth , ..}; } },
+            function => { work.push(Work { id: n.a, depth: depth , ..}); work.push(Work { id: n.b, depth: depth , ..}); work.push(Work { n.c, true, depth , ..}); },
+            provider => { work.push(Work { id: n.a, depth: depth , ..}); work.push(Work { n.c, true, depth , ..}); },
+            usage, array, list, cursor, resolver => { work.push(Work { id: n.a, depth: depth , ..}); },
+            state_provider => { work.push(Work { id: n.a, depth: depth , ..}); work.push(Work { id: n.b, depth: depth , ..}); work.push(Work { id: n.c, depth: depth , ..}); },
+            product => { for id in source.list(List { n.a, n.b , ..}) { work.push(Work { id: id, depth: depth , ..}); } },
+            record => { for index in 0..n.b { work.push(Work { id: source.recordField(n, index).ty, depth: depth , ..}); } },
+            nominal, projection => { for id in source.nominalArguments(n) { work.push(Work { id: id, depth: depth , ..}); } },
             _ => {},
         }
     } return blot_error::Error.none;
@@ -66,7 +66,7 @@ fn graphView(types: const Types&) -> blot_check_frozen_types::Graph { return blo
 fn sameRoot(left: Copier&, right: Copier&, l: Id, r: Id, remaining: i64&) -> Error {
     let first, error = left.ty(l, 0); if error != blot_error::Error.none { return convert(error); } let second, error = right.ty(r, 0); if error != blot_error::Error.none { return convert(error); }
     left.destination.has_projections = true; left.destination.projection_limit = left.destination.projection_steps + remaining; let before = left.destination.projection_steps;
-    let equal, error = left.destination.equalSymbolic(first, second); remaining -= min(remaining, left.destination.projection_steps - before);
+    let equal, error = left.destination.equalSymbolic(first, second); remaining -= min<i64>(remaining, left.destination.projection_steps - before);
     if error != blot_error::Error.none { return convert(error); } if !equal { return blot_error::Error.invalid_artifact; } return blot_error::Error.none;
 }
 fn withCopiers<C,F>(first:const Types&,second:const Types&,destination:blot_check_types::Store&,remaining:i64&,context:C&)->Error {

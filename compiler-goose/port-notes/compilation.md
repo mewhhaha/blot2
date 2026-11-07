@@ -10,8 +10,10 @@ The [scope checkpoint evidence](../../benchmarks/evidence/qualification/2026-11-
 preserves individual component receipts and rejected checker trials. Each
 receipt's reduced adapters and source identity limit its qualification.
 The [accepted checker evidence](../../benchmarks/evidence/qualification/2026-11-07-goose-identity-checker.json)
-pins the nominal-identity candidate, recipe, paired prefix runs and incomplete
-whole build189.
+pins the nominal-identity candidate and its paired prefix runs. The
+[reachability checkpoint](../../benchmarks/evidence/qualification/2026-11-07-goose-reachability-checker.json)
+preserves the selected checker, reproducible recipe, later source repair laws
+and rejected root-enumeration experiment.
 
 Main checkpoint `30f03db34c8fdd4eee94fe63d3c5caffe5eef6bd` preserves the scalar
 cache indexes, snapshot leases and scoped proof repairs through frozen176.
@@ -37,21 +39,23 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator collects five seconds of diagnostics after the first error,
 then terminates the build and its compiler process group. A timeout is not a pass.
 
-Checkpoint `0e84f55bea07a49cf3fb74957923779ff717ada7` contains the current
-frame, recursive-scratch, constructor and slice-selection repairs. Whole parsing
-passes: 36,060 declarations and 439 files in 0.952 seconds. Frozen189 selects the
-nominal-identity checker below and reaches its 120-second stage cap without a
-source diagnostic or program C. This is incomplete verification, not acceptance.
-No successful whole type check, C program, link, CLI execution, Wasm comparison
-or Gdev run exists for the Goose compiler.
+Checkpoint `0e84f55bea07a49cf3fb74957923779ff717ada7` preserves the first
+frame, recursive-scratch, constructor and slice-selection repairs. Later repairs
+make field spelling optional consistently, use payload-enum predicates, retain
+catalog references instead of copying Modules, and capture a compile-time callback
+through a nested generic function. All 38 native array appends in four affected
+files now use element `push` or slice `append`; numeric counters remain unchanged.
+Borrowed report/header lookups use reference iteration. Whole parsing passes 439
+files in about one second. No successful whole type check, C program, link, CLI
+execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
-The selected checker improves the earlier frozen185 failing prefix; it does not
-establish a full-build timing. A fresh 11-sample profile of frozen189 still shows
-root-candidate enumeration, containment cache lookups and reference-reachability
-queries during callee-store replay. These are sparse samples, not phase totals.
-The next private experiment narrows only the reachability query's readiness gate;
-its acceptance is pending. Superseded diagnostics remain pinned in checkpoint
-history and the individual evidence receipts.
+The selected checker improves an earlier frozen185 failing prefix; it does not
+establish a full-build timing. Actual repair builds remain bounded to 120 seconds
+per stage. Frozen199 advances past the repaired native-array family and stops after
+101.558 seconds at a missing slice mapping adapter and an integer-width mismatch
+in static list emission. Those source errors remain open in this checkpoint. Individual
+source laws cover exact roots, duplicate policies, bounds/fuel order and callback
+cleanup with their reduced continuation leaves disclosed in the evidence.
 
 The independent CLI/Wasm smoke runner is prepared under
 `build/goose-port/compiler-smoke/`. Its oracle-against-itself control passes;
@@ -166,8 +170,8 @@ its diagnostics qualify its recorded input tree only.
 
 The installed upstream Goose remains unchanged, SHA256
 `b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2`.
-Repair attempts explicitly select the optional private nominal-identity checker,
-SHA256 `58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b`.
+Repair attempts explicitly select the optional private checker, SHA256
+`46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e`.
 `tools/build_goose_checker.py` and `tools/goose-containment.patch` preserve its
 reproducible recipe without modifying the sibling installation. A zero-context
 patch applies without fuzz and reproduces all 108 candidate source hashes;
@@ -181,6 +185,16 @@ This passes 53 actual-AST laws, 178 graph controls, 201 exact frontend controls
 and eight runtime controls. Three frozen185 pairs measure 87.430 -> 54.749 seconds
 median to the identical diagnostic, a 37.38% reduction. All six runs are stopped
 after that error. This is not a completed compiler or Gdev timing.
+
+The selected follow-on gate qualifies only reference reachability. Nominal
+arguments use closed identity; actual fields require validated, nonfailed
+instances. Reference and slice subtypes are traversed conservatively, and only
+whole-root success is cached. Shared graph readiness and reached-element
+publication retain their previous rules. This adds 41 AST laws and passes the
+178 graph, 201 frontend and eight runtime controls. Two fresh frozen185 pairs
+measure 48.017 -> 29.326 seconds median (38.925%) to the identical error. Their
+conditions differ from the earlier identity pairs, so the percentages are not
+combined. All four runs are stopped after that error.
 
 The previous f211 checker matches the earlier 201/eight controls, with three
 expected-acceptance mismatches shared by baseline and candidate. Its older
@@ -197,6 +211,11 @@ the selected checker at that point remained f211; these experiments were not ado
 Bulk successful-subgraph publication also passes the semantic controls but
 measures only 84.273 -> 83.872 seconds to the same frozen185 error (0.48%).
 It is rejected. Synthetic graph wins do not establish a port improvement.
+
+Reusing root candidates at the last callee-store depth also passes isolated
+semantic controls, but its actual frozen185 trial regresses 32.924 -> 34.322
+seconds. It is rejected. Owner-local adapter reorganization changes too little
+of the main closure to justify a broad rewrite; no full-build gain is claimed.
 
 The Zig oracle remains
 `build/goose-port/oracle/bin/blotc`, SHA256

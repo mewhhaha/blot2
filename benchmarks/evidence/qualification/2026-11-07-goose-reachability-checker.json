@@ -1,0 +1,1344 @@
+{
+  "qualification": "accepted private checker for experimental port repairs; whole Goose compiler still unverified",
+  "binary_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+  "baseline_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+  "macro": {
+    "scope": "first diagnostic latency on one frozen failing prefix; not completed compiler timing",
+    "source": "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src",
+    "source_sha256": "34552df56f4fc04a27803981f9e39a65e55f394b6ce85163c5714dccbeb9a37e",
+    "binaries": {
+      "baseline": {
+        "path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+        "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b"
+      },
+      "candidate": {
+        "path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e"
+      }
+    },
+    "runs": [
+      {
+        "label": "candidate",
+        "pair": 1,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 29.475867872999515,
+        "elapsed_seconds": 29.742532805998053,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/prefix-pairs/1-candidate.log",
+        "host_load": "1.78 2.48 2.95 1/1994 1631003"
+      },
+      {
+        "label": "baseline",
+        "pair": 1,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 48.39835855200363,
+        "elapsed_seconds": 48.66577967100602,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/prefix-pairs/1-baseline.log",
+        "host_load": "1.57 2.33 2.87 1/1803 1631380"
+      },
+      {
+        "label": "baseline",
+        "pair": 2,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 47.63493941699562,
+        "elapsed_seconds": 47.850762008994934,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/prefix-pairs/2-baseline.log",
+        "host_load": "1.49 2.18 2.79 8/1811 1631816"
+      },
+      {
+        "label": "candidate",
+        "pair": 2,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 29.176421538002614,
+        "elapsed_seconds": 29.442103340006724,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/prefix-pairs/2-candidate.log",
+        "host_load": "1.77 2.18 2.77 2/1840 1632055"
+      }
+    ],
+    "stdlib_sha256": "46df43caee7d394ff0cd10c118a5a500e8afe61a2cdb30682d8c183a6b1ad29a",
+    "paired_gains": [
+      0.3909738107888939,
+      0.3874995561011926
+    ],
+    "median_baseline_seconds": 48.016648984499625,
+    "median_candidate_seconds": 29.326144705501065,
+    "median_gain": 0.3892504927828697,
+    "decision": "passes macro threshold"
+  },
+  "recipe_verification": {
+    "original_source_sha256": "1c7388a6c15f4429fef83f9d8377524123c231a2df20ddad91542ea31ff4bd39",
+    "patched_source_sha256": "de05402b16a525bb8cc9ba22d123e41f062bce56422709424f8b466f2da1bef1",
+    "source_file_count": 108,
+    "all_file_hashes_equal_to_candidate": true,
+    "candidate_source_manifest": {
+      "src/ast.h": "634070939bac352a7afa374d43cdcf0f55da403ea86f12fdc4a1b4886423fe4c",
+      "src/bce.h": "30f416031c6f50098d9f59c6be6e5dba7fc6db635a34a345163aea85320cdeae",
+      "src/blessed.txt": "ffaedc05b21dddd58264e1a2d9d6e476b9ca5c94117a091e2d370429cad6415e",
+      "src/build.h": "ade52a54cad88832bd83c23a190c50ce19e98e74a3b98ec97c5218a8e6f06275",
+      "src/buildfile.h": "f725e6cc6995da4a1bb854349c3303db3b33dd212fc92ffb733b30a0f3eab840",
+      "src/builtin.h": "997851ca4fa1ec980cee13de78800dc36fd21f75f1af5fdcd4c51fd54a097237",
+      "src/builtins.h": "a73c69ee76956661b0a8d6ac80b6a44f48a74e27b7add904b7c1d4531a9bf5ff",
+      "src/checked_leaf_cache.h": "90d97a256ae579fb9b5215acbb8e9d79a03f0d1f583e6c0ea425ce608f693259",
+      "src/clone.h": "7d74f7a2ba85e22191026866f27bb0018b92fc4fd0ebfe9eac828b4509cff4e3",
+      "src/codegen.h": "6992f0f3e2119aa88b78a52284926d78e09f2c96e92e940b9c97f3bcd680b15e",
+      "src/codegen_builtins.h": "6c61f891b01faa11b5da10a5ef2ac69042eac27f595c66ed504949abdbc3c8ae",
+      "src/codegen_calls.h": "bb8065ee25e5da87ec46a4ce23d23aed3bdae9b56f43f227186a4940a503d750",
+      "src/codegen_construct.h": "98c305bc7a8211d4efa4a5b2bab1366d163d8958d60c2391879ba983b7fa2fde",
+      "src/codegen_emit.h": "11e8b02d8540c07f8ec413b8e57c39657913b8b31751f169fc26460b18391fa4",
+      "src/codegen_frames.h": "9d8a1a75d7c113903a5cc472a224df9d1c18d36b2d3280df2e6b6eddb1c44f5e",
+      "src/codegen_nodes.h": "ad04f32a08aa1603bfaf0dfb184cd57f36ab9ca9d124803c9f0ae094e922aba3",
+      "src/codegen_render.h": "dcea25a5b152308c47d7aac645c184a86846c24e56eb0cab837b780bd3d7268e",
+      "src/codegen_stacks.h": "e11938b3e805b0fa7de6d0c0e6393d35703d1f5a7a89b18ec361a550dce08e98",
+      "src/codegen_stmts.h": "0eb2d605b03e0debd1867e5132ac96a0a3a0ffd25a781f7f1b5d942da1bc773b",
+      "src/codegen_types.h": "c27573c8cbb9bf9cba3eb78a429c0c068c7f664e668b16325fd3eb7ee3809124",
+      "src/codegen_values.h": "96b38aa4e68672ec8de0d0651a4e0dfa972c6e90181278823b35a202768606fd",
+      "src/direct_input_trace.h": "a48c943019f67dbd68bebf902cf0ed57b6cfd9639aadf1a276b13a316679ab23",
+      "src/direct_wasm.h": "62e010a5eb5ecc02b84249f995238c562b5d659708189402fa0740de8ba974be",
+      "src/direct_wasm_arrays.h": "ad791e0010dc3edad36fd7b8c1cb20730696481f22007031524186952a3a05d2",
+      "src/direct_wasm_bits.h": "04b347d008c82071b9a1754db20af6a8fa52b59f38546885461caa35b5bd4202",
+      "src/direct_wasm_captures.h": "7a84c5b72f59feb91800da8b539bcaf89e60c35d828a42aee007cc8966e0e1a3",
+      "src/direct_wasm_constants.h": "b0e7ce2345ca8c4f0733234b24cbeb57aaaf44ecff345f1fed4a2c8470dfdfbd",
+      "src/direct_wasm_dependencies.h": "8e8b1e28939e5777ea6ce95ec2059f3874761056621de7ecbe8d7fccbcaa5451",
+      "src/direct_wasm_dispatch.h": "8d915ed4764daa2efe4de4ef82d75af445b9c653cb7116780806e926a15ede29",
+      "src/direct_wasm_effects.h": "29baba3ce8d6a1177800f3d1e2faffce3a2eb6129c55c50c888026f340ed3712",
+      "src/direct_wasm_emit.h": "6c828f52282209dd09d44948f6ef7369a065debac68b71f932999b8662146412",
+      "src/direct_wasm_enums.h": "ea47941072634e2a19ae46c64046700f42a39d8e52e1c06f4c38d56c01e0fd4b",
+      "src/direct_wasm_expr.h": "9a1ecc291d3776c2f9060e5719f927a44f195a1fdfc0e16e116da77d7be7e87d",
+      "src/direct_wasm_funvals.h": "f13a8e0d12430c9d95e389e21752d7e6c145dfbb5e5db42fcef3d0f665b49081",
+      "src/direct_wasm_images.h": "ae9043afa9460664d1de2a304f6b0dfe14817ecfcd7eded20aa855010bd77b02",
+      "src/direct_wasm_landing.h": "a1f9d5df3ff0debb49b7edc366e4cc49a596d445a32cf55534e5360f04c49e79",
+      "src/direct_wasm_leaf.h": "00217c82a5e96ef86c9203e050f744373be14889f6b2c5bb017bd1cec4987208",
+      "src/direct_wasm_merge.h": "b5ca6e37d3e957272645965c45e1e0db579227b25434015a51820f857082c792",
+      "src/direct_wasm_numeric.h": "c50e9c971330debbbb1e351ebc14e025e1576f4e66559d678659e87b308f1828",
+      "src/direct_wasm_owned.h": "5dea8745ee53c864065e609c46dc3807171ec71b4b66cc8bc67dcacb008014f1",
+      "src/direct_wasm_publication.h": "52c5d5eb9ba2475aa49a25e505679e80d18fbd09a40c975bf29646eca2d314b5",
+      "src/direct_wasm_record_images.h": "d2e4a913d9cc54edcf6762eb2c9847ba69686c86cb5f419e4024e5bba6f7b3bc",
+      "src/direct_wasm_regions.h": "828d8b1cf5dae821f339a306fb3bb589af09cf0f2c364061beb0331d5e3a4b75",
+      "src/direct_wasm_scan.h": "6d93756d8b7423d788bfd73e6a6455b7f9f34b6434e9dda76af8c078b5d8740f",
+      "src/direct_wasm_session.h": "b101d5abd43557913dda3b35c6930d276805deb0257cad24172699af9d88ff63",
+      "src/direct_wasm_stencil.h": "6dccbe15feeda681ae1dbdc02bab5ca6265c3292d3cf3149257361f26d9c4c67",
+      "src/direct_wasm_storage.h": "31d8409c6eee4fbd741222c64e1cc58edd07f4bb5bc72240af1eada7dca596ae",
+      "src/direct_wasm_stride.h": "bc3a7c00c5a167d0a53702d5adbe5f2211a7609c2a6296821a6e4d5c4aa9dc1e",
+      "src/direct_wasm_temps.h": "66ea49d550af2ed298234425b62e926c5fe611afea37936e4e651efc75766ad3",
+      "src/direct_wasm_tiny_leaf.h": "c87caaf3b8f1c9c97f4487047fb77500d3355a69959fe9a4c7cb050652b1ab77",
+      "src/direct_wasm_uleb_arrays.h": "e9e1d04c8798b34a3135586a592e9751a87ede1db499faa0acbedd83926d7cde",
+      "src/direct_wasm_varint_arrays.h": "391d8b6a0cafc2aacb700e12094b8a05943d11e6ddc70b116d5aa1488f742e6e",
+      "src/direct_wasm_varints.h": "f04cc44f32bda1328d5492fc172201c0b45b603374eaafb56d7b4b05d5aee1bd",
+      "src/dump.h": "640369b0d35ac017caab93422319876e202be21da1e78dd4eded474b06e0e7f3",
+      "src/expansion_bind.h": "8da2ba1726da2da62eb130ba2b48b7f1fe722fa7027e938cc3b99e680c01c532",
+      "src/flat_map.h": "7d2be1a9905d5fa33afcde9c2f67a4268a6636e4ed95674bf8d5b54b4672ec9b",
+      "src/gfx.h": "8f07577960faaf8e91f992734367f5bd9714af2bfeeef31b2aeb03c77e424ff7",
+      "src/gfx_blob.h": "615d9976c105496dd5ac2e92a0f1a8f065c9432a6d5b21f0d20d410134679370",
+      "src/goose.manifest": "ae18e973ee276ee777cf40fa0ccf4c73e23ec0280d3abd4bca39f205145ebf9a",
+      "src/goose.rc": "53aadf1efb1676a75f8a290f8fe8d0918e263224e1f595c948e952a66a4064c9",
+      "src/includes.h": "e6926bf8550fd3f566f7918f04731d6db5aff6a093354440b41db095d5fddc91",
+      "src/jit.h": "0b38d0da5ab2b11586b86114bb7be086695c8db450365f72813577dbebce71bb",
+      "src/json.h": "5fdd6616238b0369d2f31a4beabe0c33ce2dc141e742c6f90e9bc00f3a6e9c7b",
+      "src/lexer.h": "41f73dad36a777489ae37f8bb07b6307045ae1160851c50c7048ef37be3c8e18",
+      "src/lexer_cache.h": "d7b6d0e7aa0b72a354c976cbabbd18e81787e30dbc8ad7eb239c75577c2a3ba3",
+      "src/lsp.h": "e1395f70ef5d6d490bc7ec3507980ee20c115e353e9f4f76e814f027687b99ba",
+      "src/lsp_analysis.h": "55b8a3d37def84b53246881eb4232b3bb81c178957a8ce3a4a96c797467cf748",
+      "src/lsp_features.h": "f540e142126c32dd27a19c898463c569400068abe6bb5e0e92403387c1cf82f0",
+      "src/lsp_rpc.h": "c128245e44b661c004fe9d8d05c03a220ff27a66a29d6ae9d0ab46dbf8b5866a",
+      "src/lsp_workspace.h": "48049bce83cd3288ca18634dfe1ab479a705f0498e10468873546784ab4aaffe",
+      "src/main.cpp": "4e23802cd3d11f0367287fec1571ea11e564d294c62b6ecaf4aed984176469f6",
+      "src/native.h": "fe44dfccb51d85ae0d9ec5a8d30b6ab9dde432bdd1d3b89140a1513cfb4403b5",
+      "src/optimize.h": "ded0012c56610624b7ce4745b4f0ebb320e70d1f297afac7f29c20abcdd56754",
+      "src/optimize_basecase.h": "b39119db7a939aaa253cc94b560e9437dc7e9c8c0502064083b0a1f975d31063",
+      "src/optimize_loops.h": "ed22a7580e8a58e2938555630cdff2d728c42073576b87a102c974160f89823c",
+      "src/optimize_reassoc.h": "b923b44b0452fb925b62b40b612f0a9a058e3f4daece565f2fbcea513f1963a1",
+      "src/optimize_tre.h": "b028cadaab1354c0d2a227409779a4b79bad13d4182ba88565fc896c929476bd",
+      "src/packages.h": "ac66b8e14b7bda5021d3e515fdf2d068f04f4638f362a81959a654dea84f9050",
+      "src/parsed_module_cache.h": "ec1a022f5c349c6dc11452927aa8e89d9542048e50dbffbf5d4cad8eb8b79d43",
+      "src/parsed_module_clone.h": "353aac484eeb9b7bba10602e042ee71513e536588a4fd62c9bf0ac71172173d8",
+      "src/parser.h": "cef074a8657c559f12a28bc9f3aa70444430115a7c20f01a580ad5726e469363",
+      "src/process.cpp": "ee9f5aae2abcd0e35bb34d986b421553299958e092220967736d8bf0c9bc8a5e",
+      "src/process.h": "a36e982d95221607baf39cba18456a7b166de39db62db42ae2ab8f30559d9d8d",
+      "src/progress.cpp": "7a506a4face45380143ddc0bf043748a869acebd48765c0cb8495b353160edf4",
+      "src/progress.h": "daa73670f5b9efeb96f7f4befb4544cef3b4a29ef46d381eee84f7c6ad511713",
+      "src/resolve.h": "a40731a88d32dee143fcdc545535439233245ea0c05d9a3592fa14cc280f571b",
+      "src/runtime/goose.h": "197478d1694847146f714ea3df1372e3d710644580b72603de8273d3c59d00a9",
+      "src/runtime/runtime.h": "e7777cc6dadcd05c0c80a05225b5d3c7afa95f7e06f091aac9c076661f10fc5b",
+      "src/runtime/runtime_ext.h": "b392a083270b4d7520ee9be1322809454b5e755bf0a4d746ec717b4e8c80312e",
+      "src/runtime/runtime_impl.h": "0640b981f5cf80bee6eba4e0432ce2de495ecc22826e50ad12faec43c2ad7465",
+      "src/runtime/runtime_os.h": "50febd965999145e92d1b310e1879b2c3deecd2973c3fdfa4039ff71a3d4f399",
+      "src/runtime/runtime_threads.h": "c9c2a3138465dc0136e05aca89ed0983bbadf42469c05e74906b4fdd65e0b877",
+      "src/runtime_inline.h": "00941ed6ec7e3e740256d15f5a4ceeacd09fd9e5e838f28c07b16e3baf2147d8",
+      "src/shaderc.c": "3eb96a568d275fe2433b041715b6e577d2c00444e3bf3ffe4124ca03ad18b74f",
+      "src/shaderc.h": "0313f038d449310b241af5917f0bc775efe44ce80ec9857c622abac6ed3cdda5",
+      "src/small_vector.h": "a6aed4530a28f778a7f1865ba0c079416effa66b8a111f80e787416251ac7c0e",
+      "src/toolchain.h": "f16f9416bb5a3ff32de987f14234f2f2d3b34f9697544ceeb3347846b3435adf",
+      "src/type_queries.h": "521a808993a7f286dfdd79aa9494979ab334731984305aefe82cf112c91a900c",
+      "src/typecheck.h": "401413c55b830e62aff2cab65a8609ba3510376491c2cf7e032ebec0924d6f86",
+      "src/typecheck_builtins.h": "7e338368c9bfe6e9bdc29f0755950db8554353f0a0d542bcf660d79764f44a45",
+      "src/typecheck_calls.h": "98349a63477603c79f290fa95c02dc0596ae4bd4758a12fcfef8ee16d37b8883",
+      "src/typecheck_expansion.h": "2d07d23be9ca09493cc54cb88ca57466086cde9295ea24bc3e527972e1fa0240",
+      "src/typecheck_exprs.h": "cf8982dddb79db17718e9c9883fb8f5ebf6649c6b109cabb870a8a5e4ff16df9",
+      "src/typecheck_flow.h": "714e3c9bc464d87756be1ec9a58b1fbed4fe61eab261e9567e4038f2117802a2",
+      "src/typecheck_nodes.h": "e3e682a6d28f58d88319a5b69bf60882f382f072cbff666f9f7268d52dc2b8f7",
+      "src/typecheck_types.h": "307828e05552cbf9abd3258050b253670a559971ad451942fa730be03c4bef18",
+      "src/utils.h": "adb917ff0376de7ed747d766ea687b7ddab625b8e513c06515069be50515de1d",
+      "src/wasm_binary.h": "b78978a007fa40e9f1cfec876d332b5d8f953e6b9aa2d161cd622a634593a169"
+    },
+    "changed_files": [
+      "src/type_queries.h",
+      "src/typecheck.h",
+      "src/typecheck_types.h"
+    ],
+    "combined_patch_sha256": "db5f591e2da778f148bec95a43dd93393a193abf26d3c119335cbe31db2573ff",
+    "builder_sha256": "5fa6433e92ed218990a86c3df516c6890e21c09b190f8dd82ac2fb2d7a14295d",
+    "command": [
+      "patch",
+      "--batch",
+      "--forward",
+      "--fuzz=0",
+      "-p1",
+      "-d",
+      "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/recipe-staging/zero-context-source-verification",
+      "-i",
+      "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/recipe-staging/goose-containment.patch"
+    ],
+    "zero_fuzz": true,
+    "zero_offset": true,
+    "zero_context": true,
+    "no_rebuild": true,
+    "binaries_unchanged": {
+      "/home/jacobt/src/goose-to-wasm/build/native/goose": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+      "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7",
+      "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+      "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e"
+    },
+    "original_and_candidate_sources_unchanged": true
+  },
+  "candidate_receipt": {
+    "authorization": "one bounded dedicated reference-reachability gate trial on accepted 585 base; not adoption",
+    "original_binary_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+    "original_source_sha256": "77fa5568e94a7c1fc08d94fb946ea4d6afc9b1005d01114ca8a823761909983b",
+    "source_files": 108,
+    "patch_sha256": "63c29b837886d5150b9bee708e248ffd22674caf01400e3f902f4079dfd4c76f",
+    "installed_binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+    "cxx_version": "clang version 23.1.4\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "cxx_sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
+    "link_inputs": {
+      "/home/jacobt/src/goose-to-wasm/build/native/CMakeFiles/goose.dir/src/process.cpp.o": "165aacdf7efbc42d53bdc4a0730cc5fbe2934f88141f4604a35355f568a78eb9",
+      "/home/jacobt/src/goose-to-wasm/build/native/CMakeFiles/goose.dir/src/progress.cpp.o": "17604e2ab092d3ed6ff1623848f662825a6602d7f55f6cb529cbf8430635d18f",
+      "/home/jacobt/src/goose-to-wasm/build/native/libgoose_shaderc.a": "b92edef61cfa6822388552bac58347b2510c76d64ae6ca89f85028522989e259",
+      "/home/jacobt/src/goose-to-wasm/build/native/libtcc.a": "25bf43b5098e259167e87d565ee1a77c170d8b26291b6e98ad260e2d94fe7d55"
+    },
+    "resource_inputs": {
+      "/home/jacobt/src/goose-to-wasm/build/native/generated": "e9c56aed9a3c4484478986e77258b149c97e05fdbfd350d0d39d1f59cf615c60",
+      "/home/jacobt/src/goose-to-wasm/build/native/tcc/api": "9df20384121bf60f5bfc00905d35324becd41692bc25d0b1b30c1c4e92f1a04e",
+      "/home/jacobt/src/goose-to-wasm/build/native/tcclib": "642782bf4a16d2e75b8692e79828c73fff7118c40ce91d297f527f9c2b0946a5",
+      "/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess": "1608874d188b73ca2a811b054a44f7c6dd2ae0643e061f84d5d14d6c9da48cd3"
+    },
+    "stages": [
+      {
+        "stage": "patch",
+        "command": [
+          "patch",
+          "--batch",
+          "--forward",
+          "--fuzz=0",
+          "-p1",
+          "-d",
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/source",
+          "-i",
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/candidate.patch"
+        ],
+        "cap_seconds": 5,
+        "exit": 0,
+        "seconds": 0.007830237002053764
+      },
+      {
+        "stage": "compile",
+        "command": [
+          "/usr/bin/clang++",
+          "-O3",
+          "-DNDEBUG",
+          "-std=gnu++20",
+          "-Wall",
+          "-Wextra",
+          "-Wno-missing-field-initializers",
+          "-DGOOSE_TCC_LIB_PATH=\"/home/jacobt/src/goose-to-wasm/build/native/tcclib\"",
+          "-I/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess",
+          "-I/home/jacobt/src/goose-to-wasm/build/native/generated",
+          "-isystem",
+          "/home/jacobt/src/goose-to-wasm/build/native/tcc/api",
+          "-c",
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/source/src/main.cpp",
+          "-o",
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/main.cpp.o"
+        ],
+        "cap_seconds": 90,
+        "exit": 0,
+        "seconds": 61.12610456599941
+      },
+      {
+        "stage": "link",
+        "command": [
+          "/usr/bin/clang++",
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/main.cpp.o",
+          "/home/jacobt/src/goose-to-wasm/build/native/CMakeFiles/goose.dir/src/process.cpp.o",
+          "/home/jacobt/src/goose-to-wasm/build/native/CMakeFiles/goose.dir/src/progress.cpp.o",
+          "/home/jacobt/src/goose-to-wasm/build/native/libgoose_shaderc.a",
+          "/home/jacobt/src/goose-to-wasm/build/native/libtcc.a",
+          "-ldl",
+          "-lm",
+          "-o",
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose"
+        ],
+        "cap_seconds": 15,
+        "exit": 0,
+        "seconds": 0.2643001910037128
+      }
+    ],
+    "complete": true,
+    "candidate_source_sha256": "496a083424e1f3732f8dad528016fb41ef49a011ab9c486b88997e157b73f641",
+    "candidate_header_sha256": "521a808993a7f286dfdd79aa9494979ab334731984305aefe82cf112c91a900c",
+    "candidate_headers": {
+      "type_queries.h": "521a808993a7f286dfdd79aa9494979ab334731984305aefe82cf112c91a900c",
+      "typecheck.h": "401413c55b830e62aff2cab65a8609ba3510376491c2cf7e032ebec0924d6f86",
+      "typecheck_types.h": "307828e05552cbf9abd3258050b253670a559971ad451942fa730be03c4bef18"
+    },
+    "originals_unchanged": true,
+    "link_inputs_unchanged": true,
+    "resource_inputs_unchanged": true,
+    "binary_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+    "qualification": {
+      "actual_ast_laws": 41,
+      "ordinary_graph_cases": 178,
+      "frontend_exact_parity": 201,
+      "runtime_exact_parity": 8,
+      "fixture_seconds": 1.2537940920010442,
+      "whole_prefix_checked": false,
+      "macro_adoption": "accepted after two matched frozen185 pairs",
+      "proof_sha256": "bc4457fb77ea34426807b916d84d2996a15aacf8860a670618208a295498eb56",
+      "probe_sha256": "d4fdfbcb4b03de87030a3e944f42a645bd057ba09523c6779e705f7739338629"
+    },
+    "macro": {
+      "status": "accepted by parent after two fresh alternating matched pairs",
+      "evidence": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/prefix-pairs/evidence.json",
+      "evidence_sha256": "be1c689b46bb529dcdcd85653215f91f1128b56d14aed0ebb30ec34bd7a54bfe",
+      "scope": "first diagnostic latency on one frozen failing prefix; not completed compiler timing",
+      "source_sha256": "34552df56f4fc04a27803981f9e39a65e55f394b6ce85163c5714dccbeb9a37e",
+      "stdlib_sha256": "46df43caee7d394ff0cd10c118a5a500e8afe61a2cdb30682d8c183a6b1ad29a",
+      "binaries": {
+        "baseline": {
+          "path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b"
+        },
+        "candidate": {
+          "path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e"
+        }
+      },
+      "pairs": [
+        {
+          "pair": 1,
+          "baseline_seconds": 48.39835855200363,
+          "candidate_seconds": 29.475867872999515,
+          "gain": 0.3909738107888939
+        },
+        {
+          "pair": 2,
+          "baseline_seconds": 47.63493941699562,
+          "candidate_seconds": 29.176421538002614,
+          "gain": 0.3874995561011926
+        }
+      ],
+      "median_baseline_seconds": 48.016648984499625,
+      "median_candidate_seconds": 29.326144705501065,
+      "median_gain": 0.3892504927828697,
+      "exact_first_two_diagnostic_lines": true,
+      "all_natural_exit_codes": null,
+      "all_forced_exit_codes": -15,
+      "source_stdlib_binaries_resources_still_match_pins": true,
+      "completed_compiler_build": false
+    },
+    "reproducible_recipe": {
+      "combined_patch_sha256": "db5f591e2da778f148bec95a43dd93393a193abf26d3c119335cbe31db2573ff",
+      "builder_sha256": "5fa6433e92ed218990a86c3df516c6890e21c09b190f8dd82ac2fb2d7a14295d",
+      "patched_source_sha256": "de05402b16a525bb8cc9ba22d123e41f062bce56422709424f8b466f2da1bef1",
+      "source_file_count": 108,
+      "all_file_hashes_equal_to_candidate": true,
+      "zero_fuzz": true,
+      "zero_offset": true,
+      "zero_context": true,
+      "no_rebuild": true,
+      "verification_receipt": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/recipe-staging/verification.json"
+    }
+  },
+  "source_repairs": {
+    "field-spelling-laws": {
+      "sha256": "4fff3c82514410964d40458a34eb5a37ba469492c0f6b26d572270ad967518b7",
+      "receipt": {
+        "coverage": "Exact full Module field layout and actual Name/FieldName, Constructor, Projection, ProjectionVariant, Types, Node/Tag/Field/Scheme, getters, selector and RecordField. Other untouched leaf schemas are reduced; Nominal exposes identity only.",
+        "sources": {
+          "/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/core.goose": "26a5a49d81ae93a56d8092a5473a4f457ab0ae365c2c6f601bec12dd7d078b6a",
+          "/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/types.goose": "e72cff96f9b953937ae9036d42c91f574b8b2b266ebd405ecf4c9edc9ca647c1",
+          "/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/capability.goose": "f47c2e847c870c13711848507a28535c14a96a0214602c37786cf0c6e8d5321b",
+          "/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose": "ae9204774bb63ad7eac83e5491eaecc2f1f2255c54259c09a14c359303eff5d5",
+          "/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/old_none_rebind.goose": "a9769c6c09064c465ab0597b98b1e98752e50f48dbacad5575873a4c90429b3f",
+          "/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/local_bytes_escape.goose": "7c96e4f01ff900953e517555779cee7286180d752994a11f5d4bf572d0c78847"
+        },
+        "runs": [
+          {
+            "compiler": "official",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.013810599004500546,
+            "stdout": "parsed ok: 223 top-level declarations, 6 file(s)\ntypechecked ok: 69 specialization(s), 64 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 10 folded, 1 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 5/10 index and 39/40 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/field-spelling-laws/official.c (130110 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:34: warning: redundant `as u32`: 10 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:34: warning: redundant `as u32`: 20 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:34: warning: redundant `as u32`: 4294967295 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 9 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 11 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 19 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 21 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 4294967294 fits u32 here\n"
+          },
+          {
+            "compiler": "official",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.09573926699522417,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0011741130001610145,
+            "stdout": "field spelling laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "query_stable",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.019726899001398124,
+            "stdout": "parsed ok: 223 top-level declarations, 6 file(s)\ntypechecked ok: 69 specialization(s), 64 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 10 folded, 1 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 5/10 index and 39/40 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/field-spelling-laws/query_stable.c (130110 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:34: warning: redundant `as u32`: 10 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:34: warning: redundant `as u32`: 20 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:34: warning: redundant `as u32`: 4294967295 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 9 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 11 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 19 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 21 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 4294967294 fits u32 here\n"
+          },
+          {
+            "compiler": "query_stable",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.07922299399797339,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "query_stable",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0011560280036064796,
+            "stdout": "field spelling laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.011106197998742573,
+            "stdout": "parsed ok: 223 top-level declarations, 6 file(s)\ntypechecked ok: 69 specialization(s), 64 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 10 folded, 1 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 5/10 index and 39/40 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/field-spelling-laws/identity.c (130110 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:34: warning: redundant `as u32`: 10 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:34: warning: redundant `as u32`: 20 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:34: warning: redundant `as u32`: 4294967295 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 9 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 11 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 19 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 21 fits u32 here\n/home/jacobt/src/blot2/build/goose-port/field-spelling-laws/src/main.goose:35: warning: redundant `as u32`: 4294967294 fits u32 here\n"
+          },
+          {
+            "compiler": "identity",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.0798687710048398,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0011950119951507077,
+            "stdout": "field spelling laws passed\n",
+            "stderr": ""
+          }
+        ]
+      }
+    },
+    "tail-predicate-laws": {
+      "sha256": "5636eba2b85b4bcef245a2d2903f9dfc977bf864af5310eece80bd47902ff3b7",
+      "receipt": {
+        "coverage": "Exact current Tail enum, isParameter/isVariable predicates, tailCode; 16 variant/payload cases, equality-versus-tag controls, preserved short-circuit and single evaluation.",
+        "source_sha256": "1f4f06d75a7b88e29f62028ec129a411290cfddece5ba86e0458e23cd817d03e",
+        "runs": [
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.018606616999022663,
+            "stdout": "parsed ok: 135 top-level declarations, 2 file(s)\ntypechecked ok: 62 specialization(s), 2 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 17 folded, 3 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 0/0 index and 0/0 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/official.c (74854 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.11760675099503715,
+            "stdout": "",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/official.c:1661:13: warning: equality comparison with extraneous parentheses [-Wparentheses-equality]\n 1661 |     if ((t3 == variable_g)) goto L0;\n      |          ~~~^~~~~~~~~~~~~\n/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/official.c:1661:13: note: remove extraneous parentheses around the comparison to silence this warning\n 1661 |     if ((t3 == variable_g)) goto L0;\n      |         ~   ^            ~\n/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/official.c:1661:13: note: use '=' to turn this equality comparison into an assignment\n 1661 |     if ((t3 == variable_g)) goto L0;\n      |             ^~\n      |             =\n1 warning generated.\n"
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.009690894999948796,
+            "stdout": "tail predicate laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "old_bare_rejected",
+            "exit": 1,
+            "seconds": 0.019935604999773204,
+            "stdout": "parsed ok: 133 top-level declarations, 2 file(s)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/bare-payload.goose:6: error: variant Tail.parameter has a payload; construct it with Tail.parameter { ... }\nfn main() {let tail=Tail.parameter{42};assert(tail==Tail.parameter);}\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/bare-payload.goose:6\n"
+          },
+          {
+            "compiler": "query_stable",
+            "compiler_sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.012616517997230403,
+            "stdout": "parsed ok: 135 top-level declarations, 2 file(s)\ntypechecked ok: 62 specialization(s), 2 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 17 folded, 3 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 0/0 index and 0/0 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/query_stable.c (74854 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "query_stable",
+            "compiler_sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.09527860800153576,
+            "stdout": "",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/query_stable.c:1661:13: warning: equality comparison with extraneous parentheses [-Wparentheses-equality]\n 1661 |     if ((t3 == variable_g)) goto L0;\n      |          ~~~^~~~~~~~~~~~~\n/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/query_stable.c:1661:13: note: remove extraneous parentheses around the comparison to silence this warning\n 1661 |     if ((t3 == variable_g)) goto L0;\n      |         ~   ^            ~\n/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/query_stable.c:1661:13: note: use '=' to turn this equality comparison into an assignment\n 1661 |     if ((t3 == variable_g)) goto L0;\n      |             ^~\n      |             =\n1 warning generated.\n"
+          },
+          {
+            "compiler": "query_stable",
+            "compiler_sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.01021094500174513,
+            "stdout": "tail predicate laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "query_stable",
+            "compiler_sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7",
+            "phase": "old_bare_rejected",
+            "exit": 1,
+            "seconds": 0.012262104995897971,
+            "stdout": "parsed ok: 133 top-level declarations, 2 file(s)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/bare-payload.goose:6: error: variant Tail.parameter has a payload; construct it with Tail.parameter { ... }\nfn main() {let tail=Tail.parameter{42};assert(tail==Tail.parameter);}\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/bare-payload.goose:6\n"
+          },
+          {
+            "compiler": "identity",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.01741848800156731,
+            "stdout": "parsed ok: 135 top-level declarations, 2 file(s)\ntypechecked ok: 62 specialization(s), 2 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 17 folded, 3 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 0/0 index and 0/0 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/identity.c (74854 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.08191177299886476,
+            "stdout": "",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/identity.c:1661:13: warning: equality comparison with extraneous parentheses [-Wparentheses-equality]\n 1661 |     if ((t3 == variable_g)) goto L0;\n      |          ~~~^~~~~~~~~~~~~\n/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/identity.c:1661:13: note: remove extraneous parentheses around the comparison to silence this warning\n 1661 |     if ((t3 == variable_g)) goto L0;\n      |         ~   ^            ~\n/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/identity.c:1661:13: note: use '=' to turn this equality comparison into an assignment\n 1661 |     if ((t3 == variable_g)) goto L0;\n      |             ^~\n      |             =\n1 warning generated.\n"
+          },
+          {
+            "compiler": "identity",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.009977940993849188,
+            "stdout": "tail predicate laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "old_bare_rejected",
+            "exit": 1,
+            "seconds": 0.016455857999972068,
+            "stdout": "parsed ok: 133 top-level declarations, 2 file(s)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/bare-payload.goose:6: error: variant Tail.parameter has a payload; construct it with Tail.parameter { ... }\nfn main() {let tail=Tail.parameter{42};assert(tail==Tail.parameter);}\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/tail-predicate-laws/bare-payload.goose:6\n"
+          }
+        ]
+      }
+    },
+    "resolver-owner-laws": {
+      "sha256": "1f96dfd3e202d2aa64f52033ae1804fa37ff29a4667f11dee49a8aa127bbbb63",
+      "receipt": {
+        "coverage": "Exact current methodOwner with full Module field layout and actual ModuleRef field type (unused inactive default omitted); untouched leaf schemas reduced. Current/zero/storage bypass, missing foreign, duplicate pointer, equal-owner distinct module, exact selected roots, empty catalog, catalog laziness via duplicate bypass, unchanged budget and modules.",
+        "source_sha256": "b7dc231eafe1b179da0a668f21cf97e76ebb324ea5072f25cd623ec27afb26be",
+        "runs": [
+          {
+            "compiler": "official",
+            "sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.03742616799718235,
+            "stdout": "parsed ok: 225 top-level declarations, 7 file(s)\ntypechecked ok: 74 specialization(s), 64 struct/2 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 2 folded, 1 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 0/0 index and 13/13 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/resolver-owner-laws/official.c (130102 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.1181001520017162,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.009970947001420427,
+            "stdout": "resolver owner laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.02467545499530388,
+            "stdout": "parsed ok: 225 top-level declarations, 7 file(s)\ntypechecked ok: 74 specialization(s), 64 struct/2 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 2 folded, 1 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 0/0 index and 13/13 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/resolver-owner-laws/identity.c (130102 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.10838511100155301,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.005905186997551937,
+            "stdout": "resolver owner laws passed\n",
+            "stderr": ""
+          }
+        ]
+      }
+    },
+    "scan-scope-laws": {
+      "evidence.json": {
+        "coverage": "Exact current withScan, ScanScope/Tables/Scan, scan init and withStore bodies. Scan deinit exact clears plus assertions/instrumented stage; Evidence init/deinit and untouched Module/table element leaves reduced. Two context types/three callbacks, success/error/init failure, exact module roots, array cleanup, deinit order.",
+        "source_sha256": "19a00c76da7953bb227f5c00d6856aee69eb0c920d8a06e644934d6d4c0383e5",
+        "runs": [
+          {
+            "compiler": "official",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.01563217099464964,
+            "stdout": "parsed ok: 170 top-level declarations, 4 file(s)\ntypechecked ok: 77 specialization(s), 23 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 0/2 index and 4/4 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/scan-scope-laws/official-actual.c (138076 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.09018932500475785,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0011391360021661967,
+            "stdout": "scan carrier actual wrapper laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.014308655001514126,
+            "stdout": "parsed ok: 170 top-level declarations, 4 file(s)\ntypechecked ok: 77 specialization(s), 23 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 0/2 index and 4/4 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/scan-scope-laws/identity-actual.c (138076 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.1073668640019605,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0013756960033788346,
+            "stdout": "scan carrier actual wrapper laws passed\n",
+            "stderr": ""
+          }
+        ]
+      }
+    },
+    "catalog-selector-laws": {
+      "evidence.json": {
+        "coverage": "Exact selectors, namedCurrent/step/ownerModule and named loop-control prefix; full Module field layout with reduced leaf schemas. Named terminal publication is reduced to a scalar observation; original semantic terminal body checked separately unchanged. Bounds is instrumented to test order/error priorities.",
+        "runs": [
+          {
+            "compiler": "official",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.02708842299762182,
+            "stdout": "parsed ok: 239 top-level declarations, 8 file(s)\ntypechecked ok: 80 specialization(s), 67 struct/3 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 3/4 index and 15/15 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/catalog-selector-laws/official.c (161754 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.09870851199957542,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.001173712000309024,
+            "stdout": "catalog selector and chain laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.01570028999412898,
+            "stdout": "parsed ok: 239 top-level declarations, 8 file(s)\ntypechecked ok: 80 specialization(s), 67 struct/3 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 3/4 index and 15/15 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/catalog-selector-laws/identity.c (161754 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.10549733999505406,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0007690920028835535,
+            "stdout": "catalog selector and chain laws passed\n",
+            "stderr": ""
+          }
+        ]
+      },
+      "audit.json": {
+        "named_terminal_body_unchanged_except_native_callable_push": true,
+        "scan_callback_body_token_identical": true,
+        "core_invocation_terminal_body_identical": true,
+        "declared_operation_validation_body_identical": true,
+        "remaining_numeric_increments": [
+          {
+            "line": 56,
+            "lhs": "self_.len",
+            "rhs": "1"
+          },
+          {
+            "line": 116,
+            "lhs": "len",
+            "rhs": "1"
+          },
+          {
+            "line": 117,
+            "lhs": "len",
+            "rhs": "1"
+          },
+          {
+            "line": 128,
+            "lhs": "len",
+            "rhs": "1"
+          },
+          {
+            "line": 147,
+            "lhs": "slot",
+            "rhs": "1"
+          },
+          {
+            "line": 154,
+            "lhs": "slot",
+            "rhs": "1"
+          },
+          {
+            "line": 181,
+            "lhs": "imported.type_len",
+            "rhs": "1"
+          },
+          {
+            "line": 186,
+            "lhs": "imported.type_len",
+            "rhs": "1"
+          },
+          {
+            "line": 218,
+            "lhs": "invocation.count",
+            "rhs": "1"
+          },
+          {
+            "line": 322,
+            "lhs": "self_.scope_depth",
+            "rhs": "1"
+          },
+          {
+            "line": 336,
+            "lhs": "self_.scope_depth",
+            "rhs": "1"
+          },
+          {
+            "line": 468,
+            "lhs": "self_.scope_depth",
+            "rhs": "1"
+          },
+          {
+            "line": 496,
+            "lhs": "count",
+            "rhs": "1"
+          },
+          {
+            "line": 511,
+            "lhs": "len",
+            "rhs": "1"
+          },
+          {
+            "line": 512,
+            "lhs": "index",
+            "rhs": "1"
+          }
+        ],
+        "native_appends_replaced": 21,
+        "limits": "Owner-chain runtime uses exact original ownerModule and loop prefix; terminal callable/evidence publication retained verbatim but not executed by the reduced fixture."
+      }
+    },
+    "native-record-appends": {
+      "evidence.json": {
+        "scope": "native array record append correction, declarations/schemas inspected; full program acceptance pending",
+        "sites": [
+          {
+            "file": "compiler-goose/src/check/capability_invocations.goose",
+            "line": 38,
+            "receiver": "self_.scopes"
+          },
+          {
+            "file": "compiler-goose/src/check/usage_check.goose",
+            "line": 81,
+            "receiver": "memo.nominals"
+          },
+          {
+            "file": "compiler-goose/src/check/usage_check.goose",
+            "line": 125,
+            "receiver": "self_.states"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 31,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 35,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 40,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 40,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 40,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 41,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 41,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 42,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 43,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 43,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 43,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 44,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 45,
+            "receiver": "work"
+          },
+          {
+            "file": "compiler-goose/src/check/associated_admission.goose",
+            "line": 46,
+            "receiver": "work"
+          }
+        ]
+      }
+    }
+  },
+  "later_attempts": {
+    "190": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-190-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 110.793,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-190.log",
+      "capture_seconds": 0.3021,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-190-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-190-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "191": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-191-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 116.911,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-191.log",
+      "capture_seconds": 0.2082,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-191-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-191-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "192": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-192-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 113.983,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-192.log",
+      "capture_seconds": 0.1984,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-192-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-192-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "193": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-193-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 102.455,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-193.log",
+      "capture_seconds": 0.5124,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-193-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-193-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "194": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-194-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 104.12,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-194.log",
+      "capture_seconds": 0.2469,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-194-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-194-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "195": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-195-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 102.974,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-195.log",
+      "capture_seconds": 0.2522,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-195-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-195-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "196": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-196-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 99.55,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-196.log",
+      "capture_seconds": 0.2859,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-196-inputs/compiler-goose",
+      "live_matches_frozen": false,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-196-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "build-197": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-197-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 99.756,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-197.log",
+      "capture_seconds": 0.1926,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-197-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-197-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "build-198": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-198-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 100.996,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-198.log",
+      "capture_seconds": 0.2341,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-198-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-198-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "build-199": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-199-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 101.558,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-199.log",
+      "capture_seconds": 0.1971,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-199-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-199-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "eval/type_evidence.goose:336 mappingItems lacks const Mapping[:] overload",
+        "runtime/list_runtime.goose:856 large integer inferred as u32"
+      ]
+    }
+  },
+  "rejected_last_depth": {
+    "scope": "first diagnostic latency on one frozen failing prefix; not completed compiler timing",
+    "source": "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src",
+    "source_sha256": "34552df56f4fc04a27803981f9e39a65e55f394b6ce85163c5714dccbeb9a37e",
+    "binaries": {
+      "baseline": {
+        "path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e"
+      },
+      "candidate": {
+        "path": "/home/jacobt/src/blot2/build/goose-port/shrink-last-depth-experiment/compiler-shrink/goose",
+        "sha256": "5f9564e4c6f2023006f7fd911af1da774678c047a6f91c21c6e416a13fdd99a8"
+      }
+    },
+    "runs": [
+      {
+        "label": "candidate",
+        "pair": 1,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/shrink-last-depth-experiment/compiler-shrink/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 34.32235228799982,
+        "elapsed_seconds": 34.53823502299929,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/shrink-last-depth-experiment/prefix-pairs/1-candidate.log",
+        "host_load": "5.84 4.40 3.68 5/2117 1655884"
+      },
+      {
+        "label": "baseline",
+        "pair": 1,
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "check",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/main.goose",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "--diagnostics",
+          "text",
+          "-O0"
+        ],
+        "first_diagnostic_seconds": 32.92412827899534,
+        "elapsed_seconds": 33.19353408399911,
+        "natural_exit_code": null,
+        "forced_exit_code": -15,
+        "stop_reason": "first diagnostic",
+        "diagnostic": [
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/src/check/staging_core.goose:73: error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)",
+          "recursive fn declaredBodyValue(self_:Named&,body:const blot_check_core::Body&,parameters:const blot_check_core::Parameter[:],depth:i64)->Error {var signature=self_.m.bindings[body.binding].ty;for parameter in parameters {let arrow,error=callable(self_.m,signature,self_.remaining);if error!=blot_error::Error.none {return error;}self_.ambient=blot_support::some(self_.m.types.row(arrow.c));signature=arrow.b;}self_.decision_owner .= null;self_.resolver_callback=0;let owner=callOwner(self_.m,body.binding,self_.active_calls);var scoped=scopedNamed(self_,self_.locals,self_.loop_owner,self_.loan_owner,owner,self_.decision_owner);let error=scoped.node(body.root,parameters,body.closed_rows,depth+1);scoped.active_calls .= owner.parent;publishNamed(self_,scoped);return error;}"
+        ],
+        "log": "/home/jacobt/src/blot2/build/goose-port/shrink-last-depth-experiment/prefix-pairs/1-baseline.log",
+        "host_load": "4.74 4.28 3.66 7/2084 1657722"
+      }
+    ],
+    "stdlib_sha256": "46df43caee7d394ff0cd10c118a5a500e8afe61a2cdb30682d8c183a6b1ad29a",
+    "paired_gains": [
+      -0.04246806467148012
+    ],
+    "decision": "rejected by first-pair improvement threshold"
+  },
+  "limits": [
+    "timings stop at the same failing diagnostic, not completion",
+    "source repair laws disclose reduced schemas or controlled leaf bodies; not whole algorithms",
+    "full CLI/Wasm/worker/Gdev/OOM/retention qualification remains pending",
+    "installed Goose and Zig oracle unchanged"
+  ],
+  "review": {
+    "source_base": "df20af3dca298c9ddf3521f91f3581308b6fb16b",
+    "scope": "18 changed Goose source files, excluding generated identity and private checker patch",
+    "result": "no concrete semantic blocker found",
+    "checked": [
+      "owner roots and duplicate policies",
+      "validation and fuel order",
+      "lexical callback and cleanup",
+      "native-array receiver schemas",
+      "reference-return loops",
+      "fieldSpelling consumers",
+      "Tail predicates and empty Row"
+    ],
+    "whole_compiler_qualification": false
+  },
+  "whole_parse": {
+    "command": [
+      "../goose-to-wasm/build/native/goose",
+      "--parse",
+      "compiler-goose/src/main.goose",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib"
+    ],
+    "exit": 0,
+    "declarations": 36066,
+    "files": 439,
+    "seconds": 0.797888204
+  }
+}

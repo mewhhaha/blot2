@@ -329,6 +329,18 @@ fn invocationCore(module: const Module&, body: blot_check_core::Body, owners: co
         if parameter.binding == 0 || parameter.binding >= module.bindings.len || module.bindings[parameter.binding].kind != blot_reuse_principal_interface::Kind.parameter || !bindings.bind(parameter.binding, (1 as u16) << index) { return blot_support::none<Parameters>(); }
     } return coreInvocation(module, body.root, bindings, body.parameters.len as u8, owners, remaining, 0);
 }
+fn coreInvocationOwner(module: const Module&, owners: const ModuleRef[:], unit: u32, remaining: i64&) -> const Module? {
+    if unit == 0 || unit == module.unit { return module; }
+    var selected: const Module? = null;
+    for entry in owners {
+        let owner .= entry.value;
+        if remaining == 0 { return null; } remaining -= 1;
+        if owner.unit != unit { continue; }
+        if selected { if selected.owner_id == 0 || selected.owner_id != owner.owner_id { return null; } }
+        selected .= owner;
+    }
+    return selected;
+}
 recursive fn coreInvocation(module: const Module&, id: u32, bindings: const CoreInvocationBindings&, inputs: u8, owners: const ModuleRef[:], remaining: i64&, depth: i64) -> blot_support::Option<Parameters> {
     if remaining < 17 || depth >= 128 { return blot_support::none<Parameters>(); } remaining -= 17; let found = coreCall(module, id); if !found.present { return blot_support::none<Parameters>(); } let call = found.value;
     if call.target.unit == 0 || call.target.unit == module.unit { let callback = bindings.get(call.target.binding);
@@ -337,11 +349,8 @@ recursive fn coreInvocation(module: const Module&, id: u32, bindings: const Core
             return invocationResult(inputs, callback.value, arguments[..call.len], false);
         }
     }
-    var producer: const Module&  = module;
-    if call.target.unit != 0 && call.target.unit != module.unit { var selected: const Module? = null;
-        for owner_owner_ref in owners { let owner: const blot_check_core::Module&  = owner_owner_ref.value; if remaining == 0 { return blot_support::none<Parameters>(); } remaining -= 1; if owner.unit != call.target.unit { continue; } if selected { if selected.owner_id == 0 || selected.owner_id != owner.owner_id { return blot_support::none<Parameters>(); } } selected .= owner; }
-        if !selected { return blot_support::none<Parameters>(); } producer .= selected;
-    }
+    let producer .= coreInvocationOwner(module, owners, call.target.unit, remaining);
+    if !producer { return blot_support::none<Parameters>(); }
     if call.target.binding == 0 || call.target.binding >= producer.bindings.len { return blot_support::none<Parameters>(); } let binding = producer.bindings[call.target.binding]; if binding.kind != blot_reuse_principal_interface::Kind.global || binding.body_id == 0 || binding.body_id >= producer.bodies.len { return blot_support::none<Parameters>(); } let body = producer.bodies[binding.body_id];
     if !body.is_function || body.parameters.len != call.len || body.parameters.start > producer.parameters.len || body.parameters.len > producer.parameters.len - body.parameters.start { return blot_support::none<Parameters>(); } var nested = CoreInvocationBindings {..};
     for index in 0..call.len { let formal = producer.parameters[body.parameters.start + index]; if formal.binding == 0 || formal.binding >= producer.bindings.len || producer.bindings[formal.binding].kind != blot_reuse_principal_interface::Kind.parameter { return blot_support::none<Parameters>(); } let node = module.node(call.arguments[index]); if node.tag != blot_check_core::Tag.reference || node.a >= module.references.len { return blot_support::none<Parameters>(); }

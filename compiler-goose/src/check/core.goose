@@ -578,14 +578,14 @@ fn loopInfo(self_: const Module&, id: Id) -> LoopInfo { let value = self_.node(i
 fn loopCarries(self_: const Module&, id: Id) -> const LoopCarry[:] { let range = self_.loopInfo(id).carries; return self_.loop_carries[range.start..range.start + range.len]; }
 fn breakValues(self_: const Module&, id: Id) -> const Id[:] { assert(self_.node(id).tag == Tag.break_); return self_.children(id); }
 fn name(self_: const Module&, range: Name) -> const u8[:] { return self_.names[range.start..range.start + range.len]; }
-fn fieldSpelling(self_: const Module&, symbol: u32) -> const u8[:], bool {
+fn fieldSpelling(self_: const Module&, symbol: u32) -> blot_support::Option<const u8[:]> {
     var low: i64 = 0; var high = self_.field_names.len;
     while low < high {
         let middle = low + (high - low) / 2; let value = self_.field_names[middle];
         if value.symbol < symbol { low = middle + 1; } else if value.symbol > symbol { high = middle; }
-        else { return self_.name(value.spelling), true; }
+        else { return blot_support::some(self_.name(value.spelling)); }
     }
-    return self_.names[..0], false;
+    return blot_support::none<const u8[:]>();
 }
 fn nominal(self_: const Module&, index: u32) -> Nominal { return self_.nominals[index]; }
 fn nominalConstructors(self_: const Module&, index: u32) -> const u32[:] { let range = self_.nominals[index].constructors; return self_.extra[range.start..range.start + range.len]; }

@@ -35,7 +35,7 @@ fn localStateStore(self_: Scan&, scope: Id, call: Id, contract: Parameters) -> b
     for item in self_.scopes { let error = self_.step(0); if error != blot_error::Error.none { return false, error; } if item.root == scope { return stateReport(self_, item.report, call, contract); } }
     let report, error = blot_check_capability_lifetimes::analyzeScope(self_.module, self_.owners, scope, self_.remaining); var owned = blot_support::none<Report>();
     if error == blot_error::Error.out_of_memory { return false, error; } if error != blot_error::Error.none && error != blot_error::Error.unsupported { return false, blot_error::Error.invalid_artifact; } if error == blot_error::Error.none { owned = blot_support::some(report); }
-    self_.scopes += Scope { scope, owned , ..}; return stateReport(self_, owned, call, contract);
+    self_.scopes.push(Scope { scope, owned , ..}); return stateReport(self_, owned, call, contract);
 }
 recursive fn authority(self_: Scan&, id: Id, scoped: bool, depth: i64) -> bool, Error {
     let error = self_.step(depth); if error != blot_error::Error.none { return false, error; } if id == 0 || id >= self_.module.nodes.len { return false, blot_error::Error.invalid_artifact; } let n = self_.module.node(id); let ty = self_.module.types.node(n.ty);

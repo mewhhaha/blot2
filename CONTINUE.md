@@ -22,12 +22,15 @@ The current package repairs keep recursive state scalar, construct borrowed
 views through explicit boundaries, and share nested admission using local
 workspace copies. Whole-program C emission and linking are still pending.
 The selected private checker separates closed nominal identity from instance
-attachment. It passes 53 AST laws, 178 graph controls, 201 frontend controls and
-eight runtime cases. Three frozen-prefix pairs measure 87.430 -> 54.749s to the
-identical diagnostic (37.38%). This is a failing-prefix gain; the repaired whole
-port still reaches its 120s cap without program C. Reference-reachability queries
-and root enumeration remain iteration costs. Removing the optional bounds cache
-may add allocation/runtime cost.
+attachment and uses a query-specific readiness gate for reference reachability.
+It passes 41 additional AST laws, 178 graph controls, 201 frontend controls and
+eight runtime cases. Two frozen-prefix pairs measure 48.017 -> 29.326s to the
+identical diagnostic (38.925%); the earlier nominal-identity change separately
+measures 87.430 -> 54.749s. These are failing-prefix gains under separate paired
+conditions, not completed compiler timings. Current source repairs preserve
+exact owner roots, callback cleanup and native array construction; complete
+program emission, linking and execution remain pending. Removing the optional
+bounds cache may add allocation/runtime cost.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
 Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.

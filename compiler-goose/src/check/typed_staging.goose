@@ -43,7 +43,7 @@ fn liftable(source, id: blot_check_types::Id) -> bool, blot_error::Error {
 fn compileOnly(source, raw: blot_check_types::Id) -> bool, blot_error::Error {
     var remaining: i64 = 4096; return compileOnlyDepth(source, raw, 0, remaining);
 }
-recursive fn compileOnlyDepth(source, raw: blot_check_types::Id, depth: i64, remaining: i64&) -> bool, blot_error::Error {
+recursive fn compileOnlyDepth<S>(source:S, raw: blot_check_types::Id, depth: i64, remaining: i64&) -> bool, blot_error::Error {
     if depth >= 128 || remaining == 0 { return false, blot_error::Error.type_limit; }
     remaining -= 1;
     let node = source.node(source.head(raw, 0));
@@ -77,7 +77,7 @@ recursive fn compileOnlyDepth(source, raw: blot_check_types::Id, depth: i64, rem
     }
     return false, blot_error::Error.none;
 }
-recursive fn liftableDepth(source, raw: blot_check_types::Id, depth: i64, remaining: i64&) -> bool, blot_error::Error {
+recursive fn liftableDepth<S>(source:S, raw: blot_check_types::Id, depth: i64, remaining: i64&) -> bool, blot_error::Error {
     if depth >= 128 || remaining == 0 { return false, blot_error::Error.type_limit; }
     remaining -= 1;
     let node = source.node(source.head(raw, 0));

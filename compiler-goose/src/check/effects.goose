@@ -17,6 +17,8 @@ let formal_key_bit: u32 = 0x80000000;
 let none: u32 = 0xffffffff;
 struct List { start: u32 = 0, len: u32 = 0 }
 enum Tail { closed, variable { value: u32 }, parameter { value: u32 }, formal { value: u32 } }
+fn isParameter(tail: Tail) -> bool { match tail { parameter => { return true; }, _ => { return false; }, } }
+fn isVariable(tail: Tail) -> bool { match tail { variable => { return true; }, _ => { return false; }, } }
 struct Row { labels: List = List {..}, tail: Tail = Tail.closed, cursor: Cursor = 0 }
 struct Variable { first: u32 = none, last: u32 = none }
 struct Version {

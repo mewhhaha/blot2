@@ -78,7 +78,7 @@ fn containsNominalMemoWork(store: const blot_check_types::Store&, nominals, root
     if same_catalog { for prior, index in memo.nominals { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } let nominal = nominals[index]; if prior.identity != nominal.identity || prior.has_usage != nominal.has_usage { same_catalog = false; break; } } }
     if !memo.epoch.present || memo.epoch.value != epoch || !memo.row_epoch.present || memo.row_epoch.value != store.effects.mutation_epoch || !same_catalog || epoch == 0xffffffffffffffff { memo.safe.clear(); }
     memo.epoch = blot_support::some(epoch); memo.row_epoch = blot_support::some(store.effects.mutation_epoch);
-    if !same_catalog { memo.nominals.clear(); for nominal in nominals { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } memo.nominals += NominalFact { nominal.identity, nominal.has_usage , ..}; } }
+    if !same_catalog { memo.nominals.clear(); for nominal in nominals { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } memo.nominals.push(NominalFact { nominal.identity, nominal.has_usage , ..}); } }
     let context = NominalStore { store, nominals, work , ..}; if epoch == 0xffffffffffffffff || store.effects.mutation_epoch == 0xffffffffffffffff { return inspectWithMemo(context, root, Mode.any, work, null); } return inspectWithMemo(context, root, Mode.any, work, memo);
 }
 struct Pending { ids: Id[4096], slots: u16[8192] = [0; 8192], count: i64 = 0 }
@@ -122,7 +122,7 @@ fn restore<E>(self_: Walker<E>&, states: const State[:]) { self_.states.resize(s
 fn state<E>(self_: Walker<E>&, binding: u32) -> State? { for &entry in self_.states { if entry.binding == binding { return entry; } } return null; }
 fn introduce<E>(self_: Walker<E>&, binding: u32) -> Error {
     if binding == 0 || self_.state(binding) != null { return blot_error::Error.none; } let affine, error = affineNominal(self_.engine.types, self_.engine.nominals, self_.engine.bindings[binding].ty); if error != blot_error::Error.none { return error; } if !affine { return blot_error::Error.none; }
-    if self_.states.len == 4096 { return blot_error::Error.type_limit; } self_.states += State { binding , ..}; return blot_error::Error.none;
+    if self_.states.len == 4096 { return blot_error::Error.type_limit; } self_.states.push(State { binding , ..}); return blot_error::Error.none;
 }
 fn use<E>(self_: Walker<E>&, binding: u32, source: AstId) -> Error {
     if binding == 0 { return blot_error::Error.none; } let affine, error = affineNominal(self_.engine.types, self_.engine.nominals, self_.engine.bindings[binding].ty); if error != blot_error::Error.none { return error; } if !affine { return blot_error::Error.none; }
