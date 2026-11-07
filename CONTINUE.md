@@ -16,9 +16,13 @@ upstream Goose acceptance checks and differential comparisons. The
 [compilation frontier](compiler-goose/port-notes/compilation.md) records the
 current repair loop. The port establishes no performance or parity result. The current repairs
 remove an unsafe optional bounds cache, keep identity-only indexes scalar, and
-trim 122 unused borrowed-root arguments from proof helpers. The last complete
-build attempt hit its 120-second cap before C output; the reduced candidate is
-under verification. Bounds revalidation may add allocation and runtime cost.
+trim 122 unused borrowed-root arguments from proof helpers. The last official
+build attempt hit its 120-second cap before C output. An explicitly selected
+private checker patch matches 201 frontend fixtures and eight runtime cases;
+three older-prefix pairs measure 7.601 -> 4.379s to the identical diagnostic.
+This is a failing-prefix gain, not completed compiler timing. Scalar package
+owner frames pass isolated execution laws; full compilation is still under
+repair. Bounds revalidation may add allocation and runtime cost.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
 Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.

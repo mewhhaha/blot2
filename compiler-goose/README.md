@@ -16,8 +16,8 @@ tables owned by their callers; numeric identities survive growth. Errors travel
 as explicit trailing results. Native adapters cover scalar representation and
 OS operations, without delegating compilation to Zig.
 
-The experiment preserves supported syntax and diagnostics, checker/evaluator
-behavior, both Wasm backends and reuse/caches. The public `blot-zig-project` server uses
+The target is the same supported syntax and diagnostics, checker/evaluator
+behavior, both Wasm backends and reuse behavior. The public `blot-zig-project` server uses
 protocol 1; guest session protocol is 2 and the private worker protocol is 2.
 Guest ABI 8 and existing storage budgets remain the owned backend contract.
 
@@ -47,8 +47,16 @@ previous executable intact.
 that is not a qualified build identity. Allocation metrics stay null with
 `coverage: "unavailable"` until real runtime allocation observations exist.
 
+An optional private bootstrap-checker experiment is reproducible with
+`python3 compiler-goose/tools/build_goose_checker.py`. It requires the pinned
+sibling Goose source/build and Clang 23.1.4, copies and patches privately, and
+prints its cached binary path as JSON. Pass that path explicitly to `--goose`;
+the installed compiler and ordinary toolchain remain unchanged. Its measured
+improvement is for an older failing prefix, not completed compiler builds; see
+the compilation frontier for exact evidence and limits.
+
 Run the checked engine laws with
-`python3 compiler-goose/tools/test_engines.py`. They compile live coalescing and
-interning sources to C and execute them using cached runtime/platform objects.
+`python3 compiler-goose/tools/test_engines.py`. They compile live coalescing, interning and scalar owner-frame sources to C and
+execute them using cached runtime/platform objects.
 Commands, source hashes and timings are saved under
 `build/goose-port/engine-tests/`; these laws do not qualify the whole compiler.

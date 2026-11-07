@@ -25,7 +25,8 @@ type Facts = blot_check_package_row_facts::Facts;
 type Views = blot_check_package_contracts::Context;
 type Import = blot_check_check_scheme_import::Copier;
 struct SourceFailure { unit: u32, span: blot_check_core::Span }
-struct Body { module: Module, binding: u32 }
+// Admission-local identity for immutable source headers, never a mutable-view certificate.
+struct Body { module_owner: u64, unit: u32, binding: u32 }
 struct SourceRows { module_owner: u64, rows: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
 struct SourceDefinitions { module_owner: u64, values: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
 struct AdmissionTables { bodies: BodyBuffer=BodyBuffer{..}, body_index: BodyMap=BodyMap{..}, source_rows: SourceRowsBuffer=SourceRowsBuffer{..}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{..} }
@@ -52,6 +53,24 @@ fn convert(error: Error) -> Error { if error == blot_error::Error.none || error 
 struct SharedGoal {
     producer: Module, origin: blot_support::Option<Module>   = blot_support::none<Module>(), binding: u32, call_owner: Id, resolver_callback: Id, goal_depth: i64,
     ambient: u32, foreign_allowed: bool, type_count: u8, row_count: u8, arguments: Id[128] = [0; 128],
+}
+fn hash(key:Body)->u64 {return ::hash_combine(::hash_combine(::hash(key.module_owner),::hash(key.unit)),::hash(key.binding));}
+// Module IDs keep hashing independent of large borrowed graph contents.
+// Structural key equality still decides SharedGoal hits; equal keys have equal IDs.
+fn hash(key:SharedGoal)->u64 {
+ var value=::hash(key.producer.owner_id);
+ value=::hash_combine(value,::hash(key.origin.present));
+ if key.origin.present {value=::hash_combine(value,::hash(key.origin.value.owner_id));}
+ value=::hash_combine(value,::hash(key.binding));
+ value=::hash_combine(value,::hash(key.call_owner));
+ value=::hash_combine(value,::hash(key.resolver_callback));
+ value=::hash_combine(value,::hash(key.goal_depth));
+ value=::hash_combine(value,::hash(key.ambient));
+ value=::hash_combine(value,::hash(key.foreign_allowed));
+ value=::hash_combine(value,::hash(key.type_count));
+ value=::hash_combine(value,::hash(key.row_count));
+ for argument in key.arguments {value=::hash_combine(value,::hash(argument));}
+ return value;
 }
 struct SharedAuthority {
     context: u64, pure_rows: Facts, closed_rows: Facts, instance_variables: Facts, instance_rows: Facts,

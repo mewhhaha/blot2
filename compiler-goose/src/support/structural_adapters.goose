@@ -155,6 +155,7 @@ import check.numeric_proof_terms;
 import check.ordered_membership;
 import check.package_contracts;
 import check.package_core;
+import check.package_owner_frames;
 import check.package_row_facts;
 import check.parallel_lowering;
 import check.parameter_patterns;
@@ -2914,10 +2915,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::Comp
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::Completed) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::Context)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::Context) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::ControlOwner)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::ControlOwner) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::DecisionOwner)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::DecisionOwner) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::Definitions)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::Definitions) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::FactKey)->bool {return equalFields(left,right);}
@@ -2932,8 +2929,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::Modu
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::ModuleCatalog) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::RowOrder)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::RowOrder) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::ScopeOwner)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::ScopeOwner) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::SolveWork)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::SolveWork) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::SourceProofCache)->bool {return equalFields(left,right);}
@@ -2948,6 +2943,12 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::Usag
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::UsageFacts) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::Walker)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::Walker) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_owner_frames::Control)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_owner_frames::Control) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_owner_frames::Decision)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_owner_frames::Decision) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_owner_frames::Scope)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_owner_frames::Scope) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_row_facts::Facts)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_row_facts::Facts) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_row_facts::Page)->bool {return equalFields(left,right);}

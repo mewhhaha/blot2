@@ -27,6 +27,7 @@ struct BindingRef {
     unit: u32 = 0,
     binding: BindingId
 }
+fn hash(value: BindingRef) -> u64 { return ::hash_combine(::hash(value.unit), ::hash(value.binding)); }
 struct Name {
     start: u32 = 0,
     len: u32 = 0

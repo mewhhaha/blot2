@@ -44,18 +44,18 @@ fn rowVariable(self_: Copier&, source: u32) -> blot_check_effects::Id, Error {
 fn variableOf(self_: Copier&, row: blot_check_effects::Id) -> u32, Error { match self_.destination.effects.node(row).tail { variable match_payload_26 => { let value = match_payload_26.value;  return value, blot_error::Error.none; }, _ => { return 0, blot_error::Error.type_limit; }, } }
 fn relocatedRows(self_: Copier&, source: const u32[:]) -> List, Error {
     var rows: u32[>..] = []; for old in source { let formal = blot_check_types::rowKeyFormal(old);
-        if formal.present { let copied, error = copy(self_, formal.value, 0); if error != blot_error::Error.none { return List {..}, error; } let key, error = blot_check_types::formalRowKey(copied); if error != blot_error::Error.none { return List {..}, error; } rows += key; continue; }
-        let fresh, error = rowVariable(self_, old); if error != blot_error::Error.none { return List {..}, error; } let variable, error = variableOf(self_, fresh); if error != blot_error::Error.none { return List {..}, error; } rows += variable;
+        if formal.present { let copied, error = copy(self_, formal.value, 0); if error != blot_error::Error.none { return List {..}, error; } let key, error = blot_check_types::formalRowKey(copied); if error != blot_error::Error.none { return List {..}, error; } rows.push(key); continue; }
+        let fresh, error = rowVariable(self_, old); if error != blot_error::Error.none { return List {..}, error; } let variable, error = variableOf(self_, fresh); if error != blot_error::Error.none { return List {..}, error; } rows.push(variable);
     } return self_.destination.saveList(rows);
 }
 fn quantifiedRows(self_: Copier&, values: List) -> List, Error {
-    var variables: u32[>..] = []; for index in self_.source.list(values) { let fresh, error = self_.destination.freshEffects(); if error != blot_error::Error.none { return List {..}, error; } self_.row_variables.insert(index, fresh); let variable, error = variableOf(self_, fresh); if error != blot_error::Error.none { return List {..}, error; } variables += variable; } return self_.destination.saveList(variables);
+    var variables: u32[>..] = []; for index in self_.source.list(values) { let fresh, error = self_.destination.freshEffects(); if error != blot_error::Error.none { return List {..}, error; } self_.row_variables.insert(index, fresh); let variable, error = variableOf(self_, fresh); if error != blot_error::Error.none { return List {..}, error; } variables.push(variable); } return self_.destination.saveList(variables);
 }
-fn copyGenerative(self_: Copier&, source: List) -> List, Error { if source.len > 32 || source.len % 2 != 0 { return List {..}, blot_error::Error.type_limit; } var roots: Id[>..] = []; for root in self_.source.list(source) { let id, error = copy(self_, root, 0); if error != blot_error::Error.none { return List {..}, error; } roots += id; } return self_.destination.saveList(roots); }
+fn copyGenerative(self_: Copier&, source: List) -> List, Error { if source.len > 32 || source.len % 2 != 0 { return List {..}, blot_error::Error.type_limit; } var roots: Id[>..] = []; for root in self_.source.list(source) { let id, error = copy(self_, root, 0); if error != blot_error::Error.none { return List {..}, error; } roots.push(id); } return self_.destination.saveList(roots); }
 recursive fn copyLabel(self_: Copier&, label: blot_check_effects::Label, depth: i64) -> blot_check_effects::Label, Error {
     if depth >= 1024 || label == 0 || label >= self_.source.operationCount() { return 0, blot_error::Error.type_limit; } { let optional_binding_57 .= self_.labels.get(label); if optional_binding_57 { let known .= optional_binding_57; return known, blot_error::Error.none;  } }
     if self_.associated { let error = self_.destination.chargeProjection(); if error != blot_error::Error.none { return 0, error; } }
-    let operation = self_.source.operation(label); var args: Id[>..] = []; for arg in self_.source.list(operation.arguments) { let copied, error = copy(self_, arg, depth + 1); if error != blot_error::Error.none { return 0, error; } args += copied; }
+    let operation = self_.source.operation(label); var args: Id[>..] = []; for arg in self_.source.list(operation.arguments) { let copied, error = copy(self_, arg, depth + 1); if error != blot_error::Error.none { return 0, error; } args.push(copied); }
     var instance = operation.instance; if instance.unit != 0 && self_.private_namespace != 0 { let copied, error = copyPhysical(self_, instance); if error != blot_error::Error.none { return 0, error; } instance = copied; }
     else if instance.unit == 0 && instance.decl != 0 { let copied, error = copy(self_, instance.decl, depth + 1); if error != blot_error::Error.none { return 0, error; } instance.decl = copied; }
     var identity = operation.identity; { let optional_binding_56 .= self_.operation_mapping; if optional_binding_56 { let mapping .= optional_binding_56; if label != blot_check_types::foreign_operation { { let optional_binding_55 .= mapping.get(identity); if optional_binding_55 { let copied .= optional_binding_55; identity = copied;  } else { return 0, blot_error::Error.type_limit; } } }  } }
@@ -65,7 +65,7 @@ recursive fn copyRow(self_: Copier&, source_row: blot_check_effects::Id, depth: 
     if depth >= 1024 { return 0, blot_error::Error.type_limit; } if source_row == 0 { return 0, blot_error::Error.none; } { let optional_binding_54 .= self_.rows.get(source_row); if optional_binding_54 { let known .= optional_binding_54; return known, blot_error::Error.none;  } }
     if self_.associated { let error = self_.destination.chargeProjection(); if error != blot_error::Error.none { return 0, error; } }
     let row = self_.source.row(source_row); var labels: blot_check_effects::Label[>..] = [];
-    for label in self_.source.rowLabels(row.labels) { let copied, error = copyLabel(self_, label, depth + 1); if error != blot_error::Error.none { return 0, error; } labels += copied; }
+    for label in self_.source.rowLabels(row.labels) { let copied, error = copyLabel(self_, label, depth + 1); if error != blot_error::Error.none { return 0, error; } labels.push(copied); }
     var tail = blot_check_effects::Tail.closed;
     match row.tail {
         closed => {},
@@ -77,7 +77,7 @@ recursive fn copyRow(self_: Copier&, source_row: blot_check_effects::Id, depth: 
             if !mapped.present { return 0, blot_error::Error.type_limit; } let replacement = self_.destination.effects.node(mapped.value);
             for label in self_.destination.effects.list(replacement.labels) {
                 if self_.associated { let error = self_.destination.chargeProjection(); if error != blot_error::Error.none { return 0, error; } }
-                var present = false; for existing in labels { if self_.associated { let error = self_.destination.chargeProjection(); if error != blot_error::Error.none { return 0, error; } } if existing == label { present = true; break; } } if !present { labels += label; }
+                var present = false; for existing in labels { if self_.associated { let error = self_.destination.chargeProjection(); if error != blot_error::Error.none { return 0, error; } } if existing == label { present = true; break; } } if !present { labels.push(label); }
             } tail = replacement.tail;
         },
     }
@@ -85,9 +85,9 @@ recursive fn copyRow(self_: Copier&, source_row: blot_check_effects::Id, depth: 
 }
 fn quantifier(self_: Copier&, node: blot_check_types::Node, depth: i64, id: Id) -> Id, Error {
     var binders: Id[>..] = []; for original in self_.source.list(List { node.b, node.c , ..}) { let leaf = self_.source.node(original); if leaf.tag != blot_check_types::Tag.bound { return 0, blot_error::Error.type_limit; }
-        var binder: Id = 0; { let optional_binding_52 .= self_.mapping.get(original); if optional_binding_52 { let known .= optional_binding_52; binder = known;  } else { let fresh, error = self_.destination.boundType(leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; } binder = fresh; } } self_.mapping.insert(original, binder); binders += binder;
+        var binder: Id = 0; { let optional_binding_52 .= self_.mapping.get(original); if optional_binding_52 { let known .= optional_binding_52; binder = known;  } else { let fresh, error = self_.destination.boundType(leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; } binder = fresh; } } self_.mapping.insert(original, binder); binders.push(binder);
     }
-    let body, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } var goals: blot_check_types::Obligation[>..] = []; goals += self_.source.quantifierGoals(id);
+    let body, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } var goals: blot_check_types::Obligation[>..] = []; goals.append(self_.source.quantifierGoals(id));
     for &goal in goals { let ty, error = copy(self_, goal.ty, depth + 1); if error != blot_error::Error.none { return 0, error; } goal.ty = ty; let other, error = copy(self_, goal.other, depth + 1); if error != blot_error::Error.none { return 0, error; } goal.other = other; let result, error = copy(self_, goal.result, depth + 1); if error != blot_error::Error.none { return 0, error; } goal.result = result; let signature, error = copy(self_, goal.signature, depth + 1); if error != blot_error::Error.none { return 0, error; } goal.signature = signature; goal.source = 0;
         if self_.private_namespace != 0 {
             if goal.qualification_span.present { let origin = goal.qualification_span.value; if goal.qualification_unit != 0 || origin.start == 0 || origin.start > self_.private_qualifications.len || origin.end != 0 { return 0, blot_error::Error.type_limit; } goal.qualification_span = blot_support::some(self_.private_qualifications[origin.start - 1]); goal.qualification_unit = self_.private_unit; }
@@ -98,7 +98,7 @@ fn quantifier(self_: Copier&, node: blot_check_types::Node, depth: i64, id: Id) 
     } return self_.destination.quantifiedWithGoals(node.tag, body, binders, goals);
 }
 fn nominal(self_: Copier&, node: blot_check_types::Node, depth: i64) -> Id, Error {
-    var args: Id[>..] = []; for arg in self_.source.nominalArguments(node) { let copied, error = copy(self_, arg, depth + 1); if error != blot_error::Error.none { return 0, error; } args += copied; }
+    var args: Id[>..] = []; for arg in self_.source.nominalArguments(node) { let copied, error = copy(self_, arg, depth + 1); if error != blot_error::Error.none { return 0, error; } args.push(copied); }
     var identity = Identity { node.a, node.b , ..}; let arity = blot_check_types::compilerNominalArity(identity);
     if !arity.present { { let optional_binding_47 .= self_.nominal_mapping; if optional_binding_47 { let mapping .= optional_binding_47; { let optional_binding_46 .= mapping.get(identity); if optional_binding_46 { let relocated .= optional_binding_46; identity = relocated;  }
         else { { let optional_binding_45 .= self_.operation_mapping; if optional_binding_45 { let operations .= optional_binding_45; { let optional_binding_44 .= operations.get(identity); if optional_binding_44 { let relocated .= optional_binding_44; identity = relocated;  } else { return 0, blot_error::Error.type_limit; } }  } else { return 0, blot_error::Error.type_limit; } } } }
@@ -120,7 +120,7 @@ fn copyDepth(self_: Copier&, source_id: Id, depth: i64) -> Id, Error {
         forall, existential => { let value, error = quantifier(self_, node, depth, id); result = value; failure = error; },
         instance_version => { let value, error = copyVersion(self_, node); result = value; failure = error; },
         instance_selection => { var choices: Id[>..] = []; let original = self_.source.nominalArguments(node); if original.len != 2 && original.len != 3 { return 0, blot_error::Error.type_limit; }
-            for choice in original { let value, error = copy(self_, choice, depth + 1); if error != blot_error::Error.none { return 0, error; } choices += value; } var identity = Identity { node.a, node.b , ..};
+            for choice in original { let value, error = copy(self_, choice, depth + 1); if error != blot_error::Error.none { return 0, error; } choices.push(value); } var identity = Identity { node.a, node.b , ..};
             if self_.private_namespace != 0 { let value, error = copyPhysical(self_, identity); if error != blot_error::Error.none { return 0, error; } identity = value; } let value, error = self_.destination.instanceSelection(identity, choices); result = value; failure = error;
         },
         usage => { let payload, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } var region: Id = 0; if node.c != 0 { let value, error = copy(self_, node.c, depth + 1); if error != blot_error::Error.none { return 0, error; } region = value; } let kind, error = blot_check_types::usageFromCode(node.b); if error != blot_error::Error.none { return 0, error; } let value, error = self_.destination.usage(payload, kind, region); result = value; failure = error; },
@@ -135,11 +135,11 @@ fn copyDepth(self_: Copier&, source_id: Id, depth: i64) -> Id, Error {
         state_provider => { let a, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } let b, error = copy(self_, node.b, depth + 1); if error != blot_error::Error.none { return 0, error; } let c, error = copy(self_, node.c, depth + 1); if error != blot_error::Error.none { return 0, error; } let value, error = self_.destination.stateProvider(a, b, c); result = value; failure = error; },
         resolver => { let a, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } let value, error = self_.destination.resolver(a); result = value; failure = error; },
         type_constructor => { var identity = Identity { node.a, node.b , ..}; { let optional_binding_42 .= self_.nominal_mapping; if optional_binding_42 { let mapping .= optional_binding_42; { let optional_binding_41 .= mapping.get(identity); if optional_binding_41 { let value .= optional_binding_41; identity = value;  } else { return 0, blot_error::Error.type_limit; } }  } } let value, error = self_.destination.typeConstructor(identity); result = value; failure = error; },
-        record => { var fields: blot_check_types::Field[>..] = []; for i in 0..node.b { let field = self_.source.recordField(node, i); var name = field.name; if self_.has_field_mapping { name = self_.field_mapping[field.name]; } let ty, error = copy(self_, field.ty, depth + 1); if error != blot_error::Error.none { return 0, error; } fields += blot_check_types::Field { name, ty , ..}; } let value, error = self_.destination.record(fields); result = value; failure = error; },
+        record => { var fields: blot_check_types::Field[>..] = []; for i in 0..node.b { let field = self_.source.recordField(node, i); var name = field.name; if self_.has_field_mapping { name = self_.field_mapping[field.name]; } let ty, error = copy(self_, field.ty, depth + 1); if error != blot_error::Error.none { return 0, error; } fields.push(blot_check_types::Field { name, ty , ..}); } let value, error = self_.destination.record(fields); result = value; failure = error; },
         nominal, projection => { let value, error = nominal(self_, node, depth); result = value; failure = error; },
         variable => { if !self_.fresh_variables { return 0, blot_error::Error.type_limit; } let value, error = self_.destination.fresh(); result = value; failure = error; },
         function => { let a, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } let b, error = copy(self_, node.b, depth + 1); if error != blot_error::Error.none { return 0, error; } let c, error = copyRow(self_, node.c, depth + 1); if error != blot_error::Error.none { return 0, error; } let value, error = self_.destination.functionWithEffects(a, b, c); result = value; failure = error; },
-        product => { var fields: Id[>..] = []; for child in self_.source.list(List { node.a, node.b , ..}) { let value, error = copy(self_, child, depth + 1); if error != blot_error::Error.none { return 0, error; } fields += value; } let value, error = self_.destination.product(fields); result = value; failure = error; },
+        product => { var fields: Id[>..] = []; for child in self_.source.list(List { node.a, node.b , ..}) { let value, error = copy(self_, child, depth + 1); if error != blot_error::Error.none { return 0, error; } fields.push(value); } let value, error = self_.destination.product(fields); result = value; failure = error; },
     }
     if failure != blot_error::Error.none { return 0, failure; } self_.mapping.insert(id, result); return result, blot_error::Error.none;
 }

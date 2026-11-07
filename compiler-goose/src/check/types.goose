@@ -2351,3 +2351,5 @@ recursive fn resolveQuantifiedGoals(self_:Store&,id:Id,value:Node,position:Curso
             }
             if !changed { return id, blot_error::Error.none; } return reownQuantified(self_, value.tag, body, binders, goals);
 }
+
+fn hash(key:NominalIdentity)->u64 {return ::hash_combine(::hash(key.unit),::hash(key.decl));}

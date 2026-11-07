@@ -4,8 +4,8 @@ The user explicitly requested fixing and recompiling the port. Verification is
 active; there is no remaining approval or source-writing barrier. Keep the Zig
 compiler, normal toolchain, saved oracle and siblings unchanged.
 
-Checkpoint `bd7e5ac93d423a860e03e00891a2269ca7752225` is pushed to main. It preserves
-scalar projection/staging state and unification scratch repairs. No successful
+Checkpoint `b499ece1e068833e13ba430e415e03ac46d4fd8e` is pushed to main. It preserves
+scalar projection/staging state, admission metadata and proof-root repairs. No successful
 whole compiler executable exists yet. Upstream Goose parses roughly 35,800
 declarations across 436 files in about one second. Whole-program type checking
 has not completed successfully.
@@ -69,11 +69,11 @@ pool free/reallocation receipts, numeric process-local owner slots, pooled
 planning/query buffers and ordered bootstrap globals. Copied packets omit the
 new process-local Chunk/Loops/Auxiliary slot fields.
 
-The installed upstream compiler remains selected and unchanged. Three private
+The installed upstream compiler remains unchanged. Three earlier private
 checker experiments passed their small differential fixtures but did not meet
 the frozen-prefix acceptance/time target. The private O0 and official O3 builds
 also prevent attributing timing differences to the algorithm changes alone.
-No experiment is accepted into the toolchain. Latest rejected-run evidence:
+None of those earlier experiments is selected. Latest rejected-run evidence:
 `build/goose-port/fast-goose-positive/decision.json`; prior source/checkpoint
 history retains the other measurements. Do not rebuild these candidates without
 a new measured lever.
@@ -82,8 +82,8 @@ The official C build attempts emitted the runtime but did not reach C program
 output: 60-second caps were incomplete. Build125 used a longer window and stopped
 immediately on the next source diagnostic at 61.464 seconds. The late profile
 (`official-profile-123`) identified RootCandidates/CanContain under recursive
-solver-summary application, before IR/emission. A private matched-O3 compiler
-build itself hit its 75-second cap and produced no candidate; see
+solver-summary application, before IR/emission. An earlier private matched-O3 compiler
+build hit its 75-second cap and produced no candidate from that run; see
 `fast-goose-o3/decision.json`. No upstream or installed binaries changed.
 
 The hot composite cache now accesses its canonical generation-checked state
@@ -119,6 +119,54 @@ Token normalization preserves all other helper logic; parsing passes. The
 compile-time effect remains unmeasured. Full C output, linking and executed
 compiler/Wasm smoke tests remain pending.
 
+The new private query-specific CanContain gate is selected explicitly for the
+current repair loop. It stops stability analysis at reference/slice identity,
+while ReachesThroughRefs retains its original complete graph requirement.
+Only three copied C++ headers change; the installed compiler and all 108
+upstream source files remain unchanged. The candidate uses the same Clang
+23.1.4, O3 and NDEBUG settings as the official compiler and is pinned as
+`f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7`.
+The reproducible optional recipe and full patch are tracked in tools/.
+
+Twenty-one focused AST/gate laws pass (their containment walk is a model).
+All 201 available selected frontend fixtures have byte-identical diagnostics;
+eight runtime fixtures match and pass. Three expected-acceptance mismatches in
+the narrower conformance selection occur identically on the official compiler;
+these are not new candidate failures. Across three pairs, the older frozen69
+prefix reaches the same first diagnostic in median 7.601 -> 4.379 seconds
+(1.736x); every complete log matches. This is a failing-prefix measurement,
+not full compilation. Evidence is under query-stable-goose/ in the ignored
+build directory. The actual candidate build142 reaches the next projection
+repair in 36.521 seconds; later repairs still require full qualification.
+
+Copied Principal comparisons now snapshot only scalar state and pass their real
+resolver, certificates, versions, views and budget explicitly. Recursive resolver
+behavior remains active. Scheme predicate goals use their native generic shape.
+Package scope/control/decision owners now use reusable scalar frame IDs instead
+of retaining stack locals. The exact 128 scoped-parameter cap and traversal
+charges remain; reusable tables add no new semantic nesting cap. Three engine
+suites pass with the official compiler; new frame laws execute recursive success
+and error cleanup, 513 nested scopes, independent return/loop chains, closure
+masking and slot reuse, ending with zero active frames. Their integration with
+the full compiler is still pending.
+
+Source-body receipts now carry owner/unit/binding IDs. Admission requires a
+nonzero owner minted by normal builder/decode boundaries; source Core headers
+must stay immutable during that admission, matching native pointer identity.
+Publication resolves the entire batch against the canonical cache catalog before
+reserving or emitting claims. Missing/zero/wrong-unit identities and reserve
+failures are covered by executed extracted-helper laws; budget charging, rollback
+and snapshot release logic stay unchanged. Unpublished zero-ID internal modules
+are rejected instead of sharing a cycle key.
+
+Recursive source-body setup uses two pure nonrecursive construction helpers,
+with initialization still after memo registration. Budget restoration likewise
+passes the original reference through a nonrecursive setter; counter values are
+never copied. Official and private checkers both execute focused differing-root,
+alias and error-cleanup laws and reject an escaping local reference. Module work
+counters use their generation-checked canonical pool views, preserving existing
+aliases. The full build remains the authority for integrating these boundaries.
+
 The unchanged Zig oracle's full gate was rerun with a 120-second total cap
 (`build/goose-port/oracle-gate-139/timings.json`). Smoke, harness, release build
 and the complete no-LLVM native compilation pass; execution stops on the budget
@@ -129,3 +177,11 @@ Goose compiler.
 
 Runtime recoverable physical OOM and retention parity remain separate known
 production requirements; null/unavailable metrics do not close them.
+
+The current source-only batch includes the private checker recipe, executed
+scalar-frame laws, canonical source-body receipts and pure construction/budget
+boundaries. Build154 clears those boundaries and reaches scheme importing;
+its mismatched table field and thirteen scalar/sequence append operations are
+repaired. Build156 now rejects a resizable local importer buffer across recursion; fixed
+pooled scratch is the next repair. This checkpoint does not contain a working
+compiler executable.

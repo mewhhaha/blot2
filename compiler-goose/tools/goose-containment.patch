@@ -1,0 +1,107 @@
+--- a/src/type_queries.h
++++ b/src/type_queries.h
+@@ -58,0 +59,83 @@
++// CanContain observes type identity and by-value fields, never a referent's
++// fields. This gate is deliberately separate from full reachability queries.
++// As in StableTypeGraph, no walk constructs, resolves or validates a type.
++struct StableCanContainGraph {
++    unordered_set<TypeExpr *> known;
++    unordered_set<TypeExpr *> identities;
++
++    bool Identity(TypeExpr *t) {
++        if (!t) return false;
++        if (identities.count(t)) return true;
++        vector<TypeExpr *> seen;
++        if (!IdentityVisit(t, seen)) return false;
++        identities.insert(t);
++        return true;
++    }
++
++    bool Ready(TypeExpr *t) {
++        if (!t) return false;
++        if (known.count(t)) return true;
++        vector<TypeExpr *> seen;
++        if (!Visit(t, seen)) return false;
++        known.insert(t);
++        return true;
++    }
++
++private:
++    bool IdentityVisit(TypeExpr *t, vector<TypeExpr *> &seen) {
++        if (!t) return false;
++        if (identities.count(t) || find(seen.begin(), seen.end(), t) != seen.end())
++            return true;
++        seen.push_back(t);
++        auto all = [&](const vector<TypeExpr *> &ts) {
++            for (auto x : ts) if (x && !IdentityVisit(x, seen)) return false;
++            return true;
++        };
++        switch (t->kind) {
++            case TY_INT: return !t->ix || t->ix->arr;
++            case TY_FLT: case TY_BOOL: case TY_VOID: return true;
++            case TY_SLICE: return IdentityVisit(t->sub, seen);
++            case TY_REF:
++                return (t->ref->poolname.empty() || t->ref->pool) &&
++                       IdentityVisit(t->ref->sub, seen);
++            case TY_ARRAY:
++                if (t->arr->sub->kind == TY_VOID) return false;
++                if (t->arr->akind == A_FIXED && t->arr->size < 0) return false;
++                if (t->arr->sizeexpr && t->arr->size < 0) return false;
++                return IdentityVisit(t->arr->sub, seen);
++            case TY_STRUCT: {
++                auto i = t->struc->inst;
++                return i && i->validated && !i->failed && all(t->struc->args);
++            }
++            case TY_ENUM: {
++                auto i = t->enu->inst;
++                return i && i->validated && !i->failed && all(t->enu->args);
++            }
++            case TY_VARIANT:
++                return t->var->variant && IdentityVisit(t->var->adt, seen);
++            default: return false;
++        }
++    }
++
++    bool Visit(TypeExpr *t, vector<TypeExpr *> &seen) {
++        if (!t || !Identity(t)) return false;
++        if (known.count(t) || find(seen.begin(), seen.end(), t) != seen.end())
++            return true;
++        seen.push_back(t);
++        auto all = [&](const vector<TypeExpr *> &ts) {
++            for (auto x : ts) if (x && !Visit(x, seen)) return false;
++            return true;
++        };
++        switch (t->kind) {
++            case TY_ARRAY: return Visit(t->arr->sub, seen);
++            case TY_STRUCT: return all(t->struc->inst->ftypes);
++            case TY_ENUM:
++                for (auto &fs : t->enu->inst->vftypes) if (!all(fs)) return false;
++                return true;
++            // More conservative than the query: require every variant's fields.
++            case TY_VARIANT: return Visit(t->var->adt, seen);
++            default: return true; // Identity proved primitives and view identities.
++        }
++    }
++};
++
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -104,0 +105 @@
++    StableCanContainGraph stablecontainment;
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1110,2 +1110,12 @@
+-        case TY_STRUCT: case TY_ENUM: case TY_VARIANT: case TY_ARRAY:
+-            return StableTypeQuery(cancontain, t, of, [&]() { return CanContainWalk(t, of); });
++        case TY_STRUCT: case TY_ENUM: case TY_VARIANT: case TY_ARRAY: {
++            pair key { t, of };
++            if (auto known = cancontain.find(key)) {
++                assert(*known == CanContainWalk(t, of));
++                return *known;
++            }
++            if (typesbuilding || !stablecontainment.Ready(t) ||
++                !stablecontainment.Identity(of)) return CanContainWalk(t, of);
++            auto result = CanContainWalk(t, of);
++            cancontain[key] = result;
++            return result;
++        }
