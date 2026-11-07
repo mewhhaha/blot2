@@ -75,31 +75,33 @@ fn hash(key:SharedGoal)->u64 {
 struct SharedAuthority {
     context: u64, pure_rows: Facts, closed_rows: Facts, instance_variables: Facts, instance_rows: Facts,
     schemes: blot_check_types::Scheme[128] = [blot_check_types::Scheme {..}; 128], scheme_count: i64,
-    generic_variables: List, generic_rows: List, obligations: const blot_check_core::Obligation[:], source_obligations: const blot_check_types::Obligation[:],
+    generic_variables: List, generic_rows: List,
     source_instances: bool, executable: bool, large_plain_graph: bool,
 }
 fn eligible(views: const Views&) -> bool { return views.owner_id != 0 && !views.formal.present && views.formal_count == 0 && views.opening_count == 0 && !views.witness && !views.representation_floor.present && views.projection_resolver == null; }
 fn captureAuthority(views: const Views&) -> SharedAuthority {
     var result = SharedAuthority { context: views.owner_id, pure_rows: views.pure_rows, closed_rows: views.closed_rows, instance_variables: views.instance_variables, instance_rows: views.instance_rows, scheme_count: views.scheme_count,
-        generic_variables: views.generic_variables, generic_rows: views.generic_rows, obligations: views.obligations, source_obligations: views.source_obligations,
+        generic_variables: views.generic_variables, generic_rows: views.generic_rows,
         source_instances: views.source_instances, executable: views.executable, large_plain_graph: views.large_plain_graph , ..};
     for index in 0..views.scheme_count { result.schemes[index] = views.schemes[index]; } return result;
 }
-fn matches(self_: const SharedAuthority&, views: const Views&) -> bool {
-    if !eligible(views) || self_.context != views.owner_id || self_.scheme_count != views.scheme_count || self_.generic_variables != views.generic_variables || self_.generic_rows != views.generic_rows || !(blot_support::same_slice_identity(self_.obligations,views.obligations)) || !(blot_support::same_slice_identity(self_.source_obligations,views.source_obligations)) || self_.source_instances != views.source_instances || self_.executable != views.executable || self_.large_plain_graph != views.large_plain_graph { return false; }
+fn matches(self_: const SharedAuthority&, views: const Views&, obligations: const blot_check_core::Obligation[:], source_obligations: const blot_check_types::Obligation[:]) -> bool {
+    if !eligible(views) || self_.context != views.owner_id || self_.scheme_count != views.scheme_count || self_.generic_variables != views.generic_variables || self_.generic_rows != views.generic_rows || !(blot_support::same_slice_identity(obligations,views.obligations)) || !(blot_support::same_slice_identity(source_obligations,views.source_obligations)) || self_.source_instances != views.source_instances || self_.executable != views.executable || self_.large_plain_graph != views.large_plain_graph { return false; }
     for index in 0..self_.scheme_count { if self_.schemes[index] != views.schemes[index] { return false; } }
     return self_.pure_rows.eql(views.pure_rows) && self_.closed_rows.eql(views.closed_rows) && self_.instance_variables.eql(views.instance_variables) && self_.instance_rows.eql(views.instance_rows);
 }
 struct SolverTables { rigid_type_overflow: IdMap=IdMap{..}, rigid_rows: IdMap=IdMap{..}, shared_goals: GoalMap=GoalMap{..} }
 struct Solver {
-    store: blot_check_types::Store, graph: blot_check_core::Types, view: blot_check_core::Types? = null, scope: u32 = 0, oom: bool = false,
+    store: blot_check_types::Store, graph: blot_check_core::Types, view: blot_check_core::Types? = null,
+    authority_obligations: const blot_check_core::Obligation[:], authority_source_obligations: const blot_check_types::Obligation[:],
+    scope: u32 = 0, oom: bool = false,
     rigid_types: blot_check_package_contracts::Bits4096 = blot_check_package_contracts::Bits4096 {..}, rigid_type_overflow: IdMap=IdMap{..}, rigid_rows: IdMap=IdMap{..},
     remaining: i64&, prefix_nodes: i64 = 0, prefix_rows: i64 = 0, prefix_operations: i64 = 0, prefix_extra: i64 = 0, prefix_row_variables: i64 = 0,
     shared_authority: blot_support::Option<SharedAuthority>   = blot_support::none<SharedAuthority>(), shared_goals: GoalMap=GoalMap{..}, shared_goal_hits: i64 = 0,
 }
-fn init(store: blot_check_types::Store, module: const Module&, views: Views&, remaining: i64&, tables: SolverTables) -> Solver, Error {
-    var result = Solver { store: store, graph: blot_check_core::emptyTypes(), rigid_type_overflow: tables.rigid_type_overflow, rigid_rows: tables.rigid_rows, remaining: remaining, shared_goals: tables.shared_goals , ..};
-    let error = initialize(result, module, views); if error != blot_error::Error.none { deinit(result); return result, error; } return result, blot_error::Error.none;
+fn init(store: blot_check_types::Store, module: const Module&, views: Views&, remaining: i64&, tables: SolverTables, view: blot_check_core::Types&) -> Solver, Error {
+    var result = Solver { store: store, graph: blot_check_core::emptyTypes(), view: view, authority_obligations: views.obligations, authority_source_obligations: views.source_obligations, rigid_type_overflow: tables.rigid_type_overflow, rigid_rows: tables.rigid_rows, remaining: remaining, shared_goals: tables.shared_goals , ..};
+    let error = initialize(result, module, views); if error != blot_error::Error.none { result.view .= null; deinit(result); return result, error; } return result, blot_error::Error.none;
 }
 fn initialize(self_: Solver&, module: const Module&, views: Views&) -> Error {
     let store: blot_check_types::Store&  = self_.store;
@@ -133,7 +135,13 @@ fn sharedAuthority(self_: Solver&, views: Views&) -> bool, Error {
     for index in 0..views.scheme_count { let scheme = views.schemes[index]; if scheme.root >= self_.prefix_nodes || scheme.generative.len != 0 { return false, blot_error::Error.none; }
         let spans: List[3] = [scheme.variables, scheme.row_variables, scheme.closed_rows]; for span, ordinal in spans { if span.start > self_.prefix_extra || span.len > self_.prefix_extra - span.start { return false, blot_error::Error.none; } var maximum = self_.prefix_row_variables; if ordinal == 0 { maximum = self_.prefix_nodes; } for id in self_.store.list(span) { if id >= maximum { return false, blot_error::Error.none; } } }
     }
-    if self_.shared_authority.present { return matches(self_.shared_authority.value, views), blot_error::Error.none; } self_.shared_authority = blot_support::some(captureAuthority(views)); return true, blot_error::Error.none;
+    if self_.shared_authority.present { return matches(self_.shared_authority.value, views, self_.authority_obligations, self_.authority_source_obligations), blot_error::Error.none; }
+    // Solver contexts keep the constructor's obligation slices: solverViews only
+    // replaces types/solver, and no checker operation rebinds either slice.
+    // First eligible capture may observe changed owned facts, never new roots.
+    assert(blot_support::same_slice_identity(self_.authority_obligations, views.obligations));
+    assert(blot_support::same_slice_identity(self_.authority_source_obligations, views.source_obligations));
+    self_.shared_authority = blot_support::some(captureAuthority(views)); return true, blot_error::Error.none;
 }
 fn sharedGoalOwners(key:const SharedGoal&)->bool {return key.producer_owner!=0 && (!key.origin_owner.present || key.origin_owner.value!=0);}
 fn sharedGoalHit(self_: Solver&, key: SharedGoal, depth: i64) -> bool { if !sharedGoalOwners(key) { return false; } { let optional_binding_78 .= self_.shared_goals.get(key); if optional_binding_78 { let proved_depth .= optional_binding_78; if depth > proved_depth { return false; } self_.shared_goal_hits += 1; return true;  } } return false; }
@@ -174,7 +182,18 @@ fn copy(self_: Solver&, copier: Import&, root: Id) -> Id, Error { let error = st
 fn bounds(module: const Module&, context: blot_check_frozen_core_validation::Context) -> Error {
     return blot_check_frozen_core_validation::validateBounds(module, context);
 }
-recursive fn withSolver<C,F>(module:const Module&,views:Views&,remaining:i64&,context:C&)->Error {let initialized,error=blot_check_types::initPooled();if error!=blot_error::Error.none {return error;}var solver,error=init(initialized,module,views,remaining,SolverTables{..});if error!=blot_error::Error.none {return error;}let failure=F(context,solver);deinit(solver);return failure;}
+// The temporary header and its Solver view share one invocation scope.
+fn solverModule(module:const Module&)->Module {return module;}
+recursive fn withSolver<C,F>(module:const Module&,views:Views&,remaining:i64&,context:C&)->Error {
+ let initialized,error=blot_check_types::initPooled();if error!=blot_error::Error.none {return error;}
+ var temporary=solverModule(module);
+ var solver,error=init(initialized,module,views,remaining,SolverTables{..},temporary.types);
+ if error!=blot_error::Error.none {return error;}
+ let failure=F(context,solver,temporary);
+ solver.view .= null;
+ deinit(solver);
+ return failure;
+}
 fn saveSourceRows(self_: Admission&, module: const Module&, rows: const u32[:]) -> Error {
     let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != blot_error::Error.none { return error; } self_.source_rows.push(SourceRows { module.owner_id, lease , ..});if self_.source_rows.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_rows.failure;}return blot_error::Error.none;
 }

@@ -6,8 +6,9 @@ passes, but type/lifetime checking still stops before program C emission.
 Keep `compiler/`, the default toolchain, the pinned Zig oracle and siblings
 unchanged. Source checkpoints are unverified whole-compiler work.
 
-Main checkpoint `796558ca7293422e7ca699b84da3dc003463967d` preserves the earlier
-admission/constructor repairs. Parser checkpoint `21df1327` qualifies the
+Main checkpoint `30f03db34c8fdd4eee94fe63d3c5caffe5eef6bd` preserves the scalar
+cache indexes, snapshot leases and scoped proof repairs through frozen176.
+Parser checkpoint `21df1327` qualifies the
 isolated parser controls below. Superseded repair narratives and exact previous
 frontiers remain in those commits; they are not later-candidate qualification.
 
@@ -27,12 +28,18 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator collects five seconds of diagnostics after the first error,
 then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen175 reaches Solver initialization after 56.912 seconds; stack-backed empty
-array literals are replaced with typed empty slices. Frozen176 then reaches the
-local temporary Module being assigned into its caller's Solver view after
-57.152 seconds. The next repair must keep that Module and Solver in the same
-owning scope. No successful whole type check, C program, link, CLI execution,
-Wasm comparison or Gdev run exists for the Goose compiler.
+Frozen176 reaches the local temporary Module being assigned into its caller's
+Solver view after 57.152 seconds. Solver and pack-projection views now share
+their local owner's scope; returned Principals are rebuilt from explicit caller
+roots and owned state. Frozen184 reaches a local call frame assigned into its
+caller's staging checker after 100.944 seconds. The staging repair applies the
+same scope boundary across call, local, loop, decision, loan and handler frames.
+Frozen185 stops after 92.411 seconds (including five seconds of diagnostic
+collection): a post-call reference restoration inside that recursive staging
+cycle is rejected. Local-only dead restores can be removed; necessary setters
+must retain their original ordering outside the recursive store restriction.
+No successful whole type check, C program, link, CLI execution, Wasm comparison
+or Gdev run exists for the Goose compiler.
 
 The independent CLI/Wasm smoke runner is prepared under
 `build/goose-port/compiler-smoke/`. Its oracle-against-itself control passes;
@@ -60,6 +67,41 @@ laws execute nested projection selection, rollback, budget boundaries and state
 publication on official/private checkers. Reduced graph matcher/endpoint and
 principalInstantiated stubs limit those laws; they do not qualify full bodies
 or returned-Principal provenance.
+
+Solver construction binds immutable obligation slices at initialization. Its
+shared authority snapshot contains owned fields only; slice identity/length
+checks retain the original cache-match criteria. This relies on the audited
+two construction paths preserving those roots before first capture, with an
+assertion and negative controls for violations. Actual-schema laws cover view
+construction, cleanup, eligibility and cache roots; reduced store adapters do
+not qualify the complete solver.
+
+Pack projection owns its Resolver, Context and Walker in one scope. All owned
+Context/Walker fields are published on success and failure. A newly populated
+borrowed source-row cache is reconstructed from its exact live snapshot lease;
+an inherited cache retains its original owner. Actual-schema scope laws and
+real projection-selection/budget controls pass on both checkers, with reduced
+matching adapters disclosed in `build/goose-port/pack-scope-laws/`.
+
+Returned call Principals preserve the canonical current/foreign graph and the
+caller's shared budget. Qualified staging returns its 15 owned Principal fields
+across local Views, then reconstructs borrowed roots at the consumer. Laws cover
+distinct but equal-valued foreign headers, both catalog forms, mutation through
+the returned budget alias, cleanup and error ordering. Reduced mapping/leaf
+adapters mean these are boundary controls, not whole call/staging qualification.
+
+Certified scheme comparison uses the same scalar Principal state boundary.
+Both checkers execute 192 scope controls and reject the old escaping wrapper:
+early length/limit rejection leaves state untouched; success and matching errors
+publish partial owned state and clear the temporary certificate. The matching
+leaf is controlled, so these do not qualify the full certificate algorithm.
+
+The main checker's arm capture is an owned optional scalar receipt into its
+existing equation-ID run, with no new pool or allocation. An actual `caseArms`
+fixture executes 33 controls per checker, covering empty/large runs, nested
+capture, parent restoration and binding/expression/constraint errors. Engine,
+tree and expression leaves are controlled, and two Buffer append calls adapt to
+native array push; full Engine and block-body execution remain pending.
 
 Nested executable/call entries use local scalar Workspace copies when no parent
 admission exists, publishing scalar results on every return. Existing-parent
@@ -107,6 +149,13 @@ mismatches occur in both baseline and candidate. Three older frozen-prefix pairs
 measure median 7.601 -> 4.379 seconds to the identical diagnostic. This is not a
 whole compiler or Gdev timing. Earlier O0/unmatched checker experiments remain
 rejected; do not rebuild them without a new measured hypothesis.
+
+A subsequent exact-pointer visited-set experiment passes 201 frontend and eight
+runtime parity cases, but fails its small-case performance gate. One explicitly
+approved whole-prefix trial measures 71.738 -> 70.735 seconds to the identical
+frozen181 diagnostic (1.4%, below the required 20%). Both runs are terminated
+after that error; neither is a completed check. The experiment is rejected and
+the selected checker and tracked build recipe remain unchanged.
 
 The Zig oracle remains
 `build/goose-port/oracle/bin/blotc`, SHA256

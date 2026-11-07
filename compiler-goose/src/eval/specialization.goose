@@ -1,5 +1,6 @@
 // Source obligations and representation expectations meet before emission.
 namespace blot_eval_specialization;
+import parse.ast;
 import backend.backend_timing;
 import backend.core_backend;
 import backend.dictionary_layout;
@@ -160,7 +161,7 @@ recursive fn mapTypeDepthSink(self_: Service&, unit_id: u32, mappings: MappingSi
             let error = mapTypeDepthSink(self_, unit_id, mappings, rows, callback.value.b, actual.b, span, depth + 1); if error != blot_error::Error.none { return error; }
             if hasRows(rows) { let e = mapRowSink(self_, unit_id, mappings, rows, callback.value.c, actual.c, span, false); if e != blot_error::Error.none { return e; } }
         }
-        if n.b == blot_check_types::usagekind_unique || n.b == blot_check_types::usagekind_shared {
+        if n.b == blot_check_types::usageCode(blot_parse_ast::usagekind_unique) || n.b == blot_check_types::usageCode(blot_parse_ast::usagekind_shared) {
             if physical.tag != blot_backend_layout::Tag.owning || physical.b != n.b || n.c != 0 { return decline(self_, unit_id, span, FailureCode.unresolved_type); }
             return mapTypeDepthSink(self_, unit_id, mappings, rows, n.a, physical.a, span, depth + 1);
         }

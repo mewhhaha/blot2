@@ -135,7 +135,7 @@ recursive fn suite<E>(self_: Walker<E>&, source: AstId, depth: i64) -> Outcome, 
 }
 fn block_<E>(self_: Walker<E>&, source: AstId, depth: i64) -> Outcome, Error {
     var joined: State[>..] = []; let error = snapshot(self_, joined); if error != blot_error::Error.none { return Outcome.live, error; }
-    var frame = ExitFrame { joined , ..}; let outer = self_.returns; self_.returns .= frame; let flow, error = suite(self_, source, depth + 1); self_.returns .= outer; if error != blot_error::Error.none { return flow, error; } self_.states.resize(joined.len);
+    var frame = exitFrame(joined); var scoped=scopedWalker(self_,frame,self_.breaks); let flow, error = suite(scoped, source, depth + 1); publishWalker(self_,scoped); if error != blot_error::Error.none { return flow, error; } self_.states.resize(joined.len);
     if frame.seen { if flow == Outcome.exit { restore(self_, joined); } else { for &entry, index in self_.states { if entry.first == 0 { entry.first = joined[index].first; } } } return Outcome.live, blot_error::Error.none; } return flow, blot_error::Error.none;
 }
 fn integer<E>(self_: Walker<E>&, source: AstId) -> blot_support::Option<u32> {
@@ -350,7 +350,7 @@ fn loopExpression<E>(self_: Walker<E>&, source: AstId, depth: i64) -> Outcome, E
     if node.tag == blot_parse_ast::tag_for_stmt { let end = self_.engine.tree.extra.items[node.c]; if end != 0 { let flow, error = expression(self_, end, depth + 1); if error != blot_error::Error.none || flow == Outcome.exit { return flow, error; } } }
     var single = false; if node.tag == blot_parse_ast::tag_range_stmt { single = singleIteration(self_, node.a, node.b); } if node.tag == blot_parse_ast::tag_for_stmt { single = singleIteration(self_, node.b, self_.engine.tree.extra.items[node.c]); }
     var prior: State[>..] = []; let error = snapshot(self_, prior); if error != blot_error::Error.none { return Outcome.live, error; } var exits: State[>..] = []; let error = snapshot(self_, exits); if error != blot_error::Error.none { return Outcome.live, error; }
-    var frame = ExitFrame { exits , ..}; let outer = self_.breaks; self_.breaks .= frame; let flow, error = loopBody(self_, source, node, prior, frame, single, depth); self_.breaks .= outer; if error != blot_error::Error.none { return flow, error; } restore(self_, exits);
+    var frame = exitFrame(exits); var scoped=scopedWalker(self_,self_.returns,frame); let flow, error = loopBody(scoped, source, node, prior, frame, single, depth); publishWalker(self_,scoped); if error != blot_error::Error.none { return flow, error; } restore(self_, exits);
     if (node.tag == blot_parse_ast::tag_forever_stmt || single) && !frame.seen { return Outcome.exit, blot_error::Error.none; } return Outcome.live, blot_error::Error.none;
 }
 fn loopBody<E>(self_: Walker<E>&, source: AstId, node: blot_parse_ast::Node, prior: const State[:], frame: ExitFrame&, single: bool, depth: i64) -> Outcome, Error {
@@ -448,3 +448,7 @@ fn inspectWithPooledMemo(store, root: Id, mode: Mode, work: Work&, memo: PooledM
     }
     { let optional_binding_71 .= memo; if optional_binding_71 { let cache .= optional_binding_71; for index in 0..pending.count { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } blot_support_pooled_map::insert(cache.safe,pending.ids[index],true,pooled_safe_slots); }  } } return false, blot_error::Error.none;
 }
+
+fn exitFrame(joined:State[:])->ExitFrame {return ExitFrame{joined:joined,..};}
+fn scopedWalker<E>(parent:const Walker<E>&,returns:ExitFrame?,breaks:ExitFrame?)->Walker<E> {return Walker<E>{engine:parent.engine,task_views:parent.task_views,states:parent.states,remaining:parent.remaining,regions:parent.regions,region_count:parent.region_count,returns:returns,breaks:breaks,..};}
+fn publishWalker<E>(target:Walker<E>&,source:const Walker<E>&) {target.task_views=source.task_views;target.remaining=source.remaining;target.regions=source.regions;target.region_count=source.region_count;}

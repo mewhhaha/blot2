@@ -400,7 +400,7 @@ fn open(self_: Context&, package: Id, binding: blot_check_core::BindingId, binde
         if leaf.tag != blot_check_types::Tag.bound || leaf.a != ordinal || leaf.b != 0 || leaf.c != binding { return blot_error::Error.invalid_artifact; } }
     self_.openings[self_.opening_count] = Opening { binding, binders, package , ..}; self_.opening_count += 1;
     let visited = visit(self_, payload); if visited != blot_error::Error.none { self_.opening_count -= 1; return visited; }
-    let proof = Substitution { types: self_.types, formal: List { quantifier.b, quantifier.c , ..}, witnesses: witnesses, remaining: self_.remaining, views: self_ , ..};
+    let proof = substitutionView(self_.types,List{quantifier.b,quantifier.c,..},witnesses,self_.remaining,self_);
     let error = validate(proof, quantifier.a, payload); if error != blot_error::Error.none { self_.opening_count -= 1; } return error;
 }
 fn pack(self_: Context&, package: Id, payload: Id, witnesses: const Id[:]) -> Error {
@@ -411,7 +411,7 @@ fn pack(self_: Context&, package: Id, payload: Id, witnesses: const Id[:]) -> Er
 }
 fn packWitnesses(self_: Context&, quantifier: blot_check_types::Node, payload: Id, witnesses: const Id[:]) -> Error {
     for witness in witnesses { let error = visit(self_, witness); if error != blot_error::Error.none { return error; } }
-    let proof = Substitution { types: self_.types, formal: List { quantifier.b, quantifier.c , ..}, witnesses: witnesses, remaining: self_.remaining, views: self_, projection_resolver: self_.projection_resolver , ..};
+    let proof = substitutionView(self_.types,List{quantifier.b,quantifier.c,..},witnesses,self_.remaining,self_,self_.projection_resolver);
     return validate(proof, quantifier.a, payload);
 }
 fn close(self_: Context&) { self_.opening_count -= 1; }
@@ -423,6 +423,7 @@ struct Substitution {
     views: Context? = null,
     projection_resolver: ProjectionResolver? = null,
 }
+fn substitutionView(types:const blot_check_core::Types&,formal:List,witnesses:const Id[:],remaining:i64&,views:Context?,projection:ProjectionResolver?=null)->Substitution {return Substitution{types:types,formal:formal,witnesses:witnesses,remaining:remaining,views:views,projection_resolver:projection};}
 fn rowPure(self_: const Substitution&, row: blot_check_effects::Id) -> bool {
     { let optional_binding_30 .= self_.views; if optional_binding_30 { let views .= optional_binding_30; return views.isPure(row);  } } return pure(self_.types, row);
 }
@@ -458,11 +459,11 @@ recursive fn matchSubstitution(self_: const Substitution&, expected: Id, actual:
             if left.c == 0 { { let optional_binding_28 .= self_.views; if optional_binding_28 { let views .= optional_binding_28; if views.types.owner_id != self_.types.owner_id || !views.ownsFormal(expected) { return blot_error::Error.invalid_artifact; }  } else { return blot_error::Error.invalid_artifact; } } }
         },
         forall, existential => {
-            var proof = Principal { left: self_.types, right: self_.types, remaining: self_.remaining, instance: self_.formal, views: self_.views , ..};
+            var proof = principalFromState(self_.types,self_.types,self_.remaining,self_.views,PrincipalState{instance:self_.formal,..});
             for witness, index in self_.witnesses { proof.witnesses[index] = witness; } return validate(proof, expected, actual);
         },
         function => {
-            var proof = Principal { left: self_.types, right: self_.types, remaining: self_.remaining, views: self_.views , ..};
+            var proof = principalFromState(self_.types,self_.types,self_.remaining,self_.views,PrincipalState{..});
             if replace { proof.instance = self_.formal; for witness, index in self_.witnesses { proof.witnesses[index] = witness; } }
             let error = matchRow(proof, left.c, right.c, depth + 1); if error != blot_error::Error.none { return error; }
             let error = matchSubstitution(self_, left.a, right.a, replace, depth + 1); if error != blot_error::Error.none { return error; }
@@ -470,7 +471,7 @@ recursive fn matchSubstitution(self_: const Substitution&, expected: Id, actual:
         },
         usage => {
             if left.b != right.b || left.c != 0 || right.c != 0 { return blot_error::Error.invalid_artifact; }
-            if left.b != blot_check_types::usageCode(blot_check_types::usagekind_unique) && left.b != blot_check_types::usageCode(blot_check_types::usagekind_shared) && left.b != blot_check_types::usageCode(blot_check_types::usagekind_once) && left.b != blot_check_types::usageCode(blot_check_types::usagekind_many) { return blot_error::Error.invalid_artifact; }
+            if left.b != blot_check_types::usageCode(blot_parse_ast::usagekind_unique) && left.b != blot_check_types::usageCode(blot_parse_ast::usagekind_shared) && left.b != blot_check_types::usageCode(blot_parse_ast::usagekind_once) && left.b != blot_check_types::usageCode(blot_parse_ast::usagekind_many) { return blot_error::Error.invalid_artifact; }
             return matchSubstitution(self_, left.a, right.a, replace, depth + 1);
         },
         array, list, cursor => { return matchSubstitution(self_, left.a, right.a, replace, depth + 1); },
@@ -603,8 +604,12 @@ fn certificateRowMode(left_types: const blot_check_core::Types&, right_types: co
 }
 fn certifiedScheme<L,R>(self_: Principal&, expected: Scheme, actual: Scheme, left_goals: L, right_goals: R) -> Error {
     if expected.closed_rows.len != actual.closed_rows.len || expected.closed_rows.len > 4096 { return blot_error::Error.invalid_artifact; }
-    var pairs = CertificatePairs { expected.closed_rows, actual.closed_rows , ..}; self_.certificate_pairs .= pairs;
-    let error = schemeGoals(self_, expected, actual, left_goals, right_goals); self_.certificate_pairs .= null; if error != blot_error::Error.none { return error; }
+    var pairs = CertificatePairs { expected.closed_rows, actual.closed_rows, ..};
+    var state = principalState(self_);
+    let error = schemeGoalsMode(state, self_.left, self_.right, self_.remaining, self_.views, pairs, self_.version_pairs, self_.projection_resolver, expected, actual, left_goals, right_goals, resolvePrincipalProjectionMode);
+    publishPrincipalState(self_, state);
+    self_.certificate_pairs .= null;
+    if error != blot_error::Error.none { return error; }
     if pairs.seen_left.count() != pairs.seen_right.count() { return blot_error::Error.invalid_artifact; } return blot_error::Error.none;
 }
 // Fresh certified endpoints keep borrowed roots outside their scalar proof state.
@@ -667,7 +672,7 @@ fn typeLimitMode(left_types: const blot_check_core::Types&, context: Context?, r
 fn publicArguments(self_: Principal&, variables: List, rows: List, arguments: const Id[:]) -> Error {
     var maximum: i64 = 128; if sourceTypes(self_) { maximum = ordinary_source_type_limit; }
     if arguments.len != variables.len + rows.len || self_.instance.len > maximum || self_.instance_rows.len > 128 { return blot_error::Error.invalid_artifact; }
-    var proof = Principal { left: self_.right, right: self_.right, remaining: self_.remaining, views: self_.views , ..};
+    var proof = principalFromState(self_.right,self_.right,self_.remaining,self_.views,PrincipalState{..});
     let binders, error = span(self_.left, variables); if error != blot_error::Error.none { return error; } let instances, error = span(self_.left, self_.instance); if error != blot_error::Error.none { return error; }
     for formal, index in binders { var ordinal: i64 = -1; for instance, j in instances { if instance == formal { ordinal = j; break; } }
         if ordinal < 0 || ordinal >= self_.witnesses.len || self_.witnesses[ordinal] == 0 { return blot_error::Error.invalid_artifact; }

@@ -218,8 +218,8 @@ recursive fn invoke(self_: Scan&, module: const Module&, source: CoreId, functio
         if invocation.count < parameterCount(invocation) { return partialCall(self_, module, source, callable, invocation, function, argument, depth); }
         if callable.runtime { return self_.sink(module, source, invocation.arguments[..invocation.count]); }
         var active .= self_.active_calls; while true { { let optional_binding_80 .= active; if optional_binding_80 { let prior .= optional_binding_80; let error = self_.step(depth); if error != blot_error::Error.none { return 0, error; } if prior.module.owner_id != 0 && prior.module.owner_id == callable.module.owner_id && prior.body == callable.body { return 0, blot_error::Error.unsupported; } active .= prior.parent;  } else { break; } } }
-        var current = ActiveCall { callable.module, callable.body, self_.active_calls , ..}; self_.active_calls .= current;
-        let result, error = executeCall(self_, module, source, callable, invocation, function, depth); self_.active_calls .= current.parent; return result, error;
+        let current = activeCall(callable.module, callable.body, self_.active_calls); var scoped = scopedScan(self_, current);
+        let result, error = executeCall(scoped, module, source, callable, invocation, function, depth); publishScan(self_, scoped); return result, error;
     } let arguments: Id[2] = [function, argument]; return self_.sink(module, source, arguments);
 }
 fn partialCall(self_: Scan&, module: const Module&, source: CoreId, callable: Callable, invocation: Callable, function: Id, argument: Id, depth: i64) -> Id, Error {
@@ -665,3 +665,7 @@ fn blot_structural::equal(left: blot_check_capability_lifetimes::EdgeKind, right
 fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_lifetimes::EdgeKind) { blot_structural::hash(sink, blot_check_capability_lifetimes::edgeKindCode(value) as! u8); }
 
 
+
+fn activeCall(module:const Module&,body:CoreId,parent:const ActiveCall?)->ActiveCall {return ActiveCall{module:module,body:body,parent:parent};}
+fn scopedScan(parent:const Scan&,active_calls:const ActiveCall?)->Scan {return Scan{module:parent.module,evidence:parent.evidence,owners:parent.owners,type_mappings:parent.type_mappings,nodes:parent.nodes,edges:parent.edges,boundaries:parent.boundaries,invocations:parent.invocations,context:parent.context,callables:parent.callables,operations:parent.operations,providers:parent.providers,frames:parent.frames,exits:parent.exits,controls:parent.controls,remaining:parent.remaining,owner:parent.owner,scope_depth:parent.scope_depth,binding:parent.binding,complete:parent.complete,scope_validation:parent.scope_validation,checked_owners:parent.checked_owners,active_calls:active_calls,..};}
+fn publishScan(target:Scan&,source:const Scan&) {target.context=source.context;target.remaining=source.remaining;target.owner=source.owner;target.scope_depth=source.scope_depth;target.binding=source.binding;target.complete=source.complete;target.scope_validation=source.scope_validation;}

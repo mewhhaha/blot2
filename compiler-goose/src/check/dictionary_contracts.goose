@@ -89,6 +89,7 @@ fn pack(module: const Module&, id: Id, scopes: Context&) -> Error {
     if count != 0 || content_slot != contents.len { return blot_error::Error.invalid_artifact; } return blot_error::Error.none;
 }
 struct PackProjection { module: const Module&, owner: Id }
+fn packProjection(module:const Module&,owner:Id)->PackProjection {return PackProjection{module:module,owner:owner};}
 fn resolver(self_: PackProjection&) -> PackProjection& { return self_; }
 fn validate(self_: PackProjection&, substitution: const blot_check_package_contracts::Substitution&, expected: Id, actual: Id) -> Error {
     let module = self_.module; let node = module.node(self_.owner);
@@ -99,7 +100,7 @@ fn validate(self_: PackProjection&, substitution: const blot_check_package_contr
         if goal.kind != blot_check_types::ObligationKind.contract || goal.identity.unit != projection.a || goal.identity.decl != projection.b { continue; }
         var selected: u32 = 0; match selection.proof { selected match_payload_30 => { let value = match_payload_30.value;  selected = value; }, given match_payload_31 => { let value = match_payload_31.value;  continue; }, }
         let proof = module.selected_proofs[selected]; let goal_arguments = module.types.node(goal.ty); if goal_arguments.tag != blot_check_types::Tag.product || goal_arguments.b != proof.arguments.len { return blot_error::Error.invalid_artifact; } if arguments.len != proof.arguments.len { continue; }
-        var comparison = Principal { left: module.types, right: module.types, remaining: substitution.remaining, views: substitution.views , ..}; var matches = true; let required = module.types.list(List { goal_arguments.a, goal_arguments.b , ..}); let actuals = module.types.list(proof.arguments);
+        var comparison = blot_check_package_contracts::principalFromState(module.types,module.types,substitution.remaining,substitution.views,blot_check_package_contracts::PrincipalState{..}); var matches = true; let required = module.types.list(List { goal_arguments.a, goal_arguments.b , ..}); let actuals = module.types.list(proof.arguments);
         for argument, index in arguments {
             if comparison.substituted(substitution.formal, substitution.witnesses, required[index], actuals[index]) != blot_error::Error.none { matches = false; break; }
             if comparison.substituted(substitution.formal, substitution.witnesses, argument, actuals[index]) != blot_error::Error.none { matches = false; break; }
