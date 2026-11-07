@@ -2308,6 +2308,1308 @@
         ],
         "whole_compiler_qualification": false
       }
+    },
+    "real-intern-laws": {
+      "evidence.json": {
+        "coverage": "Actual type_evidence Store/state ownership, all node/word/goal/bucket buffer implementations, init/deinit, normalization/full internGoalFields, fingerprint/wyhash, and actual View validators/projection. Effect Store lifecycle is a minimal closed-row leaf; effect row/projection schemas/getters are real.",
+        "compilers": {
+          "official": {
+            "path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2"
+          },
+          "identity": {
+            "path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b"
+          },
+          "selected": {
+            "path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e"
+          }
+        },
+        "cc": {
+          "invoked": "clang",
+          "path": "/usr/bin/clang-23",
+          "sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d"
+        },
+        "cwd": "/home/jacobt/src/blot2",
+        "stage_timeout_seconds": 10,
+        "stdlib": {
+          "path": "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "files": {
+            "base64.goose": "fa1111ce46e9534311f825880dbd2988953430aeb3f1f52d8f0eaecbbc298a61",
+            "binary.goose": "6973e209428668c2db856eaa941de5d93938cfb1749ed07cac534bf9fe4cb031",
+            "csv.goose": "a49b0647f4a2f8ca36170e5a184ab6c6e505492434d0a10a5e05127e96da61ba",
+            "dictionary.goose": "fb39f896731faf3799e81727f7261849a62bdfbdc92d5fdbc36405a85830f322",
+            "exception.goose": "b91033a5cb9029ac56d27ffb0ed9f5841f76ff58b39de8e881101ca2b8fc39c4",
+            "ffi.goose": "e092b245fbe13ee2fdc71599b7b8eb44198e5261cad9600b7681e13ad75a6c2e",
+            "json.goose": "0e58291ed9051e4ecb8da1ad420290549d723336516507aed33cf7ced89dc29b",
+            "math.goose": "b4c1aee33b5b7033d36a4ddc5c6522c73b21cafe204dc20e8860cdeba22467da",
+            "os.goose": "2193f394d44469daffd993ed204a91b068084fd8db13e261e11156b40c66e934",
+            "regex.goose": "be0e50bab2a1db9f85e856250bcc592dfe25aca73c2ed900410047fbefb4b035",
+            "std.goose": "2243c2ef52ba5045b275eea35252d09f36544987c6884f4a8d35579fa6f781ff",
+            "vec.goose": "2cac168c72047834433bfb419734c38455c9429ea045b1273898031c53faa82e"
+          }
+        },
+        "runtime_objects": [
+          {
+            "path": "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+            "sha256": "8520ed0e5600c2a9ae3e71d7709f927768f820f56a021b477c2495c73863d7ea"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+            "sha256": "c341eaf1d67e8bb19895fa64afaf23c501524301271b8a8f93f1175de1146a14"
+          }
+        ],
+        "source_origins": [
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/eval/type_evidence.goose",
+            "sha256": "059d23fcb86a479909238e11213fbbb56e82e459b3aa2ff4bd77992d2cd53c00"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/eval/type_evidence_schema.goose",
+            "sha256": "b912f6f7b840a76cd3d35ecce05447130d34de691ead6c39f48735cbd2548571"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/eval/evidence_projection.goose",
+            "sha256": "f99fd3ca4eff1883075ecca9b7029483efbd254640bcb31bc4cdb957bd78ef59"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/effect_evidence.goose",
+            "sha256": "e674c05ae0b6133cf5e0a5d95062cd9729f0f59a0d89f61075926d1098df566a"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/core.goose",
+            "sha256": "bb4b160a00f80f2dc9193d532e003e7ae9a7761f56b2b473a6f772f507fb552c"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/types.goose",
+            "sha256": "9d73562bb34877b9aa936f5fa29e08a806dccacc038f551d0ae89943a49abc2a"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/effects.goose",
+            "sha256": "1b94326def0e7eda87cb8383f05429620cb4c04b40c8b25855f418739c52f0cc"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/quantifier_goals.goose",
+            "sha256": "790e714947ca3201b7782177970563b87f44ce6dde373721d10cb13b28ee393d"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/reuse/projection_cache.goose",
+            "sha256": "3d3cd02302ac481205cfbeb1e1447a168814e40fe4ca7f0395da5ee098af1133"
+          }
+        ],
+        "extracted_and_support_inputs": {
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/cases.goose": "a329cd6f36be49845f5fad209ba456a0f5bd0bb9cd946421317a27b99f77ab4f",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/effects.goose": "04fbb5efce1539ffc3ec8e80c883ece2244f959f60251c12c63b2188414873b0",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/evidence.goose": "72e11f748f05eeab38fffb2d052d5113b9602de54620bd0cac5c1e5fe2952c37",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/main.goose": "f7b7dad46d8cec569e322fabbbb5c74ca75df8b0a8d8aa6e72cf2e19996018a2",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/projection.goose": "6477da8fd7dbda38b1f197740808b83e6a2dce10ed74447efb8c8db72aa47e08",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/symbols.goose": "5998990d3c6f8363c24424d46a10966d1b5f26e8c657f39687bf0b91b478c6d9",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/types.goose": "0840dc340f95c8651c94eaef974687502d986dd2b836c72c6e5350af10f1713b",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/blake3.goose": "94efa434cf1fa91133ccd8f55520a19a4e8965256627533b9fa71157d35c5209",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/bytes.goose": "bae4133669e102c01bf3259019a71c883888f6f63cee32dab11893b0e16a514e",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/core_packet.goose": "e05b6d9b99fc8e3be46b3278f15f2e994959ce757c5a1aaf1f03124da0d07f56",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/emitter.goose": "e432160ebc81c6e529240b514adb7c27dbe3950dec03479fc0b27f4f986f71e0",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/evidence_packet.goose": "e8123ec42435950b36040b4207ea99db3a6038b60478632d3cb1a13ed868a649",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/host_layout.goose": "759ba776e77f520af19fbdf9ea1a5e821ffc2c7c5c638e335cac656f45c13740",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/io.goose": "10681af80bdebf9d0d0ff6f080283f51729e84f229f7dfba2ffa0b0f2e37229f",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/json.goose": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/json_adapters.goose": "546495a18afe2083d25f066bee7cef2e8f1254c5fd45a0f325b4d34d5c09648d",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/native.goose": "521c0584db7270195ac15e498f4796abf24fb15b9e7400c36c334cac93b19916",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/option.goose": "83daa905847ce8a0c3ed7a16f22424a41622b0b8624b9dc30a648a0bca8205d6",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/path.goose": "79d672c413385eef4742516a840c5d80e09a031113c18e48086c922fbc479dae",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose": "9213e248a117f369f86e469743da489686e033ea216048d35c980a6d9b1bfeb6",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/pooled_map.goose": "dc56c1bc5c23304e56b82936a4f00249545dbea5b9696b873d7fb800f3b7417a",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/process_pool.goose": "7d98a937f9ec39077e7ebc071b6f1066d6fdfef86a194cf05da1fa440efb3be5",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet.goose": "f59c467b3142947cc83fbe5d4a6ef434d2d4755b0f1e968c95044359237a0c85",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet_codecs.goose": "206fc6922857e1f2013c03b42d710cb870ef198b229541b0cae80c8051d7aad2",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet_contexts.goose": "d4da8a96cd5470367e409b37400e189d2b5bd41d2528ce3902cebd181cd16131",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet_owners.goose": "263f7cf459a1ffbe09bf52279d09dbb8342131f6b8d725c92cf389d9e892aa7b",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/sha256.goose": "a1eac6fbbd355c23f88c111b34597a5c22097189b7abe4bf2f6fe14c08a4b6f4",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/structural.goose": "5a7c53a1916e5f434a46d8c56b977b9b6e76e7f31fb04c249fbe82c93725ff2b",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/structural_adapters.goose": "68ae1305fc11594d34246fd83b78ba318d324bef4689bd71ccb2aa11342b874e",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/wyhash.goose": "b9b20300ce43165620b8820384cabbeb820afe0d69de235035d4c1731705de85"
+        },
+        "runs": [
+          {
+            "compiler": "official",
+            "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "emit",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "-O0",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/main.goose"
+            ],
+            "exit": 0,
+            "seconds": 0.10144102299818769,
+            "stdout": "parsed ok: 431 top-level declarations, 15 file(s)\ntypechecked ok: 381 specialization(s), 33 struct/4 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 1 folded, 2 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 82/161 index and 16/43 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/real-intern-laws/official.c (466590 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/cases.goose:4: warning: redundant `as u64`: 19 fits u64 here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n"
+          },
+          {
+            "compiler": "official",
+            "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "link",
+            "command": [
+              "clang",
+              "-std=gnu11",
+              "-D_GNU_SOURCE",
+              "-O0",
+              "-pthread",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+              "-lm",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/official"
+            ],
+            "exit": 0,
+            "seconds": 0.16880334800225683,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "run",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/official"
+            ],
+            "exit": 0,
+            "seconds": 0.010415846001706086,
+            "stdout": "real buckets and interning laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "emit",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+              "-O0",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/identity.c",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/main.goose"
+            ],
+            "exit": 0,
+            "seconds": 0.07700611299515003,
+            "stdout": "parsed ok: 431 top-level declarations, 15 file(s)\ntypechecked ok: 381 specialization(s), 33 struct/4 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 1 folded, 2 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 82/161 index and 16/43 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/real-intern-laws/identity.c (466590 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/cases.goose:4: warning: redundant `as u64`: 19 fits u64 here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n"
+          },
+          {
+            "compiler": "identity",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "link",
+            "command": [
+              "clang",
+              "-std=gnu11",
+              "-D_GNU_SOURCE",
+              "-O0",
+              "-pthread",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/identity.c",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+              "-lm",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/identity"
+            ],
+            "exit": 0,
+            "seconds": 0.15428033699572552,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "run",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/identity"
+            ],
+            "exit": 0,
+            "seconds": 0.006334609999612439,
+            "stdout": "real buckets and interning laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "selected",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "phase": "emit",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+              "-O0",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/selected.c",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/main.goose"
+            ],
+            "exit": 0,
+            "seconds": 0.07428900900413282,
+            "stdout": "parsed ok: 431 top-level declarations, 15 file(s)\ntypechecked ok: 381 specialization(s), 33 struct/4 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 1 folded, 2 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 82/161 index and 16/43 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/real-intern-laws/selected.c (466590 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/cases.goose:4: warning: redundant `as u64`: 19 fits u64 here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/real-intern-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n"
+          },
+          {
+            "compiler": "selected",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "phase": "link",
+            "command": [
+              "clang",
+              "-std=gnu11",
+              "-D_GNU_SOURCE",
+              "-O0",
+              "-pthread",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/selected.c",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+              "-lm",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/selected"
+            ],
+            "exit": 0,
+            "seconds": 0.16038442800345365,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "selected",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "phase": "run",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/selected"
+            ],
+            "exit": 0,
+            "seconds": 0.006536703003803268,
+            "stdout": "real buckets and interning laws passed\n",
+            "stderr": ""
+          }
+        ],
+        "inputs_unchanged_after_run": true,
+        "artifacts": {
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/official": "57e20faf20902b5b3a18a9229ecbf926f21cbcd590f23a13c6fdb7b689617ea4",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/official.c": "0e6fca0bfbd019fe640c7f551c593f7cabd2c7f32bc7347cf866562ccb004a68",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/identity": "bbde5a57e62447677704514e1f242455d9294d1592fe0372da379632b0d874d1",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/identity.c": "0e6fca0bfbd019fe640c7f551c593f7cabd2c7f32bc7347cf866562ccb004a68",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/selected": "a67f91a49851360ecbb6b74e8f6746835efe31d377e44792830ca515aa290426",
+          "/home/jacobt/src/blot2/build/goose-port/real-intern-laws/selected.c": "0e6fca0bfbd019fe640c7f551c593f7cabd2c7f32bc7347cf866562ccb004a68"
+        }
+      }
+    },
+    "capability-results-initialization": {
+      "initialization-repair.json": {
+        "production_sha256": "a82ffc123addc40e445f3a6787a0c10e8ea58921e064d69d4711694807abeca6",
+        "change": "Only blockBody results Id[256] explicitly initialized to zero; all loop/body statements unchanged",
+        "negative_log": "official-uninitialized-results.log",
+        "whole_compiler_qualification": false
+      }
+    },
+    "capability-scratch-laws": {
+      "rewrite.json": {
+        "before_sha256": "a82ffc123addc40e445f3a6787a0c10e8ea58921e064d69d4711694807abeca6",
+        "after_sha256": "516407723ac396e3081ce439e8fc5bf81c07e1277f440cbe738fe9cf3eeaded1",
+        "scope": [
+          "branches before/joined",
+          "matchValue before/joined",
+          "invoke frame.callback saved Frame run"
+        ],
+        "preserved": "locations fuel charge and copy/zero order; callback frame suffix saved\u2192truncate\u2192recurse\u2192restore on error/success; wrapper cleanup after original return value/error",
+        "new_errors": "existing pooled_buffer out_of_memory guards returned before truncate or recursive work",
+        "additional_proven_fixes": [
+          "reusable scratch pools explicitly initialized []",
+          "matchValue local found is value bool",
+          "matchValue values[256] zero initialized"
+        ],
+        "executed_fixture": "evidence.json",
+        "negative_controls": "negative-evidence.json",
+        "algorithm_normalization": "normalization.json"
+      },
+      "source-audit.json": {
+        "production_sha256": "516407723ac396e3081ce439e8fc5bf81c07e1277f440cbe738fe9cf3eeaded1",
+        "exact_declarations": [
+          {
+            "signature": "struct Site {",
+            "sha256": "ba013a960a7f65fb82ff9c8483ccac69106244d905d090453993c83ca57f2a3b"
+          },
+          {
+            "signature": "struct TypeOrigin {",
+            "sha256": "ca53f24ba19c27974a5ff203904c61b508ec1f7d2e806417da61ddd054f87a1a"
+          },
+          {
+            "signature": "enum Kind {",
+            "sha256": "61206b99f00d8d26ade3be27fb23a0659794617f0647439ccc5011577a0f1acb"
+          },
+          {
+            "signature": "struct Node {",
+            "sha256": "0fcf9eeea5e544039fa5868da1c33eaa540ba6b230a1ef3afb7620e68c9e91fe"
+          },
+          {
+            "signature": "enum EdgeKind {",
+            "sha256": "58c273884f0ebed3f647615e988d7141ec99eb82084cb75a102bd044ce6192b3"
+          },
+          {
+            "signature": "struct Edge {",
+            "sha256": "327f27bbbfd68baeb0a6dc6b36b6f2691ba10a121faf2684738179ef12e6280b"
+          },
+          {
+            "signature": "struct Invocation {",
+            "sha256": "d1fbd26575f552921ef9eef0fbf1ac0d5b089c41027f847e62668fadbbb82fe3"
+          },
+          {
+            "signature": "struct Boundary {",
+            "sha256": "acb3fda368bd5dec790c5c88ade8c38a2a70861512bb645531e683d126333790"
+          },
+          {
+            "signature": "struct Entry {",
+            "sha256": "9562fe8837b89c1257875185bd780110c09049545da4a81b5716c971a0d7e7e5"
+          },
+          {
+            "signature": "struct Environment {",
+            "sha256": "02207f395ea5f81c6a3fd72da7d809ca8708d86158e8d58ad5340c949220f3f5"
+          },
+          {
+            "signature": "struct ActiveCall {",
+            "sha256": "6f90676b11911ddabc067de01d4c211ac9b31af9ca08d0cfbc867ad4a1fa3f0f"
+          },
+          {
+            "signature": "enum Parameters {",
+            "sha256": "d0691009afd049def48193c4173f9b6770f7abb62b7ddec812171ac38493b547"
+          },
+          {
+            "signature": "struct Callable {",
+            "sha256": "ac754bd81f928b5bc475194571d704c0092226cce304219e9ab32e44085c67a0"
+          },
+          {
+            "signature": "struct Operation {",
+            "sha256": "77c934965bc5ac05b9352bef0b49f71644d422de3d34c9634a1992356df5e168"
+          },
+          {
+            "signature": "struct Provider {",
+            "sha256": "38029385e77521a97fd6e241636b50a7c9febd51abb2dbcce1684e707786a38f"
+          },
+          {
+            "signature": "struct ProviderEntry {",
+            "sha256": "69f3465a4707193aaa8e034454802d144a73df789730310906e28affbee96681"
+          },
+          {
+            "signature": "struct Frame {",
+            "sha256": "35f38ed8bc4a758341b9729a23a2a9004381cfcae7069622f589b5b518704d13"
+          },
+          {
+            "signature": "struct Exit {",
+            "sha256": "e49350ddc87d6e0b4ccf571b66b18c17ff4ca6a12154da5f4e72431792c4d209"
+          },
+          {
+            "signature": "struct Control {",
+            "sha256": "a842f3664ba672d9a524aed99637bc011068aa4880b85ce4892e36cf026bd47f"
+          },
+          {
+            "signature": "struct Tables {",
+            "sha256": "4b2066eb28a9b51d0d2003ae6e00129656058997ae8ff7f48f9b6e1d086fc011"
+          },
+          {
+            "signature": "struct Scan {",
+            "sha256": "4a7c7f80a811cd9cd518d2ca254eb0c34cd5a9ea60522fd25aed6351c1680d7f"
+          },
+          {
+            "signature": "struct Locations {",
+            "sha256": "ca3c02bf978a6273f75e053c8d4816953ed009300d6b5e08a23f766252e634d9"
+          },
+          {
+            "signature": "fn init(",
+            "sha256": "43de3eb1be371683040adce18edce53d4d8ea8207ca35f8e66dda4c3ee5a7eef"
+          },
+          {
+            "signature": "fn step(",
+            "sha256": "d6643d275b4aaa44348287a4ecb6536e1c2e6f4d44e574df3996df1956a84c35"
+          },
+          {
+            "signature": "fn site(",
+            "sha256": "e5f8adf3a77bd0dcd83842bb15cd342099659ef76a302353a0c8838b9a7a50ae"
+          },
+          {
+            "signature": "fn value(",
+            "sha256": "f11d77019e64ae0ef6c90dcae824b2bedd0b57967176445cd4ddc7092389b2fb"
+          },
+          {
+            "signature": "fn mappings(",
+            "sha256": "8c1255790cd70a983fa364b553aa31cb9e28f7a4c7d5e9e08fc09f5736338271"
+          },
+          {
+            "signature": "fn edge(",
+            "sha256": "57c3de13799dd3904ea06633861c98e7227f5ec1b681f43cc0fce64dfee99005"
+          },
+          {
+            "signature": "fn bind(",
+            "sha256": "e7e3d216ad4d13561b1a3c09dd235566301f4554fdd7e8ba3398fa925d1d3137"
+          },
+          {
+            "signature": "fn span(",
+            "sha256": "5160a72ff197771d59b8cd87f83950205dccb4b68cee1353b694e1b57d7de930"
+          },
+          {
+            "signature": "fn aggregate(",
+            "sha256": "477fb72f65eac1a9569e75d51d114d52725b0c95f7f71154fca3e5afae252aa6"
+          },
+          {
+            "signature": "fn locations(",
+            "sha256": "43ffac4e86e230aaf9f6fc2c441dfd1fe8820f60f18279e7f9a425bc96ea4b99"
+          },
+          {
+            "signature": "fn setLocationLength(",
+            "sha256": "09a033a5589073b4f755f0f7809ea630a5dc9f96e74953e02481679d065496fb"
+          },
+          {
+            "signature": "fn reset(",
+            "sha256": "05e7fc3f392f094052f823b75ae1038fd27ea0d02ab7c681c003e152856961a7"
+          },
+          {
+            "signature": "fn collect(",
+            "sha256": "1b0034b4c0536ed33c1312cf4d94e05c1a24c988717ca55f9a29439105292197"
+          },
+          {
+            "signature": "fn finish(",
+            "sha256": "2e11edf314431d5d658e6aafe997d1b692d4dffaeab4eaead68a66ad77b6198d"
+          },
+          {
+            "signature": "recursive fn branches(",
+            "sha256": "68854646a10963f200d5c53d2d544c23b3f6845ac3083e7baeec958959dba5e4"
+          },
+          {
+            "signature": "recursive fn branchesValue(",
+            "sha256": "eec7aaf2ffe6c64d187391fa7bba8168014fe2037f8d1867d1c08cbe61bdc5a8"
+          },
+          {
+            "signature": "recursive fn matchValue(",
+            "sha256": "09a0a78575eb9e706cec0d701392a2b34f5d2d5acf2a41943540669f774a5a77"
+          },
+          {
+            "signature": "recursive fn matchValueValue(",
+            "sha256": "d5337542348628bdea4a5c623a31ec98da0617f17cf82ee1a6a400f728e4f3d3"
+          },
+          {
+            "signature": "recursive fn invokeCallback(",
+            "sha256": "ad9efe99f3efc7d4f779c56bdda90a03ff9d93d07aa6d203d0775d964345e5ad"
+          },
+          {
+            "signature": "recursive fn invokeCallbackValue(",
+            "sha256": "2c4742ecc9c73b77bb8be71955e4468b02e832d45a099d6e7b95ffe34d6bdc86"
+          }
+        ],
+        "controlled_leaves": [
+          "Module/type/Evidence schemas reduced",
+          "expression/matches/invoke controlled for reentry/errors and observable mutation",
+          "actual pooled_buffer instrumented acquisition/release counters only"
+        ],
+        "whole_compiler_qualification": false
+      },
+      "evidence.json": {
+        "passed": true,
+        "source_audit": {
+          "production_sha256": "516407723ac396e3081ce439e8fc5bf81c07e1277f440cbe738fe9cf3eeaded1",
+          "exact_declarations": [
+            {
+              "signature": "struct Site {",
+              "sha256": "ba013a960a7f65fb82ff9c8483ccac69106244d905d090453993c83ca57f2a3b"
+            },
+            {
+              "signature": "struct TypeOrigin {",
+              "sha256": "ca53f24ba19c27974a5ff203904c61b508ec1f7d2e806417da61ddd054f87a1a"
+            },
+            {
+              "signature": "enum Kind {",
+              "sha256": "61206b99f00d8d26ade3be27fb23a0659794617f0647439ccc5011577a0f1acb"
+            },
+            {
+              "signature": "struct Node {",
+              "sha256": "0fcf9eeea5e544039fa5868da1c33eaa540ba6b230a1ef3afb7620e68c9e91fe"
+            },
+            {
+              "signature": "enum EdgeKind {",
+              "sha256": "58c273884f0ebed3f647615e988d7141ec99eb82084cb75a102bd044ce6192b3"
+            },
+            {
+              "signature": "struct Edge {",
+              "sha256": "327f27bbbfd68baeb0a6dc6b36b6f2691ba10a121faf2684738179ef12e6280b"
+            },
+            {
+              "signature": "struct Invocation {",
+              "sha256": "d1fbd26575f552921ef9eef0fbf1ac0d5b089c41027f847e62668fadbbb82fe3"
+            },
+            {
+              "signature": "struct Boundary {",
+              "sha256": "acb3fda368bd5dec790c5c88ade8c38a2a70861512bb645531e683d126333790"
+            },
+            {
+              "signature": "struct Entry {",
+              "sha256": "9562fe8837b89c1257875185bd780110c09049545da4a81b5716c971a0d7e7e5"
+            },
+            {
+              "signature": "struct Environment {",
+              "sha256": "02207f395ea5f81c6a3fd72da7d809ca8708d86158e8d58ad5340c949220f3f5"
+            },
+            {
+              "signature": "struct ActiveCall {",
+              "sha256": "6f90676b11911ddabc067de01d4c211ac9b31af9ca08d0cfbc867ad4a1fa3f0f"
+            },
+            {
+              "signature": "enum Parameters {",
+              "sha256": "d0691009afd049def48193c4173f9b6770f7abb62b7ddec812171ac38493b547"
+            },
+            {
+              "signature": "struct Callable {",
+              "sha256": "ac754bd81f928b5bc475194571d704c0092226cce304219e9ab32e44085c67a0"
+            },
+            {
+              "signature": "struct Operation {",
+              "sha256": "77c934965bc5ac05b9352bef0b49f71644d422de3d34c9634a1992356df5e168"
+            },
+            {
+              "signature": "struct Provider {",
+              "sha256": "38029385e77521a97fd6e241636b50a7c9febd51abb2dbcce1684e707786a38f"
+            },
+            {
+              "signature": "struct ProviderEntry {",
+              "sha256": "69f3465a4707193aaa8e034454802d144a73df789730310906e28affbee96681"
+            },
+            {
+              "signature": "struct Frame {",
+              "sha256": "35f38ed8bc4a758341b9729a23a2a9004381cfcae7069622f589b5b518704d13"
+            },
+            {
+              "signature": "struct Exit {",
+              "sha256": "e49350ddc87d6e0b4ccf571b66b18c17ff4ca6a12154da5f4e72431792c4d209"
+            },
+            {
+              "signature": "struct Control {",
+              "sha256": "a842f3664ba672d9a524aed99637bc011068aa4880b85ce4892e36cf026bd47f"
+            },
+            {
+              "signature": "struct Tables {",
+              "sha256": "4b2066eb28a9b51d0d2003ae6e00129656058997ae8ff7f48f9b6e1d086fc011"
+            },
+            {
+              "signature": "struct Scan {",
+              "sha256": "4a7c7f80a811cd9cd518d2ca254eb0c34cd5a9ea60522fd25aed6351c1680d7f"
+            },
+            {
+              "signature": "struct Locations {",
+              "sha256": "ca3c02bf978a6273f75e053c8d4816953ed009300d6b5e08a23f766252e634d9"
+            },
+            {
+              "signature": "fn init(",
+              "sha256": "43de3eb1be371683040adce18edce53d4d8ea8207ca35f8e66dda4c3ee5a7eef"
+            },
+            {
+              "signature": "fn step(",
+              "sha256": "d6643d275b4aaa44348287a4ecb6536e1c2e6f4d44e574df3996df1956a84c35"
+            },
+            {
+              "signature": "fn site(",
+              "sha256": "e5f8adf3a77bd0dcd83842bb15cd342099659ef76a302353a0c8838b9a7a50ae"
+            },
+            {
+              "signature": "fn value(",
+              "sha256": "f11d77019e64ae0ef6c90dcae824b2bedd0b57967176445cd4ddc7092389b2fb"
+            },
+            {
+              "signature": "fn mappings(",
+              "sha256": "8c1255790cd70a983fa364b553aa31cb9e28f7a4c7d5e9e08fc09f5736338271"
+            },
+            {
+              "signature": "fn edge(",
+              "sha256": "57c3de13799dd3904ea06633861c98e7227f5ec1b681f43cc0fce64dfee99005"
+            },
+            {
+              "signature": "fn bind(",
+              "sha256": "e7e3d216ad4d13561b1a3c09dd235566301f4554fdd7e8ba3398fa925d1d3137"
+            },
+            {
+              "signature": "fn span(",
+              "sha256": "5160a72ff197771d59b8cd87f83950205dccb4b68cee1353b694e1b57d7de930"
+            },
+            {
+              "signature": "fn aggregate(",
+              "sha256": "477fb72f65eac1a9569e75d51d114d52725b0c95f7f71154fca3e5afae252aa6"
+            },
+            {
+              "signature": "fn locations(",
+              "sha256": "43ffac4e86e230aaf9f6fc2c441dfd1fe8820f60f18279e7f9a425bc96ea4b99"
+            },
+            {
+              "signature": "fn setLocationLength(",
+              "sha256": "09a033a5589073b4f755f0f7809ea630a5dc9f96e74953e02481679d065496fb"
+            },
+            {
+              "signature": "fn reset(",
+              "sha256": "05e7fc3f392f094052f823b75ae1038fd27ea0d02ab7c681c003e152856961a7"
+            },
+            {
+              "signature": "fn collect(",
+              "sha256": "1b0034b4c0536ed33c1312cf4d94e05c1a24c988717ca55f9a29439105292197"
+            },
+            {
+              "signature": "fn finish(",
+              "sha256": "2e11edf314431d5d658e6aafe997d1b692d4dffaeab4eaead68a66ad77b6198d"
+            },
+            {
+              "signature": "recursive fn branches(",
+              "sha256": "68854646a10963f200d5c53d2d544c23b3f6845ac3083e7baeec958959dba5e4"
+            },
+            {
+              "signature": "recursive fn branchesValue(",
+              "sha256": "eec7aaf2ffe6c64d187391fa7bba8168014fe2037f8d1867d1c08cbe61bdc5a8"
+            },
+            {
+              "signature": "recursive fn matchValue(",
+              "sha256": "09a0a78575eb9e706cec0d701392a2b34f5d2d5acf2a41943540669f774a5a77"
+            },
+            {
+              "signature": "recursive fn matchValueValue(",
+              "sha256": "d5337542348628bdea4a5c623a31ec98da0617f17cf82ee1a6a400f728e4f3d3"
+            },
+            {
+              "signature": "recursive fn invokeCallback(",
+              "sha256": "ad9efe99f3efc7d4f779c56bdda90a03ff9d93d07aa6d203d0775d964345e5ad"
+            },
+            {
+              "signature": "recursive fn invokeCallbackValue(",
+              "sha256": "2c4742ecc9c73b77bb8be71955e4468b02e832d45a099d6e7b95ffe34d6bdc86"
+            }
+          ],
+          "controlled_leaves": [
+            "Module/type/Evidence schemas reduced",
+            "expression/matches/invoke controlled for reentry/errors and observable mutation",
+            "actual pooled_buffer instrumented acquisition/release counters only"
+          ],
+          "whole_compiler_qualification": false
+        },
+        "stages": [
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.045,
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.588,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/official.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.027,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/private.c",
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.568,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/private.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/private-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.002,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/capability-scratch-laws/private-test"
+            ]
+          }
+        ],
+        "coverage": [
+          "36 actual-schema executions: branch success/left-error/right-error/nested/termination/implicit right, fuel exhaustion, matching, callback success/error/nested-error",
+          "native frame prefix/suffix restored in original order after errors",
+          "instrumented actual pooled_buffer active_runs returns0 after every call; peak>=4 proves nested live runs",
+          "actual empty pool declarations, wrappers and cleanup instantiated in recursive SCC",
+          "source normalization of complete branch/match algorithm bodies and only invoke block extraction"
+        ],
+        "fixture_sha256": "72c159d711ec24ba7baa6c521d4c90d36d127e10e5bab1e166895900e21d3126"
+      },
+      "normalization.json": [
+        {
+          "function": "branches",
+          "algorithm_body_identical_after_explicit_storage_and_proven_scalar_fixes": true
+        },
+        {
+          "function": "matchValue",
+          "algorithm_body_identical_after_explicit_storage_and_proven_scalar_fixes": true
+        },
+        {
+          "function": "invoke",
+          "only_original_saved_frame_block_extracted": true
+        }
+      ]
+    },
+    "project-engine-laws": {
+      "evidence.json": {
+        "coverage": "Actual projection helpers/ProjectionWork, source core.Types getters/schema, complete effect_evidence and projection cache, complete selected type interner/validator. Source Obligation omits unused diagnostic fields.",
+        "compilers": {
+          "official": {
+            "path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2"
+          },
+          "identity": {
+            "path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b"
+          },
+          "selected": {
+            "path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e"
+          }
+        },
+        "cc": {
+          "invoked": "clang",
+          "path": "/usr/bin/clang-23",
+          "sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d"
+        },
+        "cwd": "/home/jacobt/src/blot2",
+        "stage_timeout_seconds": 10,
+        "stdlib": {
+          "path": "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "files": {
+            "base64.goose": "fa1111ce46e9534311f825880dbd2988953430aeb3f1f52d8f0eaecbbc298a61",
+            "binary.goose": "6973e209428668c2db856eaa941de5d93938cfb1749ed07cac534bf9fe4cb031",
+            "csv.goose": "a49b0647f4a2f8ca36170e5a184ab6c6e505492434d0a10a5e05127e96da61ba",
+            "dictionary.goose": "fb39f896731faf3799e81727f7261849a62bdfbdc92d5fdbc36405a85830f322",
+            "exception.goose": "b91033a5cb9029ac56d27ffb0ed9f5841f76ff58b39de8e881101ca2b8fc39c4",
+            "ffi.goose": "e092b245fbe13ee2fdc71599b7b8eb44198e5261cad9600b7681e13ad75a6c2e",
+            "json.goose": "0e58291ed9051e4ecb8da1ad420290549d723336516507aed33cf7ced89dc29b",
+            "math.goose": "b4c1aee33b5b7033d36a4ddc5c6522c73b21cafe204dc20e8860cdeba22467da",
+            "os.goose": "2193f394d44469daffd993ed204a91b068084fd8db13e261e11156b40c66e934",
+            "regex.goose": "be0e50bab2a1db9f85e856250bcc592dfe25aca73c2ed900410047fbefb4b035",
+            "std.goose": "2243c2ef52ba5045b275eea35252d09f36544987c6884f4a8d35579fa6f781ff",
+            "vec.goose": "2cac168c72047834433bfb419734c38455c9429ea045b1273898031c53faa82e"
+          }
+        },
+        "runtime_objects": [
+          {
+            "path": "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+            "sha256": "8520ed0e5600c2a9ae3e71d7709f927768f820f56a021b477c2495c73863d7ea"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+            "sha256": "c341eaf1d67e8bb19895fa64afaf23c501524301271b8a8f93f1175de1146a14"
+          }
+        ],
+        "source_origins": [
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/eval/type_evidence.goose",
+            "sha256": "059d23fcb86a479909238e11213fbbb56e82e459b3aa2ff4bd77992d2cd53c00"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/eval/type_evidence_schema.goose",
+            "sha256": "b912f6f7b840a76cd3d35ecce05447130d34de691ead6c39f48735cbd2548571"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/eval/evidence_projection.goose",
+            "sha256": "f99fd3ca4eff1883075ecca9b7029483efbd254640bcb31bc4cdb957bd78ef59"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/effect_evidence.goose",
+            "sha256": "e674c05ae0b6133cf5e0a5d95062cd9729f0f59a0d89f61075926d1098df566a"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/core.goose",
+            "sha256": "bb4b160a00f80f2dc9193d532e003e7ae9a7761f56b2b473a6f772f507fb552c"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/types.goose",
+            "sha256": "9d73562bb34877b9aa936f5fa29e08a806dccacc038f551d0ae89943a49abc2a"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/effects.goose",
+            "sha256": "1b94326def0e7eda87cb8383f05429620cb4c04b40c8b25855f418739c52f0cc"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/quantifier_goals.goose",
+            "sha256": "790e714947ca3201b7782177970563b87f44ce6dde373721d10cb13b28ee393d"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/reuse/projection_cache.goose",
+            "sha256": "3d3cd02302ac481205cfbeb1e1447a168814e40fe4ca7f0395da5ee098af1133"
+          }
+        ],
+        "extracted_and_support_inputs": {
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/cache.goose": "3d3cd02302ac481205cfbeb1e1447a168814e40fe4ca7f0395da5ee098af1133",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/cases.goose": "ddd017cab7ce082ce7ad5d7658de43faf78407446166f9c0e6a4e6284a8c083b",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/effects.goose": "5e60e42b3df4571d7df1e20536a65b56b4eb2ed5d1eaf24e1f6619b46e2bed54",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose": "131f9fde8269e1e6d457b24894dda6b5d8c4f64b6adb83eb299ac7d245076145",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/main.goose": "f7b7dad46d8cec569e322fabbbb5c74ca75df8b0a8d8aa6e72cf2e19996018a2",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/projection.goose": "6477da8fd7dbda38b1f197740808b83e6a2dce10ed74447efb8c8db72aa47e08",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/quantifier_goals.goose": "672fa7762cb02cf9368540de6b548755d738dadecf40f11fe0836e0329f6eccc",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/source.goose": "546e13d66b89bcb279905155d6e02e792f50a136d32b3f29dbb34c274984b985",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/source_effects.goose": "e55e41460dee414f2b031251d473522ae2d97faf072a9f7c439b2e96b7e05cf5",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/symbols.goose": "5998990d3c6f8363c24424d46a10966d1b5f26e8c657f39687bf0b91b478c6d9",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/types.goose": "4d7a283972858720cb1357ec82335cd1b03ff48c376a8bd12fe33c81734032da",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/blake3.goose": "94efa434cf1fa91133ccd8f55520a19a4e8965256627533b9fa71157d35c5209",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/bytes.goose": "bae4133669e102c01bf3259019a71c883888f6f63cee32dab11893b0e16a514e",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/core_packet.goose": "e05b6d9b99fc8e3be46b3278f15f2e994959ce757c5a1aaf1f03124da0d07f56",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/emitter.goose": "e432160ebc81c6e529240b514adb7c27dbe3950dec03479fc0b27f4f986f71e0",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/evidence_packet.goose": "e8123ec42435950b36040b4207ea99db3a6038b60478632d3cb1a13ed868a649",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/host_layout.goose": "759ba776e77f520af19fbdf9ea1a5e821ffc2c7c5c638e335cac656f45c13740",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/io.goose": "10681af80bdebf9d0d0ff6f080283f51729e84f229f7dfba2ffa0b0f2e37229f",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/json.goose": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/json_adapters.goose": "546495a18afe2083d25f066bee7cef2e8f1254c5fd45a0f325b4d34d5c09648d",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/native.goose": "521c0584db7270195ac15e498f4796abf24fb15b9e7400c36c334cac93b19916",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/option.goose": "83daa905847ce8a0c3ed7a16f22424a41622b0b8624b9dc30a648a0bca8205d6",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/path.goose": "79d672c413385eef4742516a840c5d80e09a031113c18e48086c922fbc479dae",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose": "9213e248a117f369f86e469743da489686e033ea216048d35c980a6d9b1bfeb6",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/pooled_map.goose": "dc56c1bc5c23304e56b82936a4f00249545dbea5b9696b873d7fb800f3b7417a",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/process_pool.goose": "7d98a937f9ec39077e7ebc071b6f1066d6fdfef86a194cf05da1fa440efb3be5",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet.goose": "f59c467b3142947cc83fbe5d4a6ef434d2d4755b0f1e968c95044359237a0c85",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet_codecs.goose": "206fc6922857e1f2013c03b42d710cb870ef198b229541b0cae80c8051d7aad2",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet_contexts.goose": "d4da8a96cd5470367e409b37400e189d2b5bd41d2528ce3902cebd181cd16131",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet_owners.goose": "263f7cf459a1ffbe09bf52279d09dbb8342131f6b8d725c92cf389d9e892aa7b",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/sha256.goose": "a1eac6fbbd355c23f88c111b34597a5c22097189b7abe4bf2f6fe14c08a4b6f4",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/structural.goose": "5a7c53a1916e5f434a46d8c56b977b9b6e76e7f31fb04c249fbe82c93725ff2b",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/structural_adapters.goose": "68ae1305fc11594d34246fd83b78ba318d324bef4689bd71ccb2aa11342b874e",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/wyhash.goose": "b9b20300ce43165620b8820384cabbeb820afe0d69de235035d4c1731705de85"
+        },
+        "runs": [
+          {
+            "compiler": "official",
+            "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "emit",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "-O0",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/main.goose"
+            ],
+            "exit": 0,
+            "seconds": 0.3835764340037713,
+            "stdout": "parsed ok: 607 top-level declarations, 20 file(s)\ntypechecked ok: 655 specialization(s), 67 struct/6 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 3 folded, 32 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 223/453 index and 56/128 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/project-engine-laws/official.c (1326545 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n"
+          },
+          {
+            "compiler": "official",
+            "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "link",
+            "command": [
+              "clang",
+              "-std=gnu11",
+              "-D_GNU_SOURCE",
+              "-O0",
+              "-pthread",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+              "-lm",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official"
+            ],
+            "exit": 0,
+            "seconds": 0.3358592049989966,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "run",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official"
+            ],
+            "exit": 0,
+            "seconds": 0.0111216270015575,
+            "stdout": "cross source bound level1\nactual projection, quantifier spans, effect rows, cache and cleanup laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "emit",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+              "-O0",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity.c",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/main.goose"
+            ],
+            "exit": 0,
+            "seconds": 0.35356524599774275,
+            "stdout": "parsed ok: 607 top-level declarations, 20 file(s)\ntypechecked ok: 655 specialization(s), 67 struct/6 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 3 folded, 32 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 223/453 index and 56/128 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity.c (1326545 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n"
+          },
+          {
+            "compiler": "identity",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "link",
+            "command": [
+              "clang",
+              "-std=gnu11",
+              "-D_GNU_SOURCE",
+              "-O0",
+              "-pthread",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity.c",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+              "-lm",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity"
+            ],
+            "exit": 0,
+            "seconds": 0.3335857650017715,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "run",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity"
+            ],
+            "exit": 0,
+            "seconds": 0.010427498003991786,
+            "stdout": "cross source bound level1\nactual projection, quantifier spans, effect rows, cache and cleanup laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "selected",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "phase": "emit",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+              "-O0",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected.c",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/main.goose"
+            ],
+            "exit": 0,
+            "seconds": 0.35940419400139945,
+            "stdout": "parsed ok: 607 top-level declarations, 20 file(s)\ntypechecked ok: 655 specialization(s), 67 struct/6 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 3 folded, 32 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 223/453 index and 56/128 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected.c (1326545 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n"
+          },
+          {
+            "compiler": "selected",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "phase": "link",
+            "command": [
+              "clang",
+              "-std=gnu11",
+              "-D_GNU_SOURCE",
+              "-O0",
+              "-pthread",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected.c",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+              "-lm",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected"
+            ],
+            "exit": 0,
+            "seconds": 0.335051961003046,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "selected",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "phase": "run",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected"
+            ],
+            "exit": 0,
+            "seconds": 0.007829239002603572,
+            "stdout": "cross source bound level1\nactual projection, quantifier spans, effect rows, cache and cleanup laws passed\n",
+            "stderr": ""
+          }
+        ],
+        "inputs_unchanged_after_run": true,
+        "artifacts": {
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official": "1f49e0151c7fab74721f121fa79e7c121c9691e8cba62fb84c0d38392da8336f",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official.c": "8495db2dac2792a11bcd5b5e9893ed287b373ef2689eae144e452a3d8ef3e869",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity": "dc3d0680b2a9b2d527e5a5856056fb7b9ae5f7e7da94c56caeb9580cbf8be8b7",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity.c": "8495db2dac2792a11bcd5b5e9893ed287b373ef2689eae144e452a3d8ef3e869",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected": "0febd1c628668cd4f9e7a25b6e4c052594d286934d04f127e0e63ce47357c117",
+          "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected.c": "8495db2dac2792a11bcd5b5e9893ed287b373ef2689eae144e452a3d8ef3e869"
+        }
+      },
+      "owner-size.json": {
+        "source": "Exact emitted C type declarations from current official fixture; supersedes earlier source-relative span candidate",
+        "result": "old_slice=16 owned_frame=16 binder=4\n",
+        "allocation": "One owned binder snapshot per pushed quantifier frame, n.c u32 words; n.c already checked1..128. Header reserve remains before snapshot allocation. No logical fuel charged for copy."
+      },
+      "source-span-countercontrol.json": [
+        {
+          "checker": "official",
+          "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+          "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "command": [
+            "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "-O0",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official-source-span.c",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/main.goose"
+          ],
+          "extracted_evidence_sha256": "8e9cd4d8e96138169e657589c3eaf30c3e4515ef178ebfadf88ce7440bb8e878",
+          "cases_sha256": "965006a6cfca6ad0f5bebe052c33f879843b7311062548dcf5889f64966d7852",
+          "phase": "emit",
+          "exit": 0,
+          "seconds": 0.3867037200034247,
+          "stdout": "parsed ok: 606 top-level declarations, 20 file(s)\ntypechecked ok: 662 specialization(s), 66 struct/6 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 2 folded, 32 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 220/437 index and 44/112 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/project-engine-laws/official-source-span.c (1274595 bytes)\n",
+          "stderr": "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:211: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:240: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n"
+        },
+        {
+          "checker": "official",
+          "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+          "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "command": [
+            "clang",
+            "-std=gnu11",
+            "-D_GNU_SOURCE",
+            "-O0",
+            "-pthread",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official-source-span.c",
+            "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+            "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+            "-lm",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official-source-span"
+          ],
+          "extracted_evidence_sha256": "8e9cd4d8e96138169e657589c3eaf30c3e4515ef178ebfadf88ce7440bb8e878",
+          "cases_sha256": "965006a6cfca6ad0f5bebe052c33f879843b7311062548dcf5889f64966d7852",
+          "phase": "link",
+          "exit": 0,
+          "seconds": 0.37966165599937085,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "checker": "official",
+          "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+          "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "command": [
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/official-source-span"
+          ],
+          "extracted_evidence_sha256": "8e9cd4d8e96138169e657589c3eaf30c3e4515ef178ebfadf88ce7440bb8e878",
+          "cases_sha256": "965006a6cfca6ad0f5bebe052c33f879843b7311062548dcf5889f64966d7852",
+          "phase": "run",
+          "exit": 1,
+          "seconds": 0.011536536003404763,
+          "stdout": "cross source bound level0\n",
+          "stderr": "goose runtime error: assert failed (/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/cases.goose:13)\n"
+        },
+        {
+          "checker": "identity",
+          "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+          "command": [
+            "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "-O0",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity-source-span.c",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/main.goose"
+          ],
+          "extracted_evidence_sha256": "8e9cd4d8e96138169e657589c3eaf30c3e4515ef178ebfadf88ce7440bb8e878",
+          "cases_sha256": "965006a6cfca6ad0f5bebe052c33f879843b7311062548dcf5889f64966d7852",
+          "phase": "emit",
+          "exit": 0,
+          "seconds": 0.3714134699985152,
+          "stdout": "parsed ok: 606 top-level declarations, 20 file(s)\ntypechecked ok: 662 specialization(s), 66 struct/6 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 2 folded, 32 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 220/437 index and 44/112 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity-source-span.c (1274595 bytes)\n",
+          "stderr": "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:211: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:240: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n"
+        },
+        {
+          "checker": "identity",
+          "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+          "command": [
+            "clang",
+            "-std=gnu11",
+            "-D_GNU_SOURCE",
+            "-O0",
+            "-pthread",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity-source-span.c",
+            "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+            "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+            "-lm",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity-source-span"
+          ],
+          "extracted_evidence_sha256": "8e9cd4d8e96138169e657589c3eaf30c3e4515ef178ebfadf88ce7440bb8e878",
+          "cases_sha256": "965006a6cfca6ad0f5bebe052c33f879843b7311062548dcf5889f64966d7852",
+          "phase": "link",
+          "exit": 0,
+          "seconds": 0.4577669199934462,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "checker": "identity",
+          "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+          "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+          "command": [
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/identity-source-span"
+          ],
+          "extracted_evidence_sha256": "8e9cd4d8e96138169e657589c3eaf30c3e4515ef178ebfadf88ce7440bb8e878",
+          "cases_sha256": "965006a6cfca6ad0f5bebe052c33f879843b7311062548dcf5889f64966d7852",
+          "phase": "run",
+          "exit": 1,
+          "seconds": 0.0067652479992830195,
+          "stdout": "cross source bound level0\n",
+          "stderr": "goose runtime error: assert failed (/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/cases.goose:13)\n"
+        },
+        {
+          "checker": "selected",
+          "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+          "command": [
+            "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "-O0",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected-source-span.c",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/main.goose"
+          ],
+          "extracted_evidence_sha256": "8e9cd4d8e96138169e657589c3eaf30c3e4515ef178ebfadf88ce7440bb8e878",
+          "cases_sha256": "965006a6cfca6ad0f5bebe052c33f879843b7311062548dcf5889f64966d7852",
+          "phase": "emit",
+          "exit": 0,
+          "seconds": 0.32425786899693776,
+          "stdout": "parsed ok: 606 top-level declarations, 20 file(s)\ntypechecked ok: 662 specialization(s), 66 struct/6 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 2 folded, 32 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 220/437 index and 44/112 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected-source-span.c (1274595 bytes)\n",
+          "stderr": "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:211: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/evidence.goose:240: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n"
+        },
+        {
+          "checker": "selected",
+          "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+          "command": [
+            "clang",
+            "-std=gnu11",
+            "-D_GNU_SOURCE",
+            "-O0",
+            "-pthread",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected-source-span.c",
+            "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+            "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+            "-lm",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected-source-span"
+          ],
+          "extracted_evidence_sha256": "8e9cd4d8e96138169e657589c3eaf30c3e4515ef178ebfadf88ce7440bb8e878",
+          "cases_sha256": "965006a6cfca6ad0f5bebe052c33f879843b7311062548dcf5889f64966d7852",
+          "phase": "link",
+          "exit": 0,
+          "seconds": 0.3226026129996171,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "checker": "selected",
+          "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+          "command": [
+            "/home/jacobt/src/blot2/build/goose-port/project-engine-laws/selected-source-span"
+          ],
+          "extracted_evidence_sha256": "8e9cd4d8e96138169e657589c3eaf30c3e4515ef178ebfadf88ce7440bb8e878",
+          "cases_sha256": "965006a6cfca6ad0f5bebe052c33f879843b7311062548dcf5889f64966d7852",
+          "phase": "run",
+          "exit": 1,
+          "seconds": 0.005950740000116639,
+          "stdout": "cross source bound level0\n",
+          "stderr": "goose runtime error: assert failed (/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/cases.goose:13)\n"
+        }
+      ]
     }
   },
   "later_attempts": {
@@ -2743,6 +4045,84 @@
       "diagnostic_summary": [
         "eval/type_evidence.goose:360 borrowed binder slices cannot be stored in pooled persistent OwnersBuffer"
       ]
+    },
+    "build-207": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-207-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 50.711,
+      "stop_reason": "cancelled: actual isolated projection fixture proved obsolete cache alias calls; source fixed before next attempt",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-207.log",
+      "capture_seconds": 0.237,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-207-inputs/compiler-goose",
+      "live_matches_frozen": false,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-207-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "build-208": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-208-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 100.796,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-208.log",
+      "capture_seconds": 0.1977,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-208-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-208-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "check/capability_lifetimes.goose:261 native growable before/joined scratch is held across recursive calls"
+      ]
+    },
+    "build-209": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-209-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 99.982,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-209.log",
+      "capture_seconds": 0.2966,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-209-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-209-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "check/capability_lifetimes.goose:154 graph Item.id:i64 cannot pass to captureReference source:u32"
+      ]
     }
   },
   "rejected_last_depth": {
@@ -2850,5 +4230,14 @@
     "declarations": 36066,
     "files": 439,
     "seconds": 0.797888204
+  },
+  "rejected_source_relative_spans": {
+    "frozen_inputs": [
+      207,
+      208
+    ],
+    "reason": "cross-source resolver reentry resolves older frames against the wrong source; runtime counterexample returns bound level0 instead of original level1",
+    "replacement": "owned binder snapshots and scalar range descriptors",
+    "performance_claim": "no memory or speed gain; final frame16 bytes plus4 bytes/copied binder, one additional snapshot allocation"
   }
 }

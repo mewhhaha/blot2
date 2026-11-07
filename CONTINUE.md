@@ -28,8 +28,10 @@ eight runtime cases. Two frozen-prefix pairs measure 48.017 -> 29.326s to the
 identical diagnostic (38.925%); the earlier nominal-identity change separately
 measures 87.430 -> 54.749s. These are failing-prefix gains under separate paired
 conditions, not completed compiler timings. Current source repairs preserve
-exact owner roots, callback cleanup and native array construction; complete
-program emission, linking and execution remain pending. Removing the optional
+exact owner roots, callback cleanup and native array construction. Projection
+frames own binder snapshots across cross-source reentry; focused real interner,
+projection and recursive-scratch fixtures pass. Actual whole checks still stop
+at remaining source errors; program emission, linking and execution are pending. Removing the optional
 bounds cache may add allocation/runtime cost.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.

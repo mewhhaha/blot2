@@ -155,15 +155,30 @@ fn resize(self_: WordBuffer&,length: i64) { blot_support_pooled_buffer::resize(s
 fn resize(self_: WordBuffer&,length: i64,value: u32) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
 fn clear(self_: WordBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
 fn deinit(self_: WordBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_WordBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
-struct OwnersBuffer { storage: (const u32[:])[:]=default<(const u32[:])[:]>(),items: (const u32[:])[:]=default<(const u32[:])[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
-reusable[] var pool_OwnersBuffer: (const u32[:])[>..]=[];
-fn ensure(self_: OwnersBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_OwnersBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
-fn push(self_: OwnersBuffer&,value: (const u32[:])) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_OwnersBuffer); self_.len=self_.items.len; }
-fn append(self_: OwnersBuffer&,values: const (const u32[:])[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_OwnersBuffer); self_.len=self_.items.len; }
-fn resize(self_: OwnersBuffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
-fn resize(self_: OwnersBuffer&,length: i64,value: (const u32[:])) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
-fn clear(self_: OwnersBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
-fn deinit(self_: OwnersBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_OwnersBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
+// Resolver callbacks may reenter with another source graph. Each active frame
+// retains its own binder IDs; scalar ranges address these owned snapshots.
+struct ProjectionOwner { start: i64=0,len: i64=0 }
+struct OwnersBuffer { storage: ProjectionOwner[:]=default<ProjectionOwner[:]>(),items: ProjectionOwner[:]=default<ProjectionOwner[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
+reusable[] var pool_OwnersBuffer: ProjectionOwner[>..]=[];
+reusable[] var projection_owner_binders: u32[>..]=[];
+fn ownerBinders(frame: ProjectionOwner) -> const u32[:] { return projection_owner_binders[frame.start..frame.start+frame.len]; }
+fn push(self_: OwnersBuffer&,values: const u32[:]) {
+ if self_.failure!=blot_error::Error.none { return; }
+ let length=self_.items.len;
+ self_.failure=blot_support_pooled_buffer::ensure(self_,length+1,pool_OwnersBuffer);
+ if self_.failure!=blot_error::Error.none { return; }
+ let owned=projection_owner_binders.alloc_slice(values.len);
+ for value,index in values { owned[index]=value; }
+ var start: i64=0; if owned.len!=0 { start=projection_owner_binders.index_of(owned[0]); }
+ self_.storage[length]=ProjectionOwner {start,owned.len}; self_.items=self_.storage[..length+1]; self_.len=self_.items.len;
+}
+fn resize(self_: OwnersBuffer&,length: i64) {
+ assert(length>=0&&length<=self_.len);
+ for frame in self_.items[length..] { if frame.len!=0 { projection_owner_binders.free_slice(projection_owner_binders[frame.start..frame.start+frame.len]); } }
+ blot_support_pooled_buffer::resize(self_,length); self_.len=length;
+}
+fn clear(self_: OwnersBuffer&) { resize(self_,0); self_.failure=blot_error::Error.none; }
+fn deinit(self_: OwnersBuffer&) { clear(self_); blot_support_pooled_buffer::deinit(self_,pool_OwnersBuffer); }
 struct QuantifierBuffer { storage: QuantifierGoals[:]=default<QuantifierGoals[:]>(),items: QuantifierGoals[:]=default<QuantifierGoals[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_QuantifierBuffer: QuantifierGoals[>..]=[];
 fn ensure(self_: QuantifierBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_QuantifierBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
@@ -300,7 +315,7 @@ fn internGoalFields(self_: Store,tag: Tag,a: u32,b: u32,row: u32,values: const I
  var prior: Id=0; let previous=self_.buckets.get(hash); if previous!=null { prior=previous; } self_.nodes.push(n); self_.next.push(prior); self_.buckets.insert(hash,id); return id,blot_error::Error.none;
 }
 fn containsAbstract(self_: const Store&,id: Id) -> bool,Error { var remaining: i64=4096; return abstractDepth(self_,id,0,remaining); }
-fn abstractDepth(self_: const Store&,id: Id,depth: i64,remaining: i64&) -> bool,Error {
+recursive fn abstractDepth(self_: const Store&,id: Id,depth: i64,remaining: i64&) -> bool,Error {
  if depth>=128||remaining==0 { return false,blot_error::Error.evidence_limit; } remaining--; let n=node(self_,id);
  if n.tag==Tag.bound||n.tag==Tag.projection { return true,blot_error::Error.none; } if n.tag==Tag.forall||n.tag==Tag.existential { return false,blot_error::Error.none; }
  if n.tag==Tag.function||n.tag==Tag.state_provider {
@@ -317,15 +332,15 @@ recursive fn projectDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64,bud
  if work.failure!=blot_error::Error.none { return 0; } if depth>=1024||budget==0 { return reject(work,blot_error::Error.evidence_limit); }
  if work.resolver.enabled {
   if depth>=256||work.resolver.remaining==0 { return reject(work,blot_error::Error.evidence_limit); } work.resolver.remaining--;
-  if ty>5&&memo!=null { let answer=memo.answers.get(ty); if answer!=null { let a=answer; if depth+a.height>256 { return reject(work,blot_error::Error.evidence_limit); } budget--; if parent_height!=null&&parent_height<a.height+1 { parent_height = a.height+1; } return a.value; } }
+  if ty>5&&memo!=null { let answer=blot_reuse_projection_cache::get(memo.answers,ty); if answer!=null { let a=answer; if depth+a.height>256 { return reject(work,blot_error::Error.evidence_limit); } budget--; if parent_height!=null&&parent_height<a.height+1 { parent_height = a.height+1; } return a.value; } }
  }
  if retained&&ty>5&&memo!=null {
-  let answer=memo.answers.get(ty); if answer!=null { let a=answer; if depth+a.height>1024||budget<a.visits { return reject(work,blot_error::Error.evidence_limit); } budget-=a.visits; if parent_height!=null&&parent_height<a.height+1 { parent_height = a.height+1; } return a.value; }
+  let answer=blot_reuse_projection_cache::get(memo.answers,ty); if answer!=null { let a=answer; if depth+a.height>1024||budget<a.visits { return reject(work,blot_error::Error.evidence_limit); } budget-=a.visits; if parent_height!=null&&parent_height<a.height+1 { parent_height = a.height+1; } return a.value; }
  }
  let before=budget; budget--; var height: u16=1; let result=projectNodeDepth(work,ty,depth,budget,retained,memo,height); if work.failure!=blot_error::Error.none { return 0; }
  if retained||memo!=null {
   if parent_height!=null&&parent_height<height+1 { parent_height = height+1; }
-  if ty>5&&memo!=null { var visits: u32=1; if retained { visits=(before-budget) as u32; } memo.answers.insert(ty,blot_reuse_projection_cache::Answer {result,visits,height}); }
+  if ty>5&&memo!=null { var visits: u32=1; if retained { visits=(before-budget) as u32; } blot_reuse_projection_cache::insert(memo.answers,ty,blot_reuse_projection_cache::Answer {result,visits,height}); }
  }
  return result;
 }
@@ -342,7 +357,7 @@ recursive fn projectNodeDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64
   if leaf.tag==Tag.erased_proof&&source.node(ty).tag!=blot_check_types::Tag.erased_proof { return reject(work,blot_error::Error.type_mismatch); }
   if leaf.tag==Tag.bound {
    var scope=self_.projection_owners.len;
-   while scope!=0 { scope--; for binder in self_.projection_owners.items[scope] { if binder==ty { let levels=self_.projection_owners.len-1-scope; if levels>=128||leaf.c>127-levels { return reject(work,blot_error::Error.evidence_limit); } let id,err=internWithEffects(self_,Tag.bound,leaf.a,leaf.b,leaf.c+levels as u32,[]); return accept(work,id,err); } } }
+   while scope!=0 { scope--; for binder in ownerBinders(self_.projection_owners.items[scope]) { if binder==ty { let levels=self_.projection_owners.len-1-scope; if levels>=128||leaf.c>127-levels { return reject(work,blot_error::Error.evidence_limit); } let id,err=internWithEffects(self_,Tag.bound,leaf.a,leaf.b,leaf.c+levels as u32,[]); return accept(work,id,err); } } }
   }
   return mapping.evidence;
  } }
@@ -424,12 +439,12 @@ recursive fn projectRowBody<S,R>(work: ProjectionWork<S,R>&,row: u32,depth: i64,
  var labels=WordBuffer {};  var arguments=WordBuffer {};
  for label in source.rowLabels(row) {
   if work.resolver.enabled { if work.resolver.remaining==0 { let __cleanup_result_18_0: u32 = reject(work,blot_error::Error.evidence_limit); arguments.deinit(); labels.deinit(); return __cleanup_result_18_0; } work.resolver.remaining--; }
-  if retained&&memo!=null { let answer=memo.labels.get(label); if answer!=null { let a=answer; if depth+a.height>1024||budget<a.visits { let __cleanup_result_19_0: u32 = reject(work,blot_error::Error.evidence_limit); arguments.deinit(); labels.deinit(); return __cleanup_result_19_0; } budget-=a.visits; if height<a.height { height=a.height; } labels.push(a.value); continue; } }
+  if retained&&memo!=null { let answer=blot_reuse_projection_cache::get(memo.labels,label); if answer!=null { let a=answer; if depth+a.height>1024||budget<a.visits { let __cleanup_result_19_0: u32 = reject(work,blot_error::Error.evidence_limit); arguments.deinit(); labels.deinit(); return __cleanup_result_19_0; } budget-=a.visits; if height<a.height { height=a.height; } labels.push(a.value); continue; } }
   let operation=source.operation(label); let instance=blot_check_types::selectionAtom(source,operation.instance); if instance.unit==0&&instance.decl!=0 { let __cleanup_result_20_0: u32 = reject(work,blot_error::Error.unresolved_type); arguments.deinit(); labels.deinit(); return __cleanup_result_20_0; }
   arguments.resize(0); let before=budget; var label_height: u16=0;
   for argument in source.operationArguments(label) { if retained { arguments.push(projectDepth(work,argument,depth+1,budget,retained,memo,label_height)); } else { arguments.push(projectDepth(work,argument,depth+1,budget,retained,memo,height)); } }
   if work.failure!=blot_error::Error.none { let __cleanup_result_21_0: u32 = 0; arguments.deinit(); labels.deinit(); return __cleanup_result_21_0; } let projected,err=self_.effects.internOperationInstance(operation.identity,arguments.items,instance); if err!=blot_error::Error.none { let __cleanup_result_22_0: u32 = reject(work,err); arguments.deinit(); labels.deinit(); return __cleanup_result_22_0; }
-  if retained&&memo!=null { if height<label_height { height=label_height; } memo.labels.insert(label,blot_reuse_projection_cache::Answer {projected,(before-budget) as u32,label_height}); } labels.push(projected);
+  if retained&&memo!=null { if height<label_height { height=label_height; } blot_reuse_projection_cache::insert(memo.labels,label,blot_reuse_projection_cache::Answer {projected,(before-budget) as u32,label_height}); } labels.push(projected);
  }
  labels.append(self_.effects.view().rowLabels(suffix)); if suffix!=0 { formal=self_.effects.rows.items[suffix].formal; } let result,err=self_.effects.internRowWithFormal(labels.items,formal); let __cleanup_result_23_0: u32 = accept(work,result,err); arguments.deinit(); labels.deinit(); return __cleanup_result_23_0;
  arguments.deinit(); labels.deinit(); }

@@ -2203,8 +2203,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_lifetim
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_capability_lifetimes::Report) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_lifetimes::Scan)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_capability_lifetimes::Scan) {hashFields(sink,value);}
-fn equal<StructuralLeft,C,F>(left:StructuralLeft,right:blot_check_capability_lifetimes::ScanScope<C,F>)->bool {return equalFields(left,right);}
-fn hash<StructuralSink,C,F>(sink:StructuralSink&,value:blot_check_capability_lifetimes::ScanScope<C,F>) {hashFields(sink,value);}
+fn equal<StructuralLeft,C>(left:StructuralLeft,right:blot_check_capability_lifetimes::ScanScope<C>)->bool {return equalFields(left,right);}
+fn hash<StructuralSink,C>(sink:StructuralSink&,value:blot_check_capability_lifetimes::ScanScope<C>) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_lifetimes::Site)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_capability_lifetimes::Site) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_capability_lifetimes::Tables)->bool {return equalFields(left,right);}
@@ -4471,6 +4471,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_type_evidence::Pool
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_type_evidence::PooledRowsHeader) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_type_evidence::Projection)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_type_evidence::Projection) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_type_evidence::ProjectionOwner)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_type_evidence::ProjectionOwner) {hashFields(sink,value);}
 fn equal<StructuralLeft,R>(left:StructuralLeft,right:blot_eval_type_evidence::ProjectionResolver<R>)->bool {return equalFields(left,right);}
 fn hash<StructuralSink,R>(sink:StructuralSink&,value:blot_eval_type_evidence::ProjectionResolver<R>) {hashFields(sink,value);}
 fn equal<StructuralLeft,S,R>(left:StructuralLeft,right:blot_eval_type_evidence::ProjectionWork<S,R>)->bool {return equalFields(left,right);}

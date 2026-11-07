@@ -51,11 +51,33 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. Frozen206 includes the full direct-slot getter family, numeric-proof
-repairs and projection recursion declarations. It stops after 99.986 seconds
-because pooled projection scratch tries to retain caller-borrowed binder slices.
-A scalar-range representation is the active repair. Whole-program C emission,
-linking and compiler execution remain pending.
+per stage. This source checkpoint preserves the exact frozen209 inputs, which
+advance through projection and recursive lifetime scratch. The run stops after
+99.982 seconds at an i64 graph index passed to a u32 capture helper; its repair
+continues in the working tree. Whole-program C emission, linking and compiler
+execution remain pending.
+
+Projection scratch now owns binder snapshots addressed by scalar ranges. The
+rejected source-relative List spans read the wrong binder during cross-source
+resolver reentry: they return level0 where original semantics require level1.
+That countercontrol compiles and fails on official, baseline585 and selected46;
+the owned snapshots pass on all three. Final payload is 16 bytes per frame plus
+four bytes per copied binder and one additional snapshot allocation. Header
+reserve stays first; fuel and stack order are unchanged. Physical OOM remains
+unqualified; no whole-runtime memory or speed gain is claimed.
+
+The actual projection/interner fixture emits, links and runs in under 0.75 seconds
+per selected toolchain. It includes real effect evidence, cache and validators,
+with unused diagnostic fields omitted. Cases cover shifted/nested scopes,
+cross-source reentry, retained answer/label cache fuel, resolver behavior,
+malformed binders, cleanup, depth and abstract-type recursion. Binary, runtime,
+stdlib and source/extraction identities are pinned in the evidence. Recursive
+lifetime branch/match/callback scratch uses pooled fixed-size descriptors;
+36 actual-record SCC cases pass official and selected46, with zero active scratch
+runs after every return and exact frame restoration. Semantic leaves remain
+controlled. Old native recursive buffers still reject. Boolean binding and two
+fixed result-array initializations are repaired; their algorithm order is kept.
+
 
 All 67 affected nullable-reference getters now return through direct slot probes,
 removing temporary Map facades. The audited 66-site follow-on changes no lookup
@@ -109,7 +131,7 @@ family execute nested success/error controls with zero live scratch afterward;
 16 transformed body comparisons preserve their explicit continuation tokens.
 Controlled semantic leaves limit these witnesses to their stated boundaries.
 
-The next syntax batch makes 202 local native-array constructions and 73 native
+The source checkpoint makes 202 local native-array constructions and 73 native
 dictionary constructions explicitly empty, and selects borrowed slices through
 pure branch-return helpers. Whole parsing passes in about one second. These
 repairs do not establish full type/lifetime acceptance or compilation speed.
