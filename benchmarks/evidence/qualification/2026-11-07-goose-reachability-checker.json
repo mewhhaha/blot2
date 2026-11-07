@@ -3610,6 +3610,135 @@
           "stderr": "goose runtime error: assert failed (/home/jacobt/src/blot2/build/goose-port/project-engine-laws/src/cases.goose:13)\n"
         }
       ]
+    },
+    "capability-module-store-laws": {
+      "source-audit.json": {
+        "before_sha256": "a29e4acb5ac7ab51451ac408599e11073cb4f3b53afb6dccb5cfec6530a39bcc",
+        "production_sha256": "737b749e1a0ac9c0029ccbd53e7dfd4466a83a4fa3cb6a20a725ca917a8e68dd",
+        "replacements": {
+          "self_.callables.push(Callable { result, module, self_.binding, closure.body, Parameters.closure { catalog , ..}, environment , ..});": "pushCallable(self_.callables,result,module,self_.binding,closure.body,Parameters.closure {catalog, ..},environment,false);",
+          "self_.callables.push(Callable { value: result, module: producer, binding: body.binding, body: body.root, parameters: Parameters.body { body.parameters , ..}, environment: imported, runtime: body.runtime , ..});": "pushCallable(self_.callables,result,producer,body.binding,body.root,Parameters.body {body.parameters, ..},imported,body.runtime);",
+          "self_.callables.push(invocation);": "pushCallableValue(self_.callables,invocation);",
+          "self_.controls.push(Control { module, source, self_.scope_depth , ..});": "pushControl(self_.controls,module,source,self_.scope_depth);",
+          "self_.exits.push(Exit { module, n.b, result.value , ..});": "pushExit(self_.exits,module,n.b,result.value);"
+        },
+        "exact_extracted_helper_sha256": "9adba1be7fd14c0e085438588034fb27af2f521cf9ee21996c9a24df1670af88",
+        "scope": "Combined nonrecursive typed construction+append for Callable/Control/Exit; partial Callable value append also leaf; original expression order/passed Module references preserved",
+        "limitation": "Actual Scan/Tables/Callable/Control/Exit schemas; reduced Module/Evidence semantic leaves, full main qualification pending"
+      },
+      "evidence.json": {
+        "passed": true,
+        "source_audit": {
+          "before_sha256": "a29e4acb5ac7ab51451ac408599e11073cb4f3b53afb6dccb5cfec6530a39bcc",
+          "production_sha256": "737b749e1a0ac9c0029ccbd53e7dfd4466a83a4fa3cb6a20a725ca917a8e68dd",
+          "replacements": {
+            "self_.callables.push(Callable { result, module, self_.binding, closure.body, Parameters.closure { catalog , ..}, environment , ..});": "pushCallable(self_.callables,result,module,self_.binding,closure.body,Parameters.closure {catalog, ..},environment,false);",
+            "self_.callables.push(Callable { value: result, module: producer, binding: body.binding, body: body.root, parameters: Parameters.body { body.parameters , ..}, environment: imported, runtime: body.runtime , ..});": "pushCallable(self_.callables,result,producer,body.binding,body.root,Parameters.body {body.parameters, ..},imported,body.runtime);",
+            "self_.callables.push(invocation);": "pushCallableValue(self_.callables,invocation);",
+            "self_.controls.push(Control { module, source, self_.scope_depth , ..});": "pushControl(self_.controls,module,source,self_.scope_depth);",
+            "self_.exits.push(Exit { module, n.b, result.value , ..});": "pushExit(self_.exits,module,n.b,result.value);"
+          },
+          "exact_extracted_helper_sha256": "9adba1be7fd14c0e085438588034fb27af2f521cf9ee21996c9a24df1670af88",
+          "scope": "Combined nonrecursive typed construction+append for Callable/Control/Exit; partial Callable value append also leaf; original expression order/passed Module references preserved",
+          "limitation": "Actual Scan/Tables/Callable/Control/Exit schemas; reduced Module/Evidence semantic leaves, full main qualification pending"
+        },
+        "stages": [
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.012,
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.528,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/official.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.013,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/private.c",
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.515,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/private.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/private-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/capability-module-store-laws/private-test"
+            ]
+          }
+        ]
+      }
     }
   },
   "later_attempts": {
@@ -4122,6 +4251,88 @@
       "executable_exists": false,
       "diagnostic_summary": [
         "check/capability_lifetimes.goose:154 graph Item.id:i64 cannot pass to captureReference source:u32"
+      ]
+    },
+    "build-210": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-210-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 100.489,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-210.log",
+      "capture_seconds": 0.244,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-210-inputs/compiler-goose",
+      "live_matches_frozen": false,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-210-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "check/capability_lifetimes.goose:172 borrowed Callable.module storage in recursive SCC with changing Module roots"
+      ],
+      "scope_note": "Uses provisional item.id as u32; live helper is subsequently widened to i64 and indexes module.nodes directly, preserving original inline graph indexing without narrowing."
+    },
+    "build-211": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-211-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 99.803,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-211.log",
+      "capture_seconds": 0.2717,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-211-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-211-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "support/option.goose:8 none<Operation> requires impossible default nonoptional Module reference"
+      ]
+    },
+    "build-212": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-212-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 99.905,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-212.log",
+      "capture_seconds": 0.5003,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-212-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-212-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "check/capability_lifetimes.goose:383 span arguments may borrow mutable Scan while invoke can shrink it"
       ]
     }
   },

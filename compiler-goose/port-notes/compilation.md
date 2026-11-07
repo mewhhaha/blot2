@@ -51,11 +51,21 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This source checkpoint preserves the exact frozen209 inputs, which
-advance through projection and recursive lifetime scratch. The run stops after
-99.982 seconds at an i64 graph index passed to a u32 capture helper; its repair
-continues in the working tree. Whole-program C emission, linking and compiler
-execution remain pending.
+per stage. This source checkpoint preserves exact frozen212 inputs, including
+the graph capture index and module-storage helper repairs. The run stops after
+99.905 seconds because an application argument slice may alias mutable Scan
+storage across invoke. Its narrower accessor is the active repair. Whole-program
+C emission, linking and compiler execution remain pending.
+
+Callable, Control and Exit construction/append use narrow nonrecursive helpers.
+Official and selected46 tests retain exact references while recursive activations
+alternate current/foreign modules; both reject local and recursive-local module
+escapes into ancestor tables. Operation construction and its eventual append
+remain at their original points around validation/projection. Operation equality
+uses scalar lookup indices, preserving last-match selection, per-item fuel and
+comparison order without constructing a default Module reference. Graph capture
+keeps its i64 index and direct module indexing; no narrowing is introduced.
+
 
 Projection scratch now owns binder snapshots addressed by scalar ranges. The
 rejected source-relative List spans read the wrong binder during cross-source
