@@ -111,7 +111,7 @@ type Requests=blot_eval_semantic_parallel::Requests;
 type Proofs=blot_eval_semantic_parallel::Records;
 struct PlainMap { count: i64=0,slots: dictionary_slot<u64,bool>[:]=default<dictionary_slot<u64,bool>[:]>() }
 reusable[] var pool_PlainMap: dictionary_slot<u64,bool>[>..]=[];
-fn get(self_: const PlainMap&,key: u64) -> bool? { let view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self_: const PlainMap&,key: u64) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const PlainMap&,key: u64) -> bool { return self_.get(key)!=null; }
 fn insert(self_: PlainMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_PlainMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: PlainMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }

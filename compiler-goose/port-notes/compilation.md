@@ -51,11 +51,22 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. Frozen203 advances through the repaired interner and validator and
-stops after 100.504 seconds at missing recursion declarations in projection
-comparison. Those two declarations are repaired in the next bounded attempt;
-whole compilation remains pending. A separate numeric-proof fixture has exposed
-dictionary API and storage-view boundary errors; their repair is still active.
+per stage. Frozen206 includes the full direct-slot getter family, numeric-proof
+repairs and projection recursion declarations. It stops after 99.986 seconds
+because pooled projection scratch tries to retain caller-borrowed binder slices.
+A scalar-range representation is the active repair. Whole-program C emission,
+linking and compiler execution remain pending.
+
+All 67 affected nullable-reference getters now return through direct slot probes,
+removing temporary Map facades. The audited 66-site follow-on changes no lookup
+algorithm; pooled_map.get already delegates to the same slot function. Numeric
+proof storage/view construction uses narrow boundaries while retaining owner,
+limits, account and visits. Dictionary access follows native get/insert/contains
+and count. The take method borrows its destination holder; its append, source
+clear and result construction order are unchanged. Both checkers execute the
+actual clone/take/builder/term-intern records and methods in the focused fixture,
+with original ownership and indexing failures retained as negative controls.
+
 
 Finite implicit-binder normalization now calls a shared nonrecursive body,
 preserving binder order and the former normalization body exactly. Seventy
@@ -63,8 +74,9 @@ isolated differential cases cover bounds, errors, fingerprints, IDs and cleanup,
 with lower storage controlled. Actual recursive validator walks pass with nested
 quantifiers, row traversal, exact fuel and seen writes. Typed mutable empty
 slices and a small frame setter preserve roots; negative local-frame escapes
-still reject. Projection validation was a controlled leaf in those witnesses and
-is being qualified separately. Thirteen additional native-array appends in
+still reject. The follow-on fixture includes the entire real projection comparator and actual
+effect getters; shifted scopes, type/row recursion, unordered operations, depth
+and exact fuel pass on both checkers. Thirteen additional native-array appends in
 capability/numeric-proof clone and builder methods use push/append. All source
 law limitations remain explicit in the checkpoint evidence.
 

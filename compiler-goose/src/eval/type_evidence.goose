@@ -184,7 +184,7 @@ fn clear(self_: GoalBuffer&) { blot_support_pooled_buffer::clear(self_); self_.l
 fn deinit(self_: GoalBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_GoalBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
 struct Buckets { count: i64=0,slots: dictionary_slot<u64,u32>[:]=default<dictionary_slot<u64,u32>[:]>() }
 reusable[] var bucket_slots: dictionary_slot<u64,u32>[>..]=[];
-fn get(self_: const Buckets&,key: u64) -> u32? { let view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self_: const Buckets&,key: u64) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn insert(self_: Buckets&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,bucket_slots); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: Buckets&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn deinit(self_: Buckets&) { if self_.slots.len!=0 { bucket_slots.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,u32>[:]>(); self_.count=0; }
@@ -313,7 +313,7 @@ fn abstractDepth(self_: const Store&,id: Id,depth: i64,remaining: i64&) -> bool,
 struct ProjectionWork<S,R> { destination: Store,source: S,mappings: const Mapping[:],rows: const RowMapping[:],resolver: ProjectionResolver<R>,failure: Error=blot_error::Error.none }
 fn accept<S,R>(work: ProjectionWork<S,R>&,id: Id,error: Error) -> Id { if work.failure==blot_error::Error.none { work.failure=error; } return id; }
 fn reject<S,R>(work: ProjectionWork<S,R>&,error: Error) -> Id { if work.failure==blot_error::Error.none { work.failure=error; } return 0; }
-fn projectDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,parent_height: u16?) -> Id {
+recursive fn projectDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,parent_height: u16?) -> Id {
  if work.failure!=blot_error::Error.none { return 0; } if depth>=1024||budget==0 { return reject(work,blot_error::Error.evidence_limit); }
  if work.resolver.enabled {
   if depth>=256||work.resolver.remaining==0 { return reject(work,blot_error::Error.evidence_limit); } work.resolver.remaining--;
@@ -329,13 +329,13 @@ fn projectDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64,budget: i64&,
  }
  return result;
 }
-fn projectRowDepth<S,R>(work: ProjectionWork<S,R>&,row: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,parent_height: u16?) -> u32 {
+recursive fn projectRowDepth<S,R>(work: ProjectionWork<S,R>&,row: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,parent_height: u16?) -> u32 {
  if work.failure!=blot_error::Error.none { return 0; } if depth>=1024||budget==0 { return reject(work,blot_error::Error.evidence_limit); } budget--;
  if work.resolver.enabled { if depth>=256||work.resolver.remaining==0 { return reject(work,blot_error::Error.evidence_limit); } work.resolver.remaining--; }
  var height: u16=1; let result=projectRowBody(work,row,depth,budget,retained,memo,height);
  if memo!=null&&parent_height!=null&&parent_height<height+1 { parent_height = height+1; } return result;
 }
-fn projectNodeDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,height: u16&) -> Id {
+recursive fn projectNodeDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,height: u16&) -> Id {
  if work.failure!=blot_error::Error.none { return 0; } let self_=work.destination; let source=work.source;
  for mapping in mappingItems(work.mappings) { if mapping.variable==ty {
   if mapping.evidence==0||mapping.evidence>=self_.nodes.len { return reject(work,blot_error::Error.type_mismatch); } let leaf=node(self_,mapping.evidence);
@@ -409,7 +409,7 @@ fn projectNodeDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64,budget: i
  else { for child in source.list(blot_check_types::List {n.a,n.b}) { values.push(projectDepth(work,child,depth+1,budget,retained,memo,height)); } }
  if work.failure!=blot_error::Error.none { let __cleanup_result_16_0: Id = 0; values.deinit(); return __cleanup_result_16_0; } let id,err=intern(self_,result_tag,a,b,values.items); let __cleanup_result_17_0: Id = accept(work,id,err); values.deinit(); return __cleanup_result_17_0;
  values.deinit(); }
-fn projectRowBody<S,R>(work: ProjectionWork<S,R>&,row: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,height: u16&) -> u32 {
+recursive fn projectRowBody<S,R>(work: ProjectionWork<S,R>&,row: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,height: u16&) -> u32 {
  let self_=work.destination; let source=work.source; var suffix: u32=0; var formal: Id=0;
  match source.row(row).tail {
   closed=>{},

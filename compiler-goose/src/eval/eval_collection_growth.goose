@@ -12,7 +12,7 @@ struct BufferEffect { value: u32, frontier: Frontier }
 fn hash(value: Span) -> u64 { return hash((value.start as u64)<<32|value.len); }
 struct BufferMap { count: i64=0,slots: dictionary_slot<Span,Span>[:]=default<dictionary_slot<Span,Span>[:]>() }
 reusable[] var pool_BufferMap: dictionary_slot<Span,Span>[>..]=[];
-fn get(self_: const BufferMap&,key: Span) -> Span? { let view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self_: const BufferMap&,key: Span) -> Span? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const BufferMap&,key: Span) -> bool { return self_.get(key)!=null; }
 fn insert(self_: BufferMap&,key: Span,value: Span) { var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_BufferMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: BufferMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }

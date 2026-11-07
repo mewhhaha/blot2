@@ -17,7 +17,7 @@ fn contains(self_: View,value: u32) -> bool {
 }
 struct EntryMap { count: i64=0,slots: dictionary_slot<Key,List>[:]=default<dictionary_slot<Key,List>[:]>() }
 reusable[] var pool_EntryMap: dictionary_slot<Key,List>[>..]=[];
-fn get(self_: const EntryMap&,key: Key) -> List? { let view=blot_support_pooled_map::Map<Key,List> {count:self_.count,slots:self_.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self_: const EntryMap&,key: Key) -> List? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const EntryMap&,key: Key) -> bool { return self_.get(key)!=null; }
 fn insert(self_: EntryMap&,key: Key,value: List) { var view=blot_support_pooled_map::Map<Key,List> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_EntryMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: EntryMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }

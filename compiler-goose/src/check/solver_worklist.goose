@@ -44,7 +44,7 @@ fn clear(self_: LinkBuffer&) { blot_support_pooled_buffer::clear(self_); self_.l
 fn deinit(self_: LinkBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_LinkBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
 struct Heads { count: i64=0,slots: dictionary_slot<u64,u32>[:]=default<dictionary_slot<u64,u32>[:]>() }
 reusable[] var head_slots: dictionary_slot<u64,u32>[>..]=[];
-fn get(self_: const Heads&,key: u64) -> u32? { let view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self_: const Heads&,key: u64) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn insert(self_: Heads&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,head_slots); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: Heads&,key: u64) -> bool { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
 fn clear(self_: Heads&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }

@@ -75,8 +75,9 @@ struct Store {
 fn init(terms: Term[>..]&, index: dictionary<Term, Id>&) -> Store {
     return Store { terms: terms, index: index, owner_id: blot_native::fresh_owner_id() , ..};
 }
-fn deinit(self_: Store&) { self_.terms.clear(); self_.index.clear(); self_.owner_id = 0; }
-fn view(self_: const Store&) -> View { return View { self_.terms, self_.owner_id , ..}; }
+fn deinit(self_: Store&) { self_.terms.clear(); ::clear(self_.index); self_.owner_id = 0; }
+fn view(self_: const Store&) -> View { return termView(self_.terms,self_.owner_id); }
+fn termView(terms: Term[>..]&, owner_id: u64) -> View { return View { terms, owner_id , ..}; }
 fn charge(self_: Store&, amount: i64) -> blot_error::Error {
     var available: i64 = 0;
     if self_.visits < self_.limits.visits { available = self_.limits.visits - self_.visits; }
@@ -104,11 +105,11 @@ recursive fn intern(self_: Store&, term: Term) -> Id, blot_error::Error {
             if child.tag == Tag.complement { return child.a, blot_error::Error.none; }
         },
     }
-    block { let saved = self_.index.get(term); if saved { return saved, blot_error::Error.none; } }
+    block { let saved = ::get(self_.index,term); if saved { return saved, blot_error::Error.none; } }
     if self_.terms.len >= min(self_.limits.terms, 0xffffffff) { return 0, blot_error::Error.proof_analysis_limit; }
     self_.terms.push(term);
     let id = self_.terms.len as u32;
-    self_.index.insert(term, id);
+    ::insert(self_.index,term,id);
     return id, blot_error::Error.none;
 }
 fn copyOwned(self_: const Store&, destination: Term[>..]&) -> Owned, blot_error::Error {

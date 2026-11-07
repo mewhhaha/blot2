@@ -1415,6 +1415,899 @@
           "stderr": "build/goose-port/evidence-seen-laws/src/frame-escape.goose:10: error: storing a reference rooted at binders, which does not outlive the destination (\u00a79.2)\nfn setScopeFrame(frames: ScopeFrame[:],index: i64,binders: const Id[:],goals: const Goal[:]) { frames[index]=ScopeFrame {binders,goals}; }\n  in fn setScopeFrame(ScopeFrame[:], i64, const u32[:], const Goal[:]) instantiated from build/goose-port/evidence-seen-laws/src/frame-escape.goose:114\n  in fn escaping(ScopeFrame[:]) instantiated from build/goose-port/evidence-seen-laws/src/frame-escape.goose:115\n  in fn main() instantiated from build/goose-port/evidence-seen-laws/src/frame-escape.goose:115\n"
         }
       ]
+    },
+    "evidence-projection-laws": {
+      "evidence.json": {
+        "coverage": "Real evidence_projection file unchanged except local imports; actual full View/walk/walkRow/validation helpers from current code; actual effect View/Row/Operation/getters and type enum codes. No projection/effect semantic stubs. Storage construction/lookup outside these selected APIs not exercised.",
+        "projection_sha256": "6477da8fd7dbda38b1f197740808b83e6a2dce10ed74447efb8c8db72aa47e08",
+        "runs": [
+          {
+            "compiler": "official",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.043260050006210804,
+            "stdout": "parsed ok: 184 top-level declarations, 8 file(s)\ntypechecked ok: 107 specialization(s), 15 struct/4 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 21/41 index and 17/25 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/evidence-projection-laws/official.c (214889 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.09921784399921307,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.001208405003126245,
+            "stdout": "real projection and validator laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.05728103799629025,
+            "stdout": "parsed ok: 184 top-level declarations, 8 file(s)\ntypechecked ok: 107 specialization(s), 15 struct/4 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 21/41 index and 17/25 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/evidence-projection-laws/identity.c (214889 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.10818695800116984,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0012081450040568598,
+            "stdout": "real projection and validator laws passed\n",
+            "stderr": ""
+          }
+        ]
+      }
+    },
+    "native-array-clone-laws": {
+      "source-audit.json": {
+        "source_hashes": {
+          "check/capability_contracts.goose": "0ba15a2f496c51c8b5a07faaab5adeab18344993100cbf3dd633876048280dc6",
+          "check/numeric_proof_bodies.goose": "237e9999ccc6cc14cd398b65ce4d1ef5ae9e0c50b19b09de45e9d727e7b993ce",
+          "check/numeric_proof_terms.goose": "726a4466078d0d4d1d00ac83f8146814cf59e55a0373cdbb56dc873e42155f38",
+          "check/numeric_proof_names.goose": "083f6d7fca3a87eb982d2625b63bbe19f7317f6afcad44049a29ea68b6753fbc",
+          "support/structural.goose": "5a7c53a1916e5f434a46d8c56b977b9b6e76e7f31fb04c249fbe82c93725ff2b",
+          "support/structural_adapters.goose": "ef728d6e438b5aed33420b06259820d21361dc957c93a99fcfd3f7f14467ca7b"
+        },
+        "exact_declarations": [
+          {
+            "source": "check/capability_contracts.goose",
+            "signature": "enum Tag {",
+            "sha256": "887e953079dedba4c6e2c27b2c1775d0940f40e4c142a6c31dbff78a45aeba60"
+          },
+          {
+            "source": "check/capability_contracts.goose",
+            "signature": "struct Term {",
+            "sha256": "dc25b393ac732393af50d9de7192ef5cf8b8c3e15fb4a08da509e0af4b440634"
+          },
+          {
+            "source": "check/capability_contracts.goose",
+            "signature": "struct Owned {",
+            "sha256": "3c5066cf04ac230c254d4e434fd715f0894d99465b56615da5fc923f937b61c6"
+          },
+          {
+            "source": "check/capability_contracts.goose",
+            "signature": "struct Binding {",
+            "sha256": "d688f04d91d5a42523597326e9049f44290055ba317445dee68c0e85293c7944"
+          },
+          {
+            "source": "check/capability_contracts.goose",
+            "signature": "struct Collection {",
+            "sha256": "ee42d79c49bda1229cb465c9f815411d3b1a72f702bddd53d4b804dc68ebfff3"
+          },
+          {
+            "source": "check/capability_contracts.goose",
+            "signature": "struct CollectionTables {",
+            "sha256": "c228fd394971684b22e3dbdb2ca90d51cb048b4d3b79ad349b1e8859c953157a"
+          },
+          {
+            "source": "check/capability_contracts.goose",
+            "signature": "fn clone(self_: Owned,",
+            "sha256": "67c08fd3237eb2ce022eb8c056ae0e6910446974b4a707a2db6b42472324c157"
+          },
+          {
+            "source": "check/capability_contracts.goose",
+            "signature": "fn clone(self_: Collection,",
+            "sha256": "cd6b609ab3a5f769dceb6edd881de2f360f8df6199e06419e7ed0235eadc1b8e"
+          },
+          {
+            "source": "check/numeric_proof_names.goose",
+            "signature": "enum Relation {",
+            "sha256": "754c33f396b02b30486bef1010bc4bb330fac6b0da140a6854813bb131c39dd8"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "enum Kind {",
+            "sha256": "5f499debee21da99a27a520cb3863a8f15c3bd42e3966c68358dd846040a0544"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "enum Tag {",
+            "sha256": "665cbbac4633f57662c471ff711002f636ca95a35b47d5ce07cebeb17108b10f"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "struct Term {",
+            "sha256": "2143f058a41e96f115f066ab1e14734723b53014f689a46243350f9d361ea293"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "struct Proposition {",
+            "sha256": "d3eecaa08def7d03478e957638e073cbba1d85d7135d4f62ad3ef652f6f5b03e"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "struct Limits {",
+            "sha256": "c67c477adcd21e91f719bc51b7d1bc8dbbd20fe11dd2edc660c128c2250fcc4f"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "struct View {",
+            "sha256": "e036dfb50799e7356d56dec27f5a78e89e245db6ec6d4ed2d473a20cb9be357a"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "struct Store {",
+            "sha256": "bb535a36a0f25dfee0d601b722c9f4dafec30ff87ee4f825ebb006667216a2b8"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "fn get(self_: View,",
+            "sha256": "dbdae4cfd2cf3b5e5d7c9213bc7291964d10f2cfa3f55b646afbeabbde1536b8"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "fn proposition(self_: View,",
+            "sha256": "25c1c2c284ddec3f38b88870fa74b00a0fe67247789fde2e7f773615212eb554"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "fn view(self_: const Store&",
+            "sha256": "9bddb9a0a2eba515474d122afb363cf4ad4613d8805eb7c9735fe32426816057"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "fn termView(",
+            "sha256": "2ba6ffbec6fb068b2257c342674524f2fbb67a847afb7f114cf5eb93e25b0f6b"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "fn charge(self_: Store&",
+            "sha256": "ffa42e1bb6a91db425e28cf19b639edd0298777979b766784c4135ae7c8982d4"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "fn deinit(self_: Store&",
+            "sha256": "8d37b29d92c6ef574a6a78a62e838eb71592e070ed97bfd7f9c44ab116e422ad"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "recursive fn intern(",
+            "sha256": "84814a20720b24c3945a50e10f11f26d77163589897a8db80061ccbee71cca37"
+          },
+          {
+            "source": "check/numeric_proof_terms.goose",
+            "signature": "fn hash(value: Term)",
+            "sha256": "4f45f0b5f5cc03c7ff0682a34ed8a00a17a7fe5659be7e0f4583c17ca5f863ae"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "struct Introduction {",
+            "sha256": "841c459930bc3e64871e14752d7692ae58ddff730da8b8224499bb7125335326"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "struct Parameter {",
+            "sha256": "cb8312dfb60a9ebf7669758fb4352e7cd17771f3d713ecc54fb0a5bcadb84f77"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "struct Use {",
+            "sha256": "cc89767dfe0ebb9d203148a9db6a25962848e2f57c2b42eee2b91e2149a6bf67"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "struct Frontier {",
+            "sha256": "c2baef0f53195d03aff1b3c2a5ca1cd5d4bf58cc69527899ed48125aa41cf829"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "struct Debit {",
+            "sha256": "4024a79d3275df7d4e980592bc112ddee0a1266b0afbf1e21b9a03b2ec355f4c"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "struct Owned {",
+            "sha256": "dd15f05980ae0a6a7a3f6838b85b336589bef8a55ca9fc0ce6b1da22cf47bb0d"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "struct Tables {",
+            "sha256": "6a3f603dbaeed8023fa5507bd89195320a17c978b47ba7c3a278e0ce1e49e10c"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "struct OwnedTables {",
+            "sha256": "bdf81fe42dc812041ba1d00588f7f6d05ffe37d22a19b7e75db0ec90cbb7a9dc"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "struct Builder {",
+            "sha256": "e7586472f9d31bfa6d14b11e25f8c5b947e1fb627ff52ae7e21cd88540b7dab7"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "fn init(values:",
+            "sha256": "6f4c392108a82f66b84e7e336df403248c284b6b724451d82fa6b7d0e88dcecb"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "fn initParts(",
+            "sha256": "203f6f697bccc69a5b2d76af263becb39fd7427e6a2cc5b1735e5f3c2176f8e9"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "fn introduce(",
+            "sha256": "12e4ca64fa44261badd9d4b4cc922632819a5768ac88ade8db06fa62cb964a8e"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "fn parameter(",
+            "sha256": "fb3a2417c13935e0069d313702c06401440ba852724420b9b5e4ab8831db26f6"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "fn use(",
+            "sha256": "16aa2e1087a97f833e5f5d13f0f617550378c82fd221175812f3f98c7c9964d4"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "fn alias(",
+            "sha256": "39083df9177c4f964acb890954f7d4952a668f9af6c07ee7afc5a4c34f1e5daf"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "fn frontier(",
+            "sha256": "76390743c211c471221f1dfd7363f59dbb6af406e40f58cc0b8e0aa27e23cf7f"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "fn deinit(self_: Builder&",
+            "sha256": "0b02186a0a874f0ecd29767b40072061b1d364d59c06d1c1d75e634779c8b9c7"
+          },
+          {
+            "source": "check/numeric_proof_bodies.goose",
+            "signature": "fn take(",
+            "sha256": "f63457657506d92897982271a74caa423fb71f07e760ff3fc8f7aa1336abfc66"
+          },
+          {
+            "source": "support/structural.goose",
+            "signature": "fn equal(left: u32,",
+            "sha256": "573fabd460323307c92aaad4165968cc78e2cc6971c15381142ff2e356e7d735"
+          },
+          {
+            "source": "support/structural.goose",
+            "signature": "fn equalFields<T>",
+            "sha256": "3a5f0e849c22cab1ac08ea431ff8cc0a21e07a18c8da0effbb77d8202a35d9aa"
+          },
+          {
+            "source": "support/structural.goose",
+            "signature": "fn equal<T>(left: T[2],",
+            "sha256": "e533ea50a40572cd766d03ba78f6fab22bb0f78e64512980f831a8724e01dc53"
+          },
+          {
+            "source": "support/structural_adapters.goose",
+            "signature": "fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_numeric_proof_bodies::Introduction)",
+            "sha256": "270f04c5d178287789e76a61139338bc25c79e40e420d20ba557d44585f57e19"
+          },
+          {
+            "source": "support/structural_adapters.goose",
+            "signature": "fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_numeric_proof_terms::Proposition)",
+            "sha256": "08ffd58815a7f1f90ddaa761eeabde4d94d965905048e88383c0d1992efc5785"
+          }
+        ],
+        "limitation": "Extracted clone/take/Builder3push methods and records, actual numeric charge/view/proposition/get; structural adapter subset; no allocator failure injection or whole source check."
+      },
+      "evidence.json": {
+        "passed": true,
+        "source_audit": {
+          "source_hashes": {
+            "check/capability_contracts.goose": "0ba15a2f496c51c8b5a07faaab5adeab18344993100cbf3dd633876048280dc6",
+            "check/numeric_proof_bodies.goose": "237e9999ccc6cc14cd398b65ce4d1ef5ae9e0c50b19b09de45e9d727e7b993ce",
+            "check/numeric_proof_terms.goose": "726a4466078d0d4d1d00ac83f8146814cf59e55a0373cdbb56dc873e42155f38",
+            "check/numeric_proof_names.goose": "083f6d7fca3a87eb982d2625b63bbe19f7317f6afcad44049a29ea68b6753fbc",
+            "support/structural.goose": "5a7c53a1916e5f434a46d8c56b977b9b6e76e7f31fb04c249fbe82c93725ff2b",
+            "support/structural_adapters.goose": "ef728d6e438b5aed33420b06259820d21361dc957c93a99fcfd3f7f14467ca7b"
+          },
+          "exact_declarations": [
+            {
+              "source": "check/capability_contracts.goose",
+              "signature": "enum Tag {",
+              "sha256": "887e953079dedba4c6e2c27b2c1775d0940f40e4c142a6c31dbff78a45aeba60"
+            },
+            {
+              "source": "check/capability_contracts.goose",
+              "signature": "struct Term {",
+              "sha256": "dc25b393ac732393af50d9de7192ef5cf8b8c3e15fb4a08da509e0af4b440634"
+            },
+            {
+              "source": "check/capability_contracts.goose",
+              "signature": "struct Owned {",
+              "sha256": "3c5066cf04ac230c254d4e434fd715f0894d99465b56615da5fc923f937b61c6"
+            },
+            {
+              "source": "check/capability_contracts.goose",
+              "signature": "struct Binding {",
+              "sha256": "d688f04d91d5a42523597326e9049f44290055ba317445dee68c0e85293c7944"
+            },
+            {
+              "source": "check/capability_contracts.goose",
+              "signature": "struct Collection {",
+              "sha256": "ee42d79c49bda1229cb465c9f815411d3b1a72f702bddd53d4b804dc68ebfff3"
+            },
+            {
+              "source": "check/capability_contracts.goose",
+              "signature": "struct CollectionTables {",
+              "sha256": "c228fd394971684b22e3dbdb2ca90d51cb048b4d3b79ad349b1e8859c953157a"
+            },
+            {
+              "source": "check/capability_contracts.goose",
+              "signature": "fn clone(self_: Owned,",
+              "sha256": "67c08fd3237eb2ce022eb8c056ae0e6910446974b4a707a2db6b42472324c157"
+            },
+            {
+              "source": "check/capability_contracts.goose",
+              "signature": "fn clone(self_: Collection,",
+              "sha256": "cd6b609ab3a5f769dceb6edd881de2f360f8df6199e06419e7ed0235eadc1b8e"
+            },
+            {
+              "source": "check/numeric_proof_names.goose",
+              "signature": "enum Relation {",
+              "sha256": "754c33f396b02b30486bef1010bc4bb330fac6b0da140a6854813bb131c39dd8"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "enum Kind {",
+              "sha256": "5f499debee21da99a27a520cb3863a8f15c3bd42e3966c68358dd846040a0544"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "enum Tag {",
+              "sha256": "665cbbac4633f57662c471ff711002f636ca95a35b47d5ce07cebeb17108b10f"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "struct Term {",
+              "sha256": "2143f058a41e96f115f066ab1e14734723b53014f689a46243350f9d361ea293"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "struct Proposition {",
+              "sha256": "d3eecaa08def7d03478e957638e073cbba1d85d7135d4f62ad3ef652f6f5b03e"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "struct Limits {",
+              "sha256": "c67c477adcd21e91f719bc51b7d1bc8dbbd20fe11dd2edc660c128c2250fcc4f"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "struct View {",
+              "sha256": "e036dfb50799e7356d56dec27f5a78e89e245db6ec6d4ed2d473a20cb9be357a"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "struct Store {",
+              "sha256": "bb535a36a0f25dfee0d601b722c9f4dafec30ff87ee4f825ebb006667216a2b8"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "fn get(self_: View,",
+              "sha256": "dbdae4cfd2cf3b5e5d7c9213bc7291964d10f2cfa3f55b646afbeabbde1536b8"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "fn proposition(self_: View,",
+              "sha256": "25c1c2c284ddec3f38b88870fa74b00a0fe67247789fde2e7f773615212eb554"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "fn view(self_: const Store&",
+              "sha256": "9bddb9a0a2eba515474d122afb363cf4ad4613d8805eb7c9735fe32426816057"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "fn termView(",
+              "sha256": "2ba6ffbec6fb068b2257c342674524f2fbb67a847afb7f114cf5eb93e25b0f6b"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "fn charge(self_: Store&",
+              "sha256": "ffa42e1bb6a91db425e28cf19b639edd0298777979b766784c4135ae7c8982d4"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "fn deinit(self_: Store&",
+              "sha256": "8d37b29d92c6ef574a6a78a62e838eb71592e070ed97bfd7f9c44ab116e422ad"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "recursive fn intern(",
+              "sha256": "84814a20720b24c3945a50e10f11f26d77163589897a8db80061ccbee71cca37"
+            },
+            {
+              "source": "check/numeric_proof_terms.goose",
+              "signature": "fn hash(value: Term)",
+              "sha256": "4f45f0b5f5cc03c7ff0682a34ed8a00a17a7fe5659be7e0f4583c17ca5f863ae"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "struct Introduction {",
+              "sha256": "841c459930bc3e64871e14752d7692ae58ddff730da8b8224499bb7125335326"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "struct Parameter {",
+              "sha256": "cb8312dfb60a9ebf7669758fb4352e7cd17771f3d713ecc54fb0a5bcadb84f77"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "struct Use {",
+              "sha256": "cc89767dfe0ebb9d203148a9db6a25962848e2f57c2b42eee2b91e2149a6bf67"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "struct Frontier {",
+              "sha256": "c2baef0f53195d03aff1b3c2a5ca1cd5d4bf58cc69527899ed48125aa41cf829"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "struct Debit {",
+              "sha256": "4024a79d3275df7d4e980592bc112ddee0a1266b0afbf1e21b9a03b2ec355f4c"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "struct Owned {",
+              "sha256": "dd15f05980ae0a6a7a3f6838b85b336589bef8a55ca9fc0ce6b1da22cf47bb0d"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "struct Tables {",
+              "sha256": "6a3f603dbaeed8023fa5507bd89195320a17c978b47ba7c3a278e0ce1e49e10c"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "struct OwnedTables {",
+              "sha256": "bdf81fe42dc812041ba1d00588f7f6d05ffe37d22a19b7e75db0ec90cbb7a9dc"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "struct Builder {",
+              "sha256": "e7586472f9d31bfa6d14b11e25f8c5b947e1fb627ff52ae7e21cd88540b7dab7"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "fn init(values:",
+              "sha256": "6f4c392108a82f66b84e7e336df403248c284b6b724451d82fa6b7d0e88dcecb"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "fn initParts(",
+              "sha256": "203f6f697bccc69a5b2d76af263becb39fd7427e6a2cc5b1735e5f3c2176f8e9"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "fn introduce(",
+              "sha256": "12e4ca64fa44261badd9d4b4cc922632819a5768ac88ade8db06fa62cb964a8e"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "fn parameter(",
+              "sha256": "fb3a2417c13935e0069d313702c06401440ba852724420b9b5e4ab8831db26f6"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "fn use(",
+              "sha256": "16aa2e1087a97f833e5f5d13f0f617550378c82fd221175812f3f98c7c9964d4"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "fn alias(",
+              "sha256": "39083df9177c4f964acb890954f7d4952a668f9af6c07ee7afc5a4c34f1e5daf"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "fn frontier(",
+              "sha256": "76390743c211c471221f1dfd7363f59dbb6af406e40f58cc0b8e0aa27e23cf7f"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "fn deinit(self_: Builder&",
+              "sha256": "0b02186a0a874f0ecd29767b40072061b1d364d59c06d1c1d75e634779c8b9c7"
+            },
+            {
+              "source": "check/numeric_proof_bodies.goose",
+              "signature": "fn take(",
+              "sha256": "f63457657506d92897982271a74caa423fb71f07e760ff3fc8f7aa1336abfc66"
+            },
+            {
+              "source": "support/structural.goose",
+              "signature": "fn equal(left: u32,",
+              "sha256": "573fabd460323307c92aaad4165968cc78e2cc6971c15381142ff2e356e7d735"
+            },
+            {
+              "source": "support/structural.goose",
+              "signature": "fn equalFields<T>",
+              "sha256": "3a5f0e849c22cab1ac08ea431ff8cc0a21e07a18c8da0effbb77d8202a35d9aa"
+            },
+            {
+              "source": "support/structural.goose",
+              "signature": "fn equal<T>(left: T[2],",
+              "sha256": "e533ea50a40572cd766d03ba78f6fab22bb0f78e64512980f831a8724e01dc53"
+            },
+            {
+              "source": "support/structural_adapters.goose",
+              "signature": "fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_numeric_proof_bodies::Introduction)",
+              "sha256": "270f04c5d178287789e76a61139338bc25c79e40e420d20ba557d44585f57e19"
+            },
+            {
+              "source": "support/structural_adapters.goose",
+              "signature": "fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_numeric_proof_terms::Proposition)",
+              "sha256": "08ffd58815a7f1f90ddaa761eeabde4d94d965905048e88383c0d1992efc5785"
+            }
+          ],
+          "limitation": "Extracted clone/take/Builder3push methods and records, actual numeric charge/view/proposition/get; structural adapter subset; no allocator failure injection or whole source check."
+        },
+        "stages": [
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.027,
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.616,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/official.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.028,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/private.c",
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.635,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/private.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/private-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/native-array-clone-laws/private-test"
+            ]
+          }
+        ],
+        "coverage": [
+          "Owned.clone and Collection.clone: destination prefixes0/2, source lengths0/1/3, exact suffix lengths/values, alias destinations and retain source",
+          "take: same prefixes/lengths for five arrays, exact destination slices, clears source only after copying; dictionary maps/counters/owner retained",
+          "Builder introduce/parameter/use: fuel failure before validation, invalid proposition before capacity, capacity before append, success and repeated appends",
+          "introduction duplicate equal/mismatch and capacity-before-duplicate order",
+          "native dictionary alias insert/update/full count guard; frontier counts; Builder deinit cleanup",
+          "actual Term Store intern native dictionary lookup/insert/dedup, account alias, visits, owner and deinit",
+          "Builder init preserves limits/visits/account reference/owner_id"
+        ],
+        "case_families": {
+          "capability": 6,
+          "take": 6,
+          "builder_methods_error_success": 12,
+          "store_intern_and_state": 1
+        },
+        "fixture_sha256": "ff5106dc5007da8296ae88e4bb4db1ac97ac0e442ca01742f2f27bd9fe6bfbf1",
+        "all_exact_extracted_declarations": 47
+      },
+      "ownership-repairs.json": {
+        "files": {
+          "compiler-goose/src/check/numeric_proof_bodies.goose": {
+            "before_sha256": "9fe3eebb48cc757191c65fd22dd63054d820d85efe96e31844d010b8bef8cadb",
+            "after_sha256": "237e9999ccc6cc14cd398b65ce4d1ef5ae9e0c50b19b09de45e9d727e7b993ce"
+          },
+          "compiler-goose/src/check/numeric_proof_terms.goose": {
+            "before_sha256": "fa2656ca5622bd729394ad78c595cdb4e9bf3f3be253b229a5bed0f5c1f01abd",
+            "after_sha256": "726a4466078d0d4d1d00ac83f8146814cf59e55a0373cdbb56dc873e42155f38"
+          }
+        },
+        "changes": [
+          "Builder.init delegates to flattened storage+counter factory preserving owner/account/limits/visits",
+          "Store.view delegates to typed grow-only array boundary",
+          "native dictionary get/insert/contains/clear explicit; dictionary len\u2192count",
+          "take destination borrowed as OwnedTables&; unchanged ordered append/clear/return body; no existing production call sites"
+        ],
+        "whole_compiler_qualification": false,
+        "executed_laws_passed_both_checkers": true
+      },
+      "negative-evidence.json": {
+        "scope": "Exact pre-repair extracted source and actual full records; ownership baseline and native indexing isolated after ownership boundaries fixed",
+        "results": [
+          {
+            "compiler": "official",
+            "variant": "ownership",
+            "exit": 1,
+            "expected_diagnostic": "\u00a75.2",
+            "rejected": true
+          },
+          {
+            "compiler": "private",
+            "variant": "ownership",
+            "exit": 1,
+            "expected_diagnostic": "\u00a75.2",
+            "rejected": true
+          },
+          {
+            "compiler": "official",
+            "variant": "native-index",
+            "exit": 1,
+            "expected_diagnostic": "cannot index a value of type dictionary",
+            "rejected": true
+          },
+          {
+            "compiler": "private",
+            "variant": "native-index",
+            "exit": 1,
+            "expected_diagnostic": "cannot index a value of type dictionary",
+            "rejected": true
+          }
+        ]
+      }
+    },
+    "pooled-get-roots": {
+      "audit.json": {
+        "scope": "66 nullable-reference getters; local Map facade removed; same direct slot probe used by pooled_map.get",
+        "files": [
+          {
+            "path": "compiler-goose/src/backend/provider_chain.goose",
+            "count": 1,
+            "lines": [
+              51
+            ],
+            "before_sha256": "7f441f9864ae1218b51ae39cca02104d2ebf5c70f4dae3adf657aa3c00ec9e84",
+            "after_sha256": "5ee4f269b19cdd249bf1e84c08cb50c9d2e8ede99985b16cc45d8bd13ba47c92"
+          },
+          {
+            "path": "compiler-goose/src/check/solver_worklist.goose",
+            "count": 1,
+            "lines": [
+              47
+            ],
+            "before_sha256": "7fd7079a4d7a60b1bf3ebcc358b47a6c613d4e8b390b6205b8f6fdd3e290d470",
+            "after_sha256": "46632df66d0d53cd55b7da77bcaf76f97d5a6b2f69efa33dd26876f9287a70e6"
+          },
+          {
+            "path": "compiler-goose/src/eval/closed_source_types.goose",
+            "count": 2,
+            "lines": [
+              12,
+              53
+            ],
+            "before_sha256": "cf18977838757d220dcb107051c2cc0681aeee2ab3bdac49e995d14c214283a8",
+            "after_sha256": "73f7301c8ff8fc9f64a90ab17223fa7413377d12ed6c2a6a67e62f87ab0f0eac"
+          },
+          {
+            "path": "compiler-goose/src/eval/completed_specialization_query.goose",
+            "count": 1,
+            "lines": [
+              114
+            ],
+            "before_sha256": "3d721a54a3c8bc7f5e900d55d021454d0b8c8cf46000d4c51fb6b707c327ca3b",
+            "after_sha256": "2e4e884ae7b6ad22467b780c1a9ebae413b934ce940929b0922d8997549f28bd"
+          },
+          {
+            "path": "compiler-goose/src/eval/core_eval.goose",
+            "count": 41,
+            "lines": [
+              271,
+              1412,
+              1421,
+              1430,
+              1439,
+              1448,
+              1457,
+              1466,
+              1475,
+              1484,
+              1493,
+              1502,
+              3309,
+              3318,
+              3327,
+              3336,
+              3345,
+              3354,
+              3363,
+              3372,
+              3381,
+              3390,
+              3399,
+              3408,
+              3417,
+              3426,
+              3435,
+              3853,
+              3861,
+              3869,
+              3877,
+              3885,
+              3893,
+              3901,
+              3909,
+              3917,
+              3925,
+              3933,
+              3941,
+              3949,
+              3957
+            ],
+            "before_sha256": "b0c3ededc72340056dc4926875026075d34383ce74ec9d351e3ad4ce4a123c9d",
+            "after_sha256": "2a50320825d24380e6cd620781bc4b660ab34c039171fc4db0c0af52bd7ea7f7"
+          },
+          {
+            "path": "compiler-goose/src/eval/eval_collection_growth.goose",
+            "count": 1,
+            "lines": [
+              15
+            ],
+            "before_sha256": "e89de3f7996ae2aabfd72b887f2e7a07535427a7e533351ac4cf75f88aa177ac",
+            "after_sha256": "15bed125b47e13243602a7211607efa8445705faa21d401413453d067a4d2126"
+          },
+          {
+            "path": "compiler-goose/src/eval/eval_values.goose",
+            "count": 3,
+            "lines": [
+              104,
+              112,
+              120
+            ],
+            "before_sha256": "d24ffc00f5fc0d797f0baaa7ecba92dcdc8a8743a0f5764549401f35b5b8c756",
+            "after_sha256": "2a816d834d27652d41ba6b26b0c8a1e6ab829ff33809126dc5d10da422e4781d"
+          },
+          {
+            "path": "compiler-goose/src/eval/evidence_import_cache.goose",
+            "count": 1,
+            "lines": [
+              9
+            ],
+            "before_sha256": "ffbefd1be01891394f20c94a6940ddd766295020018c35f1b0043338256096aa",
+            "after_sha256": "eb6c05eee01564b82e7db72777caf858715f3409b745e08cd9e581f498d35ddb"
+          },
+          {
+            "path": "compiler-goose/src/eval/implementation_evidence.goose",
+            "count": 2,
+            "lines": [
+              129,
+              137
+            ],
+            "before_sha256": "c9994cc8e44fd3d092ace5ece7a77cfb2dd0a4725b7a411637b21c885f163a52",
+            "after_sha256": "35310a0f3a6c3c00fa57e42b4ce4c7985200740fa4a93b83236c6226b4ec41e7"
+          },
+          {
+            "path": "compiler-goose/src/eval/scheme_membership.goose",
+            "count": 1,
+            "lines": [
+              20
+            ],
+            "before_sha256": "ff26a0a222a229cada6398999cef3f5ab26f6f2d1d64dcec542d0710ac159e42",
+            "after_sha256": "896e68fa9cbd9e976324ee9bac5faae88ce756bdce5f27dfab56efe12467de60"
+          },
+          {
+            "path": "compiler-goose/src/reuse/constant_receipt.goose",
+            "count": 3,
+            "lines": [
+              524,
+              532,
+              540
+            ],
+            "before_sha256": "feed4471c10a70b1fa94c1885b0cabadb1c46c6d7f3f3de994c92f1822a12bfc",
+            "after_sha256": "f2719246e7841636266badf2e9301caea47cd01e6b1f65ac014e62f659e84a58"
+          },
+          {
+            "path": "compiler-goose/src/reuse/principal_inputs.goose",
+            "count": 9,
+            "lines": [
+              369,
+              385,
+              401,
+              417,
+              441,
+              457,
+              473,
+              497,
+              505
+            ],
+            "before_sha256": "a57fdf1fa8f21683aa9712eba5904c9000b0f3fba37f5b4e0d7bfcc0e569dc81",
+            "after_sha256": "1edd543cb68ef56cca07337d2bcfcf7f4cb7cef959b16458000ce683a98b1054"
+          }
+        ],
+        "whole_compiler_qualification": false
+      }
     }
   },
   "later_attempts": {
@@ -1768,6 +2661,87 @@
       "executable_exists": false,
       "diagnostic_summary": [
         "eval/evidence_projection.goose:24 undeclared recursive equal/row cycle"
+      ]
+    },
+    "build-204": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-204-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 100.784,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-204.log",
+      "capture_seconds": 0.2091,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-204-inputs/compiler-goose",
+      "live_matches_frozen": false,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-204-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "eval/type_evidence.goose:187 Buckets.get returns reference through temporary Map facade; direct slot getter repair is pending whole verification"
+      ]
+    },
+    "build-205": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-205-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 100.61,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-205.log",
+      "capture_seconds": 0.2385,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-205-inputs/compiler-goose",
+      "live_matches_frozen": false,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-205-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "eval/type_evidence.goose:351 four-function project recursion cycle lacks recursive declarations"
+      ]
+    },
+    "build-206": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-206-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 99.986,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-206.log",
+      "capture_seconds": 0.1956,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-206-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-206-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "eval/type_evidence.goose:360 borrowed binder slices cannot be stored in pooled persistent OwnersBuffer"
       ]
     }
   },

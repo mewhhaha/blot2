@@ -126,7 +126,7 @@ fn clear(self_: ActiveFactsBuffer&) { blot_support_pooled_buffer::clear(self_); 
 fn deinit(self_: ActiveFactsBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_ActiveFactsBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
 struct BucketsMap { count: i64=0,slots: dictionary_slot<u64,u32>[:]=default<dictionary_slot<u64,u32>[:]>() }
 reusable[] var pool_BucketsMap: dictionary_slot<u64,u32>[>..]=[];
-fn get(self_: const BucketsMap&,key: u64) -> u32? { let view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self_: const BucketsMap&,key: u64) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const BucketsMap&,key: u64) -> bool { return self_.get(key)!=null; }
 fn insert(self_: BucketsMap&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_BucketsMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: BucketsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
@@ -134,7 +134,7 @@ fn release(self_: BucketsMap&) { if self_.slots.len!=0 { pool_BucketsMap.free_sl
 fn restore(self_: BucketsMap&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_BucketsMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
 struct FactsMap { count: i64=0,slots: dictionary_slot<FactKey,u32>[:]=default<dictionary_slot<FactKey,u32>[:]>() }
 reusable[] var pool_FactsMap: dictionary_slot<FactKey,u32>[>..]=[];
-fn get(self_: const FactsMap&,key: FactKey) -> u32? { let view=blot_support_pooled_map::Map<FactKey,u32> {count:self_.count,slots:self_.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self_: const FactsMap&,key: FactKey) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const FactsMap&,key: FactKey) -> bool { return self_.get(key)!=null; }
 fn insert(self_: FactsMap&,key: FactKey,value: u32) { var view=blot_support_pooled_map::Map<FactKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_FactsMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: FactsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }

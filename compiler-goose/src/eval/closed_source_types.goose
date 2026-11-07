@@ -9,7 +9,7 @@ import support.pooled_map;
 import dictionary;
 struct FactMap { count: i64=0,slots: dictionary_slot<u64,bool>[:]=default<dictionary_slot<u64,bool>[:]>() }
 reusable[] var pool_FactMap: dictionary_slot<u64,bool>[>..]=[];
-fn get(self_: const FactMap&,key: u64) -> bool? { let view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self_: const FactMap&,key: u64) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const FactMap&,key: u64) -> bool { return self_.get(key)!=null; }
 fn insert(self_: FactMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_FactMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: FactMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
@@ -50,7 +50,7 @@ struct CacheKey { source: u64,depth: i64 }
 fn hash(key: CacheKey) -> u64 { return ::hash_combine(::hash(key.source),::hash(key.depth)); }
 struct AnswerMap { count: i64=0,slots: dictionary_slot<CacheKey,u32>[:]=default<dictionary_slot<CacheKey,u32>[:]>() }
 reusable[] var pool_AnswerMap: dictionary_slot<CacheKey,u32>[>..]=[];
-fn get(self_: const AnswerMap&,key: CacheKey) -> u32? { let view=blot_support_pooled_map::Map<CacheKey,u32> {count:self_.count,slots:self_.slots}; return blot_support_pooled_map::get(view,key); }
+fn get(self_: const AnswerMap&,key: CacheKey) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const AnswerMap&,key: CacheKey) -> bool { return self_.get(key)!=null; }
 fn insert(self_: AnswerMap&,key: CacheKey,value: u32) { var view=blot_support_pooled_map::Map<CacheKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_AnswerMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: AnswerMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }

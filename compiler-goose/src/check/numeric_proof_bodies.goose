@@ -23,13 +23,14 @@ struct Builder {
     values: blot_check_numeric_proof_terms::Store,
     debits: Debit[>..<]&, sources: dictionary<u32,u32>&, introductions: Introduction[>..<]&, expressions: dictionary<u32,u32>&, parameters: Parameter[>..<]&, uses: Use[>..<]&,
 }
-fn init(values: blot_check_numeric_proof_terms::Store, tables: Tables) -> Builder { return Builder { values, tables.debits, tables.sources, tables.introductions, tables.expressions, tables.parameters, tables.uses , ..}; }
-fn deinit(self_: Builder&) { self_.values.deinit(); self_.debits.clear(); self_.sources.clear(); self_.introductions.clear(); self_.expressions.clear(); self_.parameters.clear(); self_.uses.clear(); }
+fn init(values: blot_check_numeric_proof_terms::Store, tables: Tables) -> Builder { return initParts(values.terms,values.index,values.limits,values.visits,values.account,values.owner_id,tables); }
+fn initParts(terms:blot_check_numeric_proof_terms::Term[>..]&,index:dictionary<blot_check_numeric_proof_terms::Term,u32>&,limits:blot_check_numeric_proof_terms::Limits,visits:i64,account:i64?,owner_id:u64,tables:Tables)->Builder {return Builder{values:blot_check_numeric_proof_terms::Store{terms:terms,index:index,limits:limits,visits:visits,account:account,owner_id:owner_id},debits:tables.debits,sources:tables.sources,introductions:tables.introductions,expressions:tables.expressions,parameters:tables.parameters,uses:tables.uses};}
+fn deinit(self_: Builder&) { self_.values.deinit(); self_.debits.clear(); ::clear(self_.sources); self_.introductions.clear(); ::clear(self_.expressions); self_.parameters.clear(); self_.uses.clear(); }
 fn introduce(self_: Builder&, value: Introduction) -> Error {
     let error = self_.values.charge(1); if error != blot_error::Error.none { return error; } let error = self_.values.view().proposition(value.proposition); if error != blot_error::Error.none { return error; }
     if self_.introductions.len >= self_.values.limits.terms { return blot_error::Error.proof_analysis_limit; }
-    { let optional_binding_31 .= self_.expressions[value.source]; if optional_binding_31 { let slot .= optional_binding_31; if !blot_structural::equal(self_.introductions[slot], value) { return blot_error::Error.invalid_proof_operand; } return blot_error::Error.none;  } }
-    self_.expressions[value.source] = self_.introductions.len as u32; self_.introductions.push(value); return blot_error::Error.none;
+    { let optional_binding_31 .= ::get(self_.expressions,value.source); if optional_binding_31 { let slot .= optional_binding_31; if !blot_structural::equal(self_.introductions[slot], value) { return blot_error::Error.invalid_proof_operand; } return blot_error::Error.none;  } }
+    ::insert(self_.expressions,value.source,self_.introductions.len as u32); self_.introductions.push(value); return blot_error::Error.none;
 }
 fn parameter(self_: Builder&, value: Parameter) -> Error {
     let error = self_.values.charge(1); if error != blot_error::Error.none { return error; } let error = self_.values.view().proposition(value.proposition); if error != blot_error::Error.none { return error; }
@@ -39,9 +40,9 @@ fn use(self_: Builder&, value: Use) -> Error {
     let error = self_.values.charge(1); if error != blot_error::Error.none { return error; } let error = self_.values.view().proposition(value.proposition); if error != blot_error::Error.none { return error; }
     if self_.uses.len >= self_.values.limits.terms { return blot_error::Error.proof_analysis_limit; } self_.uses.push(value); return blot_error::Error.none;
 }
-fn alias(self_: Builder&, binding: u32, source: u32) -> Error { let error = self_.values.charge(1); if error != blot_error::Error.none { return error; } if !self_.sources.contains(binding) && self_.sources.len >= self_.values.limits.terms { return blot_error::Error.proof_analysis_limit; } self_.sources[binding] = source; return blot_error::Error.none; }
-fn frontier(self_: const Builder&, headers: i64) -> Frontier { return Frontier { headers as u32, self_.values.terms.len as u32, self_.introductions.len as u32, self_.parameters.len as u32, self_.uses.len as u32, self_.sources.len as u32, self_.expressions.len as u32 , ..}; }
-fn take(self_: Builder&, destination: OwnedTables) -> Owned, Error {
+fn alias(self_: Builder&, binding: u32, source: u32) -> Error { let error = self_.values.charge(1); if error != blot_error::Error.none { return error; } if !::contains(self_.sources,binding) && self_.sources.count >= self_.values.limits.terms { return blot_error::Error.proof_analysis_limit; } ::insert(self_.sources,binding,source); return blot_error::Error.none; }
+fn frontier(self_: const Builder&, headers: i64) -> Frontier { return Frontier { headers as u32, self_.values.terms.len as u32, self_.introductions.len as u32, self_.parameters.len as u32, self_.uses.len as u32, self_.sources.count as u32, self_.expressions.count as u32 , ..}; }
+fn take(self_: Builder&, destination: OwnedTables&) -> Owned, Error {
     let debits = destination.debits.len; let operands = destination.operands.len; let introductions = destination.introductions.len; let parameters = destination.parameters.len; let uses = destination.uses.len;
     destination.debits.append(self_.debits[..]); destination.operands.append(self_.values.terms[..]); destination.introductions.append(self_.introductions[..]); destination.parameters.append(self_.parameters[..]); destination.uses.append(self_.uses[..]);
     self_.debits.clear(); self_.values.terms.clear(); self_.introductions.clear(); self_.parameters.clear(); self_.uses.clear();
