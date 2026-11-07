@@ -40,7 +40,7 @@ fn changes(self_:Map)->bool {for value in self_.qualifications {if value.before!
 fn catalog(self_:Map,kind:ExportKind,old:u32)->blot_support::Option<u32> {
  if kind==blot_reuse_frozen_dependency::ExportKind.contract {if old<self_.contracts.len&&self_.contracts[old]!=unmapped {return blot_support::some(self_.contracts[old]);}return blot_support::none<u32>();}
  if kind==blot_reuse_frozen_dependency::ExportKind.implementation {if old<self_.implementations.len&&self_.implementations[old]!=unmapped {return blot_support::some(self_.implementations[old]);}return blot_support::none<u32>();}
- var entries:const u32[:]=default<const u32[:]>();if kind==blot_reuse_frozen_dependency::ExportKind.nominal {entries=self_.nominals;}else if kind==blot_reuse_frozen_dependency::ExportKind.constructor {entries=self_.constructors;}else {return blot_support::some(old);}
+ if kind!=blot_reuse_frozen_dependency::ExportKind.nominal && kind!=blot_reuse_frozen_dependency::ExportKind.constructor {return blot_support::some(old);}let entries=selectedCatalog(self_,kind);
  if old==0||old>=entries.len||entries[old]==0 {return blot_support::none<u32>();}return blot_support::some(entries[old]);
 }
 enum Stage {eligibility,public_index,public_match,nominals,constructors,contracts,implementations,graph,checked}
@@ -309,3 +309,5 @@ recursive fn pattern(self_:Checker&,old:u32,current:u32,depth:i64)->Error {
  if from.kind==blot_check_parameter_patterns::Kind.record {for field in 0..from.b {let before=self_.left.patterns.extra[from.a+field*2..from.a+field*2+2];let after=self_.right.patterns.extra[to.a+field*2..to.a+field*2+2];if before[0]!=after[0] {return blot_error::Error.declined;}{ let propagated_error = self_.pattern(before[1],after[1],depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }}}
  else {{ let propagated_error = self_.patternList(List {from.a,from.b, ..},List {to.a,to.b, ..},depth+1); if propagated_error != blot_error::Error.none { return propagated_error; } }}return blot_error::Error.none;
 }
+
+fn selectedCatalog(self_:Map,kind:ExportKind)->const u32[:] {if kind==blot_reuse_frozen_dependency::ExportKind.nominal {return self_.nominals;}return self_.constructors;}

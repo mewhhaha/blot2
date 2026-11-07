@@ -17,8 +17,7 @@ fn rigid(self_:AuxiliaryGraph&,scope:u32)->u32,Error {
 }
 fn ownFieldName(names:u8[:][>..<]&,name:const u8[:])->u32,Error {for known,index in names {if known==name {return index as u32,blot_error::Error.none;}}let index=names.len as u32;names.push(copyOwned(name));return index,blot_error::Error.none;}
 fn ownIdentityRead(catalog:Catalog,source:Source,reads:IdentityRead[>..<]&,identity_:Identity,is_contract:bool)->u32,Error {
- var kind=NominalKind.type_;var name:const u8[:]=default<const u8[:]>();var nominal_index:i64=0;
- if is_contract {kind=NominalKind.contract;let declaration=catalog.contract(identity_);if !declaration.present {return 0,blot_error::Error.dependency_limit;}name=catalog.pool.get(declaration.value.name);}else {let index=catalog.identity(identity_);if !index.present {return 0,blot_error::Error.dependency_limit;}nominal_index=index.value;name=catalog.pool.get(catalog.nominals[nominal_index].name);}
+ var kind=NominalKind.type_;if is_contract {kind=NominalKind.contract;}let name,nominal_index,name_error=selectedIdentityName(catalog,identity_,is_contract);if name_error!=blot_error::Error.none {return 0,name_error;}
  for read,index in reads {if read.kind==kind && read.unit==identity_.unit && read.name==name {return index as u32,blot_error::Error.none;}}
  var digest=blot_support::none<Digest>();if is_contract {digest=contractDigest(catalog,identity_);}else {digest=nominalDigest(source,catalog,nominal_index);}if !digest.present {return 0,blot_error::Error.dependency_limit;}
  let origin=catalog.unitOrigin(identity_.unit);if !origin.present {return 0,blot_error::Error.dependency_limit;}let slot=reads.len as u32;reads.push(IdentityRead{identity_.unit,origin.value,copyOwned(name),digest.value,kind, ..});return slot,blot_error::Error.none;
@@ -91,3 +90,5 @@ fn map_proof(self_:AuxiliaryFreeze&,value:blot_check_check::DictionaryProof)->bl
 fn map_callee_identity(self_:AuxiliaryFreeze&,value:Identity)->Identity,Error {return value,blot_error::Error.none;}
 fn map_nodes_pair(self_:AuxiliaryFreeze&,value:u32[2])->u32[2],Error {return value,blot_error::Error.none;}
 fn map_proposition(self_:AuxiliaryFreeze&,value:blot_check_numeric_proof_terms::Proposition)->blot_check_numeric_proof_terms::Proposition,Error {return value,blot_error::Error.none;}
+
+fn selectedIdentityName(catalog:Catalog,identity_:Identity,is_contract:bool)->const u8[:],i64,Error {if is_contract {let declaration=catalog.contract(identity_);if !declaration.present {return default<const u8[:]>(),0,blot_error::Error.dependency_limit;}return catalog.pool.get(declaration.value.name),0,blot_error::Error.none;}let index=catalog.identity(identity_);if !index.present {return default<const u8[:]>(),0,blot_error::Error.dependency_limit;}return catalog.pool.get(catalog.nominals[index.value].name),index.value,blot_error::Error.none;}

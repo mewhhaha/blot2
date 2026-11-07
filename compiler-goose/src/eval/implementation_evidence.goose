@@ -199,7 +199,7 @@ fn unrestrictedAssociatedNode<H>(host: H&,root: u32,depth: i64,completed: dictio
  else if node.tag==blot_eval_type_evidence::Tag.forall||node.tag==blot_eval_type_evidence::Tag.existential { children.push(node.a); for goal in host.evidenceStore().view().quantifierGoals(root) { children.append([goal.ty,goal.other,goal.result,goal.signature]); } }
  for child in children.items { let h,error=unrestrictedAssociatedNode(host,child,depth+1,completed); if error!=blot_error::Error.none { let __cleanup_result_1_0: u8 = 0; let __cleanup_result_1_1: Error = error; children.deinit(); return __cleanup_result_1_0, __cleanup_result_1_1; } if height<h+1 { height=h+1; } } completed.insert(root,height); let __cleanup_result_2_0: u8 = height; let __cleanup_result_2_1: Error = blot_error::Error.none; children.deinit(); return __cleanup_result_2_0, __cleanup_result_2_1;
  children.deinit(); }
-fn unrestrictedAssociatedType<H>(host: H&,root: u32,depth: i64) -> Error { var completed: dictionary<u32,u8>; let height,error=unrestrictedAssociatedNode(host,root,depth,completed); return error; }
+fn unrestrictedAssociatedType<H>(host: H&,root: u32,depth: i64) -> Error { var completed: dictionary<u32,u8> = dictionary<u32,u8>{}; let height,error=unrestrictedAssociatedNode(host,root,depth,completed); return error; }
 fn rejectedPrerequisite<H>(w: Work<H>&,error: Error,identity: Identity,traced: i64,kind: K) -> u32 {
  if error==blot_error::Error.out_of_memory { return fail(w,error); }
  if w.store.failure.present&&(w.store.failure.value==Code.recursive_evidence||w.store.failure.value==Code.recursive_associated_type) { return fail(w,error); }

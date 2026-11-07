@@ -97,7 +97,7 @@ fn rebindFrozenPrefix(self_:Prepared&,seed:const Frozen&)->Error {
  // Without a seed capability, copy the new prefix before publishing anything.
  // An attached pin permits the exact immutable descriptor identity required by
  // source-completion receipts; ordinary raw-Frozen callers receive owned copies.
- var copies:OwnedCore[>..<];
+ var copies:OwnedCore[>..<]=[];
  if self_.seed_pin.owners.len==0 {for module in seed.modules {let copy,error=blot_reuse_dependency_payload::clone(module.core);if error!=blot_error::Error.none {let __cleanup_result_1_0: Error = error; {for &copy in copies {copy.deinit();}} return __cleanup_result_1_0;}copies.push(copy);}}
  let receipt .= self_.source_completion;if receipt {receipt.deinit();}self_.source_completion=null;
  for module,index in seed.modules {self_.unit_owners[index].release();if self_.seed_pin.owners.len!=0 {self_.units[index]=module.core;}else {self_.units[index]=copies[index].value;self_.unit_owners[index]=copies[index].owner;copies[index].owner=Owner{};}if self_.borrowed.len!=0 {self_.borrowed[index]=true;}}
@@ -127,7 +127,7 @@ fn reject(source:const Project&,entry_path:const u8[:],diagnostic:ConsumerDiagno
 }
 struct OrderFrame {unit:u32,next:i64=0}
 fn sourceOrder(source:const Project&,owner:Owner&)->u32[:],Error {
- var states:u8[>..<];states.resize(source.units.len,0);var stack:OrderFrame[>..<];var order:u32[>..<];
+ var states:u8[>..<]=[];states.resize(source.units.len,0);var stack:OrderFrame[>..<]=[];var order:u32[>..<]=[];
  for root in [source.prelude_unit,source.entry] {
   if root==0 {continue;}if root>states.len {return default<u32[:]>(),blot_error::Error.invalid_unit;}if states[root-1]==2 {continue;}states[root-1]=1;stack.push(OrderFrame{root});
   while stack.len!=0 {
@@ -191,7 +191,7 @@ fn prepareProjectMode<E>(executor:E&,source:Project&,entry_path:const u8[:],outp
  ready.unit_owners=core_owners.alloc_slice(count);for &owner in ready.unit_owners {owner=Owner{};}
  let borrowed,error=blot_reuse_dependency_payload::alloc<bool>(ready.catalog_owner,count);if error!=blot_error::Error.none {let __cleanup_result_25_0: Preparation = Preparation.inactive; let __cleanup_result_25_1: Error = error; {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_25_0, __cleanup_result_25_1;}ready.borrowed=borrowed;for &borrowed in ready.borrowed {borrowed=false;}
  let paths,error=blot_reuse_dependency_payload::alloc<const u8[:]>(ready.catalog_owner,count);if error!=blot_error::Error.none {let __cleanup_result_26_0: Preparation = Preparation.inactive; let __cleanup_result_26_1: Error = error; {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_26_0, __cleanup_result_26_1;}ready.paths=paths;for &path in ready.paths {path=[];}
- var slots:blot_check_parallel_lowering::Slot[>..<];let batch,error=lowerFresh(executor,source,checked,slots);if error!=blot_error::Error.none {let __cleanup_result_27_0: Preparation = Preparation.inactive; let __cleanup_result_27_1: Error = error; {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_27_0, __cleanup_result_27_1;}var lowered=batch;
+ var slots:blot_check_parallel_lowering::Slot[>..<]=[];let batch,error=lowerFresh(executor,source,checked,slots);if error!=blot_error::Error.none {let __cleanup_result_27_0: Preparation = Preparation.inactive; let __cleanup_result_27_1: Error = error; {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_27_0, __cleanup_result_27_1;}var lowered=batch;
  for unit,index in source.units.items {
   let id=(index+1) as u32;let path,error=ready.catalog_owner.copy(source.filename(id));if error!=blot_error::Error.none {let __cleanup_result_28_0: Preparation = Preparation.inactive; let __cleanup_result_28_1: Error = error; {if lowered.present {lowered.value.deinit();}} {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_28_0, __cleanup_result_28_1;}ready.paths[index]=path;
   let compiled .= checked.compiledModule(source,id);var ir:OwnedCore;
@@ -213,7 +213,7 @@ fn prepareProjectMode<E>(executor:E&,source:Project&,entry_path:const u8[:],outp
   if ir.value.diagnostics.len!=0 {let issue=ir.value.diagnostics[0];let diagnostic,error=blot_reuse_dependency_consumer::init(id,"lower",coreCodeName(issue.code),issue.span,issue.message());if error!=blot_error::Error.none {let __cleanup_result_34_0: Preparation = Preparation.inactive; let __cleanup_result_34_1: Error = error; {if lowered.present {lowered.value.deinit();}} {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_34_0, __cleanup_result_34_1;}let __cleanup_result_35_0, __cleanup_result_35_1 = reject(source,entry_path,diagnostic); {if lowered.present {lowered.value.deinit();}} {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_35_0, __cleanup_result_35_1;}
  }
  let digests,error=blot_reuse_dependency_payload::alloc<u8[32]>(ready.catalog_owner,count);if error!=blot_error::Error.none {let __cleanup_result_36_0: Preparation = Preparation.inactive; let __cleanup_result_36_1: Error = error; {if lowered.present {lowered.value.deinit();}} {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_36_0, __cleanup_result_36_1;}ready.source_digests=digests;
- var identity_owners:blot_backend_runtime_identity::Owner[>..<];
+ var identity_owners:blot_backend_runtime_identity::Owner[>..<]=[];
  for index in count {let id=(index+1) as u32;let compiled .= source.compiledModule(id);if compiled {digests[index]=compiled.identity.source_digest;}else {digests[index]=blot_support_blake3::hash(source.unit(id).source);}identity_owners.push(blot_backend_runtime_identity::Owner{id,ready.paths[index]});}
  let order,error=sourceOrder(source,ready.catalog_owner);if error!=blot_error::Error.none {let __cleanup_result_37_0: Preparation = Preparation.inactive; let __cleanup_result_37_1: Error = error; {if lowered.present {lowered.value.deinit();}} {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_37_0, __cleanup_result_37_1;}ready.unit_order=order;
  let captured,error=blot_backend_runtime_identity::capture(source.symbols,identity_owners[..],count);if error!=blot_error::Error.none {let __cleanup_result_38_0: Preparation = Preparation.inactive; let __cleanup_result_38_1: Error = error; {if lowered.present {lowered.value.deinit();}} {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_38_0, __cleanup_result_38_1;}var identity=captured;
@@ -236,7 +236,7 @@ fn portableRejection(source:const Project&,issue:blot_reuse_project_check::Diagn
   duplicate_name,unknown_export,entry_module,declaration_modifier=>{},
   resolution_budget,source_validation,dependency_failed=>{return false,blot_error::Error.none;},
  }
- var seen:bool[>..<];seen.resize(source.units.len,false);var stack:u32[>..<];for root in [source.entry,source.prelude_unit] {if root!=0 {stack.push(root);}}
+ var seen:bool[>..<]=[];seen.resize(source.units.len,false);var stack:u32[>..<]=[];for root in [source.entry,source.prelude_unit] {if root!=0 {stack.push(root);}}
  while stack.len!=0 {let unit=stack.pop();if unit==0 || unit>seen.len {return false,blot_error::Error.none;}if seen[unit-1] {continue;}seen[unit-1]=true;if source.unit(unit).implicit_prelude && source.prelude_unit!=0 {stack.push(source.prelude_unit);}for edge in source.unitImports(unit) {stack.push(edge.target);}}
  for reached in seen {if !reached {return false,blot_error::Error.none;}}return true,blot_error::Error.none;
 }
@@ -251,15 +251,15 @@ fn rejectChecked(source:Project&,entry_path:const u8[:],issue:blot_reuse_project
  if issue.numeric_literal.present {var actual=publication;actual.has_actual_token=true;actual.actual_token=issue.numeric_literal.value.actual_token;let details=[issue.numeric_literal.value];let diagnostic,error=blot_reuse_dependency_consumer::publishedDiagnostic(issue.unit,"check-project",unit.source,actual,details[..]);if error!=blot_error::Error.none {return Preparation.inactive,error;}return reject(source,entry_path,diagnostic);}
  if issue.purity.present {
   let witness=issue.purity.value;if !witness.operation_name.present && !witness.foreign {return Preparation.inactive,blot_error::Error.operation_purity_origin_required;}
-  var message:u8[>..<];let error=blot_reuse_purity_diagnostics::format(source.symbols,"",witness,message);if error!=blot_error::Error.none {return Preparation.inactive,error;}var actual=publication;actual.message=message[..];let details=[witness];
+  var message:u8[>..<]=[];let error=blot_reuse_purity_diagnostics::format(source.symbols,"",witness,message);if error!=blot_error::Error.none {return Preparation.inactive,error;}var actual=publication;actual.message=message[..];let details=[witness];
   let diagnostic,error=blot_reuse_dependency_consumer::publishedDiagnostic(issue.unit,"check-project",unit.source,actual,details[..]);if error!=blot_error::Error.none {return Preparation.inactive,error;}return reject(source,entry_path,diagnostic);
  }
- var message:u8[>..<];message.append(issue.message());if issue.symbol!=0 {let code=issue.codeName();if code=="unknown_intrinsic" || code=="unknown_record_field" {message.append(" ");}else {message.append(": ");}message.append(source.symbols.get(issue.symbol));}
+ var message:u8[>..<]=[];message.append(issue.message());if issue.symbol!=0 {let code=issue.codeName();if code=="unknown_intrinsic" || code=="unknown_record_field" {message.append(" ");}else {message.append(": ");}message.append(source.symbols.get(issue.symbol));}
  let diagnostic,error=blot_reuse_dependency_consumer::init(issue.unit,"check-project",issue.codeName(),issue.span,message[..]);if error!=blot_error::Error.none {return Preparation.inactive,error;}return reject(source,entry_path,diagnostic);
 }
 fn lowerFresh<E>(executor:E&,source:Project&,checked:CheckedProject&,slots:blot_check_parallel_lowering::Slot[>..<]&)->blot_support::Option<blot_check_parallel_lowering::Batch<E>>,Error {
  if source.lowering.workers<=1 {return blot_support::none<blot_check_parallel_lowering::Batch<E>>(),blot_error::Error.none;}
- var inputs:blot_support::Option<blot_check_parallel_lowering::Input>[>..<];
+ var inputs:blot_support::Option<blot_check_parallel_lowering::Input>[>..<]=[];
  for unit,index in source.units.items {let id=(index+1) as u32;var input=blot_support::none<blot_check_parallel_lowering::Input>();if checked.compiledModule(source,id)==null && !(id==source.entry && checked.entry_cutoff.reused!=0) {input=blot_support::some(blot_check_parallel_lowering::Input{tree:unit.tree,checked:checked.module(id).checked});}inputs.push(input);}
  return blot_check_parallel_lowering::run(executor,source.lowering.io,source.lowering.workers,source.symbols,blot_reuse_project_check::moduleOrigins(source),inputs[..],slots);
 }

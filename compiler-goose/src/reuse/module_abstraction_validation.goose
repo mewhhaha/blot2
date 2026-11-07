@@ -45,7 +45,7 @@ fn publicScan(context: PublicContext&, scan: Scan&) -> Error {
         for root in owner.graph.extra[binding.scheme.generative.start..binding.scheme.generative.start + binding.scheme.generative.len] { { let propagated_error = allowed(scan, root); if propagated_error != blot_error::Error.none { return propagated_error; } } }
         for predicate in owner.obligations[binding.scheme.obligations.start..binding.scheme.obligations.start + binding.scheme.obligations.len] { { let propagated_error = requirement(scan, owner, predicate); if propagated_error != blot_error::Error.none { return propagated_error; } } }
     }
-    var identities: dictionary<blot_check_types::NominalIdentity,bool>;
+    var identities: dictionary<blot_check_types::NominalIdentity,bool> = dictionary<blot_check_types::NominalIdentity,bool>{};
     for nominal in owner.nominals {
         if nominal.identity.unit != 0 { { let propagated_error = require(!identities.contains(nominal.identity)); if propagated_error != blot_error::Error.none { return propagated_error; } } identities.insert(nominal.identity, true); }
         if nominal.private {

@@ -874,7 +874,7 @@ fn indexOperationLabels(self_: const Importer&, labels: u32[:], symbols: TextMap
     }
     if !self_.old.identity.present { return blot_error::Error.declined; }
     var entries: blot_backend_runtime_operations::Entry[>..<] = []; var bytes: u8[>..<] = [];
-    var keys: dictionary<u64,u32>; var relocations: blot_backend_runtime_operations::Relocation[>..<] = [];
+    var keys: dictionary<u64,u32> = dictionary<u64,u32>{}; var relocations: blot_backend_runtime_operations::Relocation[>..<] = [];
     var scratch = blot_backend_runtime_operations::initProject(entries, bytes, keys, relocations, self_.old.identity.value.view());
     let view = self_.old.evaluator.evidence.view(); var failure = blot_error::Error.none;
     for label in 1..view.effects.operations.len {
@@ -1031,17 +1031,13 @@ fn semanticSite<G>(self_: Importer&, g: G&, site: blot_backend_wasm::SemanticSit
     if site.node >= source.nodes.len || site.root >= source.nodes.len || site.node >= self_.units[unit - 1].nodes.len || site.root >= self_.units[unit - 1].nodes.len { return default<blot_backend_wasm::SemanticSite>(), blot_error::Error.declined; }
     if !self_.stable[site.unit - 1] {
         let key = ExpressionKey { site.unit, site.root , ..};
-        var nodes: const u32[:] = default<const u32[:]>();
         let known = self_.expression_nodes.get(key);
-        if known { nodes = known; }
+        if known {if !selectedExpressionContains(known,site.node) {return default<blot_backend_wasm::SemanticSite>(),blot_error::Error.declined;}}
         else {
             let proved, import_error_4 = blot_reuse_declaration_projection::expressionNodes(source, self_.units[unit - 1], site.root); if import_error_4 != blot_error::Error.none { return default<blot_backend_wasm::SemanticSite>(), convert(import_error_4); }
             if !proved.present { return default<blot_backend_wasm::SemanticSite>(), blot_error::Error.declined; }
-            self_.expression_nodes.insert(key, proved.value); nodes = proved.value;
+            self_.expression_nodes.insert(key, proved.value); if !selectedExpressionContains(proved.value,site.node) {return default<blot_backend_wasm::SemanticSite>(),blot_error::Error.declined;}
         }
-        var low: i64 = 0; var high = nodes.len;
-        while low < high { let middle = low + (high - low) / 2; if nodes[middle] < site.node { low = middle + 1; } else { high = middle; } }
-        if low == nodes.len || nodes[low] != site.node { return default<blot_backend_wasm::SemanticSite>(), blot_error::Error.declined; }
     }
     var result = site; result.unit = unit;
     { let imported_5, import_error_5 = self_.mappingEvidence(g, site.unit, site.mappings, 0); if import_error_5 != blot_error::Error.none { return default<blot_backend_wasm::SemanticSite>(), convert(import_error_5); } result.mappings = imported_5; }
@@ -1102,3 +1098,5 @@ fn importSolvedInto<G>(self_: Importer&, g: G&, module: const Module&, mappings:
     }
     return blot_error::Error.none;
 }
+
+fn selectedExpressionContains(nodes:const u32[:],node:u32)->bool {var low:i64=0;var high=nodes.len;while low<high {let middle=low+(high-low)/2;if nodes[middle]<node {low=middle+1;}else {high=middle;}}return low!=nodes.len && nodes[low]==node;}

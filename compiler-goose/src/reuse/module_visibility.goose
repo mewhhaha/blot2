@@ -14,7 +14,7 @@ struct Work { id: u32, row: bool = false }
 fn hash(value: Work) -> u64 { return ::hash_combine(::hash(value.id), ::hash(value.row)); }
 struct Scan { source: Source, blocked: dictionary<Identity,bool>&, seen: dictionary<Work,bool>&, work: Work[>..<]&, remaining: i64 = 1000000 }
 fn withScan<C,F>(source: Source, nominals: const blot_reuse_principal_interface::Nominal[:], families: const blot_reuse_principal_interface::EffectFamily[:], templates: const blot_reuse_principal_interface::EffectTemplate[:], context: C&) -> Error {
-    var blocked: dictionary<Identity,bool>; var seen: dictionary<Work,bool>; var work: Work[>..<] = [];
+    var blocked: dictionary<Identity,bool> = dictionary<Identity,bool>{}; var seen: dictionary<Work,bool> = dictionary<Work,bool>{}; var work: Work[>..<] = [];
     var scan = Scan { source, blocked, seen, work , ..};
     for nominal in nominals { if nominal.private && nominal.alias == 0 { blocked.insert(nominal.identity, true); } }
     for family in families { if family.private { blocked.insert(family.identity, true); } }

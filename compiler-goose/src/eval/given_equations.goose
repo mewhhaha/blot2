@@ -63,4 +63,4 @@ fn effectRow(self_: Rewrite&,root: u32,memo: Memo&,depth: i64) -> u32 {
  }
  var result=id; if changed { let value,err=self_.store.effects.rowAt(labels,row.tail,row.cursor); if err!=blot_error::Error.none { return take(self_,0,blot_check_types::effectError(err)); } result=value; } memo.rows.insert(root,result); return result;
 }
-fn normalize(self_: Rewrite&,root: u32) -> u32,Error { if self_.equations.len==0 { return self_.store.resolve(root,0); } self_.failure=blot_error::Error.none; var types: dictionary<u32,u32>; var rows: dictionary<u32,u32>; var memo=Memo {types,rows}; let result=ty(self_,root,memo,0); return result,self_.failure; }
+fn normalize(self_: Rewrite&,root: u32) -> u32,Error { if self_.equations.len==0 { return self_.store.resolve(root,0); } self_.failure=blot_error::Error.none; var types: dictionary<u32,u32> = dictionary<u32,u32>{}; var rows: dictionary<u32,u32> = dictionary<u32,u32>{}; var memo=Memo {types,rows}; let result=ty(self_,root,memo,0); return result,self_.failure; }

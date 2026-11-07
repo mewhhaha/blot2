@@ -189,8 +189,8 @@ fn codeName(code:blot_check_check::Code)->const u8[:] {match code {const for <N,
 fn coreCodeName(code:blot_check_core::Code)->const u8[:] {match code {const for <N,V> in variants<blot_check_core::Code> {V=>{return N;},}}}
 fn compile(workspace:blot_backend_core_backend::CompileWorkspace&,source:const u8[:],pool:Pool&,dependency:const blot_reuse_frozen_dependency::Module&)->Result,Error {
  if dependency.core.unit!=2 || dependency.interface.unit!=2 {return Result{},blot_error::Error.invalid_artifact;}
- var inherited:blot_parse_parser::InheritedFixity[>..<];for fixity in dependency.fixities {inherited.push(blot_parse_parser::InheritedFixity{fixity.operator,fixity.precedence,fixity.association,fixity.named});}
- var token_items:blot_parse_token::Token[>..<];var comments:blot_parse_token::Token[>..<];var lexical_issues:blot_parse_lexer::Diagnostic[>..<];var tokens=blot_parse_lexer::init(token_items,comments,lexical_issues);
+ var inherited:blot_parse_parser::InheritedFixity[>..<]=[];for fixity in dependency.fixities {inherited.push(blot_parse_parser::InheritedFixity{fixity.operator,fixity.precedence,fixity.association,fixity.named});}
+ var token_items:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var lexical_issues:blot_parse_lexer::Diagnostic[>..<]=[];var tokens=blot_parse_lexer::init(token_items,comments,lexical_issues);
  let error=blot_parse_lexer::lex(source,tokens);if error!=blot_error::Error.none {return Result{},error;}
  if lexical_issues.len!=0 {let diagnostic,error=publishedDiagnostic(1,"parse-project",source,blot_parse_syntax_diagnostics::lexical(token_items[..],lexical_issues[0]),lexical_issues[..]);if error!=blot_error::Error.none {return Result{},error;}return Result{diagnostic:blot_support::some(diagnostic)},blot_error::Error.none;}
  let created,error=blot_parse_ast::initPooled();if error!=blot_error::Error.none {return Result{},error;}var tree=created;
@@ -201,7 +201,7 @@ fn compile(workspace:blot_backend_core_backend::CompileWorkspace&,source:const u
   if node.tag==blot_parse_ast::tag_value_decl || node.tag==blot_parse_ast::tag_data_decl || node.tag==blot_parse_ast::tag_effect_type_decl || node.tag==blot_parse_ast::tag_effect_decl {occupied.insert(node.a,true);}else if node.tag==blot_parse_ast::tag_implementation_decl {occupied.insert(tree.implementation(id).name,true);}
   if node.tag==blot_parse_ast::tag_data_decl {for constructor in tree.children(node.b) {occupied.insert(tree.node(constructor).a,true);}}
  }
- var imports:blot_check_check::ImportedBinding[>..<];var catalogs:blot_check_check::ImportedCatalog[>..<];var fixities:blot_check_check::ImportedFixity[>..<];
+ var imports:blot_check_check::ImportedBinding[>..<]=[];var catalogs:blot_check_check::ImportedCatalog[>..<]=[];var fixities:blot_check_check::ImportedFixity[>..<]=[];
  catalogs.push(blot_check_check::ImportedCatalog{frozen:dependency.interface,kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0});
  for exported in dependency.exports {
   if occupied.contains(exported.name) {continue;}

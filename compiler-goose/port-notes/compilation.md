@@ -6,8 +6,14 @@ passes, but type/lifetime checking still stops before program C emission.
 Keep `compiler/`, the default toolchain, the pinned Zig oracle and siblings
 unchanged. Source checkpoints are unverified whole-compiler work.
 
+The [scope checkpoint evidence](../../benchmarks/evidence/qualification/2026-11-07-goose-scope-checkpoint.json)
+preserves individual component receipts and rejected checker trials. Each
+receipt's reduced adapters and source identity limit its qualification.
+
 Main checkpoint `30f03db34c8fdd4eee94fe63d3c5caffe5eef6bd` preserves the scalar
 cache indexes, snapshot leases and scoped proof repairs through frozen176.
+Checkpoint `abe612009229c2a22bb2f12510731643cc0210d5` preserves the exact
+frozen185 inputs and the first scoped-frame repair batch, still unverified.
 Parser checkpoint `21df1327` qualifies the
 isolated parser controls below. Superseded repair narratives and exact previous
 frontiers remain in those commits; they are not later-candidate qualification.
@@ -38,6 +44,13 @@ Frozen185 stops after 92.411 seconds (including five seconds of diagnostic
 collection): a post-call reference restoration inside that recursive staging
 cycle is rejected. Local-only dead restores can be removed; necessary setters
 must retain their original ordering outside the recursive store restriction.
+The next batch removes 26 dead restores and keeps live restoration behind
+explicit boundaries. Frozen186 reaches a separate empty-slice selection after
+107.002 seconds. That selection reuses the existing pure `exitCarries` helper.
+Frozen187 reaches its 120-second cap without a source diagnostic or program C;
+this is incomplete verification. Eleven debugger samples over its first 55
+seconds repeatedly show root-candidate enumeration and type queries during
+callee-store replay; they are sparse samples, not compiler phase totals.
 No successful whole type check, C program, link, CLI execution, Wasm comparison
 or Gdev run exists for the Goose compiler.
 
@@ -56,9 +69,23 @@ Emission/link/runtime for the differential runner take 0.587/0.343/0.020 seconds
 
 `python3 compiler-goose/tools/test_engines.py --cc clang-23` executes live
 coalescing, interning, owner-frame and parser sources. The latest four suites
-pass in 0.235/0.154/0.136/1.748 seconds. Their small import closures qualify those
+pass in 0.289/0.207/0.151/1.698 seconds. Their small import closures qualify those
 controls only. The owner-frame laws include 513 nested scopes, masking, independent
 control chains, error cleanup and reuse with zero active frames afterward.
+
+Staging's actual-record controls instantiate all 15 new scope helpers and cover
+nested frames, outgoing carries, partial state on errors, shared loop/decision
+flags, handler order and cleanup. Five other frame families use co-scoped views;
+both checkers reject their old local-to-caller escapes. Numeric and usage scratch
+tables use pooled descriptors across recursion. Eight cleanup wrappers per
+family execute nested success/error controls with zero live scratch afterward;
+16 transformed body comparisons preserve their explicit continuation tokens.
+Controlled semantic leaves limit these witnesses to their stated boundaries.
+
+The next syntax batch makes 202 local native-array constructions and 73 native
+dictionary constructions explicitly empty, and selects borrowed slices through
+pure branch-return helpers. Whole parsing passes in about one second. These
+repairs do not establish full type/lifetime acceptance or compilation speed.
 
 Borrowed construction uses typed pure factories. Fresh and copied Principals
 preserve all seven borrowed roots and 15 owned fields. A local projected proof
@@ -156,6 +183,10 @@ approved whole-prefix trial measures 71.738 -> 70.735 seconds to the identical
 frozen181 diagnostic (1.4%, below the required 20%). Both runs are terminated
 after that error; neither is a completed check. The experiment is rejected and
 the selected checker and tracked build recipe remain unchanged.
+
+Bulk successful-subgraph publication also passes the semantic controls but
+measures only 84.273 -> 83.872 seconds to the same frozen185 error (0.48%).
+It is rejected. Synthetic graph wins do not establish a port improvement.
 
 The Zig oracle remains
 `build/goose-port/oracle/bin/blotc`, SHA256

@@ -114,9 +114,7 @@ fn matches(source: const Store&, principal: Id, caller: const Store&, actual: Id
             product, nominal, instance_selection => {
                 let nominal = from.tag == blot_check_types::Tag.nominal || from.tag == blot_check_types::Tag.instance_selection;
                 if nominal && (from.a != to.a || from.b != to.b) { return false, blot_error::Error.none; }
-                var left: const Id[:] = default<const Id[:]>(); var right: const Id[:] = default<const Id[:]>();
-                if nominal { left = source.nominalArguments(from); right = caller.nominalArguments(to); }
-                else { left = source.list(blot_check_types::List { from.a, from.b , ..}); right = caller.list(blot_check_types::List { to.a, to.b , ..}); }
+                let left=selectedTypeChildren(source,from);let right=selectedTypeChildren(caller,to);
                 if left.len != right.len || !room(max_nodes, pending.len, left.len) { return false, blot_error::Error.none; }
                 for child, index in left { pending.push(Item { Pair { child, right[index], false }, depth , ..}); }
             },
@@ -391,9 +389,7 @@ recursive fn copyRecord(self_:Copier&,node:blot_check_types::Node,depth:i64)->Id
 
 recursive fn copyChildren(self_:Copier&,node:blot_check_types::Node,depth:i64)->Id,Error {
 
-            var children: const Id[:] = default<const Id[:]>();
-            if node.tag == blot_check_types::Tag.product { children = self_.source.list(blot_check_types::List { node.a, node.b , ..}); }
-            else { children = self_.source.nominalArguments(node); }
+            let children=selectedTypeChildren(self_.source,node);
             var copied=Words {..};
     recursive fn cleanup_continuation_1() -> Id,Error {
 
@@ -416,3 +412,5 @@ fn withCopy<C,F>(source:Source,destination:Store&,max_depth:i64,max_nodes:i64,re
 fn withFrozenCopy<C,F>(source:Source,destination:Store&,max_depth:i64,max_nodes:i64,remaining:i64&,observed:i64&,context:C&)->Error {
  var copier,error=initPooled(source,destination,max_depth,max_nodes,true,remaining,observed);if error!=blot_error::Error.none {return error;}let result=F(context,copier);copier.deinit();return result;
 }
+
+fn selectedTypeChildren<S>(source:const S&,node:blot_check_types::Node)->const u32[:] {if node.tag==blot_check_types::Tag.product {return source.list(blot_check_types::List{node.a,node.b});}return source.nominalArguments(node);}

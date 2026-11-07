@@ -164,15 +164,7 @@ fn decodePath(path:const u8[:],decoded:u8[>..<]&)->Error {
 }
 fn resolveImportPath(source_filename:const u8[:],raw:const u8[:],options:Options,output:u8[>..<]&)->Error {
     if raw.len==0||contains(raw,'?')||contains(raw,'#') {return blot_error::Error.invalid_path;}
-    var root:const u8[:]=default<const u8[:]>();var tail:const u8[:]=default<const u8[:]>();
-    if starts(raw,"./")||starts(raw,"../") {
-        let directory=blot_support_path::dirname(source_filename);if !directory.present {return blot_error::Error.invalid_path;}root=directory.value;tail=raw;
-    } else {
-        var matched:i64=0;
-        if options.std_root.present&&starts(raw,"std/") {root=options.std_root.value;matched=4;}
-        for alias in options.aliases {if alias.prefix.len>matched&&starts(raw,alias.prefix) {matched=alias.prefix.len;root=alias.root;}}
-        if matched==0 {return blot_error::Error.invalid_path;}tail=raw[matched..];
-    }
+    let root,tail,selection_error=selectedImportParts(source_filename,raw,options);if selection_error!=blot_error::Error.none {return selection_error;}
     var decoded:u8[>..<]=[];let decoded_error=decodePath(tail,decoded);if decoded_error!=blot_error::Error.none {return decoded_error;}
     if decoded.len!=0&&decoded[0]=='/' {return blot_error::Error.invalid_path;}
     if !ends(decoded,".blot") {decoded.append(".blot");}
@@ -326,7 +318,7 @@ struct LoadContext {
 fn withLoader<P,F>(options:Options,inputs:P&,context:LoadContext&)->Error {
     let scope=blot_phase_profile::enter(blot_phase_profile::Phase.load);
     let initialized,error=init();if error!=blot_error::Error.none {scope.exit();return error;}
-    var files:dictionary<Symbol,UnitId>;var visits:Visit[>..<]=[];var stack:Frame[>..<]=[];var fixities:blot_parse_parser::InheritedFixity[>..<]=[];
+    var files:dictionary<Symbol,UnitId> = dictionary<Symbol,UnitId>{};var visits:Visit[>..<]=[];var stack:Frame[>..<]=[];var fixities:blot_parse_parser::InheritedFixity[>..<]=[];
     var loader=Loader<P> {options:options,project:initialized,inputs:inputs,files:files,visits:visits,stack:stack,inherited_fixities:fixities, ..};loader.project.input_mode=options.input_mode;
     let failure=F(context,loader);scope.exit();
     loader.deinitScratch();
@@ -475,4 +467,12 @@ fn loadCompiledMode<P>(context:LoadContext&,loader:Loader<P>&)->Error {
         for reached in seen {if !reached {return blot_error::Error.dependency_set_changed;}}
     }
     return blot_error::Error.none;
+}
+
+fn selectedImportParts(source_filename:const u8[:],raw:const u8[:],options:Options)->const u8[:],const u8[:],Error {
+ if starts(raw,"./")||starts(raw,"../") {let directory=blot_support_path::dirname(source_filename);if !directory.present {return default<const u8[:]>(),default<const u8[:]>(),blot_error::Error.invalid_path;}return directory.value,raw,blot_error::Error.none;}
+ var matched:i64=0;var selected:i64=-1;if options.std_root.present&&starts(raw,"std/") {matched=4;}
+ for alias,index in options.aliases {if alias.prefix.len>matched&&starts(raw,alias.prefix) {matched=alias.prefix.len;selected=index;}}
+ if matched==0 {return default<const u8[:]>(),default<const u8[:]>(),blot_error::Error.invalid_path;}
+ if selected>=0 {return options.aliases[selected].root,raw[matched..],blot_error::Error.none;}return options.std_root.value,raw[matched..],blot_error::Error.none;
 }

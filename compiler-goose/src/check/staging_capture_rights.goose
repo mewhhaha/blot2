@@ -34,7 +34,7 @@ fn report(self_: Checker&, root: u32) -> const Report?, Error {
     self_.reports.push(Entry { root, result , ..}); return self_.reports[self_.reports.len - 1].report, blot_error::Error.none;
 }
 fn confined(self_: Checker&, image: const Report&, value: u32, scopes: const u32[:]) -> Error {
-    if !self_.allocating { return blot_error::Error.invalid_artifact; } var work: u32[>..<]; var seen: dictionary<u32,bool>;
+    if !self_.allocating { return blot_error::Error.invalid_artifact; } var work: u32[>..<]=[]; var seen: dictionary<u32,bool> = dictionary<u32,bool>{};
     work.append(value);
     while work.len != 0 {
         let current = work[work.len - 1]; work.resize(work.len - 1);

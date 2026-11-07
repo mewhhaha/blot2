@@ -1095,10 +1095,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     let modules = allocateOwned_pins(generator.units.len);
     for &module, index in generator.units {
         var unit = module.unit; if unit == 0 { unit = (index + 1) as u32; }
-        var path: const u8[:] = default<const u8[:]>();
-        if candidate.identity.present {
-            let found = candidate.identity.value.view().owner(unit); if found.present { path = found.value; }
-        }
+        let path=selectedOwnerPath(candidate.identity,unit);
         modules[index] = init(unit, module, copyOwned(path));
     }
     candidate.modules = modules;
@@ -1410,3 +1407,5 @@ self_.rows.deinit();
 self_.templates.deinit();
 self_.independent_calls.deinit();
 self_.principal_graphs.deinit();context_owners[at].live=false;self_=Context{..};context_owners.free(at);}
+
+fn selectedOwnerPath(identity:blot_support::Option<IdentityMetadata>,unit:u32)->const u8[:] {if identity.present {let found=identity.value.view().owner(unit);if found.present {return found.value;}}return default<const u8[:]>();}

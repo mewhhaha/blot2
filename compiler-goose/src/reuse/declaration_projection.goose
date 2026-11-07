@@ -29,7 +29,7 @@ fn deinit(self_: Workspace&) { release(self_.nodes); release(self_.bindings); re
 fn withWorkspace<C,F>(old: const Module&, context: C) { var workspace = init(old); let result = F(context, workspace); workspace.deinit(); return result; }
 fn definitionEqual(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]? = null, constant_types: bool = false) -> bool, Error { return self_.run(old, current, binding, closures, constant_types, 0, null, []); }
 fn definitionEqualWithOrigins(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool, origins: const bool[:]) -> bool, Error {
-    var admitted: const bool[:] = default<const bool[:]>(); if binding < origins.len && origins[binding] { admitted = origins; } return self_.run(old, current, binding, closures, constant_types, 0, null, admitted);
+    let admitted=selectedOrigins(binding,origins); return self_.run(old, current, binding, closures, constant_types, 0, null, admitted);
 }
 fn run(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool, expression: u32, reached: u32[>..<]?, origins: const bool[:]) -> bool, Error {
     if binding == 0 && expression == 0 { return false, blot_error::Error.none; }
@@ -77,8 +77,7 @@ fn projectedSlice<T>(self_: Scan&, left: const T[:], right: const T[:], list: Li
     return result;
 }
 fn enqueue(self_: Scan&, item: Work) {
-    if self_.failure != blot_error::Error.none { return; } var seen: u32[:] = default<u32[:]>(); var id: u32 = 0; var projection = false;
-    match item { node entry => { seen = self_.workspace.nodes; id = entry.id; }, binding entry => { seen = self_.workspace.bindings; id = entry.id; }, pattern entry => { seen = self_.workspace.patterns; id = entry.id; }, projection entry => { seen = self_.workspace.projections; id = entry.id; projection = true; } }
+    if self_.failure != blot_error::Error.none { return; } let seen,id,projection=selectedSeen(self_.workspace,item);
     if id == 0 && !projection { return; } if id >= seen.len { self_.failure = blot_error::Error.changed; return; } if seen[id] == self_.workspace.generation { return; }
     let w .= self_.workspace;
     if w.count == w.work.len {
@@ -228,3 +227,6 @@ fn aliases(self_: const Scan&, normalized: blot_check_core::Binding&, after: blo
 fn aliases(self_: const Scan&, normalized: blot_check_core::Body&, after: blot_check_core::Body) -> bool { if !self_.alias(normalized.scheme.root, after.scheme.root) { return false; } return true; }
 
 fn aliases(self_: const Scan&, normalized: blot_check_core::Pattern&, after: blot_check_core::Pattern) -> bool { if !self_.alias(normalized.ty, after.ty) { return false; } return true; }
+
+fn selectedOrigins(binding:u32,origins:const bool[:])->const bool[:] {if binding<origins.len && origins[binding] {return origins;}return default<const bool[:]>();}
+fn selectedSeen(workspace:Workspace&,item:Work)->u32[:],u32,bool {match item {node entry=>{return workspace.nodes,entry.id,false;},binding entry=>{return workspace.bindings,entry.id,false;},pattern entry=>{return workspace.patterns,entry.id,false;},projection entry=>{return workspace.projections,entry.id,true;},}}

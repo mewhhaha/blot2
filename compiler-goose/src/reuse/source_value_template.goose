@@ -429,7 +429,7 @@ recursive fn matchesAnchor<G>(self_: const Plan&, g: G&, graphs: blot_reuse_arti
             if row != target.evidence { return false, blot_error::Error.none; }
         }
     } else if left.kind != blot_eval_eval_values::ValueKind.package && left.bits != right.bits { return false, blot_error::Error.none; }
-    let record = old.value_records[old_id]; var names: const u32[:] = default<const u32[:]>(); if record != 0 { let fields = old.record_layouts[record]; names = old.field_names[fields.start..fields.start + fields.len]; }
+    let record = old.value_records[old_id]; let names=selectedRecordNames(old,record);
     if names != g.evaluator.recordFieldNames(current) { return false, blot_error::Error.none; }
     candidate[old_id] = current;
     if inverse[current] == 0 && inverse_ids { let error = inverse_ids.push(current); if error != blot_error::Error.none { return false, error; } } inverse[current] = old_id;
@@ -537,7 +537,7 @@ fn prepareMaterial<G>(self_: Material<G>&,retained_scratch: bool) -> Error {
     for id in plan.order {if mapped[id]==0 {self_.count++;}}
     if retained_scratch || self_.storage.present {{ let propagated_error = self_.scratch.grow(self_.scratch.children,old.children.len,0xffffffff as u32); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = self_.scratch.grow(self_.scratch.append_children,old.values.len,false); if propagated_error != blot_error::Error.none { return propagated_error; } }}
     { let propagated_error = self_.scratch.child_ids.ensure(plan.stats.children); if propagated_error != blot_error::Error.none { return propagated_error; } } if retained_scratch {self_.scratch.stats.materializations++; self_.scratch.stats.baseline_material_index_entries+=old.values.len*3+old.children.len;}
-    self_.children_prepared=true; var effects: const blot_eval_eval_collection_growth::BufferEffect[:]=default<const blot_eval_eval_collection_growth::BufferEffect[:]>(); if self_.storage.present {effects=self_.storage.value.buffers;} self_.transported=transport_runs.alloc_slice(effects.len);
+    self_.children_prepared=true; let effects=selectedMaterialEffects(self_); self_.transported=transport_runs.alloc_slice(effects.len);
     if self_.storage.present {{ let propagated_error = self_.prepareSpans(self_.storage.value,effects,retained_scratch); if propagated_error != blot_error::Error.none { return propagated_error; } }}
     for id in plan.order {if old.values[id].kind!=blot_eval_eval_values::ValueKind.package || mapped[id]!=0 {continue;} let info=old.values[id]; let dictionary,first=self_.graphs.importClosedEvidence(self_.generator,info.nominal as u32); { let propagated_error = first; if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = transportRequire(dictionary.present); if propagated_error != blot_error::Error.none { return propagated_error; } } let recipe,second=self_.graphs.importClosedEvidence(self_.generator,info.bits); { let propagated_error = second; if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = transportRequire(recipe.present); if propagated_error != blot_error::Error.none { return propagated_error; } } blot_support_pooled_map::insert(self_.packages,id,Package{dictionary.value,recipe.value, ..},package_slots);}
     let session .= self_.generator.evaluator; var child_count=plan.stats.children; if self_.storage.present {child_count=self_.added_children;}
@@ -647,3 +647,6 @@ fn observe(pools: const Pools&, gate: const Gate&, cached_units: i64) -> Probe, 
         if pin.unit > cached_units { if result.fresh_count < result.fresh.len { result.fresh[result.fresh_count] = RootObservation { target, body.span, found.reason, found.stats , ..}; result.fresh_count++; } else { result.fresh_truncated++; } }
     } } return result, blot_error::Error.none;
 }
+
+fn selectedRecordNames<S>(old:const S&,record:u32)->const u32[:] {if record!=0 {let fields=old.record_layouts[record];return old.field_names[fields.start..fields.start+fields.len];}return default<const u32[:]>();}
+fn selectedMaterialEffects<G>(self_:const Material<G>&)->const blot_eval_eval_collection_growth::BufferEffect[:] {if self_.storage.present {return self_.storage.value.buffers;}return default<const blot_eval_eval_collection_growth::BufferEffect[:]>();}

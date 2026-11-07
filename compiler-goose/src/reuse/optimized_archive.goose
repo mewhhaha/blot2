@@ -34,8 +34,8 @@ fn admitted(self_:Section)->bool {return self_.header==blot_reuse_portable_query
 struct Snapshot {tier:Tier,roots:bool=false,needs_roots:bool=false,root_slots:u32=0,arena:blot_support::Option<blot_backend_wasm::Arena>,regions:blot_support::Option<blot_runtime_region_runtime::Prepared> =blot_support::none<blot_runtime_region_runtime::Prepared>(),entries:const Entry[:],signatures:const blot_backend_optimized_bodies::Signature[:],imports:const blot_backend_optimized_bodies::Import[:],globals:const blot_backend_wasm::Global[:],providers:const blot_backend_provider_modes::Mode[:]=default<const blot_backend_provider_modes::Mode[:]>(),sealed:bool,queries:Section}
 fn wireKey(compiler:Digest)->blot_reuse_dependency_format::Key {return blot_reuse_dependency_format::Key{compiler,blot_reuse_dependency_format::digest("blot-optimizer-capture-v42:profile-identity+inline-contexts+borrowed-variant-payloads+collector-contract+profile-categories+tagged-numeric-rows+flatten+diagnostic-source-origins+owned-region-preparation-context+physical-tracing-absent+checked-logical-callable-endpoints+checked-provider-modes+checked-provider-parameters+selected-implementations+associated-types+checked-call-results+root-frame-demand+compact-roots+row-fusion+forwarded-roots+paired-state+numeric-scopes+row-products+conditional-roots+private-local-storage+immutable-acyclic-layouts+direct-callable-environments+scalar-journals+owned-field-locals+small-producer-groups+qualified-journal-fallback+private-cursors+private-table-projections+private-cursor-word-positions+snapshot-leaf-directory+eager-tuple-reductions+symbolic-empty-constructor-fields+activation-owned-field-roots+checked-nonempty-loads+private-absent-fields+journal-only-carriers+immortal-reference-facts+prefix-owned-fields+progress-sized-replacement+per-loop-journal-cost+bounded-private-scalar-consumers+bounded-invalidation-worklist+structured-control-reachability+completed-empty-producer-loops+checked-scalar-self-identities+checked-field-update-layouts+checked-scalar-stores+wide-counted-shapes+deferred-partial-tracing+checked-list-literal-publication+prepared-machine-sharing+proved-list-runtime-access+checked-production-emission+resolved-collection-iteration+exact-empty-cursor"),[0;32],[0;32]};}
 fn encode(compiler:Digest,capture:const Capture&)->u8[:],Error {
- var entries:Entry[>..<];for entry in capture.entries.items {let source=entry.source;entries.push(Entry{Function{parameters:source.parameters,result:source.result,result_role:source.result_role,entry:source.entry,provider_parameter:source.provider_parameter,callable_layout:source.callable_layout,parameter_roles:source.parameter_roles,annotations:source.annotations,signature:source.signature,body:Body{source.locals,source.instructions}},entry.parameters,entry.invalidates,entry.owned_result_bytes,entry.output,entry.output_ready});}
- let sealed=capture.queries_complete;var records:Record[>..<];if sealed {for record in capture.queries.records {records.push(Record{Key{record.key.tier},Dependencies{record.dependencies.callees,record.dependencies.parameters,record.dependencies.invalidates,record.dependencies.owned_result_bytes},Result{record.value.function}});}}
+ var entries:Entry[>..<]=[];for entry in capture.entries.items {let source=entry.source;entries.push(Entry{Function{parameters:source.parameters,result:source.result,result_role:source.result_role,entry:source.entry,provider_parameter:source.provider_parameter,callable_layout:source.callable_layout,parameter_roles:source.parameter_roles,annotations:source.annotations,signature:source.signature,body:Body{source.locals,source.instructions}},entry.parameters,entry.invalidates,entry.owned_result_bytes,entry.output,entry.output_ready});}
+ let sealed=capture.queries_complete;var records:Record[>..<]=[];if sealed {for record in capture.queries.records {records.push(Record{Key{record.key.tier},Dependencies{record.dependencies.callees,record.dependencies.parameters,record.dependencies.invalidates,record.dependencies.owned_result_bytes},Result{record.value.function}});}}
  let snapshot=Snapshot{tier:capture.tier,roots:capture.roots,needs_roots:capture.needs_roots,root_slots:capture.root_slots,arena:capture.arena,regions:capture.regions,entries:entries[..],signatures:capture.signatures.items,imports:capture.imports.items,globals:capture.globals.items,providers:capture.providers.items,sealed:sealed,queries:Section{blot_reuse_portable_query::header(claim),records[..]}};return blot_reuse_dependency_format::encode(wireKey(compiler),snapshot);
 }
 fn decode(compiler:Digest,bytes:const u8[:])->Capture,Error {
@@ -59,7 +59,7 @@ fn seal(capture:Capture&,records:const Record[:])->Error {
 }
 fn validTypes(values:const ValueType[:])->bool {for value in values {if value==blot_backend_runtime_ir::VT_none {return false;}}return true;}
 fn validate(snapshot:const Snapshot&)->Error {
- let section=snapshot.queries;if section.header.version!=blot_reuse_portable_query::version {return blot_error::Error.unsupported_version;}if !section.admitted() {return blot_error::Error.schema_mismatch;}var frames:bool[>..<];let resources=Resources{snapshot.entries.len,snapshot.imports.len,snapshot.signatures.len,snapshot.globals.len,frames};
+ let section=snapshot.queries;if section.header.version!=blot_reuse_portable_query::version {return blot_error::Error.unsupported_version;}if !section.admitted() {return blot_error::Error.schema_mismatch;}var frames:bool[>..<]=[];let resources=Resources{snapshot.entries.len,snapshot.imports.len,snapshot.signatures.len,snapshot.globals.len,frames};
  if snapshot.providers.len>4096 {return blot_error::Error.invalid_artifact;}for mode,index in snapshot.providers {if mode.operation==0 || (index!=0 && snapshot.providers[index-1].operation>=mode.operation) {return blot_error::Error.invalid_artifact;}if mode.access!=blot_backend_provider_modes::Access.unsupported && ((mode.role!=blot_backend_runtime_ir::ROLE_scalar && mode.role!=blot_backend_runtime_ir::ROLE_reference) || (mode.machine!=blot_backend_runtime_ir::VT_i32 && mode.machine!=blot_backend_runtime_ir::VT_f32) || (mode.role==blot_backend_runtime_ir::ROLE_reference && mode.machine!=blot_backend_runtime_ir::VT_i32)) {return blot_error::Error.invalid_artifact;}}
  for signature in snapshot.signatures {if !validTypes(signature.parameters) {return blot_error::Error.invalid_artifact;}}
  for item in snapshot.imports {if item.signature>=snapshot.signatures.len || !blot_reuse_source_overlays::utf8_valid(item.module) || !blot_reuse_source_overlays::utf8_valid(item.name) {return blot_error::Error.invalid_artifact;}}
@@ -98,19 +98,19 @@ fn body(self_:Resources,parameters:i64,value:Body)->bool {
 }
 fn validateRegions(snapshot:const Snapshot&)->Error {
  if !snapshot.regions.present {return blot_error::Error.none;}let regions=snapshot.regions.value;if !snapshot.roots || !snapshot.needs_roots || !snapshot.arena.present || regions.scopes.len>snapshot.entries.len || !regions.plan.valid() {return blot_error::Error.invalid_artifact;}
- var types:blot_backend_runtime_ir::ValueType[>..<];
- var instructions:blot_backend_runtime_ir::Instruction[>..<];
- var names:u8[>..<];
- var functions:blot_backend_runtime_ir::Function[>..<];
- var signatures:blot_backend_runtime_ir::Signature[>..<];
- var imports:blot_backend_wasm::Import[>..<];
- var globals:blot_backend_wasm::Global[>..<];
- var exports:blot_backend_wasm::Export[>..<];
- var data:u8[>..<];
- var static_fields:u32[>..<];
- var table_functions:u32[>..<];
- var table_origins:blot_backend_wasm::TableOrigin[>..<];
- var semantic_sites:blot_backend_wasm::SemanticSite[>..<];
+ var types:blot_backend_runtime_ir::ValueType[>..<]=[];
+ var instructions:blot_backend_runtime_ir::Instruction[>..<]=[];
+ var names:u8[>..<]=[];
+ var functions:blot_backend_runtime_ir::Function[>..<]=[];
+ var signatures:blot_backend_runtime_ir::Signature[>..<]=[];
+ var imports:blot_backend_wasm::Import[>..<]=[];
+ var globals:blot_backend_wasm::Global[>..<]=[];
+ var exports:blot_backend_wasm::Export[>..<]=[];
+ var data:u8[>..<]=[];
+ var static_fields:u32[>..<]=[];
+ var table_functions:u32[>..<]=[];
+ var table_origins:blot_backend_wasm::TableOrigin[>..<]=[];
+ var semantic_sites:blot_backend_wasm::SemanticSite[>..<]=[];
  var module=blot_backend_wasm::init(types,instructions,names,functions,signatures,imports,globals,exports,data,static_fields,table_functions,table_origins,semantic_sites);
  for entry in snapshot.entries {if entry.source.provider_parameter>255 {return blot_error::Error.invalid_artifact;}let start=types.len as u32;types.append(entry.source.parameters);let function=blot_backend_runtime_ir::Function{ parameters:blot_backend_runtime_ir::Range{start,entry.source.parameters.len as u32}, result:entry.source.result, result_role:entry.source.result_role, entry:entry.source.entry, provider_parameter:entry.source.provider_parameter as u8, signature:entry.source.signature, parameter_roles:entry.source.parameter_roles, .. };if !blot_backend_runtime_ir::validProviderParameter(module,function) {return blot_error::Error.invalid_artifact;}functions.push(function);}
  if !regions.valid(module) {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;

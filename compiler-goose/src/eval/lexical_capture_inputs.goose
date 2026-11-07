@@ -47,8 +47,8 @@ fn buildChecked<S>(session: S&,value: u32,selected: const Interfaces&,limit: i64
  let module=session.units[owner]; let children=session.valueChildren(value);
  if (!allow_empty&&children.len==0)||children.len>session.options.max_children||children.len>limit/4 { return default<Inputs>(),blot_error::Error.declined; }
  let anonymous=root.origin==blot_eval_eval_values::ClosureOrigin.anonymous; if anonymous&&root.identity>=module.closures.len { return default<Inputs>(),blot_error::Error.declined; }
- var bindings: const u32[:]=default<const u32[:]>(); var parameters: i64=1;
- if anonymous { let captures=module.closures[root.identity].captures; bindings=module.extra[captures.start..captures.start+captures.len]; if bindings.len!=children.len { return default<Inputs>(),blot_error::Error.declined; } }
+ let bindings=selectedCaptureBindings(module,root.identity,anonymous); var parameters: i64=1;
+ if anonymous { if bindings.len!=children.len { return default<Inputs>(),blot_error::Error.declined; } }
  else { let definition=module.body(root.identity); if definition==null||children.len!=root.applied||root.applied>=definition.parameters.len { return default<Inputs>(),blot_error::Error.declined; } parameters=definition.parameters.len-root.applied; }
  var slots: Slot[>..]=[]; var mappings: Mapping[>..]=[]; mappings.append(view.type_mappings[root.mappings.start..root.mappings.start+root.mappings.len]); var rows: RowMapping[>..]=[]; rows.append(view.row_mappings[root.row_mappings.start..root.row_mappings.start+root.row_mappings.len]);
  var values: u32[>..]=[value]; var words: u64[>..]=[];
@@ -139,3 +139,5 @@ fn intern<S>(self_:Cache&,session:S&,value:u32,selected:const Interfaces&)->u32,
  let index=(self_.inputs.len+1) as u32;self_.keys.insert(input.words,index);self_.inputs.push(input);assert(self_.inputs.failure==blot_error::Error.none);self_.retained_words+=input.words.len;return index,true,blot_error::Error.none;
 }
 fn reset(self_:Cache&) {assert(valid(self_));self_.inputs.clear();self_.keys.clear();self_.owner_id=blot_native::fresh_owner_id();self_.requests=0;self_.reused=0;self_.retained_words=0;self_.examined_words=0;self_.interface_visits=0;}
+
+fn selectedCaptureBindings<M>(module:const M&,identity:u32,anonymous:bool)->const u32[:] {if anonymous {let captures=module.closures[identity].captures;return module.extra[captures.start..captures.start+captures.len];}return default<const u32[:]>();}

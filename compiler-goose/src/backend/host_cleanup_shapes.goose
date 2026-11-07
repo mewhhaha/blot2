@@ -82,7 +82,7 @@ fn jsonNode(node: Node,out: u8[>..<]&) {
     out.append("],\"name\":"); blot_backend_backend_timing::jsonString(out,node.name); out.push('}');
 }
 fn build<C>(context: C,roots: const u32[:],out: u8[>..<]&) -> Error {
-    var nodes: Node[>..<] = []; var seen: dictionary<u32,bool>; var builder = Builder<C> { context,nodes,seen , ..};
+    var nodes: Node[>..<] = []; var seen: dictionary<u32,bool> = dictionary<u32,bool>{}; var builder = Builder<C> { context,nodes,seen , ..};
     recursive fn cleanup_continuation_1() -> Error {
 
     for root in roots { let error = add(builder,root,0); if error != blot_error::Error.none { return error; } }

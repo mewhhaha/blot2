@@ -174,7 +174,7 @@ recursive fn mapTypeDepthSink(self_: Service&, unit_id: u32, mappings: MappingSi
         return blot_error::Error.none;
     }
     if n.tag == blot_check_types::Tag.forall && representation.tag == blot_backend_layout::Tag.universal {
-        var inherited: const RowMapping[:] = default<const RowMapping[:]>(); if hasRows(rows) { inherited = rowItems(rows); }
+        let inherited=selectedInheritedRows(rows);
         let expected, error = self_.layouts.fromTypeWithRows(source, ty, mappingItems(mappings), inherited, false);
         if error != blot_error::Error.none { return representationError(self_, error, unit_id, span, FailureCode.unresolved_type); }
         if expected != concrete { return decline(self_, unit_id, span, FailureCode.unresolved_type); } return blot_error::Error.none;
@@ -263,7 +263,7 @@ recursive fn mapTypeDepthSink(self_: Service&, unit_id: u32, mappings: MappingSi
         let b = mapTypeDepthSink(self_, unit_id, mappings, rows, n.b, representation.b, span, depth + 1); if b != blot_error::Error.none { return b; }
         return mapTypeDepthSink(self_, unit_id, mappings, rows, n.c, representation.c, span, depth + 1);
     } else if n.tag == blot_check_types::Tag.product || n.tag == blot_check_types::Tag.nominal {
-        var children: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>(); if n.tag == blot_check_types::Tag.nominal { children = source.types.nominalArguments(n); } else { children = source.types.list(blot_check_types::List { n.a, n.b , ..}); }
+        let children=selectedTypeChildren(source.types,n);
         if children.len != self_.layouts.children(concrete).len { return decline(self_, unit_id, span, FailureCode.unresolved_type); }
         for child, index in children { let error = mapTypeDepthSink(self_, unit_id, mappings, rows, child, self_.layouts.children(concrete)[index], span, depth + 1); if error != blot_error::Error.none { return error; } }
     } else if n.tag == blot_check_types::Tag.record { return mapRecordSink(self_, unit_id, mappings, rows, n, concrete, span, depth); }
@@ -544,3 +544,6 @@ fn refineMappingsCapturesSink(self_: Service&, unit_id: u32, root: EvidenceRoot,
      inference_stage.deinit();
     return cleanup_result_6_0;
 }
+
+fn selectedTypeChildren<S>(source:const S&,node:blot_check_types::Node)->const u32[:] {if node.tag==blot_check_types::Tag.product {return source.list(blot_check_types::List{node.a,node.b});}return source.nominalArguments(node);}
+fn selectedInheritedRows(rows:RowSink)->const RowMapping[:] {if hasRows(rows) {return rowItems(rows);}return default<const RowMapping[:]>();}

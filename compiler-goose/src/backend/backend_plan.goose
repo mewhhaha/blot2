@@ -194,7 +194,7 @@ fn addStartupSelections(generator: blot_backend_core_backend::Generator&,target:
 fn planRuntime(state: State&,generator: blot_backend_core_backend::Generator&,entry: u32,supplied_order: const u32[:]) -> Error {
     var has_runtime = false; for source in generator.units { for body in source.bodies[1..] { if body.runtime && !body.is_function { has_runtime = true; } } } if !has_runtime { return blot_error::Error.none; }
     var order: u32[>..<] = []; if supplied_order.len == 0 { for index in 0..generator.units.len { order.push((index + 1) as u32); } } else { if supplied_order.len != generator.units.len { return blot_error::Error.invalid_function_reference; } order.append(supplied_order); }
-    var selections: blot_backend_startup_graph::Selection[>..<] = []; var processed: dictionary<blot_check_core::BindingRef,bool>; var confirmed = true;
+    var selections: blot_backend_startup_graph::Selection[>..<] = []; var processed: dictionary<blot_check_core::BindingRef,bool> = dictionary<blot_check_core::BindingRef,bool>{}; var confirmed = true;
     for body in generator.unit(entry).bodies[1..] {
         if !body.exported || !body.is_function { continue; } let target = blot_check_core::BindingRef { entry,body.binding , ..};
         let facts,error = generator.evaluator.startupDependencies(target); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return generator.evaluationFailure(); }

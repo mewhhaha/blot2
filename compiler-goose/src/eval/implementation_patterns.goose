@@ -11,7 +11,7 @@ type Error=blot_error::Error;
 struct Instance { variables: const u32[:],rows: const u32[:],head: blot_check_types::List }
 struct Work { id: u32,row: bool=false,depth: i64=0 }
 fn chargeGraph(store: Store&,root: u32) -> Error {
- var pending: Work[>..<]=[Work {id:root}]; var seen: dictionary<u64,bool>;
+ var pending: Work[>..<]=[Work {id:root}]; var seen: dictionary<u64,bool> = dictionary<u64,bool>{};
  while pending.len!=0 {
   let work=pending[pending.len-1]; pending.resize(pending.len-1); let e=store.chargeProjection(); if e!=blot_error::Error.none { return e; } if work.depth>=256 { return blot_error::Error.type_limit; }
   var key=work.id as u64; if work.row { key|=0x100000000; } if seen.contains(key) { continue; } seen.insert(key,true);

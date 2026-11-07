@@ -22,7 +22,7 @@ fn deinit(quantified: Quantified&) { quantified.types.deinit(); quantified.rows.
 fn has(quantified: Quantified,variable: u32,row: bool) -> bool { if row { return quantified.rows.contains(variable); } return quantified.types.contains(variable); }
 fn addVariables<T>(set: dictionary<u32,bool>&,types: const T&,lists: const blot_check_types::List[:]) { for list in lists { for variable in types.list(list) { set.insert(variable,true); } } }
 fn initQuantified(source: const blot_check_core::Module&) -> Quantified,Error {
-    var types: dictionary<u32,bool>; var rows: dictionary<u32,bool>;
+    var types: dictionary<u32,bool> = dictionary<u32,bool>{}; var rows: dictionary<u32,bool> = dictionary<u32,bool>{};
     for binding in source.bindings { addVariables(types,source.types,[binding.scheme.variables,binding.scheme.generative,binding.public_variables]); addVariables(rows,source.types,[binding.scheme.row_variables,binding.scheme.closed_rows,binding.public_rows]); }
     for body in source.bodies { addVariables(types,source.types,[body.scheme.variables,body.scheme.generative]); addVariables(rows,source.types,[body.scheme.row_variables,body.scheme.closed_rows,body.closed_rows]); }
     for constructor in source.constructors { addVariables(types,source.types,[constructor.scheme.variables,constructor.scheme.generative]); addVariables(rows,source.types,[constructor.scheme.row_variables]); }

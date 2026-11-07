@@ -23,7 +23,7 @@ fn runAbove<Executor>(executor: Executor&, io_available: bool, requested: u8, na
     if requested <= 1 || !io_available { return blot_support::none<Batch<Executor>>(), blot_error::Error.none; } var jobs: i64 = 0; var nodes: i64 = 0;
     for optional in inputs { if optional.present { jobs += 1; let amount = optional.value.tree.nodes.len; if amount > 0x7fffffffffffffff - nodes { nodes = 0x7fffffffffffffff; } else { nodes += amount; } } }
     if jobs < 2 || nodes < minimum_nodes { return blot_support::none<Batch<Executor>>(), blot_error::Error.none; }
-    var order: u32[>..<]; for input, index in inputs { if input.present { order.push(index as u32); } }
+    var order: u32[>..<]=[]; for input, index in inputs { if input.present { order.push(index as u32); } }
     // Stable insertion order implements source largest-first then source index.
     for ignored in 1..order.len { var index = ignored; while index != 0 { let left = order[index - 1]; let right = order[index]; let l = inputs[left].value.tree.nodes.len; let r = inputs[right].value.tree.nodes.len; if l > r || (l == r && left < right) { break; } order[index - 1] = right; order[index] = left; index -= 1; } }
     slots.clear(); for input in inputs { slots.push(Slot { requested: input.present , ..}); }

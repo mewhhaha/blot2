@@ -160,7 +160,7 @@ fn collect(self_: Frontier&, store: blot_check_types::Store&, roots: const blot_
                 let instance = store.operation(label).instance; if instance.unit == 0 && instance.decl != 0 { if len == stack.len { self_.overflow = true; return blot_error::Error.none; } stack[len] = instance.decl; len += 1; }
             }
         }
-        var local: blot_check_types::Id[3] = [0; 3]; var local_count: i64 = 0; var children: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>();
+        var local: blot_check_types::Id[3] = [0; 3]; var local_count: i64 = 0;
         match node.tag {
             function => { local = [node.a, node.b, 0]; local_count = 2; }, state_provider => { local = [node.a, node.b, node.c]; local_count = 3; },
             usage => { local = [node.a, node.c, 0]; local_count = 1; if node.c != 0 { local_count = 2; } },
@@ -171,12 +171,13 @@ fn collect(self_: Frontier&, store: blot_check_types::Store&, roots: const blot_
                 for goal in store.quantifierGoals(selected) { for child in [goal.ty, goal.other, goal.result, goal.signature] { if child != 0 { if len == stack.len { self_.overflow = true; return blot_error::Error.none; } stack[len] = child; len += 1; } } }
             },
             array, list, cursor, resolver, provider => { local[0] = node.a; local_count = 1; },
-            product => { children = store.list(blot_check_types::List { node.a, node.b }); },
-            nominal, projection, instance_selection => { children = store.nominalArguments(node); },
+            product, nominal, projection, instance_selection => {},
             record => { if node.b > stack.len - len { self_.overflow = true; return blot_error::Error.none; } for field in node.b { stack[len] = store.recordField(node, field).ty; len += 1; } }, _ => {},
         }
-        if local_count + children.len > stack.len - len { self_.overflow = true; return blot_error::Error.none; }
+        let children=selectedFrontierChildren(store,node);if local_count + children.len > stack.len - len { self_.overflow = true; return blot_error::Error.none; }
         for child in local[..local_count] { stack[len] = child; len += 1; } for child in children { stack[len] = child; len += 1; }
     }
     return blot_error::Error.none;
 }
+
+fn selectedFrontierChildren(store:const blot_check_types::Store&,node:blot_check_types::Node)->const blot_check_types::Id[:] {match node.tag {product=>{return store.list(blot_check_types::List{node.a,node.b});},nominal,projection,instance_selection=>{return store.nominalArguments(node);},_=>{return default<const blot_check_types::Id[:]>();},}}

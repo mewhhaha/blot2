@@ -1,0 +1,1536 @@
+{
+  "date": "2026-11-07",
+  "qualification": "component boundary controls only; whole Goose compiler unverified",
+  "source_checkpoint": "abe612009229c2a22bb2f12510731643cc0210d5",
+  "oracle_source": "156f84b4810f630dff7e5efb7014b2194e3160f7",
+  "oracle_binary_sha256": "7c8027242749ccc1027c6d855a7bd91f7cba72f27a39df307e36ea29aace3ac8",
+  "whole_attempt_185": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--stage-timeout",
+      "120"
+    ],
+    "exit": 1,
+    "seconds": 92.411,
+    "stop_reason": "source diagnostic",
+    "error_grace_seconds": 5.0,
+    "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-185.log",
+    "capture_seconds": 0.3369,
+    "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose",
+    "live_matches_frozen": true,
+    "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-185-inputs/compiler-goose/build/blotc-goose",
+    "executable_exists": false
+  },
+  "components": {
+    "solver-view-laws": {
+      "receipt_sha256": "7aeb76b5ff650e86ee3b6827632a7be4abb478c678524bf3fbe651fb7d63ce73",
+      "receipt": {
+        "source_sha256": {
+          "package_core": "75164f9441b82d7566d033f9e1c3fca97f272beab4c9ecc4588fabaf462e6d42",
+          "scheme_equations": "6924db86350dc64dbbf3717c22d0723d599fb2e2c372abc6dad90ce3fff26f01",
+          "package_contracts": "c5b96cc3be18fab58e0df96ae13cf993cbf2d0281dfa779ef2ec01165f83acbb",
+          "core": "2884894fd2d7daa990dbcd453299648dbc019ab9e28db21d1634487acd0c8c50"
+        },
+        "exact_extracted": [
+          "Module",
+          "Context (both schemas)",
+          "Walker",
+          "Solver",
+          "SolverTables",
+          "init",
+          "withSolver",
+          "solverModule",
+          "solverViews",
+          "solverWalkerView",
+          "solverWalker",
+          "emptyTypes"
+        ],
+        "scope": "Exact ownership records and orchestration/factory bodies. Store/initialize/refresh/deinit and leaf schema behavior are reduced controlled adapters; production solver behavior still needs whole-compiler execution.",
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.03216914299991913
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.12740520899751573
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001741772000968922
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.02628482699947199
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.10953708599845413
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.0017462699979660101
+          }
+        ],
+        "passed": true
+      }
+    },
+    "solver-authority-laws": {
+      "receipt_sha256": "bbd2663828f271fd694c2c3d04c32d1aaaa575f1f71505e01fdc30f9ab955f33",
+      "receipt": {
+        "source_sha256": {
+          "package_core": "75164f9441b82d7566d033f9e1c3fca97f272beab4c9ecc4588fabaf462e6d42",
+          "scheme_equations": "977b11f1c575ea51ea4964737984b754d7c5fe51844459489379fa9a807e3d21",
+          "package_contracts": "c5b96cc3be18fab58e0df96ae13cf993cbf2d0281dfa779ef2ec01165f83acbb",
+          "core": "2884894fd2d7daa990dbcd453299648dbc019ab9e28db21d1634487acd0c8c50"
+        },
+        "exact_extracted": [
+          "SharedAuthority",
+          "eligible",
+          "captureAuthority",
+          "matches",
+          "prefixFacts",
+          "sharedAuthority",
+          "Facts (all methods)",
+          "Module",
+          "Context (both schemas)",
+          "Walker",
+          "Solver",
+          "SolverTables",
+          "init",
+          "withSolver",
+          "solverModule",
+          "solverViews",
+          "solverWalkerView",
+          "solverWalker",
+          "emptyTypes"
+        ],
+        "scope": "Exact SharedAuthority guards/capture/matches, scalar GoalMap and memo hit/remember functions, ownership records and orchestration/factory bodies. Store/initialize/refresh/deinit and leaf schema behavior are reduced controlled adapters; production solver behavior still needs whole-compiler execution.",
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.060544502004631795
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.140553623001324
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.002025005000177771
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.05927669600350782
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.1468849769953522
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.0018997980005224235
+          }
+        ],
+        "passed": true
+      }
+    },
+    "pack-scope-laws": {
+      "receipt_sha256": "0ad0e87760f5a5b280ee12dc35539879373f62ae9a6abc2d2c6ee6c21609b24b",
+      "receipt": {
+        "scope": "Actual full Context/Walker/Module schemas, packagePack orchestration, pure factories/publication, and snapshot lease implementation. packageExpression is a controlled recursive mutation/error adapter; actual PackProjection validation is qualified separately.",
+        "cases": 96,
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.02040588099771412
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.1017596490055439
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.0072800359994289465
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.01886889900197275
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.12773373100208119
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.0067057739943265915
+          }
+        ],
+        "passed": true
+      }
+    },
+    "call-principal-laws": {
+      "receipt_sha256": "e3bd5bc3e3654989091d3807f2cbf3c95f8a14481ffca64be2a645f4621b555b",
+      "receipt": {
+        "scope": "Exact full Principal/PrincipalState/Context/Walker/Module/Admission/Workspace schemas; actual entry functions, callerPrincipal, factories, catalog/target, principalMapping rollback wrapper, state snapshot/factory. Admission owned-map leaves/deinit and principalMappingValue semantic work are controlled adapters; no full matching behavior claim.",
+        "cases": 96,
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.04483996300405124
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.14668844400148373
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.007572877999336924
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.04410569599713199
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.12796769099804806
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.00746908099972643
+          }
+        ],
+        "passed": true
+      }
+    },
+    "qualified-state-laws": {
+      "receipt_sha256": "138ec41e9dfb5d6817fefed23efacc796cce429d118a3ff0addafa50bee755d8",
+      "receipt": {
+        "scope": "Exact qualifiedInstance/qualifiedMappingState/qualifiedPrincipal/qualifiedCall and prior package entry/canonical root helpers; full Principal/State/Named/Context/Walker/Module/Body/Admission/Workspace schemas. Mapping, Views initialization/generic, callable/data/selectedEffects and parametric body algorithms are controlled adapters. Tests qualify return ownership, root identity, full state, ordering/fuel and errors; full semantic matching remains pending.",
+        "cases": 93,
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.05601089000265347
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.1408712859993102
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.005110445003083441
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.03515364899794804
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.12653488000069046
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.005222407999099232
+          }
+        ],
+        "passed": true
+      }
+    },
+    "certified-scope-laws": {
+      "receipt_sha256": "7a9d0ab46b7e139c7b32e4b85a9a72eeb1417fbda2b8ca3a6e8e784636eb7ec6",
+      "receipt": {
+        "scope": "actual certifiedScheme, actual PrincipalState/Principal schemas and snapshot/publication/factory; controlled schemeGoalsMode matching leaf and reduced dependent schemas; no full matcher/certificate semantic claim",
+        "cases_per_compiler": 192,
+        "controls": [
+          "closed-row length and 4096 limit with no mutation",
+          "prior certificate retained on early rejection",
+          "certificate cleared after success/matching failure/leaf error",
+          "partial owned state published on leaf error",
+          "exact budget/type roots and budget mutation",
+          "separate left/right seen counts",
+          "old-wrapper local escape rejected by both checkers"
+        ],
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "seconds": 0.019714079004188534,
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "seconds": 0.10901338099938584,
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "seconds": 0.0031974270023056306,
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "seconds": 0.018407215000479482,
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "seconds": 0.08736768200469669,
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "seconds": 0.0036585030029527843,
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "old-wrapper-negative",
+            "seconds": 0.010769879001600202,
+            "exit": 1,
+            "expected_failure": true
+          },
+          {
+            "compiler": "private",
+            "stage": "old-wrapper-negative",
+            "seconds": 0.01576113500050269,
+            "exit": 1,
+            "expected_failure": true
+          }
+        ],
+        "source_sha256": "f9282401498ff311b303ecd2eaacf2bf9f4987a20859e36457d8634a456c087f",
+        "actual_function_sha256": "6aba478885a223b5d5212d2d816e130f18ab31d6c9e07b113f9e960eec41db96",
+        "passed": true
+      }
+    },
+    "arm-capture-laws": {
+      "receipt_sha256": "27acace88ff8727a10a1312692ad29e8395ae465d88ddc345e9d28c5a850271a",
+      "receipt": {
+        "source_sha256": "8b9467e149908f62a57ce17a4ad0f11e1e15799f506e4923fa7474e19d3e2794",
+        "scope": "Actual ArmCapture, armVersions and caseArms source with controlled Engine/tree/expression/binding/type adapters; two Buffer.append calls adapt to native array.push; no full check.Engine or blockExpressionBody runtime qualification",
+        "cases_per_compiler": 33,
+        "controls": [
+          "zero,one,two,257 captured versions",
+          "carrying and noncarrying arms",
+          "binding/expression/constraint failures",
+          "nested capture preserves parent scalar receipt and carrying flag",
+          "existing equation run transfer and full release"
+        ],
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "seconds": 0.02302718799910508,
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "seconds": 0.1145708999974886,
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "seconds": 0.0013706649988307618,
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "seconds": 0.022139521002827678,
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "seconds": 0.09171153000352206,
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "seconds": 0.0009455580002395436,
+            "exit": 0
+          }
+        ],
+        "passed": true
+      }
+    },
+    "numeric-scratch-laws": {
+      "receipt_sha256": "056fd0c95535d7503299dc246145430fd7e2fa7c4627d9073c5944aa06d6be7e",
+      "receipt": {
+        "actual_wrappers": [
+          "assume",
+          "branches",
+          "summaryInvocation",
+          "summaryBlock",
+          "call",
+          "applied",
+          "checkBody",
+          "validate"
+        ],
+        "limitation": "Exact wrappers and Checker/Store layouts; callback bodies and leaf types controlled. Existing pooled_buffer code instrumented only at acquisition/release; numerical algorithms not executed.",
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0
+          }
+        ],
+        "passed": true
+      }
+    },
+    "non-staging-frame-laws": {
+      "receipt_sha256": "be89220706700ac0abcb86b56b20523f7795fd70d9a99f2a33a6fd22fc912c38",
+      "receipt": {
+        "source": [
+          {
+            "source": "check/capability_lifetimes.goose",
+            "sha256": "df6ee814634cb9e3c9fe815d6e0ae25588e79a5e0d1d4dc58e4bed36bdc130b1",
+            "records": [
+              "ActiveCall",
+              "Scan"
+            ],
+            "functions": [
+              "activeCall",
+              "scopedScan",
+              "publishScan"
+            ]
+          },
+          {
+            "source": "check/usage_check.goose",
+            "sha256": "46c0bd2fd8bab9efdffc8429a97c7147ff2b04a5566cdb61c560f6662ea7b264",
+            "records": [
+              "State",
+              "ExitFrame",
+              "Walker"
+            ],
+            "functions": [
+              "exitFrame",
+              "scopedWalker",
+              "publishWalker"
+            ]
+          },
+          {
+            "source": "check/numeric_proof_core.goose",
+            "sha256": "2367ca71d8a16c8f0f8681948b5aa304b12fab706b50b8a6e10a8369b72577de",
+            "records": [
+              "Loop",
+              "Checker"
+            ],
+            "functions": [
+              "loopFrame",
+              "scopedChecker",
+              "publishChecker"
+            ]
+          },
+          {
+            "source": "eval/implementation_admission.goose",
+            "sha256": "b3ff84f65ee1cbe6c6470791ff744dfc0f6afdb8c091c3eeb8b9415cf6fa3146",
+            "records": [
+              "ProjectionWork",
+              "Declaration"
+            ],
+            "functions": [
+              "projectionWork",
+              "declarationWithWork"
+            ]
+          },
+          {
+            "source": "eval/selected_implementation_admission.goose",
+            "sha256": "4c6e2b359a7b0171e0ef667c7468e79a6244d76ba9bb52230cbbc888b59fb94b",
+            "records": [
+              "Host",
+              "CoreAdmission",
+              "SnapshotAdmission"
+            ],
+            "functions": [
+              "admissionHost",
+              "coreWithHost",
+              "snapshotWithHost"
+            ]
+          }
+        ],
+        "limitations": "Actual changed records and pure factories/publication helpers; reduced leaf dependency types and controlled recursive bodies. This does not execute complete semantic algorithms or qualify whole compiler.",
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.017521704998216592
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.09990769700380042
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.0010532919986872002
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.017058074001397472
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.12233315399498679
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.0009708959987619892
+          }
+        ],
+        "passed": true
+      }
+    },
+    "staging-scoped-view-laws": {
+      "receipt_sha256": "2afb2f8d149440bf0049205b3b65bac710832696573344403b3779066310e757",
+      "receipt": {
+        "passed": true,
+        "production_sha256": "f439dff2c225dfe56ed44b40f5fd889e875cb940b505cfbd27be739cc60dc89c",
+        "fixture_sha256": "8a20725dc3b87620da76d148767f0607466a2452e1d366b5885a9305c3cfdbad",
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.075
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.702
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.049
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.794
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001
+          }
+        ],
+        "coverage": [
+          "exact Named/Effects/TaskCallSite/Locals/Handler record shapes",
+          "all new factory/publication and value-helper definitions instantiated",
+          "nested recursive sequence scopes",
+          "success/error owned state publication",
+          "conditional/match sequential branches",
+          "nonempty outgoing carries use restored parent scope",
+          "partial outgoing declarations survive later error",
+          "live loop and decision flag aliases",
+          "handler removal before completion",
+          "independent callback Effects state is not published",
+          "real row/scope frame cleanup and slot reuse after error",
+          "fuel exhaustion and depth128 bound",
+          "TaskCallSite found/rows publication"
+        ],
+        "limits": [
+          "controlled Module/type-validation leaf schemas; extracted exact staging records, factories, publication and new value helper definitions",
+          "recoverable allocator OOM is not tested"
+        ],
+        "negative_evidence": "negative-evidence.json",
+        "shape_probe": "../staging-scoped-shape-laws/evidence.json",
+        "shape_negative_probe": "../staging-scoped-shape-laws/negative-evidence.json"
+      }
+    },
+    "usage-scratch-laws": {
+      "receipt_sha256": "048f724682a8f6f4b1453738f7d6024f235253f17fb2b6a5dcb6324e3f6697ae",
+      "receipt": {
+        "actual_wrappers": [
+          "block_",
+          "captures",
+          "lambda",
+          "branches",
+          "cases",
+          "loopExpression",
+          "requestCase",
+          "fallbackSuite"
+        ],
+        "actual_body": "block_Value, snapshot, restore, record, scopedWalker, publishWalker; controlled suite exercises nested frames, state joins, exits, errors and budget exhaustion",
+        "limitation": "Full usage algorithms other than block are controlled callbacks; Engine/AST leaves reduced. Pooled buffer code instrumented only for acquisition/release counts.",
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0
+          }
+        ],
+        "passed": true
+      }
+    },
+    "static-empty-laws": {
+      "receipt_sha256": "cb36f41de368ac70bf50e0ea4797797214b650e542ec8ee1ef999c1b9b0588da",
+      "receipt": {
+        "helpers": [
+          [
+            "check/check.goose",
+            "selectedTypeChildren"
+          ],
+          [
+            "check/solver_worklist.goose",
+            "selectedFrontierChildren"
+          ],
+          [
+            "check/check.goose",
+            "selectedArgumentChildren"
+          ],
+          [
+            "check/core_builder.goose",
+            "selectedAccessPath"
+          ],
+          [
+            "eval/lexical_capture_inputs.goose",
+            "selectedCaptureBindings"
+          ],
+          [
+            "eval/core_eval.goose",
+            "selectedClosureRows"
+          ],
+          [
+            "eval/core_eval.goose",
+            "selectedClosureCaptures"
+          ],
+          [
+            "backend/backend_emission.goose",
+            "selectedRemaining"
+          ],
+          [
+            "backend/backend_emission.goose",
+            "selectedRecordDestinations"
+          ],
+          [
+            "reuse/source_value_template.goose",
+            "selectedRecordNames"
+          ],
+          [
+            "reuse/declaration_projection.goose",
+            "selectedOrigins"
+          ],
+          [
+            "reuse/declaration_projection.goose",
+            "selectedSeen"
+          ],
+          [
+            "reuse/dependency_cli.goose",
+            "selectedSetting"
+          ],
+          [
+            "reuse/completion_probe.goose",
+            "selectedCompletionPrefix"
+          ],
+          [
+            "reuse/project.goose",
+            "selectedImportParts"
+          ]
+        ],
+        "identical_type_helpers": [
+          "check/check.goose",
+          "eval/core_eval.goose",
+          "eval/specialization.goose",
+          "reuse/principal_type_graph.goose",
+          "backend/backend_emission.goose"
+        ],
+        "limitation": "Exact helper bodies and actual Node/Tag/List, Workspace/Work and Options/Alias layouts; Engine/Module/Builder leaf schemas reduced. Whole semantic algorithms not qualified.",
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0
+          }
+        ],
+        "passed": true
+      }
+    },
+    "static-empty-laws/final": {
+      "receipt_sha256": "757e1a6f3e3dc5d51848e7e7de63a2976ae87af9a559c93dc70de807fe421dc7",
+      "receipt": {
+        "helpers": [
+          "selectedImportChildren",
+          "selectedOwnerPath",
+          "selectedExpressionContains"
+        ],
+        "actual_support": [
+          "validNominal",
+          "validTypeNominal",
+          "span",
+          "IdentityMetadata",
+          "runtime_identity.Name/View/text/owner",
+          "type_evidence.Node/Tag"
+        ],
+        "limitation": "Import/Core/Evidence records reduced to read fields; no whole admission or cache runtime is executed.",
+        "stages": [
+          {
+            "compiler": "official",
+            "stage": "emit",
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "link",
+            "exit": 0
+          },
+          {
+            "compiler": "official",
+            "stage": "run",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "emit",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "link",
+            "exit": 0
+          },
+          {
+            "compiler": "private",
+            "stage": "run",
+            "exit": 0
+          }
+        ],
+        "passed": true
+      }
+    },
+    "dynamic-local-init": {
+      "receipt_sha256": "834ecf7abe46cec39bbccb476e99c11224eb1575876b547fb3ef8f695d866054",
+      "receipt": {
+        "scope": "explicit empty construction of native dynamic local arrays; mechanical source audit, not full acceptance",
+        "changed": {
+          "compiler-goose/src/backend/optimized_bodies.goose": {
+            "count": 4,
+            "before_sha256": "4b02fd13cba8703ccaf8d5460dcb6c75c8394016d3ab97d1f6a3c3343703ff19",
+            "after_sha256": "ea2aea963895d83958af52a37cd79e9345f81aa1d1bf7766ad55ab37f4b09a07"
+          },
+          "compiler-goose/src/check/check_factory.goose": {
+            "count": 105,
+            "before_sha256": "fae108c534c80b466a02088f9c0291469e4ec1eebb288bfe65e496478349b59a",
+            "after_sha256": "f79dc5744eea2fbb63e63650a361fc28a94204c25c00ac25e81b56a76d98f642"
+          },
+          "compiler-goose/src/check/parallel_lowering.goose": {
+            "count": 1,
+            "before_sha256": "c84cb98a204666d8a112855b713ae03a8949ccd493e61d9b0674ed4d4241c9c6",
+            "after_sha256": "ebc968a2af22d3c47b937c5f1f0afb8606780037b7603d439821c463049e2827"
+          },
+          "compiler-goose/src/check/staging_capture_rights.goose": {
+            "count": 1,
+            "before_sha256": "5f7a4ccb4e6b5d86d371514e62ebebf5993de73c583bedf3cd5cb7e59d089973",
+            "after_sha256": "045801ad0bc9dfe2621943ee6653e0803a62d19be43cb1c66e278d07a53f6f7f"
+          },
+          "compiler-goose/src/check/staging_snapshot.goose": {
+            "count": 8,
+            "before_sha256": "4b35cd5c1c526d50460141e917be75484a39912795a8d0790fee7c3b8efe7db4",
+            "after_sha256": "619969801bb51ccb14449acab1cb5a934343377336e8fea9944869487e7212c9"
+          },
+          "compiler-goose/src/reuse/alias_project_pipeline.goose": {
+            "count": 1,
+            "before_sha256": "671d526f66bb93b10a9bdee8880773f43477c60992950aaa273fe73b5364770c",
+            "after_sha256": "588338b0c1617b5ea36492e4ca51fabed4fada15276db37e787c50e4453fb11b"
+          },
+          "compiler-goose/src/reuse/dependency_consumer.goose": {
+            "count": 7,
+            "before_sha256": "96316b88d0f1a354d6d5da9e5e54d167b7e670f56f433d5f491a5d012ec81af7",
+            "after_sha256": "4b59b5bacedd98bff7880163b569534c4fe4d8902a524a2d41ac6fc4c0ea7129"
+          },
+          "compiler-goose/src/reuse/editor_completion.goose": {
+            "count": 2,
+            "before_sha256": "740d5a388daad369096a2d054b508876f51b064340a3a2ecd4aeb6765428d5b2",
+            "after_sha256": "8cf88c50d659bfdb2ef9b2008422b820cba38f77c850b993fc41a8f4b04d4d38"
+          },
+          "compiler-goose/src/reuse/optimized_archive.goose": {
+            "count": 16,
+            "before_sha256": "4953a381e8a5a9a4ac910cce7f38b854a38b45a1fa959a5545b42ff431d7429a",
+            "after_sha256": "ff546f2f0113c9728b98897d4c5002bba3f1cf2f9b3b6f94c24613c83dc93d9b"
+          },
+          "compiler-goose/src/reuse/partial_dependency.goose": {
+            "count": 11,
+            "before_sha256": "d46709c5057a37ebcb6c56dfe5c1aefacc45c74a272dacd5074844bdffe23b2c",
+            "after_sha256": "33408cb77be962edb7bc8db08aa0b10954981afd2c20f12076fd198ef738615c"
+          },
+          "compiler-goose/src/reuse/principal_archive.goose": {
+            "count": 2,
+            "before_sha256": "3189310ad57b988e317bef046e942a770ba0fb5a882ae5aa92fa6880f2b50b21",
+            "after_sha256": "6b6b122180208a18967abaa185949881be7b919697af3d9e9d3e8e9adb45d666"
+          },
+          "compiler-goose/src/reuse/revision_inputs.goose": {
+            "count": 10,
+            "before_sha256": "5df4b5abc14ff96d83916aa5a8b5ca7eb9d275a34e904ea4698434edd9b8e1ec",
+            "after_sha256": "e085e8f6bad834ec809f8b3afd6b4d8a7df07e11f38d30145c5206f8026162e1"
+          },
+          "compiler-goose/src/reuse/semantic_archive.goose": {
+            "count": 5,
+            "before_sha256": "1d013b5686eeab281dcab0e91c45b86f6ed8397aaa36829583905ee036498a2c",
+            "after_sha256": "4d74370033e72c2e5a38922c251643009b3cf8092c4f7e96e537cbe3705b0618"
+          },
+          "compiler-goose/src/reuse/source_overlays.goose": {
+            "count": 1,
+            "before_sha256": "8b36a6a186694873b273fa9093c9c90ce44e285e9bbd396e5c76862c239d8b06",
+            "after_sha256": "0b9f4e779667475fa00d48eaf11e780f3bce9a16be59b4403cfa26fbd06b2ed0"
+          },
+          "compiler-goose/src/check/check.goose": {
+            "count": 25,
+            "before_sha256": "ef6fb3f167b1a7e06339000021ae971796e1af33873f664069288544fb7603f9",
+            "after_sha256": "ff6cdf3a45f4b07d79da938dae4765be97eff0913f6cdef75097b0f9d27cba7e"
+          },
+          "compiler-goose/src/reuse/completion_probe.goose": {
+            "count": 3,
+            "before_sha256": "069b89058fb485be053172a1460fa646c0c4403b8a546bcd9f774f699fa50e03",
+            "after_sha256": "8629bbf69ba7caf1741e01094abf50fcdecabff3fb524c696f60d1112624e441"
+          }
+        },
+        "deferred": [],
+        "expressions_preserved": "only ; becomes =[]; at the same declaration; no element construction or allocation added",
+        "normalization": "empty native dynamic-array initializers only; all202 original local declarations initialized"
+      }
+    },
+    "dictionary-init": {
+      "receipt_sha256": "ff6be9483dae14dcbdcde4f91393342038cb3075a7ea2b4a6f29aba27f0be87c",
+      "receipt": {
+        "scope": "explicit empty native dictionary constructors; source transformation only, full acceptance pending",
+        "declarations": 73,
+        "files": {
+          "compiler-goose/src/backend/layout.goose": {
+            "count": 3,
+            "before_sha256": "001207e08b4a244a067f9d0ca8551fd556b0223d9a538a368eb983a1df047905",
+            "after_sha256": "72fbce620aeb6c8b98da059442c34e05685d21ecb710024bd7b2b803e7c92c20"
+          },
+          "compiler-goose/src/backend/host_cleanup_shapes.goose": {
+            "count": 1,
+            "before_sha256": "e95a20d83c9cecacc37e801d1a539a873904acb4654e47f80b825bfd35fd3555",
+            "after_sha256": "e436e9fa57977a6f5159e01c11fcdf742761f3ae09ffc6948f5290d29a06fe98"
+          },
+          "compiler-goose/src/backend/backend_plan.goose": {
+            "count": 1,
+            "before_sha256": "fb217510462b648a2e8637286661dbddaa605450824e85423effab37d325c580",
+            "after_sha256": "ce28c8227d6022113a3dd3bd5d46eb1500e7733bfb90b4379b82d0771d27db2d"
+          },
+          "compiler-goose/src/backend/unit_index.goose": {
+            "count": 2,
+            "before_sha256": "744ef8d55cdf3029ba182d6cb4d9ff75ecf02cfbfc0b0c76ce45c88a9b821777",
+            "after_sha256": "b03cad3e69fe0d241caa47229341ca5d0172bf1b76539d07e664c6a43f209fac"
+          },
+          "compiler-goose/src/check/staging_capture_rights.goose": {
+            "count": 1,
+            "before_sha256": "045801ad0bc9dfe2621943ee6653e0803a62d19be43cb1c66e278d07a53f6f7f",
+            "after_sha256": "5a33e424b0e8e301e7475fae48bb96d9ba9da3b38f4ab2194bef040b2faabe3b"
+          },
+          "compiler-goose/src/check/check.goose": {
+            "count": 7,
+            "before_sha256": "ff6cdf3a45f4b07d79da938dae4765be97eff0913f6cdef75097b0f9d27cba7e",
+            "after_sha256": "f26d19c827cdc7c0ed803958d9e4497502f89239352240f456bdfbbc08746b91"
+          },
+          "compiler-goose/src/check/check_factory.goose": {
+            "count": 39,
+            "before_sha256": "f79dc5744eea2fbb63e63650a361fc28a94204c25c00ac25e81b56a76d98f642",
+            "after_sha256": "d1833e028e3f9aa6ac6794eab9ca62ac58b60ae864b1106284f8c13e644f9d13"
+          },
+          "compiler-goose/src/eval/implementation_patterns.goose": {
+            "count": 1,
+            "before_sha256": "abc4781d14d8326cd1319a5f4df44af156d8a91a3e40e8706fa9fe33d25d4677",
+            "after_sha256": "7c31a52c7b86cc2b9b377cec9f930e195d33f7bc5ada526e13e65bd6bbd8220f"
+          },
+          "compiler-goose/src/eval/given_equations.goose": {
+            "count": 2,
+            "before_sha256": "f83b0293ff52a4bbaab3e16cbd48450eb0b146d14fac31dcde8427176fd3948e",
+            "after_sha256": "be9bb9fa2aec1e67c77289151d147990b10737357eb013427672c2224c5086ea"
+          },
+          "compiler-goose/src/eval/implementation_evidence.goose": {
+            "count": 1,
+            "before_sha256": "9f06d47838db0a7d2effb020da36a77a5d8226d87c0cacb0305b5dd4b16aea93",
+            "after_sha256": "c9994cc8e44fd3d092ace5ece7a77cfb2dd0a4725b7a411637b21c885f163a52"
+          },
+          "compiler-goose/src/eval/core_eval.goose": {
+            "count": 1,
+            "before_sha256": "2b1521b9ecd7ffcde6a54dadab68f9597fb5f8bcc0c9e9d666f2d480183d45c2",
+            "after_sha256": "3652faef75ac43ef138d378ad4dfb75f7592a45b81e5b4a3fcbb9041fcec2045"
+          },
+          "compiler-goose/src/eval/canonical_specialization.goose": {
+            "count": 2,
+            "before_sha256": "d1d676d2cf2d08f5db2a43b470ae0189096b270bd8e7ec53ca84385d094140e4",
+            "after_sha256": "aecea68619a58226dcf6c6fa35c5387f1cd177e2d3872368fc62cdd8ae935de2"
+          },
+          "compiler-goose/src/eval/selected_implementation_admission.goose": {
+            "count": 5,
+            "before_sha256": "4c6e2b359a7b0171e0ef667c7468e79a6244d76ba9bb52230cbbc888b59fb94b",
+            "after_sha256": "2702c8f39ce11872925035f4dea770e7c69c4ef6dd55c9782c4c7778053ef82a"
+          },
+          "compiler-goose/src/reuse/artifact_import.goose": {
+            "count": 1,
+            "before_sha256": "9cab5cc1b2b5aa556fc13c0a3e16d677d4fc00c634421f87bcb676e09099123b",
+            "after_sha256": "af21bf81d58996b07d629c75cc694e140912c2f35f1da24c501aec852e097187"
+          },
+          "compiler-goose/src/reuse/module_visibility.goose": {
+            "count": 2,
+            "before_sha256": "7885a387aebdcb077c0a775c5bc3762ba8eb933b059700a1a8d6516edb053819",
+            "after_sha256": "135168844c220ed9429d646c67f95a09087a7fae7fef08cfc805e057c7299161"
+          },
+          "compiler-goose/src/reuse/module_abstraction_validation.goose": {
+            "count": 1,
+            "before_sha256": "9231e2396c110109d4fb9a799a4f984699d616ae61ced416fe00ecfad3226ac0",
+            "after_sha256": "b020266cf4b3f80d8f0b9abab4786f94664b6ef9d1f74787cc8ef201230df931"
+          },
+          "compiler-goose/src/reuse/project.goose": {
+            "count": 1,
+            "before_sha256": "126cc9bccde90133f30463252ff9732ad220c04bc04bf88f722fb40ddf01c499",
+            "after_sha256": "4b517778295c67f90819746993d6b782950f98b85176519145c85cc1a7daa0cd"
+          },
+          "compiler-goose/src/reuse/dependency_closure.goose": {
+            "count": 2,
+            "before_sha256": "31fe53e5ed37ce79643c7e205233e79679e418c840b16930844be6f3e6774363",
+            "after_sha256": "9c31901614b939998a9cd3c97e91a56587cf93fddd1c6315971019b7846056b0"
+          }
+        }
+      }
+    }
+  },
+  "experiments": {
+    "query-visited-experiment": {
+      "decision": "rejected by first-pair improvement threshold",
+      "source_sha256": "b3d082b37847e4a74cb155a3b1d24b1be1735a7f910a33421be4cc21489ef50c",
+      "binaries": {
+        "baseline": {
+          "path": "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+          "sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7"
+        },
+        "candidate": {
+          "path": "/home/jacobt/src/blot2/build/goose-port/query-visited-experiment/compiler-flat32/goose",
+          "sha256": "b06e44be3b2bf5e2f46bb3b4e687d579da827157fa3c254447dfbabbebc8c167"
+        }
+      },
+      "paired_gains": [
+        0.013989675070603114
+      ],
+      "runs": [
+        {
+          "label": "baseline",
+          "first_diagnostic_seconds": 71.73814587800007,
+          "natural_exit_code": null,
+          "forced_exit_code": -15,
+          "stop_reason": "first diagnostic"
+        },
+        {
+          "label": "candidate",
+          "first_diagnostic_seconds": 70.73455252699932,
+          "natural_exit_code": null,
+          "forced_exit_code": -15,
+          "stop_reason": "first diagnostic"
+        }
+      ],
+      "scope": "first diagnostic latency on one frozen failing prefix; not completed compiler timing"
+    },
+    "query-bulk-experiment": {
+      "decision": "rejected by first-pair improvement threshold",
+      "source_sha256": "34552df56f4fc04a27803981f9e39a65e55f394b6ce85163c5714dccbeb9a37e",
+      "binaries": {
+        "baseline": {
+          "path": "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+          "sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7"
+        },
+        "candidate": {
+          "path": "/home/jacobt/src/blot2/build/goose-port/query-bulk-experiment/compiler-bulk/goose",
+          "sha256": "1ccaf55df7b63cacee580ece0035ff23f027ef7470996005de2e9fa75dca7f7f"
+        }
+      },
+      "paired_gains": [
+        0.004765498814036984
+      ],
+      "runs": [
+        {
+          "label": "candidate",
+          "first_diagnostic_seconds": 83.87172133399872,
+          "natural_exit_code": null,
+          "forced_exit_code": -15,
+          "stop_reason": "first diagnostic"
+        },
+        {
+          "label": "baseline",
+          "first_diagnostic_seconds": 84.27332576800109,
+          "natural_exit_code": null,
+          "forced_exit_code": -15,
+          "stop_reason": "first diagnostic"
+        }
+      ],
+      "scope": "first diagnostic latency on one frozen failing prefix; not completed compiler timing"
+    }
+  },
+  "limits": [
+    "Component receipts pin their individual sources and disclose reduced adapters; they do not jointly qualify a later compiler source tree.",
+    "Raw local paths describe evidence capture and are not portable build prerequisites.",
+    "No whole Goose compiler C/header/executable has been produced.",
+    "Full Zig gate execution and whole Goose compiler, CLI, Wasm, worker and Gdev qualification remain pending."
+  ],
+  "source_only_manifest": {
+    "path": "compiler-goose/build/source-identity.json",
+    "digest": "4b7d8907b0b0d82c67afc8be2bc77496e149539aec47ade2859c7baea279a689",
+    "qualification": "source-only identity; tools not selected, whole build pending",
+    "captured_inputs": 441,
+    "capture": "frozen188"
+  },
+  "later_attempts": {
+    "186": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-186-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 107.002,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-186.log",
+      "capture_seconds": 0.2908,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-186-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-186-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "187": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-187-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-stable-goose/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 120.334,
+      "stop_reason": null,
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-187.log",
+      "capture_seconds": 0.242,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-187-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-187-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    }
+  },
+  "sparse_profile_187": {
+    "binary_sha256": "f2119f1a944b73c4eb13522b3c5f1447534c1b7e67db110a171ebc8feeaa79d7",
+    "scope": "11 interrupt samples over first55s; not phase totals or successful check",
+    "samples": [
+      {
+        "time": 4.88,
+        "top": [
+          "#0  0x00007ffff76bee6f in free () from /usr/lib/libc.so.6",
+          "#1  0x0000555555663b6e in goose::StableCanContainGraph::IdentityVisit(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&) ()",
+          "#2  0x0000555555663c5e in goose::StableCanContainGraph::IdentityVisit(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&) ()",
+          "#3  0x0000555555662cdc in goose::StableCanContainGraph::Identity(goose::TypeExpr*) ()"
+        ]
+      },
+      {
+        "time": 9.88,
+        "top": [
+          "#0  0x0000555555661fbb in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()",
+          "#1  0x00005555556623cd in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()",
+          "#2  0x00005555556623cd in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()",
+          "#3  0x000055555566231c in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()"
+        ]
+      },
+      {
+        "time": 14.9,
+        "top": [
+          "#0  0x00005555556850c7 in goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool)::{lambda(goose::VarDef*, int)#1}::operator()(goose::VarDef*, int) const ()",
+          "#1  0x0000555555684cde in goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool) ()",
+          "#2  0x0000555555681c35 in goose::TypeCheck::ShrinkTargets(goose::Roots const&, goose::TypeExpr*, bool, bool) ()",
+          "#3  0x00005555559f4ef0 in goose::TypeCheck::ApplyCalleeStores(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*, std::vector<int, std::allocator<int> >*)::{lambda(goose::StoreEvent const&, goose::Roots const&, bool)#1}::operator()(goose::StoreEvent const&, goose::Roots const&, bool) const ()"
+        ]
+      },
+      {
+        "time": 19.86,
+        "top": [
+          "#0  0x0000555555684cec in goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool) ()",
+          "#1  0x0000555555681c35 in goose::TypeCheck::ShrinkTargets(goose::Roots const&, goose::TypeExpr*, bool, bool) ()",
+          "#2  0x00005555559f4ef0 in goose::TypeCheck::ApplyCalleeStores(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*, std::vector<int, std::allocator<int> >*)::{lambda(goose::StoreEvent const&, goose::Roots const&, bool)#1}::operator()(goose::StoreEvent const&, goose::Roots const&, bool) const ()",
+          "#3  0x00005555559ee3b6 in goose::TypeCheck::ApplyCalleeStores(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*, std::vector<int, std::allocator<int> >*) ()"
+        ]
+      },
+      {
+        "time": 24.87,
+        "top": [
+          "#0  0x0000555555661fbb in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()",
+          "#1  0x00005555556851e1 in goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool)::{lambda(goose::VarDef*, int)#1}::operator()(goose::VarDef*, int) const ()",
+          "#2  0x0000555555684cde in goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool) ()",
+          "#3  0x0000555555681c35 in goose::TypeCheck::ShrinkTargets(goose::Roots const&, goose::TypeExpr*, bool, bool) ()"
+        ]
+      },
+      {
+        "time": 29.88,
+        "top": [
+          "#0  0x0000555555685a45 in goose::StableTypeGraph::Visit(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&) ()",
+          "#1  0x0000555555685d7e in goose::StableTypeGraph::Visit(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&)::{lambda(std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> > const&)#1}::operator()(std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> > const&) const ()",
+          "#2  0x0000555555685c16 in goose::StableTypeGraph::Visit(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&) ()",
+          "#3  0x0000555555685ced in goose::StableTypeGraph::Visit(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&) ()"
+        ]
+      },
+      {
+        "time": 34.96,
+        "top": [
+          "#0  0x0000555555662a9e in goose::StableCanContainGraph::Ready(goose::TypeExpr*) ()",
+          "#1  0x0000555555662071 in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()",
+          "#2  0x00005555556623cd in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()",
+          "#3  0x000055555566231c in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()"
+        ]
+      },
+      {
+        "time": 39.9,
+        "top": [
+          "#0  0x0000555555685e1b in goose::TypeCheck::ReachedThroughRefs(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&) ()",
+          "#1  0x000055555568574e in bool goose::TypeCheck::StableTypeQuery<goose::TypeCheck::ReachesThroughRefs(goose::TypeExpr*, goose::TypeExpr*)::{lambda()#1}>(goose::flat_map<std::pair<goose::TypeExpr*, goose::TypeExpr*>, bool>&, goose::TypeExpr*, goose::TypeExpr*, goose::TypeCheck::ReachesThroughRefs(goose::TypeExpr*, goose::TypeExpr*)::{lambda()#1}) ()",
+          "#2  0x0000555555685458 in goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool)::{lambda(goose::VarDef*, int)#1}::operator()(goose::VarDef*, int) const ()",
+          "#3  0x0000555555684c11 in goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool) ()"
+        ]
+      },
+      {
+        "time": 44.86,
+        "top": [
+          "#0  0x0000555555662135 in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()",
+          "#1  0x00005555556623cd in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()",
+          "#2  0x000055555566231c in goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*) ()",
+          "#3  0x00005555556851e1 in goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool)::{lambda(goose::VarDef*, int)#1}::operator()(goose::VarDef*, int) const ()"
+        ]
+      },
+      {
+        "time": 49.87,
+        "top": [
+          "#0  0x00007ffff7abaa40 in operator new(unsigned long) () from /usr/lib/libstdc++.so.6",
+          "#1  0x0000555555a3c100 in goose::TypeCheck::CheckFor(goose::ForLoop*) ()",
+          "#2  0x00005555555bd932 in goose::ForLoop::Check(goose::TypeCheck&, goose::TypeExpr*) ()",
+          "#3  0x000055555566ee80 in goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*) ()"
+        ]
+      },
+      {
+        "time": 54.88,
+        "top": [
+          "#0  0x0000555555662c21 in goose::StableCanContainGraph::Identity(goose::TypeExpr*) ()",
+          "#1  0x0000555555663313 in goose::StableCanContainGraph::Visit(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&) ()",
+          "#2  0x000055555566362e in goose::StableCanContainGraph::Visit(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&)::{lambda(std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> > const&)#1}::operator()(std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> > const&) const ()",
+          "#3  0x0000555555663549 in goose::StableCanContainGraph::Visit(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&) ()"
+        ]
+      }
+    ]
+  },
+  "partial_instrumented_counts": {
+    "source": "GDB memory reads, no inferior calls",
+    "elapsed_seconds": 39.88600051600224,
+    "completions": 115594353,
+    "totals": {
+      "identity": {
+        "calls": 94000526,
+        "cache_hits": 73672559,
+        "successes": 10781,
+        "failures": 20317186,
+        "visits": 49816591,
+        "comparisons": 35468525,
+        "seen_sum": 48059088,
+        "seen_max": 6,
+        "successful_visits": 17112,
+        "failed_visits": 49799479,
+        "successful_comparisons": 4362,
+        "failed_comparisons": 35464163,
+        "update_in_progress": false,
+        "seen_histogram": [
+          0,
+          6895,
+          20053287,
+          267785,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "contexts": [
+          1276674,
+          20324364,
+          72399488
+        ],
+        "failure_contexts": [
+          33,
+          13180041,
+          7137112
+        ],
+        "failure_edges": [
+          1,
+          20138685,
+          178500,
+          0,
+          0,
+          0
+        ],
+        "rejections": [
+          {
+            "failure": "missing_instance",
+            "kind": "struct",
+            "count": 19543722
+          },
+          {
+            "failure": "missing_instance",
+            "kind": "enum",
+            "count": 773464
+          }
+        ]
+      },
+      "ready": {
+        "calls": 21593827,
+        "cache_hits": 1269463,
+        "successes": 7211,
+        "failures": 20317153,
+        "visits": 92723852,
+        "comparisons": 212569144,
+        "seen_sum": 39810594,
+        "seen_max": 174,
+        "successful_visits": 62100,
+        "failed_visits": 92661752,
+        "successful_comparisons": 619895,
+        "failed_comparisons": 211949249,
+        "update_in_progress": false,
+        "seen_histogram": [
+          13180041,
+          592094,
+          2402900,
+          2512184,
+          1160778,
+          476126,
+          200,
+          36,
+          5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "contexts": [
+          21593827,
+          0,
+          0
+        ],
+        "failure_contexts": [
+          20317153,
+          0,
+          0
+        ],
+        "failure_edges": [
+          0,
+          20138653,
+          178500,
+          0,
+          0,
+          0
+        ],
+        "rejections": [
+          {
+            "failure": "missing_instance",
+            "kind": "struct",
+            "count": 19543697
+          },
+          {
+            "failure": "missing_instance",
+            "kind": "enum",
+            "count": 773456
+          }
+        ]
+      }
+    },
+    "omitted_root_proofs": 0,
+    "binary_sha256": "e2f9133c190ad9d998d6acbb0133cdd72c4d31e2007b217e7a93f19a00966763",
+    "scope": "O1 instrumented f211, frozen187, timed GDB memory snapshot; unfinished check, timing incomparable to O3",
+    "raw_receipt_sha256": "bd91dec34ea4d39b0c3d1c1ea8fe67623423ab154af728e6bd40ea1eb76fc7e3"
+  }
+}
