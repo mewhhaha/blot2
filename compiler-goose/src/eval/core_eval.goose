@@ -317,7 +317,7 @@ fn init(t: SessionTables,units: const Module[:],storage: blot_eval_eval_values::
  for i in 0..binding_count { t.slots.push(Slot {}); }
  var families: dictionary<u64,bool>; var firsts: FirstFamily[>..]=[];
  for module,index in units { var unit_id=module.unit; if unit_id==0 { unit_id=(index+1) as u32; }
-  for nominal,nominal_index in module.nominals { if nominal.identity.decl==0 { continue; } var owner=nominal.identity.unit; if owner==0 { owner=unit_id; } let family=(owner as u64)<<32|nominal.identity.decl; if families.contains(family) { continue; } families.insert(family,true); firsts.push(FirstFamily {index,nominal_index,family}); }
+  for nominal,nominal_index in module.nominals { if nominal.identity.decl==0 { continue; } var owner=nominal.identity.unit; if owner==0 { owner=unit_id; } let family=(owner as u64)<<32|nominal.identity.decl; if ::contains(families,family) { continue; } ::insert(families,family,true); firsts.push(FirstFamily {index,nominal_index,family}); }
  }
  for first in firsts { let module=units[first.module]; let nominal=module.nominals[first.nominal];
   for constructor_index in module.extra[nominal.constructors.start..nominal.constructors.start+nominal.constructors.len] { let constructor=module.constructor(constructor_index); if constructor.payload==0 { continue; } let payload=module.types.node(constructor.payload); if payload.tag!=blot_check_types::Tag.record { continue; }

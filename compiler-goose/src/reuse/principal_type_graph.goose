@@ -52,13 +52,13 @@ fn matches(source: const Store&, principal: Id, caller: const Store&, actual: Id
         if item.depth >= max_depth { return false, blot_error::Error.none; }
         let original = source.head(item.pair.principal, 0); let live = caller.head(item.pair.actual, 0);
         let key = Pair { original, live, item.pair.ambient , ..};
-        if seen.contains(key) { continue; }
-        if seen.count >= max_nodes { return false, blot_error::Error.none; } seen.insert(key, true);
+        if ::contains(seen,key) { continue; }
+        if seen.count >= max_nodes { return false, blot_error::Error.none; } ::insert(seen,key, true);
         let from = source.node(original); let to = caller.node(live);
         if from.tag == blot_check_types::Tag.variable {
             if to.tag != blot_check_types::Tag.variable || exact_binders && original != live { return false, blot_error::Error.none; }
-            { let optional_source_25 .= variables.get(from.a); if optional_source_25 { let known = optional_source_25; if known != live { return false, blot_error::Error.none; }  }
-            else { variables.insert(from.a, live); } }
+            { let optional_source_25 .= ::get(variables,from.a); if optional_source_25 { let known = optional_source_25; if known != live { return false, blot_error::Error.none; }  }
+            else { ::insert(variables,from.a, live); } }
             continue;
         }
         if from.tag != to.tag { return false, blot_error::Error.none; }
@@ -102,8 +102,8 @@ fn matches(source: const Store&, principal: Id, caller: const Store&, actual: Id
                     variable variable => {
                         var row = MatchedRow { cursor: after.cursor , ..};
                         match after.tail { variable value => { row.variable = blot_support::some(value.value); }, _ => {} }
-                        { let optional_source_24 .= rows.get(variable.value); if optional_source_24 { let known = optional_source_24; if known != row { return false, blot_error::Error.none; }  }
-                        else { rows.insert(variable.value, row); } }
+                        { let optional_source_24 .= ::get(rows,variable.value); if optional_source_24 { let known = optional_source_24; if known != row { return false, blot_error::Error.none; }  }
+                        else { ::insert(rows,variable.value, row); } }
                     },
                     _ => {},
                 }

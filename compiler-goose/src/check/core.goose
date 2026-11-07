@@ -349,6 +349,7 @@ struct Types {
     quantifier_goals: const blot_check_types::QuantifierGoals[:] = default<const blot_check_types::QuantifierGoals[:]>(),
     quantifier_obligations: const blot_check_types::Obligation[:] = default<const blot_check_types::Obligation[:]>()
 }
+fn emptyTypes()->Types {return Types{nodes:default<const blot_check_types::Node[:]>(),extra:default<const blot_check_types::Id[:]>(), ..};}
 struct Module {
     owner_id: u64 = 0,
     has_rank_contracts: bool = false,

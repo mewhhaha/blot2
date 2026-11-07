@@ -27,7 +27,7 @@ fn get<T>(receiver:Reader&,value:T[:]& ) {if !receiver.enter() {return;}let leng
 fn get<T>(receiver:Reader&,value:(const T[:])&) {var run:T[:]=default<T[:]>();get(receiver,run);value=run;}
 fn put<T>(receiver:Writer&,value:blot_support::Option<T>) {put(receiver,value.present);if value.present {put(receiver,value.value);}}
 fn get<T>(receiver:Reader&,value:blot_support::Option<T>&) {get(receiver,value.present);if receiver.failure!=blot_error::Error.none {return;}if value.present {get(receiver,value.value);}}
-fn put<T>(receiver:Writer&,value:T?) {put(receiver,value!=null);if value {let item:T=value;put(receiver,item);}}
+fn putOptional<T>(receiver:Writer&,value:T?) {put(receiver,value!=null);if value {let item:T=value;put(receiver,item);}}
 fn readOptional<T>(receiver:Reader&,witness:T)->T? {var present=false;get(receiver,present);if receiver.failure!=blot_error::Error.none||!present {return null;}let run,error=allocate(receiver.owner,1,default<T>());if error!=blot_error::Error.none {receiver.failure=error;return null;}get(receiver,run[0]);if receiver.failure!=blot_error::Error.none {return null;}return run[0];}
 fn put<K,V>(receiver:Writer&,value:dictionary_slot<K,V>) {put(receiver,value.tag);if value.tag!=0 {put(receiver,value.key);put(receiver,value.val);}}
 fn get<K,V>(receiver:Reader&,value:dictionary_slot<K,V>&) {get(receiver,value.tag);if value.tag!=0 {get(receiver,value.key);get(receiver,value.val);}}

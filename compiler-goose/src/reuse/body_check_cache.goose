@@ -16,7 +16,6 @@ import reuse.dependency_payload;
 import support.error;
 import support.option;
 import support.native;
-import support.pooled_map;
 import support.pooled_buffer;
 import support.blake3;
 import .body_check_digests;
@@ -119,14 +118,15 @@ fn loopIndex(owner:const Loops&)->i64 {assert(owner.live && owner.slot!=0);let i
 struct Lease {owner:Chunk& =inactive_chunk,index:i64=0}
 fn body(self_:Lease)->const Body& {assert(self_.owner.live && self_.index>=0 && self_.index<self_.owner.bodies.len);return self_.owner.bodies[self_.index];}
 struct LeaseBuffer {storage:Lease[:]=default<Lease[:]>(),items:Lease[:]=default<Lease[:]>(),len:i64=0}
-type NameMap=blot_support_pooled_map::Map<const u8[:],i64>;
+struct NameSlot {body:i64=0,tag:u32=0}
+struct NameMap {count:i64=0,slots:NameSlot[:]=default<NameSlot[:]>()}
 struct CacheState {minimum_nodes:i64=64,bodies:LeaseBuffer=LeaseBuffer{..},index:NameMap=NameMap{..},generation:u64=0,live:bool=false,canonical:Cache=Cache{..}}
 struct InactiveCache {minimum_nodes:i64=64,bodies:LeaseBuffer=LeaseBuffer{..},index:NameMap=NameMap{..}}
 var inactive_cache:InactiveCache=InactiveCache{..};
 struct Cache {minimum_nodes:i64& =inactive_cache.minimum_nodes,bodies:LeaseBuffer& =inactive_cache.bodies,index:NameMap& =inactive_cache.index,lease:u32=0,generation:u64=0}
 reusable var cache_states:CacheState[>..]=[];
 reusable[] var lease_runs:Lease[>..]=[];
-reusable[] var name_slots:dictionary_slot<const u8[:],i64>[>..]=[];
+reusable[] var name_slots:NameSlot[>..]=[];
 fn valid(self_:const Cache&)->bool {return self_.lease!=0 && self_.lease-1<cache_states.len && cache_states[self_.lease-1].live && cache_states[self_.lease-1].generation==self_.generation;}
 fn initPooled()->Cache,Error {
  if cache_states.len>=0xffffffff {return Cache{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=cache_states.alloc_index(CacheState{generation:generation,live:true, ..});let state:CacheState& =cache_states[at];
@@ -134,22 +134,45 @@ fn initPooled()->Cache,Error {
 }
 fn init()->Cache,Error {return initPooled();}
 fn initPooledRef()->Cache?,Error {let result,error=initPooled();if error!=blot_error::Error.none {return null,error;}return cache_states[result.lease-1].canonical,blot_error::Error.none;}
-fn find(self_:const Cache&,name:const u8[:])->const Body? {if self_.lease==0 {return null;}assert(valid(self_));let index .= blot_support_pooled_map::get(self_.index,name);if !index {return null;}return self_.bodies.items[index].body();}
+fn find(self_:const Cache&,name:const u8[:])->const Body? {if self_.lease==0 {return null;}assert(valid(self_));let slot=probeName(self_,name);if slot<0 {return null;}return self_.bodies.items[self_.index.slots[slot].body].body();}
 fn activate(self_:Cache&)->Error {if self_.lease!=0 {assert(valid(self_));return blot_error::Error.none;}let value,error=initPooled();if error!=blot_error::Error.none {return error;}self_=value;return blot_error::Error.none;}
+fn setBodyLength(self_:Cache&,length:i64) {let storage=lease_runs.realloc_slice(self_.bodies.storage,self_.bodies.storage.len);self_.bodies.storage=storage;self_.bodies.items=storage[..length];self_.bodies.len=length;}
+fn removeBody(self_:Cache&,index:i64) {let length=self_.bodies.len-1;let storage=lease_runs.realloc_slice(self_.bodies.storage,self_.bodies.storage.len);storage[index]=storage[length];self_.bodies.storage=storage;self_.bodies.items=storage[..length];self_.bodies.len=length;}
 fn retain(self_:Cache&,body:const Body&)->Error {
  let opened=self_.activate();if opened!=blot_error::Error.none {return opened;}assert(body.owner.live);var index:i64=-1;for &candidate,at in body.owner.bodies {if candidate .== body {index=at;break;}}
  if index<0 {return blot_error::Error.dependency_limit;}let error=blot_support_pooled_buffer::ensure(self_.bodies,self_.bodies.len+1,lease_runs);if error!=blot_error::Error.none {return error;}
- reserveNames(self_.index,self_.index.count+1);let at=self_.bodies.len;self_.bodies.storage[at]=Lease{body.owner,index, ..};self_.bodies.items=self_.bodies.storage[..at+1];self_.bodies.len=at+1;blot_support_pooled_map::insert<NameMap,const u8[:],i64>(self_.index,body.name,at,name_slots);let owner_at=chunkIndex(body.owner);assert(owner_at>=0);chunks[owner_at].references+=1;return blot_error::Error.none;
+ reserveNames(self_,self_.index.count+1);let owner_at=chunkIndex(body.owner);assert(owner_at>=0);let at=self_.bodies.len;self_.bodies.storage[at]=Lease{chunks[owner_at],index, ..};setBodyLength(self_,at+1);insertName(self_,at);chunks[owner_at].references+=1;return blot_error::Error.none;
 }
-fn reserveNames(map:NameMap&,needed:i64) {var capacity=max(8,map.slots.len);while needed*3>capacity*2 {capacity*=2;}if capacity!=map.slots.len {blot_support_pooled_map::grow(map,capacity,name_slots);}}
+// Compaction repairs a moved slot after truncation; its old lease remains in storage.
+fn nameAt(self_:const Cache&,body:i64)->const u8[:] {assert(body>=0 && body<self_.bodies.storage.len);return self_.bodies.storage[body].body().name;}
+fn probeName(self_:const Cache&,name:const u8[:])->i64 {
+ if self_.index.count==0 {return -1;}let hash=::hash(name);let tag=(hash as! u32)|2147483648;let mask=self_.index.slots.len-1;var index=(hash&(mask as u64)) as i64;
+ loop {let slot=self_.index.slots[index];if slot.tag==tag && nameAt(self_,slot.body)==name {return index;}if slot.tag==0 {return -1;}index=(index+1)&mask;}
+}
+fn reserveNames(self_:Cache&,needed:i64) {
+ var capacity=max(8,self_.index.slots.len);while needed*3>capacity*2 {capacity*=2;}if capacity==self_.index.slots.len {return;}
+ // Keep the old run until every scalar slot has been rehashed.
+ let old=self_.index.slots;let slots=name_slots.alloc_slice(capacity);for &slot in slots {slot=NameSlot{..};}let mask=capacity-1;
+ for slot in old {if slot.tag==0 {continue;}let name=nameAt(self_,slot.body);var index=(::hash(name)&(mask as u64)) as i64;while slots[index].tag!=0 {index=(index+1)&mask;}slots[index]=slot;}
+ self_.index.slots=slots;if old.len!=0 {name_slots.free_slice(old);}
+}
+fn insertName(self_:Cache&,body:i64) {
+ reserveNames(self_,self_.index.count+1);let name=nameAt(self_,body);let hash=::hash(name);let tag=(hash as! u32)|2147483648;let mask=self_.index.slots.len-1;var index=(hash&(mask as u64)) as i64;
+ loop {let slot=self_.index.slots[index];if slot.tag==0 {self_.index.slots[index]=NameSlot{body,tag};self_.index.count+=1;return;}if slot.tag==tag && nameAt(self_,slot.body)==name {self_.index.slots[index]=NameSlot{body,tag};return;}index=(index+1)&mask;}
+}
+fn removeName(self_:Cache&,name:const u8[:])->bool {
+ var hole=probeName(self_,name);if hole<0 {return false;}let mask=self_.index.slots.len-1;var index=hole;
+ loop {index=(index+1)&mask;let slot=self_.index.slots[index];if slot.tag==0 {break;}let key=nameAt(self_,slot.body);let home=(::hash(key)&(mask as u64)) as i64;if ((index-home)&mask)>=((index-hole)&mask) {self_.index.slots[hole]=slot;hole=index;}}
+ self_.index.slots[hole]=NameSlot{..};self_.index.count-=1;return true;
+}
 fn deinit(self_:Cache&) {
- if self_.lease==0 {return;}assert(valid(self_));blot_support_pooled_map::deinit(self_.index,name_slots);for lease in self_.bodies.items {lease.owner.release();}blot_support_pooled_buffer::deinit(self_.bodies,lease_runs);let at=self_.lease-1;cache_states[at].live=false;self_=Cache{..};cache_states.free(at);
+ if self_.lease==0 {return;}assert(valid(self_));if self_.index.slots.len!=0 {name_slots.free_slice(self_.index.slots);}self_.index=NameMap{..};for lease in self_.bodies.items {lease.owner.release();}blot_support_pooled_buffer::deinit(self_.bodies,lease_runs);let at=self_.lease-1;cache_states[at].live=false;self_=Cache{..};cache_states.free(at);
 }
 struct LiveBytes {bytes:i64=0,types:i64=0}
 fn compact(self_:Cache&)->Error {
  let opened=self_.activate();if opened!=blot_error::Error.none {return opened;}var live=dictionary<u64,LiveBytes>{};for lease in self_.bodies.items {let body=lease.body();let slot=chunkIndex(body.owner) as u64;let current .= live.get(slot);var entry=LiveBytes{..};if current {entry=current;}entry.bytes+=body.bytes();entry.types+=body.type_work;live.insert(slot,entry);}
  var index:i64=0;while index<self_.bodies.len {let body=self_.bodies.items[index].body();let slot=chunkIndex(body.owner) as u64;let active .= live.get(slot);assert(active!=null);if active.bytes>=(body.owner.body_bytes+1)/2 && active.types>=(body.owner.type_work+1)/2 {index+=1;continue;}
- blot_support_pooled_map::remove(self_.index,body.name);let length=self_.bodies.len-1;self_.bodies.storage[index]=self_.bodies.storage[length];self_.bodies.items=self_.bodies.storage[..length];self_.bodies.len=length;if index<length {blot_support_pooled_map::insert<NameMap,const u8[:],i64>(self_.index,self_.bodies.items[index].body().name,index,name_slots);}body.owner.release();}return blot_error::Error.none;
+ removeName(self_,body.name);removeBody(self_,index);if index<self_.bodies.len {insertName(self_,index);}body.owner.release();}return blot_error::Error.none;
 }
 struct Payload {bytes:i64=0,graph_nodes:i64=0,chunks:i64=0}
 fn payload(self_:const Cache&)->Payload,Error {

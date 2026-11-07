@@ -27,8 +27,8 @@ type Import = blot_check_check_scheme_import::Copier;
 struct SourceFailure { unit: u32, span: blot_check_core::Span }
 // Admission-local identity for immutable source headers, never a mutable-view certificate.
 struct Body { module_owner: u64, unit: u32, binding: u32 }
-struct SourceRows { module_owner: u64, rows: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
-struct SourceDefinitions { module_owner: u64, values: const u32[:], lease: blot_check_scheme_dependencies::LeaseRef }
+struct SourceRows { module_owner: u64, lease: blot_check_scheme_dependencies::LeaseRef }
+struct SourceDefinitions { module_owner: u64, lease: blot_check_scheme_dependencies::LeaseRef }
 struct AdmissionTables { bodies: BodyBuffer=BodyBuffer{..}, body_index: BodyMap=BodyMap{..}, source_rows: SourceRowsBuffer=SourceRowsBuffer{..}, source_definitions: SourceDefinitionsBuffer=SourceDefinitionsBuffer{..} }
 struct Admission {
     workspace: Workspace? = null, remaining: i64&, units: u64[128] = [0;128], count: i64 = 0, source_bodies: bool = false,
@@ -98,7 +98,7 @@ struct Solver {
     shared_authority: blot_support::Option<SharedAuthority>   = blot_support::none<SharedAuthority>(), shared_goals: GoalMap=GoalMap{..}, shared_goal_hits: i64 = 0,
 }
 fn init(store: blot_check_types::Store, module: const Module&, views: Views&, remaining: i64&, tables: SolverTables) -> Solver, Error {
-    var result = Solver { store: store, graph: blot_check_core::Types { nodes: [], extra: [] , ..}, rigid_type_overflow: tables.rigid_type_overflow, rigid_rows: tables.rigid_rows, remaining: remaining, shared_goals: tables.shared_goals , ..};
+    var result = Solver { store: store, graph: blot_check_core::emptyTypes(), rigid_type_overflow: tables.rigid_type_overflow, rigid_rows: tables.rigid_rows, remaining: remaining, shared_goals: tables.shared_goals , ..};
     let error = initialize(result, module, views); if error != blot_error::Error.none { deinit(result); return result, error; } return result, blot_error::Error.none;
 }
 fn initialize(self_: Solver&, module: const Module&, views: Views&) -> Error {
@@ -176,10 +176,10 @@ fn bounds(module: const Module&, context: blot_check_frozen_core_validation::Con
 }
 recursive fn withSolver<C,F>(module:const Module&,views:Views&,remaining:i64&,context:C&)->Error {let initialized,error=blot_check_types::initPooled();if error!=blot_error::Error.none {return error;}var solver,error=init(initialized,module,views,remaining,SolverTables{..});if error!=blot_error::Error.none {return error;}let failure=F(context,solver);deinit(solver);return failure;}
 fn saveSourceRows(self_: Admission&, module: const Module&, rows: const u32[:]) -> Error {
-    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != blot_error::Error.none { return error; } self_.source_rows.push(SourceRows { module.owner_id, copied, lease , ..});if self_.source_rows.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_rows.failure;}return blot_error::Error.none;
+    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != blot_error::Error.none { return error; } self_.source_rows.push(SourceRows { module.owner_id, lease , ..});if self_.source_rows.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_rows.failure;}return blot_error::Error.none;
 }
 fn saveSourceDefinitions(self_: Admission&, module: const Module&, values: const u32[:]) -> Error {
-    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(values); if error != blot_error::Error.none { return error; } self_.source_definitions.push(SourceDefinitions { module.owner_id, copied, lease , ..});if self_.source_definitions.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_definitions.failure;}return blot_error::Error.none;
+    let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(values); if error != blot_error::Error.none { return error; } self_.source_definitions.push(SourceDefinitions { module.owner_id, lease , ..});if self_.source_definitions.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_definitions.failure;}return blot_error::Error.none;
 }
 
 struct BodyBuffer {storage:Body[:]=default<Body[:]>(),items:Body[:]=default<Body[:]>(),len:i64=0,failure:Error=blot_error::Error.none}

@@ -94,7 +94,7 @@ fn initPooledRef()->Cache?,Error {let cache,error=initPooled();if error!=blot_er
 fn deinit(self_:Cache&) {if self_.lease==0 {return;}assert(valid(self_));self_.recipes.release();self_.keys.release();self_.declined_limits.release();let at=self_.lease-1;cache_slots[at].state.live=false;self_=Cache {};cache_slots.free(at);}
 fn build(visits: u32[>..<]&,module: const Module&,key: Key,limit: i64) -> bool,Error {
  var items: u32[>..<]=[]; var work=Pending {items,limit}; var seen: dictionary<u32,bool> =dictionary<u32,bool> {}; let error=append(work,key.body); if error!=blot_error::Error.none { return false,error; } var captures=false;
- loop { let id,present=pop(work); if !present { break; } if id==0||seen.contains(id) { continue; } if visits.len==limit { return false,blot_error::Error.plan_limit; } seen.insert(id,true); visits.push(id); let tag=module.node(id).tag;
+ loop { let id,present=pop(work); if !present { break; } if id==0||::contains(seen,id) { continue; } if visits.len==limit { return false,blot_error::Error.plan_limit; } ::insert(seen,id,true); visits.push(id); let tag=module.node(id).tag;
   if tag==blot_check_core::Tag.closure&&module.closures[module.node(id).a].captures.len!=0 { captures=true; } if tag==blot_check_core::Tag.invalid { break; }
   let err=appendChildren(work,module,id,key.callables); if err!=blot_error::Error.none { return false,err; }
  } return captures,blot_error::Error.none;

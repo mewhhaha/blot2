@@ -2937,6 +2937,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::Stor
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::StorageChildren) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::TargetKey)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::TargetKey) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::TargetSpan)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::TargetSpan) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::Targets)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_package_core::Targets) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_package_core::UsageFacts)->bool {return equalFields(left,right);}
@@ -4927,6 +4929,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_body_check_cache::MemoOwner) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::Merge)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_body_check_cache::Merge) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::NameMap)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_body_check_cache::NameMap) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::NameSlot)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_body_check_cache::NameSlot) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::Payload)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_body_check_cache::Payload) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::Predicate)->bool {return equalFields(left,right);}

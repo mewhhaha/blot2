@@ -543,8 +543,26 @@ fn principalState<P>(self_: const P&) -> PrincipalState {
         projection_depth: self_.projection_depth,
     };
 }
+// Publish owned witnesses without extending any borrowed root lifetime.
+fn publishPrincipalState<P>(self_:P&,state:PrincipalState) {
+    self_.formals=state.formals;
+    self_.formal_count=state.formal_count;
+    self_.instance=state.instance;
+    self_.witnesses=state.witnesses;
+    self_.row_witnesses=state.row_witnesses;
+    self_.secondary=state.secondary;
+    self_.secondary_witnesses=state.secondary_witnesses;
+    self_.pending=state.pending;
+    self_.pending_count=state.pending_count;
+    self_.foreign_views=state.foreign_views;
+    self_.left_rows=state.left_rows;
+    self_.instance_rows=state.instance_rows;
+    self_.scheme_row_witnesses=state.scheme_row_witnesses;
+    self_.row_search_depth=state.row_search_depth;
+    self_.projection_depth=state.projection_depth;
+}
 // Construct a proof from explicit live roots and owned state.
-fn principalFromState(left:const blot_check_core::Types&,right:const blot_check_core::Types&,remaining:i64&,views:Context?,state:PrincipalState,projection_resolver:PrincipalProjectionResolver?=null)->Principal {
+fn principalFromState(left:const blot_check_core::Types&,right:const blot_check_core::Types&,remaining:i64&,views:Context?,state:PrincipalState,projection_resolver:PrincipalProjectionResolver?=null,certificate_pairs:CertificatePairs?=null,version_pairs:const VersionPair[:]=default<const VersionPair[:]>())->Principal {
     return Principal {
         left:left, right:right, remaining:remaining,
         formals:state.formals,
@@ -564,8 +582,14 @@ fn principalFromState(left:const blot_check_core::Types&,right:const blot_check_
         row_search_depth:state.row_search_depth,
         projection_resolver:projection_resolver,
         projection_depth:state.projection_depth,
+        certificate_pairs:certificate_pairs,
+        version_pairs:version_pairs,
         ..
     };
+}
+// Clone owned state while retaining the exact live proof roots.
+fn clonePrincipal(proof:const Principal&)->Principal {
+    return principalFromState(proof.left,proof.right,proof.remaining,proof.views,principalState(proof),proof.projection_resolver,proof.certificate_pairs,proof.version_pairs);
 }
 fn sameTypes(left: const blot_check_core::Types&, right: const blot_check_core::Types&) -> bool { return left.owner_id != 0 && left.owner_id == right.owner_id; }
 fn certificateRow(self_: Principal&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error { return certificateRowMode(self_.left, self_.right, self_.remaining, self_.certificate_pairs, left, right); }

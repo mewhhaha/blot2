@@ -15,6 +15,7 @@ struct Resolver {
     module: const blot_check_core::Module&, producer: const blot_check_core::Module&, binding: blot_check_core::BindingId,
     applied: const blot_check_package_contracts::Principal? = null,
 }
+fn init(module:const blot_check_core::Module&,producer:const blot_check_core::Module&,binding:blot_check_core::BindingId,applied:const blot_check_package_contracts::Principal?=null)->Resolver {return Resolver{module:module,producer:producer,binding:binding,applied:applied};}
 fn resolver(self_: Resolver&) -> Resolver& { return self_; }
 fn charge(remaining: i64&) -> Error { if remaining == 0 { return blot_error::Error.invalid_artifact; } remaining -= 1; return blot_error::Error.none; }
 type Types = blot_check_core::Types;

@@ -48,5 +48,5 @@ for body,index in source.bodies {let copied,error=clonePacketBody(body,value);if
 fn restorePacketIndex(cache:Cache&,slots:const dictionary_slot<const u8[:],i64>[:],count:i64)->Error {
  if count<0||count>slots.len {return blot_error::Error.invalid_artifact;}if slots.len!=0&&(slots.len&(slots.len-1))!=0 {return blot_error::Error.invalid_artifact;}var occupied:i64=0;
  for slot in slots {if slot.tag==0 {continue;}occupied++;if slot.val<0||slot.val>=cache.bodies.len||slot.key!=cache.bodies.items[slot.val].body().name {return blot_error::Error.invalid_artifact;}}if occupied!=count {return blot_error::Error.invalid_artifact;}
- blot_support_pooled_map::deinit(cache.index,name_slots);let owned=name_slots.alloc_slice(slots.len);for slot,index in slots {owned[index]=slot;if slot.tag!=0 {owned[index].key=cache.bodies.items[slot.val].body().name;}}cache.index.slots=owned;cache.index.count=count;return blot_error::Error.none;
+ if cache.index.slots.len!=0 {name_slots.free_slice(cache.index.slots);}cache.index=NameMap{..};let owned=name_slots.alloc_slice(slots.len);for slot,index in slots {owned[index]=NameSlot{..};if slot.tag!=0 {owned[index]=NameSlot{slot.val,slot.tag};}}cache.index.slots=owned;cache.index.count=count;return blot_error::Error.none;
 }

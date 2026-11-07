@@ -356,9 +356,9 @@ fn viewsEscape(self_: Recorder&, session: const Session&, result: u32) -> bool, 
     }
     while pending.len != 0 {
         let id = pending[pending.len - 1]; pending.resize(pending.len - 1);
-        if seen.contains(id) { continue; }
+        if ::contains(seen,id) { continue; }
         { let optional_source_45 .= self_.view_inputs.get(id); if optional_source_45 { let complete .= optional_source_45; if !complete { return true, blot_error::Error.none; }  } }
-        if seen.count >= 65536 { return true, blot_error::Error.none; } seen.insert(id, true);
+        if seen.count >= 65536 { return true, blot_error::Error.none; } ::insert(seen,id, true);
         let info = session.valueInfo(id);
         if info.kind == blot_eval_eval_values::ValueKind.array || info.kind == blot_eval_eval_values::ValueKind.list {
             { let optional_source_44 .= session.storage.collection_buffers.buffers.get(Span { info.start, info.len , ..}); if optional_source_44 { let buffer = optional_source_44;
@@ -376,7 +376,7 @@ fn viewsEscape(self_: Recorder&, session: const Session&, result: u32) -> bool, 
     var count: i64 = 0; let length = self_.events.len;
     for index in length {
         let event = self_.events.items[index]; var keep = true;
-        match event { view view => { keep = seen.contains(view.value.value); }, _ => {} }
+        match event { view view => { keep = ::contains(seen,view.value.value); }, _ => {} }
         if keep { self_.events.items[count] = event; count++; }
     }
     self_.events.resize(count); return false, blot_error::Error.none;

@@ -184,7 +184,7 @@ fn addStartupSelections(generator: blot_backend_core_backend::Generator&,target:
     let facts,error = generator.evaluator.startupDependencies(target); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return generator.evaluationFailure(); }
     recursive fn cleanup_continuation_1() -> Error {
  if !facts.complete { confirmed = false; }
-    for method in facts.selected { selections.push(blot_backend_startup_graph::Selection { target,method , ..}); let prepared = generator.evaluator.prepare(method); if prepared != blot_error::Error.none { if prepared == blot_error::Error.out_of_memory { return prepared; } return generator.evaluationFailure(); } } processed.insert(target,true); return blot_error::Error.none;
+    for method in facts.selected { selections.push(blot_backend_startup_graph::Selection { target,method , ..}); let prepared = generator.evaluator.prepare(method); if prepared != blot_error::Error.none { if prepared == blot_error::Error.out_of_memory { return prepared; } return generator.evaluationFailure(); } } ::insert(processed,target,true); return blot_error::Error.none;
 
     }
     let cleanup_result_1_0 = cleanup_continuation_1();
@@ -216,7 +216,7 @@ fn planRuntime(state: State&,generator: blot_backend_core_backend::Generator&,en
         }
          if reachable.const_only.present { let __cleanup_result_14_0: Error = generator.fail(reachable.const_only.value.unit,reachable.const_only.value.node,blot_check_diagnostic_code::Code.backend_const_only); { reachable.deinit(); } { declarations.deinit(); } return __cleanup_result_14_0; }
         var changed = false;
-        for node,index in declarations.nodes { if !reachable.reached[index] || !node.runtime || node.is_function || processed.contains(node.target) { continue; } let selected = addStartupSelections(generator,node.target,processed,selections,confirmed); if selected != blot_error::Error.none { let __cleanup_result_15_0: Error = selected; { reachable.deinit(); } { declarations.deinit(); } return __cleanup_result_15_0; } changed = true; }
+        for node,index in declarations.nodes { if !reachable.reached[index] || !node.runtime || node.is_function || ::contains(processed,node.target) { continue; } let selected = addStartupSelections(generator,node.target,processed,selections,confirmed); if selected != blot_error::Error.none { let __cleanup_result_15_0: Error = selected; { reachable.deinit(); } { declarations.deinit(); } return __cleanup_result_15_0; } changed = true; }
         if changed { { reachable.deinit(); } { declarations.deinit(); } continue; }
         var initializer_roots: bool[>..<] = []; for node,index in declarations.nodes { initializer_roots.push(reachable.reached[index] && node.runtime && !node.is_function); }
         let coverage,coverage_error = blot_backend_startup_runtime_reach::collect(generator.units,declarations,generator.evaluator,initializer_roots,entry); if coverage_error != blot_error::Error.none { if coverage_error == blot_error::Error.out_of_memory { let __cleanup_result_17_0: Error = coverage_error; { reachable.deinit(); } { declarations.deinit(); } return __cleanup_result_17_0; } let __cleanup_result_18_0: Error = blot_error::Error.invalid_function_reference; { reachable.deinit(); } { declarations.deinit(); } return __cleanup_result_18_0; }

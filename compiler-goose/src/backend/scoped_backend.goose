@@ -85,7 +85,7 @@ fn required(units: const blot_check_core::Module[:], entry: u32) -> bool, blot_e
         let current = pending.pop(); if current.id == 0 { continue; }
         if current.unit == 0 || current.unit > units.len || seen.count >= 100000 { return true, blot_error::Error.none; }
         let source .= units[current.unit - 1]; if current.id >= source.nodes.len { return true, blot_error::Error.none; }
-        let key = (current.unit as u64 << 32) | current.id; if seen.contains(key) { continue; } seen.insert(key, true);
+        let key = (current.unit as u64 << 32) | current.id; if ::contains(seen,key) { continue; } ::insert(seen,key, true);
         let node = source.node(current.id); if node.tag == blot_check_core::Tag.storage { return true, blot_error::Error.none; }
         if node.tag == blot_check_core::Tag.update { for selector in source.updateSelectors(current.id) { if selectorIsIndex(selector) { return true, blot_error::Error.none; } } }
         let ty = source.types.node(node.ty); if ty.tag == blot_check_types::Tag.nominal && blot_check_storage_types::identity(ty.a, ty.b).present { return true, blot_error::Error.none; }

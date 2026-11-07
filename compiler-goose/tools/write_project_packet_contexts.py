@@ -34,11 +34,15 @@ C+=['fn put(self:Writer&,value:blot_parse_ast::Tree) {put(self,value.lease!=0);i
 C+=['fn get(self:Reader&,value:blot_parse_ast::Tree&) {var present=false;get(self,present);if self.failure!=Error.none||!present {value=blot_parse_ast::Tree{..};return;}var staging=false;var proofs=false;get(self,staging);get(self,proofs);'+''.join('var '+f+':'+t+'=[];get(self,'+f+');' for f,t in fs)+'''if self.failure!=Error.none {return;}if nodes.len!=spans.len {self.failure=Error.invalid_artifact;return;}for root in roots {if root>=nodes.len {self.failure=Error.invalid_artifact;return;}}let tree,error=blot_parse_ast::initPooled();if error!=Error.none {self.failure=error;return;}value=tree;value.nodes.clear();value.spans.clear();value.has_typed_staging=staging;value.has_numeric_proofs=proofs;'''+''.join('value.'+f+'.append('+f+');' for f,t in fs)+'self.failure=value.failure();if self.failure!=Error.none {value.deinit();}}']
 for t,skip in [('blot_reuse_body_check_cache::Body',{'owner'}),('blot_reuse_body_check_cache::Chunk',{'references','graph_owner','live','slot'})]:
  fs=D[t][2]
- C+=['fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}'+''.join('put(self,value.'+f+');' for f,ty in fs if f not in skip)+'self.depth--;}']
+ C+=['fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}'+''.join(('putOptional' if ty.endswith('?') else 'put')+'(self,value.'+f+');' for f,ty in fs if f not in skip)+'self.depth--;}']
  C+=['fn get(self:Reader&,value:'+t+'&) {if !self.enter() {return;}value='+t+'{..};'+''.join('value.'+f+' .= readOptional(self,default<'+q(ty[:-1],D[t][3])+'>());' if ty.endswith('?') else 'get(self,value.'+f+');' for f,ty in fs if f not in skip)+'self.depth--;}']
-C+=['''fn put(self:Writer&,value:blot_reuse_body_check_cache::Cache) {
+C+=['''fn putNameSlots(self:Writer&,value:blot_reuse_body_check_cache::Cache) {
+ if !self.enter() {return;}count(self,value.index.slots.len);
+ for slot in value.index.slots {var wire=default<dictionary_slot<const u8[:],i64>>();wire.tag=slot.tag;if slot.tag!=0 {wire.key=blot_reuse_body_check_cache::nameAt(value,slot.body);wire.val=slot.body;}put(self,wire);}self.depth--;
+}
+fn put(self:Writer&,value:blot_reuse_body_check_cache::Cache) {
  put(self,value.minimum_nodes);var owners:u32[>..<]=[];for lease in value.bodies.items {let index=blot_reuse_body_check_cache::chunkIndex(lease.owner);assert(index>=0);var found=false;for prior in owners {if prior==index {found=true;break;}}if !found {owners.push(index as u32);}}
- count(self,owners.len);for index in owners {put(self,blot_reuse_body_check_cache::chunks[index]);}count(self,value.bodies.len);for lease in value.bodies.items {let index=blot_reuse_body_check_cache::chunkIndex(lease.owner);var ordinal:i64=-1;for owner,position in owners {if owner==index {ordinal=position;break;}}assert(ordinal>=0);put(self,ordinal);put(self,lease.index);}put(self,value.index.slots);put(self,value.index.count);
+ count(self,owners.len);for index in owners {put(self,blot_reuse_body_check_cache::chunks[index]);}count(self,value.bodies.len);for lease in value.bodies.items {let index=blot_reuse_body_check_cache::chunkIndex(lease.owner);var ordinal:i64=-1;for owner,position in owners {if owner==index {ordinal=position;break;}}assert(ordinal>=0);put(self,ordinal);put(self,lease.index);}putNameSlots(self,value);put(self,value.index.count);
 }
 fn get(self:Reader&,value:blot_reuse_body_check_cache::Cache&) {
  var minimum:i64=0;get(self,minimum);let chunk_count=count(self);if self.failure!=Error.none {return;}var chunks:(blot_reuse_body_check_cache::Chunk?)[>..<]=[];
@@ -81,6 +85,6 @@ B+=['value.nominals=cloneIdentityReads(source.nominals);','value.field_names=clo
 B+=['''fn restorePacketIndex(cache:Cache&,slots:const dictionary_slot<const u8[:],i64>[:],count:i64)->Error {
  if count<0||count>slots.len {return Error.invalid_artifact;}if slots.len!=0&&(slots.len&(slots.len-1))!=0 {return Error.invalid_artifact;}var occupied:i64=0;
  for slot in slots {if slot.tag==0 {continue;}occupied++;if slot.val<0||slot.val>=cache.bodies.len||slot.key!=cache.bodies.items[slot.val].body().name {return Error.invalid_artifact;}}if occupied!=count {return Error.invalid_artifact;}
- blot_support_pooled_map::deinit(cache.index,name_slots);let owned=name_slots.alloc_slice(slots.len);for slot,index in slots {owned[index]=slot;if slot.tag!=0 {owned[index].key=cache.bodies.items[slot.val].body().name;}}cache.index.slots=owned;cache.index.count=count;return Error.none;
+ if cache.index.slots.len!=0 {name_slots.free_slice(cache.index.slots);}cache.index=NameMap{..};let owned=name_slots.alloc_slice(slots.len);for slot,index in slots {owned[index]=NameSlot{..};if slot.tag!=0 {owned[index]=NameSlot{slot.val,slot.tag};}}cache.index.slots=owned;cache.index.count=count;return Error.none;
 }''']
 (R/'reuse/body_check_packet.goose').write_text(finish_syntax(normalize('\n'.join(B)+'\n',types)))

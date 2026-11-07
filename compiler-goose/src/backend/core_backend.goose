@@ -778,7 +778,7 @@ fn function(generator: Generator&, key: Key) -> u32, blot_error::Error {
 
 fn lookupValue<K,V>(map: const dictionary<K,V>&, key: K) -> blot_support::Option<V> { let value = map.get(key); if value { return blot_support::some(value); } return blot_support::none<V>(); }
 fn captureTemplate(generator: Generator&, template: blot_backend_backend_emission::Template) -> u32, blot_error::Error {
-    let retained = CapturedTemplate { unit: template.unit, node: template.node, captures: template.captures, templates: template.templates, staged: template.staged, has_environment: template.environment.present, scalar_environment: template.scalar_environment, computation: template.computation, evidence: template.evidence, rows: template.rows, callable_instances: template.callable_instances , ..};
+    let retained = CapturedTemplate { scalar_environment: template.scalar_environment, callable_instances: template.callable_instances, staged: template.staged, unit: template.unit, node: template.node, captures: template.captures, templates: template.templates, has_environment: template.environment.present, computation: template.computation, evidence: template.evidence, rows: template.rows, .. };
     block { let existing = generator.planning.template_instances.get(retained); if existing { return existing, blot_error::Error.none; } }
     if generator.planning.template_catalog.len >= 4294967295 { return 0, blot_error::Error.module_too_large; }
     let id = (generator.planning.template_catalog.len + 1) as u32; let pushed=generator.planning.template_catalog.push(retained);if pushed!=blot_error::Error.none {return 0,pushed;} generator.planning.template_instances.insert(retained, id); return id, blot_error::Error.none;

@@ -24,6 +24,13 @@ fn copySnapshot(source: const u32[:]) -> const u32[:], LeaseRef, blot_error::Err
     let index = lease_meta.alloc_index(LeaseMeta { start, values.len, generation, true , ..});
     return values, LeaseRef { (index + 1) as u32, generation , ..}, blot_error::Error.none;
 }
+fn snapshot(ref: LeaseRef) -> const u32[:], blot_error::Error {
+    if ref.index == 0 { return default<const u32[:]>(), blot_error::Error.none; }
+    if ref.index > lease_meta.len { return default<const u32[:]>(), blot_error::Error.invalid_artifact; }
+    let meta = lease_meta[ref.index - 1];
+    if !meta.live || meta.generation != ref.generation { return default<const u32[:]>(), blot_error::Error.invalid_artifact; }
+    return snapshot_values[meta.start..meta.start + meta.len], blot_error::Error.none;
+}
 fn releaseSnapshot(ref: LeaseRef) -> blot_error::Error {
     if ref.index == 0 { return blot_error::Error.none; }
     if ref.index > lease_meta.len { return blot_error::Error.invalid_artifact; }
