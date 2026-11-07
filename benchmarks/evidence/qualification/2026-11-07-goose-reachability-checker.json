@@ -987,6 +987,434 @@
           }
         ]
       }
+    },
+    "mapping-slice-laws": {
+      "evidence.json": {
+        "coverage": "Exact Mapping/RowMapping, buffers, pooled facade schemas, all six mappingItems overloads. Const/mutable and sub/empty slices, native growable arrays, pooled headers, generic dispatch, exact nonempty slice identities, mutation visibility, unchanged pooled status. Escape negative control.",
+        "source_sha256": "e5cc15d9b4431e59b98310f68b829e8f1404902354320dfa9d3d1aa3e8c7b63e",
+        "runs": [
+          {
+            "compiler": "official",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.01806573700014269,
+            "stdout": "parsed ok: 161 top-level declarations, 4 file(s)\ntypechecked ok: 81 specialization(s), 8 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 14/15 index and 20/20 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/mapping-slice-laws/official.c (115373 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.10488222000276437,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0007336350026889704,
+            "stdout": "mapping slice adapter laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "escape_rejected",
+            "exit": 1,
+            "seconds": 0.007790210998791736,
+            "stdout": "parsed ok: 159 top-level declarations, 4 file(s)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/mapping-slice-laws/escape.goose:20: error: returning a reference rooted in local, which dies with this function (\u00a79.2)\nfn escaped()->const Mapping[:] {var local=[Mapping{variable:1,evidence:2}];return mappingItems(local[..]);}\n  in fn escaped() instantiated from /home/jacobt/src/blot2/build/goose-port/mapping-slice-laws/escape.goose:21\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/mapping-slice-laws/escape.goose:21\n"
+          },
+          {
+            "compiler": "identity",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.014414956000109669,
+            "stdout": "parsed ok: 161 top-level declarations, 4 file(s)\ntypechecked ok: 81 specialization(s), 8 struct/1 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 14/15 index and 20/20 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/mapping-slice-laws/identity.c (115373 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.08715787099936279,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0007890499982750043,
+            "stdout": "mapping slice adapter laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "escape_rejected",
+            "exit": 1,
+            "seconds": 0.012819563002267387,
+            "stdout": "parsed ok: 159 top-level declarations, 4 file(s)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/mapping-slice-laws/escape.goose:20: error: returning a reference rooted in local, which dies with this function (\u00a79.2)\nfn escaped()->const Mapping[:] {var local=[Mapping{variable:1,evidence:2}];return mappingItems(local[..]);}\n  in fn escaped() instantiated from /home/jacobt/src/blot2/build/goose-port/mapping-slice-laws/escape.goose:21\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/mapping-slice-laws/escape.goose:21\n"
+          }
+        ]
+      }
+    },
+    "list-static-chunk-laws": {
+      "source-audit.json": {
+        "production_sha256": "a3e8c9bc36205d5019a7d2806e78ab5598c72056c453f3aa569e8759f4916dee",
+        "method_sha256": "cfa477e201d753c6c313d493f3dcfe55c314fa33b9b19aff38edbab49303abad",
+        "constants_sha256": "f4206e9cc3058f1f5d7049f80ec59f3a4b997bb0e43814f863ab58918d378eed",
+        "layout_declarations": [
+          "ArenaHeader_bytes",
+          "ListBranch_capacity",
+          "ListBranch_height",
+          "ListBranch_left",
+          "ListBranch_length",
+          "ListBranch_owner_token",
+          "ListBranch_right",
+          "ListDescriptor_bytes",
+          "ListDescriptor_cached_base",
+          "ListDescriptor_cached_leaf",
+          "ListDescriptor_directory",
+          "ListDescriptor_immutable",
+          "ListDescriptor_leaf_limit",
+          "ListDescriptor_length",
+          "ListDescriptor_root",
+          "ListDescriptor_scalar_elements",
+          "ListNode_bytes"
+        ],
+        "capacity": 244,
+        "valid_lengths": 244,
+        "cases": 732,
+        "exact_extracted_method": true,
+        "exact_extracted_constant_block": true,
+        "layout_values_source_sha256": "b96b35e0630f038a21c5cedb643129a2015ccf05a31ef50e0ca04e9c2ac6e846",
+        "limitation": "Module.ensureArena/dataWords leaf adapters record calls and copy received words; real arena/backend storage implementation not exercised."
+      },
+      "evidence.json": {
+        "passed": true,
+        "source_audit": {
+          "production_sha256": "a3e8c9bc36205d5019a7d2806e78ab5598c72056c453f3aa569e8759f4916dee",
+          "method_sha256": "cfa477e201d753c6c313d493f3dcfe55c314fa33b9b19aff38edbab49303abad",
+          "constants_sha256": "f4206e9cc3058f1f5d7049f80ec59f3a4b997bb0e43814f863ab58918d378eed",
+          "layout_declarations": [
+            "ArenaHeader_bytes",
+            "ListBranch_capacity",
+            "ListBranch_height",
+            "ListBranch_left",
+            "ListBranch_length",
+            "ListBranch_owner_token",
+            "ListBranch_right",
+            "ListDescriptor_bytes",
+            "ListDescriptor_cached_base",
+            "ListDescriptor_cached_leaf",
+            "ListDescriptor_directory",
+            "ListDescriptor_immutable",
+            "ListDescriptor_leaf_limit",
+            "ListDescriptor_length",
+            "ListDescriptor_root",
+            "ListDescriptor_scalar_elements",
+            "ListNode_bytes"
+          ],
+          "capacity": 244,
+          "valid_lengths": 244,
+          "cases": 732,
+          "exact_extracted_method": true,
+          "exact_extracted_constant_block": true,
+          "layout_values_source_sha256": "b96b35e0630f038a21c5cedb643129a2015ccf05a31ef50e0ca04e9c2ac6e846",
+          "limitation": "Module.ensureArena/dataWords leaf adapters record calls and copy received words; real arena/backend storage implementation not exercised."
+        },
+        "stages": [
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.007,
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.553,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/official.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.007,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.007,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/private.c",
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.518,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/private.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/private-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.006,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/list-static-chunk-laws/private-test"
+            ]
+          }
+        ]
+      }
+    },
+    "intern-normalization-laws": {
+      "evidence.json": {
+        "coverage": "Old intern/internWithEffects/internFields extracted with recursion annotations for reference; new exact split. Exact Word/Byte buffer schemas/push/deinit, fingerprint/tag encoding, real wyhash and pool helpers. Lower interning is a controlled ordered/deduplicating trace plus injected error at each selected call, not complete Store validation.",
+        "normalization_body_byte_identical": true,
+        "runs": [
+          {
+            "compiler": "official",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.026855600000999402,
+            "stdout": "parsed ok: 248 top-level declarations, 10 file(s)\ntypechecked ok: 162 specialization(s), 16 struct/5 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 11 folded, 4 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 43/87 index and 10/19 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/official.c (241130 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/candidate.goose:40: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/baseline.goose:40: warning: redundant `as u32`: ordinal is already u32\n"
+          },
+          {
+            "compiler": "official",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.14151336600480136,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.007747379000647925,
+            "stdout": "finite intern normalization differential laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.04958304100000532,
+            "stdout": "parsed ok: 248 top-level declarations, 10 file(s)\ntypechecked ok: 162 specialization(s), 16 struct/5 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 11 folded, 4 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 43/87 index and 10/19 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/identity.c (241130 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/candidate.goose:40: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/intern-normalization-laws/src/baseline.goose:40: warning: redundant `as u32`: ordinal is already u32\n"
+          },
+          {
+            "compiler": "identity",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.108839533997525,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.004835183004615828,
+            "stdout": "finite intern normalization differential laws passed\n",
+            "stderr": ""
+          }
+        ]
+      }
+    },
+    "native-array-clone-repairs": {
+      "evidence.json": {
+        "scope": "13 confirmed native-array append repairs, exact RHS and evaluation points retained",
+        "files": {
+          "check/capability_contracts.goose": {
+            "before_sha256": "a5e89a9cd23ef71fc72d447187daaff4247c671a0794104f40777f47f183b1e0",
+            "after_sha256": "0ba15a2f496c51c8b5a07faaab5adeab18344993100cbf3dd633876048280dc6",
+            "replacements": {
+              "nodes += self_.nodes": "nodes.append(self_.nodes)",
+              "words += self_.words": "words.append(self_.words)",
+              "destination.nodes += self_.nodes": "destination.nodes.append(self_.nodes)",
+              "destination.words += self_.words": "destination.words.append(self_.words)",
+              "destination.bindings += self_.bindings": "destination.bindings.append(self_.bindings)"
+            }
+          },
+          "check/numeric_proof_bodies.goose": {
+            "before_sha256": "b5d793b001052a36107a9505cc0c7ccef45afdb07ce2a9996625182ec11ca88d",
+            "after_sha256": "9fe3eebb48cc757191c65fd22dd63054d820d85efe96e31844d010b8bef8cadb",
+            "replacements": {
+              "self_.introductions += value": "self_.introductions.push(value)",
+              "self_.parameters += value": "self_.parameters.push(value)",
+              "self_.uses += value": "self_.uses.push(value)",
+              "destination.debits += self_.debits[..]": "destination.debits.append(self_.debits[..])",
+              "destination.operands += self_.values.terms[..]": "destination.operands.append(self_.values.terms[..])",
+              "destination.introductions += self_.introductions[..]": "destination.introductions.append(self_.introductions[..])",
+              "destination.parameters += self_.parameters[..]": "destination.parameters.append(self_.parameters[..])",
+              "destination.uses += self_.uses[..]": "destination.uses.append(self_.uses[..])"
+            }
+          }
+        },
+        "whole_compiler_qualification": false
+      }
+    },
+    "native-array-audit": {
+      "scope": "all remaining += sites, native-array field schemas/params/local declarations and slice operands",
+      "result": "no additional definite native-array sites after 13-site follow-on batch",
+      "validation": "read-only source audit; not complete typechecking or runtime qualification"
+    },
+    "evidence-seen-laws": {
+      "evidence.json": {
+        "coverage": "Exact current walk/walkRow/binderList/body/closed and related control helpers, exact Node/Tag/View/ScopeFrame schemas. Effect view reduced, projection validate controlled (not exercised). Empty and nonempty seen, nested quantifiers and row formals, exact fuel, length/fuel rejection.",
+        "runs": [
+          {
+            "compiler": "official",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.05124681400047848,
+            "stdout": "parsed ok: 169 top-level declarations, 6 file(s)\ntypechecked ok: 104 specialization(s), 12 struct/4 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 25/53 index and 18/26 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/evidence-seen-laws/official.c (195857 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.1251115779959946,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0011845289991470054,
+            "stdout": "actual mutable seen validators passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "emit",
+            "exit": 0,
+            "seconds": 0.02911112800211413,
+            "stdout": "parsed ok: 169 top-level declarations, 6 file(s)\ntypechecked ok: 104 specialization(s), 12 struct/4 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 25/53 index and 18/26 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/evidence-seen-laws/identity.c (195857 bytes)\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "link",
+            "exit": 0,
+            "seconds": 0.13047683399781818,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "phase": "run",
+            "exit": 0,
+            "seconds": 0.0007704020026721992,
+            "stdout": "actual mutable seen validators passed\n",
+            "stderr": ""
+          }
+        ]
+      },
+      "control-evidence.json": [
+        {
+          "compiler": "official",
+          "name": "literal",
+          "exit": 1,
+          "stdout": "parsed ok: 169 top-level declarations, 6 file(s)\n",
+          "stderr": "build/goose-port/evidence-seen-laws/src/literal.goose:47: error: cannot assign through this path (const, or a read-only instantiation, \u00a79.5)\n  if seen.len!=0 { if id>=seen.len { return blot_error::Error.evidence_limit; } seen[id]=true; }\n  in fn binderList(View, const u32[:], bool[:], i64&) instantiated from build/goose-port/evidence-seen-laws/src/literal.goose:110\n  in fn bodyWithGoalsValidated(View, u32, const u32[:], const Goal[:], i64&, bool[:]) instantiated from build/goose-port/evidence-seen-laws/src/literal.goose:115\n  in fn main() instantiated from build/goose-port/evidence-seen-laws/src/literal.goose:114\n"
+        },
+        {
+          "compiler": "official",
+          "name": "default",
+          "exit": 0,
+          "stdout": "parsed ok: 169 top-level declarations, 6 file(s)\ntypechecked ok: 99 specialization(s), 12 struct/4 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 7/24 index and 6/12 slice checks\nwrote build/goose-port/evidence-seen-laws/official-default.c (138009 bytes)\n",
+          "stderr": ""
+        },
+        {
+          "compiler": "official",
+          "name": "frame-escape",
+          "exit": 1,
+          "stdout": "parsed ok: 170 top-level declarations, 6 file(s)\n",
+          "stderr": "build/goose-port/evidence-seen-laws/src/frame-escape.goose:10: error: storing a reference rooted at binders, which does not outlive the destination (\u00a79.2)\nfn setScopeFrame(frames: ScopeFrame[:],index: i64,binders: const Id[:],goals: const Goal[:]) { frames[index]=ScopeFrame {binders,goals}; }\n  in fn setScopeFrame(ScopeFrame[:], i64, const u32[:], const Goal[:]) instantiated from build/goose-port/evidence-seen-laws/src/frame-escape.goose:114\n  in fn escaping(ScopeFrame[:]) instantiated from build/goose-port/evidence-seen-laws/src/frame-escape.goose:115\n  in fn main() instantiated from build/goose-port/evidence-seen-laws/src/frame-escape.goose:115\n"
+        },
+        {
+          "compiler": "identity",
+          "name": "literal",
+          "exit": 1,
+          "stdout": "parsed ok: 169 top-level declarations, 6 file(s)\n",
+          "stderr": "build/goose-port/evidence-seen-laws/src/literal.goose:47: error: cannot assign through this path (const, or a read-only instantiation, \u00a79.5)\n  if seen.len!=0 { if id>=seen.len { return blot_error::Error.evidence_limit; } seen[id]=true; }\n  in fn binderList(View, const u32[:], bool[:], i64&) instantiated from build/goose-port/evidence-seen-laws/src/literal.goose:110\n  in fn bodyWithGoalsValidated(View, u32, const u32[:], const Goal[:], i64&, bool[:]) instantiated from build/goose-port/evidence-seen-laws/src/literal.goose:115\n  in fn main() instantiated from build/goose-port/evidence-seen-laws/src/literal.goose:114\n"
+        },
+        {
+          "compiler": "identity",
+          "name": "default",
+          "exit": 0,
+          "stdout": "parsed ok: 169 top-level declarations, 6 file(s)\ntypechecked ok: 99 specialization(s), 12 struct/4 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 0 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 7/24 index and 6/12 slice checks\nwrote build/goose-port/evidence-seen-laws/identity-default.c (138009 bytes)\n",
+          "stderr": ""
+        },
+        {
+          "compiler": "identity",
+          "name": "frame-escape",
+          "exit": 1,
+          "stdout": "parsed ok: 170 top-level declarations, 6 file(s)\n",
+          "stderr": "build/goose-port/evidence-seen-laws/src/frame-escape.goose:10: error: storing a reference rooted at binders, which does not outlive the destination (\u00a79.2)\nfn setScopeFrame(frames: ScopeFrame[:],index: i64,binders: const Id[:],goals: const Goal[:]) { frames[index]=ScopeFrame {binders,goals}; }\n  in fn setScopeFrame(ScopeFrame[:], i64, const u32[:], const Goal[:]) instantiated from build/goose-port/evidence-seen-laws/src/frame-escape.goose:114\n  in fn escaping(ScopeFrame[:]) instantiated from build/goose-port/evidence-seen-laws/src/frame-escape.goose:115\n  in fn main() instantiated from build/goose-port/evidence-seen-laws/src/frame-escape.goose:115\n"
+        }
+      ]
     }
   },
   "later_attempts": {
@@ -1232,6 +1660,114 @@
       "diagnostic_summary": [
         "eval/type_evidence.goose:336 mappingItems lacks const Mapping[:] overload",
         "runtime/list_runtime.goose:856 large integer inferred as u32"
+      ]
+    },
+    "build-200": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-200-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 105.198,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-200.log",
+      "capture_seconds": 0.2495,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-200-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-200-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "eval/type_evidence.goose:219 finite implicit-binder normalization forms undeclared recursive cycle intern->internWithEffects->internFields->intern"
+      ]
+    },
+    "build-201": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-201-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 101.503,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-201.log",
+      "capture_seconds": 0.2248,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-201-inputs/compiler-goose",
+      "live_matches_frozen": false,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-201-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "eval/type_evidence.goose:70 literal empty seen slice makes validator instantiation read-only"
+      ]
+    },
+    "build-202": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-202-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 102.093,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-202.log",
+      "capture_seconds": 0.2238,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-202-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-202-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "eval/type_evidence.goose:87 borrowed recursive scope-frame store"
+      ]
+    },
+    "build-203": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-203-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 100.504,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-203.log",
+      "capture_seconds": 0.217,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-203-inputs/compiler-goose",
+      "live_matches_frozen": false,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-203-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "eval/evidence_projection.goose:24 undeclared recursive equal/row cycle"
       ]
     }
   },

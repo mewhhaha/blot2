@@ -108,7 +108,7 @@ struct Recipe { arity: u32, root: Id, nodes: const Term[:], words: const u32[:] 
 struct Owned { arity: u32, root: Id, nodes: const Term[:] = default<const Term[:]>(), words: const u32[:] = default<const u32[:]>() }
 fn view(self_: Recipe) -> View { return View { self_.nodes, self_.words , ..}; }
 fn view(self_: Owned) -> View { return View { self_.nodes, self_.words , ..}; }
-fn clone(self_: Owned, nodes: Term[>..]&, words: u32[>..]&) -> Owned, Error { let first = nodes.len; let second = words.len; nodes += self_.nodes; words += self_.words; return Owned { self_.arity, self_.root, nodes[first..], words[second..] , ..}, blot_error::Error.none; }
+fn clone(self_: Owned, nodes: Term[>..]&, words: u32[>..]&) -> Owned, Error { let first = nodes.len; let second = words.len; nodes.append(self_.nodes); words.append(self_.words); return Owned { self_.arity, self_.root, nodes[first..], words[second..] , ..}, blot_error::Error.none; }
 fn deinit(self_: Owned&) { self_.nodes = default<const blot_check_capability_contracts::Term[:]>(); self_.words = default<const u32[:]>(); }
 struct Mark { nodes: i64, words: i64, visits: i64 }
 struct Store {
@@ -255,7 +255,7 @@ fn validate(self_: Collection, binding_count: i64, symbol_count: i64) -> Error {
     } return blot_error::Error.none;
 }
 fn clone(self_: Collection, destination: CollectionTables) -> Collection, Error {
-    let nodes = destination.nodes.len; let words = destination.words.len; let bindings = destination.bindings.len; destination.nodes += self_.nodes; destination.words += self_.words; destination.bindings += self_.bindings;
+    let nodes = destination.nodes.len; let words = destination.words.len; let bindings = destination.bindings.len; destination.nodes.append(self_.nodes); destination.words.append(self_.words); destination.bindings.append(self_.bindings);
     return Collection { destination.nodes[nodes..], destination.words[words..], destination.bindings[bindings..] , ..}, blot_error::Error.none;
 }
 fn deinit(self_: Collection&) { self_ = Collection {..}; }

@@ -26,6 +26,7 @@ struct Goal { ty: Id,kind: blot_check_types::ObligationKind,name: u32=0,result: 
 struct QuantifierGoals { owner: Id,goals: blot_check_types::List }
 struct Projection { member: u32,scope: u32,goal: u32 }
 struct ScopeFrame { binders: const Id[:],goals: const Goal[:]=default<const Goal[:]>() }
+fn setScopeFrame(frames: ScopeFrame[:],index: i64,binders: const Id[:],goals: const Goal[:]) { frames[index]=ScopeFrame {binders,goals}; }
 struct ProjectionResolver<R> { context: R,remaining: i64&,enabled: bool=true }
 struct NoResolver {}
 fn resolve(self_: NoResolver&,identity: Identity,member: u32,arguments: const Id[:]) -> Id,Error { return 0,blot_error::Error.unresolved_type; }
@@ -84,7 +85,7 @@ recursive fn walk(self_: View,id: Id,depth: i64,remaining: i64&,frames: ScopeFra
   if scope_count==frames.len||n.c>self_.extra.len||n.b>self_.extra.len-n.c { return blot_error::Error.type_mismatch; } let binders=children(self_,id);
   let err=binderList(self_,binders,seen,remaining); if err!=blot_error::Error.none { return err; }
   if n.tag==Tag.existential { for binder in binders { if node(self_,binder).b!=0 { return blot_error::Error.type_mismatch; } } }
-  frames[scope_count]=ScopeFrame {binders,quantifierGoals(self_,id)}; let error=walk(self_,n.a,depth+1,remaining,frames,scope_count+1,false,seen,open); if error!=blot_error::Error.none { return error; }
+  setScopeFrame(frames,scope_count,binders,quantifierGoals(self_,id)); let error=walk(self_,n.a,depth+1,remaining,frames,scope_count+1,false,seen,open); if error!=blot_error::Error.none { return error; }
   for goal in quantifierGoals(self_,id) { if remaining==0 { return blot_error::Error.evidence_limit; } remaining--; let endpoints: Id[4]=[goal.ty,goal.other,goal.result,goal.signature]; for endpoint in endpoints { if endpoint!=0 { let e=walk(self_,endpoint,depth+1,remaining,frames,scope_count+1,false,seen,open); if e!=blot_error::Error.none { return e; } } } } return blot_error::Error.none;
  }
  if n.tag==Tag.projection {
@@ -129,7 +130,7 @@ recursive fn walkRow(self_: View,row: u32,depth: i64,remaining: i64&,frames: Sco
 }
 fn openQuantifier(self_: View,id: Id,remaining: i64&,seen: bool[:]) -> Error { let e=validateGoalTablesWithBudget(self_,remaining); if e!=blot_error::Error.none { return e; } return openQuantifierValidated(self_,id,remaining,seen); }
 fn openQuantifierValidated(self_: View,id: Id,remaining: i64&,seen: bool[:]) -> Error { var frames: ScopeFrame[128]=[ScopeFrame {..};128]; return walk(self_,id,0,remaining,frames,0,false,seen,true); }
-fn body(self_: View,id: Id,binders: const Id[:],depth: i64,remaining: i64&,seen: bool[:]) -> Error { let e=validateGoalTablesWithBudget(self_,remaining); if e!=blot_error::Error.none { return e; } var frames: ScopeFrame[128]=[ScopeFrame {..};128]; let error=binderList(self_,binders,seen,remaining); if error!=blot_error::Error.none { return error; } frames[0]=ScopeFrame {binders,[]}; return walk(self_,id,depth,remaining,frames,1,false,seen,false); }
+fn body(self_: View,id: Id,binders: const Id[:],depth: i64,remaining: i64&,seen: bool[:]) -> Error { let e=validateGoalTablesWithBudget(self_,remaining); if e!=blot_error::Error.none { return e; } var frames: ScopeFrame[128]=[ScopeFrame {..};128]; let error=binderList(self_,binders,seen,remaining); if error!=blot_error::Error.none { return error; } frames[0]=ScopeFrame {binders,default<const Goal[:]>()}; return walk(self_,id,depth,remaining,frames,1,false,seen,false); }
 fn bodyWithGoalsValidated(self_: View,id: Id,binders: const Id[:],goals: const Goal[:],remaining: i64&,seen: bool[:]) -> Error { var frames: ScopeFrame[128]=[ScopeFrame {..};128]; let err=binderList(self_,binders,seen,remaining); if err!=blot_error::Error.none { return err; } frames[0]=ScopeFrame {binders,goals}; return walk(self_,id,0,remaining,frames,1,false,seen,true); }
 fn openBodyWithGoals(self_: View,id: Id,binders: const Id[:],goals: const Goal[:],remaining: i64&,seen: bool[:]) -> Error { let err=validateGoalTablesWithBudget(self_,remaining); if err!=blot_error::Error.none { return err; } return bodyWithGoalsValidated(self_,id,binders,goals,remaining,seen); }
 fn openBody(self_: View,id: Id,binders: const Id[:],remaining: i64&,seen: bool[:]) -> Error { return openBodyWithGoals(self_,id,binders,[],remaining,seen); }
@@ -222,8 +223,11 @@ fn internStateProvider(self_: Store,read: Id,write: Id,state: Id) -> Id,Error { 
 fn internFields(self_: Store,tag: Tag,a: u32,b: u32,row: u32,values: const Id[:]) -> Id,Error {
  if (tag==Tag.forall||tag==Tag.existential)&&values.len==0 {
   if b==0||b>128 { return 0,blot_error::Error.type_mismatch; } var binders: Id[128];
-  for ordinal in 0..b { let binder,err=intern(self_,Tag.bound,ordinal as u32,0,[]); if err!=blot_error::Error.none { return 0,err; } binders[ordinal]=binder; } return internFields(self_,tag,a,b,row,binders[..b]);
+  for ordinal in 0..b { let binder,err=internNormalizedFields(self_,Tag.bound,ordinal as u32,0,0,[]); if err!=blot_error::Error.none { return 0,err; } binders[ordinal]=binder; } return internNormalizedFields(self_,tag,a,b,row,binders[..b]);
  }
+ return internNormalizedFields(self_,tag,a,b,row,values);
+}
+fn internNormalizedFields(self_: Store,tag: Tag,a: u32,b: u32,row: u32,values: const Id[:]) -> Id,Error {
  var owned=WordBuffer {};  for value in values { owned.push(value); }
  if tag==Tag.record {
   if owned.len%2!=0 { let __cleanup_result_2_0: Id = 0; let __cleanup_result_2_1: Error = blot_error::Error.type_mismatch; owned.deinit(); return __cleanup_result_2_0, __cleanup_result_2_1; }
@@ -251,11 +255,11 @@ fn internGoalFields(self_: Store,tag: Tag,a: u32,b: u32,row: u32,values: const I
  else if tag==Tag.unit||tag==Tag.boolean||tag==Tag.unsigned32||tag==Tag.floating32||tag==Tag.never { if a!=0||b!=0||values.len!=0 { return 0,blot_error::Error.type_mismatch; } return tagCode(tag) as u32,blot_error::Error.none; }
  else if tag==Tag.forall||tag==Tag.existential {
   if a==0||a>=self_.nodes.len||b==0||b>128||row!=0||values.len!=b { return 0,blot_error::Error.type_mismatch; }
-  var remaining: i64=4096; let e=bodyWithGoalsValidated(view(self_),a,values,goals,remaining,[]); if e!=blot_error::Error.none { return 0,e; }
+  var remaining: i64=4096; let e=bodyWithGoalsValidated(view(self_),a,values,goals,remaining,default<bool[:]>()); if e!=blot_error::Error.none { return 0,e; }
   if tag==Tag.existential { for binder in values { if node(self_,binder).b!=0 { return 0,blot_error::Error.type_mismatch; } } }
   for goal in goals {
    if goal.ty==0||blot_check_types::obligationKindCode(goal.kind)>blot_check_types::obligationKindCode(blot_check_types::ObligationKind.task_receive)||blot_check_types::operatorCode(goal.operator)>blot_check_types::operatorCode(blot_check_types::Operator.shift_right) { return 0,blot_error::Error.type_mismatch; }
-   let endpoints: Id[4]=[goal.ty,goal.other,goal.result,goal.signature]; for endpoint in endpoints { if endpoint!=0 { let error=bodyWithGoalsValidated(view(self_),endpoint,values,goals,remaining,[]); if error!=blot_error::Error.none { return 0,error; } } }
+   let endpoints: Id[4]=[goal.ty,goal.other,goal.result,goal.signature]; for endpoint in endpoints { if endpoint!=0 { let error=bodyWithGoalsValidated(view(self_),endpoint,values,goals,remaining,default<bool[:]>()); if error!=blot_error::Error.none { return 0,error; } } }
   }
  } else if tag==Tag.scoped { if a==0||a>=self_.nodes.len||node(self_,a).tag!=Tag.nominal||b==0||row==0||values.len!=0 { return 0,blot_error::Error.type_mismatch; } }
  else if tag==Tag.bound { if a>=128||b>2||row>=128||values.len!=0 { return 0,blot_error::Error.type_mismatch; } }
@@ -730,6 +734,8 @@ fn contains(self_: const MatchMemo&,key: u64) -> bool { return blot_support_pool
 fn insert(self_: MatchMemo&,key: u64,value: bool) { blot_support_pooled_map::insert(self_,key,value,match_memo_slots); }
 fn clear(self_: MatchMemo&) { blot_support_pooled_map::clear(self_); }
 fn deinit(self_: MatchMemo&) { blot_support_pooled_map::deinit(self_,match_memo_slots); }
+fn mappingItems(self_: const Mapping[:]) -> const Mapping[:] { return self_; }
+fn mappingItems(self_: const RowMapping[:]) -> const RowMapping[:] { return self_; }
 fn mappingItems(self_: Mapping[>..<]&) -> const Mapping[:] { return self_; }
 fn mappingItems(self_: RowMapping[>..<]&) -> const RowMapping[:] { return self_; }
 

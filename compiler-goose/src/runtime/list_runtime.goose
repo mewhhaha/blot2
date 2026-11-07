@@ -853,7 +853,7 @@ fn staticChunk(module: Module&, words: const u32[:]) -> u32, Error {
     var buffer: u32[248] = [0; 248];
     buffer[n_length / 4] = words.len as u32; buffer[n_capacity / 4] = words.len as u32;
     for word, index in words { buffer[header / 4 + index] = word; }
-    if words.len > 0x7fffffffffffffff - header / 4 { return 0, blot_error::Error.module_too_large; }
+    if words.len > (0x7fffffffffffffff as i64) - header / 4 { return 0, blot_error::Error.module_too_large; }
     let used = header / 4 + words.len; return module.dataWords(buffer[..used]);
 }
 struct StaticNode { address: u32, height: u32, count: u32 }

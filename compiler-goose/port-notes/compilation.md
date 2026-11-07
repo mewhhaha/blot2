@@ -51,11 +51,23 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. Frozen199 advances past the repaired native-array family and stops after
-101.558 seconds at a missing slice mapping adapter and an integer-width mismatch
-in static list emission. Those source errors remain open in this checkpoint. Individual
-source laws cover exact roots, duplicate policies, bounds/fuel order and callback
-cleanup with their reduced continuation leaves disclosed in the evidence.
+per stage. Frozen203 advances through the repaired interner and validator and
+stops after 100.504 seconds at missing recursion declarations in projection
+comparison. Those two declarations are repaired in the next bounded attempt;
+whole compilation remains pending. A separate numeric-proof fixture has exposed
+dictionary API and storage-view boundary errors; their repair is still active.
+
+Finite implicit-binder normalization now calls a shared nonrecursive body,
+preserving binder order and the former normalization body exactly. Seventy
+isolated differential cases cover bounds, errors, fingerprints, IDs and cleanup,
+with lower storage controlled. Actual recursive validator walks pass with nested
+quantifiers, row traversal, exact fuel and seen writes. Typed mutable empty
+slices and a small frame setter preserve roots; negative local-frame escapes
+still reject. Projection validation was a controlled leaf in those witnesses and
+is being qualified separately. Thirteen additional native-array appends in
+capability/numeric-proof clone and builder methods use push/append. All source
+law limitations remain explicit in the checkpoint evidence.
+
 
 The independent CLI/Wasm smoke runner is prepared under
 `build/goose-port/compiler-smoke/`. Its oracle-against-itself control passes;

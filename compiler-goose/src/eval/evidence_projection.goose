@@ -8,7 +8,7 @@ type Tag=blot_eval_type_evidence::Tag;
 type Error=blot_error::Error;
 struct Comparison { view: View,shift: u32,remaining: i64& }
 fn step(self_: Comparison&,depth: i64) -> Error { if depth>=128||self_.remaining==0 { return blot_error::Error.evidence_limit; } self_.remaining--; return blot_error::Error.none; }
-fn equal(self_: Comparison&,left: u32,right: u32,local: i64,depth: i64) -> bool,Error {
+recursive fn equal(self_: Comparison&,left: u32,right: u32,local: i64,depth: i64) -> bool,Error {
  let err=step(self_,depth); if err!=blot_error::Error.none { return false,err; }
  if left==0||right==0||left>=self_.view.nodes.len||right>=self_.view.nodes.len { return false,blot_error::Error.type_mismatch; }
  let a=self_.view.node(left); let b=self_.view.node(right); if a.tag!=b.tag { return false,blot_error::Error.none; }
@@ -41,7 +41,7 @@ fn equal(self_: Comparison&,left: u32,right: u32,local: i64,depth: i64) -> bool,
  if a.tag==blot_eval_type_evidence::Tag.type_constructor { return a.a==b.a&&a.b==b.b,blot_error::Error.none; }
  if a.tag==blot_eval_type_evidence::Tag.absent||a.tag==blot_eval_type_evidence::Tag.scoped||a.tag==blot_eval_type_evidence::Tag.erased_proof { return false,blot_error::Error.unresolved_type; } return true,blot_error::Error.none;
 }
-fn row(self_: Comparison&,left: u32,right: u32,local: i64,depth: i64) -> bool,Error {
+recursive fn row(self_: Comparison&,left: u32,right: u32,local: i64,depth: i64) -> bool,Error {
  let err=step(self_,depth); if err!=blot_error::Error.none { return false,err; }
  if left>=self_.view.effects.rows.len||right>=self_.view.effects.rows.len { return false,blot_error::Error.type_mismatch; }
  let a=self_.view.effects.rows[left]; let b=self_.view.effects.rows[right]; if (a.formal==0)!=(b.formal==0) { return false,blot_error::Error.none; }
