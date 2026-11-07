@@ -1,5 +1,6 @@
 // Typed code arguments retain the result, latent row and qualifiers.
 namespace blot_check_typed_staging;
+import .typed_staging_names;
 import check.effects;
 import check.types;
 import support.error;
@@ -9,19 +10,6 @@ import support.structural_adapters;
 import support.structural;
 let code_identity = blot_check_types::NominalIdentity { 0xffffffff, 8 , ..};
 let descriptor_identity = blot_check_types::NominalIdentity { 0xffffffff, 9 , ..};
-enum Op { quote, splice, lift, emit, run, describe, same, fields, evaluate }
-fn lookup(name: const u8[:]) -> Op, bool {
-    if name == "@code.evaluate" { return Op.evaluate, true; }
-    if name == "@code.quote" { return Op.quote, true; }
-    if name == "@code.splice" { return Op.splice, true; }
-    if name == "@code.lift" { return Op.lift, true; }
-    if name == "@code.emit" { return Op.emit, true; }
-    if name == "@code.run" { return Op.run, true; }
-    if name == "@code.describe" { return Op.describe, true; }
-    if name == "@descriptor.same" { return Op.same, true; }
-    if name == "@descriptor.fields" { return Op.fields, true; }
-    return Op.quote, false;
-}
 fn arity(op: Op) -> i64 { if op == Op.same { return 2; } return 1; }
 fn isIdentity(unit: u32, declaration: u32) -> bool {
     return unit == code_identity.unit && (declaration == code_identity.decl || declaration == descriptor_identity.decl);

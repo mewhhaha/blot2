@@ -1658,7 +1658,10 @@
       "zig": "compiler/src/check/numeric_proof_terms.zig",
       "goose": "compiler-goose/src/check/numeric_proof_terms.goose",
       "role": "source_module",
-      "write_state": "written_unverified"
+      "write_state": "written_unverified",
+      "extracted_goose": [
+        "compiler-goose/src/check/numeric_proof_names.goose"
+      ]
     },
     {
       "zig": "compiler/src/check/ordered_membership.zig",
@@ -1910,7 +1913,10 @@
       "zig": "compiler/src/check/typed_staging.zig",
       "goose": "compiler-goose/src/check/typed_staging.goose",
       "role": "source_module",
-      "write_state": "written_unverified"
+      "write_state": "written_unverified",
+      "extracted_goose": [
+        "compiler-goose/src/check/typed_staging_names.goose"
+      ]
     },
     {
       "zig": "compiler/src/check/typed_staging_tests.zig",
@@ -2387,7 +2393,8 @@
       "zig": "compiler/src/parse/parser.zig",
       "goose": "compiler-goose/src/parse/parser.goose",
       "role": "source_module",
-      "write_state": "written_unverified"
+      "write_state": "written_unverified",
+      "scope_note": "Official Goose native parser execution matches pinned Zig oracle counts and complete diagnostic fields on 44 fixtures and 19 controls; tracked AST/fixity/recovery/depth laws pass. Whole-compiler qualification remains pending."
     },
     {
       "zig": "compiler/src/parse/parser_adjacent_call_tests.zig",

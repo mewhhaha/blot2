@@ -1,5 +1,6 @@
 // Numeric propositions own value identities, never lengths or addresses.
 namespace blot_check_numeric_proof_terms;
+import .numeric_proof_names;
 import support.error;
 import support.native;
 import support.structural_adapters;
@@ -10,30 +11,10 @@ import dictionary;
 type Id = u32;
 enum Kind { unsigned32, array, list }
 enum Tag { literal, formal, capture, version, length, complement }
-enum Relation { eq, lt, le, add_fits, sub_fits, index }
 struct Term { tag: Tag, kind: Kind = Kind.unsigned32, a: u32, b: u32 = 0 }
 struct Proposition { relation: Relation, left: Id, right: Id }
 struct Limits { terms: i64 = 4096, visits: i64 = 65536 }
 struct Boundary { formals: const Kind[:], captures: const Kind[:] = default<const Kind[:]>(), local_versions: bool = false }
-fn constructor(name: const u8[:]) -> Relation, bool {
-    if name == "@proof.eq" { return Relation.eq, true; }
-    if name == "@proof.lt" { return Relation.lt, true; }
-    if name == "@proof.le" { return Relation.le, true; }
-    if name == "@proof.add_fits" { return Relation.add_fits, true; }
-    if name == "@proof.sub_fits" { return Relation.sub_fits, true; }
-    if name == "@proof.index" { return Relation.index, true; }
-    return Relation.eq, false;
-}
-fn typeName(name: const u8[:]) -> Relation, bool {
-    if name == "@proof.U32Eq" { return Relation.eq, true; }
-    if name == "@proof.U32Lt" { return Relation.lt, true; }
-    if name == "@proof.U32Le" { return Relation.le, true; }
-    if name == "@proof.U32AddFits" { return Relation.add_fits, true; }
-    if name == "@proof.U32SubFits" { return Relation.sub_fits, true; }
-    if name == "@proof.Index" { return Relation.index, true; }
-    return Relation.eq, false;
-}
-fn type_name(name: const u8[:]) -> Relation, bool { return typeName(name); }
 fn holds(relation: Relation, left: u32, right: u32) -> bool {
     match relation {
         eq => { return left == right; }, lt => { return left < right; }, le => { return left <= right; },

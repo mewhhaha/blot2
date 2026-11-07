@@ -4605,6 +4605,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_parser::Parser)->b
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_parse_parser::Parser) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_parser::Qualifier)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_parse_parser::Qualifier) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_parser::ScratchFixityBuffer)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_parse_parser::ScratchFixityBuffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_parser::ScratchIdBuffer)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_parse_parser::ScratchIdBuffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_parser::ScratchLambdaParameterBuffer)->bool {return equalFields(left,right);}

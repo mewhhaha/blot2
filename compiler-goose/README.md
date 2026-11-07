@@ -56,7 +56,7 @@ improvement is for an older failing prefix, not completed compiler builds; see
 the compilation frontier for exact evidence and limits.
 
 Run the checked engine laws with
-`python3 compiler-goose/tools/test_engines.py`. They compile live coalescing, interning and scalar owner-frame sources to C and
-execute them using cached runtime/platform objects.
+`python3 compiler-goose/tools/test_engines.py`. They compile live coalescing, interning, scalar owner-frame and parser sources
+to C and execute them using cached runtime/platform objects.
 Commands, source hashes and timings are saved under
 `build/goose-port/engine-tests/`; these laws do not qualify the whole compiler.

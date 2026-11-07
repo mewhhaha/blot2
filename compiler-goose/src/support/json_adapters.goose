@@ -155,6 +155,7 @@ import check.numeric_proof_bodies;
 import check.numeric_proof_contracts;
 import check.numeric_proof_core;
 import check.numeric_proof_headers;
+import check.numeric_proof_names;
 import check.numeric_proof_terms;
 import check.ordered_membership;
 import check.package_contracts;
@@ -185,6 +186,7 @@ import check.task_regions;
 import check.task_types;
 import check.type_store_snapshot;
 import check.typed_staging;
+import check.typed_staging_names;
 import check.types;
 import check.usage_check;
 import check.usage_core;
@@ -2429,6 +2431,7 @@ fn write<JsonWriter>(writer:JsonWriter&,value:blot_parse_parser::LambdaParameter
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_parse_parser::Operator)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_parse_parser::Parser)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_parse_parser::Qualifier)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
+fn write<JsonWriter>(writer:JsonWriter&,value:blot_parse_parser::ScratchFixityBuffer)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_parse_parser::ScratchIdBuffer)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_parse_parser::ScratchLambdaParameterBuffer)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_parse_parser::ScratchOperatorBuffer)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=jsonStringify(value,writer);if error!=blot_error::Error.none {return fail(writer,error);}return writer.failure;}
