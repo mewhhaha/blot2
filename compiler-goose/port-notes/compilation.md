@@ -51,11 +51,24 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This source checkpoint preserves exact frozen212 inputs, including
-the graph capture index and module-storage helper repairs. The run stops after
-99.905 seconds because an application argument slice may alias mutable Scan
-storage across invoke. Its narrower accessor is the active repair. Whole-program
-C emission, linking and compiler execution remain pending.
+per stage. This source checkpoint preserves exact frozen215 inputs, including
+scalar span iteration, selection initialization and narrow exit swap-removal.
+The run stops after 100.644 seconds because executeCall stores a scoped Scan
+reference into caller storage. A new complete expression-cycle fixture reproduces
+that error in about 0.13 seconds and exposes three further blockers together:
+report construction, reject-loop aliasing and an invalid Boolean reference bind.
+Controlled external leaves limit that fixture; those errors are being checked
+against actual ownership boundaries. Whole-program C emission, linking and
+compiler execution remain pending. Full builds wait while known engine failures
+remain, keeping repair iterations short.
+
+Eight module-extra range accesses now carry scalar core.List receipts; seven
+loops load each Id before recursion. Validation stays once at the original point,
+with unchanged fuel/error ordering and separate record-field validation. Accessor
+narrowing alone still fails the alternating-root alias witness, so it is rejected.
+No list copy is added. Exit swap-removal uses a typed same-array helper at its
+original statement point, retaining removal order and exact Module references.
+
 
 Callable, Control and Exit construction/append use narrow nonrecursive helpers.
 Official and selected46 tests retain exact references while recursive activations

@@ -3612,6 +3612,53 @@
       ]
     },
     "capability-module-store-laws": {
+      "negative-evidence.json": {
+        "actual_records": true,
+        "results": [
+          {
+            "compiler": "official",
+            "variant": "original-scc",
+            "exit": 1,
+            "expected_diagnostic": "\u00a77.8",
+            "rejected": true
+          },
+          {
+            "compiler": "private",
+            "variant": "original-scc",
+            "exit": 1,
+            "expected_diagnostic": "\u00a77.8",
+            "rejected": true
+          },
+          {
+            "compiler": "official",
+            "variant": "local-escape",
+            "exit": 1,
+            "expected_diagnostic": "\u00a79.2",
+            "rejected": true
+          },
+          {
+            "compiler": "private",
+            "variant": "local-escape",
+            "exit": 1,
+            "expected_diagnostic": "\u00a79.2",
+            "rejected": true
+          },
+          {
+            "compiler": "official",
+            "variant": "recursive-local-escape",
+            "exit": 1,
+            "expected_diagnostic": "\u00a79.2",
+            "rejected": true
+          },
+          {
+            "compiler": "private",
+            "variant": "recursive-local-escape",
+            "exit": 1,
+            "expected_diagnostic": "\u00a79.2",
+            "rejected": true
+          }
+        ]
+      },
       "source-audit.json": {
         "before_sha256": "a29e4acb5ac7ab51451ac408599e11073cb4f3b53afb6dccb5cfec6530a39bcc",
         "production_sha256": "737b749e1a0ac9c0029ccbd53e7dfd4466a83a4fa3cb6a20a725ca917a8e68dd",
@@ -3739,6 +3786,55 @@
           }
         ]
       }
+    },
+    "capability-span-laws": {
+      "source-audit.json": {
+        "before_sha256": "88c68d0389eeefc9fe43b457a27ecef36b763ae5068dbf901e1668d457d7e68e",
+        "production_sha256": "6012299c168271eb64c75d360ef9de046ca4e6d0a19b8b66d81f8d55a6ae987e",
+        "scalar_receipt": "existing core.List start/len fields; span receives Module+remaining only, returns no borrow",
+        "getter_calls_repaired": {
+          "self_.span(module, pattern_value.a, pattern_value.b)": 2,
+          "self_.span(module, n.b, n.c)": 1,
+          "self_.span(module, n.a, n.b)": 2,
+          "self_.span(module, n.c, n.b)": 1,
+          "self_.span(module, info.inputs.start, info.inputs.len)": 1,
+          "self_.span(module, row.patterns.start, row.patterns.len)": 1
+        },
+        "loop_consumers": [
+          "recursive fn pattern(",
+          "recursive fn matches(",
+          "recursive fn expression(",
+          "fn aggregateValue(",
+          "recursive fn matchValueValue(",
+          "fn blockBody("
+        ],
+        "loop_count": 7,
+        "preserved": "one step(0) equivalent charge, then ordered range checks once; each Id loaded before same original recursive body; separate record-field validation unchanged; no list copy",
+        "whole_compiler_qualification": false
+      }
+    },
+    "capability-expression-frontier": {
+      "qualification": "failing engine check, not a pass; actual full expression body and schemas with controlled external semantic leaves",
+      "receipt": {
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "-O0",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "-o",
+          "/home/jacobt/src/blot2/build/goose-port/capability-engine-laws/selected.c",
+          "/home/jacobt/src/blot2/build/goose-port/capability-engine-laws/src/main.goose"
+        ],
+        "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+        "seconds": 0.16338978800195036,
+        "exit": 1
+      },
+      "known_failures": [
+        "executeCall scoped-root store",
+        "takeReport grow-shrink field construction; reduced report-pool leaf limits evidence",
+        "rejectScan loop aliasing",
+        "localStateInvocation false literal reference bind"
+      ]
     }
   },
   "later_attempts": {
@@ -4333,6 +4429,87 @@
       "executable_exists": false,
       "diagnostic_summary": [
         "check/capability_lifetimes.goose:383 span arguments may borrow mutable Scan while invoke can shrink it"
+      ]
+    },
+    "build-213": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-213-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 99.945,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-213.log",
+      "capture_seconds": 0.2239,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-213-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-213-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "check/capability_lifetimes.goose:136 select alternatives array read before assignment"
+      ]
+    },
+    "build-214": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-214-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 100.033,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-214.log",
+      "capture_seconds": 0.1919,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-214-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-214-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "check/capability_lifetimes.goose:521 Exit swap assignment in recursive cycle with changed scopedScan root"
+      ]
+    },
+    "build-215": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-215-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 100.644,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-215.log",
+      "capture_seconds": 0.4143,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-215-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-215-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "check/capability_lifetimes.goose:231 executeCall(scoped) can store scoped-rooted reference into caller Scan storage"
       ]
     }
   },

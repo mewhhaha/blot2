@@ -116,7 +116,7 @@ fn ownerModule(self_: Scan&, current: const Module&, unit: u32) -> const Module?
      } } return null, blot_error::Error.unsupported;
 }
 fn node(self_: Scan&, module: const Module&, id: CoreId, depth: i64) -> blot_check_core::Node, Error { let error = self_.step(depth); if error != blot_error::Error.none { return default<blot_check_core::Node>(), error; } if id == 0 || id >= module.nodes.len || module.nodes[id].ty >= module.types.nodes.len { return default<blot_check_core::Node>(), blot_error::Error.invalid_artifact; } return module.nodes[id], blot_error::Error.none; }
-fn span(self_: Scan&, module: const Module&, start: u32, len: u32) -> const u32[:], Error { let error = self_.step(0); if error != blot_error::Error.none { return default<const u32[:]>(), error; } if start > module.extra.len || len > module.extra.len - start { return default<const u32[:]>(), blot_error::Error.invalid_artifact; } return module.extra[start..start + len], blot_error::Error.none; }
+fn span(module: const Module&, start: u32, len: u32, remaining: i64&) -> blot_check_core::List, Error { if remaining==0 {return blot_check_core::List{..},blot_error::Error.analysis_limit;}remaining-=1;if start > module.extra.len || len > module.extra.len - start { return blot_check_core::List{..}, blot_error::Error.invalid_artifact; } return blot_check_core::List{start,len, ..}, blot_error::Error.none; }
 fn reaches(self_: Scan&, root: Id, owner: OptionId, younger: blot_support::Option<u32>) -> bool, Error {
     if root >= self_.nodes.len { return false, blot_error::Error.invalid_artifact; } var pending: Id[4096]; var seen: bool[4096] = [false; 4096]; var len: i64 = 1; pending[0] = root; seen[root] = true;
     while len != 0 { len -= 1; let id = pending[len]; let current = self_.nodes[id]; let error = self_.step(0); if error != blot_error::Error.none { return false, error; }
@@ -132,7 +132,7 @@ fn sink(self_: Scan&, module: const Module&, source: CoreId, arguments: const Id
 fn aggregate(self_: Scan&, module: const Module&, source: CoreId, kind: Kind, children: const Id[:]) -> Id, Error { let result, error = self_.value(module, source, kind); if error != blot_error::Error.none { return 0, error; } for child, index in children { let error = self_.edge(result, child, EdgeKind.value, index as u32); if error != blot_error::Error.none { return 0, error; } } return result, blot_error::Error.none; }
 recursive fn select(self_: Scan&, module: const Module&, source: CoreId, value: Id, field: u32, depth: i64) -> Id, Error {
     let error = self_.step(depth); if error != blot_error::Error.none { return 0, error; } if value >= self_.nodes.len { return 0, blot_error::Error.invalid_artifact; } let kind = self_.nodes[value].kind;
-    if kind == Kind.selection { var alternatives: Id[256]; var len: i64 = 0; var cursor = self_.nodes[value].first_edge;
+    if kind == Kind.selection { var alternatives: Id[256] = [0;256]; var len: i64 = 0; var cursor = self_.nodes[value].first_edge;
         while cursor.present { let item = self_.edges[cursor.value]; cursor = item.next; let error = self_.step(depth); if error != blot_error::Error.none { return 0, error; } if item.kind != EdgeKind.value { continue; } if len == alternatives.len { return 0, blot_error::Error.analysis_limit; } let id, error = select(self_, module, source, item.to, field, depth + 1); if error != blot_error::Error.none { return 0, error; } alternatives[len] = id; len += 1; } return aggregate(self_, module, source, Kind.selection, alternatives[..len]);
     }
     var cursor = self_.nodes[value].first_edge; while cursor.present { let error = self_.step(depth); if error != blot_error::Error.none { return 0, error; } let item = self_.edges[cursor.value]; cursor = item.next; if item.field == field && item.kind == EdgeKind.value { return item.to, blot_error::Error.none; } }
@@ -257,7 +257,7 @@ recursive fn pattern(self_: Scan&, module: const Module&, id: u32, origin: Id, e
         constructor => { if pattern_value.b != 0 { let selected, error = self_.select(module, 0, origin, 0, depth + 1); if error != blot_error::Error.none { return error; } return pattern(self_, module, pattern_value.b, selected, environment, depth + 1); } },
         product => {
             if pattern_value.ty >= module.types.nodes.len { return blot_error::Error.invalid_artifact; } let shape = module.types.node(pattern_value.ty); if shape.tag == blot_check_types::Tag.record && (shape.a > module.types.extra.len || shape.b > (module.types.extra.len - shape.a) / 2) { return blot_error::Error.invalid_artifact; }
-            let children, error = self_.span(module, pattern_value.a, pattern_value.b); if error != blot_error::Error.none { return error; } for child, index in children { var field = index as u32; if shape.tag == blot_check_types::Tag.record { if index >= shape.b { return blot_error::Error.invalid_artifact; } field = module.types.extra[shape.a + index * 2]; }
+            let children, error = span(module, pattern_value.a, pattern_value.b, self_.remaining); if error != blot_error::Error.none { return error; } for index in 0..children.len {let child=module.extra[children.start+index]; var field = index as u32; if shape.tag == blot_check_types::Tag.record { if index >= shape.b { return blot_error::Error.invalid_artifact; } field = module.types.extra[shape.a + index * 2]; }
                 let selected, error = self_.select(module, 0, origin, field, depth + 1); if error != blot_error::Error.none { return error; } let error = pattern(self_, module, child, selected, environment, depth + 1); if error != blot_error::Error.none { return error; }
             }
         },
@@ -287,8 +287,8 @@ recursive fn matches(self_: Scan&, module: const Module&, pattern_id: u32, origi
         record_payload => { if pattern_value.b == 0 { return true, blot_error::Error.none; } return matches(self_, module, pattern_value.b, origin, environment, start, depth + 1); },
         product => {
             if pattern_value.ty >= module.types.nodes.len { return false, blot_error::Error.invalid_artifact; } let shape = module.types.node(pattern_value.ty); if shape.tag == blot_check_types::Tag.record && (shape.a > module.types.extra.len || shape.b > (module.types.extra.len - shape.a) / 2) { return false, blot_error::Error.invalid_artifact; }
-            let children, error = self_.span(module, pattern_value.a, pattern_value.b); if error != blot_error::Error.none { return false, error; }
-            for child, index in children { var field = index as u32; if shape.tag == blot_check_types::Tag.record { if index >= shape.b { return false, blot_error::Error.invalid_artifact; } field = module.types.extra[shape.a + index * 2]; }
+            let children, error = span(module, pattern_value.a, pattern_value.b, self_.remaining); if error != blot_error::Error.none { return false, error; }
+            for index in 0..children.len {let child=module.extra[children.start+index]; var field = index as u32; if shape.tag == blot_check_types::Tag.record { if index >= shape.b { return false, blot_error::Error.invalid_artifact; } field = module.types.extra[shape.a + index * 2]; }
                 let selected, error = self_.select(module, 0, origin, field, depth + 1); if error != blot_error::Error.none { return false, error; } let result, error = matches(self_, module, child, selected, environment, start, depth + 1); if error != blot_error::Error.none || !result { return result, error; }
             } return true, blot_error::Error.none;
         },
@@ -379,8 +379,8 @@ recursive fn expression(self_: Scan&, module: const Module&, source: CoreId, env
         },
         call => {
             if n.a >= module.calls.len { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } let call = module.calls[n.a]; var function, error = named(self_, module, source, call.target, call.callee_type, environment); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
-            let arguments, error = self_.span(module, n.b, n.c); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
-            for argument in arguments { let actual, error = expression(self_, module, argument, environment, depth + 1); if error != blot_error::Error.none || !actual.present { return actual, error; } let id, error = invoke(self_, module, source, function, actual.value, depth + 1); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } function = id; } return blot_support::some(function), blot_error::Error.none;
+            let arguments, error = span(module, n.b, n.c, self_.remaining); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
+            for offset in 0..arguments.len {let argument=module.extra[arguments.start+offset]; let actual, error = expression(self_, module, argument, environment, depth + 1); if error != blot_error::Error.none || !actual.present { return actual, error; } let id, error = invoke(self_, module, source, function, actual.value, depth + 1); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } function = id; } return blot_support::some(function), blot_error::Error.none;
         },
         operation_value => { return operationValue(self_, module, source, n, environment, depth); },
         effect_provider, state_provider => { return providerValue(self_, module, source, n, environment, depth); },
@@ -445,9 +445,9 @@ fn handleBody(self_: Scan&, module: const Module&, source: CoreId, n: blot_check
 }
 fn aggregateValue(self_: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, environment: Environment&, depth: i64) -> OptionId, Error {
     var kind = Kind.product; if n.tag == blot_check_core::Tag.record { kind = Kind.record; } let result, error = self_.value(module, source, kind); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
-    let children, error = self_.span(module, n.a, n.b); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } var record = blot_check_types::Node { blot_check_types::Tag.absent , ..};
-    if n.tag == blot_check_core::Tag.record { record = module.types.node(n.ty); if record.tag != blot_check_types::Tag.record || record.a > module.types.extra.len || record.b > (module.types.extra.len - record.a) / 2 { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } let fields, error = self_.span(module, n.c, n.b); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } }
-    for child, index in children { var field = index as u32; if n.tag == blot_check_core::Tag.record { let destination = module.extra[n.c + index]; if destination >= record.b { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } field = module.types.extra[record.a + destination * 2]; }
+    let children, error = span(module, n.a, n.b, self_.remaining); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } var record = blot_check_types::Node { blot_check_types::Tag.absent , ..};
+    if n.tag == blot_check_core::Tag.record { record = module.types.node(n.ty); if record.tag != blot_check_types::Tag.record || record.a > module.types.extra.len || record.b > (module.types.extra.len - record.a) / 2 { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } let fields, error = span(module, n.c, n.b, self_.remaining); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } }
+    for index in 0..children.len {let child=module.extra[children.start+index]; var field = index as u32; if n.tag == blot_check_core::Tag.record { let destination = module.extra[n.c + index]; if destination >= record.b { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } field = module.types.extra[record.a + destination * 2]; }
         let value, error = expression(self_, module, child, environment, depth + 1); if error != blot_error::Error.none || !value.present { return value, error; } let error = self_.edge(result, value.value, EdgeKind.value, field); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
     } return blot_support::some(result), blot_error::Error.none;
 }
@@ -487,15 +487,15 @@ recursive fn matchValue(self_: Scan&, module: const Module&, source: CoreId, n: 
 recursive fn matchValueValue(self_: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, environment: Environment&, depth: i64, before:IdBuffer&, joined:IdBuffer&) -> OptionId, Error {
     if n.a >= module.matches.len { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } let info = module.matches[n.a];
     if info.inputs.len > 16 || info.arms.start > module.match_arms.len || info.arms.len > module.match_arms.len - info.arms.start { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; }
-    var inputs: Id[16]; let sources, error = self_.span(module, info.inputs.start, info.inputs.len); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
-    for input, index in sources { let value, error = expression(self_, module, input, environment, depth + 1); if error != blot_error::Error.none || !value.present { return value, error; } inputs[index] = value.value; }
+    var inputs: Id[16]; let sources, error = span(module, info.inputs.start, info.inputs.len, self_.remaining); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
+    for index in 0..sources.len {let input=module.extra[sources.start+index]; let value, error = expression(self_, module, input, environment, depth + 1); if error != blot_error::Error.none || !value.present { return value, error; } inputs[index] = value.value; }
     var locations, error = locations(self_, before, joined); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
     var values: Id[256] = [0;256]; var count: i64 = 0;
     for arm in module.match_arms[info.arms.start..info.arms.start + info.arms.len] { let error = self_.step(depth); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } if arm.guard_ != 0 { return blot_support::none<Id>(), blot_error::Error.unsupported; }
         if arm.rows.start > module.pattern_rows.len || arm.rows.len > module.pattern_rows.len - arm.rows.start { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } var nested = environment; var possible = false;
         for row in module.pattern_rows[arm.rows.start..arm.rows.start + arm.rows.len] { let error = self_.step(depth); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } if row.patterns.len != info.inputs.len { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; }
-            var alternative = environment; var matched = true; let patterns, error = self_.span(module, row.patterns.start, row.patterns.len); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
-            for pattern, index in patterns { let result, error = matches(self_, module, pattern, inputs[index], alternative, environment.len, depth + 1); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } matched = result && matched; } if !matched { continue; }
+            var alternative = environment; var matched = true; let patterns, error = span(module, row.patterns.start, row.patterns.len, self_.remaining); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
+            for index in 0..patterns.len {let pattern=module.extra[patterns.start+index]; let result, error = matches(self_, module, pattern, inputs[index], alternative, environment.len, depth + 1); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } matched = result && matched; } if !matched { continue; }
             for entry in alternative.entries[environment.len..alternative.len] { var found = false;
                 for index in environment.len..nested.len { let error = self_.step(depth); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } let prior: Entry&  = nested.entries[index]; if prior.binding != entry.binding { continue; }
                     if prior.value != entry.value { let children: Id[2] = [prior.value, entry.value]; let id, error = self_.aggregate(module, source, Kind.selection, children); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } prior.value = id; } found = true; break;
@@ -514,11 +514,11 @@ fn blockValue(self_: Scan&, module: const Module&, source: CoreId, n: blot_check
     let result, error = blockBody(self_, module, source, n, nested, mark, depth); self_.controls.resize(self_.controls.len - 1); return result, error;
 }
 fn blockBody(self_: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, nested: Environment&, mark: i64, depth: i64) -> OptionId, Error {
-    var current = blot_support::some(0 as Id); let children, error = self_.span(module, n.a, n.b); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
-    for child in children { if !current.present { break; } let result, error = expression(self_, module, child, nested, depth + 1); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } current = result; }
+    var current = blot_support::some(0 as Id); let children, error = span(module, n.a, n.b, self_.remaining); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
+    for offset in 0..children.len {let child=module.extra[children.start+offset]; if !current.present { break; } let result, error = expression(self_, module, child, nested, depth + 1); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } current = result; }
     var results: Id[256] = [0;256]; var len: i64 = 0; if current.present { results[0] = current.value; len = 1; } var index = mark;
     while index < self_.exits.len { let error = self_.step(depth); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } let exit = self_.exits[index];
-        if exit.module.owner_id != 0 && exit.module.owner_id == module.owner_id && exit.target == source { if len == results.len { return blot_support::none<Id>(), blot_error::Error.analysis_limit; } results[len] = exit.value; len += 1; self_.exits[index] = self_.exits[self_.exits.len - 1]; self_.exits.resize(self_.exits.len - 1); }
+        if exit.module.owner_id != 0 && exit.module.owner_id == module.owner_id && exit.target == source { if len == results.len { return blot_support::none<Id>(), blot_error::Error.analysis_limit; } results[len] = exit.value; len += 1; removeExit(self_.exits,index); }
         else { index += 1; }
     }
     if len == 0 { return blot_support::none<Id>(), blot_error::Error.none; } if len == 1 { return blot_support::some(results[0]), blot_error::Error.none; } let result, error = self_.aggregate(module, source, Kind.selection, results[..len]); return blot_support::some(result), error;
@@ -696,3 +696,5 @@ fn pushExit(out:Exit[>..<]&,module:const Module&,target:CoreId,value:Id) {out.pu
 
 fn operationRecord(value:Id,module:const Module&,metadata:blot_check_core::OperationValue,receiver:Id)->Operation {return Operation{value:value,module:module,metadata:metadata,receiver:receiver,..};}
 fn pushOperation(out:Operation[>..<]&,value:Operation) {out.push(value);}
+
+fn removeExit(exits:Exit[>..<]&,index:i64) {exits[index]=exits[exits.len-1];exits.resize(exits.len-1);}
