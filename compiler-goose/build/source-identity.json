@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/jacobt/src/goose-to-wasm/build/source/stdlib"
   },
-  "digest": "4f1705fa9c6e97e624c32bcc7c53a6d08c60ce0ce8ff4fede2f701698f9e0b2e",
+  "digest": "759e5cf9f87b7c9d320fa61e3583c3e8e733a83e4100fb44f2d0b781c617c2d5",
   "goose": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -819,9 +819,9 @@
       "sha256": "a14cff09c5ce65d5989884d290660c5e16e45e088d9ad878e5d148e774ca21f5"
     },
     {
-      "bytes": 106908,
+      "bytes": 105868,
       "path": "src/check/capability_lifetimes.goose",
-      "sha256": "0ff4eb54b0703e6af4867ca0ec57fb03b4abcc9e7d4a0656f59e4ac2facf40cb"
+      "sha256": "3bab4067b738c063fda854b20992d980f225dfe2443ec2ec27aae40af02fece6"
     },
     {
       "bytes": 1130851,
@@ -949,9 +949,9 @@
       "sha256": "0a93f3d8b8b6ecae298b5ba59bd5ba368aca12a21e5c42ef261a81b901237903"
     },
     {
-      "bytes": 10112,
+      "bytes": 11690,
       "path": "src/check/lifetime_report_pool.goose",
-      "sha256": "b496991849de83527b85fc83524d59b4c91add1ef776e69d99aa1f718a71ecee"
+      "sha256": "cbe1746cec3e3f026d306484c8c3bcab8303e5add4a31c98daa3b2bece5630fc"
     },
     {
       "bytes": 1488,

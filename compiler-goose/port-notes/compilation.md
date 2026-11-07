@@ -51,16 +51,27 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This source checkpoint preserves exact frozen215 inputs, including
-scalar span iteration, selection initialization and narrow exit swap-removal.
-The run stops after 100.644 seconds because executeCall stores a scoped Scan
-reference into caller storage. A new complete expression-cycle fixture reproduces
-that error in about 0.13 seconds and exposes three further blockers together:
-report construction, reject-loop aliasing and an invalid Boolean reference bind.
-Controlled external leaves limit that fixture; those errors are being checked
-against actual ownership boundaries. Whole-program C emission, linking and
-compiler execution remain pending. Full builds wait while known engine failures
-remain, keeping repair iterations short.
+per stage. This source checkpoint preserves exact frozen216 inputs. The full
+build clears the capability expression engine, then stops after 110.422 seconds
+at a missing optional-report narrowing in staging_capture_rights. That guard is
+repaired in the next live attempt. Whole-program C emission, linking and compiler
+execution remain pending.
+
+The complete capability expression fixture checks 770 specializations across
+37 files in about 0.37 seconds and executes nested success/error/fuel controls.
+It uses the full production capability functions, Scan/Tables/Environment and
+Module layout, actual report pool and real evidence/project/effect engine.
+Graph edges/bounds, contract proof, relocation, rank equality and cleanup/task
+admission remain controlled semantic leaves; this is not whole-runtime parity.
+One Scan and an invocation-local active-call table replace cloned scoped views
+and scalar publication. Newest-first lookup, per-entry fuel, stack marks and
+error cleanup are retained. Reports copy directly from Scan into the same 13
+pools in the original order; success preserves existing owner IDs and consumes
+no extra fresh-owner allocation. Source arrays can be cleared after copying.
+Tests cover pool reuse, stale leases and full cleanup. Task operand getters
+retain original subspan bounds at each original access, including malformed
+short spans with trailing data. The raw-offset prototype is superseded.
+
 
 Eight module-extra range accesses now carry scalar core.List receipts; seven
 loops load each Id before recursion. Validation stays once at the original point,

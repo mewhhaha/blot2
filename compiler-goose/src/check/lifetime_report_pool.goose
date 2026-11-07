@@ -24,9 +24,19 @@ reusable[] var pool_effect_operations: blot_check_effect_evidence::Operation[>..
 reusable[] var pool_effect_arguments: u32[>..] = [];
 reusable[] var pool_effect_rows: blot_check_effect_evidence::Row[>..] = [];
 reusable[] var pool_effect_labels: u32[>..] = [];
-fn own(source: Report) -> Report, Error {
+fn own(source: const blot_check_capability_lifetimes::Scan&, initial: i64) -> Report, Error {
     if next_generation == 0xffffffffffffffff || leases.len == 0xffffffff { return default<Report>(), blot_error::Error.analysis_limit; }
-    let generation = next_generation; next_generation += 1; var lease = Lease { true, generation , ..}; var result = source;
+    let generation = next_generation; next_generation += 1; var lease = Lease { true, generation , ..}; var result = Report {
+        nodes: default<const blot_check_capability_lifetimes::Node[:]>(),
+        edges: default<const blot_check_capability_lifetimes::Edge[:]>(),
+        evidence: blot_eval_type_evidence::Snapshot {
+            owner_id: source.evidence.owner_id, nodes: default<const blot_eval_type_evidence::Node[:]>(), extra: default<const u32[:]>(),
+            effects: blot_check_effect_evidence::Snapshot { default<const blot_check_effect_evidence::Operation[:]>(), default<const u32[:]>(), default<const blot_check_effect_evidence::Row[:]>(), default<const u32[:]>(), source.evidence.effects.owner_id },
+            quantifier_goals: default<const blot_eval_type_evidence::QuantifierGoals[:]>(), quantifier_obligations: default<const blot_eval_type_evidence::Goal[:]>()
+        },
+        mappings: default<const blot_eval_type_evidence::Mapping[:]>(), boundaries: default<const blot_check_capability_lifetimes::Boundary[:]>(), invocations: default<const blot_check_capability_lifetimes::Invocation[:]>(),
+        complete: source.complete, work: initial - source.remaining, ..
+    };
     if source.nodes.len != 0 {
         let run = pool_nodes.alloc_slice(source.nodes.len); for value, index in source.nodes { run[index] = value; }
         let first: const blot_check_capability_lifetimes::Node&  = run[0]; lease.ranges[0] = Range { pool_nodes.index_of(first), run.len , ..}; result.nodes = run;
@@ -35,8 +45,8 @@ fn own(source: Report) -> Report, Error {
         let run = pool_edges.alloc_slice(source.edges.len); for value, index in source.edges { run[index] = value; }
         let first: const blot_check_capability_lifetimes::Edge&  = run[0]; lease.ranges[1] = Range { pool_edges.index_of(first), run.len , ..}; result.edges = run;
     }
-    if source.mappings.len != 0 {
-        let run = pool_mappings.alloc_slice(source.mappings.len); for value, index in source.mappings { run[index] = value; }
+    if source.type_mappings.len != 0 {
+        let run = pool_mappings.alloc_slice(source.type_mappings.len); for value, index in source.type_mappings { run[index] = value; }
         let first: const blot_eval_type_evidence::Mapping&  = run[0]; lease.ranges[2] = Range { pool_mappings.index_of(first), run.len , ..}; result.mappings = run;
     }
     if source.boundaries.len != 0 {
@@ -47,36 +57,36 @@ fn own(source: Report) -> Report, Error {
         let run = pool_invocations.alloc_slice(source.invocations.len); for value, index in source.invocations { run[index] = value; }
         let first: const blot_check_capability_lifetimes::Invocation&  = run[0]; lease.ranges[4] = Range { pool_invocations.index_of(first), run.len , ..}; result.invocations = run;
     }
-    if source.evidence.nodes.len != 0 {
-        let run = pool_evidence_nodes.alloc_slice(source.evidence.nodes.len); for value, index in source.evidence.nodes { run[index] = value; }
+    if source.evidence.nodes.items.len != 0 {
+        let run = pool_evidence_nodes.alloc_slice(source.evidence.nodes.items.len); for value, index in source.evidence.nodes.items { run[index] = value; }
         let first: const blot_eval_type_evidence::Node&  = run[0]; lease.ranges[5] = Range { pool_evidence_nodes.index_of(first), run.len , ..}; result.evidence.nodes = run;
     }
-    if source.evidence.extra.len != 0 {
-        let run = pool_evidence_extra.alloc_slice(source.evidence.extra.len); for value, index in source.evidence.extra { run[index] = value; }
+    if source.evidence.extra.items.len != 0 {
+        let run = pool_evidence_extra.alloc_slice(source.evidence.extra.items.len); for value, index in source.evidence.extra.items { run[index] = value; }
         let first: const u32&  = run[0]; lease.ranges[6] = Range { pool_evidence_extra.index_of(first), run.len , ..}; result.evidence.extra = run;
     }
-    if source.evidence.quantifier_goals.len != 0 {
-        let run = pool_evidence_goals.alloc_slice(source.evidence.quantifier_goals.len); for value, index in source.evidence.quantifier_goals { run[index] = value; }
+    if source.evidence.quantifier_goals.items.len != 0 {
+        let run = pool_evidence_goals.alloc_slice(source.evidence.quantifier_goals.items.len); for value, index in source.evidence.quantifier_goals.items { run[index] = value; }
         let first: const blot_eval_type_evidence::QuantifierGoals&  = run[0]; lease.ranges[7] = Range { pool_evidence_goals.index_of(first), run.len , ..}; result.evidence.quantifier_goals = run;
     }
-    if source.evidence.quantifier_obligations.len != 0 {
-        let run = pool_evidence_obligations.alloc_slice(source.evidence.quantifier_obligations.len); for value, index in source.evidence.quantifier_obligations { run[index] = value; }
+    if source.evidence.quantifier_obligations.items.len != 0 {
+        let run = pool_evidence_obligations.alloc_slice(source.evidence.quantifier_obligations.items.len); for value, index in source.evidence.quantifier_obligations.items { run[index] = value; }
         let first: const blot_eval_type_evidence::Goal&  = run[0]; lease.ranges[8] = Range { pool_evidence_obligations.index_of(first), run.len , ..}; result.evidence.quantifier_obligations = run;
     }
-    if source.evidence.effects.operations.len != 0 {
-        let run = pool_effect_operations.alloc_slice(source.evidence.effects.operations.len); for value, index in source.evidence.effects.operations { run[index] = value; }
+    if source.evidence.effects.operations.items.len != 0 {
+        let run = pool_effect_operations.alloc_slice(source.evidence.effects.operations.items.len); for value, index in source.evidence.effects.operations.items { run[index] = value; }
         let first: const blot_check_effect_evidence::Operation&  = run[0]; lease.ranges[9] = Range { pool_effect_operations.index_of(first), run.len , ..}; result.evidence.effects.operations = run;
     }
-    if source.evidence.effects.arguments.len != 0 {
-        let run = pool_effect_arguments.alloc_slice(source.evidence.effects.arguments.len); for value, index in source.evidence.effects.arguments { run[index] = value; }
+    if source.evidence.effects.arguments.items.len != 0 {
+        let run = pool_effect_arguments.alloc_slice(source.evidence.effects.arguments.items.len); for value, index in source.evidence.effects.arguments.items { run[index] = value; }
         let first: const u32&  = run[0]; lease.ranges[10] = Range { pool_effect_arguments.index_of(first), run.len , ..}; result.evidence.effects.arguments = run;
     }
-    if source.evidence.effects.rows.len != 0 {
-        let run = pool_effect_rows.alloc_slice(source.evidence.effects.rows.len); for value, index in source.evidence.effects.rows { run[index] = value; }
+    if source.evidence.effects.rows.items.len != 0 {
+        let run = pool_effect_rows.alloc_slice(source.evidence.effects.rows.items.len); for value, index in source.evidence.effects.rows.items { run[index] = value; }
         let first: const blot_check_effect_evidence::Row&  = run[0]; lease.ranges[11] = Range { pool_effect_rows.index_of(first), run.len , ..}; result.evidence.effects.rows = run;
     }
-    if source.evidence.effects.labels.len != 0 {
-        let run = pool_effect_labels.alloc_slice(source.evidence.effects.labels.len); for value, index in source.evidence.effects.labels { run[index] = value; }
+    if source.evidence.effects.labels.items.len != 0 {
+        let run = pool_effect_labels.alloc_slice(source.evidence.effects.labels.items.len); for value, index in source.evidence.effects.labels.items { run[index] = value; }
         let first: const u32&  = run[0]; lease.ranges[12] = Range { pool_effect_labels.index_of(first), run.len , ..}; result.evidence.effects.labels = run;
     }
     let index = leases.alloc_index(lease); result.lease_index = (index + 1) as u32; result.generation = generation; return result, blot_error::Error.none;
@@ -85,30 +95,30 @@ fn deinit(report: Report&) -> Error {
     if report.lease_index == 0 { return blot_error::Error.none; } if report.lease_index > leases.len { return blot_error::Error.invalid_artifact; }
     let index = report.lease_index - 1; let lease = leases[index]; if !lease.live || lease.generation != report.generation { return blot_error::Error.invalid_artifact; } leases[index].live = false;
     if lease.ranges[0].len != 0 { let range = lease.ranges[0]; pool_nodes.free_slice(pool_nodes[range.start..range.start + range.len]); }
-    report.nodes = default<const Node[:]>();
+    report.nodes = default<const blot_check_capability_lifetimes::Node[:]>();
     if lease.ranges[1].len != 0 { let range = lease.ranges[1]; pool_edges.free_slice(pool_edges[range.start..range.start + range.len]); }
-    report.edges = default<const Edge[:]>();
+    report.edges = default<const blot_check_capability_lifetimes::Edge[:]>();
     if lease.ranges[2].len != 0 { let range = lease.ranges[2]; pool_mappings.free_slice(pool_mappings[range.start..range.start + range.len]); }
-    report.mappings = default<const Mapping[:]>();
+    report.mappings = default<const blot_eval_type_evidence::Mapping[:]>();
     if lease.ranges[3].len != 0 { let range = lease.ranges[3]; pool_boundaries.free_slice(pool_boundaries[range.start..range.start + range.len]); }
-    report.boundaries = default<const Boundary[:]>();
+    report.boundaries = default<const blot_check_capability_lifetimes::Boundary[:]>();
     if lease.ranges[4].len != 0 { let range = lease.ranges[4]; pool_invocations.free_slice(pool_invocations[range.start..range.start + range.len]); }
-    report.invocations = default<const Invocation[:]>();
+    report.invocations = default<const blot_check_capability_lifetimes::Invocation[:]>();
     if lease.ranges[5].len != 0 { let range = lease.ranges[5]; pool_evidence_nodes.free_slice(pool_evidence_nodes[range.start..range.start + range.len]); }
-    report.evidence.nodes = default<const Node[:]>();
+    report.evidence.nodes = default<const blot_eval_type_evidence::Node[:]>();
     if lease.ranges[6].len != 0 { let range = lease.ranges[6]; pool_evidence_extra.free_slice(pool_evidence_extra[range.start..range.start + range.len]); }
-    report.evidence.extra = default<const Id[:]>();
+    report.evidence.extra = default<const u32[:]>();
     if lease.ranges[7].len != 0 { let range = lease.ranges[7]; pool_evidence_goals.free_slice(pool_evidence_goals[range.start..range.start + range.len]); }
-    report.evidence.quantifier_goals = default<const QuantifierGoals[:]>();
+    report.evidence.quantifier_goals = default<const blot_eval_type_evidence::QuantifierGoals[:]>();
     if lease.ranges[8].len != 0 { let range = lease.ranges[8]; pool_evidence_obligations.free_slice(pool_evidence_obligations[range.start..range.start + range.len]); }
-    report.evidence.quantifier_obligations = default<const Goal[:]>();
+    report.evidence.quantifier_obligations = default<const blot_eval_type_evidence::Goal[:]>();
     if lease.ranges[9].len != 0 { let range = lease.ranges[9]; pool_effect_operations.free_slice(pool_effect_operations[range.start..range.start + range.len]); }
-    report.evidence.effects.operations = default<const Operation[:]>();
+    report.evidence.effects.operations = default<const blot_check_effect_evidence::Operation[:]>();
     if lease.ranges[10].len != 0 { let range = lease.ranges[10]; pool_effect_arguments.free_slice(pool_effect_arguments[range.start..range.start + range.len]); }
     report.evidence.effects.arguments = default<const u32[:]>();
     if lease.ranges[11].len != 0 { let range = lease.ranges[11]; pool_effect_rows.free_slice(pool_effect_rows[range.start..range.start + range.len]); }
-    report.evidence.effects.rows = default<const Row[:]>();
+    report.evidence.effects.rows = default<const blot_check_effect_evidence::Row[:]>();
     if lease.ranges[12].len != 0 { let range = lease.ranges[12]; pool_effect_labels.free_slice(pool_effect_labels[range.start..range.start + range.len]); }
-    report.evidence.effects.labels = default<const Label[:]>();
+    report.evidence.effects.labels = default<const u32[:]>();
     leases.free(index); report.lease_index = 0; report.generation = 0; report.evidence.owner_id = 0; report.evidence.effects.owner_id = 0; report.complete = false; return blot_error::Error.none;
 }

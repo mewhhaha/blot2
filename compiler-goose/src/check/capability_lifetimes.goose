@@ -55,7 +55,7 @@ fn get(self_: const Environment&, binding: u32, remaining: i64&) -> blot_support
     var index = self_.len; while index != 0 { if remaining == 0 { return blot_support::none<Entry>(), blot_error::Error.analysis_limit; } remaining -= 1; index -= 1; if self_.entries[index].binding == binding { return blot_support::some(self_.entries[index]), blot_error::Error.none; } } return blot_support::none<Entry>(), blot_error::Error.none;
 }
 fn bind(self_: Environment&, binding: u32, value: Id, depth: u32) -> Error { if binding == 0 { return blot_error::Error.none; } if self_.len == self_.entries.len { return blot_error::Error.analysis_limit; } self_.entries[self_.len] = Entry { binding, value, depth , ..}; self_.len += 1; return blot_error::Error.none; }
-struct ActiveCall { module: const Module&, body: CoreId, parent: const ActiveCall? }
+struct ActiveCall { module: const Module&, body: CoreId }
 enum Parameters { closure { catalog: u32 }, body { span: blot_check_core::List } }
 struct Callable { value: Id, module: const Module&, binding: u32, body: CoreId, parameters: Parameters, environment: Environment, arguments: Id[16], count: i64 = 0, runtime: bool = false }
 fn parameterCount(self_: const Callable&) -> i64 { match self_.parameters { closure match_payload_37 => { let catalog = match_payload_37.catalog;  return 1; }, body match_payload_38 => { let span = match_payload_38.span;  return span.len; }, } }
@@ -86,14 +86,14 @@ fn collect(self_: Locations&, scan: Scan&, module: const Module&, source: CoreId
 }
 fn finish(self_: Locations, scan: Scan&) -> Error { if !self_.started { return blot_error::Error.none; } for slot, index in self_.joined { let error = scan.step(0); if error != blot_error::Error.none { return error; } scan.nodes[index].contents = slot; } return blot_error::Error.none; }
 struct Tables {
-    type_mappings: Mapping[>..<]&, nodes: Node[>..<]&, edges: Edge[>..<]&, boundaries: Boundary[>..<]&, invocations: Invocation[>..<]&, callables: Callable[>..<]&, operations: Operation[>..<]&, providers: ProviderEntry[>..<]&, frames: Frame[>..<]&, exits: Exit[>..<]&, controls: Control[>..<]&, checked_owners: (const Module&)[>..<]&,
+    type_mappings: Mapping[>..<]&, nodes: Node[>..<]&, edges: Edge[>..<]&, boundaries: Boundary[>..<]&, invocations: Invocation[>..<]&, callables: Callable[>..<]&, operations: Operation[>..<]&, providers: ProviderEntry[>..<]&, frames: Frame[>..<]&, exits: Exit[>..<]&, controls: Control[>..<]&, checked_owners: (const Module&)[>..<]&, active_calls: ActiveCall[>..<]&,
 }
 struct Scan {
     module: const Module&, evidence: Evidence&, owners: const ModuleRef[:], type_mappings: Mapping[>..<]&, nodes: Node[>..<]&, edges: Edge[>..<]&, boundaries: Boundary[>..<]&, invocations: Invocation[>..<]&, context: u32 = 0,
-    callables: Callable[>..<]&, operations: Operation[>..<]&, providers: ProviderEntry[>..<]&, frames: Frame[>..<]&, exits: Exit[>..<]&, controls: Control[>..<]&, remaining: i64 = 65536, owner: Id = 0, scope_depth: u32 = 0, binding: u32 = 0, complete: bool = true, scope_validation: bool = false, checked_owners: (const Module&)[>..<]&, active_calls: const ActiveCall? = null,
+    callables: Callable[>..<]&, operations: Operation[>..<]&, providers: ProviderEntry[>..<]&, frames: Frame[>..<]&, exits: Exit[>..<]&, controls: Control[>..<]&, remaining: i64 = 65536, owner: Id = 0, scope_depth: u32 = 0, binding: u32 = 0, complete: bool = true, scope_validation: bool = false, checked_owners: (const Module&)[>..<]&, active_calls: ActiveCall[>..<]&,
 }
-fn init(module: const Module&, owners: const ModuleRef[:], evidence: Evidence&, tables: Tables) -> Scan { return Scan { module: module, evidence: evidence, owners: owners, type_mappings: tables.type_mappings, nodes: tables.nodes, edges: tables.edges, boundaries: tables.boundaries, invocations: tables.invocations, callables: tables.callables, operations: tables.operations, providers: tables.providers, frames: tables.frames, exits: tables.exits, controls: tables.controls, checked_owners: tables.checked_owners , ..}; }
-fn deinit(self_: Scan&) { self_.type_mappings.clear(); self_.nodes.clear(); self_.edges.clear(); self_.boundaries.clear(); self_.invocations.clear(); self_.callables.clear(); self_.operations.clear(); self_.providers.clear(); self_.frames.clear(); self_.exits.clear(); self_.controls.clear(); self_.checked_owners.clear(); }
+fn init(module: const Module&, owners: const ModuleRef[:], evidence: Evidence&, tables: Tables) -> Scan { return Scan { module: module, evidence: evidence, owners: owners, type_mappings: tables.type_mappings, nodes: tables.nodes, edges: tables.edges, boundaries: tables.boundaries, invocations: tables.invocations, callables: tables.callables, operations: tables.operations, providers: tables.providers, frames: tables.frames, exits: tables.exits, controls: tables.controls, checked_owners: tables.checked_owners, active_calls: tables.active_calls , ..}; }
+fn deinit(self_: Scan&) { self_.type_mappings.clear(); self_.nodes.clear(); self_.edges.clear(); self_.boundaries.clear(); self_.invocations.clear(); self_.callables.clear(); self_.operations.clear(); self_.providers.clear(); self_.frames.clear(); self_.exits.clear(); self_.controls.clear(); self_.checked_owners.clear(); self_.active_calls.clear(); }
 fn step(self_: Scan&, depth: i64) -> Error { if self_.remaining == 0 || depth >= 128 { return blot_error::Error.analysis_limit; } self_.remaining -= 1; return blot_error::Error.none; }
 fn site(self_: const Scan&, module: const Module&, source: CoreId) -> Site { return Site { module.unit, self_.binding, source , ..}; }
 fn value(self_: Scan&, module: const Module&, source: CoreId, kind: Kind) -> Id, Error {
@@ -226,9 +226,9 @@ recursive fn invoke(self_: Scan&, module: const Module&, source: CoreId, functio
         if invocation.count >= parameterCount(invocation) || invocation.count == invocation.arguments.len { return 0, blot_error::Error.invalid_artifact; } invocation.arguments[invocation.count] = argument; invocation.count += 1;
         if invocation.count < parameterCount(invocation) { return partialCall(self_, module, source, callable, invocation, function, argument, depth); }
         if callable.runtime { return self_.sink(module, source, invocation.arguments[..invocation.count]); }
-        var active .= self_.active_calls; while true { { let optional_binding_80 .= active; if optional_binding_80 { let prior .= optional_binding_80; let error = self_.step(depth); if error != blot_error::Error.none { return 0, error; } if prior.module.owner_id != 0 && prior.module.owner_id == callable.module.owner_id && prior.body == callable.body { return 0, blot_error::Error.unsupported; } active .= prior.parent;  } else { break; } } }
-        let current = activeCall(callable.module, callable.body, self_.active_calls); var scoped = scopedScan(self_, current);
-        let result, error = executeCall(scoped, module, source, callable, invocation, function, depth); publishScan(self_, scoped); return result, error;
+        var active = self_.active_calls.len; while active!=0 { active-=1; let prior=self_.active_calls[active]; let error=self_.step(depth); if error!=blot_error::Error.none {return 0,error;} if prior.module.owner_id!=0 && prior.module.owner_id==callable.module.owner_id && prior.body==callable.body {return 0,blot_error::Error.unsupported;} }
+        let mark=self_.active_calls.len; pushActiveCall(self_.active_calls,callable.module,callable.body);
+        let result,error=executeCall(self_,module,source,callable,invocation,function,depth);self_.active_calls.resize(mark);return result,error;
     } let arguments: Id[2] = [function, argument]; return self_.sink(module, source, arguments);
 }
 fn partialCall(self_: Scan&, module: const Module&, source: CoreId, callable: Callable, invocation: Callable, function: Id, argument: Id, depth: i64) -> Id, Error {
@@ -452,35 +452,35 @@ fn aggregateValue(self_: Scan&, module: const Module&, source: CoreId, n: blot_c
     } return blot_support::some(result), blot_error::Error.none;
 }
 fn taskValue(self_: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, environment: Environment&, depth: i64) -> OptionId, Error {
-    let operation, error = blot_check_task_types::opFromCode(n.c); if error != blot_error::Error.none { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } let operands = module.children(source);
+    let operation, error = blot_check_task_types::opFromCode(n.c); if error != blot_error::Error.none { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } let operands = taskOperands(module, source);
     match operation {
-        scope => { return taskScope(self_, module, source, operands[0], environment, depth); },
-        spawn => { let group, error = expression(self_, module, operands[0], environment, depth + 1); if error != blot_error::Error.none || !group.present { return group, error; } let thunk, error = expression(self_, module, operands[1], environment, depth + 1); if error != blot_error::Error.none || !thunk.present { return thunk, error; }
+        scope => { return taskScope(self_, module, source, taskOperand(module, operands, 0), environment, depth); },
+        spawn => { let group, error = expression(self_, module, taskOperand(module, operands, 0), environment, depth + 1); if error != blot_error::Error.none || !group.present { return group, error; } let thunk, error = expression(self_, module, taskOperand(module, operands, 1), environment, depth + 1); if error != blot_error::Error.none || !thunk.present { return thunk, error; }
             let result, error = invoke(self_, module, source, thunk.value, 0, depth + 1); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } let values: Id[2] = [group.value, result]; let handle, error = self_.aggregate(module, source, Kind.wrapper, values); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } self_.nodes[handle].contents = result; return blot_support::some(handle), blot_error::Error.none;
         },
         join, cancel, receive => {
-            let handle, error = expression(self_, module, operands[0], environment, depth + 1); if error != blot_error::Error.none || !handle.present { return handle, error; }
+            let handle, error = expression(self_, module, taskOperand(module, operands, 0), environment, depth + 1); if error != blot_error::Error.none || !handle.present { return handle, error; }
             if operation == blot_check_task_types::Op.cancel { let result, error = self_.value(module, source, Kind.scalar); return blot_support::some(result), error; }
             let result, error = taskReceive(self_, module, source, handle.value, operation == blot_check_task_types::Op.receive && self_.nodes[handle.value].kind == Kind.product); return blot_support::some(result), error;
         },
-        collect => { let input, error = expression(self_, module, operands[0], environment, depth + 1); if error != blot_error::Error.none || !input.present { return input, error; } let result, error = taskReceive(self_, module, source, input.value, true); return blot_support::some(result), error; },
+        collect => { let input, error = expression(self_, module, taskOperand(module, operands, 0), environment, depth + 1); if error != blot_error::Error.none || !input.present { return input, error; } let result, error = taskReceive(self_, module, source, input.value, true); return blot_support::some(result), error; },
         split => { return splitValue(self_, module, source, operands, environment, depth); },
         read, write => {
-            let value, error = expression(self_, module, operands[0], environment, depth + 1); if error != blot_error::Error.none || !value.present { return value, error; } let value, error = expression(self_, module, operands[1], environment, depth + 1); if error != blot_error::Error.none || !value.present { return value, error; }
-            if operation == blot_check_task_types::Op.write { let value, error = expression(self_, module, operands[2], environment, depth + 1); if error != blot_error::Error.none || !value.present { return value, error; } let escapes, error = self_.reaches(value.value, blot_support::none<Id>(), blot_support::some(0 as u32)); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } if escapes { return blot_support::none<Id>(), blot_error::Error.lifetime_escape; } return blot_support::some(0 as Id), blot_error::Error.none; }
+            let value, error = expression(self_, module, taskOperand(module, operands, 0), environment, depth + 1); if error != blot_error::Error.none || !value.present { return value, error; } let value, error = expression(self_, module, taskOperand(module, operands, 1), environment, depth + 1); if error != blot_error::Error.none || !value.present { return value, error; }
+            if operation == blot_check_task_types::Op.write { let value, error = expression(self_, module, taskOperand(module, operands, 2), environment, depth + 1); if error != blot_error::Error.none || !value.present { return value, error; } let escapes, error = self_.reaches(value.value, blot_support::none<Id>(), blot_support::some(0 as u32)); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } if escapes { return blot_support::none<Id>(), blot_error::Error.lifetime_escape; } return blot_support::some(0 as Id), blot_error::Error.none; }
             let ty = module.types.node(n.ty); if ty.tag == blot_check_types::Tag.unit || ty.tag == blot_check_types::Tag.boolean || ty.tag == blot_check_types::Tag.unsigned32 || ty.tag == blot_check_types::Tag.floating32 { return blot_support::some(0 as Id), blot_error::Error.none; } return blot_support::none<Id>(), blot_error::Error.unsupported;
         },
     }
 }
-fn splitValue(self_: Scan&, module: const Module&, source: CoreId, operands: const CoreId[:], environment: Environment&, depth: i64) -> OptionId, Error {
-    let owner_value, error = expression(self_, module, operands[0], environment, depth + 1); if error != blot_error::Error.none || !owner_value.present { return owner_value, error; }
+fn splitValue(self_: Scan&, module: const Module&, source: CoreId, operands: blot_check_core::List, environment: Environment&, depth: i64) -> OptionId, Error {
+    let owner_value, error = expression(self_, module, taskOperand(module, operands, 0), environment, depth + 1); if error != blot_error::Error.none || !owner_value.present { return owner_value, error; }
     let plan, error = blot_check_task_regions::partition(module, source); if error != blot_error::Error.none { return blot_support::none<Id>(), blot_error::Error.invalid_artifact; } let saved_owner = self_.owner; let owner, error = self_.value(module, source, Kind.scope); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } self_.owner = owner; self_.scope_depth += 1;
     let result, error = splitBody(self_, module, source, operands, environment, owner_value.value, owner, plan.len, depth); self_.scope_depth -= 1; self_.owner = saved_owner; return result, error;
 }
-fn splitBody(self_: Scan&, module: const Module&, source: CoreId, operands: const CoreId[:], environment: Environment&, owner_value: Id, owner: Id, count: i64, depth: i64) -> OptionId, Error {
+fn splitBody(self_: Scan&, module: const Module&, source: CoreId, operands: blot_check_core::List, environment: Environment&, owner_value: Id, owner: Id, count: i64, depth: i64) -> OptionId, Error {
     let arguments, error = self_.value(module, source, Kind.product); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
     for ordinal in 0..count { let view, error = self_.value(module, source, Kind.capability); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } self_.nodes[view].contents = owner_value; let error = self_.edge(view, owner_value, EdgeKind.value, 0); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } let error = self_.edge(arguments, view, EdgeKind.value, ordinal as u32); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } }
-    let callback, error = expression(self_, module, operands[2], environment, depth + 1); if error != blot_error::Error.none || !callback.present { return callback, error; } let result, error = invoke(self_, module, source, callback.value, arguments, depth + 1); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
+    let callback, error = expression(self_, module, taskOperand(module, operands, 2), environment, depth + 1); if error != blot_error::Error.none || !callback.present { return callback, error; } let result, error = invoke(self_, module, source, callback.value, arguments, depth + 1); if error != blot_error::Error.none { return blot_support::none<Id>(), error; }
     let escapes, error = self_.reaches(result, blot_support::some(owner), blot_support::none<u32>()); if error != blot_error::Error.none { return blot_support::none<Id>(), error; } if escapes { return blot_support::none<Id>(), blot_error::Error.lifetime_escape; } let values: Id[2] = [owner_value, result]; let id, error = self_.aggregate(module, source, Kind.product, values); return blot_support::some(id), error;
 }
 recursive fn matchValue(self_: Scan&, module: const Module&, source: CoreId, n: blot_check_core::Node, environment: Environment&, depth: i64) -> OptionId, Error {var before=IdBuffer{..};var joined=IdBuffer{..};let result,error=matchValueValue(self_,module,source,n,environment,depth,before,joined);blot_support_pooled_buffer::deinit(joined,location_scratch);blot_support_pooled_buffer::deinit(before,location_scratch);return result,error;}
@@ -523,17 +523,15 @@ fn blockBody(self_: Scan&, module: const Module&, source: CoreId, n: blot_check_
     }
     if len == 0 { return blot_support::none<Id>(), blot_error::Error.none; } if len == 1 { return blot_support::some(results[0]), blot_error::Error.none; } let result, error = self_.aggregate(module, source, Kind.selection, results[..len]); return blot_support::some(result), error;
 }
-fn takeReport(scan: Scan&, initial: i64) -> Report, Error {
-    let evidence = blot_eval_type_evidence::Snapshot { owner_id: scan.evidence.owner_id, nodes: scan.evidence.nodes.items, extra: scan.evidence.extra.items, effects: blot_check_effect_evidence::Snapshot { scan.evidence.effects.operations.items, scan.evidence.effects.arguments.items, scan.evidence.effects.rows.items, scan.evidence.effects.labels.items, scan.evidence.effects.owner_id , ..}, quantifier_goals: scan.evidence.quantifier_goals.items, quantifier_obligations: scan.evidence.quantifier_obligations.items , ..};
-    return blot_check_lifetime_report_pool::own(Report { scan.nodes[..], scan.edges[..], evidence, scan.type_mappings[..], scan.boundaries[..], scan.invocations[..], scan.complete, initial - scan.remaining , ..});
-}
+fn takeReport(scan: Scan&, initial: i64) -> Report, Error { return blot_check_lifetime_report_pool::own(scan, initial); }
+
 fn deinit(self_: Report&) { let error = blot_check_lifetime_report_pool::deinit(self_); assert(error == blot_error::Error.none); }
 struct ScanScope<C> { module: const Module&, owners: const ModuleRef[:], context: C& }
 fn withScan<C,F>(module: const Module&, owners: const ModuleRef[:], context: C&) -> Error {
     var scope = ScanScope<C> { module, owners, context , ..};
     fn scanScope<S>(scope: S&, evidence: Evidence&) -> Error {
-    var type_mappings: Mapping[>..<] = []; var nodes: Node[>..<] = []; var edges: Edge[>..<] = []; var boundaries: Boundary[>..<] = []; var invocations: Invocation[>..<] = []; var callables: Callable[>..<] = []; var operations: Operation[>..<] = []; var providers: ProviderEntry[>..<] = []; var frames: Frame[>..<] = []; var exits: Exit[>..<] = []; var controls: Control[>..<] = []; var checked_owners: (const Module&)[>..<] = [];
-    var scan = init(scope.module, scope.owners, evidence, Tables { type_mappings, nodes, edges, boundaries, invocations, callables, operations, providers, frames, exits, controls, checked_owners , ..}); let error = F(scope.context, scan); deinit(scan); return error;
+    var type_mappings: Mapping[>..<] = []; var nodes: Node[>..<] = []; var edges: Edge[>..<] = []; var boundaries: Boundary[>..<] = []; var invocations: Invocation[>..<] = []; var callables: Callable[>..<] = []; var operations: Operation[>..<] = []; var providers: ProviderEntry[>..<] = []; var frames: Frame[>..<] = []; var exits: Exit[>..<] = []; var controls: Control[>..<] = []; var checked_owners: (const Module&)[>..<] = []; var active_calls: ActiveCall[>..<] = [];
+    var scan = init(scope.module, scope.owners, evidence, Tables { type_mappings, nodes, edges, boundaries, invocations, callables, operations, providers, frames, exits, controls, checked_owners, active_calls , ..}); let error = F(scope.context, scan); deinit(scan); return error;
     }
     return blot_eval_type_evidence::withStore(scope,scanScope);
 }
@@ -581,7 +579,7 @@ fn rejectSupportedEscapes(module: const Module&, owners: const ModuleRef[:]) -> 
 }
 fn rejectScan(context: RejectContext&, scan: Scan&) -> Error {
     scan.remaining = context.remaining; scan.scope_validation = true;
-    for n, id in scan.module.nodes { if !isScope(n) { continue; } let error = scan.step(0); if error != blot_error::Error.none { return blot_error::Error.invalid_artifact; }
+    for id in 0..scan.module.nodes.len { let n = scan.module.nodes[id]; if !isScope(n) { continue; } let error = scan.step(0); if error != blot_error::Error.none { return blot_error::Error.invalid_artifact; }
         scan.nodes.clear(); scan.edges.clear(); scan.callables.clear(); scan.operations.clear(); scan.providers.clear(); scan.frames.clear(); scan.exits.clear(); scan.controls.clear(); scan.invocations.clear(); scan.type_mappings.clear(); scan.complete = true;
         let zero, error = scan.value(scan.module, 0, Kind.scalar); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.invalid_artifact; }
         var environment = Environment {..}; let result, error = expression(scan, scan.module, id as u32, environment, 0); if error == blot_error::Error.unsupported { continue; } if error == blot_error::Error.out_of_memory { return error; } if error != blot_error::Error.none { return blot_error::Error.invalid_artifact; }
@@ -595,7 +593,7 @@ fn callArgument(report: const Report&, event: Id, field: u32, remaining: i64&) -
     return blot_support::none<Id>(), blot_error::Error.none;
 }
 fn localStateInvocation(report: const Report&, unit: u32, call: CoreId, callback: u8, argument: u8, remaining: i64&) -> bool, Error {
-    if !report.complete { return false, blot_error::Error.none; } var found .= false;
+    if !report.complete { return false, blot_error::Error.none; } var found = false;
     for node, index in report.nodes { let error = reportStep(remaining); if error != blot_error::Error.none { return false, error; } if node.kind != Kind.event || node.site.unit != unit || node.site.node != call || !node.invocation.present { continue; }
         let invocation = node.invocation.value; if invocation >= report.invocations.len { return false, blot_error::Error.invalid_artifact; } let operation, error = callArgument(report, index as u32, callback as u32 + 1, remaining); if error != blot_error::Error.none { return false, error; } if !operation.present { return false, blot_error::Error.none; }
         let value, error = callArgument(report, index as u32, argument as u32 + 1, remaining); if error != blot_error::Error.none { return false, error; } if !value.present || report.nodes[operation.value].kind != Kind.operation { return false, blot_error::Error.none; } var stored = false;
@@ -606,7 +604,7 @@ fn localStateInvocation(report: const Report&, unit: u32, call: CoreId, callback
             var context = blot_support::some(write.context);
             while context.present { let error = reportStep(remaining); if error != blot_error::Error.none { return false, error; } let current = context.value; if current >= report.invocations.len { return false, blot_error::Error.invalid_artifact; } if current == invocation { stored = true; break; } context = report.invocations[current].parent; }
             if stored { break; }
-        } if !stored { return false, blot_error::Error.none; } found .= true;
+        } if !stored { return false, blot_error::Error.none; } found = true;
     } return found, blot_error::Error.none;
 }
 fn isScope(node: blot_check_core::Node) -> bool { return node.tag == blot_check_core::Tag.effect_scope || (node.tag == blot_check_core::Tag.task && (node.c == blot_check_task_types::opCode(blot_check_task_types::Op.scope) || node.c == blot_check_task_types::opCode(blot_check_task_types::Op.split))); }
@@ -680,9 +678,6 @@ fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_lifetimes::Ed
 
 
 
-fn activeCall(module:const Module&,body:CoreId,parent:const ActiveCall?)->ActiveCall {return ActiveCall{module:module,body:body,parent:parent};}
-fn scopedScan(parent:const Scan&,active_calls:const ActiveCall?)->Scan {return Scan{module:parent.module,evidence:parent.evidence,owners:parent.owners,type_mappings:parent.type_mappings,nodes:parent.nodes,edges:parent.edges,boundaries:parent.boundaries,invocations:parent.invocations,context:parent.context,callables:parent.callables,operations:parent.operations,providers:parent.providers,frames:parent.frames,exits:parent.exits,controls:parent.controls,remaining:parent.remaining,owner:parent.owner,scope_depth:parent.scope_depth,binding:parent.binding,complete:parent.complete,scope_validation:parent.scope_validation,checked_owners:parent.checked_owners,active_calls:active_calls,..};}
-fn publishScan(target:Scan&,source:const Scan&) {target.context=source.context;target.remaining=source.remaining;target.owner=source.owner;target.scope_depth=source.scope_depth;target.binding=source.binding;target.complete=source.complete;target.scope_validation=source.scope_validation;}
 
 recursive fn invokeCallback(self_:Scan&,module:const Module&,source:CoreId,callback:Id,argument:Id,depth:i64,index:i64)->Id,Error {var saved=FrameBuffer{..};let result,error=invokeCallbackValue(self_,module,source,callback,argument,depth,index,saved);blot_support_pooled_buffer::deinit(saved,frame_scratch);return result,error;}
 recursive fn invokeCallbackValue(self_:Scan&,module:const Module&,source:CoreId,callback:Id,argument:Id,depth:i64,index:i64,saved:FrameBuffer&)->Id,Error {let stored=blot_support_pooled_buffer::append(saved,self_.frames[index..],frame_scratch);if stored!=blot_error::Error.none {return 0,stored;}self_.frames.resize(index);let result,error=invoke(self_,module,source,callback,argument,depth+1);self_.frames.append(saved.items);return result,error;}
@@ -698,3 +693,8 @@ fn operationRecord(value:Id,module:const Module&,metadata:blot_check_core::Opera
 fn pushOperation(out:Operation[>..<]&,value:Operation) {out.push(value);}
 
 fn removeExit(exits:Exit[>..<]&,index:i64) {exits[index]=exits[exits.len-1];exits.resize(exits.len-1);}
+
+fn pushActiveCall(out:ActiveCall[>..<]&,module:const Module&,body:CoreId){out.push(ActiveCall{module,body});}
+
+fn taskOperands(module: const Module&, source: CoreId) -> blot_check_core::List { let children = module.children(source); return blot_check_core::List { module.node(source).a, children.len as u32 }; }
+fn taskOperand(module: const Module&, operands: blot_check_core::List, index: i64) -> CoreId { let children = module.extra[operands.start..operands.start + operands.len]; return children[index]; }
