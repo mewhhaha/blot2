@@ -4710,7 +4710,486 @@
         "seconds": 0.007126236996555235,
         "passed_expected_rejection": true
       }
-    ]
+    ],
+    "staging-capture-engine-laws": {
+      "evidence.json": {
+        "coverage": "23 executed staging capture, report cache, exact fuel and cleanup cases. Entire actual staging_capture_rights Checker/Entry/report/confined/loan/capture implementation; physicallyCaptures controlled false leaf with exact actual signature. Entire actual capability_lifetimes expression SCC and external public functions, exact Scan/Tables/Environment/ActiveCall and full Module field layout with all used core records; actual type/effect evidence interning/projection and actual report pool. Unused core leaf records reduced. Controlled semantic leaves: graph edge/bounds validation, Context.initialize/Principal.instantiate with full record layouts, relocation initializer with actual Relocation schema, rank equality, cleanup predicate, task scope/partition with exact return shapes. Runtime laws do not claim these leaves semantics.",
+        "compilers": {
+          "official": {
+            "path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2"
+          },
+          "identity": {
+            "path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b"
+          },
+          "selected": {
+            "path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e"
+          }
+        },
+        "cc": {
+          "invoked": "clang",
+          "path": "/usr/bin/clang-23",
+          "sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d"
+        },
+        "cwd": "/home/jacobt/src/blot2",
+        "stage_timeout_seconds": 10,
+        "stdlib": {
+          "path": "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "files": {
+            "base64.goose": "fa1111ce46e9534311f825880dbd2988953430aeb3f1f52d8f0eaecbbc298a61",
+            "binary.goose": "6973e209428668c2db856eaa941de5d93938cfb1749ed07cac534bf9fe4cb031",
+            "csv.goose": "a49b0647f4a2f8ca36170e5a184ab6c6e505492434d0a10a5e05127e96da61ba",
+            "dictionary.goose": "fb39f896731faf3799e81727f7261849a62bdfbdc92d5fdbc36405a85830f322",
+            "exception.goose": "b91033a5cb9029ac56d27ffb0ed9f5841f76ff58b39de8e881101ca2b8fc39c4",
+            "ffi.goose": "e092b245fbe13ee2fdc71599b7b8eb44198e5261cad9600b7681e13ad75a6c2e",
+            "json.goose": "0e58291ed9051e4ecb8da1ad420290549d723336516507aed33cf7ced89dc29b",
+            "math.goose": "b4c1aee33b5b7033d36a4ddc5c6522c73b21cafe204dc20e8860cdeba22467da",
+            "os.goose": "2193f394d44469daffd993ed204a91b068084fd8db13e261e11156b40c66e934",
+            "regex.goose": "be0e50bab2a1db9f85e856250bcc592dfe25aca73c2ed900410047fbefb4b035",
+            "std.goose": "2243c2ef52ba5045b275eea35252d09f36544987c6884f4a8d35579fa6f781ff",
+            "vec.goose": "2cac168c72047834433bfb419734c38455c9429ea045b1273898031c53faa82e"
+          }
+        },
+        "runtime_objects": [
+          {
+            "path": "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+            "sha256": "8520ed0e5600c2a9ae3e71d7709f927768f820f56a021b477c2495c73863d7ea"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+            "sha256": "c341eaf1d67e8bb19895fa64afaf23c501524301271b8a8f93f1175de1146a14"
+          }
+        ],
+        "source_origins": [
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/staging_capture_rights.goose",
+            "sha256": "698fe8a08204b3d2b04c9f179828b9996b3ef9966bf97e3030d9dc0c2d4de371"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/capability_lifetimes.goose",
+            "sha256": "3bab4067b738c063fda854b20992d980f225dfe2443ec2ec27aae40af02fece6"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/lifetime_report_pool.goose",
+            "sha256": "cbe1746cec3e3f026d306484c8c3bcab8303e5add4a31c98daa3b2bece5630fc"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/package_contracts.goose",
+            "sha256": "f9282401498ff311b303ecd2eaacf2bf9f4987a20859e36457d8634a456c087f"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/generative_relocation.goose",
+            "sha256": "2a69e8f599e6eb1a6a4ed44727d4754089862282cf0715924b9a983eae118673"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/task_types.goose",
+            "sha256": "6775d8b99459485e6b81307b5752a79a9e0a56aaf7f9a4d6bf50a4025601f0be"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/task_regions.goose",
+            "sha256": "465f857e37c66febeb3874991873a034f89689f77d2531aac2f6ea8f7c8616e5"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/capability_flow.goose",
+            "sha256": "173d6be99842616e1689348f710aa65e6f0a554238c19b79f66fe61e07ce063f"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/parse/ast.goose",
+            "sha256": "8fe8ecb1ad3d280e35fbbc130d27dfb635300bdc98b1b9a99cb162768c2b4da0"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/reuse/principal_interface.goose",
+            "sha256": "0041ef21999b3039c319319160a17b7e44cf88562e4cf1b201a2bd9e5ba9a3bc"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/eval/type_evidence.goose",
+            "sha256": "059d23fcb86a479909238e11213fbbb56e82e459b3aa2ff4bd77992d2cd53c00"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/eval/type_evidence_schema.goose",
+            "sha256": "b912f6f7b840a76cd3d35ecce05447130d34de691ead6c39f48735cbd2548571"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/eval/evidence_projection.goose",
+            "sha256": "f99fd3ca4eff1883075ecca9b7029483efbd254640bcb31bc4cdb957bd78ef59"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/effect_evidence.goose",
+            "sha256": "e674c05ae0b6133cf5e0a5d95062cd9729f0f59a0d89f61075926d1098df566a"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/core.goose",
+            "sha256": "bb4b160a00f80f2dc9193d532e003e7ae9a7761f56b2b473a6f772f507fb552c"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/types.goose",
+            "sha256": "9d73562bb34877b9aa936f5fa29e08a806dccacc038f551d0ae89943a49abc2a"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/effects.goose",
+            "sha256": "1b94326def0e7eda87cb8383f05429620cb4c04b40c8b25855f418739c52f0cc"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/check/quantifier_goals.goose",
+            "sha256": "790e714947ca3201b7782177970563b87f44ce6dde373721d10cb13b28ee393d"
+          },
+          {
+            "path": "/home/jacobt/src/blot2/compiler-goose/src/reuse/projection_cache.goose",
+            "sha256": "3d3cd02302ac481205cfbeb1e1447a168814e40fe4ca7f0395da5ee098af1133"
+          }
+        ],
+        "extracted_and_support_inputs": {
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/ast.goose": "c699f9c706afd68e4445c48a0b971e34c87c8341dbe5830f3d6367ccfe1cb54d",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/cache.goose": "3d3cd02302ac481205cfbeb1e1447a168814e40fe4ca7f0395da5ee098af1133",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capability.goose": "f47c2e847c870c13711848507a28535c14a96a0214602c37786cf0c6e8d5321b",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose": "282f6d6e5fcff1be3883b21e6c1c9ca545300857b0ffabd4684641a84046688c",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/check_types.goose": "dbea39ec134905d23c1b80a534247b20975d164bc56d9ca726fbb5a891bf8386",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/cleanup.goose": "d20f40d55c6fbc34b0f4ddcae77ce98fe442ad6075966710a8bca5d9fda67b01",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/contracts.goose": "f20151d7be4622efd7a12c1e0828b1061e684718f52fa470e4dd59a04f60d0df",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/core.goose": "66d9372893b469f919303f937cec7ffa2fd8a912c52a9d139d736ef8d0f1aa09",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose": "5e60e42b3df4571d7df1e20536a65b56b4eb2ed5d1eaf24e1f6619b46e2bed54",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/equations.goose": "e0fabc8a61c6dc6da4ac68b8ed1fce68a34e8475a6038425bd5249317b00c321",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose": "3660b58b52c02b5a820d87a8357920e53fcf87e6bc77d545a8f800146c3112ed",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/facts.goose": "c127c1a4cdfdcbcfb8d4fea7a25aeaa0a4335e541b087508226a565ee460f0ee",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/flow.goose": "2a18d83210be5608f2a5d694f8ea551e30dce8cb16ec84f50128d74b909c46b9",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose": "ec2a5c697f61c136267a32a4264a7e2954ea67b1d7e7dae1e9722928f3bed131",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/pack_projection.goose": "415799c49f702bfaf5a4466435a819727629fb2d476d6f9d622e2350681e5a42",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/principal.goose": "16b74787a6d7a7389604d47d39767950c8977aeead7dd953ae62bd49b08d5bf0",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/projection.goose": "6477da8fd7dbda38b1f197740808b83e6a2dce10ed74447efb8c8db72aa47e08",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/quantifier_goals.goose": "672fa7762cb02cf9368540de6b548755d738dadecf40f11fe0836e0329f6eccc",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/rank.goose": "63edc16bef1c5ab1c960cd5d586fd908b507ba593dff9eb3750018b20be325c3",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/relocation.goose": "2802f96a498f974ae379c4c227785534f2d28e2fdf1ce63005acc632f9af51d2",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/report.goose": "cd9fcd1f7e293610a1cccc477a70bff93878674be744fcceb3c87a09c36d1adf",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose": "b363d9331b5e3a8fe7268da2961de64d0bd3d6a499f5655dfb3c60893b34e635",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/source.goose": "eef4a3db5af05c11fd4ee917611a85e1a4693d05d4e8e55bcd6d105cb04b9e09",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/source_effects.goose": "e55e41460dee414f2b031251d473522ae2d97faf072a9f7c439b2e96b7e05cf5",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/symbols.goose": "5998990d3c6f8363c24424d46a10966d1b5f26e8c657f39687bf0b91b478c6d9",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/task_regions.goose": "e1648e6a9b32010cfd88a028cb1b946ba19f6373f0782961be84620ebcb40cd5",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/task_types.goose": "b6a72d64eddab5b035bca96f08787f460e860894886fa601d15740b55faaa0e2",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/types.goose": "54aaf8e05aaa91ccb0e1acdd5810a8180e43349331a181711f22ade4782230ab",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/usage.goose": "3456ddb2f8eacac52f529e1a5049714c846e88607c6ab82f9141f258e37991ce",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/validation.goose": "6c8380a6299a9aec1aff12ce19813dc65b3211152800363481ee9b1df9834d35",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/blake3.goose": "94efa434cf1fa91133ccd8f55520a19a4e8965256627533b9fa71157d35c5209",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/bytes.goose": "bae4133669e102c01bf3259019a71c883888f6f63cee32dab11893b0e16a514e",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/core_packet.goose": "e05b6d9b99fc8e3be46b3278f15f2e994959ce757c5a1aaf1f03124da0d07f56",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/emitter.goose": "e432160ebc81c6e529240b514adb7c27dbe3950dec03479fc0b27f4f986f71e0",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/evidence_packet.goose": "e8123ec42435950b36040b4207ea99db3a6038b60478632d3cb1a13ed868a649",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/host_layout.goose": "759ba776e77f520af19fbdf9ea1a5e821ffc2c7c5c638e335cac656f45c13740",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/io.goose": "10681af80bdebf9d0d0ff6f080283f51729e84f229f7dfba2ffa0b0f2e37229f",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/json.goose": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/json_adapters.goose": "546495a18afe2083d25f066bee7cef2e8f1254c5fd45a0f325b4d34d5c09648d",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/native.goose": "521c0584db7270195ac15e498f4796abf24fb15b9e7400c36c334cac93b19916",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/option.goose": "83daa905847ce8a0c3ed7a16f22424a41622b0b8624b9dc30a648a0bca8205d6",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/path.goose": "79d672c413385eef4742516a840c5d80e09a031113c18e48086c922fbc479dae",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose": "9213e248a117f369f86e469743da489686e033ea216048d35c980a6d9b1bfeb6",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/pooled_map.goose": "dc56c1bc5c23304e56b82936a4f00249545dbea5b9696b873d7fb800f3b7417a",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/process_pool.goose": "7d98a937f9ec39077e7ebc071b6f1066d6fdfef86a194cf05da1fa440efb3be5",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet.goose": "f59c467b3142947cc83fbe5d4a6ef434d2d4755b0f1e968c95044359237a0c85",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet_codecs.goose": "206fc6922857e1f2013c03b42d710cb870ef198b229541b0cae80c8051d7aad2",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet_contexts.goose": "d4da8a96cd5470367e409b37400e189d2b5bd41d2528ce3902cebd181cd16131",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/project_packet_owners.goose": "263f7cf459a1ffbe09bf52279d09dbb8342131f6b8d725c92cf389d9e892aa7b",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/sha256.goose": "a1eac6fbbd355c23f88c111b34597a5c22097189b7abe4bf2f6fe14c08a4b6f4",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/structural.goose": "5a7c53a1916e5f434a46d8c56b977b9b6e76e7f31fb04c249fbe82c93725ff2b",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/structural_adapters.goose": "68ae1305fc11594d34246fd83b78ba318d324bef4689bd71ccb2aa11342b874e",
+          "/home/jacobt/src/blot2/compiler-goose/src/support/wyhash.goose": "b9b20300ce43165620b8820384cabbeb820afe0d69de235035d4c1731705de85"
+        },
+        "runs": [
+          {
+            "compiler": "official",
+            "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "emit",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "-O0",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose"
+            ],
+            "exit": 0,
+            "seconds": 0.42052339300425956,
+            "stdout": "parsed ok: 921 top-level declarations, 39 file(s)\ntypechecked ok: 797 specialization(s), 183 struct/19 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 26 folded, 29 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 304/635 index and 36/145 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/official.c (1672171 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
+          },
+          {
+            "compiler": "official",
+            "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "link",
+            "command": [
+              "clang",
+              "-std=gnu11",
+              "-D_GNU_SOURCE",
+              "-O0",
+              "-pthread",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+              "-lm",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/official"
+            ],
+            "exit": 0,
+            "seconds": 0.4100136530032614,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "official",
+            "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "phase": "run",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/official"
+            ],
+            "exit": 0,
+            "seconds": 0.008082205000391696,
+            "stdout": "23 staging capture/report/fuel/cleanup laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "emit",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+              "-O0",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/identity.c",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose"
+            ],
+            "exit": 0,
+            "seconds": 0.42740943399985554,
+            "stdout": "parsed ok: 921 top-level declarations, 39 file(s)\ntypechecked ok: 797 specialization(s), 183 struct/19 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 26 folded, 29 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 304/635 index and 36/145 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/identity.c (1672171 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
+          },
+          {
+            "compiler": "identity",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "link",
+            "command": [
+              "clang",
+              "-std=gnu11",
+              "-D_GNU_SOURCE",
+              "-O0",
+              "-pthread",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/identity.c",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+              "-lm",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/identity"
+            ],
+            "exit": 0,
+            "seconds": 0.4023740100019495,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "identity",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-identity-experiment/compiler-identity/goose",
+            "compiler_sha256": "58535de952cefabb5a1fa7b7d1d9c95185e2904e0833b92e60778154aec21f7b",
+            "phase": "run",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/identity"
+            ],
+            "exit": 0,
+            "seconds": 0.011415722001402173,
+            "stdout": "23 staging capture/report/fuel/cleanup laws passed\n",
+            "stderr": ""
+          },
+          {
+            "compiler": "selected",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "phase": "emit",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+              "-O0",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/selected.c",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose"
+            ],
+            "exit": 0,
+            "seconds": 0.44631513499916764,
+            "stdout": "parsed ok: 921 top-level declarations, 39 file(s)\ntypechecked ok: 797 specialization(s), 183 struct/19 enum instance(s); optimized -O0: 0 inlined, 0 base case(s), 26 folded, 29 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 304/635 index and 36/145 slice checks\nwrote /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/selected.c (1672171 bytes)\n",
+            "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
+          },
+          {
+            "compiler": "selected",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "phase": "link",
+            "command": [
+              "clang",
+              "-std=gnu11",
+              "-D_GNU_SOURCE",
+              "-O0",
+              "-pthread",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/selected.c",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/goose_runtime-f6dc9503be3839eeee016a9f.o",
+              "/home/jacobt/src/blot2/build/goose-port/engine-tests/platform-265a047eeb05b08cac08565d.o",
+              "-lm",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/selected"
+            ],
+            "exit": 0,
+            "seconds": 0.3952475219994085,
+            "stdout": "",
+            "stderr": ""
+          },
+          {
+            "compiler": "selected",
+            "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "phase": "run",
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/selected"
+            ],
+            "exit": 0,
+            "seconds": 0.011699011003656778,
+            "stdout": "23 staging capture/report/fuel/cleanup laws passed\n",
+            "stderr": ""
+          }
+        ],
+        "inputs_unchanged_after_run": true,
+        "artifacts": {
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/official": "3fb825fce75e3614964a3e7210d099e279093c2f2f1abdfa61f4e389f22f409d",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/official.c": "2cdde8f282789f52667754e2b3bc09cf13725b0ed12d8c693a6ca8dc38a1c258",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/identity": "33bc659b570edd9ff1cb83f4ac2fff3f1e15c2f71fa1d6dc11adaa2a922fd6ea",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/identity.c": "2cdde8f282789f52667754e2b3bc09cf13725b0ed12d8c693a6ca8dc38a1c258",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/selected": "5d9c967c73096235e998ccf6e334e1671404b2338c18ca72c7cf653a8f427d6d",
+          "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/selected.c": "2cdde8f282789f52667754e2b3bc09cf13725b0ed12d8c693a6ca8dc38a1c258"
+        }
+      },
+      "controls.json": [
+        {
+          "case": "old-readonly-cleanup",
+          "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+          "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "command": [
+            "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "-O0",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/old-readonly-cleanup-official.c",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose"
+          ],
+          "source_sha256": "c951c34efde42a0efa3c85bb872110b76aa103cc923a50d15ee2bc73ac0ebc30",
+          "exit": 1,
+          "seconds": 0.27749702900473494,
+          "stdout": "parsed ok: 921 top-level declarations, 39 file(s)\n",
+          "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/report.goose:94: error: cannot assign through this path (const, or a read-only instantiation, \u00a79.5)\n    report.nodes = default<const blot_check_capability_lifetimes::Node[:]>();\n  in fn blot_check_lifetime_report_pool::deinit(blot_check_capability_lifetimes::Report&) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:506\n  in fn blot_check_capability_lifetimes::deinit(blot_check_capability_lifetimes::Report&) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose:17\n  in fn blot_check_staging_capture_rights::deinit(blot_check_staging_capture_rights::Checker&) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:35\n  in fn law(i64) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
+        },
+        {
+          "case": "old-readonly-cleanup",
+          "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+          "command": [
+            "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "-O0",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/old-readonly-cleanup-selected.c",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose"
+          ],
+          "source_sha256": "c951c34efde42a0efa3c85bb872110b76aa103cc923a50d15ee2bc73ac0ebc30",
+          "exit": 1,
+          "seconds": 0.26096104300086154,
+          "stdout": "parsed ok: 921 top-level declarations, 39 file(s)\n",
+          "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/report.goose:94: error: cannot assign through this path (const, or a read-only instantiation, \u00a79.5)\n    report.nodes = default<const blot_check_capability_lifetimes::Node[:]>();\n  in fn blot_check_lifetime_report_pool::deinit(blot_check_capability_lifetimes::Report&) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:506\n  in fn blot_check_capability_lifetimes::deinit(blot_check_capability_lifetimes::Report&) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose:17\n  in fn blot_check_staging_capture_rights::deinit(blot_check_staging_capture_rights::Checker&) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:35\n  in fn law(i64) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
+        },
+        {
+          "case": "old-scalar-append",
+          "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+          "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "command": [
+            "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "-O0",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/old-scalar-append-official.c",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose"
+          ],
+          "source_sha256": "dcacdcf201be0299567e7ff5e176fdb9cb79efc5fac8beb3fad1b09d0a40fbde",
+          "exit": 1,
+          "seconds": 0.2513097150003887,
+          "stdout": "parsed ok: 921 top-level declarations, 39 file(s)\n",
+          "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose:29: error: .append takes an array or slice of u32, got u32\n    work.append(value);\n  in fn blot_check_staging_capture_rights::confined(blot_check_staging_capture_rights::Checker&, const blot_check_capability_lifetimes::Report&, u32, const u32[:]) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose:70\n  in fn blot_check_staging_capture_rights::capture(blot_check_staging_capture_rights::Checker&, u32, u32, const u32[:], const u32[:]) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:29\n  in fn law(i64) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
+        },
+        {
+          "case": "old-scalar-append",
+          "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+          "command": [
+            "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "-O0",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/old-scalar-append-selected.c",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose"
+          ],
+          "source_sha256": "dcacdcf201be0299567e7ff5e176fdb9cb79efc5fac8beb3fad1b09d0a40fbde",
+          "exit": 1,
+          "seconds": 0.2530348949949257,
+          "stdout": "parsed ok: 921 top-level declarations, 39 file(s)\n",
+          "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose:29: error: .append takes an array or slice of u32, got u32\n    work.append(value);\n  in fn blot_check_staging_capture_rights::confined(blot_check_staging_capture_rights::Checker&, const blot_check_capability_lifetimes::Report&, u32, const u32[:]) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose:70\n  in fn blot_check_staging_capture_rights::capture(blot_check_staging_capture_rights::Checker&, u32, u32, const u32[:], const u32[:]) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:29\n  in fn law(i64) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
+        },
+        {
+          "case": "old-nullable-report",
+          "compiler_path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+          "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "command": [
+            "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "-O0",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/old-nullable-report-official.c",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose"
+          ],
+          "source_sha256": "75e9f852ad55c812f598902d44f3ad2e01cba35e0c4089e4c350ce550891505f",
+          "exit": 1,
+          "seconds": 0.24155995000182884,
+          "stdout": "parsed ok: 921 top-level declarations, 39 file(s)\n",
+          "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose:67: error: optional value must be narrowed (if/guard/assert) before use\n    for node, value in report.nodes { let err = self_.step(); if err != blot_error::Error.none { return err; }\n  in fn blot_check_staging_capture_rights::capture(blot_check_staging_capture_rights::Checker&, u32, u32, const u32[:], const u32[:]) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:29\n  in fn law(i64) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
+        },
+        {
+          "case": "old-nullable-report",
+          "compiler_path": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+          "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+          "command": [
+            "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+            "-O0",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "-o",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/old-nullable-report-selected.c",
+            "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose"
+          ],
+          "source_sha256": "75e9f852ad55c812f598902d44f3ad2e01cba35e0c4089e4c350ce550891505f",
+          "exit": 1,
+          "seconds": 0.24889837000228,
+          "stdout": "parsed ok: 921 top-level declarations, 39 file(s)\n",
+          "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose:67: error: optional value must be narrowed (if/guard/assert) before use\n    for node, value in report.nodes { let err = self_.step(); if err != blot_error::Error.none { return err; }\n  in fn blot_check_staging_capture_rights::capture(blot_check_staging_capture_rights::Checker&, u32, u32, const u32[:], const u32[:]) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:29\n  in fn law(i64) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
+        }
+      ]
+    }
   },
   "later_attempts": {
     "190": {
@@ -5412,6 +5891,60 @@
       "executable_exists": false,
       "diagnostic_summary": [
         "check/staging_capture_rights.goose:76 optional report must be narrowed before reading nodes"
+      ]
+    },
+    "build-217": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-217-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 111.323,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-217.log",
+      "capture_seconds": 0.268,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-217-inputs/compiler-goose",
+      "live_matches_frozen": false,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-217-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "check/staging_capture_rights.goose:38 scalar native append must use push; two other scalar sites match"
+      ]
+    },
+    "build-218": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-218-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 104.984,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-218.log",
+      "capture_seconds": 0.2252,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-218-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-218-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "eval/implementation_admission.goose:64 generic templatesCopy chooses fixed principal_interface Contract Option but core.Module has core.Contract"
       ]
     }
   },

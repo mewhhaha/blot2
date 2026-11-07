@@ -23,7 +23,7 @@ struct Checker {
     reports: Entry[>..<]&
 }
 fn require(value: bool) -> Error { if !value { return blot_error::Error.invalid_artifact; } return blot_error::Error.none; }
-fn deinit(self_: Checker&) { for entry in self_.reports { blot_check_capability_lifetimes::deinit(entry.report); } self_.reports.clear(); }
+fn deinit(self_: Checker&) { for &entry in self_.reports { blot_check_capability_lifetimes::deinit(entry.report); } self_.reports.clear(); }
 fn step(self_: Checker&) -> Error { if self_.remaining == 0 { return blot_error::Error.invalid_artifact; } self_.remaining -= 1; return blot_error::Error.none; }
 fn report(self_: Checker&, root: u32) -> const Report?, Error {
     for &entry in self_.reports { let err = self_.step(); if err != blot_error::Error.none { return null, err; } if entry.scope == root { return entry.report, blot_error::Error.none; } }
@@ -35,7 +35,7 @@ fn report(self_: Checker&, root: u32) -> const Report?, Error {
 }
 fn confined(self_: Checker&, image: const Report&, value: u32, scopes: const u32[:]) -> Error {
     if !self_.allocating { return blot_error::Error.invalid_artifact; } var work: u32[>..<]=[]; var seen: dictionary<u32,bool> = dictionary<u32,bool>{};
-    work.append(value);
+    work.push(value);
     while work.len != 0 {
         let current = work[work.len - 1]; work.resize(work.len - 1);
         var err = self_.step(); if err != blot_error::Error.none { return err; } if current >= image.nodes.len { return blot_error::Error.invalid_artifact; }
@@ -47,8 +47,8 @@ fn confined(self_: Checker&, image: const Report&, value: u32, scopes: const u32
             var found = false; for scope in scopes { if scope == owner.site.node { found = true; break; } } if !found { return blot_error::Error.invalid_artifact; }
         }
         var next = node.first_edge;
-        while next.present { err = self_.step(); if err != blot_error::Error.none { return err; } let index = next.value; if index >= image.edges.len { return blot_error::Error.invalid_artifact; } let edge = image.edges[index]; if edge.from != current { return blot_error::Error.invalid_artifact; } work.append(edge.to); next = edge.next; }
-        if node.contents != 0 { work.append(node.contents); }
+        while next.present { err = self_.step(); if err != blot_error::Error.none { return err; } let index = next.value; if index >= image.edges.len { return blot_error::Error.invalid_artifact; } let edge = image.edges[index]; if edge.from != current { return blot_error::Error.invalid_artifact; } work.push(edge.to); next = edge.next; }
+        if node.contents != 0 { work.push(node.contents); }
     } return blot_error::Error.none;
 }
 fn loanCapture(self_: Checker&, closure: u32, binding: u32, loans: const u32[:]) -> bool, Error {
@@ -72,7 +72,7 @@ fn capture(self_: Checker&, closure: u32, binding: u32, scopes: const u32[:], lo
     let loan, err = self_.loanCapture(closure, binding, loans); if err != blot_error::Error.none { return err; } if loan { return blot_error::Error.none; } if scopes.len == 0 { return blot_error::Error.invalid_artifact; }
     let catalog = self_.module.node(closure).a; var found = false;
     // report may grow its table; acquire the borrow after the operation completes.
-    let report_value, report_error = self_.report(scopes[0]); if report_error != blot_error::Error.none { return report_error; } let report .= report_value;
+    let report_value, report_error = self_.report(scopes[0]); if report_error != blot_error::Error.none { return report_error; } if !report_value { return blot_error::Error.invalid_artifact; } let report .= report_value;
     for node, value in report.nodes { let err = self_.step(); if err != blot_error::Error.none { return err; }
         if node.site.unit != self_.module.unit || node.site.node != closure || !node.closure.present || node.closure.value != catalog { continue; } var captured = false; var next = node.first_edge;
         while next.present { let err = self_.step(); if err != blot_error::Error.none { return err; } let index = next.value; if index >= report.edges.len { return blot_error::Error.invalid_artifact; } let edge = report.edges[index]; if edge.from != value { return blot_error::Error.invalid_artifact; } next = edge.next; if edge.kind != blot_check_capability_lifetimes::EdgeKind.capture || edge.field != binding { continue; }

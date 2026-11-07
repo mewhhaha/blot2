@@ -51,11 +51,21 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This source checkpoint preserves exact frozen216 inputs. The full
-build clears the capability expression engine, then stops after 110.422 seconds
-at a missing optional-report narrowing in staging_capture_rights. That guard is
-repaired in the next live attempt. Whole-program C emission, linking and compiler
-execution remain pending.
+per stage. This source checkpoint preserves exact frozen218 inputs. The full
+build clears staging capture, then stops after 104.984 seconds at a fixed
+interface Contract type used with a generic core.Module owner in implementation
+admission. The generic lookup family is the active repair. Whole-program C
+emission, linking and compiler execution remain pending.
+
+The entire staging capture checker checks alongside the actual capability engine
+in about 0.42 seconds. Twenty-three runtime capture/report/fuel/cleanup laws pass
+on official, baseline585 and selected46, including leased report reuse/deinit,
+cycle/contents rejection and exact budget7/budget6 boundaries. PhysicallyCaptures
+is a controlled false-returning leaf with its actual signature; its semantics
+are not qualified here. Mutable cleanup iteration, native scalar pushes and
+optional report narrowing are repaired. Restoring each old bug independently
+rejects on official and selected46.
+
 
 The complete capability expression fixture checks 770 specializations across
 37 files in about 0.37 seconds and executes nested success/error/fuel controls.
