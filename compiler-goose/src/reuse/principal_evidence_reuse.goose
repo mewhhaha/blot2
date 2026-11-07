@@ -210,7 +210,7 @@ fn sourcesEqual(self_: State&, target: BindingRef, inputs: const Inputs&) -> boo
     }
     for source in inputs.interfaces {
         let admitted, error = self_.gate.admitsCompletedInterface(source); if error != blot_error::Error.none { return false, error; }
-        if !admitted { return self_.sourceDeclined(SourceDecline { target: target, source: source, interface_observation: true, reason: self_.sourceReason(source) , ..}), blot_error::Error.none; }
+        if !admitted {        let __field_order_478_target: blot_reuse_principal_evidence_reuse::BindingRef = target; let __field_order_479_source: blot_reuse_principal_evidence_reuse::BindingRef = source; let __field_order_480_interface_observation: bool = true; let __field_order_481_reason: blot_reuse_principal_evidence_reuse::SourceReason = self_.sourceReason(source); return self_.sourceDeclined(SourceDecline { target: __field_order_478_target, source: __field_order_479_source, reason: __field_order_481_reason, interface_observation: __field_order_480_interface_observation, .. }), blot_error::Error.none; }
     }
     var root = false;
     for source in inputs.sources {

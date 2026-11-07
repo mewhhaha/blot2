@@ -999,7 +999,7 @@ fn emitCallableOwner(context: CallableEmission&, emitter: blot_backend_backend_e
         }
         return emitter.emit(blot_backend_runtime_ir::OP_call, target);
     }
-    let next_key = blot_reuse_code_artifacts::CallableKey { target: key.target, ty: key.ty, applied: key.applied + 1, templates: key.templates, dictionaries: key.dictionaries, bound_dictionaries: key.bound_dictionaries, instance_arguments: key.instance_arguments , ..};
+    let next_key = blot_reuse_code_artifacts::CallableKey { dictionaries: key.dictionaries, bound_dictionaries: key.bound_dictionaries, instance_arguments: key.instance_arguments, target: key.target, ty: key.ty, applied: key.applied + 1, templates: key.templates, .. };
     if erased_argument { let next, error = callable(generator, next_key); if error != blot_error::Error.none { return error; } return emitter.descriptor(next, blot_support::some(0 as u32)); }
     if !key.dictionaries && directCallableEnvironment(generator, key.ty, key.applied + 1) { let next, error = callable(generator, next_key); if error != blot_error::Error.none { return error; } return emitter.descriptor(next, blot_support::some(1 as u32)); }
     var retained: u32[17]; var count: u32 = 0;
@@ -2128,7 +2128,7 @@ fn compileWithOptions(workspace: CompileWorkspace&,source_units: const blot_chec
     let required,error = blot_backend_scoped_backend::required(units,entry); if error != blot_error::Error.none { return emptyResult(workspace),error; }
     if required {
         var storage = options.policy.storage.config(); if options.storage.present { storage = options.storage.value; }
-        return blot_backend_scoped_backend::compileWithOptions(workspace,units,entry,blot_backend_scoped_backend::CompileOptions { identity: options.identity,storage: storage,tier: options.policy.codegen_tier,workers: options.policy.codegen_workers,share_machine_code: options.policy.share_machine_code,io: options.io,profile: options.profile_backend,completed_core_validation: options.completed_core_validation,source_completion: options.source_completion , ..});
+        return blot_backend_scoped_backend::compileWithOptions(workspace,units,entry,blot_backend_scoped_backend::CompileOptions { completed_core_validation: options.completed_core_validation, source_completion: options.source_completion, identity: options.identity, storage: storage, tier: options.policy.codegen_tier, workers: options.policy.codegen_workers, share_machine_code: options.policy.share_machine_code, io: options.io, profile: options.profile_backend, .. });
     }
     let first,first_error = compileLocals(workspace,units,entry,options,true); if first_error != blot_error::Error.speculative_local_retry { return first,first_error; } return compileLocals(workspace,units,entry,options,false);
 

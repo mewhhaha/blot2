@@ -134,7 +134,7 @@ fn initPooledRef() -> Store?,Error { let value,error=initPooled(); if error!=blo
 fn seedEmpty(self_: Store) { self_.values.push(ValueInfo {}); self_.value_evidence.push(1); self_.value_records.push(0); self_.record_layouts.push(blot_check_core::List {}); self_.record_shape_next.push(0); }
 fn valid(self_: Store) -> bool { return self_.lease!=0&&self_.lease-1<states.len&&states[self_.lease-1].live&&states[self_.lease-1].generation==self_.generation; }
 fn scalar(self_: Store,value: Value) -> ValueId,Error {
- let id=self_.values.len as ValueId; self_.values.push(ValueInfo {scalar:value.scalar,bits:value.bits}); var evidence: u32=0;
+ let id=self_.values.len as ValueId; self_.values.push(ValueInfo { bits:value.bits, scalar:value.scalar }); var evidence: u32=0;
  if value.scalar==blot_backend_runtime_ir::SC_unit { evidence=1; } else if value.scalar==blot_backend_runtime_ir::SC_bool { evidence=2; } else if value.scalar==blot_backend_runtime_ir::SC_u32 { evidence=3; } else if value.scalar==blot_backend_runtime_ir::SC_f32 { evidence=4; }
  self_.value_evidence.push(evidence); self_.value_records.push(0); return id,blot_error::Error.none;
 }

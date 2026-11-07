@@ -543,6 +543,30 @@ fn principalState<P>(self_: const P&) -> PrincipalState {
         projection_depth: self_.projection_depth,
     };
 }
+// Construct a proof from explicit live roots and owned state.
+fn principalFromState(left:const blot_check_core::Types&,right:const blot_check_core::Types&,remaining:i64&,views:Context?,state:PrincipalState,projection_resolver:PrincipalProjectionResolver?=null)->Principal {
+    return Principal {
+        left:left, right:right, remaining:remaining,
+        formals:state.formals,
+        formal_count:state.formal_count,
+        instance:state.instance,
+        witnesses:state.witnesses,
+        row_witnesses:state.row_witnesses,
+        secondary:state.secondary,
+        secondary_witnesses:state.secondary_witnesses,
+        views:views,
+        pending:state.pending,
+        pending_count:state.pending_count,
+        foreign_views:state.foreign_views,
+        left_rows:state.left_rows,
+        instance_rows:state.instance_rows,
+        scheme_row_witnesses:state.scheme_row_witnesses,
+        row_search_depth:state.row_search_depth,
+        projection_resolver:projection_resolver,
+        projection_depth:state.projection_depth,
+        ..
+    };
+}
 fn sameTypes(left: const blot_check_core::Types&, right: const blot_check_core::Types&) -> bool { return left.owner_id != 0 && left.owner_id == right.owner_id; }
 fn certificateRow(self_: Principal&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error { return certificateRowMode(self_.left, self_.right, self_.remaining, self_.certificate_pairs, left, right); }
 fn certificateRowMode(left_types: const blot_check_core::Types&, right_types: const blot_check_core::Types&, budget: i64&, certificates: CertificatePairs?, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {

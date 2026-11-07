@@ -285,7 +285,7 @@ fn finishRead<P>(self_:Loader<P>&,id:UnitId,lexical:const blot_parse_lexer::Diag
     let tree .= self_.project.units.items[id-1].tree;
     if tree.diagnostics.len!=0 {
         let first=tree.diagnostics.items[0];let publication,error=blot_parse_syntax_diagnostics::parse(tokens,first);if error!=blot_error::Error.none {return 0,error;}
-        let appended=self_.project.diagnostics.push(Diagnostic {unit:id,span:Span {first.start,first.end, ..},code:Code.syntax_error,parse_code:blot_support::some(first.code),parse_detail:blot_support::some(first),publication:blot_support::some(publication), ..});
+        let appended=self_.project.diagnostics.push(Diagnostic { unit:id, span:Span {first.start,first.end, ..}, code:Code.syntax_error, parse_code:blot_support::some(first.code), publication:blot_support::some(publication), parse_detail:blot_support::some(first), .. });
         if appended!=blot_error::Error.none {return 0,appended;}
     }
     let start=self_.project.imports.len as u32;

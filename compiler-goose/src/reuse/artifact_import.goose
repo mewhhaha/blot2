@@ -722,7 +722,7 @@ recursive fn capture<G>(self_: Importer&, g: G&, id: u32, depth: i64) -> u32, Er
     let templates, import_error_17 = self_.templateKey(g, old.unit, old.templates, depth + 1); if import_error_17 != blot_error::Error.none { return 0, convert(import_error_17); }
     let evidence, import_error_18 = self_.mappingEvidence(g, old.unit, old.evidence, depth + 1); if import_error_18 != blot_error::Error.none { return 0, convert(import_error_18); }
     let rows, import_error_19 = self_.rowKey(g, old.unit, old.rows, depth + 1); if import_error_19 != blot_error::Error.none { return 0, convert(import_error_19); }
-    let imported = blot_reuse_code_artifacts::CapturedTemplate { unit: owner, node: old.node, captures: captures, templates: templates, has_environment: old.has_environment, scalar_environment: old.scalar_environment, computation: old.computation, evidence: evidence, rows: rows , ..};
+    let imported = blot_reuse_code_artifacts::CapturedTemplate { scalar_environment: old.scalar_environment, unit: owner, node: old.node, captures: captures, templates: templates, has_environment: old.has_environment, computation: old.computation, evidence: evidence, rows: rows, .. };
     let closed, import_error_20 = self_.knowledge.knownLayout(g.representations.store, imported.captures); if import_error_20 != blot_error::Error.none { return 0, convert(import_error_20); }
     if !closed || (imported.scalar_environment && (!imported.has_environment || imported.templates != 0 || !g.representations.store.scalarEnvironment(imported.captures) || self_.units[owner - 1].node(imported.node).tag != blot_check_core::Tag.closure)) { return 0, blot_error::Error.declined; }
     var mapped: u32 = 0; let existing = g.planning.template_instances.get(imported);

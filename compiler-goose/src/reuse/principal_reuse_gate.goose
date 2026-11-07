@@ -297,7 +297,7 @@ fn selects(use: blot_check_core::DependencyMember, candidate: blot_check_core::A
 struct MemberSpan { start: i64, len: i64 }
 fn dirtySelections(gate: const Gate&, dirty: bool[:]) -> Error {
     var candidates: blot_check_core::Associated[>..<] = []; var members: blot_check_core::DependencyMember[>..<] = [];
-    var scanned: dictionary<i64,MemberSpan> = default<dictionary<i64,MemberSpan>>();
+    var scanned: dictionary<i64,MemberSpan> = dictionary<i64,MemberSpan>{};
     while true {
         let known = candidates.len;
         for module, unit in gate.units { for candidate in module.associated {
@@ -348,12 +348,12 @@ fn catalogEqual(previous: const Module&, current: const Module&, constant_types:
 fn namespaceEqual(old: const Pools&, units: const Module[:], previous: View, current: View) -> bool {
     if previous.owners.len != units.len || current.owners.len != units.len || previous.symbols.len == 0 || previous.symbols.len != current.symbols.len || !blot_structural::equal(previous, current) { return false; }
     if current.symbols[0].start != 0 || current.symbols[0].len != 0 { return false; }
-    var paths: dictionary<const u8[:],bool> = default<dictionary<const u8[:],bool>>();
+    var paths: dictionary<const u8[:],bool> = dictionary<const u8[:],bool>{};
     for module, index in units {
         let pin = old.modules[index]; if module.unit != index + 1 || pin.unit != index + 1 || pin.module.unit != pin.unit { return false; }
         let path = current.owner((index + 1) as u32); if !path.present || !validText(path.value) || path.value != pin.canonical_path || paths.contains(path.value) { return false; } paths.insert(path.value, true);
     }
-    var spellings: dictionary<const u8[:],bool> = default<dictionary<const u8[:],bool>>();
+    var spellings: dictionary<const u8[:],bool> = dictionary<const u8[:],bool>{};
     for index in 1..current.symbols.len { let spelling = current.symbol(index as u32); if !spelling.present || !validText(spelling.value) || spellings.contains(spelling.value) { return false; } spellings.insert(spelling.value, true); } return true;
 }
 fn validText(bytes: const u8[:]) -> bool { if bytes.len == 0 || !blot_backend_runtime_identity::validUtf8(bytes) { return false; } for byte in bytes { if byte == 0 { return false; } } return true; }

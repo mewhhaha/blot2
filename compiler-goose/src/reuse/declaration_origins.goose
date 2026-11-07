@@ -34,7 +34,7 @@ fn collect(entries: dictionary<const u8[:], Pair>&, module: const blot_check_cor
 fn mark(old: const blot_check_core::Module&, current: const blot_check_core::Module&, admitted: bool[:]) -> Error {
     if admitted.len != current.bindings.len { abort("declaration origin admission shape"); }
     for &item in admitted { item = false; }
-    var entries: dictionary<const u8[:], Pair> = default<dictionary<const u8[:], Pair>>();
+    var entries: dictionary<const u8[:], Pair> = dictionary<const u8[:], Pair>{};
     let first = collect(entries, old, true); if first != blot_error::Error.none { return first; }
     let second = collect(entries, current, false); if second != blot_error::Error.none { return second; }
     for slot in entries.slots {

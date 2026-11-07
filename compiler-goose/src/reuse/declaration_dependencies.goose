@@ -23,7 +23,7 @@ struct Capture {
 }
 fn withCapture<C,F>(module: const Module&, context: C, selection: bool = false, watched: u32 = 0) {
     var work: Work[>..<] = []; var references: BindingRef[>..<] = []; var locations: u32[>..<] = []; var members: Member[>..<] = [];
-    var schemes: dictionary<u32,bool> = default<dictionary<u32,bool>>();
+    var schemes: dictionary<u32,bool> = dictionary<u32,bool>{};
     var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: schemes, watched_binding: watched, selection: selection , ..};
     return F(scan, context);
 }
@@ -168,7 +168,7 @@ fn operator(op: blot_check_core::Op) -> blot_support::Option<blot_check_types::O
 }
 fn capture(module: Module&, declarations: Recipe[>..<]&, references: BindingRef[>..<]&, members: Member[>..<]&) -> Error {
     assert(module.declaration_dependencies.len == 0); assert(declarations.len == 0 && references.len == 0 && members.len == 0);
-    var work: Work[>..<] = []; var locations: u32[>..<] = []; var seen: dictionary<u32,bool> = default<dictionary<u32,bool>>();
+    var work: Work[>..<] = []; var locations: u32[>..<] = []; var seen: dictionary<u32,bool> = dictionary<u32,bool>{};
     var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: seen , ..};
     for index in module.bodies.len { declarations.push(Recipe {..}); }
     for body, offset in module.bodies[1..] { let recipe, error = scan.scan(body); if error != blot_error::Error.none { declarations.clear(); references.clear(); members.clear(); return error; } declarations[offset + 1] = recipe; }

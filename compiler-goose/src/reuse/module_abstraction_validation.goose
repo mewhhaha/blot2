@@ -95,7 +95,7 @@ fn requirement(scan: Scan&, owner: const Interface&, predicate: blot_check_types
     return blot_error::Error.none;
 }
 fn coreGraph(module: const Module&) -> blot_check_frozen_types::Graph {
-    return blot_check_frozen_types::Graph { nodes: module.types.nodes, extra: module.types.extra, rows: module.types.effects.rows, labels: module.types.effects.labels, operations: module.types.operations, quantifier_goals: module.types.quantifier_goals, quantifier_obligations: module.types.quantifier_obligations, row_variable_count: module.types.effects.variable_count , ..};
+    return blot_check_frozen_types::Graph { nodes: module.types.nodes, extra: module.types.extra, rows: module.types.effects.rows, labels: module.types.effects.labels, operations: module.types.operations, row_variable_count: module.types.effects.variable_count, quantifier_goals: module.types.quantifier_goals, quantifier_obligations: module.types.quantifier_obligations, .. };
 }
 fn storageContracts(owner: const Interface&, implementation: const Module&) -> Error {
     var entries: blot_backend_opaque_storage::AuthorityEntry[>..<] = [];

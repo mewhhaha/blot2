@@ -73,9 +73,9 @@ fn judgments(m: const Module&, id: Id) -> Judgments, Error {
     let info = m.resolverInfo(id); let arguments = m.resolverArguments(id); var arity: i64 = 1; if info.operation == blot_check_core::ResolverOperation.monad { arity = 0; } if info.operation == blot_check_core::ResolverOperation.bind || info.operation == blot_check_core::ResolverOperation.iterate { arity = 2; }
     if arguments.len != arity { return Judgments {..}, blot_error::Error.invalid_artifact; } let span = m.span(id); let provider = m.typeOf(info.resolver); var result = Judgments {..};
     if info.operation == blot_check_core::ResolverOperation.monad || info.operation == blot_check_core::ResolverOperation.forward || info.operation == blot_check_core::ResolverOperation.run { if info.member != 0 || info.method.unit != 0 || info.method.binding != 0 || info.method_type != 0 { return result, blot_error::Error.invalid_artifact; } }
-    else { if info.member == 0 || info.method_type == 0 { return result, blot_error::Error.invalid_artifact; } result.dispatch = blot_support::some(blot_check_core::Obligation { kind: blot_check_types::ObligationKind.resolver_dispatch, ty: provider, other: info.method_type, result: node.ty, name: info.member, span: span , ..}); }
-    if info.operation == blot_check_core::ResolverOperation.monad { result.factory = blot_support::some(blot_check_core::Obligation { kind: blot_check_types::ObligationKind.monad_factory, ty: provider, result: node.ty, span: span , ..}); }
-    else { result.result = blot_support::some(blot_check_core::Obligation { kind: blot_check_types::ObligationKind.resolver_shape, ty: provider, result: node.ty, span: span , ..}); }
+    else { if info.member == 0 || info.method_type == 0 { return result, blot_error::Error.invalid_artifact; } result.dispatch = blot_support::some(blot_check_core::Obligation { ty: provider, kind: blot_check_types::ObligationKind.resolver_dispatch, span: span, name: info.member, result: node.ty, other: info.method_type, .. }); }
+    if info.operation == blot_check_core::ResolverOperation.monad { result.factory = blot_support::some(blot_check_core::Obligation { ty: provider, kind: blot_check_types::ObligationKind.monad_factory, span: span, result: node.ty, .. }); }
+    else { result.result = blot_support::some(blot_check_core::Obligation { ty: provider, kind: blot_check_types::ObligationKind.resolver_shape, span: span, result: node.ty, .. }); }
     if info.operation == blot_check_core::ResolverOperation.run { result.callback = arguments[0]; } return result, blot_error::Error.none;
 }
 fn resolverIdentity(m: const Module&, resolver: blot_check_types::Id) -> blot_support::Option<Identity> {
@@ -87,9 +87,9 @@ fn nominal(m: const Module&, units: const ModuleRef[:], family: Identity, remain
         { let optional_binding_38 .= found; if optional_binding_38 { let found .= optional_binding_38; producer .= found;  } else { return default<blot_check_core::Nominal>(), blot_error::Error.invalid_artifact; } }
         let error = blot_check_scheme_equations::bounds( producer, blot_check_frozen_core_validation::Context { units , ..}); if error != blot_error::Error.none { return default<blot_check_core::Nominal>(), error; }
     }
-    var found .= blot_support::none<blot_check_core::Nominal>();
+    var found = blot_support::none<blot_check_core::Nominal>();
     for entry in producer.nominals { if remaining == 0 { return default<blot_check_core::Nominal>(), blot_error::Error.invalid_artifact; } remaining -= 1;
-        if !blot_check_staging_type_match::sameIdentity(producer, entry.identity, m, family) { continue; } if found.present || (entry.private && producer.owner_id != m.owner_id) { return default<blot_check_core::Nominal>(), blot_error::Error.invalid_artifact; } found .= blot_support::some(entry);
+        if !blot_check_staging_type_match::sameIdentity(producer, entry.identity, m, family) { continue; } if found.present || (entry.private && producer.owner_id != m.owner_id) { return default<blot_check_core::Nominal>(), blot_error::Error.invalid_artifact; } found = blot_support::some(entry);
     } if !found.present { return default<blot_check_core::Nominal>(), blot_error::Error.invalid_artifact; } return found.value, blot_error::Error.none;
 }
 fn factory(m: const Module&, units: const ModuleRef[:], goal: blot_check_core::Obligation, remaining: i64&) -> bool, Error { return factoryWorkspace(m, units, goal, remaining, null); }

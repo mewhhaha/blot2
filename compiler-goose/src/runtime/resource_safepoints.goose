@@ -30,12 +30,12 @@ fn run(module: const Module&, function: Function) -> blot_support::Option<blot_b
     locals.append(module.locals(function));
     let source = blot_backend_wasm::instructions(module,function);
     for inst in source {
-        if before(module, inst) { code.push(IR { op:blot_backend_runtime_ir::OP_call_import,operand:drain,..}); }
+        if before(module, inst) { code.push(IR { operand:drain,op:blot_backend_runtime_ir::OP_call_import,..}); }
         code.push(inst);
-        if after(module, inst) { code.push(IR { op:blot_backend_runtime_ir::OP_call_import,operand:drain,..}); }
+        if after(module, inst) { code.push(IR { operand:drain,op:blot_backend_runtime_ir::OP_call_import,..}); }
     }
     if source.len == 0 || source[source.len - 1].op != blot_backend_runtime_ir::OP_return_ {
-        code.push(IR { op:blot_backend_runtime_ir::OP_call_import,operand:drain,..});
+        code.push(IR { operand:drain,op:blot_backend_runtime_ir::OP_call_import,..});
     }
     let result,error=blot_backend_runtime_ir::cloneBody(locals[..],code[..]);if error!=blot_error::Error.none {return blot_support::none<blot_backend_runtime_ir::DetachedBody>(),error;}return blot_support::some(result),blot_error::Error.none;
 }

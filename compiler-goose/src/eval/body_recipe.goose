@@ -21,7 +21,7 @@ fn appendSlice(self_: Pending&,ids: const u32[:]) -> Error { if ids.len>self_.li
 fn pop(self_: Pending&) -> u32,bool { if self_.items.len==0 { return 0,false; } let id=self_.items[self_.items.len-1]; self_.items.resize(self_.items.len-1); return id,true; }
 fn appendChild<W,A,B>(work:W&,first:A&,second:B&,id:u32)->Error {return work.append(id);}
 fn appendChildSlice<W,A,B>(work:W&,first:A&,second:B&,ids:const u32[:])->Error {return work.appendSlice(ids);}
-fn appendChildren<W>(work:W&,module:const Module&,id:u32,callables:bool)->Error {var first:u8=0;var second:u8=0;return visitChildren<W,u8,u8>(work,first,second,module,id,callables,appendChild,appendChildSlice);}
+recursive fn appendChildren<W>(work:W&,module:const Module&,id:u32,callables:bool)->Error {var first:u8=0;var second:u8=0;return visitChildren<W,u8,u8>(work,first,second,module,id,callables,appendChild,appendChildSlice);}
 recursive fn visitChildren<W,A,B,F,G>(work: W&,first:A&,second:B&,module: const Module&,id: u32,callables: bool) -> Error {
  let n=module.node(id); let tag=n.tag;
  if callables&&tag==blot_check_core::Tag.apply&&module.node(n.a).tag==blot_check_core::Tag.closure { let err=F(work,first,second,module.closure(n.a).body); if err!=blot_error::Error.none { return err; } }

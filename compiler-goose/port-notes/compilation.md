@@ -4,26 +4,27 @@ The user explicitly requested fixing and recompiling the port. Verification is
 active; there is no remaining approval or source-writing barrier. Keep the Zig
 compiler, normal toolchain, saved oracle and siblings unchanged.
 
-Checkpoint `b499ece1e068833e13ba430e415e03ac46d4fd8e` is pushed to main. It preserves
-scalar projection/staging state, admission metadata and proof-root repairs. No successful
-whole compiler executable exists yet. Upstream Goose parses roughly 35,800
-declarations across 436 files in about one second. Whole-program type checking
-has not completed successfully.
+Checkpoint `21df1327d71c67b151baacbb8ee54d5801ddc120` is pushed to main. It
+qualifies the isolated parser controls described below; earlier checkpoints
+preserve scalar validation frames, proof receipts and the optional checker recipe.
+No successful whole compiler executable exists yet. Upstream Goose parses roughly
+35,900 declarations across 439 files in about one second. Whole-program type
+checking has not completed successfully.
 
 Use `python3 compiler-goose/tools/check_source.py --phase check --log NAME`.
 The runner caps and kills the process group and saves full diagnostics under
 `build/goose-port/verification/`. Check mode uses streaming text diagnostics;
 JSON diagnostics buffer until completion and hid errors in capped runs.
 Check mode stops the process group after the first error. The later source
-frontier now takes about 60–65 seconds to reach; current checks use a bounded
-90-second cap. A no-error timeout is not a pass. Exactly one coordinator runs
+frontier now takes about 50–70 seconds to reach with the explicitly selected
+private checker; current attempts use a bounded 120-second stage cap. A no-error timeout is not a pass. Exactly one coordinator runs
 whole-program checks. The coordinator now runs actual C-emission/link attempts
 with first-error interruption, saving `build-N.log`, `build-N.json` and the exact
 source/toolchain manifest under the same evidence directory.
 
 The actual build entry remains `compiler-goose/build.py`, with explicit Goose
 binary and standard-library directory. Repair attempts currently use a bounded
-90-second stage cap; the default remains 30 seconds. Do not claim a
+120-second stage cap; the default remains 30 seconds. Do not claim a
 working compiler until C emission, linking and execution have succeeded.
 
 The official repair loop has advanced through solver, projection and staging
@@ -178,10 +179,51 @@ Goose compiler.
 Runtime recoverable physical OOM and retention parity remain separate known
 production requirements; null/unavailable metrics do not close them.
 
-The current source-only batch includes the private checker recipe, executed
-scalar-frame laws, canonical source-body receipts and pure construction/budget
-boundaries. Build154 clears those boundaries and reaches scheme importing;
-its mismatched table field and thirteen scalar/sequence append operations are
-repaired. Build156 now rejects a resizable local importer buffer across recursion; fixed
-pooled scratch is the next repair. This checkpoint does not contain a working
-compiler executable.
+The next source-only batch replaces recursive importer-local arrays with pooled
+fixed descriptors, using lazy growth after child success and unchanged fuel
+charges. Extracted-helper execution covers all 22 fuel boundaries, ordering,
+recursive pool reuse and cleanup. Fresh Principal construction and returned
+proofs use pure factory boundaries with all scalar fields and real resolvers
+preserved. SharedGoal keys contain admission-scoped scalar owner identities.
+Build163 advances through those repairs to a mixed-root slice rebinding in
+package goal checking. This batch still contains no working compiler executable.
+
+The parser now passes an independent native differential against the pinned Zig
+oracle: all 44 compiler fixtures plus 19 malformed/UTF8/fixity/depth controls
+match token/node/extra/symbol counts and every diagnostic code/span/token/origin
+field. Tracked parser laws separately inspect AST shape, Boolean precedence,
+inherited/local fixities, staging/proof recognition, recovery and depth limits.
+Source/token roots travel directly through 80 private helpers; public parse APIs
+are unchanged. Exact operator-name enums/functions live in two shared import-free
+schemas, reducing the parser closure from 436 to 14 files. Official emission,
+linking and runtime take 0.587/0.343/0.020 seconds for the differential runner.
+All four tracked engine suites pass. This qualifies those parser controls, not
+whole-compiler execution or arbitrary AST output parity.
+
+The current source batch annotates proven recursive call cycles, fixes named
+constructor order, and uses typed temporaries at each original evaluation point
+when calls and other field reads must retain their order. Static source audits
+and parsing do not establish integrated runtime parity. Build165 was interrupted
+after review caught misplaced temporary declarations; that run is rejected as
+qualification evidence. The corrected source requires a fresh attempt.
+
+Nested executable/call validation no longer stores a local Admission in a
+caller's longer-lived Workspace. An empty-parent entry clones the scalar
+workspace into its invocation, binds its local admission there, and publishes
+scalar results on return. Existing-parent calls retain the same admission and
+budget identity checks. Actual extracted entry bodies pass both selected Goose
+checkers with a scalar proof stand-in, including failure/OOM propagation and
+cleanup. Real Principal-return provenance remains for the whole build to check;
+the stand-in does not qualify that return. Staging's fresh proofs use the same
+pure Principal factory with their original roots, rows and flags.
+
+The corrected constructor batch passes independent review of 64 temporary groups
+and 700 initializer expressions: expression roundtrips match and no declaration
+crosses prior control flow or effects. All four live engine suites pass in
+0.236/0.186/0.133/1.946 seconds. Build166 reaches a later resolver Option-value
+binding error; build167 reaches a dynamic dictionary initialized with
+`default<T>()`. Both errors are repaired, including all eleven direct dictionary
+sites; a fresh whole-program parse passes in 0.954 seconds. These are later
+failing frontiers, not completed compiler timing. Build169 is the next actual
+emission attempt. Returned-proof and integrated runtime qualification remain
+pending; the unchanged Zig oracle is still the only runnable full compiler.

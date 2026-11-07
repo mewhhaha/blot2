@@ -139,7 +139,7 @@ fn activate(self_:Cache&)->Error {if self_.lease!=0 {assert(valid(self_));return
 fn retain(self_:Cache&,body:const Body&)->Error {
  let opened=self_.activate();if opened!=blot_error::Error.none {return opened;}assert(body.owner.live);var index:i64=-1;for &candidate,at in body.owner.bodies {if candidate .== body {index=at;break;}}
  if index<0 {return blot_error::Error.dependency_limit;}let error=blot_support_pooled_buffer::ensure(self_.bodies,self_.bodies.len+1,lease_runs);if error!=blot_error::Error.none {return error;}
- reserveNames(self_.index,self_.index.count+1);let at=self_.bodies.len;self_.bodies.storage[at]=Lease{body.owner,index, ..};self_.bodies.items=self_.bodies.storage[..at+1];self_.bodies.len=at+1;blot_support_pooled_map::insert(self_.index,body.name,at,name_slots);let owner_at=chunkIndex(body.owner);assert(owner_at>=0);chunks[owner_at].references+=1;return blot_error::Error.none;
+ reserveNames(self_.index,self_.index.count+1);let at=self_.bodies.len;self_.bodies.storage[at]=Lease{body.owner,index, ..};self_.bodies.items=self_.bodies.storage[..at+1];self_.bodies.len=at+1;blot_support_pooled_map::insert<NameMap,const u8[:],i64>(self_.index,body.name,at,name_slots);let owner_at=chunkIndex(body.owner);assert(owner_at>=0);chunks[owner_at].references+=1;return blot_error::Error.none;
 }
 fn reserveNames(map:NameMap&,needed:i64) {var capacity=max(8,map.slots.len);while needed*3>capacity*2 {capacity*=2;}if capacity!=map.slots.len {blot_support_pooled_map::grow(map,capacity,name_slots);}}
 fn deinit(self_:Cache&) {
@@ -149,7 +149,7 @@ struct LiveBytes {bytes:i64=0,types:i64=0}
 fn compact(self_:Cache&)->Error {
  let opened=self_.activate();if opened!=blot_error::Error.none {return opened;}var live=dictionary<u64,LiveBytes>{};for lease in self_.bodies.items {let body=lease.body();let slot=chunkIndex(body.owner) as u64;let current .= live.get(slot);var entry=LiveBytes{..};if current {entry=current;}entry.bytes+=body.bytes();entry.types+=body.type_work;live.insert(slot,entry);}
  var index:i64=0;while index<self_.bodies.len {let body=self_.bodies.items[index].body();let slot=chunkIndex(body.owner) as u64;let active .= live.get(slot);assert(active!=null);if active.bytes>=(body.owner.body_bytes+1)/2 && active.types>=(body.owner.type_work+1)/2 {index+=1;continue;}
- blot_support_pooled_map::remove(self_.index,body.name);let length=self_.bodies.len-1;self_.bodies.storage[index]=self_.bodies.storage[length];self_.bodies.items=self_.bodies.storage[..length];self_.bodies.len=length;if index<length {blot_support_pooled_map::insert(self_.index,self_.bodies.items[index].body().name,index,name_slots);}body.owner.release();}return blot_error::Error.none;
+ blot_support_pooled_map::remove(self_.index,body.name);let length=self_.bodies.len-1;self_.bodies.storage[index]=self_.bodies.storage[length];self_.bodies.items=self_.bodies.storage[..length];self_.bodies.len=length;if index<length {blot_support_pooled_map::insert<NameMap,const u8[:],i64>(self_.index,self_.bodies.items[index].body().name,index,name_slots);}body.owner.release();}return blot_error::Error.none;
 }
 struct Payload {bytes:i64=0,graph_nodes:i64=0,chunks:i64=0}
 fn payload(self_:const Cache&)->Payload,Error {

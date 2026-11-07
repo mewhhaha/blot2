@@ -30,7 +30,7 @@ fn release(selected:bool[:]) {if selected.len!=0 {flag_runs.free_slice(selected)
 fn list(self_:const Graph&,range:List)->const Id[:] {return self_.edges[range.start..range.start+range.len];}
 fn init(declarations:const Declaration[:])->Graph,Error {
  if declarations.len>=none {return Graph{..},blot_error::Error.invalid_dependency_graph;}
- var ids:dictionary<BindingRef,Id> =default<dictionary<BindingRef,Id>>();
+ var ids:dictionary<BindingRef,Id> =dictionary<BindingRef,Id>{};
  for declaration,index in declarations {if declaration.target.unit==0 || declaration.target.binding==0 || ::contains(ids,declaration.target) {return Graph{..},blot_error::Error.invalid_dependency_graph;}::insert(ids,declaration.target,index as Id);}
  let nodes=node_runs.alloc_slice(declarations.len);var edges:Id[>..<]=[];
  for declaration,index in declarations {let start=edges.len;for reference in declaration.references {let id .= ::get(ids,reference);if !id {node_runs.free_slice(nodes);return Graph{..},blot_error::Error.invalid_dependency_graph;}edges.push(id);}let candidate_start=edges.len;for candidate in declaration.candidates {let id .= ::get(ids,candidate);if !id {node_runs.free_slice(nodes);return Graph{..},blot_error::Error.invalid_dependency_graph;}edges.push(id);}if edges.len>none {node_runs.free_slice(nodes);return Graph{..},blot_error::Error.invalid_dependency_graph;}nodes[index]=Node{target:declaration.target,references:List{start:start as u32,len:(candidate_start-start) as u32},candidates:List{start:candidate_start as u32,len:(edges.len-candidate_start) as u32},is_function:declaration.is_function,runtime:declaration.runtime,exported:declaration.exported};}

@@ -50,17 +50,17 @@ fn deinit(self_: Workspace&) { self_.module_count = 0; self_.admission .= null; 
 fn proved(self_: const Workspace&, module: const Module&) -> bool {return provedOwner(self_,module.owner_id);}
 fn provedOwner(self_:const Workspace&,owner_id:u64)->bool {if owner_id==0 {return false;}for index in 0..self_.module_count {if self_.modules[index]==owner_id {return true;}}return false;}
 fn convert(error: Error) -> Error { if error == blot_error::Error.none || error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.invalid_artifact; }
+// These identities are scoped to immutable source admission and the solver's checked prefix.
+// They do not certify revisions of mutable module views.
 struct SharedGoal {
-    producer: Module, origin: blot_support::Option<Module>   = blot_support::none<Module>(), binding: u32, call_owner: Id, resolver_callback: Id, goal_depth: i64,
+    producer_owner: u64, origin_owner: blot_support::Option<u64> = blot_support::none<u64>(), binding: u32, call_owner: Id, resolver_callback: Id, goal_depth: i64,
     ambient: u32, foreign_allowed: bool, type_count: u8, row_count: u8, arguments: Id[128] = [0; 128],
 }
 fn hash(key:Body)->u64 {return ::hash_combine(::hash_combine(::hash(key.module_owner),::hash(key.unit)),::hash(key.binding));}
-// Module IDs keep hashing independent of large borrowed graph contents.
-// Structural key equality still decides SharedGoal hits; equal keys have equal IDs.
 fn hash(key:SharedGoal)->u64 {
- var value=::hash(key.producer.owner_id);
- value=::hash_combine(value,::hash(key.origin.present));
- if key.origin.present {value=::hash_combine(value,::hash(key.origin.value.owner_id));}
+ var value=::hash(key.producer_owner);
+ value=::hash_combine(value,::hash(key.origin_owner.present));
+ if key.origin_owner.present {value=::hash_combine(value,::hash(key.origin_owner.value));}
  value=::hash_combine(value,::hash(key.binding));
  value=::hash_combine(value,::hash(key.call_owner));
  value=::hash_combine(value,::hash(key.resolver_callback));
@@ -135,9 +135,10 @@ fn sharedAuthority(self_: Solver&, views: Views&) -> bool, Error {
     }
     if self_.shared_authority.present { return matches(self_.shared_authority.value, views), blot_error::Error.none; } self_.shared_authority = blot_support::some(captureAuthority(views)); return true, blot_error::Error.none;
 }
-fn sharedGoalHit(self_: Solver&, key: SharedGoal, depth: i64) -> bool { if key.producer.owner_id == 0 { return false; } { let optional_binding_78 .= self_.shared_goals.get(key); if optional_binding_78 { let proved_depth .= optional_binding_78; if depth > proved_depth { return false; } self_.shared_goal_hits += 1; return true;  } } return false; }
+fn sharedGoalOwners(key:const SharedGoal&)->bool {return key.producer_owner!=0 && (!key.origin_owner.present || key.origin_owner.value!=0);}
+fn sharedGoalHit(self_: Solver&, key: SharedGoal, depth: i64) -> bool { if !sharedGoalOwners(key) { return false; } { let optional_binding_78 .= self_.shared_goals.get(key); if optional_binding_78 { let proved_depth .= optional_binding_78; if depth > proved_depth { return false; } self_.shared_goal_hits += 1; return true;  } } return false; }
 fn rememberSharedGoal(self_: Solver&, key: SharedGoal, depth: i64) -> Error {
-    if key.producer.owner_id == 0 { return blot_error::Error.none; } { let optional_binding_77 .= self_.shared_goals.get(key); if optional_binding_77 { let proved_depth .= optional_binding_77; self_.shared_goals.insert(key, max(proved_depth, depth)); return blot_error::Error.none;  } }
+    if !sharedGoalOwners(key) { return blot_error::Error.none; } { let optional_binding_77 .= self_.shared_goals.get(key); if optional_binding_77 { let proved_depth .= optional_binding_77; self_.shared_goals.insert(key, max(proved_depth, depth)); return blot_error::Error.none;  } }
     if self_.shared_goals.count >= 65536 { return blot_error::Error.none; } self_.shared_goals.insert(key, depth); return blot_error::Error.none;
 }
 fn deinit(self_: Solver&) { self_.shared_authority.present = false; self_.shared_goals.deinit(); self_.rigid_type_overflow.deinit(); self_.rigid_rows.deinit(); self_.store.deinit(); }
@@ -173,7 +174,7 @@ fn copy(self_: Solver&, copier: Import&, root: Id) -> Id, Error { let error = st
 fn bounds(module: const Module&, context: blot_check_frozen_core_validation::Context) -> Error {
     return blot_check_frozen_core_validation::validateBounds(module, context);
 }
-fn withSolver<C,F>(module:const Module&,views:Views&,remaining:i64&,context:C&)->Error {let initialized,error=blot_check_types::initPooled();if error!=blot_error::Error.none {return error;}var solver,error=init(initialized,module,views,remaining,SolverTables{..});if error!=blot_error::Error.none {return error;}let failure=F(context,solver);deinit(solver);return failure;}
+recursive fn withSolver<C,F>(module:const Module&,views:Views&,remaining:i64&,context:C&)->Error {let initialized,error=blot_check_types::initPooled();if error!=blot_error::Error.none {return error;}var solver,error=init(initialized,module,views,remaining,SolverTables{..});if error!=blot_error::Error.none {return error;}let failure=F(context,solver);deinit(solver);return failure;}
 fn saveSourceRows(self_: Admission&, module: const Module&, rows: const u32[:]) -> Error {
     let copied, lease, error = blot_check_scheme_dependencies::copySnapshot(rows); if error != blot_error::Error.none { return error; } self_.source_rows.push(SourceRows { module.owner_id, copied, lease , ..});if self_.source_rows.failure!=blot_error::Error.none {let released=blot_check_scheme_dependencies::releaseSnapshot(lease);assert(released==blot_error::Error.none);return self_.source_rows.failure;}return blot_error::Error.none;
 }
