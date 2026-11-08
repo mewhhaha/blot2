@@ -132,3 +132,6 @@ fn buildNamed<E>(engine:E&,source:u32,scope:blot_check_types::List,owner:u32,sco
  result.scope=binding_pool.alloc_slice(builder.scope.items.len);for binding,index in builder.scope.items {result.scope[index]=binding;builder.scope.items[index].name=[];}
  result.requirements=requirement_pool.alloc_slice(builder.requirements.items.len);for requirement,index in builder.requirements.items {result.requirements[index]=requirement;builder.requirements.items[index].name=blot_support::none<const u8[:]>();}result.truncated=builder.truncated;let __cleanup_result_34_0: Snapshot = result; let __cleanup_result_34_1: Error = blot_error::Error.none; {builder.deinit();} return __cleanup_result_34_0, __cleanup_result_34_1;
  {builder.deinit();} }
+
+// Recover this owned diagnostic view without copying or retaining its live runs.
+fn canonicalOwned(value:Snapshot)->Snapshot{return Snapshot{expected:value.expected,nodes:node_pool.realloc_slice(value.nodes,value.nodes.len),edges:edge_pool.realloc_slice(value.edges,value.edges.len),scope:binding_pool.realloc_slice(value.scope,value.scope.len),requirements:requirement_pool.realloc_slice(value.requirements,value.requirements.len),enclosing:value.enclosing,truncated:value.truncated};}

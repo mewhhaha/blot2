@@ -225,3 +225,7 @@ fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_expla
 fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Side) -> blot_error::Error { return writer.enumValue(value); }
 fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Outcome) -> blot_error::Error { return writer.enumValue(value); }
 fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::ContextKind) -> blot_error::Error { return writer.enumValue(value); }
+
+// Existing payload ownership keeps these unchanged runs live through transfer.
+fn canonicalText(value:Text)->Text{if !value.present {return blot_support::none<const u8[:]>();}return blot_support::some<const u8[:]>(text_runs.realloc_slice(value.value,value.value.len));}
+fn canonicalOwned(value:Explanation)->Explanation{return Explanation{operation:canonicalText(value.operation),member:canonicalText(value.member),candidates:candidate_runs.realloc_slice(value.candidates,value.candidates.len),steps:step_runs.realloc_slice(value.steps,value.steps.len),contexts:context_runs.realloc_slice(value.contexts,value.contexts.len),truncated:value.truncated};}

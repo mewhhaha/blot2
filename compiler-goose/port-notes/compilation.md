@@ -37,7 +37,7 @@ source/toolchain manifest. From attempt175, an immutable input copy is kept at
 copying. Capture175 costs 0.1865 seconds. Later live edits cannot mix with those
 inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
-(currently 45 seconds), then terminates the build and its compiler process group. A timeout is not a pass.
+(currently15 seconds; previously45), then terminates the build and its compiler process group. A timeout is not a pass.
 
 Checkpoint `0e84f55bea07a49cf3fb74957923779ff717ada7` preserves the first
 frame, recursive-scratch, constructor and slice-selection repairs. Later repairs
@@ -51,20 +51,23 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen256 inputs. Its completed run
-stops after94.80s with3 diagnostics: a malformed specialization initializer,
-Gate closure borrowing and GlobalContext field evaluation order. Whole C emission,
-linking, CLI and Wasm qualification remain pending. The batch uses exact archive
-owner recovery, typed empty previous inputs, canonical context runs, a scalar
-path dirnameEnd API, one origin snapshot per Workspace, actual SymbolPool lookup
-tuples and initialized stack scratch. Real diagnostic publication/cleanup/hash,
-archive/recipe and path golden controls pass their pinned source candidates.
-Diagnostic publication adds a nested payload copy; the projection snapshot copies
-once when any origin is true; scratch initialization adds unmeasured zeroing.
-Independent callbacks are diagnostic aids. Unsupported dummy constructors and
-unreproduced borrow warnings do not establish production bugs. Numeric high-water
-backing and O(n+m) overlap remain disclosed. Full counts come from completed logs
-with a45-second collection window; timings are failing prefixes. The private
+per stage. This checkpoint preserves exact frozen260 inputs. Whole parsing passes
+440 files. Its completed run stops after60.73s with1 captured diagnostic: nested
+Constraint slices during region snapshot restoration. The collection window is
+now15seconds after first error instead of45; this shorter failed prefix is not a
+compiler performance result or complete remaining-error count. Whole C emission,
+linking, CLI and Wasm qualification remain pending. Explicit original input borrows
+now reach nested artifact gates, Session and solver descriptors recover their
+existing owners, diagnostics/coverage transfers use exact owned runs, and scalar
+children avoid long recursive tree borrows. Private region caller labels are14
+registered literals plus empty; canonical descriptors preserve lines without
+allocation/text copies. Actual timing record stack-overwrite/resume and negative
+controls pass both checkers. Earlier diagnostic/archive/path controls retain their
+pinned source scopes. Additional costs remain: diagnostic payload copies, one
+origin snapshot per Workspace when any flag is true, stack scratch zeroing and
+numeric high-water backing. The12 append-only catalog proposal is not integrated;
+capability_roots really shrinks. Independent callbacks are diagnostic aids; dummy
+defaults and unreproduced borrow warnings are not production-bug proof. The private
 checker retains bounded1M clone/separate100k tail limits and201 frontend/8 runtime
 parity controls.
 

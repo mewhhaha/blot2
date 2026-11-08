@@ -134,15 +134,14 @@ fn initWithStamps(allocation_owner: u64, old: const Pools&, units: const Module[
     var symbol_count: i64 = 0; if old.identity.present { symbol_count = old.identity.value.symbols.len; } let symbol_map = unit_words.alloc_slice(symbol_count);
     for &word in unit_map { word = 0; } for &flag in stable { flag = false; } for &word in symbol_map { word = 0; }
     var result = Importer { allocation_owner: allocation_owner, old: old, units: units, unit_map: unit_map, symbol_map: symbol_map, stable: stable , ..};
-    let error = result.initialize(names, cached_units, stamps); if error != blot_error::Error.none { result.deinit(); return Importer {..}, error; } return result, blot_error::Error.none;
+    let error = result.initialize(old, units, names, cached_units, stamps); if error != blot_error::Error.none { result.deinit(); return Importer {..}, error; } return result, blot_error::Error.none;
 }
-fn initialize(self_: Importer&, names: blot_support::Option<View>, cached_units: i64, stamps: blot_reuse_code_artifacts::ModuleStamps?) -> Error {
+fn initialize(self_: Importer&, old: const Pools&, units: const Module[:], names: blot_support::Option<View>, cached_units: i64, stamps: blot_reuse_code_artifacts::ModuleStamps?) -> Error {
     var producers = TextMap {..}; var spellings = TextMap {..};
-    let error = self_.initializeMaps(names, cached_units, stamps, producers, spellings);
+    let error = self_.initializeMaps(old, units, names, cached_units, stamps, producers, spellings);
     producers.deinit(); spellings.deinit(); return error;
 }
-fn initializeMaps(self_: Importer&, names: blot_support::Option<View>, cached_units: i64, stamps: blot_reuse_code_artifacts::ModuleStamps?, producers: TextMap&, spellings: TextMap&) -> Error {
-    let old:const Pools& =requiredPools(self_.old);
+fn initializeMaps(self_: Importer&, old: const Pools&, units: const Module[:], names: blot_support::Option<View>, cached_units: i64, stamps: blot_reuse_code_artifacts::ModuleStamps?, producers: TextMap&, spellings: TextMap&) -> Error {
     if !old.project_identity || !names.present || !old.identity.present || cached_units > self_.units.len { return blot_error::Error.none; }
     self_.names = blot_support::some(copyIdentity(names.value)); let current = self_.names.value.view(); let old_names = old.identity.value.view();
     if current.owners.len != self_.units.len || old_names.owners.len != old.modules.len || current.symbols.len == 0 || old_names.symbols.len == 0 { return blot_error::Error.none; }
@@ -164,7 +163,7 @@ fn initializeMaps(self_: Importer&, names: blot_support::Option<View>, cached_un
         let intact, error = blot_reuse_code_artifacts::pinIntact(pin, stamps); if error != blot_error::Error.none { return error; } if !intact { continue; }
         let equal, failure = self_.coreEqual(pin.module, self_.units[mapped - 1]); if failure == blot_error::Error.out_of_memory { return failure; } self_.stable[index] = failure == blot_error::Error.none && equal;
     }
-    let gate, error = blot_reuse_code_body_validity::init(self_.allocation_owner, old, self_.units, names, stamps); if error != blot_error::Error.none { return error; } self_.code_gate = blot_support::some(gate); return blot_error::Error.none;
+    let gate, error = blot_reuse_code_body_validity::init(self_.allocation_owner, old, units, names, stamps); if error != blot_error::Error.none { return error; } self_.code_gate = blot_support::some(gate); return blot_error::Error.none;
 }
 fn initCheckedQuery(allocation_owner: u64, old: const Pools&, units: const Module[:], checked: const Gate&) -> blot_support::Option<Importer>, Error {
     if allocation_owner == 0 || checked.allocation_owner != allocation_owner { return blot_support::none<Importer>(), blot_error::Error.none; } return initIndependentQuery(allocation_owner, old, units, checked);
@@ -436,7 +435,7 @@ fn expressionUnit(self_: const Importer&, source: u32, root: u32) -> u32, Error 
 }
 fn checkFields<G>(self_: const Importer&, g: G&) -> Error {
     let __old:const Pools& =requiredPools(self_.old);
-    if __old.field_locations.len != g.evaluator.field_locations.count() { return blot_error::Error.declined; }
+    if __old.field_locations.len != g.evaluator.field_locations.count { return blot_error::Error.declined; }
     for field in __old.field_locations {
         let source_unit = (field.family >> 32) as u32; let decl = field.family as! u32;
         var mapped = source_unit;

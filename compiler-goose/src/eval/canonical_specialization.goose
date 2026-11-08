@@ -35,7 +35,7 @@ fn allocateRecords(self_: Adapter,len: i64) -> Entry[:],Error { return record_po
 fn releaseRecords(self_: Adapter,records: const Entry[:]) { record_pool.free_slice(records); }
 fn recordBytes(self_: Adapter) -> i64 { return 1+(4*6+1+8+5*16)+8+4+blot_host_layout::evaluator_options+8+blot_host_layout::specialization_record+4+5*16; }
 struct Cache { table: Table,retained_words: i64=0,examined_words: i64=0,reused: i64=0,enabled: bool=true,force_collision: bool=false }
-fn init() -> Cache { return Cache {table:blot_reuse_semantic_query_table::init<Key,retained_words: Proof,examined_words: Replay,reused: Adapter>(Adapter {})}; }
+fn init() -> Cache { let table=blot_reuse_semantic_query_table::init<Key,Proof,Replay,Adapter>(Adapter {});return Cache{table:table}; }
 fn deinit(self_: Cache&) { self_.table.deinit(); }
 fn hash(self_: const Cache&,words: const u64[:],expected: u32,mode: Mode,options: blot_eval_core_eval::Options,depth: i64) -> u64 { if self_.force_collision { return 0; } var value=blot_support_wyhash::init(0); for word in words { value.value(word); } value.value(expected); value.value(modeCode(mode)); value.value(options); value.value(depth); return value.final(); }
 fn eligible<S>(self_: const Cache&,session: const S&,value: u32) -> bool { var ordinary=session.options; ordinary.trace_runtime_dependencies=false; return self_.enabled&&session.receipt_tape==null&&session.principal_reads==null&&session.inquiry_regions==0&&ordinary==blot_eval_core_eval::Options {}&&session.valueInfo(value).kind==blot_eval_eval_values::ValueKind.closure&&self_.examined_words<session.options.max_children&&self_.retained_words<session.options.max_children; }

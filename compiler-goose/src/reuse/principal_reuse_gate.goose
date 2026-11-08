@@ -153,12 +153,11 @@ fn initialize(result: Gate&, old: const Pools&, names: blot_support::Option<View
         for reference in module.dependency_references { var target = reference; if target.unit == 0 { target.unit = (unit + 1) as u32; } if !result.declaration(target).present { return blot_error::Error.none; } }
         for candidate in module.associated { var target = candidate.target; if target.unit == 0 { target.unit = (unit + 1) as u32; } if !result.declaration(target).present { return blot_error::Error.none; } }
     }
-    var reached: u32[>..<] = [];
     for &module, unit in units {
         let pin = old.modules[unit];
         if !structural[unit] {
             for &flag in dirty[result.offsets[unit]..result.offsets[unit + 1]] { flag = true; }
-            let error = blot_reuse_declaration_projection::withWorkspace(pin.module, ProjectContext { result, module, unit, dirty, origins, closures, reached , ..}, projectUnit);
+            let error = blot_reuse_declaration_projection::withWorkspace(pin.module, ProjectContext { result, module, unit, dirty, origins, closures , ..}, projectUnit);
             if error != blot_error::Error.none { return error; }
             continue;
         }
@@ -172,10 +171,10 @@ fn initialize(result: Gate&, old: const Pools&, names: blot_support::Option<View
     result.enabled = true; return blot_error::Error.none;
 }
 // A named callback returns locally so Workspace's lexical cleanup always runs.
-struct ProjectContext { gate: Gate&, module: const Module&, unit: i64, dirty: bool[:], origins: bool[:], closures: u32[:], reached: u32[>..<]& }
+struct ProjectContext { gate: Gate&, module: const Module&, unit: i64, dirty: bool[:], origins: bool[:], closures: u32[:] }
 fn projectUnit(context: ProjectContext, workspace: blot_reuse_declaration_projection::Workspace&) -> Error {
     let gate .= context.gate; let module .= context.module; let unit = context.unit;
-    let dirty = context.dirty; let origins = context.origins; let closures = context.closures; let reached .= context.reached;
+    let dirty = context.dirty; let origins = context.origins; let closures = context.closures; var reached:u32[>..<]=[];
     workspace.prepareOrigins(origins[gate.offsets[unit]..gate.offsets[unit+1]]);
     let pools:const Pools& =requiredPools(gate.source_pools);let pin = pools.modules[unit]; var failure = blot_error::Error.none;
     for binding, index in module.bindings[1..] {
