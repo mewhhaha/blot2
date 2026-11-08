@@ -27,20 +27,21 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen239
-checkpoints312 missing recursive annotations in329 proven Engine cycle members,
-plus pooled legacy-method mappings and matching-cycle construction boundaries.
-Independent direct-call audits agree; aliases/other receivers were excluded.
-Actual matching/projection controls pass both checkers with exact fuel and cleanup;
-controlled selection leaves remain explicit. The completed whole run stops after
-86.66s with2 diagnostics in2 files: a closed-import recursive cycle and native
-scalar append. C emission, linking and execution remain pending. Component
-receipts qualify exact sources, not the complete compiler. Archive decoding adds
-a temporary input snapshot; candidate publication reuses owned output buffers and
-snapshots, and default timing labels need no allocation. The private checker uses
-a1M cumulative clone bound with a separate100k tail traversal;201 frontend and8
-runtime controls match the preceding checker. Failing-prefix durations are not
-completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen243
+checkpoints174 further reviewed recursive annotations across16 files, plus typed
+row-construction boundaries and concrete catalog-key hashes. The wider audit
+rejects qualified/aliased/generic receiver false edges; exact reviewed graphs and
+source hashes are pinned. Option.some now snapshots ordinary values before
+construction;16 value cases and strict same-scope grow-shrink escape controls
+pass both checkers. Explicit reference-valued options are unused and intentionally
+snapshot values under this helper. The completed whole run stops after86.96s
+with2 diagnostics in2 files: a recursive row Context and uninitialized editor
+stack arrays. C emission, linking and execution remain pending. Component
+receipts qualify exact sources and disclosed reduced leaves. Decoder input
+snapshots add a temporary copy; default timing labels need no allocation.
+The private checker uses a1M cumulative clone bound and a separate100k tail
+traversal, with201 frontend/8 runtime parity controls. These are failing-prefix
+durations, not completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

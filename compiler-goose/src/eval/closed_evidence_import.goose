@@ -13,8 +13,8 @@ type Error=blot_error::Error;
 type Tag=blot_eval_type_evidence::Tag;
 struct Frame { start: u32,len: u32 }
 struct Importer { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View,destination: blot_check_types::Store,types: dictionary<u32,u32>&,rows: dictionary<u32,u32>&,binders: u32[>..<]&,frames: Frame[128],scope_count: i64=0 }
-fn ty<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var arguments=Words {}; var goals=Goals {}; var children=Words {}; var fields=Fields {}; let value,error=tyInner(self_,id,depth,arguments,goals,children,fields); arguments.deinit(); goals.deinit(); children.deinit(); fields.deinit(); return value,error; }
-fn tyInner<I>(self_: I&,id: u32,depth: i64,arguments: Words&,goals: Goals&,copied_children: Words&,field_values: Fields&) -> u32,Error {
+recursive fn ty<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var arguments=Words {}; var goals=Goals {}; var children=Words {}; var fields=Fields {}; let value,error=tyInner(self_,id,depth,arguments,goals,children,fields); arguments.deinit(); goals.deinit(); children.deinit(); fields.deinit(); return value,error; }
+recursive fn tyInner<I>(self_: I&,id: u32,depth: i64,arguments: Words&,goals: Goals&,copied_children: Words&,field_values: Fields&) -> u32,Error {
  let destination=target(self_);
  if id<=5 { return id,blot_error::Error.none; } if depth>=256 { return 0,blot_error::Error.type_limit; }
  if self_.scope_count==0 { let known=self_.types.get(id); if known { return known,blot_error::Error.none; } }
@@ -63,12 +63,12 @@ fn tyInner<I>(self_: I&,id: u32,depth: i64,arguments: Words&,goals: Goals&,copie
  } else { return 0,blot_error::Error.type_mismatch; }
  if self_.scope_count==0 { self_.types.insert(id,result); } return result,blot_error::Error.none;
 }
-fn row<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var labels=Words {}; var arguments=Words {}; let value,error=rowInner(self_,id,depth,labels,arguments); labels.deinit(); arguments.deinit(); return value,error; }
-fn rowInner<I>(self_: I&,id: u32,depth: i64,labels: Words&,arguments: Words&) -> u32,Error {
+recursive fn row<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var labels=Words {}; var arguments=Words {}; let value,error=rowInner(self_,id,depth,labels,arguments); labels.deinit(); arguments.deinit(); return value,error; }
+recursive fn rowInner<I>(self_: I&,id: u32,depth: i64,labels: Words&,arguments: Words&) -> u32,Error {
  let destination=target(self_);
  if id==0 { return 0,blot_error::Error.none; } if depth>=256 { return 0,blot_error::Error.type_limit; } if self_.scope_count==0 { let known=self_.rows.get(id); if known { return known,blot_error::Error.none; } }
  let e=destination.chargeProjection(); if e!=blot_error::Error.none { return 0,e; }
- for label in self_.source.effects.rowLabels(id) { arguments.items=arguments.storage[..0];
+ for label in self_.source.effects.rowLabels(id) { blot_support_pooled_buffer::clear(arguments);
   let err=destination.chargeProjection(); if err!=blot_error::Error.none { return 0,err; } let operation=self_.source.effects.operation(label);
   for argument in self_.source.effects.operationArguments(label) { let value,error=ty(self_,argument,depth+1); if error!=blot_error::Error.none { return 0,error; } arguments.push(value); }
   if arguments.failure!=blot_error::Error.none { return 0,arguments.failure; } let value,error=destination.internScopedOperation(operation.identity,operation.instance,arguments.items); if error!=blot_error::Error.none { return 0,error; } labels.push(value);

@@ -302,7 +302,7 @@ recursive fn resolveInner<H>(w: Work<H>&,context: u32,contract: Identity,input: 
 recursive fn proveRequirement<H,R>(w: Work<H>&,context: u32,module: const blot_check_core::Module&,value: blot_check_core::Obligation,mappings: const Mapping[:],rows: const RowMapping[:],resolver_: blot_eval_type_evidence::ProjectionResolver<R>&) -> u32 {
  if !step(w) { return 0; } w.store.prerequisite_edges++;
  if value.kind==blot_check_types::ObligationKind.contract { let product,error=w.host.evidenceStore().projectSelected(module.types,value.ty,mappings,rows,resolver_); if error!=blot_error::Error.none { return fail(w,error); } if w.host.evidenceStore().node(product).tag!=blot_eval_type_evidence::Tag.product { return fail(w,blot_error::Error.type_mismatch); } return resolveInner(w,context,value.identity,w.host.evidenceStore().children(product)); }
- let fact,present,error=closedPredicateFrom(w.host,context,module,value,mappings,rows,resolver_,[]); if error!=blot_error::Error.none { return fail(w,error); } if !present { w.store.failure=blot_support::some(Code.incompatible_implementation); return fail(w,blot_error::Error.incompatible_implementation); } return proveFact(w,context,fact,resolver_);
+ let fact,present,error=closedPredicateFrom(w.host,context,module,value,mappings,rows,resolver_,default<u32[:]>()); if error!=blot_error::Error.none { return fail(w,error); } if !present { w.store.failure=blot_support::some(Code.incompatible_implementation); return fail(w,blot_error::Error.incompatible_implementation); } return proveFact(w,context,fact,resolver_);
 }
 recursive fn proveFact<H,R>(w: Work<H>&,context: u32,value: Fact,resolver_: blot_eval_type_evidence::ProjectionResolver<R>&) -> u32 {
  if !step(w) { return 0; } let self_=w.store; let host .= w.host; let fact_key=FactKey {context,value}; let known=self_.facts.get(fact_key); if known { self_.hits++; return known; }
@@ -349,7 +349,7 @@ fn nominalFields<H,R>(host: H&,context: u32,module: const blot_check_core::Modul
  }
  return FieldCheck.absent,blot_error::Error.none;
 }
-fn closedPredicate<H,R>(host: H&,context: u32,value: blot_check_core::Obligation,mappings: const Mapping[:],rows: const RowMapping[:],resolver_: blot_eval_type_evidence::ProjectionResolver<R>&) -> Fact,bool,Error { let index=owner(host,context); if index<0 { return Fact {},false,blot_error::Error.type_mismatch; } return closedPredicateFrom(host,context,host.units[index],value,mappings,rows,resolver_,[]); }
+fn closedPredicate<H,R>(host: H&,context: u32,value: blot_check_core::Obligation,mappings: const Mapping[:],rows: const RowMapping[:],resolver_: blot_eval_type_evidence::ProjectionResolver<R>&) -> Fact,bool,Error { let index=owner(host,context); if index<0 { return Fact {},false,blot_error::Error.type_mismatch; } return closedPredicateFrom(host,context,host.units[index],value,mappings,rows,resolver_,default<u32[:]>()); }
 fn closedPredicateFrom<H,R>(host: H&,context: u32,module: const blot_check_core::Module&,value: blot_check_core::Obligation,mappings: const Mapping[:],rows: const RowMapping[:],resolver_: blot_eval_type_evidence::ProjectionResolver<R>&,observed: u32[:]) -> Fact,bool,Error {
  let evidence=host.evidenceStore(); var operands: u32[4]=[0;4]; let roots: u32[4]=[value.ty,value.other,value.result,value.signature];
  if value.kind==blot_check_types::ObligationKind.effect_operation {

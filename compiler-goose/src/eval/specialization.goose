@@ -269,7 +269,7 @@ recursive fn mapTypeDepthSink(self_: Service&, unit_id: u32, mappings: MappingSi
     } else if n.tag == blot_check_types::Tag.record { return mapRecordSink(self_, unit_id, mappings, rows, n, concrete, span, depth); }
     return blot_error::Error.none;
 }
-fn mapRecordSink(self_: Service&, unit_id: u32, mappings: MappingSink, rows: RowSink, n: blot_check_types::Node, concrete: u32, span: blot_check_core::Span, depth: i64) -> Error {
+recursive fn mapRecordSink(self_: Service&, unit_id: u32, mappings: MappingSink, rows: RowSink, n: blot_check_types::Node, concrete: u32, span: blot_check_core::Span, depth: i64) -> Error {
     if self_.layouts.children(concrete).len != n.b as i64 * 2 { return decline(self_, unit_id, span, FailureCode.unresolved_type); }
     for i in 0..n.b {
         let field = unit(self_, unit_id).types.recordField(n, i); var matched = false; var j: i64 = 0;
@@ -280,7 +280,7 @@ fn mapRecordSink(self_: Service&, unit_id: u32, mappings: MappingSink, rows: Row
     }
     return blot_error::Error.none;
 }
-fn mapRowSink(self_: Service&, unit_id: u32, mappings: MappingSink, rows: RowSink, source_row: u32, actual_row: u32, span: blot_check_core::Span, covariant: bool) -> Error {
+recursive fn mapRowSink(self_: Service&, unit_id: u32, mappings: MappingSink, rows: RowSink, source_row: u32, actual_row: u32, span: blot_check_core::Span, covariant: bool) -> Error {
     if actual_row == blot_backend_layout::unknown_row { return blot_error::Error.none; }
     let source = unit(self_, unit_id).types; let expected = source.row(source_row);
     // Mapping may extend both effect stores. Keep IDs, and reload every view.

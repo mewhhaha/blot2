@@ -51,17 +51,18 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen239 inputs. Its completed log
-captures2 diagnostics in2 files in86.66s: closed-import recursion and scalar
-append.312 annotations cover missing declarations in329 proven Engine cycle
-members; two direct-call audits agree and retain exact graph/source evidence.
-Legacy method matching uses pooled owners; recursive projection/matching records
-use typed construction boundaries. Actual engine controls pass with explicit
-controlled leaves. Whole C emission, linking, CLI and Wasm qualification remain
-pending. Counts use completed logs with a45-second collection window; durations
-describe failing prefixes. The opt-in private checker uses a1M cumulative clone
-bound and separate100k tail traversal;201 frontend and8 runtime controls match
-the preceding checker. All108 checker source files are pinned.
+per stage. This checkpoint preserves exact frozen243 inputs. Its completed log
+captures2 diagnostics in2 files in86.96s: row Context construction in a recursive
+cycle and uninitialized editor stack storage.174 additional recursive declarations
+follow a reviewed graph that excludes qualified, aliased and generic dot receivers.
+Option.some snapshots values before constructing its payload;16 value cases and
+strict local/same-scope borrow negatives pass both checkers. Reference-valued
+custom Option uses were absent. Whole C emission, linking, CLI and Wasm
+qualification remain pending. Counts use completed logs with a45-second window;
+durations describe failing prefixes. The private checker retains its bounded1M
+clone experiment and separate100k tail limit, qualified by201 frontend/8 runtime
+parity controls. A diagnostic-only independent-root harness is being developed
+for broader type-error feedback; it is not compiler/runtime qualification.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
 through one callback boundary. Actual core/snapshot admission methods use explicit

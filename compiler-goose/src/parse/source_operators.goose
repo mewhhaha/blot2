@@ -73,7 +73,7 @@ fn pattern_names<C>(self_: Validator<C>&,id: Id,depth: i64) { let saved=self_.lo
 fn unique_pattern<C>(self_: Validator<C>&,first: const Symbol[:],second: const Symbol[:],id: Id) {
  for a in first { for b in second { if a==b { fail(self_,c_duplicate_pattern_binding,id,self_.tree.span(id).start,0); return; } } }
 }
-fn pattern_result<C>(self_: Validator<C>&,id: Id,depth: i64) {
+recursive fn pattern_result<C>(self_: Validator<C>&,id: Id,depth: i64) {
  if id==0||stopped(self_) { return; } if depth>=1024 { fail(self_,c_nesting_limit,id,self_.tree.span(id).start,0); return; }
  let n=self_.tree.node(id);
  if n.tag==a_numeric_error { numeric_failure(self_,id); }
@@ -105,7 +105,7 @@ fn request_input<C>(self_: Validator<C>&,id: Id) -> bool {
  return self_.tree.node(head).tag==a_intrinsic&&self_.pool.get(self_.tree.node(head).a)=="@requests";
 }
 struct Deferred { node: Id, locals: i64, handlers: bool=false }
-fn suite<C>(self_: Validator<C>&,children: const Id[:],depth: i64) {
+recursive fn suite<C>(self_: Validator<C>&,children: const Id[:],depth: i64) {
  var deferred=ScratchDeferredBuffer {};
  for child,index in children {
   if stopped(self_) { deferred.deinit(); return; } let n=self_.tree.node(child); var terminator=terminator_none;
@@ -138,20 +138,20 @@ fn request_dispatch<C>(self_: Validator<C>&,id: Id) -> Id,bool {
  let body=self_.tree.extra.items[n.c+1]; if self_.tree.node(body).tag!=a_block { return 0,false; }
  let statements=self_.tree.children(body); if statements.len!=1||self_.tree.node(statements[0]).tag!=a_request_case { return 0,false; } return statements[0],true;
 }
-fn request_case<C>(self_: Validator<C>&,id: Id,completion: bool,depth: i64) {
+recursive fn request_case<C>(self_: Validator<C>&,id: Id,completion: bool,depth: i64) {
  if stopped(self_) { return; } let saved_replies=self_.replies; let saved_loops=self_.loops; self_.replies=!completion; self_.loops++;
 
  let n=self_.tree.node(id);
  if completion { let start=self_.tree.extra.items[n.a]; let len=self_.tree.extra.items[n.a+1]; for child in self_.tree.list(blot_parse_ast::List {start,len}) { walk(self_,child,depth+1); } }
  for child in self_.tree.list(blot_parse_ast::List {n.b,n.c}) { if (self_.tree.node(child).a==0)==completion { walk(self_,child,depth+1); } }
  { self_.replies=saved_replies; self_.loops=saved_loops; } }
-fn scope<C>(self_: Validator<C>&,pattern_id: Id,body: Id,depth: i64) { let saved=self_.locals.len; pattern(self_,pattern_id,depth); walk(self_,body,depth); self_.locals.resize(saved); }
-fn loop_scope<C>(self_: Validator<C>&,pattern_id: Id,body: Id,depth: i64) { self_.loops++; scope(self_,pattern_id,body,depth); self_.loops--; }
+recursive fn scope<C>(self_: Validator<C>&,pattern_id: Id,body: Id,depth: i64) { let saved=self_.locals.len; pattern(self_,pattern_id,depth); walk(self_,body,depth); self_.locals.resize(saved); }
+recursive fn loop_scope<C>(self_: Validator<C>&,pattern_id: Id,body: Id,depth: i64) { self_.loops++; scope(self_,pattern_id,body,depth); self_.loops--; }
 fn operator<C>(self_: Validator<C>&,symbol: Symbol,is_named: bool,id: Id) {
  let spelling=self_.pool.get(symbol); if spelling=="and"||spelling=="or" { return; } let point=origin(self_.tree,id);
  if is_named { name(self_,symbol,id,point); } else if !self_.context.source_symbolic_declared(symbol) { fail(self_,c_unknown_operator,id,point,symbol); }
 }
-fn primitive<C>(self_: Validator<C>&,id: Id,head: Id,argument_count: i64,depth: i64) {
+recursive fn primitive<C>(self_: Validator<C>&,id: Id,head: Id,argument_count: i64,depth: i64) {
  if stopped(self_) { return; } let symbol=self_.tree.node(head).a; let spelling=self_.pool.get(symbol);
  if validate_controls(self_)&&spelling=="@requests"&&head!=self_.permitted_requests { fail(self_,c_requests_scope,head,self_.tree.span(head).start,0); return; }
  if !self_.context.source_intrinsic_known(symbol) { fail(self_,c_unknown_intrinsic,head,self_.tree.span(head).start,symbol); return; }
@@ -303,7 +303,7 @@ let a_package_unpack=blot_parse_ast::tag_package_unpack;
 let a_type_code=blot_parse_ast::tag_type_code;
 let a_type_descriptor=blot_parse_ast::tag_type_descriptor;
 let a_task_region=blot_parse_ast::tag_task_region;
-fn walk<C>(self_: Validator<C>&,id: Id,depth: i64) {
+recursive fn walk<C>(self_: Validator<C>&,id: Id,depth: i64) {
  if id!=0 { let tag=self_.tree.node(id).tag; if (tag==a_name||tag==a_constructor_ref||tag==a_intrinsic)&&self_.context.source_editor_probe(id) { return; } }
  if id==0||stopped(self_) { return; } if depth>=1024 { fail(self_,c_nesting_limit,id,self_.tree.span(id).start,0); return; }
  let n=self_.tree.node(id);

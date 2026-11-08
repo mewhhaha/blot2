@@ -15,7 +15,7 @@ struct Counter<A> { adapter: A&,plan: blot_backend_ragged_builder::Plan,remainin
 fn step<A>(self_: Counter<A>&) -> bool { if self_.failure { return false; } if self_.remaining==0 { self_.failure=true; return false; } self_.remaining--; self_.visits++; return true; }
 fn put<A>(self_: Counter<A>&,binding: u32,value: Value) { if self_.failure { return; } for i in 0..self_.local_count { if self_.locals[i].binding==binding { self_.locals[i].value=value; return; } } if self_.local_count==80 { self_.failure=true; return; } self_.locals[self_.local_count]=Local {binding,value}; self_.local_count++; }
 fn number<A>(self_: Counter<A>&,value: Value) -> Scalar { if !value.is_borrowed { return value.scalar; } let result=self_.adapter.scalar(value.borrowed); if !result.present { self_.failure=true; return default<Scalar>(); } return result.value; }
-fn expression<A>(self_: Counter<A>&,id: u32) -> Value {
+recursive fn expression<A>(self_: Counter<A>&,id: u32) -> Value {
  if id==0 { return Value {}; } if !step(self_) { return Value {}; } let m=self_.adapter.module; let n=m.node(id); let tag=n.tag;
  if tag==blot_check_core::Tag.constant { let scalar=self_.adapter.constantType(id); if !scalar.present { self_.failure=true; return Value {}; } return Value {scalar:Scalar {scalar.value,n.a}}; }
  if tag==blot_check_core::Tag.reference {
@@ -38,7 +38,7 @@ fn expression<A>(self_: Counter<A>&,id: u32) -> Value {
  if tag==blot_check_core::Tag.project { let operand=expression(self_,n.a); if !operand.is_borrowed { self_.failure=true; return Value {}; } let result=self_.adapter.project(id,operand.borrowed); if !result.present { self_.failure=true; return Value {}; } return result.value; }
  self_.failure=true; return Value {};
 }
-fn pattern<A>(self_: Counter<A>&,id: u32,value: Value) {
+recursive fn pattern<A>(self_: Counter<A>&,id: u32,value: Value) {
  if id==0 { return; } if !step(self_) { return; } let m=self_.adapter.module; let p=m.pattern(id);
  if p.tag==blot_check_core::PatternTag.wildcard { return; } if p.tag==blot_check_core::PatternTag.bind { put(self_,p.a,value); return; }
  if p.tag==blot_check_core::PatternTag.product {
@@ -47,7 +47,7 @@ fn pattern<A>(self_: Counter<A>&,id: u32,value: Value) {
  }
  self_.failure=true;
 }
-fn program<A>(self_: Counter<A>&,id: u32) {
+recursive fn program<A>(self_: Counter<A>&,id: u32) {
  if id==0||id==self_.plan.storage.initial { return; } if !step(self_) { return; }
  if id==self_.plan.storage.append { if self_.count==self_.limit { self_.failure=true; return; } self_.count++; return; }
  if id==self_.plan.storage.conversion { return; } let m=self_.adapter.module; let n=m.node(id); let tag=n.tag;

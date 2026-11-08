@@ -12,8 +12,8 @@ type Error=blot_error::Error;
 type Tag=blot_eval_type_evidence::Tag;
 struct Importer { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View,destination: blot_eval_type_evidence::Store,max_depth: i64,allow_scoped: bool=true,remaining: i64?=null,nodes: dictionary<u32,u32>&,rows: dictionary<u32,u32>&,labels: dictionary<u32,u32>& }
 fn charge<I>(self_: I&) -> Error { if self_.remaining!=null { if self_.remaining==0 { return blot_error::Error.evidence_limit; } self_.remaining--; } return blot_error::Error.none; }
-fn ty<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; var goals=GoalBuffer {}; let value,error=tyInner(self_,id,depth,copied,goals); deinit(copied); deinit(goals); return value,error; }
-fn tyInner<I>(self_: I&,id: u32,depth: i64,copied: WordBuffer&,goals: GoalBuffer&) -> u32,Error {
+recursive fn ty<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; var goals=GoalBuffer {}; let value,error=tyInner(self_,id,depth,copied,goals); deinit(copied); deinit(goals); return value,error; }
+recursive fn tyInner<I>(self_: I&,id: u32,depth: i64,copied: WordBuffer&,goals: GoalBuffer&) -> u32,Error {
  let destination=target(self_);
  if id==0 { return 0,blot_error::Error.none; } if depth>=self_.max_depth||id>=self_.source.nodes.len { return 0,blot_error::Error.evidence_limit; } if id<=5 { return id,blot_error::Error.none; } let known=self_.nodes.get(id); if known { return known,blot_error::Error.none; }
  let error=charge(self_); if error!=blot_error::Error.none { return 0,error; } let n=self_.source.node(id); let tag=n.tag;
@@ -43,8 +43,8 @@ fn tyInner<I>(self_: I&,id: u32,depth: i64,copied: WordBuffer&,goals: GoalBuffer
  else { let value,e=destination.internWithEffects(tag,a,b,c,copied.items); if e!=blot_error::Error.none { return 0,e; } result=value; }
  self_.nodes.insert(id,result); return result,blot_error::Error.none;
 }
-fn row<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; let value,error=rowInner(self_,id,depth,copied); deinit(copied); return value,error; }
-fn rowInner<I>(self_: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {
+recursive fn row<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; let value,error=rowInner(self_,id,depth,copied); deinit(copied); return value,error; }
+recursive fn rowInner<I>(self_: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {
  let destination=target(self_);
  if id==0 { return 0,blot_error::Error.none; } if depth>=self_.max_depth||id>=self_.source.effects.rows.len { return 0,blot_error::Error.evidence_limit; } let known=self_.rows.get(id); if known { return known,blot_error::Error.none; }
  let err=charge(self_); if err!=blot_error::Error.none { return 0,err; }
@@ -52,8 +52,8 @@ fn rowInner<I>(self_: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {
  if copied.failure!=blot_error::Error.none { return 0,copied.failure; } let old_formal=self_.source.effects.rows[id].formal; var formal: u32=0; if old_formal!=0 { let value,e=ty(self_,old_formal,depth+1); if e!=blot_error::Error.none { return 0,e; } formal=value; }
  let result,error=destination.effects.internRowWithFormal(copied.items,formal); if error!=blot_error::Error.none { return 0,error; } self_.rows.insert(id,result); return result,blot_error::Error.none;
 }
-fn label<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; let value,error=labelInner(self_,id,depth,copied); deinit(copied); return value,error; }
-fn labelInner<I>(self_: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {
+recursive fn label<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; let value,error=labelInner(self_,id,depth,copied); deinit(copied); return value,error; }
+recursive fn labelInner<I>(self_: I&,id: u32,depth: i64,copied: WordBuffer&) -> u32,Error {
  let destination=target(self_);
  if depth>=self_.max_depth||id==0||id>=self_.source.effects.operations.len { return 0,blot_error::Error.evidence_limit; } let known=self_.labels.get(id); if known { return known,blot_error::Error.none; }
  let err=charge(self_); if err!=blot_error::Error.none { return 0,err; } let operation=self_.source.effects.operation(id);

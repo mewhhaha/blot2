@@ -24,7 +24,7 @@ fn initFactsPooled() -> Facts,blot_error::Error { if next_Facts_generation==0xff
 fn deinit(self_: Facts&) { if self_.lease==0 { return; } let index=self_.lease-1; assert(index<Facts_states.len&&Facts_states[index].live&&Facts_states[index].lease_generation==self_.lease_generation); release(self_.answers); Facts_states[index].live=false; Facts_states.free(index); self_=Facts {}; }
 
 fn key(owner: i64,ty: u32) -> u64 { return (owner as u64)<<32|ty; }
-fn closed(self_: Facts&,units: const blot_check_core::Module[:],owner: i64,ty: u32,depth: i64) -> bool,blot_error::Error {
+recursive fn closed(self_: Facts&,units: const blot_check_core::Module[:],owner: i64,ty: u32,depth: i64) -> bool,blot_error::Error {
  if ty<=5 { return ty!=0,blot_error::Error.none; } if depth>=256 { return false,blot_error::Error.none; }
  let id=key(owner,ty); let known=self_.answers.get(id); if known { return known,blot_error::Error.none; }
  let source=units[owner].types; let n=source.node(ty); let tag=n.tag; var result=false;
@@ -42,7 +42,7 @@ fn closed(self_: Facts&,units: const blot_check_core::Module[:],owner: i64,ty: u
  } else if tag==blot_check_types::Tag.record { result=true; for index in 0..n.b { let value,err=closed(self_,units,owner,source.recordField(n,index).ty,depth+1); if err!=blot_error::Error.none { return false,err; } if !value { result=false; break; } } }
  self_.answers.insert(id,result); return result,blot_error::Error.none;
 }
-fn closedRow(self_: Facts&,units: const blot_check_core::Module[:],owner: i64,row: u32,depth: i64) -> bool,blot_error::Error {
+recursive fn closedRow(self_: Facts&,units: const blot_check_core::Module[:],owner: i64,row: u32,depth: i64) -> bool,blot_error::Error {
  if depth>=256 { return false,blot_error::Error.none; } let source=units[owner].types; if source.row(row).tail!=blot_check_effects::Tail.closed { return false,blot_error::Error.none; }
  for label in source.rowLabels(row) { for arg in source.operationArguments(label) { let value,err=closed(self_,units,owner,arg,depth+1); if err!=blot_error::Error.none||!value { return value,err; } } } return true,blot_error::Error.none;
 }

@@ -6,7 +6,7 @@ import check.types;
 type Module=blot_check_core::Module;
 struct Walk { units: const Module[:],max_depth: i64,remaining: i64=65536 }
 fn enter(self_: Walk&,depth: i64) -> bool { if depth>=self_.max_depth||self_.remaining==0 { return false; } self_.remaining--; return true; }
-fn nominal(self_: Walk&,unit: u32,decl: u32,depth: i64) -> bool {
+recursive fn nominal(self_: Walk&,unit: u32,decl: u32,depth: i64) -> bool {
  if !enter(self_,depth) { return false; } var owner: i64=-1;
  for module,index in self_.units { var actual=module.unit; if actual==0 { actual=(index+1) as u32; } if actual==unit { owner=index; break; } }
  if owner<0 { return false; } let module=self_.units[owner];

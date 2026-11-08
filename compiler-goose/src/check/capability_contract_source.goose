@@ -43,7 +43,7 @@ fn namePath(self_: Builder&, symbol: u32, environment: const Environment&, captu
     } return value, blot_error::Error.none;
 }
 fn inputStore(self_: Builder&, root: Id) -> Error { if self_.lexical_captures { let found, error = self_.store.view().containsParameter(root, self_.remaining); if error != blot_error::Error.none { return error; } if found { return blot_error::Error.unavailable; } } return blot_error::Error.none; }
-fn selectIndex(self_: Builder&, receiver: AstId, index: AstId, environment: const Environment&, depth: i64) -> Id, Error {
+recursive fn selectIndex(self_: Builder&, receiver: AstId, index: AstId, environment: const Environment&, depth: i64) -> Id, Error {
     let base, error = expression(self_, receiver, environment, depth + 1); if error != blot_error::Error.none { return 0, error; } let selector, error = self_.node(index, depth + 1); if error != blot_error::Error.none { return 0, error; }
     if selector.tag != blot_parse_ast::tag_integer { return self_.store.elements(base); } return self_.store.project(base, selector.a, blot_check_capability_contracts::Projection.index);
 }
@@ -79,7 +79,7 @@ recursive fn expression(self_: Builder&, source: AstId, environment: const Envir
         _ => { return 0, blot_error::Error.unavailable; },
     }
 }
-fn application(self_: Builder&, ungrouped: AstId, value: blot_parse_ast::Node, environment: const Environment&, depth: i64) -> Id, Error {
+recursive fn application(self_: Builder&, ungrouped: AstId, value: blot_parse_ast::Node, environment: const Environment&, depth: i64) -> Id, Error {
     if self_.lexical_captures {
         let argument, error = self_.node(value.b, depth + 1); if error != blot_error::Error.none { return 0, error; } var callee_source = value.a; while self_.tree.node(callee_source).tag == blot_parse_ast::tag_group { callee_source = self_.tree.node(callee_source).a; }
         var head = ungrouped; var operands: AstId[16]; var count: i64 = 0;
@@ -113,7 +113,7 @@ fn application(self_: Builder&, ungrouped: AstId, value: blot_parse_ast::Node, e
     if callee.tag == blot_parse_ast::tag_intrinsic { let name = self_.pool.get(callee.a); if name == "@usage.read" || name == "@usage.length" { if self_.lexical_captures { let ignored, error = expression(self_, value.b, environment, depth + 1); if error != blot_error::Error.none { return 0, error; } } return 0, blot_error::Error.none; } }
     if callee.tag != blot_parse_ast::tag_constructor_ref { return 0, blot_error::Error.unavailable; } let id, error = expression(self_, value.b, environment, depth + 1); if error != blot_error::Error.none { return 0, error; } return self_.store.append(blot_check_capability_contracts::Term { blot_check_capability_contracts::Tag.wrapped, id , ..});
 }
-fn blockValue(self_: Builder&, source: AstId, value: blot_parse_ast::Node, environment: const Environment&, depth: i64) -> Id, Error {
+recursive fn blockValue(self_: Builder&, source: AstId, value: blot_parse_ast::Node, environment: const Environment&, depth: i64) -> Id, Error {
     if value.c != 0 { return 0, blot_error::Error.unavailable; } var nested = environment; let children = self_.tree.children(source);
     for child, index in children { let statement = self_.tree.node(child); if statement.tag == blot_parse_ast::tag_return_stmt && index + 1 == children.len { return expression(self_, statement.a, nested, depth + 1); }
         if self_.lexical_captures && statement.tag == blot_parse_ast::tag_use_stmt { let retained, error = expression(self_, statement.b, nested, depth + 1); if error != blot_error::Error.none { return 0, error; } if statement.a != 0 { let error = nested.bind(statement.a, retained); if error != blot_error::Error.none { return 0, error; } } continue; }
@@ -121,7 +121,7 @@ fn blockValue(self_: Builder&, source: AstId, value: blot_parse_ast::Node, envir
         let id, error = expression(self_, binding.value, nested, depth + 1); if error != blot_error::Error.none { return 0, error; } let error = nested.bind(alias.a, id); if error != blot_error::Error.none { return 0, error; }
     } return 0, blot_error::Error.unavailable;
 }
-fn caseValue(self_: Builder&, value: blot_parse_ast::Node, environment: const Environment&, depth: i64) -> Id, Error {
+recursive fn caseValue(self_: Builder&, value: blot_parse_ast::Node, environment: const Environment&, depth: i64) -> Id, Error {
     let inputs = self_.tree.extra.items[value.a..value.a + 2]; if inputs[1] > 16 || value.c > 4096 { return 0, blot_error::Error.capability_analysis_limit; } var retained: Id[16];
     for input, index in self_.tree.list(blot_parse_ast::List { inputs[0], inputs[1] , ..}) { let id, error = expression(self_, input, environment, depth + 1); if error != blot_error::Error.none { return 0, error; } retained[index] = id; }
     var arms: Id[4096]; for arm_id, index in self_.tree.list(blot_parse_ast::List { value.b, value.c , ..}) { let arm = self_.tree.node(arm_id); var nested = environment; let start = nested.len;

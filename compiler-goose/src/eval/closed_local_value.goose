@@ -25,7 +25,7 @@ fn row(m: const Module&,id: u32,certificates: blot_check_types::List) -> bool {
   _ => { return false; },
  }
 }
-fn shape(self_: Scan&,m: const Module&,id: u32,certificates: blot_check_types::List,pure: bool,depth: i64) -> bool {
+recursive fn shape(self_: Scan&,m: const Module&,id: u32,certificates: blot_check_types::List,pure: bool,depth: i64) -> bool {
  if !step(self_,depth) { return false; } let n=m.types.node(id); let tag=n.tag;
  if tag==blot_check_types::Tag.unit||tag==blot_check_types::Tag.boolean||tag==blot_check_types::Tag.unsigned32||tag==blot_check_types::Tag.floating32||tag==blot_check_types::Tag.variable { return true; }
  if tag==blot_check_types::Tag.function {
@@ -39,7 +39,7 @@ fn shape(self_: Scan&,m: const Module&,id: u32,certificates: blot_check_types::L
  if tag==blot_check_types::Tag.nominal { if n.a==0xffffffff { return false; } for child in m.types.nominalArguments(n) { if !shape(self_,m,child,certificates,pure,depth+1) { return false; } } return true; } return false;
 }
 fn dependency(self_: Scan&,target: BindingRef) -> bool { for prior in self_.proof.dependencies[..self_.proof.len] { if prior.unit==target.unit&&prior.binding==target.binding { return true; } } if self_.proof.len==16 { return false; } self_.proof.dependencies[self_.proof.len]=target; self_.proof.len++; return true; }
-fn value(self_: Scan&,owner: u32,id: u32,parameters: const Parameter[:],depth: i64) -> bool {
+recursive fn value(self_: Scan&,owner: u32,id: u32,parameters: const Parameter[:],depth: i64) -> bool {
  if !step(self_,depth)||id==0 { return false; } let module=unit(self_,owner); if module==null { return false; } let m=module; let n=m.node(id); let tag=n.tag;
  if tag!=blot_check_core::Tag.return_||m.types.node(n.ty).tag!=blot_check_types::Tag.never { if !shape(self_,m,n.ty,blot_check_types::List {},false,depth+1) { return false; } }
  if tag==blot_check_core::Tag.constant { return shape(self_,m,n.ty,blot_check_types::List {},true,depth+1); }

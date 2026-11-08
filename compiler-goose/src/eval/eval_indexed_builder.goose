@@ -43,7 +43,7 @@ fn edit(self_: Plan&,m: const Module&,id: Id) -> bool {
  else { return false; }
  if !localAlias(self_,m,root)||!independent(self_,m,item.index)||!independent(self_,m,item.value) { return false; } self_.edits[self_.edit_count]=item; self_.edit_count++; return true;
 }
-fn check(self_: Plan&,m: const Module&,id: Id) -> bool {
+recursive fn check(self_: Plan&,m: const Module&,id: Id) -> bool {
  if self_.budget==0 { return false; } self_.budget--; let n=m.node(id);
  if n.tag==blot_check_core::Tag.suite { for child in m.children(id) { if !check(self_,m,child) { return false; } } return true; }
  if n.tag==blot_check_core::Tag.bind { if alias(self_,n.a) { return edit(self_,m,n.b); } return independent(self_,m,n.b); }

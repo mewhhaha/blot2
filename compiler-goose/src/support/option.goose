@@ -4,7 +4,11 @@ namespace blot_support;
 // references use Goose's native nullable reference instead.
 struct Option<T> { present: bool = false, value: T }
 
-fn some<T>(value: T) -> Option<T> { Option<T> { true, value } }
+fn some<T>(value: T) {
+    let snapshot = value;
+    return someValue(snapshot);
+}
+fn someValue<T>(value: T) -> Option<T> { Option<T> { true, value } }
 fn none<T>() -> Option<T> { Option<T> { false, default<T>() } }
 fn value_or<T>(option: Option<T>, fallback: T) -> T {
     if option.present { return option.value; }

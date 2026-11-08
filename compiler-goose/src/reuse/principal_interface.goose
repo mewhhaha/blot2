@@ -13,6 +13,7 @@ type List = blot_check_types::List;
 type Id = blot_check_types::Id;
 enum Kind { global, local, parameter, external }
 struct ExternalTarget { unit: u32, binding: u32 }
+fn hash(value:ExternalTarget)->u64 {return ::hash_combine(::hash(value.unit),::hash(value.binding));}
 struct Nominal {
     affine: bool = false, has_usage: bool = false, closed_storage: bool = false,
     private: bool = false, is_opaque: bool = false,
