@@ -821,7 +821,7 @@ fn importClosedEvidence<G>(self_: Importer&, g: G&, id: u32) -> blot_support::Op
     let __old:const Pools& =requiredPools(self_.old); let view = __old.evaluator.evidence.view(); var remaining: i64 = 65536;
     if view.closed(id, 0, remaining) != blot_error::Error.none { return blot_support::none<u32>(), blot_error::Error.none; }
     if !self_.closed_evidence.present {
-        self_.closed_evidence = blot_support::some(blot_eval_semantic_evidence_import::initPooled(view, g.evaluator.storage.evidence, depth_limit, false));
+        self_.closed_evidence = blot_support::some(blot_eval_semantic_evidence_import::initPooled(view, blot_eval_type_evidence::canonicalStore(g.evaluator.storage.evidence), depth_limit, false));
     }
     let value, failure = self_.closed_evidence.value.ty(id, 0);
     if failure == blot_error::Error.none { self_.semantic.insert(key, value); }

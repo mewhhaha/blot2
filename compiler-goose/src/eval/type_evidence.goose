@@ -217,6 +217,19 @@ var inactive_GoalBuffer: GoalBuffer=GoalBuffer {};
 var inactive_effects: blot_check_effect_evidence::Store=blot_check_effect_evidence::Store {};
 struct Store { owner_id: u64=0,lease: u32=0,generation: u64=0,effects: blot_check_effect_evidence::Store& =inactive_effects,nodes: NodeBuffer& =inactive_NodeBuffer,extra: WordBuffer& =inactive_WordBuffer,next: WordBuffer& =inactive_WordBuffer,buckets: Buckets& =inactive_Buckets,projection_owners: OwnersBuffer& =inactive_OwnersBuffer,projection_quantifiers: WordBuffer& =inactive_WordBuffer,quantifier_goals: QuantifierBuffer& =inactive_QuantifierBuffer,quantifier_obligations: GoalBuffer& =inactive_GoalBuffer }
 fn valid(self_: const Store&) -> bool { return self_.lease!=0&&self_.lease-1<states.len&&states[self_.lease-1].owner_id==self_.owner_id&&states[self_.lease-1].generation==self_.generation&&self_.owner_id!=0; }
+fn canonicalStore(source:Store)->Store {
+ assert(valid(source)); let state:State& =states[source.lease-1];
+ assert(source.effects .== state.effects);
+ assert(source.nodes .== state.nodes);
+ assert(source.extra .== state.extra);
+ assert(source.next .== state.next);
+ assert(source.buckets .== state.buckets);
+ assert(source.projection_owners .== state.projection_owners);
+ assert(source.projection_quantifiers .== state.projection_quantifiers);
+ assert(source.quantifier_goals .== state.quantifier_goals);
+ assert(source.quantifier_obligations .== state.quantifier_obligations);
+ return Store{owner_id:state.owner_id,lease:source.lease,generation:state.generation,effects:state.effects,nodes:state.nodes,extra:state.extra,next:state.next,buckets:state.buckets,projection_owners:state.projection_owners,projection_quantifiers:state.projection_quantifiers,quantifier_goals:state.quantifier_goals,quantifier_obligations:state.quantifier_obligations};
+}
 fn init() -> Store,Error { if next_generation==0xffffffffffffffff||states.len>=0xffffffff { return Store {},blot_error::Error.out_of_memory; } let effects,error=blot_check_effect_evidence::init(); if error!=blot_error::Error.none { return Store {},error; } let generation=next_generation; next_generation++; let owner=blot_native::fresh_owner_id(); let index=states.alloc_index(State {owner_id:owner,generation:generation,effects:effects}); let state: State& =states[index]; var self_=Store {owner_id:owner,lease:(index+1) as u32,generation:generation,effects:state.effects,nodes:state.nodes,extra:state.extra,next:state.next,buckets:state.buckets,projection_owners:state.projection_owners,projection_quantifiers:state.projection_quantifiers,quantifier_goals:state.quantifier_goals,quantifier_obligations:state.quantifier_obligations}; for tag in [Tag.absent,Tag.unit,Tag.boolean,Tag.unsigned32,Tag.floating32,Tag.never] { self_.nodes.push(Node {tag}); self_.next.push(0); } return self_,blot_error::Error.none; }
 fn view(self_: const Store&) -> View { assert(valid(self_)); return View {self_.owner_id,self_.nodes.items,self_.extra.items,self_.effects.view(),self_.quantifier_goals.items,self_.quantifier_obligations.items}; }
 fn node(self_: const Store&,id: Id) -> Node { return view(self_).node(id); }
