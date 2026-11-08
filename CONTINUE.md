@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen330 replaces Session's Generator backpointer with the existing scalar
+Frozen333 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -69,7 +69,11 @@ cache boundary and reaches a temporary result-return lifetime error. Frozen329
 returns a validated live pool prefix on success and empty output on error before
 original cleanup; focused transfer/escape controls pass. Frozen330 also creates a
 readonly mapping header before Option wrapping. Its77.047s run reaches a nullable
-PrincipalGraph conversion. Source and frontier differ,
+PrincipalGraph conversion. Frozen333 retains each missing/null branch before
+three local graph narrowings, fixes the readonly encoded view, and handles two
+concrete source/evidence callback cycles with pure factories and original-point
+setters. Its80.617s run reaches an owned recursive-result return; successful
+three-pool reconstitution is next. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
 comparison or Gdev result exists for the port. Caps remain 120/300s with a 3s

@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen330 is the current source checkpoint. Selected private checker
+Frozen333 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -91,7 +91,12 @@ lifetime. Frozen329 validates the full named-pool storage and original prefix be
 unchanged detach/cleanup; errors return an empty output. Focused owned/retained
 transfer, cleanup, empty and wrong-prefix/foreign controls pass both checkers.
 Frozen330 then creates a readonly mapping header before Option wrapping without
-a data copy. Its77.047s run reaches a PrincipalGraph nullable conversion. The optional-global index passes correctness controls but its
+a data copy. Its77.047s run reaches a PrincipalGraph nullable conversion. Frozen333 preserves
+all missing/null cases, narrows three graph locals, fixes encoded-view constness,
+and handles two exact callback cycles with reviewed pure helpers. Its80.617s run
+reaches an owned recursive-result escape. A three-pool success-result receipt is
+next. The revised semantic-only entry probe with export-first checking still hit
+its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo
 was rejected because store replay mutates provenance. A semantic-only entry
 hit its 20s cap without a diagnostic/C and established no speed gain. A narrower
