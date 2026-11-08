@@ -51,13 +51,20 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 300 inputs. Whole parsing passes
-440 files. Its completed run stops after 97.094s with one child-slice return-root
-error attributed to scalar id in code_expectation. No C/header/executable exists.
-The earlier match dispatch/scalar-helper variants and the current direct caller
-Node borrow did not resolve this wide-context boundary. All compact variants
-pass branch/content/address/bounds/escape controls, so they do not reproduce the
-real failure. Root-analysis investigation is active; caps stay 120/300s.
+per stage. This checkpoint preserves exact frozen 301 inputs and selects private
+checker 4e93 explicitly. Its one-condition ContentsReadBack fix recognizes the
+existing global-only null-root bound without changing alternatives or exactness.
+Both stock b27 and 869 false positives reproduce in 4 functions, including an unused
+scalar parameter and the actual inactive-reference Expected variant. Ten valid
+cases execute on 4e93; 26 strict mutation/escape/shrink/identity negatives still
+reject, and 201 frontend/8 executed-runtime cases have exact prior 869 parity. All 108
+source files reconstruct from the tracked patch with zero fuzz/offset. No upstream,
+installed or default tool is modified. Original children source is restored.
+The actual run clears its old false error and stops after 98.681s with one genuine
+nondefaultable PrincipalVisit scratch-slot error. Whole parsing passes 440 files;
+no C/header/executable exists yet. Caps remain 120/300s. Earlier dispatch and
+scalar-helper experiments failed and were removed; compact old/new controls did
+not reproduce the checker defect until the recursive/inactive-variant trigger.
 Complete hash/JSON adapters now dispatch by receiver's nominal namespace: global
 hash/write sets shrink 3,005/3,325→1/2 while equality stays unchanged. Independent
 inversion preserves all 2,921 generated hash/3,304 JSON heads, 50 custom hashes and 5

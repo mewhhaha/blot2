@@ -27,22 +27,21 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen 300
-routes every hash/JSON adapter through its nominal namespace. Global hash/write
-families fall from 3,005/3,325 heads to 1/2; equality is unchanged. All 2,921 generated
-hash and 3,304 JSON heads retain their original bodies/types; 50 custom hashes and
-5 JSON overrides pass independent inversion. Actual-schema gates preserve 11,365
-hash bytes, custom diagnostic JSON, aliases, refs, nullable values and evaluation
-order. No completed compiler-speed result is claimed.
-The type-argument journal retains its focused oracle/ownership qualification;
-fixture non-common payload is 15,340 vs 55,321B, excluding runtime overhead. Whole
-parsing passes 440 files. The completed build stops after 97.094s with 1 captured
-code_expectation child-slice error, now attributed to scalar id. C emission,
-linking and execution remain pending. Dispatch/scalar-helper rewrites failed;
-current direct Node borrow also fails in the full context, despite compact
-branch/alias/bounds/escape controls passing. A checker/root-analysis investigation
-is active; no more blind variants or cap increases. Stage/overall caps remain
-120/300s with 3s partial first-error collection. The Zig oracle is unchanged.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen 301
+uses a checked private Goose correctness fix. Stock and prior checkers misread an
+explicit global-only provenance bound as unknown, incorrectly blaming an unused
+scalar parameter in four functions. The one-condition fix preserves alternatives
+and exactness; 10 positive cases execute, 26 independent strict negatives reject,
+and 201 frontend/8 executed-runtime cases match the prior checker exactly. The
+tracked recipe reconstructs all 108 source files byte-exactly. Installed tools,
+upstream checkout and Zig oracle are unchanged.
+Original code_expectation children source is restored, and the actual build
+clears that false error. Whole parsing passes 440 files. The completed run stops
+after 98.681s with 1 genuine PrincipalVisit spare-capacity default error; its graph
+field has no default. C emission/linking/execution remain pending. Caps stay
+120/300s with 3s partial first-error collection. Complete hash/JSON namespace
+adapters and the journal retain their focused qualification; no completed compiler
+speed or whole-runtime parity is established.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

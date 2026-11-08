@@ -236,3 +236,15 @@
 -            ctx->error(line, cat("const for expansion exceeds ", ExpansionClone::MAXNODES, " generated nodes"));
 +        if (++*ctx->size > ExpansionClone::MAX_CLONE_NODES)
 +            ctx->error(line, cat("const for expansion exceeds ", ExpansionClone::MAX_CLONE_NODES, " generated nodes"));
+
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1504,7 +1504,7 @@
+         }
+         else if (IsClassRoot(a.root)) r.Add({ a.root, false, h });
+         else return false;
+-        known = known || a.classread || a.exact || IsClassRoot(a.root);
++        known = known || !a.root || a.classread || a.exact || IsClassRoot(a.root);
+     }
+     if (!known) return false;
+     out.Add(r);

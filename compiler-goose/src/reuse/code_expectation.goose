@@ -35,7 +35,7 @@ struct Store {
 }
 fn node(view: View, id: Id) -> Node { view.nodes[id] }
 fn children(view: View, id: Id) -> const Id[:] {
-    let n: const Node& = view.nodes[id];
+    let n = view.node(id);
     match n.tag {
         product => { return view.extra[n.a..n.a + n.b]; },
         record => { return view.extra[n.a..n.a + n.b * 2]; },
