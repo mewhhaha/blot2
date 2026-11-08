@@ -64,7 +64,12 @@ EscapingContinue AST traversal. They are not timing percentages. Frozen397 hits
 the120.269s cap with zero diagnostics and no C; it is incomplete and must not be
 repeated unchanged or counted as a pass. A private static EscapingContinue
 candidate is being qualified: its body uses no checker state, and dropping the
-unused this capture fits the callback's small buffer. Full compile gain unmeasured.
+unused this capture fits the callback's small buffer. It matches201frontend,
+8runtime/7focused cases and12emitted-C programs; the synthetic traversal drops
+819100allocations→0. However its398 whole attempt also times out120.291s with
+zero diagnostics/C on the same442authored inputs as397. It remains unselected;
+no whole gain is demonstrated. A dedicated non-owning AST child visitor is the
+next isolated prototype; all actual uses must remain synchronous/copy-equivalent.
 No compiler C/header/executable or executed-Wasm/Gdev result exists for the port.
 
 Current representation repairs use the existing Session→Generator Frame token

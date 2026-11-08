@@ -142,7 +142,14 @@ Ordinary397 hits120.269s without diagnostics/C/header/executable, so checking is
 incomplete. Do not repeat unchanged or raise the cap. A static EscapingContinue
 private candidate is being measured/qualified: exact body uses no checker state;
 removing its unused this capture reduces24B→16B and fits libstdc++'s small buffer.
-Synthetic allocation removal is measured; completed compiler speed is unmeasured.
+Synthetic allocation removal is measured: five rotated pairs fall12.646→6.223ms,
+819100allocations/frees→0. The isolated a071ca7d candidate matches201frontend,
+8runtime,7focused and12emitted-C programs, with independent108file/source review.
+Its398 attempt still times out120.291s with zero diagnostics/C versus397's
+120.269s timeout on matching442authored inputs. It remains unselected: no whole
+progress is demonstrated. The next prototype targets Node::Children's owning
+callback wrapper across synchronous visitors; retention, copy/mutable semantics
+and temporary lifetimes need separate proof before qualification or use.
 No whole compiler C, header or executable has been emitted; source acceptance
 is not runtime qualification.
 
