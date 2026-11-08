@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen384 is the current source checkpoint. PrincipalGraph publication keeps all
+Frozen385 is the current source checkpoint. PrincipalGraph publication keeps all
 25 fields and its original mint/copy/accounting order. The transferred snapshot
 uses its live/generation lease and exact checks on all 22 ranges; State is
 unchanged. All 37 strict controls pass on both checkers. Mutable reference-return
@@ -51,8 +51,10 @@ accepted bool. The scheme-copy wrapper borrows context and frame directly:
 closed-callback source reviews preserve partial errors and prove frame-state
 saves happen after F, with no later cleanup observer. Context-only383 still
 failed; both borrows in384 clear that boundary. Its108.620s run reaches a borrowed
-constructor in schemeImport. Next, fix that constructor family and remove the
-wrapper's unused region reference, already queued in live source.
+constructor in schemeImport. Frozen385 removes the wrapper's unused region
+reference and formats that function without changing tokens. Its101.563s run
+pinpoints the returned SchemeFrame payload binding. Reconstructing its owned
+name and five live saved-map runs at that return is next; cleanup stays ordered.
 No whole compiler or runtime pass follows from this source checkpoint.
 
 Current representation repairs use the existing Session→Generator Frame token

@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen384 is the current source checkpoint. Selected private checker
+Frozen385 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -97,8 +97,10 @@ Exact two-callback/three-call-site reviews preserve partial error outputs; F
 runs before any frame-state saves, and later map saves/deinit have no frame
 observer or callback. Physical OOM timing remains unqualified. Its108.620s actual
 run clears withSchemeCopy and reaches a borrowed constructor in schemeImport.
-The exact constructor family and removal of the unused Invocation.region
-reference are next. No whole compiler C, header or executable has been emitted;
+Frozen385 removes the unused Invocation.region field/formal/argument and adds
+token-identical diagnostic line breaks. Its101.563s run pinpoints the returned
+SchemeFrame payload binding. Its owned name and five live map runs need explicit
+reconstruction there, preserving the original return and cleanup order. No whole compiler C, header or executable has been emitted;
 source acceptance is not runtime qualification.
 
 A single 15-second post-error collection experiment returns only one diagnostic
