@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen350 is the current source checkpoint. Selected private checker
+Frozen352 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -112,7 +112,9 @@ rejected by both checkers. Its84.214s actual run reaches Candidate Plan-header
 retention. A by-value field alone still failed the actual349 check. Frozen350
 removes Plan from Candidate and forwards it explicitly to its two consumers.
 Its83.663s check reaches a missing QueryStorage.root_buffer default; the native
-oracle supplies null, so restoring that declaration default is next. The revised semantic-only entry probe with export-first checking still hit
+oracle supplies null. Frozen352 restores the field default and preserves three
+recorder protocols through six existing-setter substitutions. Its87.459s actual
+check reaches a MemberTrace missing entries owner; its scoped owner API is next. The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo
 was rejected because store replay mutates provenance. A semantic-only entry

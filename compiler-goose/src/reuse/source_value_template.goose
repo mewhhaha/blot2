@@ -477,7 +477,7 @@ fn matchPrepared<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_impor
 
 fn transportRequire(value: bool) -> Error {if !value {return blot_error::Error.declined;} return blot_error::Error.none;}
 // Materialization converts every graph and reserves outputs before publication.
-struct QueryStorage { values_before: i64, values_added: i64, children_added: i64, exact: bool=true, precharged: bool=false, buffers: const blot_eval_eval_collection_growth::BufferEffect[:]=default<const blot_eval_eval_collection_growth::BufferEffect[:]>(), root_buffer: blot_support::Option<blot_eval_eval_collection_growth::Frontier> }
+struct QueryStorage { values_before: i64, values_added: i64, children_added: i64, exact: bool=true, precharged: bool=false, buffers: const blot_eval_eval_collection_growth::BufferEffect[:]=default<const blot_eval_eval_collection_growth::BufferEffect[:]>(), root_buffer: blot_support::Option<blot_eval_eval_collection_growth::Frontier> =blot_support::none<blot_eval_eval_collection_growth::Frontier>() }
 struct Transport { old: blot_eval_eval_collection_growth::Span, start: u32 }
 struct Package { dictionary: u32, recipe: u32 }
 reusable[] var transport_runs: Transport[>..]=[];
