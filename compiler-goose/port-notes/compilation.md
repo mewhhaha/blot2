@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen324 is the current source checkpoint. Selected private checker
+Frozen325 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -71,7 +71,13 @@ WordBuffer controls cover capacity/prefix/reuse/empty/address and reject foreign
 and stack ranges. Its74.494s run clears the seed boundary and reaches another
 readonly Plan forwarding chain. Frozen324 extends the retaining ancestors and
 uses live mapping/row buffer item views; its74.640s run reaches an importer API
-mismatch. The optional-global index passes correctness controls but its
+mismatch. Frozen325 repairs that Option API, preserves constructor/cleanup order
+through pure selectors, uses nine error-propagating descriptor capacity checks,
+and adds typed BufferMap reservation plus two children item views. Reduced
+selectors/escape, actualWords capacity/OOM and actualmap growth/reuse controls
+pass both checkers. Its82.987s run reaches retained destination-store provenance
+in importClosedEvidence; canonical borrowed-store reconstitution is the next
+experiment. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo
 was rejected because store replay mutates provenance. A semantic-only entry
 hit its 20s cap without a diagnostic/C and established no speed gain. A narrower

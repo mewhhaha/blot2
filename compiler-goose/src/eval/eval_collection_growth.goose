@@ -15,6 +15,17 @@ reusable[] var pool_BufferMap: dictionary_slot<Span,Span>[>..]=[];
 fn get(self_: const BufferMap&,key: Span) -> Span? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const BufferMap&,key: Span) -> bool { return self_.get(key)!=null; }
 fn insert(self_: BufferMap&,key: Span,value: Span) { var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_BufferMap); self_.count=view.count; self_.slots=view.slots; }
+fn reserve(self_: BufferMap&,count: i64) -> blot_error::Error {
+ if count<0||count>0x1555555555555555 { return blot_error::Error.out_of_memory; }
+ var capacity=max<i64>(8,self_.slots.len);
+ while count*3>capacity*2 { capacity*=2; }
+ if capacity>self_.slots.len {
+  var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots};
+  blot_support_pooled_map::grow(view,capacity,pool_BufferMap);
+  self_.count=view.count; self_.slots=view.slots;
+ }
+ return blot_error::Error.none;
+}
 fn clear(self_: BufferMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: BufferMap&) { if self_.slots.len!=0 { pool_BufferMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Span,Span>[:]>(); self_.count=0; }
 fn restore(self_: BufferMap&,slots: const dictionary_slot<Span,Span>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_BufferMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }

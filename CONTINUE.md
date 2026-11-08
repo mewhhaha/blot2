@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen324 replaces Session's Generator backpointer with the existing scalar
+Frozen325 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -54,7 +54,10 @@ Actual321 reaches a new active-seed-borrow diagnostic after 74.174s, compared wi
 live anchor prefix through its named pool; concrete clone-path analysis excludes
 anchor invalidation. Its74.494s run reached another readonly Plan forwarding
 path. Frozen324 passes that path by value and indexes live mapping/row buffer
-item views; the74.640s actual run reaches an importer call API mismatch. Source and frontier differ,
+item views; the74.640s actual run reaches an importer call API mismatch. Frozen325 fixes
+that Option API, two pure reference selectors, nine descriptor reservations with
+original error order, typed BufferMap capacity and two children item views.
+Its82.987s run reaches cached evidence-store destination provenance. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
 comparison or Gdev result exists for the port. Caps remain 120/300s with a 3s

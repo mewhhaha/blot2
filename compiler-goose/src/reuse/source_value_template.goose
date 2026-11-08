@@ -500,15 +500,17 @@ fn materializeReceiptWithScratch<G>(self_: Plan,g: G&,graphs: blot_reuse_artifac
     let error=scratch.bind(self_,g); if error!=blot_error::Error.none {return default<u32[:]>(),error;} if !blot_support::same_slice_identity(seeds,scratch.anchors.items) {return default<u32[:]>(),blot_error::Error.declined;}
     return self_.materializeImpl(g,blot_support::none<u32>(),blot_support::some(seeds),blot_support::some(storage),graphs,scratch);
 }
+fn chooseMaterialImporter(paired:blot_reuse_artifact_import::Importer?,owned:blot_support::Option<blot_reuse_artifact_import::Importer>&)->blot_reuse_artifact_import::Importer? { if paired { return paired; } assert(owned.present); return owned.value; }
+fn chooseMaterialScratch(scratch:QueryScratch?,temporary:QueryScratch&)->QueryScratch? { if scratch { return scratch; } return temporary; }
 fn materializeImpl<G>(self_: const Plan&,g: G&,entry: blot_support::Option<u32>,seeds: blot_support::Option<const u32[:]>,storage: blot_support::Option<QueryStorage>,paired: blot_reuse_artifact_import::Importer?,scratch: QueryScratch?) -> u32[:],Error {
     if !self_.gate || !self_.pools || requiredGate(self_.gate).source_pools .!= self_.pools || !requiredGate(self_.gate).enabled || !blot_support::same_slice_identity(g.evaluator.units,requiredGate(self_.gate).units) {return default<u32[:]>(),blot_error::Error.declined;}
-    var owned=blot_support::none<blot_reuse_artifact_import::Importer>(); var graphs: blot_reuse_artifact_import::Importer?=paired;
-    if !graphs {let created,error=blot_reuse_artifact_import::init(g.evaluator.allocation_owner,requiredPools(self_.pools),requiredGate(self_.gate).units,requiredPools(self_.pools).identity.value.view(),requiredGate(self_.gate).units.len); if error!=blot_error::Error.none {return default<u32[:]>(),error;} owned=blot_support::some(created); graphs .= owned.value;}
-    assert(graphs); var temporary=QueryScratch{allocation_owner:g.evaluator.allocation_owner, ..}; var buffers: QueryScratch?=scratch;
-    if !buffers {let run=scratch_wordbuffer.alloc_slice(requiredPools(self_.pools).evaluator.values.len); for &word in run {word=0;} temporary.anchors=WordBuffer{run,run, ..}; buffers .= temporary;}
-    assert(buffers); let mapped,error=self_.materializeOwned(g,graphs,entry,seeds,storage,buffers,scratch!=null);
+    var owned=blot_support::none<blot_reuse_artifact_import::Importer>();
+    if !paired {let created,error=blot_reuse_artifact_import::init(g.evaluator.allocation_owner,requiredPools(self_.pools),requiredGate(self_.gate).units,blot_support::some(requiredPools(self_.pools).identity.value.view()),requiredGate(self_.gate).units.len); if error!=blot_error::Error.none {return default<u32[:]>(),error;} owned=blot_support::some(created);}
+    let graphs=chooseMaterialImporter(paired,owned); assert(graphs); var temporary=QueryScratch{allocation_owner:g.evaluator.allocation_owner, ..};
+    if !scratch {let run=scratch_wordbuffer.alloc_slice(requiredPools(self_.pools).evaluator.values.len); for &word in run {word=0;} temporary.anchors=WordBuffer{run,run, ..};}
+    let buffers=chooseMaterialScratch(scratch,temporary); assert(buffers); let mapped,error=self_.materializeOwned(g,graphs,entry,seeds,storage,buffers,scratch!=null);
     if owned.present {owned.value.deinit();}
-    if error==blot_error::Error.none && !scratch {temporary.anchors.storage=[]; temporary.anchors.items=[];}
+    if error==blot_error::Error.none && !scratch {temporary.anchors.storage=default<u32[:]>(); temporary.anchors.items=default<u32[:]>();}
     if !scratch {temporary.deinit();} return mapped,error;
 }
 fn materializeOwned<G>(self_: const Plan&,g: G&,graphs: blot_reuse_artifact_import::Importer&,entry: blot_support::Option<u32>,seeds: blot_support::Option<const u32[:]>,storage: blot_support::Option<QueryStorage>,buffers: QueryScratch&,retained_scratch: bool) -> u32[:],Error {
@@ -548,10 +550,19 @@ fn prepareMaterial<G>(self_: Material<G>&,retained_scratch: bool) -> Error {
     var value_room=session.options.max_values-values_before; if value_room<0 {value_room=0;} var child_room=session.options.max_children-children_before; if child_room<0 {child_room=0;} if self_.count>value_room || child_count>child_room {return blot_error::Error.declined;}
     var reserve_children=plan.stats.children; if self_.storage.present {reserve_children=self_.added_children;}
     if !room(session.storage.values.len,plan.order.len) || !room(session.storage.children.len,reserve_children) || !room(session.storage.closures.len,plan.stats.closures) || !room(session.storage.type_mappings.len,self_.scratch.types.items.len) || !room(session.storage.row_mappings.len,self_.scratch.rows.items.len) || !room(session.storage.record_layouts.len,plan.order.len) || !room(session.storage.field_names.len,plan.stats.fields) {return blot_error::Error.declined;}
-    reserve(session.storage.values,plan.order.len,default<ValueInfo>()); reserve(session.storage.value_evidence,plan.order.len,0 as u32); reserve(session.storage.value_records,plan.order.len,0 as u32); reserve(session.storage.children,reserve_children,0 as u32); reserve(session.storage.closures,plan.stats.closures,default<blot_eval_eval_values::ClosureValue>()); reserve(session.storage.type_mappings,self_.scratch.types.items.len,default<blot_eval_type_evidence::Mapping>()); reserve(session.storage.row_mappings,self_.scratch.rows.items.len,default<blot_eval_type_evidence::RowMapping>()); reserve(session.storage.record_layouts,plan.order.len,blot_check_core::List{..}); reserve(session.storage.field_names,plan.stats.fields,0 as u32); session.storage.collection_buffers.buffers.reserve(session.storage.collection_buffers.buffers.count+effects.len);
+    let reserve_error_0=reserve(session.storage.values,plan.order.len); if reserve_error_0!=blot_error::Error.none { return reserve_error_0; }
+    let reserve_error_1=reserve(session.storage.value_evidence,plan.order.len); if reserve_error_1!=blot_error::Error.none { return reserve_error_1; }
+    let reserve_error_2=reserve(session.storage.value_records,plan.order.len); if reserve_error_2!=blot_error::Error.none { return reserve_error_2; }
+    let reserve_error_3=reserve(session.storage.children,reserve_children); if reserve_error_3!=blot_error::Error.none { return reserve_error_3; }
+    let reserve_error_4=reserve(session.storage.closures,plan.stats.closures); if reserve_error_4!=blot_error::Error.none { return reserve_error_4; }
+    let reserve_error_5=reserve(session.storage.type_mappings,self_.scratch.types.items.len); if reserve_error_5!=blot_error::Error.none { return reserve_error_5; }
+    let reserve_error_6=reserve(session.storage.row_mappings,self_.scratch.rows.items.len); if reserve_error_6!=blot_error::Error.none { return reserve_error_6; }
+    let reserve_error_7=reserve(session.storage.record_layouts,plan.order.len); if reserve_error_7!=blot_error::Error.none { return reserve_error_7; }
+    let reserve_error_8=reserve(session.storage.field_names,plan.stats.fields); if reserve_error_8!=blot_error::Error.none { return reserve_error_8; }
+    let map_error=session.storage.collection_buffers.buffers.reserve(session.storage.collection_buffers.buffers.count+effects.len); if map_error!=blot_error::Error.none {return map_error;}
     return blot_error::Error.none;
 }
-fn reserve<T>(values: T[>..<]&,added: i64,initial: T) {let length=values.len; values.resize(length+added,initial); values.resize(length);}
+fn reserve<B>(values:B&,added:i64)->Error {return values.ensure(values.len+added);}
 fn prepareSpans<G>(self_: Material<G>&,query: QueryStorage,effects: const blot_eval_eval_collection_growth::BufferEffect[:],retained_scratch: bool) -> Error {
     assert(self_.plan.pools); let plan .= self_.plan; let old .= requiredPools(plan.pools).evaluator; let session .= self_.generator.evaluator; let mapped=self_.scratch.anchors.items; let positions=self_.scratch.children.items; let append_children=self_.scratch.append_children.items;
     if self_.count>query.values_added || (query.exact && self_.count!=query.values_added) {return blot_error::Error.declined;}
@@ -595,11 +606,11 @@ fn publishMaterial<G>(self_: Material<G>&,retained_scratch: bool) {
         var info=old.values[id]; let package .= blot_support_pooled_map::get(self_.packages,id); if package {info.nominal=package.dictionary; info.bits=package.recipe;}
         let children=old.children[info.start..info.start+info.len]; if self_.storage.present && info.len!=0 {info.start=self_.scratch.children.items[info.start];} else {info.start=session.storage.children.len as u32;}
         if !self_.storage.present || self_.scratch.append_children.items[id] {
-            if id==plan.root && self_.root_buffer.present {let buffer=self_.root_buffer.value; let start=session.storage.children.len; session.storage.children.resize(start+buffer.capacity,0); for child,child_index in children {session.storage.children[start+buffer.offset+child_index]=mapped[child];}}
+            if id==plan.root && self_.root_buffer.present {let buffer=self_.root_buffer.value; let start=session.storage.children.len; session.storage.children.resize(start+buffer.capacity,0); for child,child_index in children {session.storage.children.items[start+buffer.offset+child_index]=mapped[child];}}
             else {for child in children {session.storage.children.push(mapped[child]);}}
         }
         if self_.storage.present && info.len!=0 && !self_.scratch.append_children.items[id] {
-            for buffer in self_.transported {let original=old.values[id]; if original.start>=buffer.old.start && original.start as i64+original.len<=buffer.old.start as i64+buffer.old.len {for child,child_index in children {session.storage.children[info.start+child_index]=mapped[child];} break;}}
+            for buffer in self_.transported {let original=old.values[id]; if original.start>=buffer.old.start && original.start as i64+original.len<=buffer.old.start as i64+buffer.old.len {for child,child_index in children {session.storage.children.items[info.start+child_index]=mapped[child];} break;}}
         }
         if info.kind==blot_eval_eval_values::ValueKind.closure {var meta=old.closures[info.bits]; let length=meta.mappings.len; meta.mappings.start=session.storage.type_mappings.len as u32; session.storage.type_mappings.append(self_.scratch.types.items[type_index..type_index+length]); type_index+=length; let rows=meta.row_mappings.len; meta.row_mappings.start=session.storage.row_mappings.len as u32; session.storage.row_mappings.append(self_.scratch.rows.items[row_index..row_index+rows]); row_index+=rows; info.bits=session.storage.closures.len as u32; session.storage.closures.push(meta);}
         var record: u32=0; if old.value_records[id]!=0 {let fields=old.record_layouts[old.value_records[id]]; record=session.storage.record_layouts.len as u32; session.storage.record_layouts.push(blot_check_core::List{session.storage.field_names.len as u32,fields.len, ..}); session.storage.field_names.append(old.field_names[fields.start..fields.start+fields.len]);}
