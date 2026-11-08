@@ -48,7 +48,7 @@ struct Observation { regions: i64 = 0, scopes: i64 = 0, nodes: i64 = 0, complete
 fn observe<R>(self_: Observation&, region: const R&) {
     self_.regions++; self_.scopes += region.scratch.sources.len; self_.nodes += region.solver.nodes.len;
     self_.complete = self_.complete && !region.source_interface && !region.retain_selected;
-    for constraint in region.scratch.constraints { self_.complete = self_.complete && constraint.solved; }
+    for constraint in region.scratch.constraints.items { self_.complete = self_.complete && constraint.solved; }
 }
 struct Key {
     root: Root, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:],

@@ -27,23 +27,22 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen260
-checkpoints explicit input borrows through artifact initialization, canonical
-Session/solver ownership, private static profiling labels, exact diagnostic and
-coverage transfers, and scalar child traversal. Whole parsing passes440 files.
-The completed full run stops after60.73s with1 captured diagnostic: a nested
-Constraint slice during region snapshot restoration. This uses a15-second
-first-error collection window instead of45; the shorter failing prefix is not a
-compiler performance result or a complete error count. C emission, linking and
-execution remain pending. Private region labels are14 registered literals plus
-empty, retaining line numbers without allocations or text copies. Both checkers
-pass actual timing-record stack-overwrite/resume and strict rejection controls.
-Earlier diagnostic/archive/path controls qualify their pinned candidates. Payload
-publication copies, origin snapshots, scratch zeroing and numeric high-water
-backing costs remain disclosed. The catalog ownership audit is pending integration;
-capability_roots really shrinks and cannot become append-only. The private checker
-retains bounded1M clone/separate100k tail limits with201 frontend/8 runtime parity
-controls. Independent callbacks remain diagnostic aids, not runtime qualification.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen267
+checkpoints12 audited append-only catalog arrays, an owned capability-root buffer
+that retains ordered deletion, and a typed catalog-owner constructor.32 schema
+controls,2 deletion/cleanup laws and10 whole-Engine-type boundary controls pass
+their pinned candidates. Catalog callbacks and Engine identity remain intact.
+Region snapshot constraints/byte-key maps use exact owned runs; focused restore,
+retained-owner and Session-registry controls pass with their documented carrier
+reductions. Whole parsing passes440 files. The completed full run stops after
+62.33s with1 captured diagnostic: an inline sort callback returns from the outer
+parallelReadyOwned function. The15-second first-error window gives a partial error
+list, not completed compilation/performance evidence. C emission, linking and
+execution remain pending. Independent probes retain unresolved proof-header and
+capability/catalog borrow paths; rejected helper experiments are not production
+fixes. Earlier payload-copy, origin-snapshot, stack-zeroing and numeric high-water
+costs remain disclosed. The private checker retains bounded1M clone/separate100k
+tail limits with201 frontend/8 runtime parity controls.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

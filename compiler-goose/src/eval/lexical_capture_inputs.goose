@@ -103,7 +103,7 @@ fn buildCanonicalBudget<S>(session: S&,value: u32,limit: i64,examined: i64&) -> 
 struct InputBuffer {storage:Inputs[:]=default<Inputs[:]>(),items:Inputs[:]=default<Inputs[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var input_runs:Inputs[>..]=[];
 fn ensure(self_:InputBuffer&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,input_runs);return self_.failure;}
-fn push(self_:InputBuffer&,value:Inputs) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,input_runs);self_.len=self_.items.len;}
+fn push(self_:InputBuffer&,value:Inputs) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,canonicalOwned(value),input_runs);self_.len=self_.items.len;}
 fn clear(self_:InputBuffer&) {for &input in self_.items {input.deinit();}blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
 fn release(self_:InputBuffer&) {self_.clear();blot_support_pooled_buffer::deinit(self_,input_runs);}
 type Keys=blot_support_pooled_map::Map<const u64[:],u32>;

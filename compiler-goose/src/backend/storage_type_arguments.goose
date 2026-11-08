@@ -17,8 +17,8 @@ struct Stack<A> {
     pools: Pools<A>? = null,items: A[..] = [],arguments: blot_support_pooled_buffer::Buffer<A>,undo: blot_support_pooled_buffer::Buffer<Undo<A>>,positions: blot_support_pooled_map::Map<u64,Positions>,
     active_count: i64 = 0,first_active: i64 = absent,last_active: i64 = absent,snapshot: blot_support::Option<Snapshot<A>>,stats: Stats,
 }
-fn init<A>(pools: Pools<A>&) -> Stack<A> { Stack<A> { pools } }
-fn emptyFrom<A>(source: const Stack<A>&) -> Stack<A> { Stack<A> { pools: source.pools } }
+fn init<A>(pools: Pools<A>&) -> Stack<A> { Stack<A> { pools, .. } }
+fn emptyFrom<A>(source: const Stack<A>&) -> Stack<A> { Stack<A> { pools: source.pools, .. } }
 fn increase(counter: u64&) { if counter != 18446744073709551615 { counter++; } }
 fn key(unit: u32,parameter: u32) -> u64 { (unit as u64 << 32) | parameter as u64 }
 fn deinit<A>(stack: Stack<A>&) { if stack.pools == null { return; } blot_support_pooled_buffer::deinit(stack.arguments,stack.pools.arguments); blot_support_pooled_buffer::deinit(stack.undo,stack.pools.undo); blot_support_pooled_map::deinit(stack.positions,stack.pools.positions); stack.items = []; stack.active_count = 0; stack.first_active = absent; stack.last_active = absent; stack.snapshot = blot_support::none<Snapshot<A>>(); stack.stats = Stats {..}; }

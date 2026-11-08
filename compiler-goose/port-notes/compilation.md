@@ -51,25 +51,23 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen260 inputs. Whole parsing passes
-440 files. Its completed run stops after60.73s with1 captured diagnostic: nested
-Constraint slices during region snapshot restoration. The collection window is
-now15seconds after first error instead of45; this shorter failed prefix is not a
-compiler performance result or complete remaining-error count. Whole C emission,
-linking, CLI and Wasm qualification remain pending. Explicit original input borrows
-now reach nested artifact gates, Session and solver descriptors recover their
-existing owners, diagnostics/coverage transfers use exact owned runs, and scalar
-children avoid long recursive tree borrows. Private region caller labels are14
-registered literals plus empty; canonical descriptors preserve lines without
-allocation/text copies. Actual timing record stack-overwrite/resume and negative
-controls pass both checkers. Earlier diagnostic/archive/path controls retain their
-pinned source scopes. Additional costs remain: diagnostic payload copies, one
-origin snapshot per Workspace when any flag is true, stack scratch zeroing and
-numeric high-water backing. The12 append-only catalog proposal is not integrated;
-capability_roots really shrinks. Independent callbacks are diagnostic aids; dummy
-defaults and unreproduced borrow warnings are not production-bug proof. The private
-checker retains bounded1M clone/separate100k tail limits and201 frontend/8 runtime
-parity controls.
+per stage. This checkpoint preserves exact frozen267 inputs. Whole parsing passes
+440 files. Its completed full run stops after62.33s with1 captured diagnostic:
+a nonlocal return inside an inline parallelReadyOwned sort callback. The15-second
+first-error window is a partial error list; these are failed prefixes, not compiler
+performance/completion results. Whole C emission, linking, CLI and Wasm remain
+pending. The batch makes12 audited catalog owners append-only, preserves real
+capability-root ordered deletion in an owned buffer, and constructs Catalog through
+typed owners.32 actual-schema controls,2 deletion/cleanup laws and10 constructor
+boundary controls pass their pinned candidates; callbacks and Engine identity
+remain intact. Snapshot constraint/string-key restoration recovers exact owned
+runs, and retained-owner/Session-registry receipts state their carrier reductions.
+Private profiling labels still use14 literals plus empty with lines unchanged.
+Independent probes retain unresolved proof-header and capability/catalog borrow
+paths. Pure constructor and owner-receipt experiments that still reject are not
+production fixes. Diagnostic payload copies, origin snapshots, scratch zeroing
+and numeric high-water backing remain disclosed. The private checker retains
+bounded1M clone/separate100k tail limits and201 frontend/8 runtime parity controls.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
 through one callback boundary. Actual core/snapshot admission methods use explicit

@@ -52,7 +52,7 @@ fn acquire<S,G>(state: S&, g: G&, read: blot_reuse_specialization_receipt::CallR
         if valid { for input in record.scalar_reads { if !state.gate.admits(input.target) || !scalarMatches(g, input) { valid = false; break; } } }
         if !valid { continue; } var cloned, error = record.clone(); if error != blot_error::Error.none { return blot_support::none<Record>(), error; } cloned.evidence = actual; state.stats.independent_reused++; return blot_support::some(cloned), blot_error::Error.none;
     }
-    var context = Recheck<S,G> { state, g, read, actual , ..}; let error = blot_eval_core_eval::withSharedSession<Recheck<S,G>,probeSession<S,G>>(g.evaluator, state.gate.allocation_owner, context);
+    var context = Recheck<S,G> { state, g, read, actual , ..}; let error = blot_eval_core_eval::withSharedSession<Recheck<S,G>>(g.evaluator, state.gate.allocation_owner, context, probeSession);
     if error != blot_error::Error.none { return blot_support::none<Record>(), error; }
     if context.result.present { state.stats.independent_rechecked++; } else { state.stats.independent_declined++; } return context.result, blot_error::Error.none;
 }

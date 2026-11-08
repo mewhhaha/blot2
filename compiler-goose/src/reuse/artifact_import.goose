@@ -2,6 +2,7 @@
 namespace blot_reuse_artifact_import;
 import std;
 import dictionary;
+import parse.ast;
 import check.core;
 import check.types;
 import check.check;
@@ -301,7 +302,7 @@ recursive fn shapeInto<G>(self_: Importer&, g: G&, id: u32, depth: i64, values: 
             c = 0;
         },
         owning => {
-            if c != 0 || (b != blot_check_types::usageKindCode(blot_check_types::UsageKind.unique) && b != blot_check_types::usageKindCode(blot_check_types::UsageKind.shared)) { return 0, blot_error::Error.declined; }
+            if c != 0 || (b != blot_check_types::usageKindCode(blot_parse_ast::usagekind_unique) && b != blot_check_types::usageKindCode(blot_parse_ast::usagekind_shared)) { return 0, blot_error::Error.declined; }
             { let imported_9, import_error_9 = self_.shape(g, a, depth + 1); if import_error_9 != blot_error::Error.none { return 0, convert(import_error_9); } a = imported_9; }
         },
         function => { { let imported_10, import_error_10 = self_.shape(g, a, depth + 1); if import_error_10 != blot_error::Error.none { return 0, convert(import_error_10); } a = imported_10; } { let imported_11, import_error_11 = self_.shape(g, b, depth + 1); if import_error_11 != blot_error::Error.none { return 0, convert(import_error_11); } b = imported_11; } { let imported_12, import_error_12 = self_.row(g, Domain.layout, c, depth + 1); if import_error_12 != blot_error::Error.none { return 0, convert(import_error_12); } c = imported_12; } },
