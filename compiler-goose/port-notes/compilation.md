@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen385 is the current source checkpoint. Selected private checker
+Frozen388 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -99,8 +99,16 @@ observer or callback. Physical OOM timing remains unqualified. Its108.620s actua
 run clears withSchemeCopy and reaches a borrowed constructor in schemeImport.
 Frozen385 removes the unused Invocation.region field/formal/argument and adds
 token-identical diagnostic line breaks. Its101.563s run pinpoints the returned
-SchemeFrame payload binding. Its owned name and five live map runs need explicit
-reconstruction there, preserving the original return and cleanup order. No whole compiler C, header or executable has been emitted;
+SchemeFrame payload binding. Frozen386 reconstructs its owned name and five
+live saved-map slices, preserving all counts, key, next and cleanup order; nine
+actual-schema controls pass on both checkers. Frozen388 transfers active scheme
+key bytes through their exact pool while normalizing ignored inactive headers.
+Three actual-map transfer controls pass on both checkers, covering growth,
+suspension, restore and final cleanup. Attempt387 was cancelled after57.352s
+without a diagnostic; it is not a pass, and no actual inactive-key UAF was
+established. Its102.504s run reaches summary-job RegionSnapshot publication.
+The existing lease owns57ranges; explicit header reconstruction is next, while
+scalar-only snapshot representation is independently reviewed. No whole compiler C, header or executable has been emitted;
 source acceptance is not runtime qualification.
 
 A single 15-second post-error collection experiment returns only one diagnostic

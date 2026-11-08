@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen385 is the current source checkpoint. PrincipalGraph publication keeps all
+Frozen388 is the current source checkpoint. PrincipalGraph publication keeps all
 25 fields and its original mint/copy/accounting order. The transferred snapshot
 uses its live/generation lease and exact checks on all 22 ranges; State is
 unchanged. All 37 strict controls pass on both checkers. Mutable reference-return
@@ -53,8 +53,14 @@ saves happen after F, with no later cleanup observer. Context-only383 still
 failed; both borrows in384 clear that boundary. Its108.620s run reaches a borrowed
 constructor in schemeImport. Frozen385 removes the wrapper's unused region
 reference and formats that function without changing tokens. Its101.563s run
-pinpoints the returned SchemeFrame payload binding. Reconstructing its owned
-name and five live saved-map runs at that return is next; cleanup stays ordered.
+pinpoints the returned SchemeFrame payload binding. Frozen386 reconstructs its
+owned name and five live map runs without extra copy/retain; nine controls pass
+on both checkers. Frozen388 snapshots active scheme keys through their owning
+byte pool and normalizes ignored inactive keys to empty. Transfer controls pass
+on both checkers. Attempt387 was cancelled after57.352s with no diagnostic, not
+a pass; no actual inactive-key UAF was established. Its102.504s run reaches
+summary-job RegionSnapshot publication. Exact validation/reconstruction of its
+existing57-range lease is next; scalar-only handles are under source review.
 No whole compiler or runtime pass follows from this source checkpoint.
 
 Current representation repairs use the existing Session→Generator Frame token
