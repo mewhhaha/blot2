@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen406 is the current source checkpoint. The selected private checker is
+Frozen407 is the current source checkpoint. The selected private checker is
 `57bb3e817a5edab895f90cb518812299f1076a49127c3509b37f57a45515e847`.
 It retains 678b88's exported-root scheduling and adds a call-local raw-store
 identity skip plus traversal-local visited-type buckets. All 201 frontend,
@@ -255,3 +255,10 @@ Recoverable physical OOM and retention/allocation observation remain separate
 production requirements. Null/unavailable metrics do not close them. Full compiler,
 public API, executed Wasm, copied-worker, library and Gdev qualification remain
 pending. Subsecond compilation and 1–2MB Gdev Wasm remain unmet.
+
+407 passes Project headers by value through the retaining factory chain and
+returns updated worker requests on all 16 decoder exits, before caller cleanup.
+Both checkers pass 280 fault-prefix/cleanup cases; local payload escapes still
+reject. No new authority, payload allocation or copy. Its 101.946s run clears
+Project retention and reaches executeProjectJob with a nullable Engine field.
+Use the existing local borrow/assert narrowing pattern next; no C output yet.
