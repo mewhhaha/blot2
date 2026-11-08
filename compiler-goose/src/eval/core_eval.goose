@@ -910,7 +910,7 @@ fn implementationMethod(self_: Session&,owner: i64,source: u32,template: blot_ch
 fn implementationMethodAt(self_: Session&,owner: i64,caller: i64,source: u32,context: u32,template: blot_check_core::MemberTemplate,mappings: const Mapping[:],rows: const RowMapping[:]) -> MethodSelection,Error { let __scratch_index=scratch_implementationMethodAt_31.alloc_index(ScratchImplementationMethodAt31 {}); let __scratch: ScratchImplementationMethodAt31& =scratch_implementationMethodAt_31[__scratch_index];   let arguments: CoreWordsBuffer& =__scratch.arguments_0;  for root in self_.units[owner].types.list(template.arguments) { let actual,error=projectType(self_,owner,0,root,mappings,rows); if error!=blot_error::Error.none { let __cleanup_result_387_0: MethodSelection = default<MethodSelection>(); let __cleanup_result_387_1: Error = error; { arguments.deinit(); } { scratch_implementationMethodAt_31.free(__scratch_index); } return __cleanup_result_387_0, __cleanup_result_387_1; } if actual==0 { let __cleanup_result_388_0: MethodSelection = default<MethodSelection>(); let __cleanup_result_388_1: Error = failNode(self_,caller,source,blot_check_diagnostic_code::Code.ambiguous_qualified); { arguments.deinit(); } { scratch_implementationMethodAt_31.free(__scratch_index); } return __cleanup_result_388_0, __cleanup_result_388_1; } arguments.push(actual); } let proof,error=self_.implementation_proofs.resolve(self_,context,template.contract,arguments.items); if error==blot_error::Error.out_of_memory { let __cleanup_result_389_0: MethodSelection = default<MethodSelection>(); let __cleanup_result_389_1: Error = error; { arguments.deinit(); } { scratch_implementationMethodAt_31.free(__scratch_index); } return __cleanup_result_389_0, __cleanup_result_389_1; } if error==blot_error::Error.unresolved_type { let __cleanup_result_390_0: MethodSelection = default<MethodSelection>(); let __cleanup_result_390_1: Error = failNode(self_,caller,source,blot_check_diagnostic_code::Code.ambiguous_qualified); { arguments.deinit(); } { scratch_implementationMethodAt_31.free(__scratch_index); } return __cleanup_result_390_0, __cleanup_result_390_1; } if error!=blot_error::Error.none { let __cleanup_result_391_0: MethodSelection = default<MethodSelection>(); let __cleanup_result_391_1: Error = implementationFailure(self_,caller,source); { arguments.deinit(); } { scratch_implementationMethodAt_31.free(__scratch_index); } return __cleanup_result_391_0, __cleanup_result_391_1; } let declaration=self_.implementation_proofs.proofs.items[proof]; for member in self_.implementation_proofs.members.items[declaration.members.start..declaration.members.start+declaration.members.len] { if member.name==template.name { let __cleanup_result_392_0: MethodSelection = MethodSelection {member.target,member.root}; let __cleanup_result_392_1: Error = blot_error::Error.none; { arguments.deinit(); } { scratch_implementationMethodAt_31.free(__scratch_index); } return __cleanup_result_392_0, __cleanup_result_392_1; } } let __cleanup_result_393_0: MethodSelection = default<MethodSelection>(); let __cleanup_result_393_1: Error = failNode(self_,caller,source,blot_check_diagnostic_code::Code.missing_implementation); { arguments.deinit(); } { scratch_implementationMethodAt_31.free(__scratch_index); } return __cleanup_result_393_0, __cleanup_result_393_1;  { arguments.deinit(); } { scratch_implementationMethodAt_31.free(__scratch_index); } }
 fn dictionaryMember(self_: Session&,owner: i64,id: u32,quantifier: u32,goal_ordinal: u32,member_ordinal: u32,mappings: const Mapping[:],rows: const RowMapping[:]) -> MethodSelection,Error { let module=self_.units[owner]; let goals=module.types.quantifierGoals(quantifier); if goal_ordinal>=goals.len { return default<MethodSelection>(),failNode(self_,owner,id,blot_check_diagnostic_code::Code.type_mismatch); } let goal=goals[goal_ordinal]; if goal.kind!=blot_check_types::ObligationKind.contract { return default<MethodSelection>(),failNode(self_,owner,id,blot_check_diagnostic_code::Code.unsupported); } let application,error=projectType(self_,owner,id,goal.ty,mappings,rows); if error!=blot_error::Error.none { return default<MethodSelection>(),error; } if application==0||self_.storage.evidence.node(application).tag!=blot_eval_type_evidence::Tag.product { return default<MethodSelection>(),failNode(self_,owner,id,blot_check_diagnostic_code::Code.ambiguous_qualified); } let proof,e=self_.implementation_proofs.resolve(self_,implementationUseContext(self_,owner,id),goal.identity,self_.storage.evidence.children(application)); if e==blot_error::Error.out_of_memory { return default<MethodSelection>(),e; } if e==blot_error::Error.unresolved_type { return default<MethodSelection>(),failNode(self_,owner,id,blot_check_diagnostic_code::Code.ambiguous_qualified); } if e!=blot_error::Error.none { return default<MethodSelection>(),implementationFailure(self_,owner,id); } let selected=self_.implementation_proofs.proofs.items[proof]; if member_ordinal>=selected.members.len { return default<MethodSelection>(),failNode(self_,owner,id,blot_check_diagnostic_code::Code.missing_implementation); } let member=self_.implementation_proofs.members.items[selected.members.start+member_ordinal]; if member.kind!=blot_reuse_principal_interface::ImplementationMemberKind.value { return default<MethodSelection>(),failNode(self_,owner,id,blot_check_diagnostic_code::Code.unsupported); } return MethodSelection {member.target,member.root},blot_error::Error.none; }
 fn dictionaryUse(self_: Session&,owner: i64,id: u32,mappings: const Mapping[:],rows: const RowMapping[:]) -> MethodSelection,bool,Error { for use in self_.units[owner].dictionary_uses { if use.node!=id||use.introduction==0 { continue; } let selected,error=dictionaryMember(self_,owner,id,use.quantifier,use.goal,use.member,mappings,rows); return selected,error==blot_error::Error.none,error; } return default<MethodSelection>(),false,blot_error::Error.none; }
-recursive fn contractMethod(self_: Session&,owner: i64,id: u32,frame: Frame) -> Flow,Error { let __scratch_index=scratch_contractMethod_32.alloc_index(ScratchContractMethod32 {}); let __scratch: ScratchContractMethod32& =scratch_contractMethod_32[__scratch_index];   let module=self_.units[owner]; let template=module.member_templates[module.node(id).a]; let selected,error=implementationMethod(self_,owner,id,template,frame.mappings.items,frame.row_mappings.items); if error!=blot_error::Error.none { let __cleanup_result_394_0: Flow = Flow.value {0}; let __cleanup_result_394_1: Error = error; { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_394_0, __cleanup_result_394_1; } let first,e=target(self_,blot_support::some(owner),selected.target); if e!=blot_error::Error.none { let __cleanup_result_395_0: Flow = Flow.value {0}; let __cleanup_result_395_1: Error = e; { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_395_0, __cleanup_result_395_1; } let location,e2=external(self_,first); if e2!=blot_error::Error.none { let __cleanup_result_396_0: Flow = Flow.value {0}; let __cleanup_result_396_1: Error = e2; { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_396_0, __cleanup_result_396_1; } let prep=prepare(self_,selected.target); if prep!=blot_error::Error.none { let __cleanup_result_397_0: Flow = Flow.value {0}; let __cleanup_result_397_1: Error = prep; { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_397_0, __cleanup_result_397_1; } let arguments: CoreValuesBuffer& =__scratch.arguments_0;  for child in module.children(id) { let outcome,e3=expression(self_,owner,child,frame); if e3!=blot_error::Error.none||!isValue(outcome) { let __cleanup_result_398_0: Flow = outcome; let __cleanup_result_398_1: Error = e3; { arguments.deinit(); } { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_398_0, __cleanup_result_398_1; } arguments.push(flowValue(outcome)); } let __cleanup_result_399_0, __cleanup_result_399_1 = invokeNamed(self_,location,arguments.items,owner,id,selected.signature,frame.providers); { arguments.deinit(); } { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_399_0, __cleanup_result_399_1;  { arguments.deinit(); } { scratch_contractMethod_32.free(__scratch_index); } }
+recursive fn contractMethod(self_: Session&,owner: i64,id: u32,frame: Frame) -> Flow,Error { let __scratch_index=scratch_contractMethod_32.alloc_index(ScratchContractMethod32 {}); let __scratch: ScratchContractMethod32& =scratch_contractMethod_32[__scratch_index];   let module=self_.units[owner]; let template=module.member_templates[module.node(id).a]; let selected,error=implementationMethod(self_,owner,id,template,frame.mappings.items,frame.row_mappings.items); if error!=blot_error::Error.none { let __cleanup_result_394_0: Flow = Flow.value {0}; let __cleanup_result_394_1: Error = error; { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_394_0, __cleanup_result_394_1; } let first,e=target(self_,blot_support::some(owner),selected.target); if e!=blot_error::Error.none { let __cleanup_result_395_0: Flow = Flow.value {0}; let __cleanup_result_395_1: Error = e; { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_395_0, __cleanup_result_395_1; } let location,e2=external(self_,first); if e2!=blot_error::Error.none { let __cleanup_result_396_0: Flow = Flow.value {0}; let __cleanup_result_396_1: Error = e2; { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_396_0, __cleanup_result_396_1; } let prep=prepare(self_,selected.target); if prep!=blot_error::Error.none { let __cleanup_result_397_0: Flow = Flow.value {0}; let __cleanup_result_397_1: Error = prep; { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_397_0, __cleanup_result_397_1; } let arguments: CoreValuesBuffer& =__scratch.arguments_0;  let child_count=module.children(id).len;for child_index in 0..child_count {let child=module.children(id)[child_index];let outcome,e3=expression(self_,owner,child,frame); if e3!=blot_error::Error.none||!isValue(outcome) { let __cleanup_result_398_0: Flow = outcome; let __cleanup_result_398_1: Error = e3; { arguments.deinit(); } { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_398_0, __cleanup_result_398_1; } arguments.push(flowValue(outcome)); } let __cleanup_result_399_0, __cleanup_result_399_1 = invokeNamed(self_,location,arguments.items,owner,id,selected.signature,frame.providers); { arguments.deinit(); } { scratch_contractMethod_32.free(__scratch_index); } return __cleanup_result_399_0, __cleanup_result_399_1;  { arguments.deinit(); } { scratch_contractMethod_32.free(__scratch_index); } }
 fn projectType(self_: Session&,owner: i64,source: u32,ty: u32,mappings: const Mapping[:],rows: const RowMapping[:]) -> u32,Error {
  if !self_.has_implementations { let result,error=self_.storage.evidence.projectWithRows(self_.units[owner].types,ty,mappings,rows); if error==blot_error::Error.none||error==blot_error::Error.out_of_memory { return result,error; } if error==blot_error::Error.unresolved_type { return 0,blot_error::Error.none; } if error==blot_error::Error.evidence_limit { return 0,failNode(self_,owner,source,blot_check_diagnostic_code::Code.constant_fuel); } return 0,failNode(self_,owner,source,blot_check_diagnostic_code::Code.unsupported); }
  var projection=initProjection(self_,implementationUseContext(self_,owner,source));  var selected=resolver(projection,self_.associated_remaining); let result,error=self_.storage.evidence.projectSelected(self_.units[owner].types,ty,mappings,rows,selected); if error==blot_error::Error.none||error==blot_error::Error.out_of_memory { let __cleanup_result_7_0: u32 = result; let __cleanup_result_7_1: Error = error; deinitProjection(projection); return __cleanup_result_7_0, __cleanup_result_7_1; } if error==blot_error::Error.unresolved_type { let __cleanup_result_8_0: u32 = 0; let __cleanup_result_8_1: Error = blot_error::Error.none; deinitProjection(projection); return __cleanup_result_8_0, __cleanup_result_8_1; } let __cleanup_result_9_0: u32 = 0; let __cleanup_result_9_1: Error = implementationMatchFailure(self_,owner,source,projection,error); deinitProjection(projection); return __cleanup_result_9_0, __cleanup_result_9_1;
@@ -1076,7 +1076,7 @@ recursive fn regionOwner<C,F>(invocation: RegionInvocation&,solver: blot_check_t
  let membership_cache_initialized,membership_cache_error=blot_eval_scheme_membership::initPooled(); if membership_cache_error!=blot_error::Error.none { let __cleanup_result_5_0: Error = membership_cache_error; closed_cache.deinit(); evidence_cache.deinit(); projection_cache.deinit(); region_worklists.free(work_index); alias_queue.deinit(); constraint_queue.deinit(); let __cleanup_result_6_0: Error = __cleanup_result_5_0; deinitRegionTables(table_index); return __cleanup_result_6_0; } var membership_cache=membership_cache_initialized;
  let components_initialized,components_error=blot_eval_scope_components::initPooled(); if components_error!=blot_error::Error.none { let __cleanup_result_6_0: Error = components_error; membership_cache.deinit(); closed_cache.deinit(); evidence_cache.deinit(); projection_cache.deinit(); region_worklists.free(work_index); alias_queue.deinit(); constraint_queue.deinit(); let __cleanup_result_7_0: Error = __cleanup_result_6_0; deinitRegionTables(table_index); return __cleanup_result_7_0; } var components=components_initialized;
  let scratch=makeSccRegionScratch(constraint_names,callback_origins,projection_cache,evidence_cache,closed_cache,membership_cache,sources,imported,imported_rows,imported_labels,row_variables,row_variable_entries,row_parameters,evidence_rows,evidence_labels,variables,edges,constraints,selected_targets,summary_arguments,data_aliases,frozen,value_scopes,call_instances,candidate_instances,unresolved_calls,target_scopes,components,source_functions,witness_inputs,principal_references,principal_actions,scheme_instances,makeSccSchemeInputs(scheme_keys));
- var arena_index: i64=-1; if resume { arena_index=resume.state.arena_index; } else { arena_index=session.regions.region_arena_pool.take(session.allocation_owner); } let arena: blot_eval_region_arena::Arena& =blot_eval_region_arena::arena(arena_index);
+ var arena_index: i64=-1; if resume {if !validRegionSnapshot(resume) {let __cleanup_result_7_0: Error = blot_error::Error.unresolved_type; components.deinit(); membership_cache.deinit(); closed_cache.deinit(); evidence_cache.deinit(); projection_cache.deinit(); region_worklists.free(work_index); alias_queue.deinit(); constraint_queue.deinit(); let __cleanup_result_8_0: Error = __cleanup_result_7_0;  deinitRegionTables(table_index); return __cleanup_result_8_0;}arena_index=region_snapshot_leases[resume.lease-1].state.arena_index;} else { arena_index=session.regions.region_arena_pool.take(session.allocation_owner); } let arena: blot_eval_region_arena::Arena& =blot_eval_region_arena::arena(arena_index);
  var local_region=makeSccClosureRegion(blot_native::fresh_owner_id(),arena_index,session,copy(blot_check_types::canonical(solver.lease,solver.owner_generation)),scratch,makeSccCollector(collection_frames,collection_words,collection_seen,collection_seen_words),work,session.inference_stage,session.specialization_origin,projection_scopes,normalization_memo,arena,rank_evidence_frames,rank_evidence_words,canonicalRegionCaller(invocation.caller),invocation.timing_active,invocation.timing_started,invocation.timing_previous);let region:ClosureRegion& =local_region;  invocation.registered=true;
  if resume { let restored=restoreRegionSnapshot(resume,region); if restored!=blot_error::Error.none { let __cleanup_result_7_0: Error = restored; components.deinit(); membership_cache.deinit(); closed_cache.deinit(); evidence_cache.deinit(); projection_cache.deinit(); region_worklists.free(work_index); alias_queue.deinit(); constraint_queue.deinit(); let __cleanup_result_8_0: Error = __cleanup_result_7_0;  deinitRegionTables(table_index); return __cleanup_result_8_0; } } else { if session.inquiry_regions==0&&!session.semantic_job_budget.present { session.summary_transitions=0; session.summary_exhausted=false; } session.inquiry_regions++; }
  let result=F(context,region); if !region.suspended { finishRegion(region); session.regions.region_arena_pool.give(arena_index); } let __cleanup_result_8_0: Error = result; components.deinit(); membership_cache.deinit(); closed_cache.deinit(); evidence_cache.deinit(); projection_cache.deinit(); region_worklists.free(work_index); alias_queue.deinit(); constraint_queue.deinit(); let __cleanup_result_9_0: Error = __cleanup_result_8_0;  deinitRegionTables(table_index); return __cleanup_result_9_0;
@@ -1918,7 +1918,8 @@ struct RegionState {
  queue_constraints_heads_count: i64,
  queue_aliases_heads_count: i64,
 }
-struct RegionSnapshot { state: RegionState,solver: blot_check_types::StoreSnapshot,lease: u32=0,generation: u64=0,
+struct RegionSnapshot { lease:u32=0,generation:u64=0 }
+struct RegionSnapshotView { state:RegionState,
  callback_origins: const CallbackOriginUse[:]=default<const CallbackOriginUse[:]>(),
  sources: const RegionSource[:]=default<const RegionSource[:]>(),
  row_variable_entries: const ImportedRowVariable[:]=default<const ImportedRowVariable[:]>(),
@@ -1977,7 +1978,7 @@ struct RegionSnapshot { state: RegionState,solver: blot_check_types::StoreSnapsh
  queue_constraints_heads: const dictionary_slot<u64,u32>[:]=default<const dictionary_slot<u64,u32>[:]>(),
  queue_aliases_heads: const dictionary_slot<u64,u32>[:]=default<const dictionary_slot<u64,u32>[:]>(),
 }
-struct RegionSnapshotLease { live: bool=false,generation: u64=0,
+struct RegionSnapshotLease { live: bool=false,generation: u64=0,state:RegionState,solver:blot_check_types::StoreSnapshot,
  callback_origins: SnapshotRange=SnapshotRange {},
  sources: SnapshotRange=SnapshotRange {},
  row_variable_entries: SnapshotRange=SnapshotRange {},
@@ -2099,8 +2100,8 @@ fn suspendRegion(region: ClosureRegion&) -> RegionSnapshot,Error {
  assert(!region.code_projection.present&&region.rank_evidence_frames.len==0&&!region.suspended);
  if region_snapshot_generation==0xffffffffffffffff||region_snapshot_leases.len>=0xffffffff { return default<RegionSnapshot>(),blot_error::Error.type_limit; }
  let solver,error=blot_check_types::suspendStore(region.solver); if error!=blot_error::Error.none { return default<RegionSnapshot>(),error; }
- let generation=region_snapshot_generation; region_snapshot_generation++; var lease=RegionSnapshotLease {true,generation};
- var snapshot=RegionSnapshot { state:RegionState {
+ let generation=region_snapshot_generation; region_snapshot_generation++;
+ let state=RegionState {
  owner_id:region.owner_id,
  arena_index:region.arena_index,
  inference_stage:region.inference_stage,
@@ -2216,120 +2217,121 @@ fn suspendRegion(region: ClosureRegion&) -> RegionSnapshot,Error {
  normalization_memo_count:region.normalization_memo.count,
  queue_constraints_heads_count:region.work_owner.constraints.heads.count,
  queue_aliases_heads_count:region.work_owner.aliases.heads.count,
- }, solver:solver, generation:generation };
- if region.scratch.callback_origins.len!=0 { let run=region_snapshot_callback_origins.alloc_slice(region.scratch.callback_origins.len); for value,index in region.scratch.callback_origins.items { run[index]=value; } let first: const CallbackOriginUse& =run[0]; lease.callback_origins=SnapshotRange {region_snapshot_callback_origins.index_of(first),run.len}; snapshot.callback_origins=run; }
+ };
+ var lease=RegionSnapshotLease{live:true,generation:generation,state:canonicalRegionState(state),solver:blot_check_type_store_snapshot::canonicalSnapshot(solver),..};
+ if region.scratch.callback_origins.len!=0 { let run=region_snapshot_callback_origins.alloc_slice(region.scratch.callback_origins.len); for value,index in region.scratch.callback_origins.items { run[index]=value; } let first: const CallbackOriginUse& =run[0]; lease.callback_origins=SnapshotRange {region_snapshot_callback_origins.index_of(first),run.len};  }
  region.scratch.callback_origins.clear();
- if region.scratch.sources.len!=0 { let run=region_snapshot_sources.alloc_slice(region.scratch.sources.len); for value,index in region.scratch.sources.items { run[index]=value; } let first: const RegionSource& =run[0]; lease.sources=SnapshotRange {region_snapshot_sources.index_of(first),run.len}; snapshot.sources=run; }
+ if region.scratch.sources.len!=0 { let run=region_snapshot_sources.alloc_slice(region.scratch.sources.len); for value,index in region.scratch.sources.items { run[index]=value; } let first: const RegionSource& =run[0]; lease.sources=SnapshotRange {region_snapshot_sources.index_of(first),run.len};  }
  region.scratch.sources.clear();
- if region.scratch.row_variable_entries.len!=0 { let run=region_snapshot_row_variable_entries.alloc_slice(region.scratch.row_variable_entries.len); for value,index in region.scratch.row_variable_entries.items { run[index]=value; } let first: const ImportedRowVariable& =run[0]; lease.row_variable_entries=SnapshotRange {region_snapshot_row_variable_entries.index_of(first),run.len}; snapshot.row_variable_entries=run; }
+ if region.scratch.row_variable_entries.len!=0 { let run=region_snapshot_row_variable_entries.alloc_slice(region.scratch.row_variable_entries.len); for value,index in region.scratch.row_variable_entries.items { run[index]=value; } let first: const ImportedRowVariable& =run[0]; lease.row_variable_entries=SnapshotRange {region_snapshot_row_variable_entries.index_of(first),run.len};  }
  region.scratch.row_variable_entries.clear();
- if region.scratch.variables.len!=0 { let run=region_snapshot_variables.alloc_slice(region.scratch.variables.len); for value,index in region.scratch.variables.items { run[index]=value; } let first: const Variable& =run[0]; lease.variables=SnapshotRange {region_snapshot_variables.index_of(first),run.len}; snapshot.variables=run; }
+ if region.scratch.variables.len!=0 { let run=region_snapshot_variables.alloc_slice(region.scratch.variables.len); for value,index in region.scratch.variables.items { run[index]=value; } let first: const Variable& =run[0]; lease.variables=SnapshotRange {region_snapshot_variables.index_of(first),run.len};  }
  region.scratch.variables.clear();
- if region.scratch.edges.len!=0 { let run=region_snapshot_edges.alloc_slice(region.scratch.edges.len); for value,index in region.scratch.edges.items { run[index]=value; } let first: const RegionEdge& =run[0]; lease.edges=SnapshotRange {region_snapshot_edges.index_of(first),run.len}; snapshot.edges=run; }
+ if region.scratch.edges.len!=0 { let run=region_snapshot_edges.alloc_slice(region.scratch.edges.len); for value,index in region.scratch.edges.items { run[index]=value; } let first: const RegionEdge& =run[0]; lease.edges=SnapshotRange {region_snapshot_edges.index_of(first),run.len};  }
  region.scratch.edges.clear();
- if region.scratch.constraints.len!=0 { let run=region_snapshot_constraints.alloc_slice(region.scratch.constraints.len); for value,index in region.scratch.constraints.items { run[index]=canonicalConstraint(value); } let first: const Constraint& =run[0]; lease.constraints=SnapshotRange {region_snapshot_constraints.index_of(first),run.len}; snapshot.constraints=run; }
+ if region.scratch.constraints.len!=0 { let run=region_snapshot_constraints.alloc_slice(region.scratch.constraints.len); for value,index in region.scratch.constraints.items { run[index]=canonicalConstraint(value); } let first: const Constraint& =run[0]; lease.constraints=SnapshotRange {region_snapshot_constraints.index_of(first),run.len};  }
  region.scratch.constraints.clear();
- if region.scratch.selected_targets.len!=0 { let run=region_snapshot_selected_targets.alloc_slice(region.scratch.selected_targets.len); for value,index in region.scratch.selected_targets.items { run[index]=value; } let first: const BindingRef& =run[0]; lease.selected_targets=SnapshotRange {region_snapshot_selected_targets.index_of(first),run.len}; snapshot.selected_targets=run; }
+ if region.scratch.selected_targets.len!=0 { let run=region_snapshot_selected_targets.alloc_slice(region.scratch.selected_targets.len); for value,index in region.scratch.selected_targets.items { run[index]=value; } let first: const BindingRef& =run[0]; lease.selected_targets=SnapshotRange {region_snapshot_selected_targets.index_of(first),run.len};  }
  region.scratch.selected_targets.clear();
- if region.scratch.summary_arguments.len!=0 { let run=region_snapshot_summary_arguments.alloc_slice(region.scratch.summary_arguments.len); for value,index in region.scratch.summary_arguments.items { run[index]=value; } let first: const u32& =run[0]; lease.summary_arguments=SnapshotRange {region_snapshot_summary_arguments.index_of(first),run.len}; snapshot.summary_arguments=run; }
+ if region.scratch.summary_arguments.len!=0 { let run=region_snapshot_summary_arguments.alloc_slice(region.scratch.summary_arguments.len); for value,index in region.scratch.summary_arguments.items { run[index]=value; } let first: const u32& =run[0]; lease.summary_arguments=SnapshotRange {region_snapshot_summary_arguments.index_of(first),run.len};  }
  region.scratch.summary_arguments.clear();
- if region.scratch.data_aliases.len!=0 { let run=region_snapshot_data_aliases.alloc_slice(region.scratch.data_aliases.len); for value,index in region.scratch.data_aliases.items { run[index]=value; } let first: const DataAlias& =run[0]; lease.data_aliases=SnapshotRange {region_snapshot_data_aliases.index_of(first),run.len}; snapshot.data_aliases=run; }
+ if region.scratch.data_aliases.len!=0 { let run=region_snapshot_data_aliases.alloc_slice(region.scratch.data_aliases.len); for value,index in region.scratch.data_aliases.items { run[index]=value; } let first: const DataAlias& =run[0]; lease.data_aliases=SnapshotRange {region_snapshot_data_aliases.index_of(first),run.len};  }
  region.scratch.data_aliases.clear();
- if region.scratch.source_functions.len!=0 { let run=region_snapshot_source_functions.alloc_slice(region.scratch.source_functions.len); for value,index in region.scratch.source_functions.items { run[index]=value; } let first: const u32& =run[0]; lease.source_functions=SnapshotRange {region_snapshot_source_functions.index_of(first),run.len}; snapshot.source_functions=run; }
+ if region.scratch.source_functions.len!=0 { let run=region_snapshot_source_functions.alloc_slice(region.scratch.source_functions.len); for value,index in region.scratch.source_functions.items { run[index]=value; } let first: const u32& =run[0]; lease.source_functions=SnapshotRange {region_snapshot_source_functions.index_of(first),run.len};  }
  region.scratch.source_functions.clear();
- if region.scratch.principal_references.len!=0 { let run=region_snapshot_principal_references.alloc_slice(region.scratch.principal_references.len); for value,index in region.scratch.principal_references.items { run[index]=value; } let first: const Target& =run[0]; lease.principal_references=SnapshotRange {region_snapshot_principal_references.index_of(first),run.len}; snapshot.principal_references=run; }
+ if region.scratch.principal_references.len!=0 { let run=region_snapshot_principal_references.alloc_slice(region.scratch.principal_references.len); for value,index in region.scratch.principal_references.items { run[index]=value; } let first: const Target& =run[0]; lease.principal_references=SnapshotRange {region_snapshot_principal_references.index_of(first),run.len};  }
  region.scratch.principal_references.clear();
- if region.scratch.principal_actions.len!=0 { let run=region_snapshot_principal_actions.alloc_slice(region.scratch.principal_actions.len); for value,index in region.scratch.principal_actions.items { run[index]=value; } let first: const PrincipalAction& =run[0]; lease.principal_actions=SnapshotRange {region_snapshot_principal_actions.index_of(first),run.len}; snapshot.principal_actions=run; }
+ if region.scratch.principal_actions.len!=0 { let run=region_snapshot_principal_actions.alloc_slice(region.scratch.principal_actions.len); for value,index in region.scratch.principal_actions.items { run[index]=value; } let first: const PrincipalAction& =run[0]; lease.principal_actions=SnapshotRange {region_snapshot_principal_actions.index_of(first),run.len};  }
  region.scratch.principal_actions.clear();
- if region.scratch.constraint_names.len!=0 { let run=region_snapshot_constraint_names.alloc_slice(region.scratch.constraint_names.len); for value,index in region.scratch.constraint_names.items { run[index]=value; } let first: const ConstraintNameLease& =run[0]; lease.constraint_names=SnapshotRange {region_snapshot_constraint_names.index_of(first),run.len}; snapshot.constraint_names=run; }
+ if region.scratch.constraint_names.len!=0 { let run=region_snapshot_constraint_names.alloc_slice(region.scratch.constraint_names.len); for value,index in region.scratch.constraint_names.items { run[index]=value; } let first: const ConstraintNameLease& =run[0]; lease.constraint_names=SnapshotRange {region_snapshot_constraint_names.index_of(first),run.len};  }
  region.scratch.constraint_names.clear();
- if region.rank_evidence_frames.len!=0 { let run=region_snapshot_rank_evidence_frames.alloc_slice(region.rank_evidence_frames.len); for value,index in region.rank_evidence_frames.items { run[index]=value; } let first: const blot_check_types::List& =run[0]; lease.rank_evidence_frames=SnapshotRange {region_snapshot_rank_evidence_frames.index_of(first),run.len}; snapshot.rank_evidence_frames=run; }
+ if region.rank_evidence_frames.len!=0 { let run=region_snapshot_rank_evidence_frames.alloc_slice(region.rank_evidence_frames.len); for value,index in region.rank_evidence_frames.items { run[index]=value; } let first: const blot_check_types::List& =run[0]; lease.rank_evidence_frames=SnapshotRange {region_snapshot_rank_evidence_frames.index_of(first),run.len};  }
  region.rank_evidence_frames.clear();
- if region.rank_evidence_words.len!=0 { let run=region_snapshot_rank_evidence_words.alloc_slice(region.rank_evidence_words.len); for value,index in region.rank_evidence_words.items { run[index]=value; } let first: const u32& =run[0]; lease.rank_evidence_words=SnapshotRange {region_snapshot_rank_evidence_words.index_of(first),run.len}; snapshot.rank_evidence_words=run; }
+ if region.rank_evidence_words.len!=0 { let run=region_snapshot_rank_evidence_words.alloc_slice(region.rank_evidence_words.len); for value,index in region.rank_evidence_words.items { run[index]=value; } let first: const u32& =run[0]; lease.rank_evidence_words=SnapshotRange {region_snapshot_rank_evidence_words.index_of(first),run.len};  }
  region.rank_evidence_words.clear();
- if region.scratch.components.nodes.len!=0 { let run=region_snapshot_component_nodes.alloc_slice(region.scratch.components.nodes.len); for value,index in region.scratch.components.nodes.items { run[index]=value; } let first: const blot_eval_scope_components::Node& =run[0]; lease.component_nodes=SnapshotRange {region_snapshot_component_nodes.index_of(first),run.len}; snapshot.component_nodes=run; }
+ if region.scratch.components.nodes.len!=0 { let run=region_snapshot_component_nodes.alloc_slice(region.scratch.components.nodes.len); for value,index in region.scratch.components.nodes.items { run[index]=value; } let first: const blot_eval_scope_components::Node& =run[0]; lease.component_nodes=SnapshotRange {region_snapshot_component_nodes.index_of(first),run.len};  }
  region.scratch.components.nodes.clear();
- if region.scratch.components.edges.len!=0 { let run=region_snapshot_component_edges.alloc_slice(region.scratch.components.edges.len); for value,index in region.scratch.components.edges.items { run[index]=value; } let first: const blot_eval_scope_components::Edge& =run[0]; lease.component_edges=SnapshotRange {region_snapshot_component_edges.index_of(first),run.len}; snapshot.component_edges=run; }
+ if region.scratch.components.edges.len!=0 { let run=region_snapshot_component_edges.alloc_slice(region.scratch.components.edges.len); for value,index in region.scratch.components.edges.items { run[index]=value; } let first: const blot_eval_scope_components::Edge& =run[0]; lease.component_edges=SnapshotRange {region_snapshot_component_edges.index_of(first),run.len};  }
  region.scratch.components.edges.clear();
- if region.scratch.components.work.len!=0 { let run=region_snapshot_component_work.alloc_slice(region.scratch.components.work.len); for value,index in region.scratch.components.work.items { run[index]=value; } let first: const u32& =run[0]; lease.component_work=SnapshotRange {region_snapshot_component_work.index_of(first),run.len}; snapshot.component_work=run; }
+ if region.scratch.components.work.len!=0 { let run=region_snapshot_component_work.alloc_slice(region.scratch.components.work.len); for value,index in region.scratch.components.work.items { run[index]=value; } let first: const u32& =run[0]; lease.component_work=SnapshotRange {region_snapshot_component_work.index_of(first),run.len};  }
  region.scratch.components.work.clear();
- if region.scratch.scheme_memberships.words.len!=0 { let run=region_snapshot_membership_words.alloc_slice(region.scratch.scheme_memberships.words.len); for value,index in region.scratch.scheme_memberships.words.items { run[index]=value; } let first: const u32& =run[0]; lease.membership_words=SnapshotRange {region_snapshot_membership_words.index_of(first),run.len}; snapshot.membership_words=run; }
+ if region.scratch.scheme_memberships.words.len!=0 { let run=region_snapshot_membership_words.alloc_slice(region.scratch.scheme_memberships.words.len); for value,index in region.scratch.scheme_memberships.words.items { run[index]=value; } let first: const u32& =run[0]; lease.membership_words=SnapshotRange {region_snapshot_membership_words.index_of(first),run.len};  }
  region.scratch.scheme_memberships.words.clear();
- if region.collector.frames.len!=0 { let run=region_snapshot_collection_frames.alloc_slice(region.collector.frames.len); for value,index in region.collector.frames.items { run[index]=value; } let first: const CollectionFrame& =run[0]; lease.collection_frames=SnapshotRange {region_snapshot_collection_frames.index_of(first),run.len}; snapshot.collection_frames=run; }
+ if region.collector.frames.len!=0 { let run=region_snapshot_collection_frames.alloc_slice(region.collector.frames.len); for value,index in region.collector.frames.items { run[index]=value; } let first: const CollectionFrame& =run[0]; lease.collection_frames=SnapshotRange {region_snapshot_collection_frames.index_of(first),run.len};  }
  region.collector.frames.clear();
- if region.collector.words.len!=0 { let run=region_snapshot_collection_words.alloc_slice(region.collector.words.len); for value,index in region.collector.words.items { run[index]=value; } let first: const u32& =run[0]; lease.collection_words=SnapshotRange {region_snapshot_collection_words.index_of(first),run.len}; snapshot.collection_words=run; }
+ if region.collector.words.len!=0 { let run=region_snapshot_collection_words.alloc_slice(region.collector.words.len); for value,index in region.collector.words.items { run[index]=value; } let first: const u32& =run[0]; lease.collection_words=SnapshotRange {region_snapshot_collection_words.index_of(first),run.len};  }
  region.collector.words.clear();
- if region.collector.seen_words.len!=0 { let run=region_snapshot_collection_seen_words.alloc_slice(region.collector.seen_words.len); for value,index in region.collector.seen_words.items { run[index]=value; } let first: const u32& =run[0]; lease.collection_seen_words=SnapshotRange {region_snapshot_collection_seen_words.index_of(first),run.len}; snapshot.collection_seen_words=run; }
+ if region.collector.seen_words.len!=0 { let run=region_snapshot_collection_seen_words.alloc_slice(region.collector.seen_words.len); for value,index in region.collector.seen_words.items { run[index]=value; } let first: const u32& =run[0]; lease.collection_seen_words=SnapshotRange {region_snapshot_collection_seen_words.index_of(first),run.len};  }
  region.collector.seen_words.clear();
- if region.work_owner.constraints.entries.len!=0 { let run=region_snapshot_queue_constraints_entries.alloc_slice(region.work_owner.constraints.entries.len); for value,index in region.work_owner.constraints.entries.items { run[index]=value; } let first: const blot_check_solver_worklist::Entry& =run[0]; lease.queue_constraints_entries=SnapshotRange {region_snapshot_queue_constraints_entries.index_of(first),run.len}; snapshot.queue_constraints_entries=run; }
+ if region.work_owner.constraints.entries.len!=0 { let run=region_snapshot_queue_constraints_entries.alloc_slice(region.work_owner.constraints.entries.len); for value,index in region.work_owner.constraints.entries.items { run[index]=value; } let first: const blot_check_solver_worklist::Entry& =run[0]; lease.queue_constraints_entries=SnapshotRange {region_snapshot_queue_constraints_entries.index_of(first),run.len};  }
  region.work_owner.constraints.entries.clear();
- if region.work_owner.constraints.links.len!=0 { let run=region_snapshot_queue_constraints_links.alloc_slice(region.work_owner.constraints.links.len); for value,index in region.work_owner.constraints.links.items { run[index]=value; } let first: const blot_check_solver_worklist::Link& =run[0]; lease.queue_constraints_links=SnapshotRange {region_snapshot_queue_constraints_links.index_of(first),run.len}; snapshot.queue_constraints_links=run; }
+ if region.work_owner.constraints.links.len!=0 { let run=region_snapshot_queue_constraints_links.alloc_slice(region.work_owner.constraints.links.len); for value,index in region.work_owner.constraints.links.items { run[index]=value; } let first: const blot_check_solver_worklist::Link& =run[0]; lease.queue_constraints_links=SnapshotRange {region_snapshot_queue_constraints_links.index_of(first),run.len};  }
  region.work_owner.constraints.links.clear();
- if region.work_owner.constraints.ready.len!=0 { let run=region_snapshot_queue_constraints_ready.alloc_slice(region.work_owner.constraints.ready.len); for value,index in region.work_owner.constraints.ready.items { run[index]=value; } let first: const u64& =run[0]; lease.queue_constraints_ready=SnapshotRange {region_snapshot_queue_constraints_ready.index_of(first),run.len}; snapshot.queue_constraints_ready=run; }
+ if region.work_owner.constraints.ready.len!=0 { let run=region_snapshot_queue_constraints_ready.alloc_slice(region.work_owner.constraints.ready.len); for value,index in region.work_owner.constraints.ready.items { run[index]=value; } let first: const u64& =run[0]; lease.queue_constraints_ready=SnapshotRange {region_snapshot_queue_constraints_ready.index_of(first),run.len};  }
  region.work_owner.constraints.ready.clear();
- if region.work_owner.constraints.pending.len!=0 { let run=region_snapshot_queue_constraints_pending.alloc_slice(region.work_owner.constraints.pending.len); for value,index in region.work_owner.constraints.pending.items { run[index]=value; } let first: const u64& =run[0]; lease.queue_constraints_pending=SnapshotRange {region_snapshot_queue_constraints_pending.index_of(first),run.len}; snapshot.queue_constraints_pending=run; }
+ if region.work_owner.constraints.pending.len!=0 { let run=region_snapshot_queue_constraints_pending.alloc_slice(region.work_owner.constraints.pending.len); for value,index in region.work_owner.constraints.pending.items { run[index]=value; } let first: const u64& =run[0]; lease.queue_constraints_pending=SnapshotRange {region_snapshot_queue_constraints_pending.index_of(first),run.len};  }
  region.work_owner.constraints.pending.clear();
- if region.work_owner.aliases.entries.len!=0 { let run=region_snapshot_queue_aliases_entries.alloc_slice(region.work_owner.aliases.entries.len); for value,index in region.work_owner.aliases.entries.items { run[index]=value; } let first: const blot_check_solver_worklist::Entry& =run[0]; lease.queue_aliases_entries=SnapshotRange {region_snapshot_queue_aliases_entries.index_of(first),run.len}; snapshot.queue_aliases_entries=run; }
+ if region.work_owner.aliases.entries.len!=0 { let run=region_snapshot_queue_aliases_entries.alloc_slice(region.work_owner.aliases.entries.len); for value,index in region.work_owner.aliases.entries.items { run[index]=value; } let first: const blot_check_solver_worklist::Entry& =run[0]; lease.queue_aliases_entries=SnapshotRange {region_snapshot_queue_aliases_entries.index_of(first),run.len};  }
  region.work_owner.aliases.entries.clear();
- if region.work_owner.aliases.links.len!=0 { let run=region_snapshot_queue_aliases_links.alloc_slice(region.work_owner.aliases.links.len); for value,index in region.work_owner.aliases.links.items { run[index]=value; } let first: const blot_check_solver_worklist::Link& =run[0]; lease.queue_aliases_links=SnapshotRange {region_snapshot_queue_aliases_links.index_of(first),run.len}; snapshot.queue_aliases_links=run; }
+ if region.work_owner.aliases.links.len!=0 { let run=region_snapshot_queue_aliases_links.alloc_slice(region.work_owner.aliases.links.len); for value,index in region.work_owner.aliases.links.items { run[index]=value; } let first: const blot_check_solver_worklist::Link& =run[0]; lease.queue_aliases_links=SnapshotRange {region_snapshot_queue_aliases_links.index_of(first),run.len};  }
  region.work_owner.aliases.links.clear();
- if region.work_owner.aliases.ready.len!=0 { let run=region_snapshot_queue_aliases_ready.alloc_slice(region.work_owner.aliases.ready.len); for value,index in region.work_owner.aliases.ready.items { run[index]=value; } let first: const u64& =run[0]; lease.queue_aliases_ready=SnapshotRange {region_snapshot_queue_aliases_ready.index_of(first),run.len}; snapshot.queue_aliases_ready=run; }
+ if region.work_owner.aliases.ready.len!=0 { let run=region_snapshot_queue_aliases_ready.alloc_slice(region.work_owner.aliases.ready.len); for value,index in region.work_owner.aliases.ready.items { run[index]=value; } let first: const u64& =run[0]; lease.queue_aliases_ready=SnapshotRange {region_snapshot_queue_aliases_ready.index_of(first),run.len};  }
  region.work_owner.aliases.ready.clear();
- if region.work_owner.aliases.pending.len!=0 { let run=region_snapshot_queue_aliases_pending.alloc_slice(region.work_owner.aliases.pending.len); for value,index in region.work_owner.aliases.pending.items { run[index]=value; } let first: const u64& =run[0]; lease.queue_aliases_pending=SnapshotRange {region_snapshot_queue_aliases_pending.index_of(first),run.len}; snapshot.queue_aliases_pending=run; }
+ if region.work_owner.aliases.pending.len!=0 { let run=region_snapshot_queue_aliases_pending.alloc_slice(region.work_owner.aliases.pending.len); for value,index in region.work_owner.aliases.pending.items { run[index]=value; } let first: const u64& =run[0]; lease.queue_aliases_pending=SnapshotRange {region_snapshot_queue_aliases_pending.index_of(first),run.len};  }
  region.work_owner.aliases.pending.clear();
- if region.scratch.imported.slots.len!=0 { let run=region_snapshot_imported.alloc_slice(region.scratch.imported.slots.len); for value,index in region.scratch.imported.slots { run[index]=value; } let first: const dictionary_slot<Import,u32>& =run[0]; lease.imported=SnapshotRange {region_snapshot_imported.index_of(first),run.len}; snapshot.imported=run; }
+ if region.scratch.imported.slots.len!=0 { let run=region_snapshot_imported.alloc_slice(region.scratch.imported.slots.len); for value,index in region.scratch.imported.slots { run[index]=value; } let first: const dictionary_slot<Import,u32>& =run[0]; lease.imported=SnapshotRange {region_snapshot_imported.index_of(first),run.len};  }
  release(region.scratch.imported);
- if region.scratch.imported_rows.slots.len!=0 { let run=region_snapshot_imported_rows.alloc_slice(region.scratch.imported_rows.slots.len); for value,index in region.scratch.imported_rows.slots { run[index]=value; } let first: const dictionary_slot<RowImport,u32>& =run[0]; lease.imported_rows=SnapshotRange {region_snapshot_imported_rows.index_of(first),run.len}; snapshot.imported_rows=run; }
+ if region.scratch.imported_rows.slots.len!=0 { let run=region_snapshot_imported_rows.alloc_slice(region.scratch.imported_rows.slots.len); for value,index in region.scratch.imported_rows.slots { run[index]=value; } let first: const dictionary_slot<RowImport,u32>& =run[0]; lease.imported_rows=SnapshotRange {region_snapshot_imported_rows.index_of(first),run.len};  }
  release(region.scratch.imported_rows);
- if region.scratch.imported_labels.slots.len!=0 { let run=region_snapshot_imported_labels.alloc_slice(region.scratch.imported_labels.slots.len); for value,index in region.scratch.imported_labels.slots { run[index]=value; } let first: const dictionary_slot<LabelImport,u32>& =run[0]; lease.imported_labels=SnapshotRange {region_snapshot_imported_labels.index_of(first),run.len}; snapshot.imported_labels=run; }
+ if region.scratch.imported_labels.slots.len!=0 { let run=region_snapshot_imported_labels.alloc_slice(region.scratch.imported_labels.slots.len); for value,index in region.scratch.imported_labels.slots { run[index]=value; } let first: const dictionary_slot<LabelImport,u32>& =run[0]; lease.imported_labels=SnapshotRange {region_snapshot_imported_labels.index_of(first),run.len};  }
  release(region.scratch.imported_labels);
- if region.scratch.row_variables.slots.len!=0 { let run=region_snapshot_row_variables.alloc_slice(region.scratch.row_variables.slots.len); for value,index in region.scratch.row_variables.slots { run[index]=value; } let first: const dictionary_slot<RowVariable,u32>& =run[0]; lease.row_variables=SnapshotRange {region_snapshot_row_variables.index_of(first),run.len}; snapshot.row_variables=run; }
+ if region.scratch.row_variables.slots.len!=0 { let run=region_snapshot_row_variables.alloc_slice(region.scratch.row_variables.slots.len); for value,index in region.scratch.row_variables.slots { run[index]=value; } let first: const dictionary_slot<RowVariable,u32>& =run[0]; lease.row_variables=SnapshotRange {region_snapshot_row_variables.index_of(first),run.len};  }
  release(region.scratch.row_variables);
- if region.scratch.row_parameters.slots.len!=0 { let run=region_snapshot_row_parameters.alloc_slice(region.scratch.row_parameters.slots.len); for value,index in region.scratch.row_parameters.slots { run[index]=value; } let first: const dictionary_slot<RowParameter,u32>& =run[0]; lease.row_parameters=SnapshotRange {region_snapshot_row_parameters.index_of(first),run.len}; snapshot.row_parameters=run; }
+ if region.scratch.row_parameters.slots.len!=0 { let run=region_snapshot_row_parameters.alloc_slice(region.scratch.row_parameters.slots.len); for value,index in region.scratch.row_parameters.slots { run[index]=value; } let first: const dictionary_slot<RowParameter,u32>& =run[0]; lease.row_parameters=SnapshotRange {region_snapshot_row_parameters.index_of(first),run.len};  }
  release(region.scratch.row_parameters);
- if region.scratch.evidence_rows.slots.len!=0 { let run=region_snapshot_evidence_rows.alloc_slice(region.scratch.evidence_rows.slots.len); for value,index in region.scratch.evidence_rows.slots { run[index]=value; } let first: const dictionary_slot<u32,u32>& =run[0]; lease.evidence_rows=SnapshotRange {region_snapshot_evidence_rows.index_of(first),run.len}; snapshot.evidence_rows=run; }
+ if region.scratch.evidence_rows.slots.len!=0 { let run=region_snapshot_evidence_rows.alloc_slice(region.scratch.evidence_rows.slots.len); for value,index in region.scratch.evidence_rows.slots { run[index]=value; } let first: const dictionary_slot<u32,u32>& =run[0]; lease.evidence_rows=SnapshotRange {region_snapshot_evidence_rows.index_of(first),run.len};  }
  release(region.scratch.evidence_rows);
- if region.scratch.evidence_labels.slots.len!=0 { let run=region_snapshot_evidence_labels.alloc_slice(region.scratch.evidence_labels.slots.len); for value,index in region.scratch.evidence_labels.slots { run[index]=value; } let first: const dictionary_slot<u32,u32>& =run[0]; lease.evidence_labels=SnapshotRange {region_snapshot_evidence_labels.index_of(first),run.len}; snapshot.evidence_labels=run; }
+ if region.scratch.evidence_labels.slots.len!=0 { let run=region_snapshot_evidence_labels.alloc_slice(region.scratch.evidence_labels.slots.len); for value,index in region.scratch.evidence_labels.slots { run[index]=value; } let first: const dictionary_slot<u32,u32>& =run[0]; lease.evidence_labels=SnapshotRange {region_snapshot_evidence_labels.index_of(first),run.len};  }
  release(region.scratch.evidence_labels);
- if region.scratch.frozen.slots.len!=0 { let run=region_snapshot_frozen.alloc_slice(region.scratch.frozen.slots.len); for value,index in region.scratch.frozen.slots { run[index]=value; } let first: const dictionary_slot<u32,ValueId>& =run[0]; lease.frozen=SnapshotRange {region_snapshot_frozen.index_of(first),run.len}; snapshot.frozen=run; }
+ if region.scratch.frozen.slots.len!=0 { let run=region_snapshot_frozen.alloc_slice(region.scratch.frozen.slots.len); for value,index in region.scratch.frozen.slots { run[index]=value; } let first: const dictionary_slot<u32,ValueId>& =run[0]; lease.frozen=SnapshotRange {region_snapshot_frozen.index_of(first),run.len};  }
  release(region.scratch.frozen);
- if region.scratch.value_scopes.slots.len!=0 { let run=region_snapshot_value_scopes.alloc_slice(region.scratch.value_scopes.slots.len); for value,index in region.scratch.value_scopes.slots { run[index]=value; } let first: const dictionary_slot<ValueId,u32>& =run[0]; lease.value_scopes=SnapshotRange {region_snapshot_value_scopes.index_of(first),run.len}; snapshot.value_scopes=run; }
+ if region.scratch.value_scopes.slots.len!=0 { let run=region_snapshot_value_scopes.alloc_slice(region.scratch.value_scopes.slots.len); for value,index in region.scratch.value_scopes.slots { run[index]=value; } let first: const dictionary_slot<ValueId,u32>& =run[0]; lease.value_scopes=SnapshotRange {region_snapshot_value_scopes.index_of(first),run.len};  }
  release(region.scratch.value_scopes);
- if region.scratch.call_instances.slots.len!=0 { let run=region_snapshot_call_instances.alloc_slice(region.scratch.call_instances.slots.len); for value,index in region.scratch.call_instances.slots { run[index]=value; } let first: const dictionary_slot<CallKey,u32>& =run[0]; lease.call_instances=SnapshotRange {region_snapshot_call_instances.index_of(first),run.len}; snapshot.call_instances=run; }
+ if region.scratch.call_instances.slots.len!=0 { let run=region_snapshot_call_instances.alloc_slice(region.scratch.call_instances.slots.len); for value,index in region.scratch.call_instances.slots { run[index]=value; } let first: const dictionary_slot<CallKey,u32>& =run[0]; lease.call_instances=SnapshotRange {region_snapshot_call_instances.index_of(first),run.len};  }
  release(region.scratch.call_instances);
- if region.scratch.candidate_instances.slots.len!=0 { let run=region_snapshot_candidate_instances.alloc_slice(region.scratch.candidate_instances.slots.len); for value,index in region.scratch.candidate_instances.slots { run[index]=value; } let first: const dictionary_slot<CandidateKey,u32>& =run[0]; lease.candidate_instances=SnapshotRange {region_snapshot_candidate_instances.index_of(first),run.len}; snapshot.candidate_instances=run; }
+ if region.scratch.candidate_instances.slots.len!=0 { let run=region_snapshot_candidate_instances.alloc_slice(region.scratch.candidate_instances.slots.len); for value,index in region.scratch.candidate_instances.slots { run[index]=value; } let first: const dictionary_slot<CandidateKey,u32>& =run[0]; lease.candidate_instances=SnapshotRange {region_snapshot_candidate_instances.index_of(first),run.len};  }
  release(region.scratch.candidate_instances);
- if region.scratch.unresolved_calls.slots.len!=0 { let run=region_snapshot_unresolved_calls.alloc_slice(region.scratch.unresolved_calls.slots.len); for value,index in region.scratch.unresolved_calls.slots { run[index]=value; } let first: const dictionary_slot<Target,u32>& =run[0]; lease.unresolved_calls=SnapshotRange {region_snapshot_unresolved_calls.index_of(first),run.len}; snapshot.unresolved_calls=run; }
+ if region.scratch.unresolved_calls.slots.len!=0 { let run=region_snapshot_unresolved_calls.alloc_slice(region.scratch.unresolved_calls.slots.len); for value,index in region.scratch.unresolved_calls.slots { run[index]=value; } let first: const dictionary_slot<Target,u32>& =run[0]; lease.unresolved_calls=SnapshotRange {region_snapshot_unresolved_calls.index_of(first),run.len};  }
  release(region.scratch.unresolved_calls);
- if region.scratch.target_scopes.slots.len!=0 { let run=region_snapshot_target_scopes.alloc_slice(region.scratch.target_scopes.slots.len); for value,index in region.scratch.target_scopes.slots { run[index]=value; } let first: const dictionary_slot<Target,u32>& =run[0]; lease.target_scopes=SnapshotRange {region_snapshot_target_scopes.index_of(first),run.len}; snapshot.target_scopes=run; }
+ if region.scratch.target_scopes.slots.len!=0 { let run=region_snapshot_target_scopes.alloc_slice(region.scratch.target_scopes.slots.len); for value,index in region.scratch.target_scopes.slots { run[index]=value; } let first: const dictionary_slot<Target,u32>& =run[0]; lease.target_scopes=SnapshotRange {region_snapshot_target_scopes.index_of(first),run.len};  }
  release(region.scratch.target_scopes);
- if region.scratch.witness_inputs.slots.len!=0 { let run=region_snapshot_witness_inputs.alloc_slice(region.scratch.witness_inputs.slots.len); for value,index in region.scratch.witness_inputs.slots { run[index]=value; } let first: const dictionary_slot<u32,u32>& =run[0]; lease.witness_inputs=SnapshotRange {region_snapshot_witness_inputs.index_of(first),run.len}; snapshot.witness_inputs=run; }
+ if region.scratch.witness_inputs.slots.len!=0 { let run=region_snapshot_witness_inputs.alloc_slice(region.scratch.witness_inputs.slots.len); for value,index in region.scratch.witness_inputs.slots { run[index]=value; } let first: const dictionary_slot<u32,u32>& =run[0]; lease.witness_inputs=SnapshotRange {region_snapshot_witness_inputs.index_of(first),run.len};  }
  release(region.scratch.witness_inputs);
- if region.scratch.scheme_instances.slots.len!=0 { let run=region_snapshot_scheme_instances.alloc_slice(region.scratch.scheme_instances.slots.len); for value,index in region.scratch.scheme_instances.slots { run[index]=value; } let first: const dictionary_slot<SchemeInstance,bool>& =run[0]; lease.scheme_instances=SnapshotRange {region_snapshot_scheme_instances.index_of(first),run.len}; snapshot.scheme_instances=run; }
+ if region.scratch.scheme_instances.slots.len!=0 { let run=region_snapshot_scheme_instances.alloc_slice(region.scratch.scheme_instances.slots.len); for value,index in region.scratch.scheme_instances.slots { run[index]=value; } let first: const dictionary_slot<SchemeInstance,bool>& =run[0]; lease.scheme_instances=SnapshotRange {region_snapshot_scheme_instances.index_of(first),run.len};  }
  release(region.scratch.scheme_instances);
- if region.scratch.projection_cache.answers.slots.len!=0 { let run=region_snapshot_projection_answers.alloc_slice(region.scratch.projection_cache.answers.slots.len); for value,index in region.scratch.projection_cache.answers.slots { run[index]=value; } let first: const dictionary_slot<u32,blot_reuse_projection_cache::Answer>& =run[0]; lease.projection_answers=SnapshotRange {region_snapshot_projection_answers.index_of(first),run.len}; snapshot.projection_answers=run; }
+ if region.scratch.projection_cache.answers.slots.len!=0 { let run=region_snapshot_projection_answers.alloc_slice(region.scratch.projection_cache.answers.slots.len); for value,index in region.scratch.projection_cache.answers.slots { run[index]=value; } let first: const dictionary_slot<u32,blot_reuse_projection_cache::Answer>& =run[0]; lease.projection_answers=SnapshotRange {region_snapshot_projection_answers.index_of(first),run.len};  }
  blot_reuse_projection_cache::release(region.scratch.projection_cache.answers);
- if region.scratch.projection_cache.labels.slots.len!=0 { let run=region_snapshot_projection_labels.alloc_slice(region.scratch.projection_cache.labels.slots.len); for value,index in region.scratch.projection_cache.labels.slots { run[index]=value; } let first: const dictionary_slot<u32,blot_reuse_projection_cache::Answer>& =run[0]; lease.projection_labels=SnapshotRange {region_snapshot_projection_labels.index_of(first),run.len}; snapshot.projection_labels=run; }
+ if region.scratch.projection_cache.labels.slots.len!=0 { let run=region_snapshot_projection_labels.alloc_slice(region.scratch.projection_cache.labels.slots.len); for value,index in region.scratch.projection_cache.labels.slots { run[index]=value; } let first: const dictionary_slot<u32,blot_reuse_projection_cache::Answer>& =run[0]; lease.projection_labels=SnapshotRange {region_snapshot_projection_labels.index_of(first),run.len};  }
  blot_reuse_projection_cache::release(region.scratch.projection_cache.labels);
- if region.scratch.evidence_import_cache.answers.slots.len!=0 { let run=region_snapshot_evidence_answers.alloc_slice(region.scratch.evidence_import_cache.answers.slots.len); for value,index in region.scratch.evidence_import_cache.answers.slots { run[index]=value; } let first: const dictionary_slot<u64,u32>& =run[0]; lease.evidence_answers=SnapshotRange {region_snapshot_evidence_answers.index_of(first),run.len}; snapshot.evidence_answers=run; }
+ if region.scratch.evidence_import_cache.answers.slots.len!=0 { let run=region_snapshot_evidence_answers.alloc_slice(region.scratch.evidence_import_cache.answers.slots.len); for value,index in region.scratch.evidence_import_cache.answers.slots { run[index]=value; } let first: const dictionary_slot<u64,u32>& =run[0]; lease.evidence_answers=SnapshotRange {region_snapshot_evidence_answers.index_of(first),run.len};  }
  blot_eval_evidence_import_cache::release(region.scratch.evidence_import_cache.answers);
- if region.scratch.closed_source_cache.answers.slots.len!=0 { let run=region_snapshot_closed_answers.alloc_slice(region.scratch.closed_source_cache.answers.slots.len); for value,index in region.scratch.closed_source_cache.answers.slots { run[index]=value; } let first: const dictionary_slot<blot_eval_closed_source_types::CacheKey,u32>& =run[0]; lease.closed_answers=SnapshotRange {region_snapshot_closed_answers.index_of(first),run.len}; snapshot.closed_answers=run; }
+ if region.scratch.closed_source_cache.answers.slots.len!=0 { let run=region_snapshot_closed_answers.alloc_slice(region.scratch.closed_source_cache.answers.slots.len); for value,index in region.scratch.closed_source_cache.answers.slots { run[index]=value; } let first: const dictionary_slot<blot_eval_closed_source_types::CacheKey,u32>& =run[0]; lease.closed_answers=SnapshotRange {region_snapshot_closed_answers.index_of(first),run.len};  }
  blot_eval_closed_source_types::release(region.scratch.closed_source_cache.answers);
- if region.scratch.scheme_memberships.entries.slots.len!=0 { let run=region_snapshot_memberships.alloc_slice(region.scratch.scheme_memberships.entries.slots.len); for value,index in region.scratch.scheme_memberships.entries.slots { run[index]=value; } let first: const dictionary_slot<blot_eval_scheme_membership::Key,blot_check_types::List>& =run[0]; lease.memberships=SnapshotRange {region_snapshot_memberships.index_of(first),run.len}; snapshot.memberships=run; }
+ if region.scratch.scheme_memberships.entries.slots.len!=0 { let run=region_snapshot_memberships.alloc_slice(region.scratch.scheme_memberships.entries.slots.len); for value,index in region.scratch.scheme_memberships.entries.slots { run[index]=value; } let first: const dictionary_slot<blot_eval_scheme_membership::Key,blot_check_types::List>& =run[0]; lease.memberships=SnapshotRange {region_snapshot_memberships.index_of(first),run.len};  }
  blot_eval_scheme_membership::release(region.scratch.scheme_memberships.entries);
- if region.scratch.components.keys.slots.len!=0 { let run=region_snapshot_component_keys.alloc_slice(region.scratch.components.keys.slots.len); for value,index in region.scratch.components.keys.slots { run[index]=value; } let first: const dictionary_slot<u64,bool>& =run[0]; lease.component_keys=SnapshotRange {region_snapshot_component_keys.index_of(first),run.len}; snapshot.component_keys=run; }
+ if region.scratch.components.keys.slots.len!=0 { let run=region_snapshot_component_keys.alloc_slice(region.scratch.components.keys.slots.len); for value,index in region.scratch.components.keys.slots { run[index]=value; } let first: const dictionary_slot<u64,bool>& =run[0]; lease.component_keys=SnapshotRange {region_snapshot_component_keys.index_of(first),run.len};  }
  blot_eval_scope_components::release(region.scratch.components.keys);
- if region.scratch.scheme_inputs.keys.slots.len!=0 { let run=region_snapshot_scheme_keys.alloc_slice(region.scratch.scheme_inputs.keys.slots.len); for value,index in region.scratch.scheme_inputs.keys.slots { run[index]=ownedSchemeKey(value); } let first: const dictionary_slot<const u8[:],u32>& =run[0]; lease.scheme_keys=SnapshotRange {region_snapshot_scheme_keys.index_of(first),run.len}; snapshot.scheme_keys=run; }
+ if region.scratch.scheme_inputs.keys.slots.len!=0 { let run=region_snapshot_scheme_keys.alloc_slice(region.scratch.scheme_inputs.keys.slots.len); for value,index in region.scratch.scheme_inputs.keys.slots { run[index]=ownedSchemeKey(value); } let first: const dictionary_slot<const u8[:],u32>& =run[0]; lease.scheme_keys=SnapshotRange {region_snapshot_scheme_keys.index_of(first),run.len};  }
  release(region.scratch.scheme_inputs.keys);
- if region.collector.seen.slots.len!=0 { let run=region_snapshot_collection_seen.alloc_slice(region.collector.seen.slots.len); for value,index in region.collector.seen.slots { run[index]=value; } let first: const dictionary_slot<WalkSeenKey,bool>& =run[0]; lease.collection_seen=SnapshotRange {region_snapshot_collection_seen.index_of(first),run.len}; snapshot.collection_seen=run; }
+ if region.collector.seen.slots.len!=0 { let run=region_snapshot_collection_seen.alloc_slice(region.collector.seen.slots.len); for value,index in region.collector.seen.slots { run[index]=value; } let first: const dictionary_slot<WalkSeenKey,bool>& =run[0]; lease.collection_seen=SnapshotRange {region_snapshot_collection_seen.index_of(first),run.len};  }
  release(region.collector.seen);
- if region.projection_scopes.slots.len!=0 { let run=region_snapshot_projection_scopes.alloc_slice(region.projection_scopes.slots.len); for value,index in region.projection_scopes.slots { run[index]=value; } let first: const dictionary_slot<u32,u32>& =run[0]; lease.projection_scopes=SnapshotRange {region_snapshot_projection_scopes.index_of(first),run.len}; snapshot.projection_scopes=run; }
+ if region.projection_scopes.slots.len!=0 { let run=region_snapshot_projection_scopes.alloc_slice(region.projection_scopes.slots.len); for value,index in region.projection_scopes.slots { run[index]=value; } let first: const dictionary_slot<u32,u32>& =run[0]; lease.projection_scopes=SnapshotRange {region_snapshot_projection_scopes.index_of(first),run.len};  }
  release(region.projection_scopes);
- if region.normalization_memo.slots.len!=0 { let run=region_snapshot_normalization_memo.alloc_slice(region.normalization_memo.slots.len); for value,index in region.normalization_memo.slots { run[index]=value; } let first: const dictionary_slot<NormalizationKey,bool>& =run[0]; lease.normalization_memo=SnapshotRange {region_snapshot_normalization_memo.index_of(first),run.len}; snapshot.normalization_memo=run; }
+ if region.normalization_memo.slots.len!=0 { let run=region_snapshot_normalization_memo.alloc_slice(region.normalization_memo.slots.len); for value,index in region.normalization_memo.slots { run[index]=value; } let first: const dictionary_slot<NormalizationKey,bool>& =run[0]; lease.normalization_memo=SnapshotRange {region_snapshot_normalization_memo.index_of(first),run.len};  }
  release(region.normalization_memo);
- if region.work_owner.constraints.heads.slots.len!=0 { let run=region_snapshot_queue_constraints_heads.alloc_slice(region.work_owner.constraints.heads.slots.len); for value,index in region.work_owner.constraints.heads.slots { run[index]=value; } let first: const dictionary_slot<u64,u32>& =run[0]; lease.queue_constraints_heads=SnapshotRange {region_snapshot_queue_constraints_heads.index_of(first),run.len}; snapshot.queue_constraints_heads=run; }
+ if region.work_owner.constraints.heads.slots.len!=0 { let run=region_snapshot_queue_constraints_heads.alloc_slice(region.work_owner.constraints.heads.slots.len); for value,index in region.work_owner.constraints.heads.slots { run[index]=value; } let first: const dictionary_slot<u64,u32>& =run[0]; lease.queue_constraints_heads=SnapshotRange {region_snapshot_queue_constraints_heads.index_of(first),run.len};  }
  blot_check_solver_worklist::release(region.work_owner.constraints.heads);
- if region.work_owner.aliases.heads.slots.len!=0 { let run=region_snapshot_queue_aliases_heads.alloc_slice(region.work_owner.aliases.heads.slots.len); for value,index in region.work_owner.aliases.heads.slots { run[index]=value; } let first: const dictionary_slot<u64,u32>& =run[0]; lease.queue_aliases_heads=SnapshotRange {region_snapshot_queue_aliases_heads.index_of(first),run.len}; snapshot.queue_aliases_heads=run; }
+ if region.work_owner.aliases.heads.slots.len!=0 { let run=region_snapshot_queue_aliases_heads.alloc_slice(region.work_owner.aliases.heads.slots.len); for value,index in region.work_owner.aliases.heads.slots { run[index]=value; } let first: const dictionary_slot<u64,u32>& =run[0]; lease.queue_aliases_heads=SnapshotRange {region_snapshot_queue_aliases_heads.index_of(first),run.len};  }
  blot_check_solver_worklist::release(region.work_owner.aliases.heads);
  region.scratch.imported.count=0;
  region.scratch.imported_rows.count=0;
@@ -2358,7 +2360,7 @@ fn suspendRegion(region: ClosureRegion&) -> RegionSnapshot,Error {
  region.normalization_memo.count=0;
  region.work_owner.constraints.heads.count=0;
  region.work_owner.aliases.heads.count=0;
- snapshot.lease=(region_snapshot_leases.alloc_index(lease)+1) as u32; region.suspended=true; return snapshot,blot_error::Error.none;
+ let snapshot=RegionSnapshot{lease:(region_snapshot_leases.alloc_index(lease)+1) as u32,generation:generation}; region.suspended=true; return snapshot,blot_error::Error.none;
 }
 fn canonicalRegionState(value:RegionState)->RegionState {
  return RegionState{
@@ -2479,552 +2481,150 @@ fn canonicalRegionState(value:RegionState)->RegionState {
  queue_aliases_heads_count:value.queue_aliases_heads_count,
  };
 }
-fn canonicalRegionSnapshot(source:RegionSnapshot)->RegionSnapshot {
- assert(validRegionSnapshot(source));
- let lease=region_snapshot_leases[source.lease-1];
- var result=RegionSnapshot{state:canonicalRegionState(source.state),solver:blot_check_type_store_snapshot::canonicalSnapshot(source.solver),lease:source.lease,generation:source.generation,..};
- assert(source.callback_origins.len==lease.callback_origins.len);
- if lease.callback_origins.len!=0 {
-  let span=lease.callback_origins;
-  assert(span.start>=0&&span.start<=region_snapshot_callback_origins.len&&span.len>=0&&span.len<=region_snapshot_callback_origins.len-span.start);
-  let values=region_snapshot_callback_origins[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.callback_origins));
-  result.callback_origins=values;
- }
- assert(source.sources.len==lease.sources.len);
- if lease.sources.len!=0 {
-  let span=lease.sources;
-  assert(span.start>=0&&span.start<=region_snapshot_sources.len&&span.len>=0&&span.len<=region_snapshot_sources.len-span.start);
-  let values=region_snapshot_sources[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.sources));
-  result.sources=values;
- }
- assert(source.row_variable_entries.len==lease.row_variable_entries.len);
- if lease.row_variable_entries.len!=0 {
-  let span=lease.row_variable_entries;
-  assert(span.start>=0&&span.start<=region_snapshot_row_variable_entries.len&&span.len>=0&&span.len<=region_snapshot_row_variable_entries.len-span.start);
-  let values=region_snapshot_row_variable_entries[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.row_variable_entries));
-  result.row_variable_entries=values;
- }
- assert(source.variables.len==lease.variables.len);
- if lease.variables.len!=0 {
-  let span=lease.variables;
-  assert(span.start>=0&&span.start<=region_snapshot_variables.len&&span.len>=0&&span.len<=region_snapshot_variables.len-span.start);
-  let values=region_snapshot_variables[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.variables));
-  result.variables=values;
- }
- assert(source.edges.len==lease.edges.len);
- if lease.edges.len!=0 {
-  let span=lease.edges;
-  assert(span.start>=0&&span.start<=region_snapshot_edges.len&&span.len>=0&&span.len<=region_snapshot_edges.len-span.start);
-  let values=region_snapshot_edges[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.edges));
-  result.edges=values;
- }
- assert(source.constraints.len==lease.constraints.len);
- if lease.constraints.len!=0 {
-  let span=lease.constraints;
-  assert(span.start>=0&&span.start<=region_snapshot_constraints.len&&span.len>=0&&span.len<=region_snapshot_constraints.len-span.start);
-  let values=region_snapshot_constraints[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.constraints));
-  result.constraints=values;
- }
- assert(source.selected_targets.len==lease.selected_targets.len);
- if lease.selected_targets.len!=0 {
-  let span=lease.selected_targets;
-  assert(span.start>=0&&span.start<=region_snapshot_selected_targets.len&&span.len>=0&&span.len<=region_snapshot_selected_targets.len-span.start);
-  let values=region_snapshot_selected_targets[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.selected_targets));
-  result.selected_targets=values;
- }
- assert(source.summary_arguments.len==lease.summary_arguments.len);
- if lease.summary_arguments.len!=0 {
-  let span=lease.summary_arguments;
-  assert(span.start>=0&&span.start<=region_snapshot_summary_arguments.len&&span.len>=0&&span.len<=region_snapshot_summary_arguments.len-span.start);
-  let values=region_snapshot_summary_arguments[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.summary_arguments));
-  result.summary_arguments=values;
- }
- assert(source.data_aliases.len==lease.data_aliases.len);
- if lease.data_aliases.len!=0 {
-  let span=lease.data_aliases;
-  assert(span.start>=0&&span.start<=region_snapshot_data_aliases.len&&span.len>=0&&span.len<=region_snapshot_data_aliases.len-span.start);
-  let values=region_snapshot_data_aliases[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.data_aliases));
-  result.data_aliases=values;
- }
- assert(source.source_functions.len==lease.source_functions.len);
- if lease.source_functions.len!=0 {
-  let span=lease.source_functions;
-  assert(span.start>=0&&span.start<=region_snapshot_source_functions.len&&span.len>=0&&span.len<=region_snapshot_source_functions.len-span.start);
-  let values=region_snapshot_source_functions[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.source_functions));
-  result.source_functions=values;
- }
- assert(source.principal_references.len==lease.principal_references.len);
- if lease.principal_references.len!=0 {
-  let span=lease.principal_references;
-  assert(span.start>=0&&span.start<=region_snapshot_principal_references.len&&span.len>=0&&span.len<=region_snapshot_principal_references.len-span.start);
-  let values=region_snapshot_principal_references[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.principal_references));
-  result.principal_references=values;
- }
- assert(source.principal_actions.len==lease.principal_actions.len);
- if lease.principal_actions.len!=0 {
-  let span=lease.principal_actions;
-  assert(span.start>=0&&span.start<=region_snapshot_principal_actions.len&&span.len>=0&&span.len<=region_snapshot_principal_actions.len-span.start);
-  let values=region_snapshot_principal_actions[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.principal_actions));
-  result.principal_actions=values;
- }
- assert(source.constraint_names.len==lease.constraint_names.len);
- if lease.constraint_names.len!=0 {
-  let span=lease.constraint_names;
-  assert(span.start>=0&&span.start<=region_snapshot_constraint_names.len&&span.len>=0&&span.len<=region_snapshot_constraint_names.len-span.start);
-  let values=region_snapshot_constraint_names[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.constraint_names));
-  result.constraint_names=values;
- }
- assert(source.rank_evidence_frames.len==lease.rank_evidence_frames.len);
- if lease.rank_evidence_frames.len!=0 {
-  let span=lease.rank_evidence_frames;
-  assert(span.start>=0&&span.start<=region_snapshot_rank_evidence_frames.len&&span.len>=0&&span.len<=region_snapshot_rank_evidence_frames.len-span.start);
-  let values=region_snapshot_rank_evidence_frames[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.rank_evidence_frames));
-  result.rank_evidence_frames=values;
- }
- assert(source.rank_evidence_words.len==lease.rank_evidence_words.len);
- if lease.rank_evidence_words.len!=0 {
-  let span=lease.rank_evidence_words;
-  assert(span.start>=0&&span.start<=region_snapshot_rank_evidence_words.len&&span.len>=0&&span.len<=region_snapshot_rank_evidence_words.len-span.start);
-  let values=region_snapshot_rank_evidence_words[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.rank_evidence_words));
-  result.rank_evidence_words=values;
- }
- assert(source.component_nodes.len==lease.component_nodes.len);
- if lease.component_nodes.len!=0 {
-  let span=lease.component_nodes;
-  assert(span.start>=0&&span.start<=region_snapshot_component_nodes.len&&span.len>=0&&span.len<=region_snapshot_component_nodes.len-span.start);
-  let values=region_snapshot_component_nodes[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.component_nodes));
-  result.component_nodes=values;
- }
- assert(source.component_edges.len==lease.component_edges.len);
- if lease.component_edges.len!=0 {
-  let span=lease.component_edges;
-  assert(span.start>=0&&span.start<=region_snapshot_component_edges.len&&span.len>=0&&span.len<=region_snapshot_component_edges.len-span.start);
-  let values=region_snapshot_component_edges[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.component_edges));
-  result.component_edges=values;
- }
- assert(source.component_work.len==lease.component_work.len);
- if lease.component_work.len!=0 {
-  let span=lease.component_work;
-  assert(span.start>=0&&span.start<=region_snapshot_component_work.len&&span.len>=0&&span.len<=region_snapshot_component_work.len-span.start);
-  let values=region_snapshot_component_work[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.component_work));
-  result.component_work=values;
- }
- assert(source.membership_words.len==lease.membership_words.len);
- if lease.membership_words.len!=0 {
-  let span=lease.membership_words;
-  assert(span.start>=0&&span.start<=region_snapshot_membership_words.len&&span.len>=0&&span.len<=region_snapshot_membership_words.len-span.start);
-  let values=region_snapshot_membership_words[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.membership_words));
-  result.membership_words=values;
- }
- assert(source.collection_frames.len==lease.collection_frames.len);
- if lease.collection_frames.len!=0 {
-  let span=lease.collection_frames;
-  assert(span.start>=0&&span.start<=region_snapshot_collection_frames.len&&span.len>=0&&span.len<=region_snapshot_collection_frames.len-span.start);
-  let values=region_snapshot_collection_frames[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.collection_frames));
-  result.collection_frames=values;
- }
- assert(source.collection_words.len==lease.collection_words.len);
- if lease.collection_words.len!=0 {
-  let span=lease.collection_words;
-  assert(span.start>=0&&span.start<=region_snapshot_collection_words.len&&span.len>=0&&span.len<=region_snapshot_collection_words.len-span.start);
-  let values=region_snapshot_collection_words[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.collection_words));
-  result.collection_words=values;
- }
- assert(source.collection_seen_words.len==lease.collection_seen_words.len);
- if lease.collection_seen_words.len!=0 {
-  let span=lease.collection_seen_words;
-  assert(span.start>=0&&span.start<=region_snapshot_collection_seen_words.len&&span.len>=0&&span.len<=region_snapshot_collection_seen_words.len-span.start);
-  let values=region_snapshot_collection_seen_words[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.collection_seen_words));
-  result.collection_seen_words=values;
- }
- assert(source.queue_constraints_entries.len==lease.queue_constraints_entries.len);
- if lease.queue_constraints_entries.len!=0 {
-  let span=lease.queue_constraints_entries;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_entries.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_entries.len-span.start);
-  let values=region_snapshot_queue_constraints_entries[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_constraints_entries));
-  result.queue_constraints_entries=values;
- }
- assert(source.queue_constraints_links.len==lease.queue_constraints_links.len);
- if lease.queue_constraints_links.len!=0 {
-  let span=lease.queue_constraints_links;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_links.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_links.len-span.start);
-  let values=region_snapshot_queue_constraints_links[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_constraints_links));
-  result.queue_constraints_links=values;
- }
- assert(source.queue_constraints_ready.len==lease.queue_constraints_ready.len);
- if lease.queue_constraints_ready.len!=0 {
-  let span=lease.queue_constraints_ready;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_ready.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_ready.len-span.start);
-  let values=region_snapshot_queue_constraints_ready[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_constraints_ready));
-  result.queue_constraints_ready=values;
- }
- assert(source.queue_constraints_pending.len==lease.queue_constraints_pending.len);
- if lease.queue_constraints_pending.len!=0 {
-  let span=lease.queue_constraints_pending;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_pending.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_pending.len-span.start);
-  let values=region_snapshot_queue_constraints_pending[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_constraints_pending));
-  result.queue_constraints_pending=values;
- }
- assert(source.queue_aliases_entries.len==lease.queue_aliases_entries.len);
- if lease.queue_aliases_entries.len!=0 {
-  let span=lease.queue_aliases_entries;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_entries.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_entries.len-span.start);
-  let values=region_snapshot_queue_aliases_entries[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_aliases_entries));
-  result.queue_aliases_entries=values;
- }
- assert(source.queue_aliases_links.len==lease.queue_aliases_links.len);
- if lease.queue_aliases_links.len!=0 {
-  let span=lease.queue_aliases_links;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_links.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_links.len-span.start);
-  let values=region_snapshot_queue_aliases_links[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_aliases_links));
-  result.queue_aliases_links=values;
- }
- assert(source.queue_aliases_ready.len==lease.queue_aliases_ready.len);
- if lease.queue_aliases_ready.len!=0 {
-  let span=lease.queue_aliases_ready;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_ready.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_ready.len-span.start);
-  let values=region_snapshot_queue_aliases_ready[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_aliases_ready));
-  result.queue_aliases_ready=values;
- }
- assert(source.queue_aliases_pending.len==lease.queue_aliases_pending.len);
- if lease.queue_aliases_pending.len!=0 {
-  let span=lease.queue_aliases_pending;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_pending.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_pending.len-span.start);
-  let values=region_snapshot_queue_aliases_pending[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_aliases_pending));
-  result.queue_aliases_pending=values;
- }
- assert(source.imported.len==lease.imported.len);
- if lease.imported.len!=0 {
-  let span=lease.imported;
-  assert(span.start>=0&&span.start<=region_snapshot_imported.len&&span.len>=0&&span.len<=region_snapshot_imported.len-span.start);
-  let values=region_snapshot_imported[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.imported));
-  result.imported=values;
- }
- assert(source.imported_rows.len==lease.imported_rows.len);
- if lease.imported_rows.len!=0 {
-  let span=lease.imported_rows;
-  assert(span.start>=0&&span.start<=region_snapshot_imported_rows.len&&span.len>=0&&span.len<=region_snapshot_imported_rows.len-span.start);
-  let values=region_snapshot_imported_rows[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.imported_rows));
-  result.imported_rows=values;
- }
- assert(source.imported_labels.len==lease.imported_labels.len);
- if lease.imported_labels.len!=0 {
-  let span=lease.imported_labels;
-  assert(span.start>=0&&span.start<=region_snapshot_imported_labels.len&&span.len>=0&&span.len<=region_snapshot_imported_labels.len-span.start);
-  let values=region_snapshot_imported_labels[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.imported_labels));
-  result.imported_labels=values;
- }
- assert(source.row_variables.len==lease.row_variables.len);
- if lease.row_variables.len!=0 {
-  let span=lease.row_variables;
-  assert(span.start>=0&&span.start<=region_snapshot_row_variables.len&&span.len>=0&&span.len<=region_snapshot_row_variables.len-span.start);
-  let values=region_snapshot_row_variables[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.row_variables));
-  result.row_variables=values;
- }
- assert(source.row_parameters.len==lease.row_parameters.len);
- if lease.row_parameters.len!=0 {
-  let span=lease.row_parameters;
-  assert(span.start>=0&&span.start<=region_snapshot_row_parameters.len&&span.len>=0&&span.len<=region_snapshot_row_parameters.len-span.start);
-  let values=region_snapshot_row_parameters[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.row_parameters));
-  result.row_parameters=values;
- }
- assert(source.evidence_rows.len==lease.evidence_rows.len);
- if lease.evidence_rows.len!=0 {
-  let span=lease.evidence_rows;
-  assert(span.start>=0&&span.start<=region_snapshot_evidence_rows.len&&span.len>=0&&span.len<=region_snapshot_evidence_rows.len-span.start);
-  let values=region_snapshot_evidence_rows[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.evidence_rows));
-  result.evidence_rows=values;
- }
- assert(source.evidence_labels.len==lease.evidence_labels.len);
- if lease.evidence_labels.len!=0 {
-  let span=lease.evidence_labels;
-  assert(span.start>=0&&span.start<=region_snapshot_evidence_labels.len&&span.len>=0&&span.len<=region_snapshot_evidence_labels.len-span.start);
-  let values=region_snapshot_evidence_labels[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.evidence_labels));
-  result.evidence_labels=values;
- }
- assert(source.frozen.len==lease.frozen.len);
- if lease.frozen.len!=0 {
-  let span=lease.frozen;
-  assert(span.start>=0&&span.start<=region_snapshot_frozen.len&&span.len>=0&&span.len<=region_snapshot_frozen.len-span.start);
-  let values=region_snapshot_frozen[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.frozen));
-  result.frozen=values;
- }
- assert(source.value_scopes.len==lease.value_scopes.len);
- if lease.value_scopes.len!=0 {
-  let span=lease.value_scopes;
-  assert(span.start>=0&&span.start<=region_snapshot_value_scopes.len&&span.len>=0&&span.len<=region_snapshot_value_scopes.len-span.start);
-  let values=region_snapshot_value_scopes[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.value_scopes));
-  result.value_scopes=values;
- }
- assert(source.call_instances.len==lease.call_instances.len);
- if lease.call_instances.len!=0 {
-  let span=lease.call_instances;
-  assert(span.start>=0&&span.start<=region_snapshot_call_instances.len&&span.len>=0&&span.len<=region_snapshot_call_instances.len-span.start);
-  let values=region_snapshot_call_instances[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.call_instances));
-  result.call_instances=values;
- }
- assert(source.candidate_instances.len==lease.candidate_instances.len);
- if lease.candidate_instances.len!=0 {
-  let span=lease.candidate_instances;
-  assert(span.start>=0&&span.start<=region_snapshot_candidate_instances.len&&span.len>=0&&span.len<=region_snapshot_candidate_instances.len-span.start);
-  let values=region_snapshot_candidate_instances[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.candidate_instances));
-  result.candidate_instances=values;
- }
- assert(source.unresolved_calls.len==lease.unresolved_calls.len);
- if lease.unresolved_calls.len!=0 {
-  let span=lease.unresolved_calls;
-  assert(span.start>=0&&span.start<=region_snapshot_unresolved_calls.len&&span.len>=0&&span.len<=region_snapshot_unresolved_calls.len-span.start);
-  let values=region_snapshot_unresolved_calls[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.unresolved_calls));
-  result.unresolved_calls=values;
- }
- assert(source.target_scopes.len==lease.target_scopes.len);
- if lease.target_scopes.len!=0 {
-  let span=lease.target_scopes;
-  assert(span.start>=0&&span.start<=region_snapshot_target_scopes.len&&span.len>=0&&span.len<=region_snapshot_target_scopes.len-span.start);
-  let values=region_snapshot_target_scopes[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.target_scopes));
-  result.target_scopes=values;
- }
- assert(source.witness_inputs.len==lease.witness_inputs.len);
- if lease.witness_inputs.len!=0 {
-  let span=lease.witness_inputs;
-  assert(span.start>=0&&span.start<=region_snapshot_witness_inputs.len&&span.len>=0&&span.len<=region_snapshot_witness_inputs.len-span.start);
-  let values=region_snapshot_witness_inputs[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.witness_inputs));
-  result.witness_inputs=values;
- }
- assert(source.scheme_instances.len==lease.scheme_instances.len);
- if lease.scheme_instances.len!=0 {
-  let span=lease.scheme_instances;
-  assert(span.start>=0&&span.start<=region_snapshot_scheme_instances.len&&span.len>=0&&span.len<=region_snapshot_scheme_instances.len-span.start);
-  let values=region_snapshot_scheme_instances[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.scheme_instances));
-  result.scheme_instances=values;
- }
- assert(source.projection_answers.len==lease.projection_answers.len);
- if lease.projection_answers.len!=0 {
-  let span=lease.projection_answers;
-  assert(span.start>=0&&span.start<=region_snapshot_projection_answers.len&&span.len>=0&&span.len<=region_snapshot_projection_answers.len-span.start);
-  let values=region_snapshot_projection_answers[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.projection_answers));
-  result.projection_answers=values;
- }
- assert(source.projection_labels.len==lease.projection_labels.len);
- if lease.projection_labels.len!=0 {
-  let span=lease.projection_labels;
-  assert(span.start>=0&&span.start<=region_snapshot_projection_labels.len&&span.len>=0&&span.len<=region_snapshot_projection_labels.len-span.start);
-  let values=region_snapshot_projection_labels[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.projection_labels));
-  result.projection_labels=values;
- }
- assert(source.evidence_answers.len==lease.evidence_answers.len);
- if lease.evidence_answers.len!=0 {
-  let span=lease.evidence_answers;
-  assert(span.start>=0&&span.start<=region_snapshot_evidence_answers.len&&span.len>=0&&span.len<=region_snapshot_evidence_answers.len-span.start);
-  let values=region_snapshot_evidence_answers[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.evidence_answers));
-  result.evidence_answers=values;
- }
- assert(source.closed_answers.len==lease.closed_answers.len);
- if lease.closed_answers.len!=0 {
-  let span=lease.closed_answers;
-  assert(span.start>=0&&span.start<=region_snapshot_closed_answers.len&&span.len>=0&&span.len<=region_snapshot_closed_answers.len-span.start);
-  let values=region_snapshot_closed_answers[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.closed_answers));
-  result.closed_answers=values;
- }
- assert(source.memberships.len==lease.memberships.len);
- if lease.memberships.len!=0 {
-  let span=lease.memberships;
-  assert(span.start>=0&&span.start<=region_snapshot_memberships.len&&span.len>=0&&span.len<=region_snapshot_memberships.len-span.start);
-  let values=region_snapshot_memberships[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.memberships));
-  result.memberships=values;
- }
- assert(source.component_keys.len==lease.component_keys.len);
- if lease.component_keys.len!=0 {
-  let span=lease.component_keys;
-  assert(span.start>=0&&span.start<=region_snapshot_component_keys.len&&span.len>=0&&span.len<=region_snapshot_component_keys.len-span.start);
-  let values=region_snapshot_component_keys[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.component_keys));
-  result.component_keys=values;
- }
- assert(source.scheme_keys.len==lease.scheme_keys.len);
- if lease.scheme_keys.len!=0 {
-  let span=lease.scheme_keys;
-  assert(span.start>=0&&span.start<=region_snapshot_scheme_keys.len&&span.len>=0&&span.len<=region_snapshot_scheme_keys.len-span.start);
-  let values=region_snapshot_scheme_keys[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.scheme_keys));
-  result.scheme_keys=values;
- }
- assert(source.collection_seen.len==lease.collection_seen.len);
- if lease.collection_seen.len!=0 {
-  let span=lease.collection_seen;
-  assert(span.start>=0&&span.start<=region_snapshot_collection_seen.len&&span.len>=0&&span.len<=region_snapshot_collection_seen.len-span.start);
-  let values=region_snapshot_collection_seen[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.collection_seen));
-  result.collection_seen=values;
- }
- assert(source.projection_scopes.len==lease.projection_scopes.len);
- if lease.projection_scopes.len!=0 {
-  let span=lease.projection_scopes;
-  assert(span.start>=0&&span.start<=region_snapshot_projection_scopes.len&&span.len>=0&&span.len<=region_snapshot_projection_scopes.len-span.start);
-  let values=region_snapshot_projection_scopes[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.projection_scopes));
-  result.projection_scopes=values;
- }
- assert(source.normalization_memo.len==lease.normalization_memo.len);
- if lease.normalization_memo.len!=0 {
-  let span=lease.normalization_memo;
-  assert(span.start>=0&&span.start<=region_snapshot_normalization_memo.len&&span.len>=0&&span.len<=region_snapshot_normalization_memo.len-span.start);
-  let values=region_snapshot_normalization_memo[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.normalization_memo));
-  result.normalization_memo=values;
- }
- assert(source.queue_constraints_heads.len==lease.queue_constraints_heads.len);
- if lease.queue_constraints_heads.len!=0 {
-  let span=lease.queue_constraints_heads;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_heads.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_heads.len-span.start);
-  let values=region_snapshot_queue_constraints_heads[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_constraints_heads));
-  result.queue_constraints_heads=values;
- }
- assert(source.queue_aliases_heads.len==lease.queue_aliases_heads.len);
- if lease.queue_aliases_heads.len!=0 {
-  let span=lease.queue_aliases_heads;
-  assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_heads.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_heads.len-span.start);
-  let values=region_snapshot_queue_aliases_heads[span.start..span.start+span.len];
-  assert(blot_support::same_slice_identity(values,source.queue_aliases_heads));
-  result.queue_aliases_heads=values;
- }
+fn regionSnapshotView(handle:RegionSnapshot)->RegionSnapshotView {
+ assert(validRegionSnapshot(handle));let lease:RegionSnapshotLease& =region_snapshot_leases[handle.lease-1];
+ var result=RegionSnapshotView{state:lease.state,..};
+ if lease.callback_origins.len!=0 {let span=lease.callback_origins;assert(span.start>=0&&span.start<=region_snapshot_callback_origins.len&&span.len>=0&&span.len<=region_snapshot_callback_origins.len-span.start);result.callback_origins=region_snapshot_callback_origins[span.start..span.start+span.len];}
+ if lease.sources.len!=0 {let span=lease.sources;assert(span.start>=0&&span.start<=region_snapshot_sources.len&&span.len>=0&&span.len<=region_snapshot_sources.len-span.start);result.sources=region_snapshot_sources[span.start..span.start+span.len];}
+ if lease.row_variable_entries.len!=0 {let span=lease.row_variable_entries;assert(span.start>=0&&span.start<=region_snapshot_row_variable_entries.len&&span.len>=0&&span.len<=region_snapshot_row_variable_entries.len-span.start);result.row_variable_entries=region_snapshot_row_variable_entries[span.start..span.start+span.len];}
+ if lease.variables.len!=0 {let span=lease.variables;assert(span.start>=0&&span.start<=region_snapshot_variables.len&&span.len>=0&&span.len<=region_snapshot_variables.len-span.start);result.variables=region_snapshot_variables[span.start..span.start+span.len];}
+ if lease.edges.len!=0 {let span=lease.edges;assert(span.start>=0&&span.start<=region_snapshot_edges.len&&span.len>=0&&span.len<=region_snapshot_edges.len-span.start);result.edges=region_snapshot_edges[span.start..span.start+span.len];}
+ if lease.constraints.len!=0 {let span=lease.constraints;assert(span.start>=0&&span.start<=region_snapshot_constraints.len&&span.len>=0&&span.len<=region_snapshot_constraints.len-span.start);result.constraints=region_snapshot_constraints[span.start..span.start+span.len];}
+ if lease.selected_targets.len!=0 {let span=lease.selected_targets;assert(span.start>=0&&span.start<=region_snapshot_selected_targets.len&&span.len>=0&&span.len<=region_snapshot_selected_targets.len-span.start);result.selected_targets=region_snapshot_selected_targets[span.start..span.start+span.len];}
+ if lease.summary_arguments.len!=0 {let span=lease.summary_arguments;assert(span.start>=0&&span.start<=region_snapshot_summary_arguments.len&&span.len>=0&&span.len<=region_snapshot_summary_arguments.len-span.start);result.summary_arguments=region_snapshot_summary_arguments[span.start..span.start+span.len];}
+ if lease.data_aliases.len!=0 {let span=lease.data_aliases;assert(span.start>=0&&span.start<=region_snapshot_data_aliases.len&&span.len>=0&&span.len<=region_snapshot_data_aliases.len-span.start);result.data_aliases=region_snapshot_data_aliases[span.start..span.start+span.len];}
+ if lease.source_functions.len!=0 {let span=lease.source_functions;assert(span.start>=0&&span.start<=region_snapshot_source_functions.len&&span.len>=0&&span.len<=region_snapshot_source_functions.len-span.start);result.source_functions=region_snapshot_source_functions[span.start..span.start+span.len];}
+ if lease.principal_references.len!=0 {let span=lease.principal_references;assert(span.start>=0&&span.start<=region_snapshot_principal_references.len&&span.len>=0&&span.len<=region_snapshot_principal_references.len-span.start);result.principal_references=region_snapshot_principal_references[span.start..span.start+span.len];}
+ if lease.principal_actions.len!=0 {let span=lease.principal_actions;assert(span.start>=0&&span.start<=region_snapshot_principal_actions.len&&span.len>=0&&span.len<=region_snapshot_principal_actions.len-span.start);result.principal_actions=region_snapshot_principal_actions[span.start..span.start+span.len];}
+ if lease.constraint_names.len!=0 {let span=lease.constraint_names;assert(span.start>=0&&span.start<=region_snapshot_constraint_names.len&&span.len>=0&&span.len<=region_snapshot_constraint_names.len-span.start);result.constraint_names=region_snapshot_constraint_names[span.start..span.start+span.len];}
+ if lease.rank_evidence_frames.len!=0 {let span=lease.rank_evidence_frames;assert(span.start>=0&&span.start<=region_snapshot_rank_evidence_frames.len&&span.len>=0&&span.len<=region_snapshot_rank_evidence_frames.len-span.start);result.rank_evidence_frames=region_snapshot_rank_evidence_frames[span.start..span.start+span.len];}
+ if lease.rank_evidence_words.len!=0 {let span=lease.rank_evidence_words;assert(span.start>=0&&span.start<=region_snapshot_rank_evidence_words.len&&span.len>=0&&span.len<=region_snapshot_rank_evidence_words.len-span.start);result.rank_evidence_words=region_snapshot_rank_evidence_words[span.start..span.start+span.len];}
+ if lease.component_nodes.len!=0 {let span=lease.component_nodes;assert(span.start>=0&&span.start<=region_snapshot_component_nodes.len&&span.len>=0&&span.len<=region_snapshot_component_nodes.len-span.start);result.component_nodes=region_snapshot_component_nodes[span.start..span.start+span.len];}
+ if lease.component_edges.len!=0 {let span=lease.component_edges;assert(span.start>=0&&span.start<=region_snapshot_component_edges.len&&span.len>=0&&span.len<=region_snapshot_component_edges.len-span.start);result.component_edges=region_snapshot_component_edges[span.start..span.start+span.len];}
+ if lease.component_work.len!=0 {let span=lease.component_work;assert(span.start>=0&&span.start<=region_snapshot_component_work.len&&span.len>=0&&span.len<=region_snapshot_component_work.len-span.start);result.component_work=region_snapshot_component_work[span.start..span.start+span.len];}
+ if lease.membership_words.len!=0 {let span=lease.membership_words;assert(span.start>=0&&span.start<=region_snapshot_membership_words.len&&span.len>=0&&span.len<=region_snapshot_membership_words.len-span.start);result.membership_words=region_snapshot_membership_words[span.start..span.start+span.len];}
+ if lease.collection_frames.len!=0 {let span=lease.collection_frames;assert(span.start>=0&&span.start<=region_snapshot_collection_frames.len&&span.len>=0&&span.len<=region_snapshot_collection_frames.len-span.start);result.collection_frames=region_snapshot_collection_frames[span.start..span.start+span.len];}
+ if lease.collection_words.len!=0 {let span=lease.collection_words;assert(span.start>=0&&span.start<=region_snapshot_collection_words.len&&span.len>=0&&span.len<=region_snapshot_collection_words.len-span.start);result.collection_words=region_snapshot_collection_words[span.start..span.start+span.len];}
+ if lease.collection_seen_words.len!=0 {let span=lease.collection_seen_words;assert(span.start>=0&&span.start<=region_snapshot_collection_seen_words.len&&span.len>=0&&span.len<=region_snapshot_collection_seen_words.len-span.start);result.collection_seen_words=region_snapshot_collection_seen_words[span.start..span.start+span.len];}
+ if lease.queue_constraints_entries.len!=0 {let span=lease.queue_constraints_entries;assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_entries.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_entries.len-span.start);result.queue_constraints_entries=region_snapshot_queue_constraints_entries[span.start..span.start+span.len];}
+ if lease.queue_constraints_links.len!=0 {let span=lease.queue_constraints_links;assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_links.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_links.len-span.start);result.queue_constraints_links=region_snapshot_queue_constraints_links[span.start..span.start+span.len];}
+ if lease.queue_constraints_ready.len!=0 {let span=lease.queue_constraints_ready;assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_ready.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_ready.len-span.start);result.queue_constraints_ready=region_snapshot_queue_constraints_ready[span.start..span.start+span.len];}
+ if lease.queue_constraints_pending.len!=0 {let span=lease.queue_constraints_pending;assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_pending.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_pending.len-span.start);result.queue_constraints_pending=region_snapshot_queue_constraints_pending[span.start..span.start+span.len];}
+ if lease.queue_aliases_entries.len!=0 {let span=lease.queue_aliases_entries;assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_entries.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_entries.len-span.start);result.queue_aliases_entries=region_snapshot_queue_aliases_entries[span.start..span.start+span.len];}
+ if lease.queue_aliases_links.len!=0 {let span=lease.queue_aliases_links;assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_links.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_links.len-span.start);result.queue_aliases_links=region_snapshot_queue_aliases_links[span.start..span.start+span.len];}
+ if lease.queue_aliases_ready.len!=0 {let span=lease.queue_aliases_ready;assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_ready.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_ready.len-span.start);result.queue_aliases_ready=region_snapshot_queue_aliases_ready[span.start..span.start+span.len];}
+ if lease.queue_aliases_pending.len!=0 {let span=lease.queue_aliases_pending;assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_pending.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_pending.len-span.start);result.queue_aliases_pending=region_snapshot_queue_aliases_pending[span.start..span.start+span.len];}
+ if lease.imported.len!=0 {let span=lease.imported;assert(span.start>=0&&span.start<=region_snapshot_imported.len&&span.len>=0&&span.len<=region_snapshot_imported.len-span.start);result.imported=region_snapshot_imported[span.start..span.start+span.len];}
+ if lease.imported_rows.len!=0 {let span=lease.imported_rows;assert(span.start>=0&&span.start<=region_snapshot_imported_rows.len&&span.len>=0&&span.len<=region_snapshot_imported_rows.len-span.start);result.imported_rows=region_snapshot_imported_rows[span.start..span.start+span.len];}
+ if lease.imported_labels.len!=0 {let span=lease.imported_labels;assert(span.start>=0&&span.start<=region_snapshot_imported_labels.len&&span.len>=0&&span.len<=region_snapshot_imported_labels.len-span.start);result.imported_labels=region_snapshot_imported_labels[span.start..span.start+span.len];}
+ if lease.row_variables.len!=0 {let span=lease.row_variables;assert(span.start>=0&&span.start<=region_snapshot_row_variables.len&&span.len>=0&&span.len<=region_snapshot_row_variables.len-span.start);result.row_variables=region_snapshot_row_variables[span.start..span.start+span.len];}
+ if lease.row_parameters.len!=0 {let span=lease.row_parameters;assert(span.start>=0&&span.start<=region_snapshot_row_parameters.len&&span.len>=0&&span.len<=region_snapshot_row_parameters.len-span.start);result.row_parameters=region_snapshot_row_parameters[span.start..span.start+span.len];}
+ if lease.evidence_rows.len!=0 {let span=lease.evidence_rows;assert(span.start>=0&&span.start<=region_snapshot_evidence_rows.len&&span.len>=0&&span.len<=region_snapshot_evidence_rows.len-span.start);result.evidence_rows=region_snapshot_evidence_rows[span.start..span.start+span.len];}
+ if lease.evidence_labels.len!=0 {let span=lease.evidence_labels;assert(span.start>=0&&span.start<=region_snapshot_evidence_labels.len&&span.len>=0&&span.len<=region_snapshot_evidence_labels.len-span.start);result.evidence_labels=region_snapshot_evidence_labels[span.start..span.start+span.len];}
+ if lease.frozen.len!=0 {let span=lease.frozen;assert(span.start>=0&&span.start<=region_snapshot_frozen.len&&span.len>=0&&span.len<=region_snapshot_frozen.len-span.start);result.frozen=region_snapshot_frozen[span.start..span.start+span.len];}
+ if lease.value_scopes.len!=0 {let span=lease.value_scopes;assert(span.start>=0&&span.start<=region_snapshot_value_scopes.len&&span.len>=0&&span.len<=region_snapshot_value_scopes.len-span.start);result.value_scopes=region_snapshot_value_scopes[span.start..span.start+span.len];}
+ if lease.call_instances.len!=0 {let span=lease.call_instances;assert(span.start>=0&&span.start<=region_snapshot_call_instances.len&&span.len>=0&&span.len<=region_snapshot_call_instances.len-span.start);result.call_instances=region_snapshot_call_instances[span.start..span.start+span.len];}
+ if lease.candidate_instances.len!=0 {let span=lease.candidate_instances;assert(span.start>=0&&span.start<=region_snapshot_candidate_instances.len&&span.len>=0&&span.len<=region_snapshot_candidate_instances.len-span.start);result.candidate_instances=region_snapshot_candidate_instances[span.start..span.start+span.len];}
+ if lease.unresolved_calls.len!=0 {let span=lease.unresolved_calls;assert(span.start>=0&&span.start<=region_snapshot_unresolved_calls.len&&span.len>=0&&span.len<=region_snapshot_unresolved_calls.len-span.start);result.unresolved_calls=region_snapshot_unresolved_calls[span.start..span.start+span.len];}
+ if lease.target_scopes.len!=0 {let span=lease.target_scopes;assert(span.start>=0&&span.start<=region_snapshot_target_scopes.len&&span.len>=0&&span.len<=region_snapshot_target_scopes.len-span.start);result.target_scopes=region_snapshot_target_scopes[span.start..span.start+span.len];}
+ if lease.witness_inputs.len!=0 {let span=lease.witness_inputs;assert(span.start>=0&&span.start<=region_snapshot_witness_inputs.len&&span.len>=0&&span.len<=region_snapshot_witness_inputs.len-span.start);result.witness_inputs=region_snapshot_witness_inputs[span.start..span.start+span.len];}
+ if lease.scheme_instances.len!=0 {let span=lease.scheme_instances;assert(span.start>=0&&span.start<=region_snapshot_scheme_instances.len&&span.len>=0&&span.len<=region_snapshot_scheme_instances.len-span.start);result.scheme_instances=region_snapshot_scheme_instances[span.start..span.start+span.len];}
+ if lease.projection_answers.len!=0 {let span=lease.projection_answers;assert(span.start>=0&&span.start<=region_snapshot_projection_answers.len&&span.len>=0&&span.len<=region_snapshot_projection_answers.len-span.start);result.projection_answers=region_snapshot_projection_answers[span.start..span.start+span.len];}
+ if lease.projection_labels.len!=0 {let span=lease.projection_labels;assert(span.start>=0&&span.start<=region_snapshot_projection_labels.len&&span.len>=0&&span.len<=region_snapshot_projection_labels.len-span.start);result.projection_labels=region_snapshot_projection_labels[span.start..span.start+span.len];}
+ if lease.evidence_answers.len!=0 {let span=lease.evidence_answers;assert(span.start>=0&&span.start<=region_snapshot_evidence_answers.len&&span.len>=0&&span.len<=region_snapshot_evidence_answers.len-span.start);result.evidence_answers=region_snapshot_evidence_answers[span.start..span.start+span.len];}
+ if lease.closed_answers.len!=0 {let span=lease.closed_answers;assert(span.start>=0&&span.start<=region_snapshot_closed_answers.len&&span.len>=0&&span.len<=region_snapshot_closed_answers.len-span.start);result.closed_answers=region_snapshot_closed_answers[span.start..span.start+span.len];}
+ if lease.memberships.len!=0 {let span=lease.memberships;assert(span.start>=0&&span.start<=region_snapshot_memberships.len&&span.len>=0&&span.len<=region_snapshot_memberships.len-span.start);result.memberships=region_snapshot_memberships[span.start..span.start+span.len];}
+ if lease.component_keys.len!=0 {let span=lease.component_keys;assert(span.start>=0&&span.start<=region_snapshot_component_keys.len&&span.len>=0&&span.len<=region_snapshot_component_keys.len-span.start);result.component_keys=region_snapshot_component_keys[span.start..span.start+span.len];}
+ if lease.scheme_keys.len!=0 {let span=lease.scheme_keys;assert(span.start>=0&&span.start<=region_snapshot_scheme_keys.len&&span.len>=0&&span.len<=region_snapshot_scheme_keys.len-span.start);result.scheme_keys=region_snapshot_scheme_keys[span.start..span.start+span.len];}
+ if lease.collection_seen.len!=0 {let span=lease.collection_seen;assert(span.start>=0&&span.start<=region_snapshot_collection_seen.len&&span.len>=0&&span.len<=region_snapshot_collection_seen.len-span.start);result.collection_seen=region_snapshot_collection_seen[span.start..span.start+span.len];}
+ if lease.projection_scopes.len!=0 {let span=lease.projection_scopes;assert(span.start>=0&&span.start<=region_snapshot_projection_scopes.len&&span.len>=0&&span.len<=region_snapshot_projection_scopes.len-span.start);result.projection_scopes=region_snapshot_projection_scopes[span.start..span.start+span.len];}
+ if lease.normalization_memo.len!=0 {let span=lease.normalization_memo;assert(span.start>=0&&span.start<=region_snapshot_normalization_memo.len&&span.len>=0&&span.len<=region_snapshot_normalization_memo.len-span.start);result.normalization_memo=region_snapshot_normalization_memo[span.start..span.start+span.len];}
+ if lease.queue_constraints_heads.len!=0 {let span=lease.queue_constraints_heads;assert(span.start>=0&&span.start<=region_snapshot_queue_constraints_heads.len&&span.len>=0&&span.len<=region_snapshot_queue_constraints_heads.len-span.start);result.queue_constraints_heads=region_snapshot_queue_constraints_heads[span.start..span.start+span.len];}
+ if lease.queue_aliases_heads.len!=0 {let span=lease.queue_aliases_heads;assert(span.start>=0&&span.start<=region_snapshot_queue_aliases_heads.len&&span.len>=0&&span.len<=region_snapshot_queue_aliases_heads.len-span.start);result.queue_aliases_heads=region_snapshot_queue_aliases_heads[span.start..span.start+span.len];}
  return result;
 }
 fn validRegionSnapshot(snapshot: const RegionSnapshot&) -> bool { return snapshot.lease!=0&&snapshot.lease<=region_snapshot_leases.len&&region_snapshot_leases[snapshot.lease-1].live&&region_snapshot_leases[snapshot.lease-1].generation==snapshot.generation; }
 fn releaseRegionSnapshotRuns(snapshot: RegionSnapshot&) {
  assert(validRegionSnapshot(snapshot)); let lease=region_snapshot_leases[snapshot.lease-1];
- if lease.callback_origins.len!=0 { region_snapshot_callback_origins.free_slice(region_snapshot_callback_origins[lease.callback_origins.start..lease.callback_origins.start+lease.callback_origins.len]); } snapshot.callback_origins=default<const blot_eval_core_eval::CallbackOriginUse[:]>();
- if lease.sources.len!=0 { region_snapshot_sources.free_slice(region_snapshot_sources[lease.sources.start..lease.sources.start+lease.sources.len]); } snapshot.sources=default<const blot_eval_core_eval::RegionSource[:]>();
- if lease.row_variable_entries.len!=0 { region_snapshot_row_variable_entries.free_slice(region_snapshot_row_variable_entries[lease.row_variable_entries.start..lease.row_variable_entries.start+lease.row_variable_entries.len]); } snapshot.row_variable_entries=default<const blot_eval_core_eval::ImportedRowVariable[:]>();
- if lease.variables.len!=0 { region_snapshot_variables.free_slice(region_snapshot_variables[lease.variables.start..lease.variables.start+lease.variables.len]); } snapshot.variables=default<const blot_eval_core_eval::Variable[:]>();
- if lease.edges.len!=0 { region_snapshot_edges.free_slice(region_snapshot_edges[lease.edges.start..lease.edges.start+lease.edges.len]); } snapshot.edges=default<const blot_eval_core_eval::RegionEdge[:]>();
- if lease.constraints.len!=0 { region_snapshot_constraints.free_slice(region_snapshot_constraints[lease.constraints.start..lease.constraints.start+lease.constraints.len]); } snapshot.constraints=default<const blot_eval_core_eval::Constraint[:]>();
- if lease.selected_targets.len!=0 { region_snapshot_selected_targets.free_slice(region_snapshot_selected_targets[lease.selected_targets.start..lease.selected_targets.start+lease.selected_targets.len]); } snapshot.selected_targets=default<const blot_eval_core_eval::BindingRef[:]>();
- if lease.summary_arguments.len!=0 { region_snapshot_summary_arguments.free_slice(region_snapshot_summary_arguments[lease.summary_arguments.start..lease.summary_arguments.start+lease.summary_arguments.len]); } snapshot.summary_arguments=default<const u32[:]>();
- if lease.data_aliases.len!=0 { region_snapshot_data_aliases.free_slice(region_snapshot_data_aliases[lease.data_aliases.start..lease.data_aliases.start+lease.data_aliases.len]); } snapshot.data_aliases=default<const blot_eval_core_eval::DataAlias[:]>();
- if lease.source_functions.len!=0 { region_snapshot_source_functions.free_slice(region_snapshot_source_functions[lease.source_functions.start..lease.source_functions.start+lease.source_functions.len]); } snapshot.source_functions=default<const u32[:]>();
- if lease.principal_references.len!=0 { region_snapshot_principal_references.free_slice(region_snapshot_principal_references[lease.principal_references.start..lease.principal_references.start+lease.principal_references.len]); } snapshot.principal_references=default<const blot_eval_core_eval::Target[:]>();
- if lease.principal_actions.len!=0 { region_snapshot_principal_actions.free_slice(region_snapshot_principal_actions[lease.principal_actions.start..lease.principal_actions.start+lease.principal_actions.len]); } snapshot.principal_actions=default<const blot_eval_core_eval::PrincipalAction[:]>();
- if lease.constraint_names.len!=0 { region_snapshot_constraint_names.free_slice(region_snapshot_constraint_names[lease.constraint_names.start..lease.constraint_names.start+lease.constraint_names.len]); } snapshot.constraint_names=default<const blot_eval_core_eval::ConstraintNameLease[:]>();
- if lease.rank_evidence_frames.len!=0 { region_snapshot_rank_evidence_frames.free_slice(region_snapshot_rank_evidence_frames[lease.rank_evidence_frames.start..lease.rank_evidence_frames.start+lease.rank_evidence_frames.len]); } snapshot.rank_evidence_frames=default<const blot_check_types::List[:]>();
- if lease.rank_evidence_words.len!=0 { region_snapshot_rank_evidence_words.free_slice(region_snapshot_rank_evidence_words[lease.rank_evidence_words.start..lease.rank_evidence_words.start+lease.rank_evidence_words.len]); } snapshot.rank_evidence_words=default<const u32[:]>();
- if lease.component_nodes.len!=0 { region_snapshot_component_nodes.free_slice(region_snapshot_component_nodes[lease.component_nodes.start..lease.component_nodes.start+lease.component_nodes.len]); } snapshot.component_nodes=default<const blot_eval_scope_components::Node[:]>();
- if lease.component_edges.len!=0 { region_snapshot_component_edges.free_slice(region_snapshot_component_edges[lease.component_edges.start..lease.component_edges.start+lease.component_edges.len]); } snapshot.component_edges=default<const blot_eval_scope_components::Edge[:]>();
- if lease.component_work.len!=0 { region_snapshot_component_work.free_slice(region_snapshot_component_work[lease.component_work.start..lease.component_work.start+lease.component_work.len]); } snapshot.component_work=default<const u32[:]>();
- if lease.membership_words.len!=0 { region_snapshot_membership_words.free_slice(region_snapshot_membership_words[lease.membership_words.start..lease.membership_words.start+lease.membership_words.len]); } snapshot.membership_words=default<const u32[:]>();
- if lease.collection_frames.len!=0 { region_snapshot_collection_frames.free_slice(region_snapshot_collection_frames[lease.collection_frames.start..lease.collection_frames.start+lease.collection_frames.len]); } snapshot.collection_frames=default<const blot_eval_core_eval::CollectionFrame[:]>();
- if lease.collection_words.len!=0 { region_snapshot_collection_words.free_slice(region_snapshot_collection_words[lease.collection_words.start..lease.collection_words.start+lease.collection_words.len]); } snapshot.collection_words=default<const u32[:]>();
- if lease.collection_seen_words.len!=0 { region_snapshot_collection_seen_words.free_slice(region_snapshot_collection_seen_words[lease.collection_seen_words.start..lease.collection_seen_words.start+lease.collection_seen_words.len]); } snapshot.collection_seen_words=default<const u32[:]>();
- if lease.queue_constraints_entries.len!=0 { region_snapshot_queue_constraints_entries.free_slice(region_snapshot_queue_constraints_entries[lease.queue_constraints_entries.start..lease.queue_constraints_entries.start+lease.queue_constraints_entries.len]); } snapshot.queue_constraints_entries=default<const blot_check_solver_worklist::Entry[:]>();
- if lease.queue_constraints_links.len!=0 { region_snapshot_queue_constraints_links.free_slice(region_snapshot_queue_constraints_links[lease.queue_constraints_links.start..lease.queue_constraints_links.start+lease.queue_constraints_links.len]); } snapshot.queue_constraints_links=default<const blot_check_solver_worklist::Link[:]>();
- if lease.queue_constraints_ready.len!=0 { region_snapshot_queue_constraints_ready.free_slice(region_snapshot_queue_constraints_ready[lease.queue_constraints_ready.start..lease.queue_constraints_ready.start+lease.queue_constraints_ready.len]); } snapshot.queue_constraints_ready=default<const u64[:]>();
- if lease.queue_constraints_pending.len!=0 { region_snapshot_queue_constraints_pending.free_slice(region_snapshot_queue_constraints_pending[lease.queue_constraints_pending.start..lease.queue_constraints_pending.start+lease.queue_constraints_pending.len]); } snapshot.queue_constraints_pending=default<const u64[:]>();
- if lease.queue_aliases_entries.len!=0 { region_snapshot_queue_aliases_entries.free_slice(region_snapshot_queue_aliases_entries[lease.queue_aliases_entries.start..lease.queue_aliases_entries.start+lease.queue_aliases_entries.len]); } snapshot.queue_aliases_entries=default<const blot_check_solver_worklist::Entry[:]>();
- if lease.queue_aliases_links.len!=0 { region_snapshot_queue_aliases_links.free_slice(region_snapshot_queue_aliases_links[lease.queue_aliases_links.start..lease.queue_aliases_links.start+lease.queue_aliases_links.len]); } snapshot.queue_aliases_links=default<const blot_check_solver_worklist::Link[:]>();
- if lease.queue_aliases_ready.len!=0 { region_snapshot_queue_aliases_ready.free_slice(region_snapshot_queue_aliases_ready[lease.queue_aliases_ready.start..lease.queue_aliases_ready.start+lease.queue_aliases_ready.len]); } snapshot.queue_aliases_ready=default<const u64[:]>();
- if lease.queue_aliases_pending.len!=0 { region_snapshot_queue_aliases_pending.free_slice(region_snapshot_queue_aliases_pending[lease.queue_aliases_pending.start..lease.queue_aliases_pending.start+lease.queue_aliases_pending.len]); } snapshot.queue_aliases_pending=default<const u64[:]>();
- if lease.imported.len!=0 { region_snapshot_imported.free_slice(region_snapshot_imported[lease.imported.start..lease.imported.start+lease.imported.len]); } snapshot.imported=default<const dictionary_slot<blot_eval_core_eval::Import,u32>[:]>();
- if lease.imported_rows.len!=0 { region_snapshot_imported_rows.free_slice(region_snapshot_imported_rows[lease.imported_rows.start..lease.imported_rows.start+lease.imported_rows.len]); } snapshot.imported_rows=default<const dictionary_slot<blot_eval_core_eval::RowImport,u32>[:]>();
- if lease.imported_labels.len!=0 { region_snapshot_imported_labels.free_slice(region_snapshot_imported_labels[lease.imported_labels.start..lease.imported_labels.start+lease.imported_labels.len]); } snapshot.imported_labels=default<const dictionary_slot<blot_eval_core_eval::LabelImport,u32>[:]>();
- if lease.row_variables.len!=0 { region_snapshot_row_variables.free_slice(region_snapshot_row_variables[lease.row_variables.start..lease.row_variables.start+lease.row_variables.len]); } snapshot.row_variables=default<const dictionary_slot<blot_eval_core_eval::RowVariable,u32>[:]>();
- if lease.row_parameters.len!=0 { region_snapshot_row_parameters.free_slice(region_snapshot_row_parameters[lease.row_parameters.start..lease.row_parameters.start+lease.row_parameters.len]); } snapshot.row_parameters=default<const dictionary_slot<blot_eval_core_eval::RowParameter,u32>[:]>();
- if lease.evidence_rows.len!=0 { region_snapshot_evidence_rows.free_slice(region_snapshot_evidence_rows[lease.evidence_rows.start..lease.evidence_rows.start+lease.evidence_rows.len]); } snapshot.evidence_rows=default<const dictionary_slot<u32,u32>[:]>();
- if lease.evidence_labels.len!=0 { region_snapshot_evidence_labels.free_slice(region_snapshot_evidence_labels[lease.evidence_labels.start..lease.evidence_labels.start+lease.evidence_labels.len]); } snapshot.evidence_labels=default<const dictionary_slot<u32,u32>[:]>();
- if lease.frozen.len!=0 { region_snapshot_frozen.free_slice(region_snapshot_frozen[lease.frozen.start..lease.frozen.start+lease.frozen.len]); } snapshot.frozen=default<const dictionary_slot<u32,blot_eval_core_eval::ValueId>[:]>();
- if lease.value_scopes.len!=0 { region_snapshot_value_scopes.free_slice(region_snapshot_value_scopes[lease.value_scopes.start..lease.value_scopes.start+lease.value_scopes.len]); } snapshot.value_scopes=default<const dictionary_slot<blot_eval_core_eval::ValueId,u32>[:]>();
- if lease.call_instances.len!=0 { region_snapshot_call_instances.free_slice(region_snapshot_call_instances[lease.call_instances.start..lease.call_instances.start+lease.call_instances.len]); } snapshot.call_instances=default<const dictionary_slot<blot_eval_core_eval::CallKey,u32>[:]>();
- if lease.candidate_instances.len!=0 { region_snapshot_candidate_instances.free_slice(region_snapshot_candidate_instances[lease.candidate_instances.start..lease.candidate_instances.start+lease.candidate_instances.len]); } snapshot.candidate_instances=default<const dictionary_slot<blot_eval_core_eval::CandidateKey,u32>[:]>();
- if lease.unresolved_calls.len!=0 { region_snapshot_unresolved_calls.free_slice(region_snapshot_unresolved_calls[lease.unresolved_calls.start..lease.unresolved_calls.start+lease.unresolved_calls.len]); } snapshot.unresolved_calls=default<const dictionary_slot<blot_eval_core_eval::Target,u32>[:]>();
- if lease.target_scopes.len!=0 { region_snapshot_target_scopes.free_slice(region_snapshot_target_scopes[lease.target_scopes.start..lease.target_scopes.start+lease.target_scopes.len]); } snapshot.target_scopes=default<const dictionary_slot<blot_eval_core_eval::Target,u32>[:]>();
- if lease.witness_inputs.len!=0 { region_snapshot_witness_inputs.free_slice(region_snapshot_witness_inputs[lease.witness_inputs.start..lease.witness_inputs.start+lease.witness_inputs.len]); } snapshot.witness_inputs=default<const dictionary_slot<u32,u32>[:]>();
- if lease.scheme_instances.len!=0 { region_snapshot_scheme_instances.free_slice(region_snapshot_scheme_instances[lease.scheme_instances.start..lease.scheme_instances.start+lease.scheme_instances.len]); } snapshot.scheme_instances=default<const dictionary_slot<blot_eval_core_eval::SchemeInstance,bool>[:]>();
- if lease.projection_answers.len!=0 { region_snapshot_projection_answers.free_slice(region_snapshot_projection_answers[lease.projection_answers.start..lease.projection_answers.start+lease.projection_answers.len]); } snapshot.projection_answers=default<const dictionary_slot<u32,blot_reuse_projection_cache::Answer>[:]>();
- if lease.projection_labels.len!=0 { region_snapshot_projection_labels.free_slice(region_snapshot_projection_labels[lease.projection_labels.start..lease.projection_labels.start+lease.projection_labels.len]); } snapshot.projection_labels=default<const dictionary_slot<u32,blot_reuse_projection_cache::Answer>[:]>();
- if lease.evidence_answers.len!=0 { region_snapshot_evidence_answers.free_slice(region_snapshot_evidence_answers[lease.evidence_answers.start..lease.evidence_answers.start+lease.evidence_answers.len]); } snapshot.evidence_answers=default<const dictionary_slot<u64,u32>[:]>();
- if lease.closed_answers.len!=0 { region_snapshot_closed_answers.free_slice(region_snapshot_closed_answers[lease.closed_answers.start..lease.closed_answers.start+lease.closed_answers.len]); } snapshot.closed_answers=default<const dictionary_slot<blot_eval_closed_source_types::CacheKey,u32>[:]>();
- if lease.memberships.len!=0 { region_snapshot_memberships.free_slice(region_snapshot_memberships[lease.memberships.start..lease.memberships.start+lease.memberships.len]); } snapshot.memberships=default<const dictionary_slot<blot_eval_scheme_membership::Key,blot_check_types::List>[:]>();
- if lease.component_keys.len!=0 { region_snapshot_component_keys.free_slice(region_snapshot_component_keys[lease.component_keys.start..lease.component_keys.start+lease.component_keys.len]); } snapshot.component_keys=default<const dictionary_slot<u64,bool>[:]>();
- if lease.scheme_keys.len!=0 { region_snapshot_scheme_keys.free_slice(region_snapshot_scheme_keys[lease.scheme_keys.start..lease.scheme_keys.start+lease.scheme_keys.len]); } snapshot.scheme_keys=default<const dictionary_slot<const u8[:],u32>[:]>();
- if lease.collection_seen.len!=0 { region_snapshot_collection_seen.free_slice(region_snapshot_collection_seen[lease.collection_seen.start..lease.collection_seen.start+lease.collection_seen.len]); } snapshot.collection_seen=default<const dictionary_slot<blot_eval_core_eval::WalkSeenKey,bool>[:]>();
- if lease.projection_scopes.len!=0 { region_snapshot_projection_scopes.free_slice(region_snapshot_projection_scopes[lease.projection_scopes.start..lease.projection_scopes.start+lease.projection_scopes.len]); } snapshot.projection_scopes=default<const dictionary_slot<u32,u32>[:]>();
- if lease.normalization_memo.len!=0 { region_snapshot_normalization_memo.free_slice(region_snapshot_normalization_memo[lease.normalization_memo.start..lease.normalization_memo.start+lease.normalization_memo.len]); } snapshot.normalization_memo=default<const dictionary_slot<blot_eval_core_eval::NormalizationKey,bool>[:]>();
- if lease.queue_constraints_heads.len!=0 { region_snapshot_queue_constraints_heads.free_slice(region_snapshot_queue_constraints_heads[lease.queue_constraints_heads.start..lease.queue_constraints_heads.start+lease.queue_constraints_heads.len]); } snapshot.queue_constraints_heads=default<const dictionary_slot<u64,u32>[:]>();
- if lease.queue_aliases_heads.len!=0 { region_snapshot_queue_aliases_heads.free_slice(region_snapshot_queue_aliases_heads[lease.queue_aliases_heads.start..lease.queue_aliases_heads.start+lease.queue_aliases_heads.len]); } snapshot.queue_aliases_heads=default<const dictionary_slot<u64,u32>[:]>();
+ if lease.callback_origins.len!=0 { region_snapshot_callback_origins.free_slice(region_snapshot_callback_origins[lease.callback_origins.start..lease.callback_origins.start+lease.callback_origins.len]); }
+ if lease.sources.len!=0 { region_snapshot_sources.free_slice(region_snapshot_sources[lease.sources.start..lease.sources.start+lease.sources.len]); }
+ if lease.row_variable_entries.len!=0 { region_snapshot_row_variable_entries.free_slice(region_snapshot_row_variable_entries[lease.row_variable_entries.start..lease.row_variable_entries.start+lease.row_variable_entries.len]); }
+ if lease.variables.len!=0 { region_snapshot_variables.free_slice(region_snapshot_variables[lease.variables.start..lease.variables.start+lease.variables.len]); }
+ if lease.edges.len!=0 { region_snapshot_edges.free_slice(region_snapshot_edges[lease.edges.start..lease.edges.start+lease.edges.len]); }
+ if lease.constraints.len!=0 { region_snapshot_constraints.free_slice(region_snapshot_constraints[lease.constraints.start..lease.constraints.start+lease.constraints.len]); }
+ if lease.selected_targets.len!=0 { region_snapshot_selected_targets.free_slice(region_snapshot_selected_targets[lease.selected_targets.start..lease.selected_targets.start+lease.selected_targets.len]); }
+ if lease.summary_arguments.len!=0 { region_snapshot_summary_arguments.free_slice(region_snapshot_summary_arguments[lease.summary_arguments.start..lease.summary_arguments.start+lease.summary_arguments.len]); }
+ if lease.data_aliases.len!=0 { region_snapshot_data_aliases.free_slice(region_snapshot_data_aliases[lease.data_aliases.start..lease.data_aliases.start+lease.data_aliases.len]); }
+ if lease.source_functions.len!=0 { region_snapshot_source_functions.free_slice(region_snapshot_source_functions[lease.source_functions.start..lease.source_functions.start+lease.source_functions.len]); }
+ if lease.principal_references.len!=0 { region_snapshot_principal_references.free_slice(region_snapshot_principal_references[lease.principal_references.start..lease.principal_references.start+lease.principal_references.len]); }
+ if lease.principal_actions.len!=0 { region_snapshot_principal_actions.free_slice(region_snapshot_principal_actions[lease.principal_actions.start..lease.principal_actions.start+lease.principal_actions.len]); }
+ if lease.constraint_names.len!=0 { region_snapshot_constraint_names.free_slice(region_snapshot_constraint_names[lease.constraint_names.start..lease.constraint_names.start+lease.constraint_names.len]); }
+ if lease.rank_evidence_frames.len!=0 { region_snapshot_rank_evidence_frames.free_slice(region_snapshot_rank_evidence_frames[lease.rank_evidence_frames.start..lease.rank_evidence_frames.start+lease.rank_evidence_frames.len]); }
+ if lease.rank_evidence_words.len!=0 { region_snapshot_rank_evidence_words.free_slice(region_snapshot_rank_evidence_words[lease.rank_evidence_words.start..lease.rank_evidence_words.start+lease.rank_evidence_words.len]); }
+ if lease.component_nodes.len!=0 { region_snapshot_component_nodes.free_slice(region_snapshot_component_nodes[lease.component_nodes.start..lease.component_nodes.start+lease.component_nodes.len]); }
+ if lease.component_edges.len!=0 { region_snapshot_component_edges.free_slice(region_snapshot_component_edges[lease.component_edges.start..lease.component_edges.start+lease.component_edges.len]); }
+ if lease.component_work.len!=0 { region_snapshot_component_work.free_slice(region_snapshot_component_work[lease.component_work.start..lease.component_work.start+lease.component_work.len]); }
+ if lease.membership_words.len!=0 { region_snapshot_membership_words.free_slice(region_snapshot_membership_words[lease.membership_words.start..lease.membership_words.start+lease.membership_words.len]); }
+ if lease.collection_frames.len!=0 { region_snapshot_collection_frames.free_slice(region_snapshot_collection_frames[lease.collection_frames.start..lease.collection_frames.start+lease.collection_frames.len]); }
+ if lease.collection_words.len!=0 { region_snapshot_collection_words.free_slice(region_snapshot_collection_words[lease.collection_words.start..lease.collection_words.start+lease.collection_words.len]); }
+ if lease.collection_seen_words.len!=0 { region_snapshot_collection_seen_words.free_slice(region_snapshot_collection_seen_words[lease.collection_seen_words.start..lease.collection_seen_words.start+lease.collection_seen_words.len]); }
+ if lease.queue_constraints_entries.len!=0 { region_snapshot_queue_constraints_entries.free_slice(region_snapshot_queue_constraints_entries[lease.queue_constraints_entries.start..lease.queue_constraints_entries.start+lease.queue_constraints_entries.len]); }
+ if lease.queue_constraints_links.len!=0 { region_snapshot_queue_constraints_links.free_slice(region_snapshot_queue_constraints_links[lease.queue_constraints_links.start..lease.queue_constraints_links.start+lease.queue_constraints_links.len]); }
+ if lease.queue_constraints_ready.len!=0 { region_snapshot_queue_constraints_ready.free_slice(region_snapshot_queue_constraints_ready[lease.queue_constraints_ready.start..lease.queue_constraints_ready.start+lease.queue_constraints_ready.len]); }
+ if lease.queue_constraints_pending.len!=0 { region_snapshot_queue_constraints_pending.free_slice(region_snapshot_queue_constraints_pending[lease.queue_constraints_pending.start..lease.queue_constraints_pending.start+lease.queue_constraints_pending.len]); }
+ if lease.queue_aliases_entries.len!=0 { region_snapshot_queue_aliases_entries.free_slice(region_snapshot_queue_aliases_entries[lease.queue_aliases_entries.start..lease.queue_aliases_entries.start+lease.queue_aliases_entries.len]); }
+ if lease.queue_aliases_links.len!=0 { region_snapshot_queue_aliases_links.free_slice(region_snapshot_queue_aliases_links[lease.queue_aliases_links.start..lease.queue_aliases_links.start+lease.queue_aliases_links.len]); }
+ if lease.queue_aliases_ready.len!=0 { region_snapshot_queue_aliases_ready.free_slice(region_snapshot_queue_aliases_ready[lease.queue_aliases_ready.start..lease.queue_aliases_ready.start+lease.queue_aliases_ready.len]); }
+ if lease.queue_aliases_pending.len!=0 { region_snapshot_queue_aliases_pending.free_slice(region_snapshot_queue_aliases_pending[lease.queue_aliases_pending.start..lease.queue_aliases_pending.start+lease.queue_aliases_pending.len]); }
+ if lease.imported.len!=0 { region_snapshot_imported.free_slice(region_snapshot_imported[lease.imported.start..lease.imported.start+lease.imported.len]); }
+ if lease.imported_rows.len!=0 { region_snapshot_imported_rows.free_slice(region_snapshot_imported_rows[lease.imported_rows.start..lease.imported_rows.start+lease.imported_rows.len]); }
+ if lease.imported_labels.len!=0 { region_snapshot_imported_labels.free_slice(region_snapshot_imported_labels[lease.imported_labels.start..lease.imported_labels.start+lease.imported_labels.len]); }
+ if lease.row_variables.len!=0 { region_snapshot_row_variables.free_slice(region_snapshot_row_variables[lease.row_variables.start..lease.row_variables.start+lease.row_variables.len]); }
+ if lease.row_parameters.len!=0 { region_snapshot_row_parameters.free_slice(region_snapshot_row_parameters[lease.row_parameters.start..lease.row_parameters.start+lease.row_parameters.len]); }
+ if lease.evidence_rows.len!=0 { region_snapshot_evidence_rows.free_slice(region_snapshot_evidence_rows[lease.evidence_rows.start..lease.evidence_rows.start+lease.evidence_rows.len]); }
+ if lease.evidence_labels.len!=0 { region_snapshot_evidence_labels.free_slice(region_snapshot_evidence_labels[lease.evidence_labels.start..lease.evidence_labels.start+lease.evidence_labels.len]); }
+ if lease.frozen.len!=0 { region_snapshot_frozen.free_slice(region_snapshot_frozen[lease.frozen.start..lease.frozen.start+lease.frozen.len]); }
+ if lease.value_scopes.len!=0 { region_snapshot_value_scopes.free_slice(region_snapshot_value_scopes[lease.value_scopes.start..lease.value_scopes.start+lease.value_scopes.len]); }
+ if lease.call_instances.len!=0 { region_snapshot_call_instances.free_slice(region_snapshot_call_instances[lease.call_instances.start..lease.call_instances.start+lease.call_instances.len]); }
+ if lease.candidate_instances.len!=0 { region_snapshot_candidate_instances.free_slice(region_snapshot_candidate_instances[lease.candidate_instances.start..lease.candidate_instances.start+lease.candidate_instances.len]); }
+ if lease.unresolved_calls.len!=0 { region_snapshot_unresolved_calls.free_slice(region_snapshot_unresolved_calls[lease.unresolved_calls.start..lease.unresolved_calls.start+lease.unresolved_calls.len]); }
+ if lease.target_scopes.len!=0 { region_snapshot_target_scopes.free_slice(region_snapshot_target_scopes[lease.target_scopes.start..lease.target_scopes.start+lease.target_scopes.len]); }
+ if lease.witness_inputs.len!=0 { region_snapshot_witness_inputs.free_slice(region_snapshot_witness_inputs[lease.witness_inputs.start..lease.witness_inputs.start+lease.witness_inputs.len]); }
+ if lease.scheme_instances.len!=0 { region_snapshot_scheme_instances.free_slice(region_snapshot_scheme_instances[lease.scheme_instances.start..lease.scheme_instances.start+lease.scheme_instances.len]); }
+ if lease.projection_answers.len!=0 { region_snapshot_projection_answers.free_slice(region_snapshot_projection_answers[lease.projection_answers.start..lease.projection_answers.start+lease.projection_answers.len]); }
+ if lease.projection_labels.len!=0 { region_snapshot_projection_labels.free_slice(region_snapshot_projection_labels[lease.projection_labels.start..lease.projection_labels.start+lease.projection_labels.len]); }
+ if lease.evidence_answers.len!=0 { region_snapshot_evidence_answers.free_slice(region_snapshot_evidence_answers[lease.evidence_answers.start..lease.evidence_answers.start+lease.evidence_answers.len]); }
+ if lease.closed_answers.len!=0 { region_snapshot_closed_answers.free_slice(region_snapshot_closed_answers[lease.closed_answers.start..lease.closed_answers.start+lease.closed_answers.len]); }
+ if lease.memberships.len!=0 { region_snapshot_memberships.free_slice(region_snapshot_memberships[lease.memberships.start..lease.memberships.start+lease.memberships.len]); }
+ if lease.component_keys.len!=0 { region_snapshot_component_keys.free_slice(region_snapshot_component_keys[lease.component_keys.start..lease.component_keys.start+lease.component_keys.len]); }
+ if lease.scheme_keys.len!=0 { region_snapshot_scheme_keys.free_slice(region_snapshot_scheme_keys[lease.scheme_keys.start..lease.scheme_keys.start+lease.scheme_keys.len]); }
+ if lease.collection_seen.len!=0 { region_snapshot_collection_seen.free_slice(region_snapshot_collection_seen[lease.collection_seen.start..lease.collection_seen.start+lease.collection_seen.len]); }
+ if lease.projection_scopes.len!=0 { region_snapshot_projection_scopes.free_slice(region_snapshot_projection_scopes[lease.projection_scopes.start..lease.projection_scopes.start+lease.projection_scopes.len]); }
+ if lease.normalization_memo.len!=0 { region_snapshot_normalization_memo.free_slice(region_snapshot_normalization_memo[lease.normalization_memo.start..lease.normalization_memo.start+lease.normalization_memo.len]); }
+ if lease.queue_constraints_heads.len!=0 { region_snapshot_queue_constraints_heads.free_slice(region_snapshot_queue_constraints_heads[lease.queue_constraints_heads.start..lease.queue_constraints_heads.start+lease.queue_constraints_heads.len]); }
+ if lease.queue_aliases_heads.len!=0 { region_snapshot_queue_aliases_heads.free_slice(region_snapshot_queue_aliases_heads[lease.queue_aliases_heads.start..lease.queue_aliases_heads.start+lease.queue_aliases_heads.len]); }
  region_snapshot_leases[snapshot.lease-1].live=false; region_snapshot_leases.free(snapshot.lease-1); snapshot.lease=0; snapshot.generation=0;
 }
 fn snapshotConstraints(snapshot:const RegionSnapshot&)->const Constraint[:] {
  assert(validRegionSnapshot(snapshot));let span=region_snapshot_leases[snapshot.lease-1].constraints;
- if span.len==0 {assert(snapshot.constraints.len==0);return default<const Constraint[:]>();}
- assert(span.start>=0 && span.start<=region_snapshot_constraints.len && span.len>=0 && span.len<=region_snapshot_constraints.len-span.start);
- let values=region_snapshot_constraints[span.start..span.start+span.len];
- assert(blot_support::same_slice_identity(values,snapshot.constraints));return values;
+ if span.len==0 {return default<const Constraint[:]>();}
+ assert(span.start>=0&&span.start<=region_snapshot_constraints.len&&span.len>=0&&span.len<=region_snapshot_constraints.len-span.start);
+ return region_snapshot_constraints[span.start..span.start+span.len];
 }
 fn snapshotSchemeKeys(snapshot:const RegionSnapshot&)->const dictionary_slot<const u8[:],u32>[:] {
  assert(validRegionSnapshot(snapshot));let span=region_snapshot_leases[snapshot.lease-1].scheme_keys;
- if span.len==0 {assert(snapshot.scheme_keys.len==0);return default<const dictionary_slot<const u8[:],u32>[:]>();}
- assert(span.start>=0 && span.start<=region_snapshot_scheme_keys.len && span.len>=0 && span.len<=region_snapshot_scheme_keys.len-span.start);
- let values=region_snapshot_scheme_keys[span.start..span.start+span.len];
- assert(blot_support::same_slice_identity(values,snapshot.scheme_keys));return values;
+ if span.len==0 {return default<const dictionary_slot<const u8[:],u32>[:]>();}
+ assert(span.start>=0&&span.start<=region_snapshot_scheme_keys.len&&span.len>=0&&span.len<=region_snapshot_scheme_keys.len-span.start);
+ return region_snapshot_scheme_keys[span.start..span.start+span.len];
 }
-fn restoreRegionSnapshot(snapshot: RegionSnapshot&,region: ClosureRegion&) -> Error {
- if !validRegionSnapshot(snapshot) { return blot_error::Error.unresolved_type; } let error=blot_check_types::restoreStore(snapshot.solver,region.solver); if error!=blot_error::Error.none { return error; }
+fn restoreRegionSnapshot(handle: RegionSnapshot&,region: ClosureRegion&) -> Error {
+ if !validRegionSnapshot(handle) { return blot_error::Error.unresolved_type; } let lease:RegionSnapshotLease& =region_snapshot_leases[handle.lease-1];let error=blot_check_types::restoreStore(lease.solver,region.solver); if error!=blot_error::Error.none { return error; } let snapshot=regionSnapshotView(handle);
  region.scratch.callback_origins.clear(); region.scratch.callback_origins.append(snapshot.callback_origins);
  region.scratch.sources.clear(); region.scratch.sources.append(snapshot.sources);
  region.scratch.row_variable_entries.clear(); region.scratch.row_variable_entries.append(snapshot.row_variable_entries);
  region.scratch.variables.clear(); region.scratch.variables.append(snapshot.variables);
  region.scratch.edges.clear(); region.scratch.edges.append(snapshot.edges);
- region.scratch.constraints.clear(); region.scratch.constraints.append(snapshotConstraints(snapshot));
+ region.scratch.constraints.clear(); region.scratch.constraints.append(snapshotConstraints(handle));
  region.scratch.selected_targets.clear(); region.scratch.selected_targets.append(snapshot.selected_targets);
  region.scratch.summary_arguments.clear(); region.scratch.summary_arguments.append(snapshot.summary_arguments);
  region.scratch.data_aliases.clear(); region.scratch.data_aliases.append(snapshot.data_aliases);
@@ -3070,7 +2670,7 @@ fn restoreRegionSnapshot(snapshot: RegionSnapshot&,region: ClosureRegion&) -> Er
  blot_eval_closed_source_types::restore(region.scratch.closed_source_cache.answers,snapshot.closed_answers,snapshot.state.closed_answers_count);
  blot_eval_scheme_membership::restore(region.scratch.scheme_memberships.entries,snapshot.memberships,snapshot.state.memberships_count);
  blot_eval_scope_components::restore(region.scratch.components.keys,snapshot.component_keys,snapshot.state.component_keys_count);
- restore(region.scratch.scheme_inputs.keys,snapshotSchemeKeys(snapshot),snapshot.state.scheme_keys_count);
+ restore(region.scratch.scheme_inputs.keys,snapshotSchemeKeys(handle),snapshot.state.scheme_keys_count);
  restore(region.collector.seen,snapshot.collection_seen,snapshot.state.collection_seen_count);
  restore(region.projection_scopes,snapshot.projection_scopes,snapshot.state.projection_scopes_count);
  restore(region.normalization_memo,snapshot.normalization_memo,snapshot.state.normalization_memo_count);
@@ -3187,7 +2787,7 @@ fn restoreRegionSnapshot(snapshot: RegionSnapshot&,region: ClosureRegion&) -> Er
  region.normalization_memo.count=snapshot.state.normalization_memo_count;
  region.work_owner.constraints.heads.count=snapshot.state.queue_constraints_heads_count;
  region.work_owner.aliases.heads.count=snapshot.state.queue_aliases_heads_count;
- if snapshot.state.worklists_enabled { attachRegionWorklists(region.scratch,region.work_owner); } else { region.scratch.worklists .= null; } region.suspended=false; releaseRegionSnapshotRuns(snapshot); return blot_error::Error.none;
+ if snapshot.state.worklists_enabled { attachRegionWorklists(region.scratch,region.work_owner); } else { region.scratch.worklists .= null; } region.suspended=false; releaseRegionSnapshotRuns(handle); return blot_error::Error.none;
 }
 recursive fn withResumedRegion<C,F>(session: Session&,snapshot: RegionSnapshot&,context: C&) -> Error { var invocation=makeSccResumedRegionInvocation(session,snapshot); return invokeRegion<C>(invocation,context,F); }
 fn join(self_: RegionImport&,left: u32,right: u32) { if self_.failure!=blot_error::Error.none { return; } let error=unify(self_.region,left,right); if error!=blot_error::Error.none { reject(self_,error); } }
@@ -3768,7 +3368,7 @@ recursive fn drainSummaries(self_: CallSummaries&,session: Session&) -> Error { 
  else { assert(self_.jobs.items[index].region.present); let snapshot=self_.jobs.items[index].region.value; self_.jobs.items[index].region=blot_support::none<RegionSnapshot>(); let result=withResumedRegion<AdvanceSummary>(session,snapshot,context,advanceSummary); if result!=blot_error::Error.none { self_.jobs.items[index].region_active=false; return result; } }
  } return blot_error::Error.none; }
 recursive fn advanceSummary(context: AdvanceSummary&,region: ClosureRegion&) -> Error { let self_: CallSummaries& =context.store; let session: Session& =context.session; let index=context.index; if context.fresh { let began=beginComponent(self_,session,index,region); if began!=blot_error::Error.none { return declineComponent(self_,session,index,began); } } var first=!context.fresh;
- loop { if !first { let progressed,error=parallelReady(self_,session); if error!=blot_error::Error.none { return error; } if progressed { continue; } if self_.stack.len==0||self_.stack.items[self_.stack.len-1]!=index { let snapshot,e=suspendRegion(region); if e!=blot_error::Error.none { return e; } self_.jobs.items[index].region=blot_support::some<RegionSnapshot>(canonicalRegionSnapshot(snapshot)); return blot_error::Error.none; } self_.current=blot_support::some(index); if !summaryCharge(session,1) { discardDiagnostic(session); for pending in 0..self_.jobs.len { let state=self_.jobs.items[pending].state; if state==SummaryJobState.queued||state==SummaryJobState.running||state==SummaryJobState.waiting { finish(self_,session,pending,0); } } return blot_error::Error.none; } } first=false;
+ loop { if !first { let progressed,error=parallelReady(self_,session); if error!=blot_error::Error.none { return error; } if progressed { continue; } if self_.stack.len==0||self_.stack.items[self_.stack.len-1]!=index { let snapshot,e=suspendRegion(region); if e!=blot_error::Error.none { return e; } self_.jobs.items[index].region=blot_support::some<RegionSnapshot>(snapshot); return blot_error::Error.none; } self_.current=blot_support::some(index); if !summaryCharge(session,1) { discardDiagnostic(session); for pending in 0..self_.jobs.len { let state=self_.jobs.items[pending].state; if state==SummaryJobState.queued||state==SummaryJobState.running||state==SummaryJobState.waiting { finish(self_,session,pending,0); } } return blot_error::Error.none; } } first=false;
  let done,error=solveStep(region,false); if error!=blot_error::Error.none { if error==blot_error::Error.out_of_memory { return error; } if self_.restart.present { restartComponent(self_,session,self_.restart.value); return blot_error::Error.none; } return declineComponent(self_,session,index,error); } if self_.restart.present { restartComponent(self_,session,self_.restart.value); return blot_error::Error.none; } if !done { continue; } if session.summary_exhausted { return declineComponent(self_,session,index,blot_error::Error.type_limit); } let published=publishComponent(self_,session,index,region); if published!=blot_error::Error.none { return declineComponent(self_,session,index,published); } return blot_error::Error.none;
  }
 }

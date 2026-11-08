@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen392 is the current source checkpoint. Selected private checker
+Frozen393 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -107,23 +107,29 @@ Three actual-map transfer controls pass on both checkers, covering growth,
 suspension, restore and final cleanup. Attempt387 was cancelled after57.352s
 without a diagnostic; it is not a pass, and no actual inactive-key UAF was
 established. Its102.504s run reaches summary-job RegionSnapshot publication.
-Frozen389 validates all57exact leased ranges and rebuilds all115Statefields,
-using the existing static caller canonicalizer and owned solver-snapshot helper.
-All73strict controls pass on official/selected Goose, including every same-pool
-redirect, stale lease/generation, bad bounds, foreign/stack slice and cleanup.
-Full solver suspend/restore is not instantiated by that fixture. Frozen390 makes
-the resume carrier a nullable snapshot reference for the synchronous call and
-removes its whole-value copyback. Exact six-edit source review passes. Its107.726s
-run clears resume and reaches the remaining direct child-ID collectCall alias.
-The tested argument-copy boundary is next. A scalar-only snapshot representation
-is the next coherent implementation batch. Frozen391 applies the tested
-scratch argument copy to the remaining direct collectCall children slice. Its
-120.284s stage timeout captures one error; it is incomplete, not a pass.
-Frozen392 reconstitutes the actual registered Session at the partial-member
-factory's original field point. Exact source review passes; its112.850s run
-clears that boundary and reaches a child-ID for-loop borrow in contractMethod.
-Scalar count/reloads and the scalar snapshot rewrite are prepared separately. No whole compiler C, header or executable has been emitted;
-source acceptance is not runtime qualification.
+Frozen389 validates all57leased ranges and115Statefields;73strict controls pass
+on both checkers. Frozen390 borrows resumed snapshots; Frozen391 applies the
+argument-copy boundary at the remaining direct collectCall children slice.
+Its120.284s timeout includes one diagnostic and is not complete. Frozen392
+validates the registered Session at the partial-member constructor; its112.850s
+run reaches contractMethod's child-slice loop borrow.
+
+Frozen393 replaces RegionSnapshot's duplicated headers with a two-scalar
+lease/generation handle. Its existing lease owns State/solver metadata; one
+invocation-local view is constructed after successful solver restore. This
+removes400lines/15948bytes; the static Session proxy drops499→473 (SCC1→1), with
+no speed claim. All70controls pass on each checker across real schemas,
+57payloads, stale/invalid owners, actual release/solver deinit and20controlled
+failure prefixes. Full solver fault injection and ClosureRegion restore remain
+unqualified. Actual source proves restore errors mutate target state only and
+preserve the source owner; valid allocation/mint and restore-tail order stay
+unchanged. Invalid tokens intentionally reject before arena metadata, with the
+existing scratch cleanup but changed invalid-token allocation/mint prefix.
+The contract-method loop uses scalar count/reloaded IDs. Its110.028s run clears
+that boundary and reaches the equivalent aggregate child-slice borrow. Three
+same-protocol loops and the mutable ragged-header reference fix are next.
+No whole compiler C, header or executable has been emitted; source acceptance
+is not runtime qualification.
 
 A single 15-second post-error collection experiment returns only one diagnostic
 after110.572s. It is rejected; subsequent attempts restore three seconds within

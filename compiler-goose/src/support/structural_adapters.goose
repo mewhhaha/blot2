@@ -3799,6 +3799,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::RegionSn
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::RegionSnapshot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::RegionSnapshotLease)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::RegionSnapshotLease,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::RegionSnapshotView)->bool {return equalFields(left,right);}
+fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::RegionSnapshotView,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::RegionSource)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::RegionSource,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::RegionSourcesBuffer)->bool {return equalFields(left,right);}

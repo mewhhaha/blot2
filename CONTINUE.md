@@ -40,39 +40,20 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen392 is the current source checkpoint. PrincipalGraph publication keeps all
-25 fields and its original mint/copy/accounting order. The transferred snapshot
-uses its live/generation lease and exact checks on all 22 ranges; State is
-unchanged. All 37 strict controls pass on both checkers. Mutable reference-return
-tuples borrow the graph and three audited index/importer/bridge results; plain
-tuples were demonstrated wrong at runtime. PrincipalVisit publication validates
-its live table-owned graph after reserve. RetainOpen publishes only its changed
-accepted bool. The scheme-copy wrapper borrows context and frame directly:
-closed-callback source reviews preserve partial errors and prove frame-state
-saves happen after F, with no later cleanup observer. Context-only383 still
-failed; both borrows in384 clear that boundary. Its108.620s run reaches a borrowed
-constructor in schemeImport. Frozen385 removes the wrapper's unused region
-reference and formats that function without changing tokens. Its101.563s run
-pinpoints the returned SchemeFrame payload binding. Frozen386 reconstructs its
-owned name and five live map runs without extra copy/retain; nine controls pass
-on both checkers. Frozen388 snapshots active scheme keys through their owning
-byte pool and normalizes ignored inactive keys to empty. Transfer controls pass
-on both checkers. Attempt387 was cancelled after57.352s with no diagnostic, not
-a pass; no actual inactive-key UAF was established. Its102.504s run reaches
-summary-job RegionSnapshot publication. Exact validation/reconstruction of its
-existing57-range lease is explicit in Frozen389, preserving all115Statefields
-and solver ownership;73strict controls pass on both checkers. Frozen390 borrows
-the resumed snapshot for synchronous restore, removing its whole-value copyback.
-Its107.726s run clears that boundary and reaches the remaining direct child-ID
-collectCall alias. Reusing the tested argument-copy boundary is next. Scalar-only
-snapshot handles are the next implementation batch. Frozen391 applies the
-proven scratch copy at the last direct collectCall children slice. Its120.284s
-stage timeout includes one diagnostic and is not a completed check. Frozen392
-uses the existing exact registered Session getter in the partial-member context
-factory; its112.850s run clears that boundary and reaches a contract-method
-child-ID loop borrow. Scalar count/reloads and the reviewed scalar snapshot
-rewrite are prepared separately; neither is qualified by this checkpoint.
-No whole compiler or runtime pass follows from this source checkpoint.
+Frozen393 is the current source checkpoint. RegionSnapshot is now only a
+lease/generation handle; its existing lease owns State and solver metadata.
+Restore creates one invocation-local payload view after solver restore succeeds.
+The rewrite removes400lines/15948bytes and reduces the static Session type proxy
+499→473 (SCC1→1); neither is a completed speed result. All70focused controls pass
+on both checkers. Actual solver source-nonmutation/error prefixes are reviewed;
+the fixture's20failure leaves are controlled, not full solver fault injection.
+Malformed tokens now reject before arena metadata use with existing scratch
+cleanup; their invalid-token allocation/mint prefix intentionally changes.
+Valid-path allocation and ID order are preserved. contractMethod now iterates
+scalar child count/IDs without copying. Its110.028s run clears that loop and
+reaches aggregate's equivalent child-slice borrow. Three loop reloads and the
+confirmed mutable ragged-header reference fix are next.
+No compiler C/header/executable or executed-Wasm/Gdev result exists for the port.
 
 Current representation repairs use the existing Session→Generator Frame token
 with live generation, current-frame and exact registered Session/Generator/
