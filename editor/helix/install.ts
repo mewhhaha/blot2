@@ -2,6 +2,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { installBlotLanguage } from "./languages.ts";
 
+const highlightingOnly = Deno.args[0] === "--highlight-only";
+if (Deno.args.length > 1 || (Deno.args.length === 1 && !highlightingOnly)) {
+  throw new Error("Usage: install.ts [--highlight-only]");
+}
+
 const repository = fileURLToPath(new URL("../../", import.meta.url));
 const grammarDirectory = fileURLToPath(
   new URL("../tree-sitter-blot2/", import.meta.url),
@@ -35,12 +40,15 @@ try {
 } catch (error) {
   if (!(error instanceof Deno.errors.NotFound)) throw error;
 }
-const installedLanguages = installBlotLanguage(existingLanguages, {
-  repository,
-  definition: await Deno.readTextFile(
-    new URL("./languages.toml", import.meta.url),
-  ),
-});
+let installedLanguages = existingLanguages;
+if (!highlightingOnly) {
+  installedLanguages = installBlotLanguage(existingLanguages, {
+    repository,
+    definition: await Deno.readTextFile(
+      new URL("./languages.toml", import.meta.url),
+    ),
+  });
+}
 
 // Build before touching installed files. A failed build leaves Helix unchanged.
 const build = await new Deno.Command("tree-sitter", {
@@ -70,34 +78,36 @@ for (const name of ["highlights.scm", "rainbows.scm"]) {
 }
 
 // These legacy queries refer to nodes the highlighting grammar does not have.
-for (
-  const name of [
-    "indents.scm",
-    "textobjects.scm",
-    "tags.scm",
-    "locals.scm",
-    "injections.scm",
-  ]
-) {
+if (!highlightingOnly) {
+  for (
+    const name of [
+      "indents.scm",
+      "textobjects.scm",
+      "tags.scm",
+      "locals.scm",
+      "injections.scm",
+    ]
+  ) {
+    replacements.push({
+      relativePath: join("runtime", "queries", "blot", name),
+      contents: undefined,
+    });
+  }
+  // Retire the separate runtime installed by the initial project-local setup.
+  for (
+    const relativePath of [
+      join("runtime", "grammars", `blot2.${extension}`),
+      join("runtime", "queries", "blot2", "highlights.scm"),
+      join("runtime", "queries", "blot2", "rainbows.scm"),
+    ]
+  ) {
+    replacements.push({ relativePath, contents: undefined });
+  }
   replacements.push({
-    relativePath: join("runtime", "queries", "blot", name),
-    contents: undefined,
+    relativePath: "languages.toml",
+    contents: new TextEncoder().encode(installedLanguages),
   });
 }
-// Retire the separate runtime installed by the initial project-local setup.
-for (
-  const relativePath of [
-    join("runtime", "grammars", `blot2.${extension}`),
-    join("runtime", "queries", "blot2", "highlights.scm"),
-    join("runtime", "queries", "blot2", "rainbows.scm"),
-  ]
-) {
-  replacements.push({ relativePath, contents: undefined });
-}
-replacements.push({
-  relativePath: "languages.toml",
-  contents: new TextEncoder().encode(installedLanguages),
-});
 
 const changes = [];
 for (const replacement of replacements) {
@@ -165,13 +175,17 @@ const health = await new Deno.Command("hx", {
 }).output();
 const report = new TextDecoder().decode(health.stdout);
 const required = [
-  "Configured language servers:",
-  "deno",
-  "Configured formatter: None",
   "Tree-sitter parser: ✓",
   "Highlight queries: ✓",
   "Rainbow queries: ✓",
 ];
+if (!highlightingOnly) {
+  required.push(
+    "Configured language servers:",
+    "deno",
+    "Configured formatter: None",
+  );
+}
 if (!health.success || required.some((line) => !report.includes(line))) {
   throw new Error(
     `Helix did not load the installed Blot configuration:\n${report}${
@@ -180,6 +194,10 @@ if (!health.success || required.some((line) => !report.includes(line))) {
   );
 }
 console.log(report.trimEnd());
-console.log(
-  "Restart Helix to use Blot completion. In insert mode, Ctrl-x requests suggestions.",
-);
+if (highlightingOnly) {
+  console.log("Restart Helix to load the updated Blot highlighting.");
+} else {
+  console.log(
+    "Restart Helix to use Blot completion. In insert mode, Ctrl-x requests suggestions.",
+  );
+}

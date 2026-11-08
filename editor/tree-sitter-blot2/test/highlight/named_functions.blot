@@ -1,0 +1,48 @@
+entry func add (left: U32) -> (right: U32): U32 => return left
+// <- keyword.storage.modifier
+//    ^^^^ keyword.function
+//         ^^^ function
+//              ^^^^ variable.parameter
+//                         ^^ operator
+//                             ^^^^^ variable.parameter
+
+private func Vec2.add (left: Vec2) -> (right: Vec2): Vec2 => return left
+// <- keyword.storage.modifier
+//      ^^^^ keyword.function
+//           ^^^^ type
+//                ^^^ function
+//                    ^^^^ variable.parameter
+
+func identity (value: a): a where { type_rep a } => return value
+// <- keyword.function
+//   ^^^^^^^^ function
+//             ^^^^^ variable.parameter
+//                    ^ !variable.parameter
+//                          ^^^^^ keyword.control
+
+let closure = func (value: a) => return value
+//            ^^^^ keyword.function
+//                  ^^^^^ variable.parameter
+//                         ^ !variable.parameter
+
+entry
+// <- variable
+// <- !keyword.storage.modifier
+func following value => return value
+// <- keyword.function
+//   ^^^^^^^^^ function
+
+private
+// <- variable
+// <- !keyword.storage.modifier
+func separate value => return value
+// <- keyword.function
+//   ^^^^^^^^ function
+
+"entry func hidden (value: U32) => return value"
+// ^ string
+// ^ !keyword.storage.modifier
+
+// func hidden value => return value
+// ^ comment
+// ^ !keyword.function

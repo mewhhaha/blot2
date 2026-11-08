@@ -333,6 +333,10 @@ Task 050 updates the existing managed block through
 [helix_languages.ts](../../editor/helix/languages.ts), preserving unrelated user
 configuration and the current Tree-sitter grammar/highlights/rainbows:
 
+For an existing installation, `deno task helix:highlight` refreshes only the
+parser and highlighting queries, preserving language-server and formatter
+settings. Restart Helix afterward to load the new parser.
+
 ```toml
 [language-server.blot]
 command = "deno"

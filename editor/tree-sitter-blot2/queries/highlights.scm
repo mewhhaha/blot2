@@ -1,4 +1,3 @@
-"func" @keyword.function
 ["import" "from" "as"] @keyword.control.import
 (export_declaration "export" @keyword.control.import)
 ["data" "type" "is" "effect" "const" "let" "use"] @keyword.storage.type
@@ -8,6 +7,11 @@
 (entry_binding (binding_keyword) @keyword.storage.type)
 (private_modifier) @variable
 (opaque_modifier) @variable
+((named_function_header
+    (private_modifier)? @keyword.storage.modifier
+    (entry_modifier)? @keyword.storage.modifier) @_named_function
+  (#match? @_named_function "^(private[ \t]+)?(entry[ \t]+)?func"))
+"func" @keyword.function
 ((private_binding (private_modifier) @keyword.storage.modifier) @_private
   (#match? @_private "^private[ \t]+(entry[ \t]+)?(const|let)"))
 ((private_effect_header (private_modifier) @keyword.storage.modifier) @_private_effect
@@ -42,6 +46,7 @@
 (float) @constant.numeric.float
 (operator) @operator
 "=>" @operator
+"->" @operator
 (separator) @punctuation.delimiter
 (comment) @comment
 "." @punctuation.delimiter
@@ -49,10 +54,8 @@
 
 (function_binding name: (identifier) @function)
 (named_function_header name: (identifier) @function)
-(named_function_header (private_modifier) @keyword.storage.modifier)
-(named_function_header (entry_modifier) @keyword.storage.modifier)
 (named_function_header parameter: (identifier) @variable.parameter)
-(named_function_header parameter: (parenthesized (identifier) @variable.parameter))
+(named_function_header parameter: (parenthesized . (identifier) @variable.parameter))
 (qualified_function_name name: (identifier) @function)
 (qualified_function_name owner: (identifier) @namespace)
 (infix_function "`" @operator)
@@ -61,7 +64,7 @@
 (lambda_header parameter: (identifier) @variable.parameter)
 (request_complete_header parameter: (identifier) @variable.parameter)
 (completion_constructor_pattern (identifier) @variable.parameter)
-(lambda_header parameter: (parenthesized (identifier) @variable.parameter))
+(lambda_header parameter: (parenthesized . (identifier) @variable.parameter))
 (record_field name: (identifier) @variable.other.member)
 (type_parameter_field name: (identifier) @variable.other.member)
 (member name: (_) @variable.other.member)
