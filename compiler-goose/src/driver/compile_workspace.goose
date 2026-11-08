@@ -44,6 +44,19 @@ fn canonicalGenerator(source:Generator&)->Generator& {
  assert(source .== owned && registered .== owned && registered_workspace .== workspace && workspace.generator .== owned);
  return owned;
 }
+// Session backpointers borrow the existing active frame; they never retain it.
+fn generatorForSession(frame:Frame,session:blot_eval_core_eval::Session&)->Generator& {
+ assert(frame.valid()&&frame==active);let state:FrameState& =frames[frame.slot-1];
+ let registered .=state.generator;let registered_session .=state.session;assert(registered&&registered_session);
+ let generator:Generator& =canonicalGenerator(registered);
+ assert(registered_session .== session && generator.evaluator .== session);
+ return generator;
+}
+fn frameForGenerator(source:Generator&,session:blot_eval_core_eval::Session&)->Frame {
+ let generator:Generator& =canonicalGenerator(source);let state:FrameState& =frames[active.slot-1];
+ let registered_session .=state.session;assert(registered_session && registered_session .== session && generator.evaluator .== session);
+ return active;
+}
 fn borrow(self_:Frame)->Workspace? {if !self_.valid() {return null;}return frames[self_.slot-1].workspace;}
 fn retain(self_:Frame)->Frame,Error {if !self_.valid() {return Frame{..},blot_error::Error.invalid_artifact;}let state:FrameState& =frames[self_.slot-1];if state.references==0xffffffffffffffff {return Frame{..},blot_error::Error.dependency_limit;}state.references++;return self_,blot_error::Error.none;}
 fn create(allocation_owner:u64)->Frame,Error {

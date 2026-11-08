@@ -179,17 +179,17 @@ struct Plan {
 }
 reusable[] var plan_order: u32[>..] = [];
 fn deinit(self_: Plan&) { if self_.order.len != 0 { plan_order.free_slice(self_.order); } self_ = Plan {..}; }
-fn bind<G>(self_: QueryScratch&, plan: const Plan&, g: G&) -> Error {
+fn bind<G>(self_: QueryScratch&, plan: Plan, g: G&) -> Error {
     if !plan.gate || !plan.pools || self_.allocation_owner == 0 || self_.allocation_owner != g.evaluator.allocation_owner || !blot_reuse_catalog_storage::same(g.evaluator.units, requiredGate(plan.gate).units) { return blot_error::Error.declined; }
     if self_.owner != 0 { if self_.owner != self_.owner_id || self_.generator != g.owner_id || self_.session != g.evaluator.owner_id || self_.pools .!= plan.pools || self_.gate .!= plan.gate || !self_.policy.present || self_.policy.value != plan.row_policy { return blot_error::Error.declined; } }
     else { if self_.owner_id == 0 || g.owner_id == 0 || g.evaluator.owner_id == 0 { return blot_error::Error.declined; } self_.owner = self_.owner_id; self_.generator = g.owner_id; self_.session = g.evaluator.owner_id; self_.pools .= plan.pools; self_.gate .= plan.gate; self_.policy = blot_support::some(plan.row_policy); }
     return blot_error::Error.none;
 }
 fn grow<B,T>(self_: QueryScratch&, buffer: B&, length: i64, initial: T) -> Error { let before = buffer.items.len; let error = buffer.resize(length, initial); if error != blot_error::Error.none { return error; } if length > before { self_.stats.initialized_slots += length - before; } return blot_error::Error.none; }
-fn begin<G>(self_: QueryScratch&, plan: const Plan&, g: G&) -> u32[:], Error {
+fn begin<G>(self_: QueryScratch&, plan: Plan, g: G&) -> u32[:], Error {
     let bound = self_.bind(plan, g); if bound != blot_error::Error.none { return default<u32[:]>(), bound; }
     for id in self_.anchor_ids.items { self_.anchors.items[id] = 0; } self_.stats.anchor_resets += self_.anchor_ids.items.len; self_.anchor_ids.clear();
-    let error = self_.grow(self_.anchors, requiredPools(plan.pools).evaluator.values.len, 0 as u32); if error != blot_error::Error.none { return default<u32[:]>(), error; } return self_.anchors.items, blot_error::Error.none;
+    let error = self_.grow(self_.anchors, requiredPools(plan.pools).evaluator.values.len, 0 as u32); if error != blot_error::Error.none { return default<u32[:]>(), error; } if self_.anchors.items.len==0 { return default<u32[:]>(),blot_error::Error.none; } let storage=scratch_wordbuffer.realloc_slice(self_.anchors.storage,self_.anchors.storage.len); return storage[..self_.anchors.items.len], blot_error::Error.none;
 }
 fn finishMatch(self_: QueryScratch&, order: const u32[:]) { for id in order { self_.positions.items[id] = 0x7fffffffffffffff; self_.candidate.items[id] = 0; } for id in self_.inverse_ids.items { self_.inverse.items[id] = 0; } self_.stats.inverse_positions += self_.inverse_ids.items.len; self_.inverse_ids.clear(); }
 fn finishChildren(self_: QueryScratch&, order: const u32[:]) { for id in self_.child_ids.items { self_.children.items[id] = 0xffffffff; } self_.stats.child_positions += self_.child_ids.items.len; self_.child_ids.clear(); for id in order { self_.append_children.items[id] = false; } }

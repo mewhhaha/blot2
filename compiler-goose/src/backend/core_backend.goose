@@ -1867,20 +1867,20 @@ fn prepareReuse(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Erro
             let error = blot_reuse_principal_evidence_reuse::initInto(workspace.principal_state,principal_previous,run.units,run.options.identity,run.stamps,workspace.allocation_owner,admission); if error != blot_error::Error.none { return error; }
             run.principal_state .= workspace.principal_state; generator.principal_state .= workspace.principal_state;
         }
-        generator.evaluator.generator .= generator; generator.evaluator.principal_provider_enabled = true; generator.evaluator.principal_graph_provider_enabled = true;
+        generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.principal_provider_enabled = true; generator.evaluator.principal_graph_provider_enabled = true;
     }
     generator.evaluator.retain_specialization_receipts = run.recording; generator.evaluator.retain_constant_receipts = run.recording && run.options.constant_receipts;
     if query_previous != null && query_previous.metadata.pools.present {
         var admission = blot_support::none<blot_reuse_principal_reuse_gate::Gate>(); if run.principal_state != null { admission = blot_reuse_shared_query_gate::share(workspace.allocation_owner,query_previous.metadata.pools.value,run.units,run.principal_state.gate); }
         let shared = admission.present; let error = blot_eval_completed_specialization_query::initInto(workspace.query_state,query_previous,run.units,run.options.identity,run.stamps,workspace.allocation_owner,admission); if error != blot_error::Error.none { return error; }
         run.query_state .= workspace.query_state; if shared { workspace.query_state.stats.shared_gates = 1; workspace.query_state.stats.shared_gate_bytes = blot_reuse_shared_query_gate::validationBytes(workspace.query_state.gate); } else { workspace.query_state.stats.gate_fresh = 1; }
-        workspace.query_state.parallel_enabled = run.options.io; workspace.query_state.semantic_workers = run.options.policy.semantic_workers; generator.query_state .= workspace.query_state; generator.evaluator.generator .= generator; generator.evaluator.specialization_provider_enabled = true;
+        workspace.query_state.parallel_enabled = run.options.io; workspace.query_state.semantic_workers = run.options.policy.semantic_workers; generator.query_state .= workspace.query_state; generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.specialization_provider_enabled = true;
     }
     if run.options.constant_receipts && !skip_constant_replay && run.query_state != null {
         let pools .= run.query_state.old.metadata.pools.value;
         if blot_reuse_constant_receipt::hasProductiveRecord(pools.constant_records,generator.evaluator.minimum_constant_steps) {
             let error = blot_reuse_constant_receipt_reuse::initInto(workspace.constant_state,pools,run.units,run.options.identity,run.stamps,workspace.allocation_owner,run.query_state.gate); if error != blot_error::Error.none { return error; }
-            run.constant_state .= workspace.constant_state; generator.constant_state .= workspace.constant_state; generator.evaluator.generator .= generator; generator.evaluator.constant_provider_enabled = true;
+            run.constant_state .= workspace.constant_state; generator.constant_state .= workspace.constant_state; generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.constant_provider_enabled = true;
         }
     }
     return blot_error::Error.none;

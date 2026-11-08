@@ -40,25 +40,26 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Source repairs now cover PrincipalVisit capacity initialization, canonical
-Session/Generator publication, summary-job compaction and the concrete recursive
-summary callback cycle. Frozen320 narrows all four pairedImporter success results after their existing
-error guards. On the same442 source inputs, export-first319 reaches a new source
-diagnostic in114.133s; preceding318 times out at120.303s with no diagnostic.
-Generated identity changes with the checker fingerprint. This is frontier
-progress, not a completed compiler speed result. Actual320 reaches source_value_template.visit after115.636s and stops on a
-retained reference rooted at plan.
-No program C/header/executable exists. The optional-global index showed no gain
-beyond controls and remains unselected. A separate source-only Session/Generator
-frame-token experiment is being prepared; its static graph proxy is not a speed
-result. Whole parsing passes 440 files. No whole-program C,
-header, executable, Wasm comparison or Gdev result exists yet. Caps remain
-120/300s with a 3s first-error collection window. Focused controls qualify only
-their named source/carriers; source checkpoints remain unverified whole-compiler
-work. Complete hash/JSON namespace adapters and the journal retain their focused
-qualification. No completed compiler speed or whole-runtime parity is established.
-The prior nominal-identity/reachability
-measurements qualify their own separate frozen conditions.
+Frozen322 replaces Session's Generator backpointer with the existing scalar
+Frame token. Lookup retains live generation, current-frame, registry bounds and
+exact Session/Generator/Workspace identity checks. Three source files change;
+normal writers leave all generated adapters unchanged. Fourteen reduced Frame
+controls pass, and independent inversion preserves the surrounding source.
+The static declaration graph falls 939→506; this is not an instantiated-type or
+time measurement. Six readonly Plan parameters also pass the small view by value
+through the actual forwarding chain; local-reference escapes still reject.
+
+Actual321 reaches a new active-seed-borrow diagnostic after 74.174s, compared with
+320's 115.636s at the preceding Plan binding error. Frozen322 returns the same
+live anchor prefix through its named pool; concrete clone-path analysis excludes
+anchor invalidation. Its74.494s run reaches another readonly Plan forwarding
+path, which still needs the small view by value. Source and frontier differ,
+so this is shorter repair iteration, not a paired full-compile speed result.
+Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
+comparison or Gdev result exists for the port. Caps remain 120/300s with a 3s
+first-error window. The optional-global index showed no gain beyond controls and
+remains unselected; a query-specific array-cache gate passed correctness but regressed
+its measured stresses and remains unselected. Preserve the exact source/carrier limits in the linked evidence.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
 Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.

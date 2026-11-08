@@ -39,328 +39,49 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Checkpoint `0e84f55bea07a49cf3fb74957923779ff717ada7` preserves the first
-frame, recursive-scratch, constructor and slice-selection repairs. Later repairs
-make field spelling optional consistently, use payload-enum predicates, retain
-catalog references instead of copying Modules, and capture a compile-time callback
-through a nested generic function. All 38 native array appends in four affected
-files now use element `push` or slice `append`; numeric counters remain unchanged.
-Borrowed report/header lookups use reference iteration. Whole parsing passes 439
-files in about one second. No successful whole type check, C program, link, CLI
-execution, Wasm comparison or Gdev run exists for the Goose compiler.
+Frozen322 is the current source checkpoint. Selected private checker
+`678b88bd…` checks exported roots before nonexports, retaining final export
+validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
+27 focused controls retain acceptance and error multisets (one ordering change).
+Two emitted-C/header host executions pass. The tracked builder reconstructs all
+108 source files byte-exactly, without offsets or fuzz. Installed tools, upstream
+checkout, siblings and the pinned Zig oracle remain unchanged.
 
-The selected checker improves an earlier frozen185 failing prefix; it does not
-establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 320 inputs and selects private
-checker678b88 explicitly. Its preceding one-condition ContentsReadBack correction
-recognizes the existing global-only null-root bound without changing alternatives
-or exactness. Stock b27 and 869 false positives reproduce in four functions.
-Ten valid cases execute; 26 strict mutation/escape/shrink/identity negatives reject.
-The added performance change skips diagnostic text only when no-match diagnostics
-cannot be consumed, retaining matcher work and candidate ordering. Against 4e93,
-201 frontend/8 runtime/20 focused outcomes match, as do 15 emitted-C comparisons.
-Five paired same-CPU synthetic checks improve 24–32% at 512–2048 overloads;
-direct controls are within 2%. These do not establish a whole-port improvement.
-The tracked patch reconstructs all 108 source files with zero fuzz/offset. No
-upstream, installed or default tool is modified.
+The Session→Generator data edge now uses the existing scalar Frame token. Getter
+and installer retain generation/live/current-frame checks and exact registered
+Session, Generator and Workspace identities. No new ownership, allocation, retain
+or ID mint is introduced. Three authored source files change; normal structural
+and JSON writers preserve every generated adapter. Fourteen projected registry
+controls pass, including copied/stale/wrong-owner failures and original guard
+order. Independent source inversion passes. The declaration-graph proxy falls
+939→506 (Session SCC 2→1); this is not an instantiated-type or speed result.
 
-Source 302–312 repairs nondefaultable PrincipalVisit capacity slots, optional
-field loads, Session diagnostic publication, fieldType's actual tuple API,
-recursive region worklist attachment and summary-job compaction. Canonical
-Generator boundaries retain exact registry/slot/pointer checks. Ten annotations
-follow the concrete summary callback cycle; seven nonrecursive constructors or
-setters preserve original defaults, values and evaluation order. Independent
-inversion reviews and focused controls retain their exact limits in the receipt.
-The post-solve principal-record tail now uses a nonrecursive boundary; separate
-per-owner bindings preserve input priority without mixing roots. Seventeen reduced
-precedence/null/artifact cases match on both checkers; two omission mutations trap.
-Six further nullable-field accesses retain original guard order through locals.
-Fourteen declarations follow two concrete retained/principal query callback cycles;
-eight constructor/setter helpers preserve defaults, types and assignment order.
-Three callback Session bindings now use the exact existing canonical registry
-lookup before saving references; previous restoration order is unchanged. Both
-principalEvidence and raggedBlock now consume their actual Option+Error API. A
-nine-field ConstantRun factory preserves Frame by value and explicit defaults.
-The actual 317 boundary was pairedImporter, not init: a missing .= copied a Pools
-header, then identity.view retained through that local copy. Frozen318 preserves
-the original header borrow and adds the concrete constant-recorder callback cycle.
-Actual318 times out at the120s emitter cap (120.303s total) with0captured errors
-and no C/header/executable; no whole-check or preceding-frontier pass is claimed. A semantic-worker-only entry hit its
-20s cap with no diagnostic/C, establishing no faster loop. Four sparse samples
-of real instrumented316 locate root/store replay and specialization traversal;
-they do not establish time percentages. The optional-global index passes
-201frontend/8runtime/8focused checks but1.4–2.4% synthetic gains match2–2.5%
-zero-global controls; it remains unselected. Export-first standalone checking is
-now explicitly selected after201frontend/8runtime/27focused controls plus two
-C-host executions; one focused diagnostic-order change retains the same errors.
-All original final export validation and fixups remain. On the same442 source
-inputs, actual319 reaches a new nullable-importer diagnostic in114.133s versus
-318's120.303s timeout without diagnostics. Generatedidentity differs by toolchain
-fingerprint. Frozen320 narrows all four success locals after their original error
-guards; its actual check reaches source_value_template.visit after115.636s and
-stops on reference retention through plan. No completed compiler speed or whole-runtime
-result is established. The tracked recipe reconstructs all108 checker files
-byte-exactly. A separate scalar-frame Session/Generator edge cut is source-only;
-its939→505 declaration proxy is not instantiated-type or time evidence. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
-remain 120/300s with a 3s first-error window. Earlier dispatch and scalar-helper
-experiments failed and were removed after the private correctness fix; original
-code_expectation children source is restored. Whole compiler/runtime parity is
-still pending.
-Complete hash/JSON adapters now dispatch by receiver's nominal namespace: global
-hash/write sets shrink 3,005/3,325→1/2 while equality stays unchanged. Independent
-inversion preserves all 2,921 generated hash/3,304 JSON heads, 50 custom hashes and 5
-custom JSON projections. Actual-schema current 869 gates preserve 11,365 hash bytes,
-all diagnostic wire tags and ref/alias/snapshot/evaluation behavior. One concrete
-byte-slice public facade retains empty-literal behavior. Equality sharding was
-rejected because its generic bridges changed existing slice/array inference.
-Source generators emit the new hooks; generated output was not manually patched.
-The isolated 299 run hit the prior local-Node error at 96.937s; baseline 298 timed out
-120s without diagnostics. Different failing/incomplete prefixes establish no
-completed compiler speedup or runtime parity.
-The independently reviewed 35 recursion annotations use three concrete callback
-bindings; a broader merged-callback graph was rejected. Six scheme constructor
-factories pass ten controls on official/8335 and five on currently selected869.
-A further 22 reference-bearing sites use 14 pure functions. Independent root
-review reconstructs frozen 286 byte-for-byte after reversing only these changes,
-checks actual field types/order, and confirms one owner-ID mint as the first
-argument. Reduced executed default-order controls show original 12, naive 21 and
-corrected 12: leaving the side-effecting default inside a helper was rejected.
-Seven further annotations follow the concrete importPrincipalRead/withCopy
-callback binding, and three pure factories preserve Store by value. Read-only
-graph worklist publication validates the same pool slot, pointer and live lease
-as the existing mutable getter. Seven focused controls cover its reduced
-carrier and unchanged pooled_buffer; the reduced all-global old variant also
-compiles, so actual288 remains the original failure witness. No stale-generation
-validation after slot reuse is claimed. The unsigned work-counter fix preserves
-Zig saturation with eight boundary controls. Full recursive callback/Session/solver
-runtime parity remains pending.
-Constraint publication now reconstructs all 31 fields and validates the existing
-owned name run at its unchanged length; 12 focused controls preserve nondefault
-payloads, text identity and cleanup. The empty-header-only 290 variant failed the
-same real boundary and was removed. Two rowInto view selections use a typed
-nonrecursive helper, preserving original layout/semantic construction order and
-all surrounding checks/counters. Three focused controls include the original
-7.8 failure and strict local escape. A separate snapshot-name transfer fixture
-finds/verifies one later copy repair; that source change is after frozen 292.
-The 64-root Session refresh times out at 120s with no diagnostics, not a method pass.
-Frozen 295 also includes the specialized type-argument journal. Two ordinary local
-owners and an Owner-bound publisher replace five stored reusable-pool references,
-snapshot allocation and the environment cache map. Source and exact-candidate
-controls match 1,503 operations twice against the adapted original algorithm,
-including current 869. Eleven semantic mutations and strict publisher/lifetime
-controls reject. Global owner-ID miss mint ordering is retained. Measured trace
-non-common payload is 15,340 vs 55,321B; shared published data, runtime pages,
-freelists and owner headers are excluded. OldStack 185B is an adapted fixed-header
-oracle descriptor, not the original physical Stack. Full memory/speed/output
-qualification remains pending. Generated adapters are regenerated from inputs.
-Fifty-six concrete mutable-slice fields now use exact declared typedempty defaults.
-The existing activeFrame registry getter validates generation/live/slots/exact
-source and Workspace pointers, returning the same Generator pool slot. 16 focused
-controls use projected records; actual 295 clears the former importer retention
-boundary. No new registry, allocation, copy or retain is added by that getter.
-Earlier ClosureRegion local ownership, exact mask recovery, backend nullable
-access, lexical dictionary dispatch and DFS cursor repairs remain. Focused
-controls retain their exact source/carrier limits. Diagnostic root probes with
-dummy constructors and timeout caps are not method qualification. Stack pool
-provider exploration is read-only; no production stack representation changes.
-Private checker bounds remain 1M/100k with 201 frontend/8 runtime controls.
+Six readonly Plan parameters pass the small borrowed view by value through
+bind/begin and demand/ready forwarding. A bind-only change failed a tiny chained
+control and was rejected before a whole build. Both direct/chained positive
+controls execute and local-reference escapes reject on stock and selected Goose.
+Actual321 reaches a new active-seed-borrow error in constant_receipt_reuse after
+74.174s. Preceding320 took 115.636s at Plan binding; source/frontier differ, so no
+paired full-build speed claim follows. No program C/header/executable exists.
 
-The scoped implementation-evidence owner now initializes, invokes and cleans up
-through one callback boundary. Actual core/snapshot admission methods use explicit
-buffer items, stable Host locals and recursive annotations. Focused laws execute
-all twelve owner buffers and both maps, release/reuse/failure paths and admission
-budget/error conversion; resolver/projection/import leaves remain controlled.
-Collection operations retain their native four-byte enum ordinal hash. Asset text
-cleanup stores scalar ranges at allocation, and Candidate stores its exact slot
-index; cleanup validates its canonical reference before freeing. Type-safe null
-slices replace temporary defaults, retaining allocation and cleanup order.
-Specialization initialization preserves five borrowed tables, admits a shared or
-fresh stamped gate, leaves the target unchanged on failure and uses an empty
-scratch policy. Both native fixtures execute on official and selected checkers.
-225 was cancelled after22.5s when its concurrent focused fixture caught the
-scratch-policy initializer omission;226 includes that repair. Source-only checkpoint
-and focused controls do not establish whole-program qualification.
+Frozen322 keeps seed address/length/content through the named full-storage pool
+receipt and original prefix. Range checks alone are not liveness authority; the
+concrete clone/import semantic path cannot invalidate these anchors. Actual
+WordBuffer controls cover capacity/prefix/reuse/empty/address and reject foreign
+and stack ranges. Its74.494s run clears the seed boundary and reaches another
+readonly Plan forwarding chain; extending the same small by-value view is next. The optional-global index passes correctness controls but its
+synthetic gains match zero-global noise; it is unselected. Cross-event root memo
+was rejected because store replay mutates provenance. A semantic-only entry
+hit its 20s cap without a diagnostic/C and established no speed gain. A narrower
+array-reachability cache gate passes correctness checks but regresses measured
+stresses4.2–4.5% versus controls within0.4%; it remains unselected.
 
-Frozen227 also contains46 mechanically typed empty-slice returns and23 direct
-pool frees. Identical pointer/length runs can be freed without first recovering
-an index from a borrowed reference; official and selected native probes execute
-that API. Asset TextRun sidecars were therefore removed in favor of the original
-slice registry. Build227 collects282 diagnostics across51 files after56.43s
-(15s after the first error), revealing broad generated identity/enum-codec,
-archive/reuse and frontend/driver API repair groups. Whole program C is absent.
-Later actual resolve tests expose/fix copied Host state through reference binding;
-these and final asset laws qualify their exact recorded working-tree hashes.
-They do not retroactively qualify frozen227 or the full compiler.
-
-Frozen228 contains the broad serialization/API fixes and eight mandatory query
-adapter contracts. Canonical receipts validate each owned run against its named
-pool at unchanged length. They retain pointers, allocation/copy order, scalar
-metadata and cleanup. The actual Portable/Optimizer adapters execute40-record
-16->32->64 table growth, and all eight concrete schema mappings pass focused
-checks. Stack-backed and wrong-pool payloads abort at receipt validation before
-publication, as the Goose runtime pool contract requires; no escape rule changes.
-InputPin stores two scalar range words into its original pool instead of a slice
-header, with identical layout/allocation count and tested failure cleanup.
-Build228 stops after17.66s with nine captured diagnostics across eight files;
-its15s collection window is bounded and is not a complete remaining-error list.
-Later worker/archive/hash/cleanup fixes and request-reader API repairs are active.
-Latest diagnostic/cache-offer component laws qualify their recorded source hashes,
-including working-tree edits after228; whole compiler qualification remains pending.
-
-Frozen230 includes a return-value JSON reader with six explicit record heads,
-retaining readonly slices and avoiding writes through readonly-header references.
-Forty-five input cases, three reuse rounds and24 injected registration failures
-return every byte/record/link pool to zero on both binaries. A high-water native
-frame buffer grows only as needed; each Frame exposes its exact packet prefix.
-Split I/O, EOF/error, shorter-frame reuse and writer controls pass without packet
-copies. Proof terms clear at their actual local native-array owners before Store
-index/identity teardown; reusable-pool and live-slice shrink negatives reject.
-The tempting by-value aggregate clear helper passed positive but failed strict
-negatives, and was rejected. Build230 stops after17.77s with19 diagnostics across
-14 files in its15s collection window; protocol/schema and publication fixes continue.
-
-ScopeKey and three principal-interface enum hash hooks now match native golden
-streams. Decoder allocations dispatch by the actual owner type at121 generated
-sites, with idempotent generator repair support. Checkpoint nullable cells use
-single-field nominal slots, preserving live-cell references and mutation order.
-Typed empty asset and restart-path defaults avoid references into temporaries.
-Diagnostic JSON methods return sticky writer errors; explanation publication
-snapshots candidate/step text before releasing Builder originals. Focused native
-execution covers publication lifetimes, aliases, bounds, failure cleanup and pool
-reuse. The bounded extra text copy is measured separately from compiler timing.
-Eight remaining confirmed native element appends use push; slice and custom-buffer
-append APIs retain their behavior. Whole-program qualification remains pending.
-
-Given-equation normalization uses lexical memo-hit scopes and fixed pooled scratch
-instead of native dynamic locals across its recursive cycle.123 executed controls
-per checker cover normalization, rank/ties, rows/effects, memo/depth/fuel/error
-order and six scratch failures; active runs return to zero. Body audit reconstructs
-the original algorithms modulo storage/cleanup. TypeStore semantics are controlled
-leaves. Declaration projection work now has a checked nonnullable borrow, retaining
-the original assertion and fuel behavior across calls;27 controls and old-bug/local
-escape negatives pass both checkers.
-
-The global-filter checker improves frozen220 first-error medians99.138 ->42.461s
-(57.17%) over two rotated matched pairs; sampled VmHWM is essentially unchanged.
-Both reviews,14 AST laws,256 ordered comparisons,201 frontend and eight runtime
-parity controls pass. These are not completed compiler timings. The
-[accepted receipt](../../benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json)
-pins the candidate and incremental source patch. The tracked builder recipe now
-reconstructs all 108 candidate source files byte-for-byte with zero fuzz or offset;
-no rebuild was needed to verify adoption. Installed Goose and Zig are unchanged.
-
-
-Generic implementation admission selects first matching contracts by scalar
-index into its actual immutable owner, supporting both core.Module and Interface
-without nominal record conversions. ScopeImport/ScopeAnchor carry that index;
-four append-only local arrays use grow-only storage so their scoped views are
-legal. Forty-two template cases,126 actual scope-anchor calls, bounds and
-copy-failure controls pass on both checkers; Copier equality/type-copy leaves
-are controlled, and full scope/declaration algorithms are not runtime-qualified.
-WordMap is a nominal record with exactly the old count/slots layout. This fixes
-method lookup in all five Copier maps and external callers; wrappers, pools and
-counters are unchanged. Growth/update/physical restore/clear/lease reuse laws
-pass both checkers; restoring only the alias reproduces the original failure.
-
-A separate source audit covers81 single-element native-array append-to-push
-repairs. Five custom IdBuffer substitutions were identified and reverted before
-frozen220. Receiver/RHS declarations and source hashes are pinned; the broad
-batch remains source-audited rather than a completed checker/runtime result.
-
-
-The entire staging capture checker checks alongside the actual capability engine
-in about 0.42 seconds. Twenty-three runtime capture/report/fuel/cleanup laws pass
-on official, baseline585 and selected46, including leased report reuse/deinit,
-cycle/contents rejection and exact budget7/budget6 boundaries. PhysicallyCaptures
-is a controlled false-returning leaf with its actual signature; its semantics
-are not qualified here. Mutable cleanup iteration, native scalar pushes and
-optional report narrowing are repaired. Restoring each old bug independently
-rejects on official and selected46.
-
-
-The complete capability expression fixture checks 770 specializations across
-37 files in about 0.37 seconds and executes nested success/error/fuel controls.
-It uses the full production capability functions, Scan/Tables/Environment and
-Module layout, actual report pool and real evidence/project/effect engine.
-Graph edges/bounds, contract proof, relocation, rank equality and cleanup/task
-admission remain controlled semantic leaves; this is not whole-runtime parity.
-One Scan and an invocation-local active-call table replace cloned scoped views
-and scalar publication. Newest-first lookup, per-entry fuel, stack marks and
-error cleanup are retained. Reports copy directly from Scan into the same 13
-pools in the original order; success preserves existing owner IDs and consumes
-no extra fresh-owner allocation. Source arrays can be cleared after copying.
-Tests cover pool reuse, stale leases and full cleanup. Task operand getters
-retain original subspan bounds at each original access, including malformed
-short spans with trailing data. The raw-offset prototype is superseded.
-
-
-Eight module-extra range accesses now carry scalar core.List receipts; seven
-loops load each Id before recursion. Validation stays once at the original point,
-with unchanged fuel/error ordering and separate record-field validation. Accessor
-narrowing alone still fails the alternating-root alias witness, so it is rejected.
-No list copy is added. Exit swap-removal uses a typed same-array helper at its
-original statement point, retaining removal order and exact Module references.
-
-
-Callable, Control and Exit construction/append use narrow nonrecursive helpers.
-Official and selected46 tests retain exact references while recursive activations
-alternate current/foreign modules; both reject local and recursive-local module
-escapes into ancestor tables. Operation construction and its eventual append
-remain at their original points around validation/projection. Operation equality
-uses scalar lookup indices, preserving last-match selection, per-item fuel and
-comparison order without constructing a default Module reference. Graph capture
-keeps its i64 index and direct module indexing; no narrowing is introduced.
-
-
-Projection scratch now owns binder snapshots addressed by scalar ranges. The
-rejected source-relative List spans read the wrong binder during cross-source
-resolver reentry: they return level0 where original semantics require level1.
-That countercontrol compiles and fails on official, baseline585 and selected46;
-the owned snapshots pass on all three. Final payload is 16 bytes per frame plus
-four bytes per copied binder and one additional snapshot allocation. Header
-reserve stays first; fuel and stack order are unchanged. Physical OOM remains
-unqualified; no whole-runtime memory or speed gain is claimed.
-
-The actual projection/interner fixture emits, links and runs in under 0.75 seconds
-per selected toolchain. It includes real effect evidence, cache and validators,
-with unused diagnostic fields omitted. Cases cover shifted/nested scopes,
-cross-source reentry, retained answer/label cache fuel, resolver behavior,
-malformed binders, cleanup, depth and abstract-type recursion. Binary, runtime,
-stdlib and source/extraction identities are pinned in the evidence. Recursive
-lifetime branch/match/callback scratch uses pooled fixed-size descriptors;
-36 actual-record SCC cases pass official and selected46, with zero active scratch
-runs after every return and exact frame restoration. Semantic leaves remain
-controlled. Old native recursive buffers still reject. Boolean binding and two
-fixed result-array initializations are repaired; their algorithm order is kept.
-
-
-All 67 affected nullable-reference getters now return through direct slot probes,
-removing temporary Map facades. The audited 66-site follow-on changes no lookup
-algorithm; pooled_map.get already delegates to the same slot function. Numeric
-proof storage/view construction uses narrow boundaries while retaining owner,
-limits, account and visits. Dictionary access follows native get/insert/contains
-and count. The take method borrows its destination holder; its append, source
-clear and result construction order are unchanged. Both checkers execute the
-actual clone/take/builder/term-intern records and methods in the focused fixture,
-with original ownership and indexing failures retained as negative controls.
-
-
-Finite implicit-binder normalization now calls a shared nonrecursive body,
-preserving binder order and the former normalization body exactly. Seventy
-isolated differential cases cover bounds, errors, fingerprints, IDs and cleanup,
-with lower storage controlled. Actual recursive validator walks pass with nested
-quantifiers, row traversal, exact fuel and seen writes. Typed mutable empty
-slices and a small frame setter preserve roots; negative local-frame escapes
-still reject. The follow-on fixture includes the entire real projection comparator and actual
-effect getters; shifted scopes, type/row recursion, unordered operations, depth
-and exact fuel pass on both checkers. Thirteen additional native-array appends in
-capability/numeric-proof clone and builder methods use push/append. All source
-law limitations remain explicit in the checkpoint evidence.
-
-
-The independent CLI/Wasm smoke runner is prepared under
-`build/goose-port/compiler-smoke/`. Its oracle-against-itself control passes;
-that is runner validation, not Goose compiler execution.
+The [preceding source checkpoint](https://github.com/mewhhaha/blot2/blob/2e946372541c5226443e540b9e9d04a840c81571/compiler-goose/port-notes/compilation.md)
+retains earlier repair narratives and their explicit limitations. They qualify
+those exact sources and reduced carriers, not later revisions. The linked
+qualification receipts preserve original requirements, rejected experiments,
+source/toolchain hashes and incomplete runs. Source writing remains separate
+from full compiler/runtime qualification.
 
 ## Qualified components and source repairs
 
