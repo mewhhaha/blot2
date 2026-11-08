@@ -7,11 +7,14 @@ whole compiler C/header/executable or end-to-end parity result exists. Keep
 `compiler/`, the pinned Zig oracle and existing siblings unchanged.
 
 Work in large source batches. Runtime, semantic, lowering and independent-proof
-production entry paths pass their partial checks. Lowering now uses grow-only
-append tables and the correct type/proof domains. Backend loop-target traversal
-uses fixed scratch descriptors and reloads immutable AST children by identity.
-The remaining checker path is advancing through inference/purity ownership
-boundaries; whole compilation remains pending.
+production entry paths pass their partial checks. Lowering uses grow-only append
+tables and the correct type/proof domains. The latest checker batch replaces
+retained name/recipe slices with stable IDs, restores owned environments through
+existing pool helpers, moves callback construction outside recursive inference,
+and repairs projection/importer span traversal and proof callback/type domains.
+Row reconstruction now keeps a variable List identity and accepts both obligation
+domains. The remaining checker frontier is proof predicate aliasing at
+`proveLegacyWithStore`/`proveLegacyState`; whole compilation remains pending. The Zig compiler and siblings are unchanged.
 
 Use `python3 compiler-goose/tools/check_engines.py` for five concrete production
 paths in parallel (`--engines check lower independent` narrows a batch).

@@ -23,17 +23,17 @@ recursive fn tyInner<I>(self_: I&,id: u32,depth: i64,arguments: Words&,goals: Go
  else if tag==blot_eval_type_evidence::Tag.erased_proof { let value,error=destination.proofKind(); if error!=blot_error::Error.none { return 0,error; } result=value; }
  else if tag==blot_eval_type_evidence::Tag.projection {
   let descriptor=self_.source.projection(id); if descriptor.scope>=self_.scope_count { return 0,blot_error::Error.type_mismatch; }
-  for arg in self_.source.children(id) { let value,err=ty(self_,arg,depth+1); if err!=blot_error::Error.none { return 0,err; } arguments.push(value); }
+  let arg_count=self_.source.children(id).len;for arg_index in 0..arg_count {let arg=self_.source.children(id)[arg_index]; let value,err=ty(self_,arg,depth+1); if err!=blot_error::Error.none { return 0,err; } arguments.push(value); }
   if arguments.failure!=blot_error::Error.none { return 0,arguments.failure; } let value,error=destination.projection(blot_check_types::NominalIdentity {n.a,n.b},descriptor.member,arguments.items); if error!=blot_error::Error.none { return 0,error; } result=value;
  } else if tag==blot_eval_type_evidence::Tag.bound {
   if n.c>=self_.scope_count { return 0,blot_error::Error.type_mismatch; } let frame=self_.frames[self_.scope_count-1-n.c]; if n.a>=frame.len { return 0,blot_error::Error.type_mismatch; }
   result=binderValues(self_)[frame.start+n.a]; if destination.node(result).b!=n.b { return 0,blot_error::Error.type_mismatch; }
  } else if tag==blot_eval_type_evidence::Tag.forall||tag==blot_eval_type_evidence::Tag.existential {
   if n.b==0||n.b>128||self_.scope_count==128 { return 0,blot_error::Error.type_limit; } let first=binderLength(self_);
-  for formal,ordinal in self_.source.children(id) { let leaf=self_.source.node(formal); if leaf.tag!=blot_eval_type_evidence::Tag.bound||leaf.a!=ordinal||leaf.b>2||leaf.c!=0 { return 0,blot_error::Error.type_mismatch; } let value,err=destination.boundType(ordinal as u32,leaf.b); if err!=blot_error::Error.none { return 0,err; } let pushed=pushBinder(self_,value); if pushed!=blot_error::Error.none { return 0,pushed; } }
+  let formal_count=self_.source.children(id).len;for ordinal in 0..formal_count {let formal=self_.source.children(id)[ordinal]; let leaf=self_.source.node(formal); if leaf.tag!=blot_eval_type_evidence::Tag.bound||leaf.a!=ordinal||leaf.b>2||leaf.c!=0 { return 0,blot_error::Error.type_mismatch; } let value,err=destination.boundType(ordinal as u32,leaf.b); if err!=blot_error::Error.none { return 0,err; } let pushed=pushBinder(self_,value); if pushed!=blot_error::Error.none { return 0,pushed; } }
   self_.frames[self_.scope_count]=Frame {first as u32,n.b}; self_.scope_count++;
 
-  for goal in self_.source.quantifierGoals(id) {
+  let goal_count=self_.source.quantifierGoals(id).len;for goal_index in 0..goal_count {let goal=self_.source.quantifierGoals(id)[goal_index];
    let err=destination.chargeProjection(); if err!=blot_error::Error.none { let __cleanup_result_142_0: u32 = 0; let __cleanup_result_142_1: Error = err; { self_.scope_count--; resizeBinders(self_,first); } return __cleanup_result_142_0, __cleanup_result_142_1; }
    var value=blot_check_types::Obligation {ty:0,kind:goal.kind,source:0,name:goal.name,operator:goal.operator,identity:goal.identity,explicit:goal.explicit};
    if goal.ty!=0 { let v,e1=ty(self_,goal.ty,depth+1); if e1!=blot_error::Error.none { let __cleanup_result_143_0: u32 = 0; let __cleanup_result_143_1: Error = e1; { self_.scope_count--; resizeBinders(self_,first); } return __cleanup_result_143_0, __cleanup_result_143_1; } value.ty=v; } if goal.other!=0 { let v,e2=ty(self_,goal.other,depth+1); if e2!=blot_error::Error.none { let __cleanup_result_144_0: u32 = 0; let __cleanup_result_144_1: Error = e2; { self_.scope_count--; resizeBinders(self_,first); } return __cleanup_result_144_0, __cleanup_result_144_1; } value.other=v; } if goal.result!=0 { let v,e3=ty(self_,goal.result,depth+1); if e3!=blot_error::Error.none { let __cleanup_result_145_0: u32 = 0; let __cleanup_result_145_1: Error = e3; { self_.scope_count--; resizeBinders(self_,first); } return __cleanup_result_145_0, __cleanup_result_145_1; } value.result=v; } if goal.signature!=0 { let v,e4=ty(self_,goal.signature,depth+1); if e4!=blot_error::Error.none { let __cleanup_result_146_0: u32 = 0; let __cleanup_result_146_1: Error = e4; { self_.scope_count--; resizeBinders(self_,first); } return __cleanup_result_146_0, __cleanup_result_146_1; } value.signature=v; } goals.push(value);
@@ -54,12 +54,12 @@ recursive fn tyInner<I>(self_: I&,id: u32,depth: i64,arguments: Words&,goals: Go
   let read,e1=ty(self_,n.a,depth+1); if e1!=blot_error::Error.none { return 0,e1; } let write,e2=ty(self_,n.b,depth+1); if e2!=blot_error::Error.none { return 0,e2; } let state,e3=ty(self_,n.c,depth+1); if e3!=blot_error::Error.none { return 0,e3; } let value,error=destination.stateProvider(read,write,state); if error!=blot_error::Error.none { return 0,error; } result=value;
  } else if tag==blot_eval_type_evidence::Tag.type_constructor { let value,error=destination.typeConstructor(blot_check_types::NominalIdentity {n.a,n.b}); if error!=blot_error::Error.none { return 0,error; } result=value; }
  else if tag==blot_eval_type_evidence::Tag.product||tag==blot_eval_type_evidence::Tag.nominal {
-   for child in self_.source.children(id) { let value,e=ty(self_,child,depth+1); if e!=blot_error::Error.none { return 0,e; } copied_children.push(value); }
+   let child_count=self_.source.children(id).len;for child_index in 0..child_count {let child=self_.source.children(id)[child_index]; let value,e=ty(self_,child,depth+1); if e!=blot_error::Error.none { return 0,e; } copied_children.push(value); }
   if copied_children.failure!=blot_error::Error.none { return 0,copied_children.failure; } if tag==blot_eval_type_evidence::Tag.nominal { let value,error=destination.nominal(blot_check_types::NominalIdentity {n.a,n.b},copied_children.items); if error!=blot_error::Error.none { return 0,error; } result=value; }
   else { let value,error=destination.product(copied_children.items); if error!=blot_error::Error.none { return 0,error; } result=value; }
  } else if tag==blot_eval_type_evidence::Tag.record {
-   let children=self_.source.children(id); var at=0;
-  while at<children.len { let value,e=ty(self_,children[at+1],depth+1); if e!=blot_error::Error.none { return 0,e; } field_values.push(blot_check_types::Field {children[at],value}); at+=2; } if field_values.failure!=blot_error::Error.none { return 0,field_values.failure; } let value,error=destination.record(field_values.items); if error!=blot_error::Error.none { return 0,error; } result=value;
+   let child_count=self_.source.children(id).len; var at=0;
+  while at<child_count {let child=self_.source.children(id)[at+1];let name=self_.source.children(id)[at];let value,e=ty(self_,child,depth+1); if e!=blot_error::Error.none { return 0,e; } field_values.push(blot_check_types::Field {name,value}); at+=2; } if field_values.failure!=blot_error::Error.none { return 0,field_values.failure; } let value,error=destination.record(field_values.items); if error!=blot_error::Error.none { return 0,error; } result=value;
  } else { return 0,blot_error::Error.type_mismatch; }
  if self_.scope_count==0 { self_.types.insert(id,result); } return result,blot_error::Error.none;
 }
@@ -68,9 +68,9 @@ recursive fn rowInner<I>(self_: I&,id: u32,depth: i64,labels: Words&,arguments: 
  let destination=target(self_);
  if id==0 { return 0,blot_error::Error.none; } if depth>=256 { return 0,blot_error::Error.type_limit; } if self_.scope_count==0 { let known=self_.rows.get(id); if known { return known,blot_error::Error.none; } }
  let e=destination.chargeProjection(); if e!=blot_error::Error.none { return 0,e; }
- for label in self_.source.effects.rowLabels(id) { blot_support_pooled_buffer::clear(arguments);
+ let label_count=self_.source.effects.rowLabels(id).len;for label_index in 0..label_count {let label=self_.source.effects.rowLabels(id)[label_index]; blot_support_pooled_buffer::clear(arguments);
   let err=destination.chargeProjection(); if err!=blot_error::Error.none { return 0,err; } let operation=self_.source.effects.operation(label);
-  for argument in self_.source.effects.operationArguments(label) { let value,error=ty(self_,argument,depth+1); if error!=blot_error::Error.none { return 0,error; } arguments.push(value); }
+  let argument_count=self_.source.effects.operationArguments(label).len;for argument_index in 0..argument_count {let argument=self_.source.effects.operationArguments(label)[argument_index]; let value,error=ty(self_,argument,depth+1); if error!=blot_error::Error.none { return 0,error; } arguments.push(value); }
   if arguments.failure!=blot_error::Error.none { return 0,arguments.failure; } let value,error=destination.internScopedOperation(operation.identity,operation.instance,arguments.items); if error!=blot_error::Error.none { return 0,error; } labels.push(value);
  }
  if labels.failure!=blot_error::Error.none { return 0,labels.failure; } var tail=blot_check_effects::Tail.closed; let formal=self_.source.effects.rows[id].formal;
@@ -102,4 +102,4 @@ fn pushBinder(self_: Importer&,value: u32) -> Error { self_.binders.push(value);
 fn pushBinder(self_: PooledImporter&,value: u32) -> Error { self_.binders.push(value); return self_.binders.failure; }
 fn resizeBinders(self_: Importer&,length: i64) { self_.binders.resize(length); }
 fn resizeBinders(self_: PooledImporter&,length: i64) { assert(length>=0&&length<=self_.binders.items.len); self_.binders.items=self_.binders.storage[..length]; }
-fn withImporter<C,F,R>(source: blot_eval_type_evidence::View,destination: blot_check_types::Store,context: C&) -> R,Error { var importer=initPooled(source,destination); let result,error=F(context,importer); importer.deinit(); return result,error; }
+recursive fn withImporter<C,R,F>(source: blot_eval_type_evidence::View,destination: blot_check_types::Store,context: C&) -> R,Error { var importer=initPooled(source,destination); let result,error=F(context,importer); importer.deinit(); return result,error; }

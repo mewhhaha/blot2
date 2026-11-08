@@ -301,7 +301,7 @@ fn mapRecord<M>(value:blot_check_check::RankImplementation,mapper:M&)->blot_chec
 return result,blot_error::Error.none;}
 fn source(value:blot_check_check::RankImplementation)->u32 {return value.node;}
 fn registeredField(value:blot_check_check::DictionarySelection,name:const u8[:])->bool {return name=="source" || name=="quantifier" || name=="goal" || name=="proof";}
-fn mapRecord<M>(value:blot_check_check::DictionarySelection,mapper:M&)->blot_check_check::DictionarySelection,Error {const for <N,A> in fields<blot_check_check::DictionarySelection> {if !registeredField(value,N) {return default<blot_check_check::DictionarySelection>(),blot_error::Error.dependency_limit;}}var result=value;
+recursive fn mapRecord<M>(value:blot_check_check::DictionarySelection,mapper:M&)->blot_check_check::DictionarySelection,Error {const for <N,A> in fields<blot_check_check::DictionarySelection> {if !registeredField(value,N) {return default<blot_check_check::DictionarySelection>(),blot_error::Error.dependency_limit;}}var result=value;
 {let mapped,error=mapper.map_node(value.source);if error!=blot_error::Error.none {return default<blot_check_check::DictionarySelection>(),error;}result.source=mapped;}
 {let mapped,error=mapper.map_ty(value.quantifier);if error!=blot_error::Error.none {return default<blot_check_check::DictionarySelection>(),error;}result.quantifier=mapped;}
 {let mapped,error=mapper.map_goal(value.goal);if error!=blot_error::Error.none {return default<blot_check_check::DictionarySelection>(),error;}result.goal=mapped;}

@@ -396,6 +396,376 @@
         ],
         "full_qualification": false
       }
+    },
+    {
+      "batch": "selected-batch-13",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 41.651,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1762,
+            "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8): the recursive call at /home/jacobt/src/blot2/compiler-goose/src/check/check.goose:1808 passes self_ rooted differently from the cycle's entry call"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-14",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 42.15,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2108,
+            "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8): the recursive call at /home/jacobt/src/blot2/compiler-goose/src/check/check.goose:1763 passes self_ rooted differently from the cycle's entry call"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-15",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 42.043,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1995,
+            "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8): the recursive call at /home/jacobt/src/blot2/compiler-goose/src/check/check.goose:1763 passes self_ rooted differently from the cycle's entry call"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-16",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 44.162,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2625,
+            "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8): the recursive call at /home/jacobt/src/blot2/compiler-goose/src/check/check.goose:1763 passes self_ rooted differently from the cycle's entry call"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-17",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 43.963,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2387,
+            "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8): the recursive call at /home/jacobt/src/blot2/compiler-goose/src/check/check.goose:1763 passes self_ rooted differently from the cycle's entry call"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-18",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 44.192,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2964,
+            "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8): the recursive call at /home/jacobt/src/blot2/compiler-goose/src/check/check.goose:1763 passes self_ rooted differently from the cycle's entry call"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-19",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 44.172,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 3038,
+            "message": "error: recursive call cycle through mapRecord, which is not declared `recursive fn` (\u00a77.8)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-20",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 44.563,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 3002,
+            "message": "error: .append takes an array or slice of blot_check_numeric_proof_bodies::Debit, got blot_check_numeric_proof_bodies::Debit"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-21",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 44.656,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1891,
+            "message": "error: .alloc_index exists on reusable pools only, not on the slice pools of reusable[] (\u00a75.4)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-22",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 44.557,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/closed_evidence_import.goose",
+            "line": 105,
+            "message": "error: unknown type: R"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-23",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 44.757,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/type_evidence.goose",
+            "line": 458,
+            "message": "error: cannot call projectDepth, which may shrink work: the for loop at /home/jacobt/src/blot2/compiler-goose/src/eval/type_evidence.goose:453 iterates source.rowLabels(row), which may refer into work (\u00a75.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-24",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 45.258,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1900,
+            "message": "error: no matching overload for call to blot_eval_implementation_rows::reconstruct"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-25",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 45.687,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/implementation_rows.goose",
+            "line": 76,
+            "message": "error: no matching overload for call to contextView"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-26",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 46.762,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/implementation_rows.goose",
+            "line": 23,
+            "message": "error: storing a reference into variables, which holds a grow-shrink array: such a reference lives in a variable, is passed down or returned, and is never stored (\u00a75.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-27",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 46.083,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1890,
+            "message": "error: call withPooledStoreValue stores a reference rooted at call into what its parameter context leads to, which may be the caller's storage behind self_, which call does not outlive (\u00a79.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-28",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 0.913,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/support/structural_adapters.goose",
+            "line": 2362,
+            "message": "error: unknown type: blot_check_check::LegacyCall"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/support/structural_adapters.goose",
+            "line": 2363,
+            "message": "error: unknown type: blot_check_check::LegacyCall"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/support/json_adapters.goose",
+            "line": 1313,
+            "message": "error: unknown type: blot_check_check::LegacyCall"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-29",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 46.376,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1890,
+            "message": "error: cannot call proveLegacyState: it may shrink predicate while predicate is still used, and predicate may refer into predicate (\u00a75.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-30",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 46.08,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1890,
+            "message": "error: cannot call proveLegacyState: it may shrink predicate while predicate is still used, and predicate may refer into predicate (\u00a75.2)"
+          }
+        ],
+        "full_qualification": false
+      }
     }
   ],
   "source_files": [
@@ -404,15 +774,24 @@
     "compiler-goose/src/backend/loop_targets.goose",
     "compiler-goose/src/check/capability_contracts.goose",
     "compiler-goose/src/check/check.goose",
+    "compiler-goose/src/check/check_factory.goose",
+    "compiler-goose/src/check/check_owners.goose",
     "compiler-goose/src/check/core.goose",
     "compiler-goose/src/check/core_builder.goose",
+    "compiler-goose/src/eval/closed_evidence_import.goose",
     "compiler-goose/src/eval/core_eval.goose",
+    "compiler-goose/src/eval/implementation_evidence.goose",
+    "compiler-goose/src/eval/implementation_rows.goose",
     "compiler-goose/src/eval/purity_type_key.goose",
+    "compiler-goose/src/eval/type_evidence.goose",
+    "compiler-goose/src/reuse/body_auxiliary.goose",
     "compiler-goose/src/reuse/independent_worker.goose",
     "compiler-goose/src/source_identity.goose",
+    "compiler-goose/src/support/json_adapters.goose",
+    "compiler-goose/src/support/structural_adapters.goose",
     "compiler-goose/tools/build_goose_checker.py"
   ],
-  "next": "checker recursive Engine root identity at resolveAlias/annotationBody; four production roots pass, whole ordinary compile pending",
+  "next": "Proof path aliasing at check.goose proveLegacyWithStore/proveLegacyState; repeated exact diagnostic held for bounded review, ordinary full build pending",
   "oracle": "native Zig compiler unchanged; ABI8/session2 preserved",
-  "source_batch": "Lowering API/domain family and typed scratch cleanup; fixed loop-target scratch; loop and component publication; purity recursive arguments and actual-context cleanup; nonrecursive replay-copier initialization"
+  "source_batch": "Stable symbol/callback IDs; exact borrowed contexts; owned proof/editor/diagnostic publication; explicit proof callback recursion; whole projection/matching/importer span family; generic row reconstruction accepts original Types/Core obligation domains; direct proof-store init/deinit removes LegacyCall and two unused callback wrappers; generated adapters rebuilt from sources"
 }

@@ -380,17 +380,17 @@ recursive fn projectNodeDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64
   let base=projectDepth(work,n.a,depth+1,budget,retained,memo,height); if work.failure!=blot_error::Error.none { return 0; } let id,err=internWithEffects(self_,Tag.usage,base,n.b,region,[]); return accept(work,id,err);
  }
  if tag==blot_check_types::Tag.forall||tag==blot_check_types::Tag.existential {
-  let source_binders=source.list(blot_check_types::List {n.b,n.c});
-  if tag==blot_check_types::Tag.forall { var complete=true; for binder in source_binders { var found=false; for mapping in mappingItems(work.mappings) { if mapping.variable==binder { found=true; break; } } complete=complete&&found; } if complete&&source.quantifierGoals(ty).len==0 { return projectDepth(work,n.a,depth+1,budget,retained,memo,height); } }
+  let source_binder_range=blot_check_types::List {n.b,n.c}; let source_binder_count=source.list(source_binder_range).len;
+  if tag==blot_check_types::Tag.forall { var complete=true; for binder_index in 0..source_binder_count { let binder=source.list(source_binder_range)[binder_index]; var found=false; for mapping in mappingItems(work.mappings) { if mapping.variable==binder { found=true; break; } } complete=complete&&found; } if complete&&source.quantifierGoals(ty).len==0 { return projectDepth(work,n.a,depth+1,budget,retained,memo,height); } }
   if depth>=128||n.c==0||n.c>128 { return reject(work,blot_error::Error.evidence_limit); }
   var owned=MappingBuffer {};
-  for binder,ordinal in source_binders { let leaf=source.node(binder); if leaf.tag!=blot_check_types::Tag.bound||leaf.a!=ordinal||leaf.b>2||leaf.c!=0 { let __cleanup_result_6_0: Id = reject(work,blot_error::Error.unresolved_type); owned.deinit(); return __cleanup_result_6_0; } let id,error=intern(self_,Tag.bound,ordinal as u32,leaf.b,[]); if error!=blot_error::Error.none { let __cleanup_result_7_0: Id = reject(work,error); owned.deinit(); return __cleanup_result_7_0; } owned.push(Mapping {binder,id}); }
-  owned.append(work.mappings); self_.projection_owners.push(source_binders); self_.projection_quantifiers.push(ty);
+  for ordinal in 0..source_binder_count { let binder=source.list(source_binder_range)[ordinal]; let leaf=source.node(binder); if leaf.tag!=blot_check_types::Tag.bound||leaf.a!=ordinal||leaf.b>2||leaf.c!=0 { let __cleanup_result_6_0: Id = reject(work,blot_error::Error.unresolved_type); owned.deinit(); return __cleanup_result_6_0; } let id,error=intern(self_,Tag.bound,ordinal as u32,leaf.b,[]); if error!=blot_error::Error.none { let __cleanup_result_7_0: Id = reject(work,error); owned.deinit(); return __cleanup_result_7_0; } owned.push(Mapping {binder,id}); }
+  owned.append(work.mappings); self_.projection_owners.push(source.list(source_binder_range)); self_.projection_quantifiers.push(ty);
   let saved_mappings=work.mappings; setProjectionMappings(work,owned.items); var body_budget=budget; if body_budget>4096 { body_budget=4096; } let available=body_budget;
 
   let body=projectDepth(work,n.a,depth+1,body_budget,false,null,height); var result_tag=Tag.existential; if tag==blot_check_types::Tag.forall { result_tag=Tag.forall; }
   var binders: Id[128]; for mapping,index in owned.items[..n.c] { binders[index]=mapping.evidence; } var goals=GoalBuffer {};
-  for goal in source.quantifierGoals(ty) {
+  let source_count_1=source.quantifierGoals(ty).len; for source_index_1 in 0..source_count_1 { let goal=source.quantifierGoals(ty)[source_index_1];
    if body_budget==0 { let __cleanup_result_87_0: Id = reject(work,blot_error::Error.evidence_limit); { setProjectionMappings(work,saved_mappings); self_.projection_owners.resize(self_.projection_owners.len-1); self_.projection_quantifiers.resize(self_.projection_quantifiers.len-1); budget-=available-body_budget; } let __cleanup_result_8_0: Id = __cleanup_result_87_0; goals.deinit(); owned.deinit(); return __cleanup_result_8_0; } body_budget--; var value=Goal {ty:0,kind:goal.kind,name:goal.name,operator:goal.operator,identity:goal.identity,explicit:goal.explicit};
    if goal.ty!=0 { value.ty=projectDepth(work,goal.ty,depth+1,body_budget,false,null,height); } if goal.other!=0 { value.other=projectDepth(work,goal.other,depth+1,body_budget,false,null,height); } if goal.result!=0 { value.result=projectDepth(work,goal.result,depth+1,body_budget,false,null,height); } if goal.signature!=0 { value.signature=projectDepth(work,goal.signature,depth+1,body_budget,false,null,height); } goals.push(value);
   }
@@ -405,14 +405,14 @@ recursive fn projectNodeDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64
  if tag==blot_check_types::Tag.erased_proof { let id,err=intern(self_,Tag.erased_proof,0,0,[]); return accept(work,id,err); }
  if tag==blot_check_types::Tag.unit { return 1; } if tag==blot_check_types::Tag.boolean { return 2; } if tag==blot_check_types::Tag.unsigned32 { return 3; } if tag==blot_check_types::Tag.floating32 { return 4; } if tag==blot_check_types::Tag.never { return 5; }
  if tag==blot_check_types::Tag.projection {
-  let input=source.nominalArguments(n); var arguments=WordBuffer {};  for root in input { arguments.push(projectDepth(work,root,depth+1,budget,retained,memo,height)); }
+  let input_count=source.nominalArguments(n).len; var arguments=WordBuffer {}; for input_index in 0..input_count { let root=source.nominalArguments(n)[input_index]; arguments.push(projectDepth(work,root,depth+1,budget,retained,memo,height)); }
   var owner_index=self_.projection_quantifiers.len;
   while owner_index!=0 {
    owner_index--; let owner=self_.projection_quantifiers.items[owner_index];
-   for goal,ordinal in source.quantifierGoals(owner) {
+   let source_count_2=source.quantifierGoals(owner).len; for ordinal in 0..source_count_2 { let goal=source.quantifierGoals(owner)[ordinal];
     if budget==0 { let __cleanup_result_11_0: Id = reject(work,blot_error::Error.evidence_limit); arguments.deinit(); return __cleanup_result_11_0; } budget--;
-    if goal.kind!=blot_check_types::ObligationKind.contract||goal.identity.unit!=n.a||goal.identity.decl!=n.b { continue; } let tuple=source.node(goal.ty); if tuple.tag!=blot_check_types::Tag.product||tuple.b!=input.len { continue; }
-    var matches=true; for expected,index in source.list(blot_check_types::List {tuple.a,tuple.b}) { let projected=projectDepth(work,expected,depth+1,budget,retained,memo,height); if projected!=arguments.items[index] { matches=false; } }
+    if goal.kind!=blot_check_types::ObligationKind.contract||goal.identity.unit!=n.a||goal.identity.decl!=n.b { continue; } let tuple=source.node(goal.ty); if tuple.tag!=blot_check_types::Tag.product||tuple.b!=input_count { continue; }
+    var matches=true; let source_count_3=source.list(blot_check_types::List {tuple.a,tuple.b}).len; for index in 0..source_count_3 { let expected=source.list(blot_check_types::List {tuple.a,tuple.b})[index]; let projected=projectDepth(work,expected,depth+1,budget,retained,memo,height); if projected!=arguments.items[index] { matches=false; } }
     if matches&&work.failure==blot_error::Error.none { let id,err=internProjection(self_,Identity {n.a,n.b},source.projectionMember(n),arguments.items,(self_.projection_quantifiers.len-1-owner_index) as u32,ordinal as u32); let __cleanup_result_12_0: Id = accept(work,id,err); arguments.deinit(); return __cleanup_result_12_0; }
    }
   }
@@ -433,8 +433,8 @@ recursive fn projectNodeDepth<S,R>(work: ProjectionWork<S,R>&,ty: u32,depth: i64
  if tag==blot_check_types::Tag.type_constructor { let id,err=intern(self_,Tag.type_constructor,n.a,n.b,[]); return accept(work,id,err); }
  var values=WordBuffer {};  var result_tag=Tag.product; var a: u32=0; var b: u32=0;
  if tag==blot_check_types::Tag.record { result_tag=Tag.record; for index in 0..n.b { let field=source.recordField(n,index); values.push(field.name); values.push(projectDepth(work,field.ty,depth+1,budget,retained,memo,height)); } }
- else if tag==blot_check_types::Tag.nominal { result_tag=Tag.nominal; a=n.a; b=n.b; for child in source.nominalArguments(n) { values.push(projectDepth(work,child,depth+1,budget,retained,memo,height)); } }
- else { for child in source.list(blot_check_types::List {n.a,n.b}) { values.push(projectDepth(work,child,depth+1,budget,retained,memo,height)); } }
+ else if tag==blot_check_types::Tag.nominal { result_tag=Tag.nominal; a=n.a; b=n.b; let source_count_4=source.nominalArguments(n).len; for source_index_4 in 0..source_count_4 { let child=source.nominalArguments(n)[source_index_4]; values.push(projectDepth(work,child,depth+1,budget,retained,memo,height)); } }
+ else { let source_count_5=source.list(blot_check_types::List {n.a,n.b}).len; for source_index_5 in 0..source_count_5 { let child=source.list(blot_check_types::List {n.a,n.b})[source_index_5]; values.push(projectDepth(work,child,depth+1,budget,retained,memo,height)); } }
  if work.failure!=blot_error::Error.none { let __cleanup_result_16_0: Id = 0; values.deinit(); return __cleanup_result_16_0; } let id,err=intern(self_,result_tag,a,b,values.items); let __cleanup_result_17_0: Id = accept(work,id,err); values.deinit(); return __cleanup_result_17_0;
  values.deinit(); }
 recursive fn projectRowBody<S,R>(work: ProjectionWork<S,R>&,row: u32,depth: i64,budget: i64&,retained: bool,memo: blot_reuse_projection_cache::Cache?,height: u16&) -> u32 {
@@ -450,12 +450,12 @@ recursive fn projectRowBody<S,R>(work: ProjectionWork<S,R>&,row: u32,depth: i64,
   variable v=>{ var found=false; for mapping in mappingItems(work.rows) { if mapping.variable==v.value { if mapping.evidence>=self_.effects.rows.len { return reject(work,blot_error::Error.type_mismatch); } suffix=mapping.evidence; found=true; break; } } if !found { return reject(work,blot_error::Error.unresolved_type); } },
  }
  var labels=WordBuffer {};  var arguments=WordBuffer {};
- for label in source.rowLabels(row) {
+ let source_count_6=source.rowLabels(row).len; for source_index_6 in 0..source_count_6 { let label=source.rowLabels(row)[source_index_6];
   if work.resolver.enabled { if work.resolver.remaining==0 { let __cleanup_result_18_0: u32 = reject(work,blot_error::Error.evidence_limit); arguments.deinit(); labels.deinit(); return __cleanup_result_18_0; } work.resolver.remaining--; }
   if retained&&memo!=null { let answer=blot_reuse_projection_cache::get(memo.labels,label); if answer!=null { let a=answer; if depth+a.height>1024||budget<a.visits { let __cleanup_result_19_0: u32 = reject(work,blot_error::Error.evidence_limit); arguments.deinit(); labels.deinit(); return __cleanup_result_19_0; } budget-=a.visits; if height<a.height { height=a.height; } labels.push(a.value); continue; } }
   let operation=source.operation(label); let instance=blot_check_types::selectionAtom(source,operation.instance); if instance.unit==0&&instance.decl!=0 { let __cleanup_result_20_0: u32 = reject(work,blot_error::Error.unresolved_type); arguments.deinit(); labels.deinit(); return __cleanup_result_20_0; }
   arguments.resize(0); let before=budget; var label_height: u16=0;
-  for argument in source.operationArguments(label) { if retained { arguments.push(projectDepth(work,argument,depth+1,budget,retained,memo,label_height)); } else { arguments.push(projectDepth(work,argument,depth+1,budget,retained,memo,height)); } }
+  let source_count_7=source.operationArguments(label).len; for source_index_7 in 0..source_count_7 { let argument=source.operationArguments(label)[source_index_7]; if retained { arguments.push(projectDepth(work,argument,depth+1,budget,retained,memo,label_height)); } else { arguments.push(projectDepth(work,argument,depth+1,budget,retained,memo,height)); } }
   if work.failure!=blot_error::Error.none { let __cleanup_result_21_0: u32 = 0; arguments.deinit(); labels.deinit(); return __cleanup_result_21_0; } let projected,err=self_.effects.internOperationInstance(operation.identity,arguments.items,instance); if err!=blot_error::Error.none { let __cleanup_result_22_0: u32 = reject(work,err); arguments.deinit(); labels.deinit(); return __cleanup_result_22_0; }
   if retained&&memo!=null { if height<label_height { height=label_height; } blot_reuse_projection_cache::insert(memo.labels,label,blot_reuse_projection_cache::Answer {projected,(before-budget) as u32,label_height}); } labels.push(projected);
  }
@@ -534,9 +534,9 @@ recursive fn matchDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: 
  else if tag==blot_check_types::Tag.state_provider { if !matchDepth(work,n.a,concrete.a,depth+1,budget)||!matchDepth(work,n.b,concrete.b,depth+1,budget)||!matchDepth(work,n.c,concrete.c,depth+1,budget) { return false; } }
  else if tag==blot_check_types::Tag.function { if !matchDepth(work,n.a,concrete.a,depth+1,budget)||!matchRowDepth(work,n.c,concrete.c,depth+1,budget)||!matchDepth(work,n.b,concrete.b,depth+1,budget) { return false; } }
  else if tag==blot_check_types::Tag.product||tag==blot_check_types::Tag.nominal {
-  var expected=source.list(blot_check_types::List {n.a,n.b}); if tag==blot_check_types::Tag.nominal { expected=source.nominalArguments(n); }
-  var actuals=WordBuffer {};  actuals.append(children(self_,actual)); if expected.len!=actuals.len { let __cleanup_result_24_0: bool = false; actuals.deinit(); return __cleanup_result_24_0; }
-  for child,index in expected { if !matchDepth(work,child,actuals.items[index],depth+1,budget) { let __cleanup_result_25_0: bool = false; actuals.deinit(); return __cleanup_result_25_0; } }
+  let expected_range=blot_check_types::List {n.a,n.b}; var expected_count=source.list(expected_range).len; if tag==blot_check_types::Tag.nominal { expected_count=source.nominalArguments(n).len; }
+  var actuals=WordBuffer {};  actuals.append(children(self_,actual)); if expected_count!=actuals.len { let __cleanup_result_24_0: bool = false; actuals.deinit(); return __cleanup_result_24_0; }
+  for index in 0..expected_count { var child:u32; if tag==blot_check_types::Tag.nominal {child=source.nominalArguments(n)[index];}else {child=source.list(expected_range)[index];} if !matchDepth(work,child,actuals.items[index],depth+1,budget) { let __cleanup_result_25_0: bool = false; actuals.deinit(); return __cleanup_result_25_0; } }
   actuals.deinit(); } else if tag==blot_check_types::Tag.record {
   var fields=WordBuffer {};  fields.append(children(self_,actual)); if fields.len!=(n.b as i64)*2 { let __cleanup_result_26_0: bool = false; fields.deinit(); return __cleanup_result_26_0; }
   for index in 0..n.b { let field=source.recordField(n,index); var found=false; var i=0; while i<fields.len { if fields.items[i]==field.name { if !matchDepth(work,field.ty,fields.items[i+1],depth+1,budget) { let __cleanup_result_27_0: bool = false; fields.deinit(); return __cleanup_result_27_0; } found=true; break; } i+=2; } if !found { let __cleanup_result_28_0: bool = false; fields.deinit(); return __cleanup_result_28_0; } }
@@ -554,14 +554,14 @@ recursive fn matchRowDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actua
   closed=>{ closed=true; },
  }
  let actual_formal=self_.effects.rows.items[actual].formal; if closed&&actual_formal!=0 { return false; }
- let expected=source.rowLabels(pattern); var actuals=WordBuffer {};  actuals.append(self_.effects.view().rowLabels(actual));
- if expected.len>actuals.len||(closed&&expected.len!=actuals.len) { let __cleanup_result_29_0: bool = false; actuals.deinit(); return __cleanup_result_29_0; } var used=BoolBuffer {};  used.resize(actuals.len,false);
- let __cleanup_result_30_0: bool = matchOperations(work,expected,actuals.items,used.items,tail,actual_formal,0,depth,budget); used.deinit(); actuals.deinit(); return __cleanup_result_30_0;
+ let expected_count=source.rowLabels(pattern).len; var actuals=WordBuffer {};  actuals.append(self_.effects.view().rowLabels(actual));
+ if expected_count>actuals.len||(closed&&expected_count!=actuals.len) { let __cleanup_result_29_0: bool = false; actuals.deinit(); return __cleanup_result_29_0; } var used=BoolBuffer {};  used.resize(actuals.len,false);
+ let __cleanup_result_30_0: bool = matchOperations(work,pattern,expected_count,actuals.items,used.items,tail,actual_formal,0,depth,budget); used.deinit(); actuals.deinit(); return __cleanup_result_30_0;
  used.deinit(); actuals.deinit(); }
-recursive fn matchOperations<S,R,M,B>(work: MatchWork<S,R,M,B>&,expected: const u32[:],actuals: const u32[:],used: bool[:],tail: blot_check_effects::Tail,actual_formal: Id,index: i64,depth: i64,budget: i64&) -> bool {
+recursive fn matchOperations<S,R,M,B>(work: MatchWork<S,R,M,B>&,expected_row:u32,expected_count:i64,actuals: const u32[:],used: bool[:],tail: blot_check_effects::Tail,actual_formal: Id,index: i64,depth: i64,budget: i64&) -> bool {
  if work.failure!=blot_error::Error.none { return false; } if depth>=1024||(work.use_memo&&depth>=256)||budget==0 { return matchFail(work,blot_error::Error.evidence_limit); } budget--;
  let self_=work.destination; let source=work.source;
- if index==expected.len {
+ if index==expected_count {
   match tail {
    closed=>{ return true; },
    variable variable=>{
@@ -572,16 +572,16 @@ recursive fn matchOperations<S,R,M,B>(work: MatchWork<S,R,M,B>&,expected: const 
    _=>{ return matchFail(work,blot_error::Error.unresolved_type); },
   }
  }
- let operation=source.operation(expected[index]); let arguments=source.operationArguments(expected[index]);
+ let expected_label=source.rowLabels(expected_row)[index]; let operation=source.operation(expected_label); let argument_count=source.operationArguments(expected_label).len;
  for label,i in actuals {
   if work.use_memo { if budget==0 { return matchFail(work,blot_error::Error.evidence_limit); } budget--; } if used[i] { continue; }
   let concrete=self_.effects.view().operation(label); let atom=blot_check_types::selectionAtom(source,operation.instance);
   if atom!=concrete.instance||operation.identity.unit!=concrete.identity.unit||operation.identity.decl!=concrete.identity.decl { continue; }
-  var actual_arguments=WordBuffer {};  actual_arguments.append(self_.effects.view().operationArguments(label)); if arguments.len!=actual_arguments.len { actual_arguments.deinit(); continue; }
+  var actual_arguments=WordBuffer {};  actual_arguments.append(self_.effects.view().operationArguments(label)); if argument_count!=actual_arguments.len { actual_arguments.deinit(); continue; }
   let frontier=work.mappings.len; let row_frontier=work.rows.len; var same=true;
-  for argument,j in arguments { if !matchDepth(work,argument,actual_arguments.items[j],depth+1,budget) { same=false; break; } }
+  for j in 0..argument_count { let argument=source.operationArguments(expected_label)[j]; if !matchDepth(work,argument,actual_arguments.items[j],depth+1,budget) { same=false; break; } }
   if work.failure!=blot_error::Error.none { let __cleanup_result_35_0: bool = false; actual_arguments.deinit(); return __cleanup_result_35_0; }
-  if same { used[i]=true; if matchOperations(work,expected,actuals,used,tail,actual_formal,index+1,depth+1,budget) { let __cleanup_result_36_0: bool = true; actual_arguments.deinit(); return __cleanup_result_36_0; } used[i]=false; }
+  if same { used[i]=true; if matchOperations(work,expected_row,expected_count,actuals,used,tail,actual_formal,index+1,depth+1,budget) { let __cleanup_result_36_0: bool = true; actual_arguments.deinit(); return __cleanup_result_36_0; } used[i]=false; }
   if work.failure!=blot_error::Error.none { let __cleanup_result_37_0: bool = false; actual_arguments.deinit(); return __cleanup_result_37_0; } if work.use_memo { work.memo.clear(); } work.mappings.resize(frontier); work.rows.resize(row_frontier);
   actual_arguments.deinit(); }
  return false;
@@ -616,7 +616,7 @@ fn matchSignatureInner<S,R,M,B>(self_: Store,source: const S&,pattern: u32,actua
   }
   if projection.failure!=blot_error::Error.none { let __cleanup_result_96_0: bool = false; let __cleanup_result_96_1: Error = projection.failure; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_49_0: bool = __cleanup_result_96_0; let __cleanup_result_49_1: Error = __cleanup_result_96_1; blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_49_0, __cleanup_result_49_1; }
   var required=WordBuffer {};  required.append(self_.effects.view().rowLabels(required_row));
-  for label in required.items { if resolver.remaining==0 { let __cleanup_result_97_0: bool = false; let __cleanup_result_97_1: Error = blot_error::Error.evidence_limit; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_50_0: bool = __cleanup_result_97_0; let __cleanup_result_50_1: Error = __cleanup_result_97_1; required.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_50_0, __cleanup_result_50_1; } resolver.remaining--; var found=false; for actual in self_.effects.view().rowLabels(concrete.c) { if actual==label { found=true; break; } } if !found { let __cleanup_result_98_0: bool = false; let __cleanup_result_98_1: Error = blot_error::Error.none; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_51_0: bool = __cleanup_result_98_0; let __cleanup_result_51_1: Error = __cleanup_result_98_1; required.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_51_0, __cleanup_result_51_1; } }
+  for label in required.items { if resolver.remaining==0 { let __cleanup_result_97_0: bool = false; let __cleanup_result_97_1: Error = blot_error::Error.evidence_limit; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_50_0: bool = __cleanup_result_97_0; let __cleanup_result_50_1: Error = __cleanup_result_97_1; required.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_50_0, __cleanup_result_50_1; } resolver.remaining--; var found=false; let source_count_8=self_.effects.view().rowLabels(concrete.c).len; for source_index_8 in 0..source_count_8 { let actual=self_.effects.view().rowLabels(concrete.c)[source_index_8]; if actual==label { found=true; break; } } if !found { let __cleanup_result_98_0: bool = false; let __cleanup_result_98_1: Error = blot_error::Error.none; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_51_0: bool = __cleanup_result_98_0; let __cleanup_result_51_1: Error = __cleanup_result_98_1; required.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_51_0, __cleanup_result_51_1; } }
   expected=arrow.b; supplied=concrete.b; depth++;
   required.deinit(); }
  accepted=matchDepth(work,expected,supplied,depth+1,resolver.remaining); let __cleanup_result_99_0: bool = accepted; let __cleanup_result_99_1: Error = work.failure; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_52_0: bool = __cleanup_result_99_0; let __cleanup_result_52_1: Error = __cleanup_result_99_1; blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_52_0, __cleanup_result_52_1;
@@ -637,11 +637,11 @@ fn matchPrerequisiteInner<S,R,M,B>(self_: Store,source: const S&,pattern: u32,op
    projection.failure=blot_error::Error.none; setProjectionMappings(projection,mappingItems(mappings)); setProjectionRows(projection,mappingItems(rows)); own_row=projectRowDepth(projection,arrow.c,0,resolver.remaining,false,null,null);
   }
   if projection.failure!=blot_error::Error.none { let __cleanup_result_106_0: Id = 0; let __cleanup_result_106_1: bool = false; let __cleanup_result_106_2: Error = projection.failure; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_59_0: Id = __cleanup_result_106_0; let __cleanup_result_59_1: bool = __cleanup_result_106_1; let __cleanup_result_59_2: Error = __cleanup_result_106_2; labels.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_59_0, __cleanup_result_59_1, __cleanup_result_59_2; }
-  let own_labels=self_.effects.view().rowLabels(own_row);
-  for label,index in own_labels {
+  let own_label_count=self_.effects.view().rowLabels(own_row).len;
+  for index in 0..own_label_count { let label=self_.effects.view().rowLabels(own_row)[index];
    if resolver.remaining==0 { let __cleanup_result_107_0: Id = 0; let __cleanup_result_107_1: bool = false; let __cleanup_result_107_2: Error = blot_error::Error.evidence_limit; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_60_0: Id = __cleanup_result_107_0; let __cleanup_result_60_1: bool = __cleanup_result_107_1; let __cleanup_result_60_2: Error = __cleanup_result_107_2; labels.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_60_0, __cleanup_result_60_1, __cleanup_result_60_2; } resolver.remaining--; var count=0;
-   for earlier in own_labels[..index+1] { if resolver.remaining==0 { let __cleanup_result_108_0: Id = 0; let __cleanup_result_108_1: bool = false; let __cleanup_result_108_2: Error = blot_error::Error.evidence_limit; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_61_0: Id = __cleanup_result_108_0; let __cleanup_result_61_1: bool = __cleanup_result_108_1; let __cleanup_result_61_2: Error = __cleanup_result_108_2; labels.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_61_0, __cleanup_result_61_1, __cleanup_result_61_2; } resolver.remaining--; if earlier==label { count++; } }
-   if operands[3]!=0 { var available=0; for actual in self_.effects.view().rowLabels(requested) { if resolver.remaining==0 { let __cleanup_result_109_0: Id = 0; let __cleanup_result_109_1: bool = false; let __cleanup_result_109_2: Error = blot_error::Error.evidence_limit; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_62_0: Id = __cleanup_result_109_0; let __cleanup_result_62_1: bool = __cleanup_result_109_1; let __cleanup_result_62_2: Error = __cleanup_result_109_2; labels.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_62_0, __cleanup_result_62_1, __cleanup_result_62_2; } resolver.remaining--; if actual==label { available++; } } if count>available { let __cleanup_result_110_0: Id = 0; let __cleanup_result_110_1: bool = false; let __cleanup_result_110_2: Error = blot_error::Error.type_mismatch; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_63_0: Id = __cleanup_result_110_0; let __cleanup_result_63_1: bool = __cleanup_result_110_1; let __cleanup_result_63_2: Error = __cleanup_result_110_2; labels.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_63_0, __cleanup_result_63_1, __cleanup_result_63_2; } }
+   let earlier_count=self_.effects.view().rowLabels(own_row)[..index+1].len; for earlier_index in 0..earlier_count { let earlier=self_.effects.view().rowLabels(own_row)[earlier_index]; if resolver.remaining==0 { let __cleanup_result_108_0: Id = 0; let __cleanup_result_108_1: bool = false; let __cleanup_result_108_2: Error = blot_error::Error.evidence_limit; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_61_0: Id = __cleanup_result_108_0; let __cleanup_result_61_1: bool = __cleanup_result_108_1; let __cleanup_result_61_2: Error = __cleanup_result_108_2; labels.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_61_0, __cleanup_result_61_1, __cleanup_result_61_2; } resolver.remaining--; if earlier==label { count++; } }
+   if operands[3]!=0 { var available=0; let source_count_9=self_.effects.view().rowLabels(requested).len; for source_index_9 in 0..source_count_9 { let actual=self_.effects.view().rowLabels(requested)[source_index_9]; if resolver.remaining==0 { let __cleanup_result_109_0: Id = 0; let __cleanup_result_109_1: bool = false; let __cleanup_result_109_2: Error = blot_error::Error.evidence_limit; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_62_0: Id = __cleanup_result_109_0; let __cleanup_result_62_1: bool = __cleanup_result_109_1; let __cleanup_result_62_2: Error = __cleanup_result_109_2; labels.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_62_0, __cleanup_result_62_1, __cleanup_result_62_2; } resolver.remaining--; if actual==label { available++; } } if count>available { let __cleanup_result_110_0: Id = 0; let __cleanup_result_110_1: bool = false; let __cleanup_result_110_2: Error = blot_error::Error.type_mismatch; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_63_0: Id = __cleanup_result_110_0; let __cleanup_result_63_1: bool = __cleanup_result_110_1; let __cleanup_result_63_2: Error = __cleanup_result_110_2; labels.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_63_0, __cleanup_result_63_1, __cleanup_result_63_2; } }
    var present=0; for actual in labels.items { if resolver.remaining==0 { let __cleanup_result_111_0: Id = 0; let __cleanup_result_111_1: bool = false; let __cleanup_result_111_2: Error = blot_error::Error.evidence_limit; { if !accepted { mappings.resize(frontier); rows.resize(row_frontier); } } let __cleanup_result_64_0: Id = __cleanup_result_111_0; let __cleanup_result_64_1: bool = __cleanup_result_111_1; let __cleanup_result_64_2: Error = __cleanup_result_111_2; labels.deinit(); blot_eval_type_evidence::deinit(work.memo); return __cleanup_result_64_0, __cleanup_result_64_1, __cleanup_result_64_2; } resolver.remaining--; if actual==label { present++; } } if count>present { labels.push(label); }
   }
   required=arrow.b;
@@ -669,8 +669,6 @@ fn clone(self_: const Store&,destination: Store&) -> Error {
 }
 fn withStore<C,F>(context: C&) -> Error { let initialized,error=init(); if error!=blot_error::Error.none { return error; } var store=initialized; let result=F(context,store); deinit(store); return result; }
 fn withPooledStore<C,F>(context: C&) -> Error { return withStore<C>(context,F); }
-fn withStoreValue<C,R,F>(context: C&) -> R,Error { let initialized,error=init(); if error!=blot_error::Error.none { return default<R>(),error; } var store=initialized; let result,failure=F(context,store); deinit(store); return result,failure; }
-fn withPooledStoreValue<C,R,F>(context: C&) -> R,Error { return withStoreValue<C,R>(context,F); }
 fn deinit(self_: Store&) { if self_.lease==0 { return; } assert(valid(self_));
  self_.nodes.deinit();
  self_.extra.deinit();

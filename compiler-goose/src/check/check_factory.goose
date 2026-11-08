@@ -19,6 +19,7 @@ import parse.symbols;
 import phase_profile;
 import reuse.body_check_packet;
 import reuse.completion_names;
+import reuse.hole_diagnostics;
 import reuse.principal_interface;
 import support.error;
 import support.option;
@@ -260,10 +261,14 @@ result.loop_carries=ownChecked_loop_carries(owner,engine.loop_carries);
 result.loop_ranges=ownChecked_loop_ranges(owner,engine.loop_ranges);
 result.loop_exits=ownChecked_loop_exits(owner,engine.loop_exits);
 result.statement_arms=ownChecked_statement_arms(owner,engine.statement_arms);
-result.proof_contracts=ownChecked_proof_contracts(owner,engine.proof_contracts.items);ownCheckedHeaders(owner,result.proof_contracts);
+result.proof_contracts=ownChecked_proof_contracts(owner,engine.proof_contracts.items);
 if engine.capability_roots.items.len!=0 {blot_check_source_sort::pdqContext(0,engine.capability_roots.items.len,CapabilityRootOrder{engine.capability_roots.items, ..});result.capability_contracts=blot_check_capability_contracts::Collection{nodes:ownChecked_cap_nodes(owner,engine.capability_store.nodes.items),words:ownChecked_cap_words(owner,engine.capability_store.words.items),bindings:ownChecked_cap_bindings(owner,engine.capability_roots.items), ..};}
 result.proof_bodies=blot_check_numeric_proof_bodies::Owned{debits:ownChecked_body_debits(owner,engine.proof_body.debits),operands:ownChecked_body_operands(owner,blot_check_numeric_proof_terms::activeTerms(engine.proof_body.values.terms,engine.proof_body.values.index.count)),introductions:ownChecked_body_introductions(owner,engine.proof_body.introductions),parameters:ownChecked_body_parameters(owner,engine.proof_body.parameters),uses:ownChecked_body_uses(owner,engine.proof_body.uses), ..};
-result.editor=engine.editor_capture;if result.editor.present {let names=result.editor.value.names;result.editor.value.names=ownChecked_editor_names(owner,names);blot_reuse_completion_names::release(names);}engine.editor_capture=blot_support::none<EditorCapture>();return result,blot_error::Error.none;}
+if engine.editor_capture.present {let capture=engine.editor_capture.value;let owned=ownEditorCapture(owner,capture);result.editor=blot_support::some(owned);blot_reuse_completion_names::release(capture.names);}engine.editor_capture=blot_support::none<EditorCapture>();return result,blot_error::Error.none;}
+fn ownEditorCapture(owner:CheckedOwner,value:EditorCapture)->EditorCapture {
+ var result=EditorCapture{names:ownChecked_editor_names(owner,value.names),kind:value.kind,node:value.node,scope:value.scope,visible:value.visible,visible_names:value.visible_names,scope_names:value.scope_names,type_scope:value.type_scope,truncated:value.truncated,owner:value.owner,receiver:value.receiver,namespace_:value.namespace_,..};
+ if value.context.present {result.context=blot_support::some(blot_reuse_hole_diagnostics::canonicalOwned(value.context.value));}return result;
+}
 struct CapabilityRootOrder {values:blot_check_capability_contracts::Binding[:]}
 fn lessThan(self_:CapabilityRootOrder,left:i64,right:i64)->bool {return self_.values[left].binding<self_.values[right].binding;}
 fn swap(self_:CapabilityRootOrder,left:i64,right:i64) {let old=self_.values[left];self_.values[left]=self_.values[right];self_.values[right]=old;}
