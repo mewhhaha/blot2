@@ -507,7 +507,7 @@ fn finish(self_: Recorder&, session: const Session&, target: BindingRef, value: 
     }
     return blot_support::some(result), blot_error::Error.none;
 }
-fn withRecorder<C,F>(session: const Session&,context: C&) -> Error { var owner,error=initRecorderOwner(session); if error!=blot_error::Error.none { return error; } let recorder=owner.borrow(); assert(recorder); let result=F(context,recorder); let allocation_error=recorder.failure(); owner.deinit(); if result!=blot_error::Error.none { return result; } return allocation_error; }
+recursive fn withRecorder<C,F>(session: const Session&,context: C&) -> Error { var owner,error=initRecorderOwner(session); if error!=blot_error::Error.none { return error; } let recorder=owner.borrow(); assert(recorder); let result=F(context,recorder); let allocation_error=recorder.failure(); owner.deinit(); if result!=blot_error::Error.none { return result; } return allocation_error; }
 
 struct RecorderEventsBuffer { storage: Event[:]=default<Event[:]>(),items: Event[:]=default<Event[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_RecorderEventsBuffer: Event[>..]=[];

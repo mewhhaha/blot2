@@ -39,11 +39,14 @@ fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged
 
 Source repairs now cover PrincipalVisit capacity initialization, canonical
 Session/Generator publication, summary-job compaction and the concrete recursive
-summary callback cycle. Frozen 317 retains separate principal-record roots and concrete callback
-cycles, canonicalizes three saved-reference Session bindings, repairs two Option
-return APIs and constructs ConstantRun outside the recursive boundary. The actual
-build clears those errors and stops after 117.786s in constant_receipt_reuse.init:
-a reference through old cannot be retained. Whole parsing passes 440 files. No whole-program C,
+summary callback cycle. Frozen 318 adds the concrete constant-recording callback cycle and preserves a
+borrow of the original Pools header in pairedImporter (the prior prose
+incorrectly named init). The actual run hits its 120s emitter cap after 120.303s
+with no captured diagnostic and no program C/header/executable. This is not a
+pass or proof that every preceding boundary was reached. Identical reruns and
+cap increases are held. A separate export-first checker candidate is under
+qualification; the optional-global index showed no gain beyond controls and is
+unselected. Whole parsing passes 440 files. No whole-program C,
 header, executable, Wasm comparison or Gdev result exists yet. Caps remain
 120/300s with a 3s first-error collection window. Focused controls qualify only
 their named source/carriers; source checkpoints remain unverified whole-compiler

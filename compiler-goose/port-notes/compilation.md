@@ -51,7 +51,7 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 317 inputs and selects private
+per stage. This checkpoint preserves exact frozen 318 inputs and selects private
 checker ce317 explicitly. Its preceding one-condition ContentsReadBack correction
 recognizes the existing global-only null-root bound without changing alternatives
 or exactness. Stock b27 and 869 false positives reproduce in four functions.
@@ -81,12 +81,18 @@ Three callback Session bindings now use the exact existing canonical registry
 lookup before saving references; previous restoration order is unchanged. Both
 principalEvidence and raggedBlock now consume their actual Option+Error API. A
 nine-field ConstantRun factory preserves Frame by value and explicit defaults.
-Actual 317 clears those boundaries and stops after 117.786s at old-reference
-retention in constant_receipt_reuse.init. A semantic-worker-only entry hit its
+The actual 317 boundary was pairedImporter, not init: a missing .= copied a Pools
+header, then identity.view retained through that local copy. Frozen318 preserves
+the original header borrow and adds the concrete constant-recorder callback cycle.
+Actual318 times out at the120s emitter cap (120.303s total) with0captured errors
+and no C/header/executable; no whole-check or preceding-frontier pass is claimed. A semantic-worker-only entry hit its
 20s cap with no diagnostic/C, establishing no faster loop. Four sparse samples
 of real instrumented316 locate root/store replay and specialization traversal;
-they do not establish time percentages. Ordered global-optional indexing and
-export-first standalone checking are private candidates under review. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
+they do not establish time percentages. The optional-global index passes
+201frontend/8runtime/8focused checks but1.4–2.4% synthetic gains match2–2.5%
+zero-global controls; it remains unselected. Export-first standalone checking is
+a separate source-reviewed candidate under binary qualification. No identical
+318 rerun or cap increase is planned. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
 remain 120/300s with a 3s first-error window. Earlier dispatch and scalar-helper
 experiments failed and were removed after the private correctness fix; original
 code_expectation children source is restored. Whole compiler/runtime parity is
