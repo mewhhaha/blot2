@@ -51,8 +51,8 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 318 inputs and selects private
-checker ce317 explicitly. Its preceding one-condition ContentsReadBack correction
+per stage. This checkpoint preserves exact frozen 320 inputs and selects private
+checker678b88 explicitly. Its preceding one-condition ContentsReadBack correction
 recognizes the existing global-only null-root bound without changing alternatives
 or exactness. Stock b27 and 869 false positives reproduce in four functions.
 Ten valid cases execute; 26 strict mutation/escape/shrink/identity negatives reject.
@@ -91,8 +91,17 @@ of real instrumented316 locate root/store replay and specialization traversal;
 they do not establish time percentages. The optional-global index passes
 201frontend/8runtime/8focused checks but1.4–2.4% synthetic gains match2–2.5%
 zero-global controls; it remains unselected. Export-first standalone checking is
-a separate source-reviewed candidate under binary qualification. No identical
-318 rerun or cap increase is planned. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
+now explicitly selected after201frontend/8runtime/27focused controls plus two
+C-host executions; one focused diagnostic-order change retains the same errors.
+All original final export validation and fixups remain. On the same442 source
+inputs, actual319 reaches a new nullable-importer diagnostic in114.133s versus
+318's120.303s timeout without diagnostics. Generatedidentity differs by toolchain
+fingerprint. Frozen320 narrows all four success locals after their original error
+guards; its actual check reaches source_value_template.visit after115.636s and
+stops on reference retention through plan. No completed compiler speed or whole-runtime
+result is established. The tracked recipe reconstructs all108 checker files
+byte-exactly. A separate scalar-frame Session/Generator edge cut is source-only;
+its939→505 declaration proxy is not instantiated-type or time evidence. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
 remain 120/300s with a 3s first-error window. Earlier dispatch and scalar-helper
 experiments failed and were removed after the private correctness fix; original
 code_expectation children source is restored. Whole compiler/runtime parity is

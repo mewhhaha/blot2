@@ -28,7 +28,10 @@ sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
 including its source delta and byte-exact tracked recipe reconstruction. Private
-checker ce317 now also defers unused overload diagnostic formatting. The preceding
+checker678b88 retains the ce317 unused-overload-text optimization and checks
+exported roots first, retaining final export validation and every fixup. Its
+201frontend/8runtime/27focused controls pass; one error order changes while the
+complete multiset remains equal. The preceding
 global-bound correctness fix preserves all provenance alternatives and exactness;
 10 positive cases execute and 26 strict negatives reject. The formatting candidate
 matches 201 frontend cases, 8 executed runtimes, 20 focused cases and 15 emitted-C
@@ -39,14 +42,16 @@ fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged
 
 Source repairs now cover PrincipalVisit capacity initialization, canonical
 Session/Generator publication, summary-job compaction and the concrete recursive
-summary callback cycle. Frozen 318 adds the concrete constant-recording callback cycle and preserves a
-borrow of the original Pools header in pairedImporter (the prior prose
-incorrectly named init). The actual run hits its 120s emitter cap after 120.303s
-with no captured diagnostic and no program C/header/executable. This is not a
-pass or proof that every preceding boundary was reached. Identical reruns and
-cap increases are held. A separate export-first checker candidate is under
-qualification; the optional-global index showed no gain beyond controls and is
-unselected. Whole parsing passes 440 files. No whole-program C,
+summary callback cycle. Frozen320 narrows all four pairedImporter success results after their existing
+error guards. On the same442 source inputs, export-first319 reaches a new source
+diagnostic in114.133s; preceding318 times out at120.303s with no diagnostic.
+Generated identity changes with the checker fingerprint. This is frontier
+progress, not a completed compiler speed result. Actual320 reaches source_value_template.visit after115.636s and stops on a
+retained reference rooted at plan.
+No program C/header/executable exists. The optional-global index showed no gain
+beyond controls and remains unselected. A separate source-only Session/Generator
+frame-token experiment is being prepared; its static graph proxy is not a speed
+result. Whole parsing passes 440 files. No whole-program C,
 header, executable, Wasm comparison or Gdev result exists yet. Caps remain
 120/300s with a 3s first-error collection window. Focused controls qualify only
 their named source/carriers; source checkpoints remain unverified whole-compiler

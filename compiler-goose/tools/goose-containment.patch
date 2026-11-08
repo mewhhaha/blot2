@@ -319,3 +319,15 @@
 -                string why;
 -                if (!TryMatch(sf, c, vals, mi, why, defaults)) continue;
 +                if (!TryMatch(sf, c, vals, mi, nullptr, defaults)) continue;
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -3024,0 +3025,2 @@
++        // Establish exported roots before permissive standalone checks can
++        // specialize their callees without the export's caller facts.
+@@ -3027 +3029,5 @@
+-            CheckRoot([&] { CheckUnreached(sf); });
++            if (sf->isexport) CheckRoot([&] { CheckUnreached(sf); });
++        }
++        for (size_t i = 0; i < ast.functions.size(); i++) {
++            auto sf = ast.functions[i];
++            if (!sf->isexport) CheckRoot([&] { CheckUnreached(sf); });
