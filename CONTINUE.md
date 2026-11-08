@@ -27,23 +27,20 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen271
-checkpoints nominal local ownership of the proof-contract array, clearing the
-former header publication conflict without payload copies/new pools.10 focused
-controls pass; the full Engine callback passes that former boundary and finds
-other errors before its120s cap, so it is not a whole-probe pass. The batch also
-adds explicit stack defaults, worker pin receipts, callback/counter repairs and
-scalar importer row traversal. Independent source review preserves validation,
-census and intern order under the existing immutable old-Snapshot contract.
-Whole parsing passes440 files. The completed full run stops after67.38s with1
-captured diagnostic: implementation-evidence ProjectionResolver lifetime. The15s
-first-error window gives a partial error list; C emission, linking and execution
-remain pending.64 Session roots collect12 diagnostics at a120s cap, including one
-unsupported dummy constructor; invalid-owner borrow warnings require separate
-confirmation. Capability children pass valid-owner fixtures and remain unchanged.
-Earlier ownership/copy/scratch/high-water costs retain their pinned limits. The
-private checker retains bounded1M clone/separate100k tail limits and201 frontend/8
-runtime parity controls. Failing prefixes are not completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen273
+checkpoints typed Session/admission-host budget access: the actual shared scalar
+is recovered through the existing registered Session identity, with no snapshot
+or writeback delay.12 focused reentrant/identity controls pass; the actual full
+run advances past the resolver borrow and stops after66.38s with1 captured
+u32/optional API mismatch in core_eval. Whole parsing passes440 files.15s after
+first error is a partial collection window; C emission, linking and execution
+remain pending. Nullable backend/Stack access, worker pin receipts, typed lexical
+word literals and retired-membership storage recovery are included. Local region
+ownership remains a separately reviewed experiment, not this checkpoint. Source
+reviews preserve importer row/child traversal ordering under immutable old
+Snapshots. Prior proof-owner/catalog/snapshot controls retain their exact scopes.
+The private checker remains bounded1M clone/separate100k tail with201 frontend/8
+runtime parity controls. Failed prefixes are not completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

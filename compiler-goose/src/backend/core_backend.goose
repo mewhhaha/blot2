@@ -582,10 +582,10 @@ fn constantLookup(generator: Generator&, session: blot_eval_core_eval::Session&,
     let constant .= generator.constant_state; if constant { return constant.lookup(generator, target, inputs); } return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none;
 }
 fn principalLookup(generator: Generator&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options) -> blot_support::Option<blot_eval_core_eval::SolvedEvidence>, blot_error::Error {
-    if generator.persisted_principals != null { generator.persisted_principals.clearInputs(); }
+    let persisted .= generator.persisted_principals; if persisted { persisted.clearInputs(); }
     if generator.principal_state != null { let solved, error = generator.principal_state.lookup(generator, target, options); if error != blot_error::Error.none || solved.present { return solved, error; } }
     else { generator.principal_stats.requests++; generator.principal_stats.missing++; }
-    if generator.persisted_principals != null { return generator.persisted_principals.lookup(generator.evaluator, target, options); }
+    if persisted { return persisted.lookup(generator.evaluator, target, options); }
     return blot_support::none<blot_eval_core_eval::SolvedEvidence>(), blot_error::Error.none;
 }
 fn principalGraphLookup(generator: Generator&, key: blot_eval_core_eval::PrincipalGraphKey) -> blot_eval_core_eval::PrincipalGraph&? {

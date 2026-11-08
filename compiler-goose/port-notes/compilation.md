@@ -51,25 +51,20 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen271 inputs. Whole parsing passes
-440 files. Its completed full run stops after67.38s with1 captured diagnostic:
-implementation-evidence ProjectionResolver lifetime. The15-second first-error
-window gives a partial error list. Whole C emission, linking, CLI and Wasm remain
-pending. The proof-contract table now uses a nominal local owner record;10 focused
-controls preserve header addresses and reject escape/shrink cases. The actual
-full Engine callback advances past that publication conflict but still reports
-other failures at its120s cap. No extra header copies or pools were added. Typed
-Stack defaults, explicit worker pin receipts, callback/counter fixes and scalar
-import row loops are captured. Independent review preserves validation/census/
-intern order under immutable old Snapshots; no runtime equivalence is claimed
-for that traversal.64 independent Session roots captured12 diagnostics at120s,
-including one unsupported dummy constructor. Other dummy-input borrow warnings
-need valid-owner confirmation. Actual capability-children owner fixtures pass;
-that helper is unchanged. Earlier diagnostic copies, origin snapshots, zeroing
-and high-water backing costs retain their receipt scopes. Checkpoint blob/index
-batching produced the identical Git tree in0.24s versus one observed7.39s run;
-these are unpaired tool observations, not compiler timings. The private checker
-retains bounded1M clone/separate100k tail limits and201 frontend/8 runtime controls.
+per stage. This checkpoint preserves exact frozen273 inputs. Whole parsing passes
+440 files. Its completed full run advances past the real Session resolver-budget
+borrow, then stops after66.38s with1 captured u32/optional API mismatch in core_eval.
+The15s first-error window gives a partial error list. Whole C emission, linking,
+CLI and Wasm remain pending. Typed host budget access returns the same registered
+Session/admission counter, preserving reentrant charges;12 controls validate
+identity, generation and shared updates. Nullable backend/Stack access, worker pin
+receipts, typed lexical word arrays and same-pool retired-membership storage are
+captured. Local ClosureRegion ownership is separately reviewed/probed and not in
+this snapshot. Import row/child source reviews preserve bounds/error/census/intern
+order under immutable old Snapshots; no runtime equivalence claim was added.
+Earlier proof/catalog/snapshot/capability controls retain their receipt scopes.
+Private checker clone/tail bounds remain1M/100k with201 frontend/8 runtime controls.
+All failed-prefix and short-window results remain distinct from completed builds.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
 through one callback boundary. Actual core/snapshot admission methods use explicit

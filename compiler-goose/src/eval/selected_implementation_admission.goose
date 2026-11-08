@@ -23,6 +23,7 @@ fn require(value: bool) -> Error { if !value { return blot_error::Error.invalid_
 fn convert(error: Error) -> Error { if error==blot_error::Error.none||error==blot_error::Error.out_of_memory { return error; } return blot_error::Error.invalid_artifact; }
 struct Host { units: const C[:],evidence: blot_eval_type_evidence::Store&,associated_remaining: i64 }
 fn evidenceStore(self_: Host&) -> blot_eval_type_evidence::Store& { return self_.evidence; }
+fn associatedBudget(self_: Host&) -> i64& { return self_.associated_remaining; }
 fn diagnosticIdentity(self_: Host&) -> blot_support::Option<blot_backend_runtime_identity::View> { return blot_support::none<blot_backend_runtime_identity::View>(); }
 fn implementationRead(self_: Host&,context: u32,identity: blot_check_types::NominalIdentity) -> Error { return blot_error::Error.none; }
 recursive fn implementationLegacyPredicate<R>(self_: Host&,context: u32,value: blot_check_core::Obligation,operands: E[4],resolver: blot_eval_type_evidence::ProjectionResolver<R>&) -> blot_eval_implementation_evidence::LegacyChoice,bool,Error {
