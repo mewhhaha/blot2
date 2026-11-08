@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen372 is the current source checkpoint. Selected private checker
+Frozen373 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -180,8 +180,13 @@ Exact source review and two original/new executed controls preserve LIFO IDs,
 slot liveness and every payload field across 2,048 mixed transitions plus drain
 and reuse. Physical allocation/OOM and max-ID runtime behavior remain unqualified.
 Its95.334s run reaches another global buffer shrink at the same collectCallAt
-source slice. One invocation-local grow-only child-ID copy is next, with its
-extra copying/allocation cost explicitly unmeasured.
+source slice. Frozen373 copies ordered child IDs into a dedicated invocation-owned
+named run. Exact getter/bounds order and free-before-error propagation are
+reviewed; downstream retention already copies IDs into owned summary storage.
+Two exact-helper controls pass with empty/1/17/400 IDs, repeated content epochs,
+nested live runs and unrelated shrinking-array mutation. Its97.185s actual run
+clears that alias boundary and reaches an empty UpdateStep placeholder. Extra
+copy/allocation cost and physical OOM behavior remain unmeasured.
 No whole compiler C, header or executable has been emitted.
 The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its

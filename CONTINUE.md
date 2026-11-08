@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-The checkpoint through frozen372 replaces Session's Generator backpointer with the existing scalar
+The checkpoint through frozen373 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -145,8 +145,11 @@ the private SmallOutput free-ID stack a grow-only backing and scalar active
 count. Exact source review and two executed original/new controls preserve
 LIFO IDs and every slot payload field across more than 2,000 transitions.
 Its95.334s run reaches another global-buffer alias at the same collectCallAt
-argument slice. A local grow-only child-ID copy at that boundary is next;
-its extra copy/allocation cost remains unmeasured.
+argument slice. Frozen373 copies those ordered child IDs into an invocation-owned
+named scratch run, preserving getter order and freeing it immediately after
+the call returns. Exact source review and two nested-copy controls pass. Its
+97.185s run clears the global alias boundary and reaches an empty UpdateStep
+placeholder initializer. Extra copy/allocation cost remains unmeasured.
 No whole compiler success follows. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
