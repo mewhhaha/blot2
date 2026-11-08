@@ -502,6 +502,7 @@ fn materializeReceiptWithScratch<G>(self_: Plan,g: G&,graphs: blot_reuse_artifac
 }
 fn chooseMaterialImporter(paired:blot_reuse_artifact_import::Importer?,owned:blot_support::Option<blot_reuse_artifact_import::Importer>&)->blot_reuse_artifact_import::Importer? { if paired { return paired; } assert(owned.present); return owned.value; }
 fn chooseMaterialScratch(scratch:QueryScratch?,temporary:QueryScratch&)->QueryScratch? { if scratch { return scratch; } return temporary; }
+fn materializedRun(storage:u32[:],mapped:u32[:],error:Error)->u32[:] { if error!=blot_error::Error.none||mapped.len==0 {return default<u32[:]>();} assert(storage.len>=mapped.len); assert(storage[0] .== mapped[0]); let run=scratch_wordbuffer.realloc_slice(storage,storage.len); return run[..mapped.len]; }
 fn materializeImpl<G>(self_: const Plan&,g: G&,entry: blot_support::Option<u32>,seeds: blot_support::Option<const u32[:]>,storage: blot_support::Option<QueryStorage>,paired: blot_reuse_artifact_import::Importer?,scratch: QueryScratch?) -> u32[:],Error {
     if !self_.gate || !self_.pools || requiredGate(self_.gate).source_pools .!= self_.pools || !requiredGate(self_.gate).enabled || !blot_support::same_slice_identity(g.evaluator.units,requiredGate(self_.gate).units) {return default<u32[:]>(),blot_error::Error.declined;}
     var owned=blot_support::none<blot_reuse_artifact_import::Importer>();
@@ -509,9 +510,10 @@ fn materializeImpl<G>(self_: const Plan&,g: G&,entry: blot_support::Option<u32>,
     let graphs=chooseMaterialImporter(paired,owned); assert(graphs); var temporary=QueryScratch{allocation_owner:g.evaluator.allocation_owner, ..};
     if !scratch {let run=scratch_wordbuffer.alloc_slice(requiredPools(self_.pools).evaluator.values.len); for &word in run {word=0;} temporary.anchors=WordBuffer{run,run, ..};}
     let buffers=chooseMaterialScratch(scratch,temporary); assert(buffers); let mapped,error=self_.materializeOwned(g,graphs,entry,seeds,storage,buffers,scratch!=null);
+    let result=materializedRun(buffers.anchors.storage,mapped,error);
     if owned.present {owned.value.deinit();}
     if error==blot_error::Error.none && !scratch {temporary.anchors.storage=default<u32[:]>(); temporary.anchors.items=default<u32[:]>();}
-    if !scratch {temporary.deinit();} return mapped,error;
+    if !scratch {temporary.deinit();} return result,error;
 }
 fn materializeOwned<G>(self_: const Plan&,g: G&,graphs: blot_reuse_artifact_import::Importer&,entry: blot_support::Option<u32>,seeds: blot_support::Option<const u32[:]>,storage: blot_support::Option<QueryStorage>,buffers: QueryScratch&,retained_scratch: bool) -> u32[:],Error {
     assert(self_.gate && self_.pools);
