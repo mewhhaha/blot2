@@ -422,11 +422,11 @@ recursive fn matchesAnchor<G>(self_: const Plan&, g: G&, graphs: blot_reuse_arti
         let meta = old.closures[left.bits]; let actual = g.evaluator.closureInfo(current);
         if meta.unit != actual.unit || meta.identity != actual.identity || meta.applied != actual.applied || meta.origin != actual.origin || meta.ty != actual.ty || meta.mappings.len != actual.mappings.len || meta.row_mappings.len != actual.row_mappings.len { return false, blot_error::Error.none; }
         for seed, index in old.type_mappings[meta.mappings.start..meta.mappings.start + meta.mappings.len] {
-            let target = g.evaluator.storage.type_mappings[actual.mappings.start + index]; if seed.variable != target.variable { return false, blot_error::Error.none; }
+            let target = g.evaluator.storage.type_mappings.items[actual.mappings.start + index]; if seed.variable != target.variable { return false, blot_error::Error.none; }
             let imported, error = graphs.importClosedEvidence(g, seed.evidence); if error != blot_error::Error.none || !imported.present { return false, error; } if imported.value != target.evidence { return false, blot_error::Error.none; }
         }
         for seed, index in old.row_mappings[meta.row_mappings.start..meta.row_mappings.start + meta.row_mappings.len] {
-            let target = g.evaluator.storage.row_mappings[actual.row_mappings.start + index]; if seed.variable != target.variable { return false, blot_error::Error.none; } var row: u32 = 0;
+            let target = g.evaluator.storage.row_mappings.items[actual.row_mappings.start + index]; if seed.variable != target.variable { return false, blot_error::Error.none; } var row: u32 = 0;
             if seed.evidence != 0 { let imported, error = graphs.importSemanticRow(g, seed.evidence); if error != blot_error::Error.none || !imported.present { return false, error; } row = imported.value; }
             if row != target.evidence { return false, blot_error::Error.none; }
         }
@@ -439,13 +439,13 @@ recursive fn matchesAnchor<G>(self_: const Plan&, g: G&, graphs: blot_reuse_arti
     for child, index in old.children[left.start..left.start + left.len] { let valid, error = self_.matchesAnchor(g, graphs, positions, semantic, mapped, candidate, inverse, child, current_children[index], depth + 1, inverse_ids); if error != blot_error::Error.none || !valid { return false, error; } }
     return true, blot_error::Error.none;
 }
-fn matchInto<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_root: u32, current_root: u32, mapped: u32[:]) -> bool, Error {
+fn matchInto<G>(self_: Plan, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_root: u32, current_root: u32, mapped: u32[:]) -> bool, Error {
     var scratch = QueryScratch { allocation_owner: g.evaluator.allocation_owner , ..}; let roots = [old_root]; let current = [current_root];
     let result, error = self_.matchEngine(g, graphs, roots, current, mapped, scratch, false); scratch.deinit(); return result, error;
 }
-fn matchIntoWithScratch<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_root: u32, current_root: u32, mapped: u32[:], scratch: QueryScratch&) -> bool, Error { let roots = [old_root]; let current = [current_root]; return self_.matchRootsIntoWithScratch(g, graphs, roots, current, mapped, scratch); }
-fn matchRootsIntoWithScratch<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_roots: const u32[:], current_roots: const u32[:], mapped: u32[:], scratch: QueryScratch&) -> bool, Error { return self_.matchEngine(g, graphs, old_roots, current_roots, mapped, scratch, true); }
-fn matchEngine<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_roots: const u32[:], current_roots: const u32[:], mapped: u32[:], scratch: QueryScratch&, borrowed_anchors: bool) -> bool, Error {
+fn matchIntoWithScratch<G>(self_: Plan, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_root: u32, current_root: u32, mapped: u32[:], scratch: QueryScratch&) -> bool, Error { let roots = [old_root]; let current = [current_root]; return self_.matchRootsIntoWithScratch(g, graphs, roots, current, mapped, scratch); }
+fn matchRootsIntoWithScratch<G>(self_: Plan, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_roots: const u32[:], current_roots: const u32[:], mapped: u32[:], scratch: QueryScratch&) -> bool, Error { return self_.matchEngine(g, graphs, old_roots, current_roots, mapped, scratch, true); }
+fn matchEngine<G>(self_: Plan, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_roots: const u32[:], current_roots: const u32[:], mapped: u32[:], scratch: QueryScratch&, borrowed_anchors: bool) -> bool, Error {
     if old_roots.len == 0 || old_roots.len != current_roots.len { return false, blot_error::Error.none; }
     let bound = scratch.bind(self_, g); if bound != blot_error::Error.none { return false, bound; }
     if !self_.paired(g, graphs) || mapped.len != requiredPools(self_.pools).evaluator.values.len || (borrowed_anchors && !blot_support::same_slice_identity(mapped, scratch.anchors.items)) { return false, blot_error::Error.declined; }
@@ -496,7 +496,7 @@ fn materializeMapped<G>(self_: const Plan&,g: G&,entry: blot_support::Option<u32
 fn materializeReachableMapped<G>(self_: const Plan&,g: G&,graphs: blot_reuse_artifact_import::Importer&,seeds: const u32[:]) -> u32[:],Error {let storage=QueryStorage{values_before:0,values_added:0x7fffffffffffffff,children_added:0x7fffffffffffffff,exact:false, ..}; return self_.materializeImpl(g,blot_support::none<u32>(),blot_support::some(seeds),blot_support::some(storage),graphs,null);}
 fn materializeReceiptMapped<G>(self_: const Plan&,g: G&,seeds: const u32[:],storage: QueryStorage) -> u32[:],Error {return self_.materializeImpl(g,blot_support::none<u32>(),blot_support::some(seeds),blot_support::some(storage),null,null);}
 fn materializeReceiptMappedWithImporter<G>(self_: const Plan&,g: G&,graphs: blot_reuse_artifact_import::Importer&,seeds: const u32[:],storage: QueryStorage) -> u32[:],Error {return self_.materializeImpl(g,blot_support::none<u32>(),blot_support::some(seeds),blot_support::some(storage),graphs,null);}
-fn materializeReceiptWithScratch<G>(self_: const Plan&,g: G&,graphs: blot_reuse_artifact_import::Importer&,seeds: const u32[:],storage: QueryStorage,scratch: QueryScratch&) -> u32[:],Error {
+fn materializeReceiptWithScratch<G>(self_: Plan,g: G&,graphs: blot_reuse_artifact_import::Importer&,seeds: const u32[:],storage: QueryStorage,scratch: QueryScratch&) -> u32[:],Error {
     let error=scratch.bind(self_,g); if error!=blot_error::Error.none {return default<u32[:]>(),error;} if !blot_support::same_slice_identity(seeds,scratch.anchors.items) {return default<u32[:]>(),blot_error::Error.declined;}
     return self_.materializeImpl(g,blot_support::none<u32>(),blot_support::some(seeds),blot_support::some(storage),graphs,scratch);
 }
