@@ -138,7 +138,7 @@ fn sourceU32(module: const blot_check_core::Module&) -> bool {
 fn primitiveEvidence<G>(self_: const State&, g: G&, owner: u32, types: const blot_eval_type_evidence::Mapping[:], rows: const blot_eval_type_evidence::RowMapping[:]) -> PrimitiveResult, Error {
     if rows.len != 0 || types.len == 0 { return PrimitiveResult.fallback, blot_error::Error.none; }
     if !blot_support::same_slice_identity(g.evaluator.units, self_.gate.units) { return PrimitiveResult.declined, blot_error::Error.none; }
-    assert(self_.old); let pools .= self_.old.metadata.pools.value;
+    assert(self_.old); let pools .= requiredOld(self_.old).metadata.pools.value;
     if owner == 0 || owner > pools.modules.len || owner > self_.gate.units.len { return PrimitiveResult.declined, blot_error::Error.none; }
     let pin = pools.modules[owner - 1];
     if pin.unit != owner || !self_.gate.structural_units[owner - 1] { return PrimitiveResult.declined, blot_error::Error.none; }
@@ -283,10 +283,10 @@ fn lookup<G>(self_: State&, g: G&, target: BindingRef, options: blot_eval_core_e
     let no = blot_support::none<SolvedEvidence>();
     if target.unit == 0 || target.unit > self_.gate.units.len || target.binding == 0 || target.binding >= self_.gate.units[target.unit - 1].bindings.len { self_.stats.changed_or_unsupported++; return no, blot_error::Error.none; }
     assert(self_.old);
-    if target.unit > self_.old.cached_units { self_.stats.fresh_unit_requests++; }
+    if target.unit > requiredOld(self_.old).cached_units { self_.stats.fresh_unit_requests++; }
     let exact = self_.gate.admitsPrincipal(target);
     if !exact && !self_.gate.enabled { self_.stats.changed_or_unsupported++; return no, blot_error::Error.none; }
-    let table .= self_.old.metadata.principal_queries;
+    let table .= requiredOld(self_.old).metadata.principal_queries;
     var cursor = table.candidates(blot_reuse_principal_query::fingerprint(target), blot_reuse_semantic_query_table::Order.oldest_first);
     loop {
         let position = cursor.next(); if !position.present { break; }
@@ -318,7 +318,7 @@ fn lookup<G>(self_: State&, g: G&, target: BindingRef, options: blot_eval_core_e
         let replay_error = self_.replayExactInputs(g, target, proof);
         if replay_error != blot_error::Error.none { solved.deinit(); return no, replay_error; }
         if empty { self_.stats.empty_hits++; }
-        self_.stats.hits++; if target.unit > self_.old.cached_units { self_.stats.fresh_unit_hits++; }
+        self_.stats.hits++; if target.unit > requiredOld(self_.old).cached_units { self_.stats.fresh_unit_hits++; }
         return blot_support::some(solved), blot_error::Error.none;
     }
     self_.stats.missing++; return no, blot_error::Error.none;
@@ -360,7 +360,7 @@ fn projectedLookup<G>(self_: State&, g: G&, target: BindingRef, proof: const blo
     else { self_.stats.projected_nonempty_hits++; }
     if !complete_image { self_.stats.projected_source_hits++; }
     self_.stats.hits++; assert(self_.old);
-    if target.unit > self_.old.cached_units { self_.stats.fresh_unit_hits++; }
+    if target.unit > requiredOld(self_.old).cached_units { self_.stats.fresh_unit_hits++; }
     return blot_support::some(solved), blot_error::Error.none;
 }
 

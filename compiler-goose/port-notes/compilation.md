@@ -37,7 +37,7 @@ source/toolchain manifest. From attempt175, an immutable input copy is kept at
 copying. Capture175 costs 0.1865 seconds. Later live edits cannot mix with those
 inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
-(currently15 seconds; previously45), then terminates the build and its compiler process group. A timeout is not a pass.
+(currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
 Checkpoint `0e84f55bea07a49cf3fb74957923779ff717ada7` preserves the first
 frame, recursive-scratch, constructor and slice-selection repairs. Later repairs
@@ -51,23 +51,23 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen281 inputs. Whole parsing passes
-440 files. Its completed run stops after94.63s with1 captured backend principal
-lookup nullable-access error. The15s first-error window is a partial diagnostic
-list; C emission, linking, CLI and Wasm remain pending. ClosureRegion is now an
-invocation-local owner;18 transitive carriers and old suspension cleanup establish
-its callback lifetime, and6 reduced scoped controls reject escapes. Its measured
-1270B record payload is not net stack growth. Owned HeaderParts and Option transfer
-recover the exact existing mask pool run, preserving addresses, flags and cleanup
-without allocation/copy. Indexed-loop pure allocation/outgoing scalar, scalar
-importer children, nullable Plan access, literal word types and stack initialization
-are captured. Earlier indexed controls have a projected Session and older3-helper
-fixture; actual minimal allocation passes its former source boundary but not the
-whole callback.16 backend literal arrays preserve numericbits/order. Complementary
-Session probes collect6 diagnostics at120s, including2 unsupported dummy defaults.
-These remain diagnostic aids, not runtime qualification. Focused control source
-limits and unbenchmarked zeroing/copy/high-water costs remain in pinned receipts.
-Private checker clone/tail bounds remain1M/100k with201 frontend/8 runtime controls.
+per stage. This checkpoint preserves exact frozen 285 inputs. Whole parsing passes
+440 files. The completed run stops after 79.835s with 1 captured schemeImport
+recursive-constructor lifetime error; C emission, linking, CLI and Wasm remain
+pending. The 3s first-error window is a partial diagnostic list, retaining the
+120/300s stage/overall caps. 35 recursion annotations are justified by an
+independently reviewed graph with three concrete callback bindings; a broader
+merged-callback graph was rejected. Bodies are unchanged by those annotations.
+ClosureRegion is an invocation-local owner; 18 transitive carriers and old
+suspension cleanup establish its callback lifetime, and 6 reduced scoped controls
+reject escapes. Its 1270B payload is not measured net stack growth. Exact owned
+mask recovery preserves addresses, flags and cleanup without allocation/copy.
+Later nullable backend accesses, lexical dictionary dispatch and DFS value-cursor
+snapshots are repaired. DFS controls pass both recorded toolchains with 12 strict
+controls. Complementary Session probes remain diagnostic aids: their dummy
+constructors and timeout limits do not qualify full methods. Focused controls
+retain exact source/carrier limits and unbenchmarked zeroing/copy/high-water costs.
+Private checker bounds remain 1M/100k with 201 frontend/8 runtime controls.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
 through one callback boundary. Actual core/snapshot admission methods use explicit

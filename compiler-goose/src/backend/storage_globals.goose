@@ -12,7 +12,7 @@ struct Node {unit: u32,id: u32}
 struct Limits {nodes_per_module: i64 = 100000}
 reusable[] var binding_runs: Ref[>..] = [];
 fn ownBindings(values: const Ref[:]) -> Ref[:] {if values.len == 0 {return default<Ref[:]>();}let result = binding_runs.alloc_slice(values.len);for index in 0..values.len {result[index] = values[index];}return result;}
-fn release(values: const Ref[:]) {if values.len != 0 {let first: const Ref& = values[0];let start = binding_runs.index_of(first);binding_runs.free_slice(binding_runs[start..start + values.len]);}}
+fn release(values: const Ref[:]) {if values.len != 0 {binding_runs.free_slice(values);}}
 fn discover(units: const Module[:],roots: const Node[:],follow_arrays: bool,limits: Limits) -> Ref[:],Error {
     var pending: Node[>..<] = [];var seen: dictionary<u64,bool> = dictionary<u64,bool> {};var globals: Ref[>..] = [];var remaining: i64[>..] = [];for unit in units {remaining.push(limits.nodes_per_module);}pending.append(roots);
     while pending.len != 0 {
@@ -38,7 +38,7 @@ fn discover(units: const Module[:],roots: const Node[:],follow_arrays: bool,limi
 struct Initializer {target: Ref,root: u32,dependencies: const Ref[:]}
 struct Plan {initializers: Initializer[:] = default<Initializer[:]>()}
 reusable[] var initializer_runs: Initializer[>..] = [];
-fn deinit(self_: Plan&) {for item in self_.initializers {release(item.dependencies);}if self_.initializers.len != 0 {initializer_runs.free_slice(self_.initializers);}self_.initializers = [];}
+fn deinit(self_: Plan&) {for item in self_.initializers {release(item.dependencies);}if self_.initializers.len != 0 {initializer_runs.free_slice(self_.initializers);}self_.initializers = default<Initializer[:]>();}
 fn indexOf(bindings: const Ref[:],target: Ref) -> blot_support::Option<i64> {for binding,index in bindings {if binding == target {return blot_support::some(index);}}return blot_support::none<i64>();}
 struct Frame {index: i64,next: i64 = 0}
 fn plan(units: const Module[:],entry: u32) -> Plan,Error {return planWithLimits(units,entry,Limits {..});}
@@ -49,9 +49,9 @@ fn planWithLimits(units: const Module[:],entry: u32,limits: Limits) -> Plan,Erro
         for target in bindings {let module: const Module& = units[target.unit - 1];let body .= module.body(target.binding);if !body {return Plan {..},blot_error::Error.invalid_global;}let dependencies,error = discover(units,[Node {unit: target.unit,id: body.root}],false,limits);if error != blot_error::Error.none {return Plan {..},error;}entries.push(Initializer {target: target,root: body.root,dependencies: dependencies});}
         var states: u8[>..] = [];for entry in entries {states.push(0);}var stack: Frame[>..<] = [];var order: i64[>..] = [];
         for start in 0..bindings.len {if states[start] != 0 {continue;}states[start] = 1;stack.push(Frame {index: start,..});
-            while stack.len != 0 {let top: Frame& = stack[stack.len - 1];let dependencies = entries[top.index].dependencies;
+            while stack.len != 0 {let last = stack.len - 1;let top = stack[last];let dependencies = entries[top.index].dependencies;
                 if top.next == dependencies.len {let done = top.index;stack.resize(stack.len - 1);states[done] = 2;order.push(done);continue;}
-                let next = indexOf(bindings,dependencies[top.next]);if !next.present {return Plan {..},blot_error::Error.invalid_global;}top.next++;if states[next.value] == 1 {return Plan {..},blot_error::Error.initialization_cycle;}if states[next.value] == 2 {continue;}states[next.value] = 1;stack.push(Frame {index: next.value,..});
+                let next = indexOf(bindings,dependencies[top.next]);if !next.present {return Plan {..},blot_error::Error.invalid_global;}stack[last].next++;if states[next.value] == 1 {return Plan {..},blot_error::Error.initialization_cycle;}if states[next.value] == 2 {continue;}states[next.value] = 1;stack.push(Frame {index: next.value,..});
             }
         }
         var ordered: Initializer[:] = default<Initializer[:]>();if entries.len != 0 {ordered = initializer_runs.alloc_slice(entries.len);for index in 0..order.len {ordered[index] = entries[order[index]];}}transferred = true;return Plan {initializers: ordered},blot_error::Error.none;

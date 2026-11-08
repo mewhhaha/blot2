@@ -63,17 +63,17 @@ fn buildChecked<S>(session: S&,value: u32,selected: const Interfaces&,limit: i64
  for child,index in children {
   var binding: u32=0; if anonymous { binding=bindings[index]; } else { let body=module.body(root.identity); if body==null { return default<Inputs>(),blot_error::Error.declined; } binding=module.bodyParameters(body)[index].binding; }
   if child>=view.values.len||child>=view.value_evidence.len||interface(view,selected,child)==0 { return default<Inputs>(),blot_error::Error.declined; }
-  let err=append(words,[0x736c6f74,binding as u64],limit,examined); if err!=blot_error::Error.none { return default<Inputs>(),err; } stack.push(Visit {value:child,depth:0});
+  let err=append(words,[0x736c6f74 as u64,binding as u64],limit,examined); if err!=blot_error::Error.none { return default<Inputs>(),err; } stack.push(Visit {value:child,depth:0});
   while stack.len!=0 {
    let last=stack.len-1; let current=stack[last];
    if !current.opened {
-    let prior=seen.get(current.value);
-    if prior { if prior.active { return default<Inputs>(),blot_error::Error.declined; } let error=append(words,[0,prior.ordinal as u64],limit,examined); if error!=blot_error::Error.none { return default<Inputs>(),error; } stack.resize(last); continue; }
+    let prior=::get(seen,current.value);
+    if prior { if prior.active { return default<Inputs>(),blot_error::Error.declined; } let error=append(words,[0 as u64,prior.ordinal as u64],limit,examined); if error!=blot_error::Error.none { return default<Inputs>(),error; } stack.resize(last); continue; }
     if current.depth>=session.options.max_type_depth||seen.count>=session.options.max_values||seen.count>=0xffffffff { return default<Inputs>(),blot_error::Error.declined; }
     if current.value>=view.values.len||current.value>=view.value_evidence.len||interface(view,selected,current.value)==0 { return default<Inputs>(),blot_error::Error.declined; }
-    let ordinal=seen.count as u32; values.push(current.value); seen.insert(current.value,Seen {ordinal,true}); let info=view.values[current.value];
+    let ordinal=seen.count as u32; values.push(current.value); ::insert(seen,current.value,Seen {ordinal,true}); let info=view.values[current.value];
     if info.start>view.children.len||info.len>view.children.len-info.start { return default<Inputs>(),blot_error::Error.declined; }
-    let h=append(words,[1,ordinal as u64,blot_eval_eval_values::valueKindCode(info.kind) as u64,info.scalar as u64,interface(view,selected,current.value) as u64,info.len as u64],limit,examined); if h!=blot_error::Error.none { return default<Inputs>(),h; }
+    let h=append(words,[1 as u64,ordinal as u64,blot_eval_eval_values::valueKindCode(info.kind) as u64,info.scalar as u64,interface(view,selected,current.value) as u64,info.len as u64],limit,examined); if h!=blot_error::Error.none { return default<Inputs>(),h; }
     let kind=info.kind;
     if kind==blot_eval_eval_values::ValueKind.scalar||kind==blot_eval_eval_values::ValueKind.product||kind==blot_eval_eval_values::ValueKind.record||kind==blot_eval_eval_values::ValueKind.nominal||kind==blot_eval_eval_values::ValueKind.array||kind==blot_eval_eval_values::ValueKind.list||kind==blot_eval_eval_values::ValueKind.cursor { let error=append(words,[info.nominal,info.bits as u64],limit,examined); if error!=blot_error::Error.none { return default<Inputs>(),error; } }
     else if kind==blot_eval_eval_values::ValueKind.closure {
@@ -87,10 +87,10 @@ fn buildChecked<S>(session: S&,value: u32,selected: const Interfaces&,limit: i64
     if kind==blot_eval_eval_values::ValueKind.record { let names=session.recordFieldNames(current.value); let error=append(words,[names.len as u64],limit,examined); if error!=blot_error::Error.none { return default<Inputs>(),error; } for name in names { let er=append(words,[name as u64],limit,examined); if er!=blot_error::Error.none { return default<Inputs>(),er; } } }
     stack[last].opened=true;
    }
-   let info=view.values[current.value]; if current.next==info.len { let prior=seen.get(current.value);if prior {prior.active=false;} stack.resize(last); continue; }
+   let info=view.values[current.value]; if current.next==info.len { let prior=::get(seen,current.value);if prior {prior.active=false;} stack.resize(last); continue; }
    edges++; if edges>limit { return default<Inputs>(),blot_error::Error.declined; } stack[last].next++; stack.push(Visit {value:view.children[info.start+current.next],depth:current.depth+1});
   }
-  let item=seen.get(child); if !item { return default<Inputs>(),blot_error::Error.declined; } slots.push(Slot {binding,interface(view,selected,child),item.ordinal});
+  let item=::get(seen,child); if !item { return default<Inputs>(),blot_error::Error.declined; } slots.push(Slot {binding,interface(view,selected,child),item.ordinal});
  }
  let ms=mapping_pool.alloc_slice(mappings.len); for m,i in mappings { ms[i]=m; } let rs=row_pool.alloc_slice(rows.len); for r,i in rows { rs[i]=r; } let ss=slot_pool.alloc_slice(slots.len); for s,i in slots { ss[i]=s; } let ws=word_pool.alloc_slice(words.len); for w,i in words { ws[i]=w; } let vs=value_pool.alloc_slice(values.len); for v,i in values { vs[i]=v; }
  return Inputs {root.unit,root.identity,anonymous,root.applied,root.ty,view.value_evidence[value],parameters,ms,rs,ss,ws,vs},blot_error::Error.none;

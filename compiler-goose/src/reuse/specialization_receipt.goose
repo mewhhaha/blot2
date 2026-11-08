@@ -273,7 +273,7 @@ fn finish(self_: Tape&, base: Record) -> Record, Error {
     result.complete = result.complete && !self_.nested && !self_.unknown;
     self_.deinit(); return result, blot_error::Error.none;
 }
-fn withTape<C,F>(context: C&) -> Error { var owner,error=initTapeOwner(); if error!=blot_error::Error.none { return error; } let tape=owner.borrow(); assert(tape); let result=F(context,tape); owner.deinit(); return result; }
+recursive fn withTape<C,F>(context: C&) -> Error { var owner,error=initTapeOwner(); if error!=blot_error::Error.none { return error; } let tape=owner.borrow(); assert(tape); let result=F(context,tape); owner.deinit(); return result; }
 
 fn principalOutcomeCode(value: PrincipalOutcome) -> u8 {
     match value { missing => 0, declined => 1, graph => 2 }

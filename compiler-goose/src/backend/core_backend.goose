@@ -583,32 +583,33 @@ fn constantLookup(generator: Generator&, session: blot_eval_core_eval::Session&,
 }
 fn principalLookup(generator: Generator&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options) -> blot_support::Option<blot_eval_core_eval::SolvedEvidence>, blot_error::Error {
     let persisted .= generator.persisted_principals; if persisted { persisted.clearInputs(); }
-    if generator.principal_state != null { let solved, error = generator.principal_state.lookup(generator, target, options); if error != blot_error::Error.none || solved.present { return solved, error; } }
+    let principal .= generator.principal_state; if principal { let solved, error = principal.lookup(generator, target, options); if error != blot_error::Error.none || solved.present { return solved, error; } }
     else { generator.principal_stats.requests++; generator.principal_stats.missing++; }
     if persisted { return persisted.lookup(generator.evaluator, target, options); }
     return blot_support::none<blot_eval_core_eval::SolvedEvidence>(), blot_error::Error.none;
 }
 fn principalGraphLookup(generator: Generator&, key: blot_eval_core_eval::PrincipalGraphKey) -> blot_eval_core_eval::PrincipalGraph&? {
-    if generator.principal_state == null { return null; } let state .= generator.principal_state;
-    if state.gate.source_pools == null || !state.old.metadata.pools.present { return null; }
-    let gate_pools .= state.gate.source_pools; let captured_pools: const blot_reuse_code_artifacts::Pools& = state.old.metadata.pools.value;
+    let state .= generator.principal_state; if state == null { return null; }
+    let gate_pools .= state.gate.source_pools; if gate_pools == null { return null; }
+    let old .= state.old; assert(old); if !old.metadata.pools.present { return null; }
+    let captured_pools: const blot_reuse_code_artifacts::Pools& = old.metadata.pools.value;
     if !(gate_pools .== captured_pools) { return null; }
-    if generator.allocation_owner == 0 || state.old.metadata.allocation_owner != generator.allocation_owner { return null; }
-    return state.old.metadata.principal_graphs.lookup(key, state.gate);
+    if generator.allocation_owner == 0 || old.metadata.allocation_owner != generator.allocation_owner { return null; }
+    return old.metadata.principal_graphs.lookup(key, state.gate);
 }
 fn principalRecord(generator: Generator&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options, solved: blot_eval_core_eval::SolvedEvidence, inputs: const blot_reuse_principal_inputs::Key&?) -> blot_error::Error {
     var selected .= inputs;
-    if selected == null && generator.principal_state != null { selected .= generator.principal_state.last_inputs; }
-    if selected == null && generator.persisted_principals != null && generator.persisted_principals.last_inputs.present { selected .= generator.persisted_principals.last_inputs.value; }
-    if generator.artifacts != null { return generator.artifacts.recordPrincipal(target, options, solved, selected); } return blot_error::Error.none;
+    if selected == null { let principal .= generator.principal_state; if principal { selected .= principal.last_inputs; } }
+    if selected == null { let persisted .= generator.persisted_principals; if persisted { if persisted.last_inputs.present { selected .= persisted.last_inputs.value; } } }
+    let artifacts .= generator.artifacts; if artifacts { return artifacts.recordPrincipal(target, options, solved, selected); } return blot_error::Error.none;
 }
 fn principalStats(generator: const Generator&) -> blot_reuse_principal_evidence_reuse::Stats {
-    var result = generator.principal_stats; if generator.principal_state != null { result = generator.principal_state.stats; } result.fresh_regions = generator.evaluator.principal_regions;
-    if generator.persisted_principals != null {
-        result.persisted_requests = generator.persisted_principals.stats.requests; result.persisted_hits = generator.persisted_principals.stats.hits;
-        result.persisted_nonempty_hits = generator.persisted_principals.stats.nonempty_hits; result.persisted_call_proofs = generator.persisted_principals.stats.call_proofs; result.persisted_declines = generator.persisted_principals.stats.declined;
+    var result = generator.principal_stats; let principal .= generator.principal_state; if principal { result = principal.stats; } result.fresh_regions = generator.evaluator.principal_regions;
+    let persisted .= generator.persisted_principals; if persisted {
+        result.persisted_requests = persisted.stats.requests; result.persisted_hits = persisted.stats.hits;
+        result.persisted_nonempty_hits = persisted.stats.nonempty_hits; result.persisted_call_proofs = persisted.stats.call_proofs; result.persisted_declines = persisted.stats.declined;
     }
-    if generator.artifacts != null { result.captured = generator.artifacts.principal_queries.records.len; } return result;
+    let artifacts .= generator.artifacts; if artifacts { result.captured = artifacts.principal_queries.records.len; } return result;
 }
 struct NamedEmission { key: Key, body: const blot_check_core::Body&, parameter_locals: u32[16], runtime_count: u32, root: u32 }
 fn emitNamedOwner(context: NamedEmission&, emitter: blot_backend_backend_emission::Owner&) -> blot_error::Error {
