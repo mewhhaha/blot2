@@ -224,7 +224,7 @@ result.resolved=ownChecked_resolved(owner,engine.resolved);
 result.bindings=ownChecked_bindings(owner,engine.bindings);
 result.merges=ownChecked_merges(owner,engine.merges);
 result.obligations=ownChecked_obligations(owner,engine.obligations);
-result.diagnostics=ownChecked_diagnostics(owner,engine.diagnostics);
+let diagnostics,diagnostic_error=cloneDiagnostics(owner,engine.diagnostics);if diagnostic_error!=blot_error::Error.none {result.deinit();return default<Checked>(),diagnostic_error;}result.diagnostics=diagnostics;
 result.associated=ownChecked_associated(owner,engine.associated);
 result.nominals=ownChecked_nominals(owner,engine.nominals);
 result.contracts=ownChecked_contracts(owner,engine.contracts);
@@ -260,7 +260,7 @@ result.loop_carries=ownChecked_loop_carries(owner,engine.loop_carries);
 result.loop_ranges=ownChecked_loop_ranges(owner,engine.loop_ranges);
 result.loop_exits=ownChecked_loop_exits(owner,engine.loop_exits);
 result.statement_arms=ownChecked_statement_arms(owner,engine.statement_arms);
-engine.diagnostics.clear();result.proof_contracts=ownChecked_proof_contracts(owner,engine.proof_contracts);ownCheckedHeaders(owner,result.proof_contracts);
+result.proof_contracts=ownChecked_proof_contracts(owner,engine.proof_contracts);ownCheckedHeaders(owner,result.proof_contracts);
 if engine.capability_roots.len!=0 {blot_check_source_sort::pdqContext(0,engine.capability_roots.len,CapabilityRootOrder{engine.capability_roots, ..});result.capability_contracts=blot_check_capability_contracts::Collection{nodes:ownChecked_cap_nodes(owner,engine.capability_store.nodes.items),words:ownChecked_cap_words(owner,engine.capability_store.words.items),bindings:ownChecked_cap_bindings(owner,engine.capability_roots), ..};}
 result.proof_bodies=blot_check_numeric_proof_bodies::Owned{debits:ownChecked_body_debits(owner,engine.proof_body.debits),operands:ownChecked_body_operands(owner,blot_check_numeric_proof_terms::activeTerms(engine.proof_body.values.terms,engine.proof_body.values.index.count)),introductions:ownChecked_body_introductions(owner,engine.proof_body.introductions),parameters:ownChecked_body_parameters(owner,engine.proof_body.parameters),uses:ownChecked_body_uses(owner,engine.proof_body.uses), ..};
 result.editor=engine.editor_capture;if result.editor.present {let names=result.editor.value.names;result.editor.value.names=ownChecked_editor_names(owner,names);blot_reuse_completion_names::release(names);}engine.editor_capture=blot_support::none<EditorCapture>();return result,blot_error::Error.none;}

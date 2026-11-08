@@ -364,7 +364,7 @@ fn validDependencies(module: const Module&, units: const blot_check_frozen_core_
     var erased: i64 = 0;
     for node, id in module.nodes { if node.tag != blot_check_core::Tag.effect_reflection || node.a != blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.of) { continue; } if erased >= module.erased_declaration_references.len || module.erased_declaration_references[erased].node != id { return false, blot_error::Error.none; } erased++; }
     if erased != module.erased_declaration_references.len { return false, blot_error::Error.none; }
-    var scanned = module; scanned.declaration_dependencies = []; scanned.dependency_references = []; scanned.dependency_members = [];
+    var scanned = module; scanned.declaration_dependencies = default<blot_check_core::DeclarationDependencies[:]>(); scanned.dependency_references = default<BindingRef[:]>(); scanned.dependency_members = default<blot_check_core::DependencyMember[:]>();
     var declarations: blot_check_core::DeclarationDependencies[>..<] = []; var references: BindingRef[>..<] = []; var members: blot_check_core::DependencyMember[>..<] = [];
     let captured = blot_reuse_declaration_dependencies::capture(scanned, declarations, references, members);
     if captured == blot_error::Error.out_of_memory { return false, captured; } if captured != blot_error::Error.none { return false, blot_error::Error.none; }

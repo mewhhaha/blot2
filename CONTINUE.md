@@ -27,19 +27,19 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen251
-checkpoints covariant fixed scratch, typed numeric values and loop-frame pool
-reborrows, alongside intrinsic checker repairs from independent probes. Focused
-covariant controls reproduce original failures and pass both checkers; no allocator
-OOM injection was claimed. The completed whole run stops after90.71s with2
-diagnostics: numeric summary borrow and Span/Option mismatch. C emission, linking
-and execution remain pending. Refreshed64-root probes captured17 diagnostics at
-a120s cap; unsupported dummy constructors and unproven borrow-context warnings
-remain excluded from production-fix claims. Numeric rollback retains high-water
-physical backing but exact live IDs/views; overlap remains O(n+m). Component
-fixtures and their reductions are pinned. The private checker uses bounded1M
-clone/separate100k tail limits with201 frontend/8 runtime parity controls.
-Failing-prefix observations are not completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen253
+checkpoints numeric child snapshots, typed provider/reuse resets, safe diagnostic
+publication through the existing owned clone path, and additional API repairs.
+The completed whole run stops after90.57s with5 diagnostics in5 files; C emission,
+linking and execution remain pending. Diagnostic publication adds a payload copy;
+its cost is not measured. Covariant and numeric component controls qualify their
+recorded earlier source hashes, not this whole compiler. Independent probes expose
+additional checker paths; unsupported dummy constructors and unproven borrow
+warnings remain excluded from production-fix claims. Numeric rollback retains
+high-water physical backing but exact live IDs/views; overlap remains O(n+m).
+The private checker uses bounded1M clone/separate100k tail limits with201 frontend/8
+runtime parity controls. Failing-prefix observations are not completed compiler
+timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

@@ -227,7 +227,15 @@ fn ownChecked_resolved(owner:CheckedOwner,values:const BindingId[:])->BindingId[
 fn ownChecked_bindings(owner:CheckedOwner,values:const Binding[:])->Binding[:] {let state .= checkedOwnerState(owner);assert(state.bindings.len==0);let result=checked_bindings.alloc_slice(values.len);for value,index in values {result[index]=value;}state.bindings=result;return result;}
 fn ownChecked_merges(owner:CheckedOwner,values:const Merge[:])->Merge[:] {let state .= checkedOwnerState(owner);assert(state.merges.len==0);let result=checked_merges.alloc_slice(values.len);for value,index in values {result[index]=value;}state.merges=result;return result;}
 fn ownChecked_obligations(owner:CheckedOwner,values:const blot_check_types::Obligation[:])->blot_check_types::Obligation[:] {let state .= checkedOwnerState(owner);assert(state.obligations.len==0);let result=checked_obligations.alloc_slice(values.len);for value,index in values {result[index]=value;}state.obligations=result;return result;}
-fn ownChecked_diagnostics(owner:CheckedOwner,values:const Diagnostic[:])->Diagnostic[:] {let state .= checkedOwnerState(owner);assert(state.diagnostics.len==0);let result=checked_diagnostics.alloc_slice(values.len);for value,index in values {result[index]=value;}state.diagnostics=result;return result;}
+// Publish scalar metadata first. cloneDiagnostics installs independently owned
+// text, hole and explanation payloads after this run has a cleanup owner.
+fn ownChecked_diagnostics(owner:CheckedOwner,values:const Diagnostic[:])->Diagnostic[:] {
+ let state .= checkedOwnerState(owner);assert(state.diagnostics.len==0);let result=checked_diagnostics.alloc_slice(values.len);
+ for value,index in values {result[index]=Diagnostic{origin_unit:value.origin_unit,code:value.code,span:value.span,node:value.node,
+  type_application:value.type_application,symbol:value.symbol,implicit_type_witness:value.implicit_type_witness,source_terminator:value.source_terminator,
+  numeric_literal:value.numeric_literal,contexts:value.contexts,context_len:value.context_len,..};}
+ state.diagnostics=result;return result;
+}
 fn ownChecked_associated(owner:CheckedOwner,values:const Associated[:])->Associated[:] {let state .= checkedOwnerState(owner);assert(state.associated.len==0);let result=checked_associated.alloc_slice(values.len);for value,index in values {result[index]=value;}state.associated=result;return result;}
 fn ownChecked_nominals(owner:CheckedOwner,values:const Nominal[:])->Nominal[:] {let state .= checkedOwnerState(owner);assert(state.nominals.len==0);let result=checked_nominals.alloc_slice(values.len);for value,index in values {result[index]=value;}state.nominals=result;return result;}
 fn ownChecked_contracts(owner:CheckedOwner,values:const Contract[:])->Contract[:] {let state .= checkedOwnerState(owner);assert(state.contracts.len==0);let result=checked_contracts.alloc_slice(values.len);for value,index in values {result[index]=value;}state.contracts=result;return result;}

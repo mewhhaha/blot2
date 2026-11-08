@@ -53,7 +53,7 @@ fn reserve(map: FrameOwners&,extra: i64) -> blot_error::Error { if extra < 0 || 
 fn insert(map: FrameOwners&,key: Head,value: Authority) { var view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; blot_support_pooled_map::insert(view,key,value,frame_owner_slots); map.count = view.count; map.slots = view.slots; }
 fn remove(map: FrameOwners&,key: Head) -> bool { var view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; let removed = blot_support_pooled_map::remove(view,key); map.count = view.count; map.slots = view.slots; return removed; }
 fn clear(map: FrameOwners&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
-fn deinit(map: FrameOwners&) { if map.slots.len != 0 { frame_owner_slots.free_slice(map.slots); } map.slots = []; map.count = 0; }
+fn deinit(map: FrameOwners&) { if map.slots.len != 0 { frame_owner_slots.free_slice(map.slots); } map.slots = default<dictionary_slot<Head,Authority>[:]>(); map.count = 0; }
 struct Activation { scopes: Scopes }
 struct State { owner_id: u64,generation: u64,frames: Frames,cells: Cells,authorities: blot_check_effect_authority::Store,frame_owners: FrameOwners }
 reusable var states: State[>..] = [];
