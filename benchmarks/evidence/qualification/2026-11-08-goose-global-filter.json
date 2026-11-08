@@ -565694,5 +565694,1711 @@
     },
     "result": "120.281s timeout with0diagnostics/no C/header/executable; helper controls pass but whole boundary remains unqualified",
     "next": "One instrumentation-only58-word ABI2 work measurement fromselected57bb on frozen409, same120s cap; no speculative optimization or identical ordinary rerun"
+  },
+  "instrumented_work_progress_410": {
+    "status": "measurement-only; capped119.671s including cleanup, no program C/header/executable; selected private checker57bb unchanged",
+    "source": "exact frozen409 authored input matrix; no new source repair in this measurement",
+    "result": {
+      "sha256": "8786168a169ce4124216e9de9df98de50f8c9aa0d2f5de61cfc2e2337bc83d90",
+      "contents": {
+        "command": [
+          "/home/jacobt/src/blot2/build/goose-port/work-telemetry-v2-build/goose",
+          "-o",
+          "/home/jacobt/src/blot2/build/goose-port/verification/work410/blot_goose.c",
+          "--header",
+          "/home/jacobt/src/blot2/build/goose-port/verification/work410/blot_goose.h",
+          "-O0",
+          "--stdlib",
+          "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+          "/home/jacobt/src/blot2/build/goose-port/verification/build-409-inputs/compiler-goose/src/main.goose"
+        ],
+        "binary_sha256": "ee44e952b880e668eebe30aead188453663b8a92c10cfdf1b6d8ff13c3d7edea",
+        "driver_sha256": "07c101587278c36c14c3008a930dbaaea37fb1607f772ace098df172ea75f3f6",
+        "cleanup_proxy_sha256": "341c74f1d8b5ed8f9dd038e377a7658db2eca12d172265e82acb56ae5bc540b2",
+        "gdb_sha256": "e2db863afa4d39c743d5057509aa18a9a6330d5b7ccd71a63ffe70c8b862810a",
+        "manifest_sha256": "9754815dc6dbd83de241fadb449c2acc7905e63e6be6462a1ec19e02dce9f2b3",
+        "targets_seconds": [
+          5,
+          20,
+          50,
+          90,
+          115
+        ],
+        "cap_seconds": 120,
+        "log_cap_bytes": 8388608,
+        "GOOSE_ROUNDS": "1",
+        "instrumentation_only": true,
+        "signal_requests": [
+          {
+            "target": 5,
+            "elapsed": 5.003650825005025
+          },
+          {
+            "target": 20,
+            "elapsed": 20.00821452800301
+          },
+          {
+            "target": 50,
+            "elapsed": 50.00825442399946
+          },
+          {
+            "target": 90,
+            "elapsed": 90.0078702030005
+          },
+          {
+            "target": 115,
+            "elapsed": 115.00847798200266
+          }
+        ],
+        "stop_reason": "fixed measurement cap",
+        "cleanup_groups": [
+          2426735,
+          2426760
+        ],
+        "gdb_exit_code": 0,
+        "remaining_groups": [],
+        "elapsed_seconds": 119.67081406600482,
+        "counter_state": {
+          "exited": true,
+          "exit_code": null,
+          "samples": [
+            {
+              "elapsed_seconds": 4.907217425003182,
+              "pid": 2426760,
+              "address": "0x555555c31700",
+              "raw_sha256": "306f3f7bc01f7f5753079637d31a205d54812803550a7b1a23b29543e19b83c1",
+              "words": [
+                5138412918917254994,
+                2,
+                58,
+                223861,
+                3392,
+                266,
+                2416,
+                18718,
+                65654,
+                16300,
+                429,
+                2932,
+                2887,
+                15,
+                87,
+                519,
+                34,
+                5,
+                18689,
+                131708,
+                352397,
+                3185670,
+                23404,
+                0,
+                0,
+                0,
+                0,
+                1,
+                6,
+                0,
+                1,
+                67354,
+                175402,
+                7284,
+                15684,
+                179130,
+                490898,
+                4448,
+                3483,
+                3483,
+                15279,
+                106476,
+                83375,
+                3882317,
+                52922024,
+                56353,
+                393385,
+                30,
+                67,
+                2401,
+                2380,
+                1959,
+                2,
+                67659,
+                48,
+                15,
+                68,
+                3183049
+              ],
+              "counts": {
+                "types_created": 223861,
+                "struct_instances_created": 3392,
+                "enum_instances_created": 266,
+                "specs_created": 2416,
+                "spec_lookup_calls": 18718,
+                "spec_candidates_tested": 65654,
+                "spec_reused": 16300,
+                "spec_stale_rechecks": 429,
+                "body_pass_started": 2932,
+                "body_pass_completed": 2887,
+                "extern_completed": 15,
+                "scc_round_starts": 87,
+                "scc_members_scheduled": 519,
+                "scc_max_members": 34,
+                "scc_max_round": 5,
+                "apply_stores_calls": 18689,
+                "classat_calls": 131708,
+                "classat_parameter_tests": 352397,
+                "record_store_events_examined": 3185670,
+                "class_events_examined": 23404,
+                "held_sweeps": 0,
+                "held_entries_examined": 0,
+                "held_entries_applied": 0,
+                "held_max_sweeps_one_call": 0,
+                "slot_sweeps": 1,
+                "slot_entries_examined": 6,
+                "slot_entries_changed": 0,
+                "slot_max_sweeps_one_call": 1,
+                "store_events_added": 67354,
+                "class_dedup_comparisons": 175402,
+                "new_class_facts": 7284,
+                "root_candidates_calls": 15684,
+                "local_candidates_considered": 179130,
+                "global_candidates_considered": 490898,
+                "shrink_scan_groups": 4448,
+                "used_after_calls": 3483,
+                "used_after_exit_scan_requests": 3483,
+                "exit_scan_statements": 15279,
+                "escaping_continue_node_visits": 106476,
+                "mentions_name_node_visits": 83375,
+                "array_reach_node_visits": 3882317,
+                "type_eq_calls": 52922024,
+                "check_statement_visits": 56353,
+                "check_value_visits": 393385,
+                "active_body_passes": 30,
+                "max_active_body_passes": 67,
+                "last_body_started_id": 2401,
+                "last_body_completed_id": 2380,
+                "last_scc_head_id": 1959,
+                "last_scc_round": 2,
+                "store_events_highwater": 67659,
+                "class_facts_highwater": 48,
+                "max_classat_parameters": 15,
+                "scc_settled_rounds": 68,
+                "raw_identity_skips": 3183049
+              }
+            },
+            {
+              "elapsed_seconds": 19.910119089996442,
+              "pid": 2426760,
+              "address": "0x555555c31700",
+              "raw_sha256": "03568cfe26c8f573d24c8c45fd8e98d02dd0a6405366dbd2418d0e07a50df644",
+              "words": [
+                5138412918917254994,
+                2,
+                58,
+                281338,
+                3404,
+                266,
+                4127,
+                50980,
+                196078,
+                46834,
+                1715,
+                6009,
+                5959,
+                16,
+                167,
+                1962,
+                281,
+                5,
+                50947,
+                1297645,
+                3537532,
+                398139170,
+                368689,
+                200,
+                272,
+                136,
+                2,
+                1,
+                6,
+                0,
+                1,
+                2393533,
+                19069775,
+                107837,
+                349581,
+                3763053,
+                11722315,
+                4469,
+                3495,
+                3495,
+                15291,
+                106584,
+                84526,
+                16894943,
+                346172893,
+                139776,
+                962526,
+                34,
+                67,
+                3920,
+                3767,
+                1907,
+                4,
+                2394038,
+                258,
+                17,
+                120,
+                398079166
+              ],
+              "counts": {
+                "types_created": 281338,
+                "struct_instances_created": 3404,
+                "enum_instances_created": 266,
+                "specs_created": 4127,
+                "spec_lookup_calls": 50980,
+                "spec_candidates_tested": 196078,
+                "spec_reused": 46834,
+                "spec_stale_rechecks": 1715,
+                "body_pass_started": 6009,
+                "body_pass_completed": 5959,
+                "extern_completed": 16,
+                "scc_round_starts": 167,
+                "scc_members_scheduled": 1962,
+                "scc_max_members": 281,
+                "scc_max_round": 5,
+                "apply_stores_calls": 50947,
+                "classat_calls": 1297645,
+                "classat_parameter_tests": 3537532,
+                "record_store_events_examined": 398139170,
+                "class_events_examined": 368689,
+                "held_sweeps": 200,
+                "held_entries_examined": 272,
+                "held_entries_applied": 136,
+                "held_max_sweeps_one_call": 2,
+                "slot_sweeps": 1,
+                "slot_entries_examined": 6,
+                "slot_entries_changed": 0,
+                "slot_max_sweeps_one_call": 1,
+                "store_events_added": 2393533,
+                "class_dedup_comparisons": 19069775,
+                "new_class_facts": 107837,
+                "root_candidates_calls": 349581,
+                "local_candidates_considered": 3763053,
+                "global_candidates_considered": 11722315,
+                "shrink_scan_groups": 4469,
+                "used_after_calls": 3495,
+                "used_after_exit_scan_requests": 3495,
+                "exit_scan_statements": 15291,
+                "escaping_continue_node_visits": 106584,
+                "mentions_name_node_visits": 84526,
+                "array_reach_node_visits": 16894943,
+                "type_eq_calls": 346172893,
+                "check_statement_visits": 139776,
+                "check_value_visits": 962526,
+                "active_body_passes": 34,
+                "max_active_body_passes": 67,
+                "last_body_started_id": 3920,
+                "last_body_completed_id": 3767,
+                "last_scc_head_id": 1907,
+                "last_scc_round": 4,
+                "store_events_highwater": 2394038,
+                "class_facts_highwater": 258,
+                "max_classat_parameters": 17,
+                "scc_settled_rounds": 120,
+                "raw_identity_skips": 398079166
+              },
+              "selected_thread_stack": {
+                "thread_num": 1,
+                "ptid": [
+                  2426760,
+                  2426760,
+                  0
+                ],
+                "walked_frames": 9,
+                "truncated": false,
+                "top": [
+                  {
+                    "index": 0,
+                    "name": null,
+                    "pc": "0x7ffff76b5a22"
+                  },
+                  {
+                    "index": 1,
+                    "name": null,
+                    "pc": "0x7ffff76a908a"
+                  },
+                  {
+                    "index": 2,
+                    "name": null,
+                    "pc": "0x7ffff76ae797"
+                  },
+                  {
+                    "index": 3,
+                    "name": "goose::RunOnCompilerStack(std::function<int ()> const&)",
+                    "pc": "0x55555557d05c"
+                  },
+                  {
+                    "index": 4,
+                    "name": "goose::Main(int, char**)::$_2::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const",
+                    "pc": "0x55555557bbd3"
+                  },
+                  {
+                    "index": 5,
+                    "name": "goose::Main(int, char**)",
+                    "pc": "0x55555557a559"
+                  },
+                  {
+                    "index": 6,
+                    "name": null,
+                    "pc": "0x7ffff7627d0e"
+                  },
+                  {
+                    "index": 7,
+                    "name": "__libc_start_main",
+                    "pc": "0x7ffff7627e4b"
+                  },
+                  {
+                    "index": 8,
+                    "name": "_start",
+                    "pc": "0x555555565f35"
+                  }
+                ],
+                "bottom": [
+                  {
+                    "index": 0,
+                    "name": null,
+                    "pc": "0x7ffff76b5a22"
+                  },
+                  {
+                    "index": 1,
+                    "name": null,
+                    "pc": "0x7ffff76a908a"
+                  },
+                  {
+                    "index": 2,
+                    "name": null,
+                    "pc": "0x7ffff76ae797"
+                  },
+                  {
+                    "index": 3,
+                    "name": "goose::RunOnCompilerStack(std::function<int ()> const&)",
+                    "pc": "0x55555557d05c"
+                  },
+                  {
+                    "index": 4,
+                    "name": "goose::Main(int, char**)::$_2::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const",
+                    "pc": "0x55555557bbd3"
+                  },
+                  {
+                    "index": 5,
+                    "name": "goose::Main(int, char**)",
+                    "pc": "0x55555557a559"
+                  },
+                  {
+                    "index": 6,
+                    "name": null,
+                    "pc": "0x7ffff7627d0e"
+                  },
+                  {
+                    "index": 7,
+                    "name": "__libc_start_main",
+                    "pc": "0x7ffff7627e4b"
+                  },
+                  {
+                    "index": 8,
+                    "name": "_start",
+                    "pc": "0x555555565f35"
+                  }
+                ]
+              },
+              "stack_elapsed_seconds": 0.0004298089916119352
+            },
+            {
+              "elapsed_seconds": 49.91029146799701,
+              "pid": 2426760,
+              "address": "0x555555c31700",
+              "raw_sha256": "15d2cae28c0ee939e2782486d9a2fd73750fa37b25e9117a48e1a2560c9731df",
+              "words": [
+                5138412918917254994,
+                2,
+                58,
+                490713,
+                3515,
+                266,
+                11946,
+                131242,
+                1357717,
+                119297,
+                3080,
+                15386,
+                15291,
+                27,
+                360,
+                3440,
+                281,
+                5,
+                131175,
+                2655525,
+                6382114,
+                706766758,
+                697022,
+                890,
+                1112,
+                556,
+                2,
+                22,
+                972,
+                12,
+                2,
+                3989276,
+                27465019,
+                188391,
+                603900,
+                6962448,
+                20525138,
+                35478,
+                53613,
+                53612,
+                177603,
+                1717559,
+                2752614,
+                44959830,
+                2201172548,
+                333238,
+                2145352,
+                68,
+                89,
+                11945,
+                11934,
+                11935,
+                3,
+                3993961,
+                258,
+                34,
+                247,
+                706600979
+              ],
+              "counts": {
+                "types_created": 490713,
+                "struct_instances_created": 3515,
+                "enum_instances_created": 266,
+                "specs_created": 11946,
+                "spec_lookup_calls": 131242,
+                "spec_candidates_tested": 1357717,
+                "spec_reused": 119297,
+                "spec_stale_rechecks": 3080,
+                "body_pass_started": 15386,
+                "body_pass_completed": 15291,
+                "extern_completed": 27,
+                "scc_round_starts": 360,
+                "scc_members_scheduled": 3440,
+                "scc_max_members": 281,
+                "scc_max_round": 5,
+                "apply_stores_calls": 131175,
+                "classat_calls": 2655525,
+                "classat_parameter_tests": 6382114,
+                "record_store_events_examined": 706766758,
+                "class_events_examined": 697022,
+                "held_sweeps": 890,
+                "held_entries_examined": 1112,
+                "held_entries_applied": 556,
+                "held_max_sweeps_one_call": 2,
+                "slot_sweeps": 22,
+                "slot_entries_examined": 972,
+                "slot_entries_changed": 12,
+                "slot_max_sweeps_one_call": 2,
+                "store_events_added": 3989276,
+                "class_dedup_comparisons": 27465019,
+                "new_class_facts": 188391,
+                "root_candidates_calls": 603900,
+                "local_candidates_considered": 6962448,
+                "global_candidates_considered": 20525138,
+                "shrink_scan_groups": 35478,
+                "used_after_calls": 53613,
+                "used_after_exit_scan_requests": 53612,
+                "exit_scan_statements": 177603,
+                "escaping_continue_node_visits": 1717559,
+                "mentions_name_node_visits": 2752614,
+                "array_reach_node_visits": 44959830,
+                "type_eq_calls": 2201172548,
+                "check_statement_visits": 333238,
+                "check_value_visits": 2145352,
+                "active_body_passes": 68,
+                "max_active_body_passes": 89,
+                "last_body_started_id": 11945,
+                "last_body_completed_id": 11934,
+                "last_scc_head_id": 11935,
+                "last_scc_round": 3,
+                "store_events_highwater": 3993961,
+                "class_facts_highwater": 258,
+                "max_classat_parameters": 34,
+                "scc_settled_rounds": 247,
+                "raw_identity_skips": 706600979
+              }
+            },
+            {
+              "elapsed_seconds": 89.90983860600682,
+              "pid": 2426760,
+              "address": "0x555555c31700",
+              "raw_sha256": "ee4b7a94e6ef1b64e0530be06e1e0784015e0b86b1f894f6af3a0c1e79a81b18",
+              "words": [
+                5138412918917254994,
+                2,
+                58,
+                582949,
+                3559,
+                266,
+                13654,
+                158316,
+                1559433,
+                144633,
+                3636,
+                17677,
+                17607,
+                31,
+                387,
+                4032,
+                281,
+                5,
+                158278,
+                4233610,
+                8928600,
+                980433656,
+                1147013,
+                1294,
+                1524,
+                762,
+                2,
+                60,
+                2676,
+                12,
+                2,
+                5752204,
+                83622829,
+                364760,
+                1026047,
+                12802827,
+                35576397,
+                471943,
+                490733,
+                490732,
+                2060055,
+                24534701,
+                22385928,
+                70598200,
+                7329989385,
+                401578,
+                2490985,
+                39,
+                96,
+                13405,
+                13368,
+                6287,
+                3,
+                5772534,
+                645,
+                34,
+                268,
+                980243319
+              ],
+              "counts": {
+                "types_created": 582949,
+                "struct_instances_created": 3559,
+                "enum_instances_created": 266,
+                "specs_created": 13654,
+                "spec_lookup_calls": 158316,
+                "spec_candidates_tested": 1559433,
+                "spec_reused": 144633,
+                "spec_stale_rechecks": 3636,
+                "body_pass_started": 17677,
+                "body_pass_completed": 17607,
+                "extern_completed": 31,
+                "scc_round_starts": 387,
+                "scc_members_scheduled": 4032,
+                "scc_max_members": 281,
+                "scc_max_round": 5,
+                "apply_stores_calls": 158278,
+                "classat_calls": 4233610,
+                "classat_parameter_tests": 8928600,
+                "record_store_events_examined": 980433656,
+                "class_events_examined": 1147013,
+                "held_sweeps": 1294,
+                "held_entries_examined": 1524,
+                "held_entries_applied": 762,
+                "held_max_sweeps_one_call": 2,
+                "slot_sweeps": 60,
+                "slot_entries_examined": 2676,
+                "slot_entries_changed": 12,
+                "slot_max_sweeps_one_call": 2,
+                "store_events_added": 5752204,
+                "class_dedup_comparisons": 83622829,
+                "new_class_facts": 364760,
+                "root_candidates_calls": 1026047,
+                "local_candidates_considered": 12802827,
+                "global_candidates_considered": 35576397,
+                "shrink_scan_groups": 471943,
+                "used_after_calls": 490733,
+                "used_after_exit_scan_requests": 490732,
+                "exit_scan_statements": 2060055,
+                "escaping_continue_node_visits": 24534701,
+                "mentions_name_node_visits": 22385928,
+                "array_reach_node_visits": 70598200,
+                "type_eq_calls": 7329989385,
+                "check_statement_visits": 401578,
+                "check_value_visits": 2490985,
+                "active_body_passes": 39,
+                "max_active_body_passes": 96,
+                "last_body_started_id": 13405,
+                "last_body_completed_id": 13368,
+                "last_scc_head_id": 6287,
+                "last_scc_round": 3,
+                "store_events_highwater": 5772534,
+                "class_facts_highwater": 645,
+                "max_classat_parameters": 34,
+                "scc_settled_rounds": 268,
+                "raw_identity_skips": 980243319
+              },
+              "selected_thread_stack": {
+                "thread_num": 1,
+                "ptid": [
+                  2426760,
+                  2426760,
+                  0
+                ],
+                "walked_frames": 9,
+                "truncated": false,
+                "top": [
+                  {
+                    "index": 0,
+                    "name": null,
+                    "pc": "0x7ffff76b5a22"
+                  },
+                  {
+                    "index": 1,
+                    "name": null,
+                    "pc": "0x7ffff76a908a"
+                  },
+                  {
+                    "index": 2,
+                    "name": null,
+                    "pc": "0x7ffff76ae797"
+                  },
+                  {
+                    "index": 3,
+                    "name": "goose::RunOnCompilerStack(std::function<int ()> const&)",
+                    "pc": "0x55555557d05c"
+                  },
+                  {
+                    "index": 4,
+                    "name": "goose::Main(int, char**)::$_2::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const",
+                    "pc": "0x55555557bbd3"
+                  },
+                  {
+                    "index": 5,
+                    "name": "goose::Main(int, char**)",
+                    "pc": "0x55555557a559"
+                  },
+                  {
+                    "index": 6,
+                    "name": null,
+                    "pc": "0x7ffff7627d0e"
+                  },
+                  {
+                    "index": 7,
+                    "name": "__libc_start_main",
+                    "pc": "0x7ffff7627e4b"
+                  },
+                  {
+                    "index": 8,
+                    "name": "_start",
+                    "pc": "0x555555565f35"
+                  }
+                ],
+                "bottom": [
+                  {
+                    "index": 0,
+                    "name": null,
+                    "pc": "0x7ffff76b5a22"
+                  },
+                  {
+                    "index": 1,
+                    "name": null,
+                    "pc": "0x7ffff76a908a"
+                  },
+                  {
+                    "index": 2,
+                    "name": null,
+                    "pc": "0x7ffff76ae797"
+                  },
+                  {
+                    "index": 3,
+                    "name": "goose::RunOnCompilerStack(std::function<int ()> const&)",
+                    "pc": "0x55555557d05c"
+                  },
+                  {
+                    "index": 4,
+                    "name": "goose::Main(int, char**)::$_2::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const",
+                    "pc": "0x55555557bbd3"
+                  },
+                  {
+                    "index": 5,
+                    "name": "goose::Main(int, char**)",
+                    "pc": "0x55555557a559"
+                  },
+                  {
+                    "index": 6,
+                    "name": null,
+                    "pc": "0x7ffff7627d0e"
+                  },
+                  {
+                    "index": 7,
+                    "name": "__libc_start_main",
+                    "pc": "0x7ffff7627e4b"
+                  },
+                  {
+                    "index": 8,
+                    "name": "_start",
+                    "pc": "0x555555565f35"
+                  }
+                ]
+              },
+              "stack_elapsed_seconds": 0.000411264001741074
+            },
+            {
+              "elapsed_seconds": 114.91033934199368,
+              "pid": 2426760,
+              "address": "0x555555c31700",
+              "raw_sha256": "6014b4a673dd8c1783206c65818384f3fa6bbe0a1b6f07f25b431e70f379667f",
+              "words": [
+                5138412918917254994,
+                2,
+                58,
+                1717811,
+                3566,
+                266,
+                15176,
+                178096,
+                1717845,
+                162921,
+                4165,
+                19730,
+                19689,
+                31,
+                389,
+                4562,
+                281,
+                5,
+                178087,
+                5681476,
+                11138999,
+                1302156112,
+                1575953,
+                1498,
+                1728,
+                864,
+                2,
+                647,
+                6308,
+                94,
+                2,
+                7450631,
+                147966448,
+                538314,
+                1443543,
+                18503798,
+                50265896,
+                860738,
+                858954,
+                858953,
+                3786073,
+                45459330,
+                40242931,
+                86478877,
+                7933907721,
+                454084,
+                2742062,
+                10,
+                96,
+                15175,
+                15175,
+                6287,
+                5,
+                7472569,
+                645,
+                34,
+                269,
+                1301951822
+              ],
+              "counts": {
+                "types_created": 1717811,
+                "struct_instances_created": 3566,
+                "enum_instances_created": 266,
+                "specs_created": 15176,
+                "spec_lookup_calls": 178096,
+                "spec_candidates_tested": 1717845,
+                "spec_reused": 162921,
+                "spec_stale_rechecks": 4165,
+                "body_pass_started": 19730,
+                "body_pass_completed": 19689,
+                "extern_completed": 31,
+                "scc_round_starts": 389,
+                "scc_members_scheduled": 4562,
+                "scc_max_members": 281,
+                "scc_max_round": 5,
+                "apply_stores_calls": 178087,
+                "classat_calls": 5681476,
+                "classat_parameter_tests": 11138999,
+                "record_store_events_examined": 1302156112,
+                "class_events_examined": 1575953,
+                "held_sweeps": 1498,
+                "held_entries_examined": 1728,
+                "held_entries_applied": 864,
+                "held_max_sweeps_one_call": 2,
+                "slot_sweeps": 647,
+                "slot_entries_examined": 6308,
+                "slot_entries_changed": 94,
+                "slot_max_sweeps_one_call": 2,
+                "store_events_added": 7450631,
+                "class_dedup_comparisons": 147966448,
+                "new_class_facts": 538314,
+                "root_candidates_calls": 1443543,
+                "local_candidates_considered": 18503798,
+                "global_candidates_considered": 50265896,
+                "shrink_scan_groups": 860738,
+                "used_after_calls": 858954,
+                "used_after_exit_scan_requests": 858953,
+                "exit_scan_statements": 3786073,
+                "escaping_continue_node_visits": 45459330,
+                "mentions_name_node_visits": 40242931,
+                "array_reach_node_visits": 86478877,
+                "type_eq_calls": 7933907721,
+                "check_statement_visits": 454084,
+                "check_value_visits": 2742062,
+                "active_body_passes": 10,
+                "max_active_body_passes": 96,
+                "last_body_started_id": 15175,
+                "last_body_completed_id": 15175,
+                "last_scc_head_id": 6287,
+                "last_scc_round": 5,
+                "store_events_highwater": 7472569,
+                "class_facts_highwater": 645,
+                "max_classat_parameters": 34,
+                "scc_settled_rounds": 269,
+                "raw_identity_skips": 1301951822
+              }
+            }
+          ],
+          "error": null
+        },
+        "program_log_bytes": 21920,
+        "program_c_exists": false
+      }
+    },
+    "pilot_measurement_review": {
+      "sha256": "025f30a00b2c25ea00953ced4816793a345e2bf9a488b82190d17f5886bf8d0e",
+      "contents": {
+        "status": "bounded diagnostic measurement completed and reaped",
+        "result_sha256": "8786168a169ce4124216e9de9df98de50f8c9aa0d2f5de61cfc2e2337bc83d90",
+        "binary_sha256": "ee44e952b880e668eebe30aead188453663b8a92c10cfdf1b6d8ff13c3d7edea",
+        "driver_sha256": "07c101587278c36c14c3008a930dbaaea37fb1607f772ace098df172ea75f3f6",
+        "manifest_sha256": "9754815dc6dbd83de241fadb449c2acc7905e63e6be6462a1ec19e02dce9f2b3",
+        "source_pins_sha256": "f823c4383e181f07ef656d9aa5df988954412dbd7e57b4db49f8767f15241b0d",
+        "elapsed_seconds": 119.67081406600482,
+        "stop_reason": "fixed measurement cap",
+        "samples": [
+          {
+            "file": "sample-0.bin",
+            "sha256": "306f3f7bc01f7f5753079637d31a205d54812803550a7b1a23b29543e19b83c1",
+            "bytes": 464,
+            "elapsed_seconds": 4.907217425003182
+          },
+          {
+            "file": "sample-1.bin",
+            "sha256": "03568cfe26c8f573d24c8c45fd8e98d02dd0a6405366dbd2418d0e07a50df644",
+            "bytes": 464,
+            "elapsed_seconds": 19.910119089996442
+          },
+          {
+            "file": "sample-2.bin",
+            "sha256": "15d2cae28c0ee939e2782486d9a2fd73750fa37b25e9117a48e1a2560c9731df",
+            "bytes": 464,
+            "elapsed_seconds": 49.91029146799701
+          },
+          {
+            "file": "sample-3.bin",
+            "sha256": "ee4b7a94e6ef1b64e0530be06e1e0784015e0b86b1f894f6af3a0c1e79a81b18",
+            "bytes": 464,
+            "elapsed_seconds": 89.90983860600682
+          },
+          {
+            "file": "sample-4.bin",
+            "sha256": "6014b4a673dd8c1783206c65818384f3fa6bbe0a1b6f07f25b431e70f379667f",
+            "bytes": 464,
+            "elapsed_seconds": 114.91033934199368
+          }
+        ],
+        "all58word_snapshots_verified": true,
+        "reader_error": null,
+        "remaining_groups": [],
+        "program_c_exists": false,
+        "program_h_exists": false,
+        "program_log_bytes": 21920,
+        "optional_stacks": [
+          {
+            "index": 1,
+            "thread": 1,
+            "frames": 9,
+            "top_names": [
+              null,
+              null,
+              null,
+              "goose::RunOnCompilerStack(std::function<int ()> const&)",
+              "goose::Main(int, char**)::$_2::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const",
+              "goose::Main(int, char**)"
+            ],
+            "stack_elapsed_seconds": 0.0004298089916119352,
+            "stack_error": null
+          },
+          {
+            "index": 3,
+            "thread": 1,
+            "frames": 9,
+            "top_names": [
+              null,
+              null,
+              null,
+              "goose::RunOnCompilerStack(std::function<int ()> const&)",
+              "goose::Main(int, char**)::$_2::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const",
+              "goose::Main(int, char**)"
+            ],
+            "stack_elapsed_seconds": 0.000411264001741074,
+            "stack_error": null
+          }
+        ],
+        "limits": [
+          "Telemetry/debugger wall time not comparable to uninstrumented runs.",
+          "Counter snapshots are nontransactional; examined minus identityskip still includes ownactivation earlyskip.",
+          "Optional stacks captured selected main waiting in RunOnCompilerStack; no activeworker hotspot conclusion.",
+          "No program C/header/executable; no full compiler or runtime qualification."
+        ]
+      }
+    },
+    "qualification": {
+      "sha256": "5818e21814486f6da5414ec1f3798dd19acf4a623879884ab56f017a80db1127",
+      "contents": {
+        "candidate": "isolated telemetry-v2 over selected57bb; unselected",
+        "baseline_binary_sha256": "57bb3e817a5edab895f90cb518812299f1076a49127c3509b37f57a45515e847",
+        "baseline_source108_sha256": "ebc1625848bad00e8b3d3708c6a6df63603c2a884fc3841c4e0b64709178b3d1",
+        "candidate_binary_sha256": "ee44e952b880e668eebe30aead188453663b8a92c10cfdf1b6d8ff13c3d7edea",
+        "candidate_source108_sha256": "91f07ab7aeafa960a304fbd8482ecc4c84be4d86e87e639e957628104f410154",
+        "candidate_manifest_sha256": "9754815dc6dbd83de241fadb449c2acc7905e63e6be6462a1ec19e02dce9f2b3",
+        "candidate_patch_sha256": "85c826f5946eb131489abf24fed0cbec9c89aa2281d59242ba455fca7dae76b2",
+        "changed_files": [
+          "src/ast.h",
+          "src/typecheck.h",
+          "src/typecheck_builtins.h",
+          "src/typecheck_calls.h",
+          "src/typecheck_exprs.h",
+          "src/typecheck_types.h"
+        ],
+        "compile_link_stages": [
+          {
+            "stage": "compile",
+            "exit": 0,
+            "seconds": 55.87
+          },
+          {
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.264
+          }
+        ],
+        "telemetry_abi": {
+          "version": 2,
+          "word_count": 58,
+          "byte_count": 464,
+          "old_57_indexes_preserved": true,
+          "appended_counter": {
+            "index": 57,
+            "name": "raw_identity_skips",
+            "byte_offset": 456
+          }
+        },
+        "gates": {
+          "frontend": 201,
+          "historical_runtime": 8,
+          "focused_checks": 7,
+          "focused_runtime": 4,
+          "focused_emitted_C": 4,
+          "historical_same_path_emitted_C": 12,
+          "store_controls": 8,
+          "store_negative_type_errors": 4,
+          "store_positive_runtime": 4,
+          "store_positive_same_path_C": 4,
+          "actual_binary_raw_reader": "PASS actual isolated telemetry-v2 binary read on tiny Goose input; not full workload"
+        },
+        "all_gates_pass": true,
+        "whole_prefix_checked": false,
+        "whole_measurement_run": false,
+        "selected": false,
+        "limits": [
+          "Telemetry is measurement-only; counter updates perturb elapsed time, no wall-time claim.",
+          "Raw 58-word tiny-input capture verifies ABI and symbol, not whole-workload progress."
+        ],
+        "evidence": {
+          "build-receipt.json": "6d29dedc81da515af3c437dc7ec7071f9e0db0d656d3ab82d54ba60696d50cb7",
+          "parity-results.json": "b97e00cc612fea51e8bd7ad1b02ea47a4788fbbb5d1640c3fbae87035915a991",
+          "focused-results.json": "62ff7b70a5b4b81926566bae644bf81df27ff74f55d8521f6406acdd3cfce4ea",
+          "runtime-c-results.json": "d95721b80969dd80cc4fa4d165abfbfcd71ff95882c869669d4478e8fec0cdc3",
+          "store-control-results.json": "a0641398b1f8e1da022f62b433968bb8275ed52dc487dc16b02c5e40243b21b4",
+          "tiny-reader/receipt.json": "430765bc73ad10b3b83eece99edd99973fa81c67abe37995748438af2b9570c0"
+        },
+        "source_reviews": {
+          "root": "79f120e754136a4d1ebe5782296de1d066c6c64423e25544744cb7f18ef15774",
+          "pilot": "cb99da9887a3f52e6a26e864f4e04e480d1529176a79228b3c93901e6b375708",
+          "astra": "6daee480cc0844e693ef9ee35842018b72889876ea9f49204b7aa692ee818bde"
+        }
+      }
+    },
+    "actual_tiny_reader": {
+      "sha256": "430765bc73ad10b3b83eece99edd99973fa81c67abe37995748438af2b9570c0",
+      "contents": {
+        "status": "PASS actual isolated telemetry-v2 binary read on tiny Goose input; not full workload",
+        "binary_sha256": "ee44e952b880e668eebe30aead188453663b8a92c10cfdf1b6d8ff13c3d7edea",
+        "source108_sha256": "91f07ab7aeafa960a304fbd8482ecc4c84be4d86e87e639e957628104f410154",
+        "manifest_sha256": "9754815dc6dbd83de241fadb449c2acc7905e63e6be6462a1ec19e02dce9f2b3",
+        "word_count": 58,
+        "byte_count": 464,
+        "version": 2,
+        "symbol": "goose_work_counts",
+        "symbol_size_from_nm": "0x1d0",
+        "tiny_goose_source": "fn main() {}",
+        "tiny_source_sha256": "536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4",
+        "raw_reader_sha256": "a86c78f69fa0b43b91dfb1a96dc6a224dc26f4b0f9ad0f0dc28b71767380ddd0",
+        "gdb_calls_disabled": true,
+        "raw_snapshot_sha256": "f14730ae550196d30ab8e1d3ae51c6eeb6684887eaf1cf4b6d90fefa1fe2b005",
+        "read_bytes": 464,
+        "header": [
+          5138412918917254994,
+          2,
+          58
+        ],
+        "types_created": 17,
+        "raw_identity_skips": 0,
+        "mapped_counter_names": 55,
+        "gdb_log_sha256": "ae2f60663119ae7134ec8cece8ed6e8b7844f0dde9a58eccfb5c66f4122fe82c",
+        "gdb_termination": "GDB process group TERM after snapshot; candidate process terminated; observed GDB exit 1 is expected after forced stop",
+        "no_whole_measurement": true
+      }
+    },
+    "source_ready": {
+      "sha256": "6daee480cc0844e693ef9ee35842018b72889876ea9f49204b7aa692ee818bde",
+      "contents": {
+        "status": "SOURCE_FROZEN_READY_FOR_INDEPENDENT_REVIEW",
+        "baseline_binary_sha256": "57bb3e817a5edab895f90cb518812299f1076a49127c3509b37f57a45515e847",
+        "baseline_source108_sha256": "ebc1625848bad00e8b3d3708c6a6df63603c2a884fc3841c4e0b64709178b3d1",
+        "source108_sha256": "91f07ab7aeafa960a304fbd8482ecc4c84be4d86e87e639e957628104f410154",
+        "manifest_sha256": "9754815dc6dbd83de241fadb449c2acc7905e63e6be6462a1ec19e02dce9f2b3",
+        "patch_sha256": "85c826f5946eb131489abf24fed0cbec9c89aa2281d59242ba455fca7dae76b2",
+        "source_count": 108,
+        "changed_files": [
+          "ast.h",
+          "typecheck.h",
+          "typecheck_builtins.h",
+          "typecheck_calls.h",
+          "typecheck_exprs.h",
+          "typecheck_types.h"
+        ],
+        "inverse_byte_exact": true,
+        "previous_counter_indexes_preserved": true,
+        "previous_instrumentation_edits": 36,
+        "current_instrumentation_edits": 37,
+        "delta_from_previous_sites": "Prior changes preserved exactly except helper ABI/appendedenum, ArrayReachVisited formal adaptation; one raw identity-skip count added. No algorithm changes.",
+        "abi": {
+          "symbol": "goose_work_counts",
+          "version": 2,
+          "word_count": 58,
+          "byte_count": 464,
+          "new_index": 57,
+          "new_offset": 456
+        },
+        "qualifications": [
+          "Volatile telemetry counts work; elapsed time is instrumentation-biased and not comparable to optimized baseline.",
+          "Raw examined minus identity skips still includes inprogress ownactivation skips; not exact remap count.",
+          "GOOSE_ROUNDS remains existing opt-in trace, no new logging/maps/allocations."
+        ],
+        "paths": {
+          "manifest": "build/goose-port/work-telemetry-v2-candidate/manifest.json",
+          "patch": "build/goose-port/work-telemetry-v2-candidate/candidate.patch",
+          "replacements": "build/goose-port/work-telemetry-v2-candidate/replacements.json",
+          "counter_semantics": "build/goose-port/work-telemetry-v2-candidate/counter-semantics.json"
+        }
+      }
+    },
+    "manifest": {
+      "sha256": "9754815dc6dbd83de241fadb449c2acc7905e63e6be6462a1ec19e02dce9f2b3",
+      "contents": {
+        "baseline_binary_sha256": "57bb3e817a5edab895f90cb518812299f1076a49127c3509b37f57a45515e847",
+        "source_files": {
+          "src/ast.h": "5c0bf9f39213837df8e420462ddf2f4f0bc7737cd8791beb035596d9b76b6926",
+          "src/bce.h": "30f416031c6f50098d9f59c6be6e5dba7fc6db635a34a345163aea85320cdeae",
+          "src/blessed.txt": "ffaedc05b21dddd58264e1a2d9d6e476b9ca5c94117a091e2d370429cad6415e",
+          "src/build.h": "ade52a54cad88832bd83c23a190c50ce19e98e74a3b98ec97c5218a8e6f06275",
+          "src/buildfile.h": "f725e6cc6995da4a1bb854349c3303db3b33dd212fc92ffb733b30a0f3eab840",
+          "src/builtin.h": "997851ca4fa1ec980cee13de78800dc36fd21f75f1af5fdcd4c51fd54a097237",
+          "src/builtins.h": "a73c69ee76956661b0a8d6ac80b6a44f48a74e27b7add904b7c1d4531a9bf5ff",
+          "src/checked_leaf_cache.h": "90d97a256ae579fb9b5215acbb8e9d79a03f0d1f583e6c0ea425ce608f693259",
+          "src/clone.h": "f9e88692342c320da4290773ca0fdb159171e6ddb9211967a55dd7fa819bc79c",
+          "src/codegen.h": "6992f0f3e2119aa88b78a52284926d78e09f2c96e92e940b9c97f3bcd680b15e",
+          "src/codegen_builtins.h": "6c61f891b01faa11b5da10a5ef2ac69042eac27f595c66ed504949abdbc3c8ae",
+          "src/codegen_calls.h": "bb8065ee25e5da87ec46a4ce23d23aed3bdae9b56f43f227186a4940a503d750",
+          "src/codegen_construct.h": "98c305bc7a8211d4efa4a5b2bab1366d163d8958d60c2391879ba983b7fa2fde",
+          "src/codegen_emit.h": "11e8b02d8540c07f8ec413b8e57c39657913b8b31751f169fc26460b18391fa4",
+          "src/codegen_frames.h": "9d8a1a75d7c113903a5cc472a224df9d1c18d36b2d3280df2e6b6eddb1c44f5e",
+          "src/codegen_nodes.h": "ad04f32a08aa1603bfaf0dfb184cd57f36ab9ca9d124803c9f0ae094e922aba3",
+          "src/codegen_render.h": "dcea25a5b152308c47d7aac645c184a86846c24e56eb0cab837b780bd3d7268e",
+          "src/codegen_stacks.h": "e11938b3e805b0fa7de6d0c0e6393d35703d1f5a7a89b18ec361a550dce08e98",
+          "src/codegen_stmts.h": "0eb2d605b03e0debd1867e5132ac96a0a3a0ffd25a781f7f1b5d942da1bc773b",
+          "src/codegen_types.h": "c27573c8cbb9bf9cba3eb78a429c0c068c7f664e668b16325fd3eb7ee3809124",
+          "src/codegen_values.h": "96b38aa4e68672ec8de0d0651a4e0dfa972c6e90181278823b35a202768606fd",
+          "src/direct_input_trace.h": "a48c943019f67dbd68bebf902cf0ed57b6cfd9639aadf1a276b13a316679ab23",
+          "src/direct_wasm.h": "62e010a5eb5ecc02b84249f995238c562b5d659708189402fa0740de8ba974be",
+          "src/direct_wasm_arrays.h": "ad791e0010dc3edad36fd7b8c1cb20730696481f22007031524186952a3a05d2",
+          "src/direct_wasm_bits.h": "04b347d008c82071b9a1754db20af6a8fa52b59f38546885461caa35b5bd4202",
+          "src/direct_wasm_captures.h": "7a84c5b72f59feb91800da8b539bcaf89e60c35d828a42aee007cc8966e0e1a3",
+          "src/direct_wasm_constants.h": "b0e7ce2345ca8c4f0733234b24cbeb57aaaf44ecff345f1fed4a2c8470dfdfbd",
+          "src/direct_wasm_dependencies.h": "8e8b1e28939e5777ea6ce95ec2059f3874761056621de7ecbe8d7fccbcaa5451",
+          "src/direct_wasm_dispatch.h": "8d915ed4764daa2efe4de4ef82d75af445b9c653cb7116780806e926a15ede29",
+          "src/direct_wasm_effects.h": "29baba3ce8d6a1177800f3d1e2faffce3a2eb6129c55c50c888026f340ed3712",
+          "src/direct_wasm_emit.h": "6c828f52282209dd09d44948f6ef7369a065debac68b71f932999b8662146412",
+          "src/direct_wasm_enums.h": "ea47941072634e2a19ae46c64046700f42a39d8e52e1c06f4c38d56c01e0fd4b",
+          "src/direct_wasm_expr.h": "9a1ecc291d3776c2f9060e5719f927a44f195a1fdfc0e16e116da77d7be7e87d",
+          "src/direct_wasm_funvals.h": "f13a8e0d12430c9d95e389e21752d7e6c145dfbb5e5db42fcef3d0f665b49081",
+          "src/direct_wasm_images.h": "ae9043afa9460664d1de2a304f6b0dfe14817ecfcd7eded20aa855010bd77b02",
+          "src/direct_wasm_landing.h": "a1f9d5df3ff0debb49b7edc366e4cc49a596d445a32cf55534e5360f04c49e79",
+          "src/direct_wasm_leaf.h": "00217c82a5e96ef86c9203e050f744373be14889f6b2c5bb017bd1cec4987208",
+          "src/direct_wasm_merge.h": "b5ca6e37d3e957272645965c45e1e0db579227b25434015a51820f857082c792",
+          "src/direct_wasm_numeric.h": "c50e9c971330debbbb1e351ebc14e025e1576f4e66559d678659e87b308f1828",
+          "src/direct_wasm_owned.h": "5dea8745ee53c864065e609c46dc3807171ec71b4b66cc8bc67dcacb008014f1",
+          "src/direct_wasm_publication.h": "52c5d5eb9ba2475aa49a25e505679e80d18fbd09a40c975bf29646eca2d314b5",
+          "src/direct_wasm_record_images.h": "d2e4a913d9cc54edcf6762eb2c9847ba69686c86cb5f419e4024e5bba6f7b3bc",
+          "src/direct_wasm_regions.h": "828d8b1cf5dae821f339a306fb3bb589af09cf0f2c364061beb0331d5e3a4b75",
+          "src/direct_wasm_scan.h": "6d93756d8b7423d788bfd73e6a6455b7f9f34b6434e9dda76af8c078b5d8740f",
+          "src/direct_wasm_session.h": "b101d5abd43557913dda3b35c6930d276805deb0257cad24172699af9d88ff63",
+          "src/direct_wasm_stencil.h": "6dccbe15feeda681ae1dbdc02bab5ca6265c3292d3cf3149257361f26d9c4c67",
+          "src/direct_wasm_storage.h": "31d8409c6eee4fbd741222c64e1cc58edd07f4bb5bc72240af1eada7dca596ae",
+          "src/direct_wasm_stride.h": "bc3a7c00c5a167d0a53702d5adbe5f2211a7609c2a6296821a6e4d5c4aa9dc1e",
+          "src/direct_wasm_temps.h": "66ea49d550af2ed298234425b62e926c5fe611afea37936e4e651efc75766ad3",
+          "src/direct_wasm_tiny_leaf.h": "c87caaf3b8f1c9c97f4487047fb77500d3355a69959fe9a4c7cb050652b1ab77",
+          "src/direct_wasm_uleb_arrays.h": "e9e1d04c8798b34a3135586a592e9751a87ede1db499faa0acbedd83926d7cde",
+          "src/direct_wasm_varint_arrays.h": "391d8b6a0cafc2aacb700e12094b8a05943d11e6ddc70b116d5aa1488f742e6e",
+          "src/direct_wasm_varints.h": "f04cc44f32bda1328d5492fc172201c0b45b603374eaafb56d7b4b05d5aee1bd",
+          "src/dump.h": "640369b0d35ac017caab93422319876e202be21da1e78dd4eded474b06e0e7f3",
+          "src/expansion_bind.h": "8da2ba1726da2da62eb130ba2b48b7f1fe722fa7027e938cc3b99e680c01c532",
+          "src/flat_map.h": "7d2be1a9905d5fa33afcde9c2f67a4268a6636e4ed95674bf8d5b54b4672ec9b",
+          "src/gfx.h": "8f07577960faaf8e91f992734367f5bd9714af2bfeeef31b2aeb03c77e424ff7",
+          "src/gfx_blob.h": "615d9976c105496dd5ac2e92a0f1a8f065c9432a6d5b21f0d20d410134679370",
+          "src/goose.manifest": "ae18e973ee276ee777cf40fa0ccf4c73e23ec0280d3abd4bca39f205145ebf9a",
+          "src/goose.rc": "53aadf1efb1676a75f8a290f8fe8d0918e263224e1f595c948e952a66a4064c9",
+          "src/includes.h": "e6926bf8550fd3f566f7918f04731d6db5aff6a093354440b41db095d5fddc91",
+          "src/jit.h": "0b38d0da5ab2b11586b86114bb7be086695c8db450365f72813577dbebce71bb",
+          "src/json.h": "5fdd6616238b0369d2f31a4beabe0c33ce2dc141e742c6f90e9bc00f3a6e9c7b",
+          "src/lexer.h": "41f73dad36a777489ae37f8bb07b6307045ae1160851c50c7048ef37be3c8e18",
+          "src/lexer_cache.h": "d7b6d0e7aa0b72a354c976cbabbd18e81787e30dbc8ad7eb239c75577c2a3ba3",
+          "src/lsp.h": "e1395f70ef5d6d490bc7ec3507980ee20c115e353e9f4f76e814f027687b99ba",
+          "src/lsp_analysis.h": "55b8a3d37def84b53246881eb4232b3bb81c178957a8ce3a4a96c797467cf748",
+          "src/lsp_features.h": "f540e142126c32dd27a19c898463c569400068abe6bb5e0e92403387c1cf82f0",
+          "src/lsp_rpc.h": "c128245e44b661c004fe9d8d05c03a220ff27a66a29d6ae9d0ab46dbf8b5866a",
+          "src/lsp_workspace.h": "48049bce83cd3288ca18634dfe1ab479a705f0498e10468873546784ab4aaffe",
+          "src/main.cpp": "4e23802cd3d11f0367287fec1571ea11e564d294c62b6ecaf4aed984176469f6",
+          "src/native.h": "fe44dfccb51d85ae0d9ec5a8d30b6ab9dde432bdd1d3b89140a1513cfb4403b5",
+          "src/optimize.h": "ded0012c56610624b7ce4745b4f0ebb320e70d1f297afac7f29c20abcdd56754",
+          "src/optimize_basecase.h": "b39119db7a939aaa253cc94b560e9437dc7e9c8c0502064083b0a1f975d31063",
+          "src/optimize_loops.h": "ed22a7580e8a58e2938555630cdff2d728c42073576b87a102c974160f89823c",
+          "src/optimize_reassoc.h": "b923b44b0452fb925b62b40b612f0a9a058e3f4daece565f2fbcea513f1963a1",
+          "src/optimize_tre.h": "b028cadaab1354c0d2a227409779a4b79bad13d4182ba88565fc896c929476bd",
+          "src/packages.h": "ac66b8e14b7bda5021d3e515fdf2d068f04f4638f362a81959a654dea84f9050",
+          "src/parsed_module_cache.h": "ec1a022f5c349c6dc11452927aa8e89d9542048e50dbffbf5d4cad8eb8b79d43",
+          "src/parsed_module_clone.h": "353aac484eeb9b7bba10602e042ee71513e536588a4fd62c9bf0ac71172173d8",
+          "src/parser.h": "cef074a8657c559f12a28bc9f3aa70444430115a7c20f01a580ad5726e469363",
+          "src/process.cpp": "ee9f5aae2abcd0e35bb34d986b421553299958e092220967736d8bf0c9bc8a5e",
+          "src/process.h": "a36e982d95221607baf39cba18456a7b166de39db62db42ae2ab8f30559d9d8d",
+          "src/progress.cpp": "7a506a4face45380143ddc0bf043748a869acebd48765c0cb8495b353160edf4",
+          "src/progress.h": "daa73670f5b9efeb96f7f4befb4544cef3b4a29ef46d381eee84f7c6ad511713",
+          "src/resolve.h": "a40731a88d32dee143fcdc545535439233245ea0c05d9a3592fa14cc280f571b",
+          "src/runtime/goose.h": "197478d1694847146f714ea3df1372e3d710644580b72603de8273d3c59d00a9",
+          "src/runtime/runtime.h": "e7777cc6dadcd05c0c80a05225b5d3c7afa95f7e06f091aac9c076661f10fc5b",
+          "src/runtime/runtime_ext.h": "b392a083270b4d7520ee9be1322809454b5e755bf0a4d746ec717b4e8c80312e",
+          "src/runtime/runtime_impl.h": "0640b981f5cf80bee6eba4e0432ce2de495ecc22826e50ad12faec43c2ad7465",
+          "src/runtime/runtime_os.h": "50febd965999145e92d1b310e1879b2c3deecd2973c3fdfa4039ff71a3d4f399",
+          "src/runtime/runtime_threads.h": "c9c2a3138465dc0136e05aca89ed0983bbadf42469c05e74906b4fdd65e0b877",
+          "src/runtime_inline.h": "00941ed6ec7e3e740256d15f5a4ceeacd09fd9e5e838f28c07b16e3baf2147d8",
+          "src/shaderc.c": "3eb96a568d275fe2433b041715b6e577d2c00444e3bf3ffe4124ca03ad18b74f",
+          "src/shaderc.h": "0313f038d449310b241af5917f0bc775efe44ce80ec9857c622abac6ed3cdda5",
+          "src/small_vector.h": "a6aed4530a28f778a7f1865ba0c079416effa66b8a111f80e787416251ac7c0e",
+          "src/toolchain.h": "f16f9416bb5a3ff32de987f14234f2f2d3b34f9697544ceeb3347846b3435adf",
+          "src/type_queries.h": "521a808993a7f286dfdd79aa9494979ab334731984305aefe82cf112c91a900c",
+          "src/typecheck.h": "b0b6862528e1c3481d5ae6ca4f21d589c32a5e5f067e5893a271c17e9aa15175",
+          "src/typecheck_builtins.h": "8e81d30a35d915faa15bc2c9e16b835a264bb3bd280fa47d9f960abfee6cae7d",
+          "src/typecheck_calls.h": "4cc20754fa1d158fac8e28e87198f5a181f7b11de71cb8a960a3e994be2ba568",
+          "src/typecheck_expansion.h": "2d07d23be9ca09493cc54cb88ca57466086cde9295ea24bc3e527972e1fa0240",
+          "src/typecheck_exprs.h": "f7a0595e82d49d64c9cc474b960ccb95decb6fadcde50fe1a0d0be2faa734aca",
+          "src/typecheck_flow.h": "714e3c9bc464d87756be1ec9a58b1fbed4fe61eab261e9567e4038f2117802a2",
+          "src/typecheck_nodes.h": "e3e682a6d28f58d88319a5b69bf60882f382f072cbff666f9f7268d52dc2b8f7",
+          "src/typecheck_types.h": "b80d8a3bb0aead3718657dba60f7cbbb888a16d76e9d925c78492516d6103fd6",
+          "src/utils.h": "adb917ff0376de7ed747d766ea687b7ddab625b8e513c06515069be50515de1d",
+          "src/wasm_binary.h": "b78978a007fa40e9f1cfec876d332b5d8f953e6b9aa2d161cd622a634593a169"
+        },
+        "source_digest_manifest_json": "91f07ab7aeafa960a304fbd8482ecc4c84be4d86e87e639e957628104f410154",
+        "patch_sha256": "85c826f5946eb131489abf24fed0cbec9c89aa2281d59242ba455fca7dae76b2",
+        "changed_files": [
+          "ast.h",
+          "typecheck.h",
+          "typecheck_builtins.h",
+          "typecheck_calls.h",
+          "typecheck_exprs.h",
+          "typecheck_types.h"
+        ],
+        "exact_inverse_pass": true,
+        "replacements": 37,
+        "symbol": "goose_work_counts",
+        "magic": "0x474f4f5345574f52",
+        "version": 2,
+        "baseline_source108_sha256": "ebc1625848bad00e8b3d3708c6a6df63603c2a884fc3841c4e0b64709178b3d1",
+        "word_count": 58,
+        "word_bytes": 8,
+        "byte_count": 464,
+        "fields": [
+          {
+            "index": 0,
+            "byte_offset": 0,
+            "name": "magic"
+          },
+          {
+            "index": 1,
+            "byte_offset": 8,
+            "name": "version"
+          },
+          {
+            "index": 2,
+            "byte_offset": 16,
+            "name": "word_count"
+          },
+          {
+            "index": 3,
+            "byte_offset": 24,
+            "name": "types_created"
+          },
+          {
+            "index": 4,
+            "byte_offset": 32,
+            "name": "struct_instances_created"
+          },
+          {
+            "index": 5,
+            "byte_offset": 40,
+            "name": "enum_instances_created"
+          },
+          {
+            "index": 6,
+            "byte_offset": 48,
+            "name": "specs_created"
+          },
+          {
+            "index": 7,
+            "byte_offset": 56,
+            "name": "spec_lookup_calls"
+          },
+          {
+            "index": 8,
+            "byte_offset": 64,
+            "name": "spec_candidates_tested"
+          },
+          {
+            "index": 9,
+            "byte_offset": 72,
+            "name": "spec_reused"
+          },
+          {
+            "index": 10,
+            "byte_offset": 80,
+            "name": "spec_stale_rechecks"
+          },
+          {
+            "index": 11,
+            "byte_offset": 88,
+            "name": "body_pass_started"
+          },
+          {
+            "index": 12,
+            "byte_offset": 96,
+            "name": "body_pass_completed"
+          },
+          {
+            "index": 13,
+            "byte_offset": 104,
+            "name": "extern_completed"
+          },
+          {
+            "index": 14,
+            "byte_offset": 112,
+            "name": "scc_round_starts"
+          },
+          {
+            "index": 15,
+            "byte_offset": 120,
+            "name": "scc_members_scheduled"
+          },
+          {
+            "index": 16,
+            "byte_offset": 128,
+            "name": "scc_max_members"
+          },
+          {
+            "index": 17,
+            "byte_offset": 136,
+            "name": "scc_max_round"
+          },
+          {
+            "index": 18,
+            "byte_offset": 144,
+            "name": "apply_stores_calls"
+          },
+          {
+            "index": 19,
+            "byte_offset": 152,
+            "name": "classat_calls"
+          },
+          {
+            "index": 20,
+            "byte_offset": 160,
+            "name": "classat_parameter_tests"
+          },
+          {
+            "index": 21,
+            "byte_offset": 168,
+            "name": "record_store_events_examined"
+          },
+          {
+            "index": 22,
+            "byte_offset": 176,
+            "name": "class_events_examined"
+          },
+          {
+            "index": 23,
+            "byte_offset": 184,
+            "name": "held_sweeps"
+          },
+          {
+            "index": 24,
+            "byte_offset": 192,
+            "name": "held_entries_examined"
+          },
+          {
+            "index": 25,
+            "byte_offset": 200,
+            "name": "held_entries_applied"
+          },
+          {
+            "index": 26,
+            "byte_offset": 208,
+            "name": "held_max_sweeps_one_call"
+          },
+          {
+            "index": 27,
+            "byte_offset": 216,
+            "name": "slot_sweeps"
+          },
+          {
+            "index": 28,
+            "byte_offset": 224,
+            "name": "slot_entries_examined"
+          },
+          {
+            "index": 29,
+            "byte_offset": 232,
+            "name": "slot_entries_changed"
+          },
+          {
+            "index": 30,
+            "byte_offset": 240,
+            "name": "slot_max_sweeps_one_call"
+          },
+          {
+            "index": 31,
+            "byte_offset": 248,
+            "name": "store_events_added"
+          },
+          {
+            "index": 32,
+            "byte_offset": 256,
+            "name": "class_dedup_comparisons"
+          },
+          {
+            "index": 33,
+            "byte_offset": 264,
+            "name": "new_class_facts"
+          },
+          {
+            "index": 34,
+            "byte_offset": 272,
+            "name": "root_candidates_calls"
+          },
+          {
+            "index": 35,
+            "byte_offset": 280,
+            "name": "local_candidates_considered"
+          },
+          {
+            "index": 36,
+            "byte_offset": 288,
+            "name": "global_candidates_considered"
+          },
+          {
+            "index": 37,
+            "byte_offset": 296,
+            "name": "shrink_scan_groups"
+          },
+          {
+            "index": 38,
+            "byte_offset": 304,
+            "name": "used_after_calls"
+          },
+          {
+            "index": 39,
+            "byte_offset": 312,
+            "name": "used_after_exit_scan_requests"
+          },
+          {
+            "index": 40,
+            "byte_offset": 320,
+            "name": "exit_scan_statements"
+          },
+          {
+            "index": 41,
+            "byte_offset": 328,
+            "name": "escaping_continue_node_visits"
+          },
+          {
+            "index": 42,
+            "byte_offset": 336,
+            "name": "mentions_name_node_visits"
+          },
+          {
+            "index": 43,
+            "byte_offset": 344,
+            "name": "array_reach_node_visits"
+          },
+          {
+            "index": 44,
+            "byte_offset": 352,
+            "name": "type_eq_calls"
+          },
+          {
+            "index": 45,
+            "byte_offset": 360,
+            "name": "check_statement_visits"
+          },
+          {
+            "index": 46,
+            "byte_offset": 368,
+            "name": "check_value_visits"
+          },
+          {
+            "index": 47,
+            "byte_offset": 376,
+            "name": "active_body_passes"
+          },
+          {
+            "index": 48,
+            "byte_offset": 384,
+            "name": "max_active_body_passes"
+          },
+          {
+            "index": 49,
+            "byte_offset": 392,
+            "name": "last_body_started_id"
+          },
+          {
+            "index": 50,
+            "byte_offset": 400,
+            "name": "last_body_completed_id"
+          },
+          {
+            "index": 51,
+            "byte_offset": 408,
+            "name": "last_scc_head_id"
+          },
+          {
+            "index": 52,
+            "byte_offset": 416,
+            "name": "last_scc_round"
+          },
+          {
+            "index": 53,
+            "byte_offset": 424,
+            "name": "store_events_highwater"
+          },
+          {
+            "index": 54,
+            "byte_offset": 432,
+            "name": "class_facts_highwater"
+          },
+          {
+            "index": 55,
+            "byte_offset": 440,
+            "name": "max_classat_parameters"
+          },
+          {
+            "index": 56,
+            "byte_offset": 448,
+            "name": "scc_settled_rounds"
+          },
+          {
+            "index": 57,
+            "byte_offset": 456,
+            "name": "raw_identity_skips"
+          }
+        ],
+        "no_optimization": true,
+        "no_static_or_ChildVisitor_delta": true,
+        "measurement_only": "Hot volatile updates perturb elapsed time. Work counts and censored progress only, no wall-time comparison."
+      }
+    },
+    "source_patch": {
+      "sha256": "85c826f5946eb131489abf24fed0cbec9c89aa2281d59242ba455fca7dae76b2",
+      "contents": "--- a/src/ast.h\n+++ b/src/ast.h\n@@ -4,6 +4,94 @@\n #pragma once\n \n namespace goose {\n+\n+// Diagnostic telemetry only: one compiler worker updates this fixed C-layout block.\n+// A stopped debugger reads the exported symbol without DWARF or inferior calls.\n+// No telemetry value participates in any semantic decision.\n+extern \"C\" {\n+alignas(64) volatile uint64_t goose_work_counts[58] = {\n+    0x474f4f5345574f52ULL, 2, 58\n+};\n+}\n+enum WorkCounter {\n+    WC_MAGIC,\n+    WC_VERSION,\n+    WC_WORD_COUNT,\n+    WC_TYPES_CREATED,\n+    WC_STRUCT_INSTANCES_CREATED,\n+    WC_ENUM_INSTANCES_CREATED,\n+    WC_SPECS_CREATED,\n+    WC_SPEC_LOOKUP_CALLS,\n+    WC_SPEC_CANDIDATES_TESTED,\n+    WC_SPEC_REUSED,\n+    WC_SPEC_STALE_RECHECKS,\n+    WC_BODY_PASS_STARTED,\n+    WC_BODY_PASS_COMPLETED,\n+    WC_EXTERN_COMPLETED,\n+    WC_SCC_ROUND_STARTS,\n+    WC_SCC_MEMBERS_SCHEDULED,\n+    WC_SCC_MAX_MEMBERS,\n+    WC_SCC_MAX_ROUND,\n+    WC_APPLY_STORES_CALLS,\n+    WC_CLASSAT_CALLS,\n+    WC_CLASSAT_PARAMETER_TESTS,\n+    WC_RECORD_STORE_EVENTS_EXAMINED,\n+    WC_CLASS_EVENTS_EXAMINED,\n+    WC_HELD_SWEEPS,\n+    WC_HELD_ENTRIES_EXAMINED,\n+    WC_HELD_ENTRIES_APPLIED,\n+    WC_HELD_MAX_SWEEPS_ONE_CALL,\n+    WC_SLOT_SWEEPS,\n+    WC_SLOT_ENTRIES_EXAMINED,\n+    WC_SLOT_ENTRIES_CHANGED,\n+    WC_SLOT_MAX_SWEEPS_ONE_CALL,\n+    WC_STORE_EVENTS_ADDED,\n+    WC_CLASS_DEDUP_COMPARISONS,\n+    WC_NEW_CLASS_FACTS,\n+    WC_ROOT_CANDIDATES_CALLS,\n+    WC_LOCAL_CANDIDATES_CONSIDERED,\n+    WC_GLOBAL_CANDIDATES_CONSIDERED,\n+    WC_SHRINK_SCAN_GROUPS,\n+    WC_USED_AFTER_CALLS,\n+    WC_USED_AFTER_EXIT_SCAN_REQUESTS,\n+    WC_EXIT_SCAN_STATEMENTS,\n+    WC_ESCAPING_CONTINUE_NODE_VISITS,\n+    WC_MENTIONS_NAME_NODE_VISITS,\n+    WC_ARRAY_REACH_NODE_VISITS,\n+    WC_TYPE_EQ_CALLS,\n+    WC_CHECK_STATEMENT_VISITS,\n+    WC_CHECK_VALUE_VISITS,\n+    WC_ACTIVE_BODY_PASSES,\n+    WC_MAX_ACTIVE_BODY_PASSES,\n+    WC_LAST_BODY_STARTED_ID,\n+    WC_LAST_BODY_COMPLETED_ID,\n+    WC_LAST_SCC_HEAD_ID,\n+    WC_LAST_SCC_ROUND,\n+    WC_STORE_EVENTS_HIGHWATER,\n+    WC_CLASS_FACTS_HIGHWATER,\n+    WC_MAX_CLASSAT_PARAMETERS,\n+    WC_SCC_SETTLED_ROUNDS,\n+    WC_RAW_IDENTITY_SKIPS,\n+};\n+inline void WorkAdd(WorkCounter counter, uint64_t amount = 1) {\n+    auto value = goose_work_counts[counter];\n+    goose_work_counts[counter] = value + amount;\n+}\n+inline void WorkSet(WorkCounter counter, uint64_t value) {\n+    goose_work_counts[counter] = value;\n+}\n+inline void WorkMax(WorkCounter counter, uint64_t value) {\n+    if (goose_work_counts[counter] < value) goose_work_counts[counter] = value;\n+}\n+struct WorkBodyScope {\n+    WorkBodyScope() {\n+        WorkAdd(WC_ACTIVE_BODY_PASSES);\n+        WorkMax(WC_MAX_ACTIVE_BODY_PASSES, goose_work_counts[WC_ACTIVE_BODY_PASSES]);\n+    }\n+    ~WorkBodyScope() {\n+        goose_work_counts[WC_ACTIVE_BODY_PASSES] = goose_work_counts[WC_ACTIVE_BODY_PASSES] - 1;\n+    }\n+};\n \n struct Node;\n struct Block;\n@@ -2531,6 +2619,7 @@\n     TypeExpr *NewType(TypeKind kind, Line line) {\n         auto t = new TypeExpr(kind, line);\n         alltypes.push_back(t);\n+        WorkAdd(WC_TYPES_CREATED);\n         return t;\n     }\n \n@@ -2686,12 +2775,13 @@\n     }\n \n     VarDef *NewVarDef()       { auto v = new VarDef();     vardefs.push_back(v);     return v; }\n-    StructInst *NewStructInst() { auto i = new StructInst(); structinsts.push_back(i); return i; }\n-    EnumInst *NewEnumInst()   { auto i = new EnumInst();   enuminsts.push_back(i);   return i; }\n+    StructInst *NewStructInst() { auto i = new StructInst(); structinsts.push_back(i); WorkAdd(WC_STRUCT_INSTANCES_CREATED); return i; }\n+    EnumInst *NewEnumInst()   { auto i = new EnumInst();   enuminsts.push_back(i); WorkAdd(WC_ENUM_INSTANCES_CREATED);   return i; }\n     FnSpec *NewFnSpec() {\n         auto sp = new FnSpec();\n         sp->id = (int)fnspecs.size();\n         fnspecs.push_back(sp);\n+        WorkAdd(WC_SPECS_CREATED);\n         return sp;\n     }\n     FnSpec *NewFunValEnv() {\n--- a/src/typecheck.h\n+++ b/src/typecheck.h\n@@ -903,6 +903,7 @@\n     // Type equality on concrete (post-substitution) types.\n \n     bool TypeEq(TypeExpr *a, TypeExpr *b) {\n+        WorkAdd(WC_TYPE_EQ_CALLS);\n         if (a == b) return true;\n         if (a->kind != b->kind || a->cq != b->cq) return false;\n         switch (a->kind) {\n@@ -1832,6 +1833,7 @@\n     // reference. Consumers go through CheckValue/CheckArg/Operand, which\n     // apply reference transparency.\n     Val CheckV(Node *n, TypeExpr *expected) {\n+        WorkAdd(WC_CHECK_VALUE_VISITS);\n         NodeScope ns(*this, n);\n         auto cyclecalls = frames.back().cyclecalls;\n         auto v = n->Check(*this, expected);\n--- a/src/typecheck_builtins.h\n+++ b/src/typecheck_builtins.h\n@@ -1487,6 +1487,8 @@\n // stands for -- the call sites map those back (\u00a73.5).\n inline void TypeCheck::AddStoreEvent(const StoreEvent &e) {\n     storeevents.push_back(e);\n+    WorkAdd(WC_STORE_EVENTS_ADDED);\n+    WorkMax(WC_STORE_EVENTS_HIGHWATER, storeevents.size());\n     madestores.push_back(e);\n     NoteSlotStore(e);\n     if (e.container->type || e.container->isglobal) return;\n@@ -1509,6 +1511,7 @@\n     // every store of it is.\n     auto &evs = spec->record.classevents;\n     for (size_t m = 0; m < evs.size(); m++) {\n+        WorkAdd(WC_CLASS_DEDUP_COMPARISONS);\n         auto &o = evs[m];\n         if (o.container == e.container && o.root == e.root && o.src == e.src &&\n             o.exact == e.exact && o.byteview == e.byteview && o.bound == e.bound &&\n@@ -1521,6 +1524,8 @@\n         }\n     }\n     evs.push_back(e);\n+    WorkAdd(WC_NEW_CLASS_FACTS);\n+    WorkMax(WC_CLASS_FACTS_HIGHWATER, evs.size());\n     origin(evs.size() - 1);\n }\n \n@@ -1662,6 +1667,7 @@\n // a loop around the call feeds back (NoteFact).\n inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Node *at,\n                                          vector<int> *origins) {\n+    WorkAdd(WC_APPLY_STORES_CALLS);\n     auto base = storeevents.size();\n     // The class event each store added from `from` on replays.\n     auto tag = [&](size_t from, int origin) {\n@@ -1673,7 +1679,10 @@\n     // What class root cr of the callee stands for here: the argument's roots,\n     // or for a view the slice its slot held (Val::held).\n     auto classat = [&](VarDef *cr, Roots &out) -> int {\n+        WorkAdd(WC_CLASSAT_CALLS);\n+        WorkMax(WC_MAX_CLASSAT_PARAMETERS, std::min(spec->params.size(), argvals.size()));\n         for (size_t p = 0; cr && p < spec->params.size() && p < argvals.size(); p++) {\n+            WorkAdd(WC_CLASSAT_PARAMETER_TESTS);\n             if (spec->params[p]->ref.Root() == cr) {\n                 out = ClassArgRoots(spec->argtypes[p], argvals[p]);\n                 return (int)p;\n@@ -1794,6 +1803,7 @@\n             if (auto view = ViewClassOf(spec, p)) rawclasses.insert(view);\n         }\n     for (auto i = rec->eventstart; i < end; i++) {\n+        WorkAdd(WC_RECORD_STORE_EVENTS_EXAMINED);\n         const auto &raw = storeevents[i];\n         // A back edge leaves its own activation's variables unchanged.\n         if (spec->inprogress && raw.container && raw.container->ownerspec == spec) continue;\n@@ -1801,6 +1811,7 @@\n             // mapped/source are identity here; only classread normalization\n             // can change the single event. In particular no event is appended.\n             storeevents[i].classread = raw.classread && IsClassRoot(raw.src);\n+            WorkAdd(WC_RAW_IDENTITY_SKIPS);\n             continue;\n         }\n         auto e = raw;\n@@ -1952,6 +1963,7 @@\n     // until what they store no longer grows.\n     vector<pair<const StoreEvent *, Roots>> held;\n     for (auto &e : rec->classevents) {\n+        WorkAdd(WC_CLASS_EVENTS_EXAMINED);\n         if (e.src == e.container && !e.bound) continue;\n         Roots unused;\n         if (e.classread && e.src == e.root && !e.exact && classat(e.root, unused) >= 0) {\n@@ -1964,11 +1976,16 @@\n         replay.origin = -1;\n         tag(from, (int)(&e - rec->classevents.data()));\n     }\n+    uint64_t work_held_sweeps = 0;\n     for (auto again = !held.empty(), first = true; again; first = false) {\n+        WorkAdd(WC_HELD_SWEEPS);\n+        WorkMax(WC_HELD_MAX_SWEEPS_ONE_CALL, ++work_held_sweeps);\n         again = false;\n         for (auto &[e, last] : held) {\n+            WorkAdd(WC_HELD_ENTRIES_EXAMINED);\n             auto r = mappedheld(e->root);\n             if (!first && r.Same(last)) continue;\n+            WorkAdd(WC_HELD_ENTRIES_APPLIED);\n             last = r;\n             again = true;\n             auto from = storeevents.size();\n@@ -1981,10 +1998,17 @@\n     // A slice loaded through one slot may be stored into another, and the\n     // record keeps no order: the re-bindings are applied until none changes\n     // what a slot holds.\n+    uint64_t work_slot_sweeps = 0;\n     for (auto again = !slotstores.empty(); again;) {\n+        WorkAdd(WC_SLOT_SWEEPS);\n+        WorkMax(WC_SLOT_MAX_SWEEPS_ONE_CALL, ++work_slot_sweeps);\n         again = false;\n-        for (auto &s : slotstores)\n-            again = StoreIntoSlot(at, s.root, s.bound, s.e.reached, slotval(s.e), s.via) || again;\n+        for (auto &s : slotstores) {\n+            WorkAdd(WC_SLOT_ENTRIES_EXAMINED);\n+            auto changed = StoreIntoSlot(at, s.root, s.bound, s.e.reached, slotval(s.e), s.via);\n+            if (changed) WorkAdd(WC_SLOT_ENTRIES_CHANGED);\n+            again = changed || again;\n+        }\n     }\n     tag(storeevents.size(), -1);\n }\n--- a/src/typecheck_calls.h\n+++ b/src/typecheck_calls.h\n@@ -1385,6 +1385,7 @@\n // check its body (once) in call-graph order.\n \n inline FnSpec *TypeCheck::GetOrCreateSpec(MatchInfo &mi, vector<Val> &argvals, Node *callnode) {\n+    WorkAdd(WC_SPEC_LOOKUP_CALLS);\n     auto sf = mi.sf;\n     if (sf->brokensig) throw Abandoned {};\n     // A thread_fn starts a program of its own (\u00a711.2), whose one\n@@ -1616,6 +1617,7 @@\n         }\n     }\n     for (auto spec : sf->specs) {\n+        WorkAdd(WC_SPEC_CANDIDATES_TESTED);\n         // A reuse would merge an exemplar's call into what the real calls\n         // agreed on (CheckExemplars).\n         if (spec->id < exemplarbase) continue;\n@@ -1716,6 +1718,7 @@\n         NoteLitArgs(spec, argvals, callnode);\n         // A member of a cycle whose next round has yet to check it again.\n         if (spec->stale) {\n+            WorkAdd(WC_SPEC_STALE_RECHECKS);\n             spec->stale = false;\n             CheckSpecBodyOnce(spec, &argvals, callnode->line);\n         } else if (!spec->inprogress) {\n@@ -1723,6 +1726,7 @@\n             ReplayEnvExits(spec);\n         }\n         NoteCalleeEnvReads(spec);\n+        WorkAdd(WC_SPEC_REUSED);\n         return spec;\n     }\n     // The specializations in progress are the ones this call path is\n@@ -2784,6 +2788,12 @@\n         auto broken = 0;\n         for (auto &[cls, tc] : threadedclasses) broken += tc.broken;\n         auto members = spec->cyclemembers;\n+        WorkAdd(WC_SCC_ROUND_STARTS);\n+        WorkAdd(WC_SCC_MEMBERS_SCHEDULED, members.size());\n+        WorkMax(WC_SCC_MAX_MEMBERS, members.size());\n+        WorkMax(WC_SCC_MAX_ROUND, (uint64_t)spec->rounds + 1);\n+        WorkSet(WC_LAST_SCC_HEAD_ID, (uint64_t)spec->id);\n+        WorkSet(WC_LAST_SCC_ROUND, (uint64_t)spec->rounds + 1);\n         if (getenv(\"GOOSE_ROUNDS\"))\n             fprintf(stderr, \"round %d of %.*s begins (%d members)\\n\", spec->rounds + 1,\n                     (int)spec->sf->name.size(), spec->sf->name.data(), (int)members.size());\n@@ -2802,7 +2812,7 @@\n         for (auto m : members)\n             if (!m->stale) settled = settled && SameRecord(m->record, *m->prev, m);\n         for (auto m : members) m->prev = nullptr;\n-        if (settled) break;\n+        if (settled) { WorkAdd(WC_SCC_SETTLED_ROUNDS); break; }\n     }\n     if (spec->incycle && CycleHead(spec) == spec) ShareCycleEnvReads(spec);\n }\n@@ -2884,6 +2894,9 @@\n }\n \n inline void TypeCheck::CheckSpecBodyOnce(FnSpec *spec, vector<Val> *argvals, Line callline) {\n+    WorkBodyScope work_body_scope;\n+    WorkAdd(WC_BODY_PASS_STARTED);\n+    WorkSet(WC_LAST_BODY_STARTED_ID, (uint64_t)spec->id);\n     // In progress from here, so that an error before the body's check, an\n     // extern's included, leaves it failed (Checkpoint).\n     spec->inprogress = true;\n@@ -2896,7 +2909,7 @@\n                             depth, \" nested calls)\"));\n     }\n     auto sf = spec->sf;\n-    if (sf->isextern) { CheckExternSpec(spec); return; }\n+    if (sf->isextern) { CheckExternSpec(spec); WorkAdd(WC_EXTERN_COMPLETED); return; }\n     auto leaf = PrepareCheckedScalar(ast, spec);\n     auto leaf_warnings = warned.size(), leaf_casts = castverdicts.size();\n     spec->record.eventstart = storeevents.size();\n@@ -3307,6 +3320,8 @@\n     spec->inprogress = false;\n     spec->record.eventend = storeevents.size();\n     spec->rounds++;\n+    WorkAdd(WC_BODY_PASS_COMPLETED);\n+    WorkSet(WC_LAST_BODY_COMPLETED_ID, (uint64_t)spec->id);\n     if (leaf) active_checked_leaf_cache->Store(*spec, *leaf,\n         warned.size() != leaf_warnings || castverdicts.size() != leaf_casts);\n }\n--- a/src/typecheck_exprs.h\n+++ b/src/typecheck_exprs.h\n@@ -3163,6 +3163,7 @@\n // nested function whose body does. Syntactic, so a shadowing declaration\n // counts too, which only errs on the safe side.\n inline bool TypeCheck::MentionsName(Node *n, string_view name, set<SFunction *> &seen) {\n+    if (n) WorkAdd(WC_MENTIONS_NAME_NODE_VISITS);\n     if (!n) return false;\n     if (auto id = Is<Ident>(n); id && id->name == name) return true;\n     if (auto fd = Is<FnDecl>(n)) {\n@@ -3190,6 +3191,7 @@\n // inside a loop's body there, nor in a nested function or a function value,\n // whose loops are their own.\n inline bool TypeCheck::EscapingContinue(Node *n) {\n+    if (n) WorkAdd(WC_ESCAPING_CONTINUE_NODE_VISITS);\n     if (!n || Is<FnDecl>(n) || Is<FunVal>(n)) return false;\n     if (Is<Continue>(n)) return true;\n     Node *body = nullptr;\n@@ -3267,6 +3269,7 @@\n // everything else of this frame's body, for a `break` everything inside the\n // loop or `block` it ends, that loop's next iteration included.\n inline bool TypeCheck::UsedAfter(VarDef *v) {\n+    WorkAdd(WC_USED_AFTER_CALLS);\n     set<SFunction *> seen;\n     auto vframe = FrameOfScope(Depth(v) - 1);\n     auto mentions = [&](Node *n, int fi) {\n@@ -3275,6 +3278,7 @@\n     auto later = false;\n     LaterOperands([&](Node *n, int fi) { later = later || mentions(n, fi); });\n     if (later) return true;\n+    WorkAdd(WC_USED_AFTER_EXIT_SCAN_REQUESTS);\n     // The scopes the exit leaves, from `cut` on, and the statement it is in\n     // the innermost block (its stmts.size() for the tail).\n     auto cut = (int)scopes.size();\n@@ -3286,6 +3290,7 @@\n         if (bp.scopeidx == (int)scopes.size() - 1 && FrameOfScope(bp.scopeidx) == frameidx &&\n             bp.idx < stmts.size() && !EscapingContinue(stmts[bp.idx])) {\n             for (auto i = bp.idx + 1; i <= stmts.size(); i++) {\n+                WorkAdd(WC_EXIT_SCAN_STATEMENTS);\n                 auto s = i < stmts.size() ? stmts[i] : bp.block->tail;\n                 if (!s || EscapingContinue(s)) break;\n                 auto to = Is<Return>(s) ? frames[frameidx].scopebase\n@@ -3328,6 +3333,7 @@\n }\n \n inline void TypeCheck::CheckStmt(Node *n) {\n+    WorkAdd(WC_CHECK_STATEMENT_VISITS);\n     DestScope ds(*this, Dest {});\n     ast.CheckCancel();\n     // A statement inside a returned value's block is no part of that value:\n--- a/src/typecheck_types.h\n+++ b/src/typecheck_types.h\n@@ -1202,6 +1202,7 @@\n // those of the function running it, which the body cannot name but runs in\n // the middle of (\u00a77.6), with that function's lexical parents in turn.\n inline void TypeCheck::ShrinkScanVars(const function<void(VarDef *)> &f) {\n+    WorkAdd(WC_SHRINK_SCAN_GROUPS);\n     vector<bool> seen(frames.size(), false);\n     for (auto fi = (int)frames.size() - 1; fi >= 0; fi--) {\n         LexicalVars(fi, &seen, f);\n@@ -1280,6 +1281,7 @@\n // so that root stands in for it, as a bound.\n inline Roots TypeCheck::RootCandidates(TypeExpr *of, int d, bool globalsonly, bool writable,\n                                        bool slots) {\n+    WorkAdd(WC_ROOT_CANDIDATES_CALLS);\n     Roots out;\n     auto beyond = [&](VarDef *v, TypeExpr *t, int rd) {\n         if (!v->isparam || !v->refrootknown || !ReachesThroughRefs(t, of)) return;\n@@ -1287,6 +1289,8 @@\n             if (Depth(a.root) <= rd) out.Add({ a.root, false });\n     };\n     auto consider = [&](VarDef *v, int rd) {\n+        if (v->isglobal) WorkAdd(WC_GLOBAL_CANDIDATES_CONSIDERED);\n+        else WorkAdd(WC_LOCAL_CANDIDATES_CONSIDERED);\n         if (!v->type) return;\n         if (IsRefOrSlice(v->type)) {\n             if (!v->refrootknown) return;   // No commitment yet; nothing stored from it.\n@@ -1581,6 +1585,7 @@\n // (RootArg::onearray).\n inline void TypeCheck::ArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out,\n                                          ArrayReachVisited &open) {\n+    WorkAdd(WC_ARRAY_REACH_NODE_VISITS);\n     auto &bucket = open.Bucket(t);\n     for (auto o : bucket)\n         if (TypeEq(o, t)) return;\n"
+    },
+    "root_review": {
+      "sha256": "79f120e754136a4d1ebe5782296de1d066c6c64423e25544744cb7f18ef15774",
+      "contents": {
+        "status": "PASS root independent inverse108 and counter placement review",
+        "replacements": 37,
+        "source_files": 108,
+        "patch_sha256": "85c826f5946eb131489abf24fed0cbec9c89aa2281d59242ba455fca7dae76b2",
+        "proof": [
+          "All37replacement groups reverse uniquely and reproduce selected57bb108source byte-exactly.",
+          "Prior57-word instrumentation retained; version2/58thword adds only actual raw identity skip count after classread normalization. Raw examinations count before owning-container and identity skips.",
+          "ArrayReachVisited signature preserved; selected raw skip/type bucket algorithms unchanged. No counter enters semantic predicates.",
+          "Original one-call StoreIntoSlot evaluation/again order and body RAII balancing retained; helper updates volatile fixed words only.",
+          "Instrumentation changes wall time; use work/progress only, no speed claim."
+        ]
+      }
+    },
+    "independent_source_review": {
+      "sha256": "cb99da9887a3f52e6a26e864f4e04e480d1529176a79228b3c93901e6b375708",
+      "contents": {
+        "verdict": "PASS diagnostic-only source; runtime qualification separate",
+        "source108_sha256": "91f07ab7aeafa960a304fbd8482ecc4c84be4d86e87e639e957628104f410154",
+        "manifest_sha256": "9754815dc6dbd83de241fadb449c2acc7905e63e6be6462a1ec19e02dce9f2b3",
+        "patch_sha256": "85c826f5946eb131489abf24fed0cbec9c89aa2281d59242ba455fca7dae76b2",
+        "all108_verified": true,
+        "37_replacements_inverse_byte_exact": true,
+        "baseline": "57bb array visited buckets + raw negative skip",
+        "changed_files": [
+          "src/ast.h",
+          "src/typecheck.h",
+          "src/typecheck_builtins.h",
+          "src/typecheck_calls.h",
+          "src/typecheck_exprs.h",
+          "src/typecheck_types.h"
+        ],
+        "prior57counter_fields_identical": true,
+        "new_counter": "raw_identity_skips atindex57 after original classread normalization before continue; raw examined remains before inprogress skip",
+        "proof": [
+          "All instrumentation values are exported volatile scalars used only for telemetry, no semantic branches or cache keys.",
+          "Slot StoreIntoSlot evaluation remains once before changed||again; all original calls/short-circuit order unchanged.",
+          "Body-depth RAII unwinds on normal/error paths; body completed counts only normal tail, extern completion separate.",
+          "Existing raw membership skip and bucket algorithms byte-identical after instrumentation inversion.",
+          "New skip counter observes only proven negative branch; examined minus skip includes inprogress early continue and cannot be called exact remap count."
+        ],
+        "limits": [
+          "Hot volatile updates and debugger perturb wall time; no comparison to uninstrumented120s timing.",
+          "Snapshots can stop between adjacent counter updates, not transactional.",
+          "Counter additions are unsigned monotone modulo overflow; no per-call histograms or type names."
+        ]
+      }
+    },
+    "helper_control": {
+      "sha256": "917b35baad682254a187363318d9b45952aa85831186d210e4bd547b08302d7b",
+      "contents": {
+        "status": "PASS",
+        "kind": "tiny fixed counter ABI/update/RAII test, not checker build",
+        "compile_argv": [
+          "c++",
+          "-std=c++20",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "build/goose-port/work-telemetry-v2-candidate/helper-control.cpp",
+          "-o",
+          "build/goose-port/work-telemetry-v2-candidate/helper-control"
+        ],
+        "runtime_exit": 0,
+        "input_hashes": {
+          "helper-control.cpp": "24d85dcfc6e598b363402080cc779a6d487ce116f345de4d67fc885a21cd91bb",
+          "helper.h": "b1380d9b75dd62ce33b668e7898e6f05d188b04091cbae5f05efe9255544cae5",
+          "manifest.json": "9754815dc6dbd83de241fadb449c2acc7905e63e6be6462a1ec19e02dce9f2b3"
+        },
+        "binary_sha256": "8435c15a9cab6a4ea523bb8aef383ad1cf453cd4778c0bac3e3f5ce5368a9f25",
+        "checks": [
+          "magic/version2/count58",
+          "464-byte exact array size",
+          "new counter index57 and increment",
+          "existing add/max behavior",
+          "nested active-body scopes balanced after normal and exception exits"
+        ]
+      }
+    },
+    "driver": {
+      "sha256": "07c101587278c36c14c3008a930dbaaea37fb1607f772ace098df172ea75f3f6",
+      "contents": "#!/usr/bin/env python3\nimport ctypes,hashlib,importlib.util,json,os,shlex,signal,subprocess,sys,time\nfrom pathlib import Path\nROOT=Path(__file__).resolve().parents[3]\nBASE=ROOT/'build/goose-port';BINARY=BASE/'work-telemetry-v2-build/goose'\nBINARY_SHA='ee44e952b880e668eebe30aead188453663b8a92c10cfdf1b6d8ff13c3d7edea'\nGDB=Path('/usr/bin/gdb');GDB_SHA='e2db863afa4d39c743d5057509aa18a9a6330d5b7ccd71a63ffe70c8b862810a'\nMANIFEST=BASE/'work-telemetry-v2-candidate/manifest.json'\nPROXY=BASE/'profile_678v2_proxy.py';PROXY_SHA='341c74f1d8b5ed8f9dd038e377a7658db2eca12d172265e82acb56ae5bc540b2'\ndef digest(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()\ndef write(path,value):\n temporary=path.with_suffix('.tmp');temporary.write_text(json.dumps(value,indent=2)+'\\n');temporary.replace(path)\nassert digest(PROXY)==PROXY_SHA and digest(GDB)==GDB_SHA\nspec=importlib.util.spec_from_file_location('cleanup_proxy',PROXY);proxy=importlib.util.module_from_spec(spec);spec.loader.exec_module(proxy)\nlibc=ctypes.CDLL(None,use_errno=True);assert libc.prctl(36,1,0,0,0)==0,'subreaper setup failed'\nHELPER=r'''\nimport gdb,hashlib,json,re,struct,time\nfrom pathlib import Path\nconfig=json.loads(Path(CONFIG).read_text());status=Path(config['status']);manifest=config['manifest']\nstate={'exited':False,'exit_code':None,'samples':[],'error':None};last_signal=None;started=time.monotonic()\ndef save():\n temporary=status.with_suffix('.tmp');temporary.write_text(json.dumps(state,indent=2)+'\\n');temporary.replace(status)\ndef stopped(event):\n global last_signal\n last_signal=getattr(event,'stop_signal',None)\ndef exited(event):\n state['exited']=True;state['exit_code']=getattr(event,'exit_code',None);save()\ngdb.events.stop.connect(stopped);gdb.events.exited.connect(exited);save()\ntry:\n gdb.execute('run '+config['shell_args']+' >> '+config['quoted_log']+' 2>> '+config['quoted_log'])\n while not state['exited']:\n  if last_signal!='SIGINT':raise RuntimeError('unexpected stop '+str(last_signal))\n  info=gdb.execute('info address '+manifest['symbol'],to_string=True);found=re.search(r'0x[0-9a-fA-F]+',info)\n  if not found:raise RuntimeError('symbol not found: '+info)\n  address=int(found.group(0),16);raw=bytes(gdb.selected_inferior().read_memory(address,manifest['byte_count']))\n  words=list(struct.unpack('<'+'Q'*manifest['word_count'],raw))\n  if words[:3]!=[int(manifest['magic'],16),manifest['version'],manifest['word_count']]:raise RuntimeError('counter ABI mismatch')\n  index=len(state['samples']);rawpath=status.parent/('sample-'+str(index)+'.bin');rawpath.write_bytes(raw)\n  sample={'elapsed_seconds':time.monotonic()-started,'pid':gdb.selected_inferior().pid,'address':hex(address),'raw_sha256':hashlib.sha256(raw).hexdigest(),'words':words,'counts':{field['name']:words[field['index']] for field in manifest['fields'][3:]}}\n  state['samples'].append(sample);save()\n  if index in config.get('stack_indices',[]):\n   stack_started=time.monotonic()\n   try:\n    frames=[];frame=gdb.newest_frame();limit=2048\n    while frame is not None and len(frames)<limit:\n     frames.append({'index':len(frames),'name':frame.name(),'pc':hex(frame.pc())});frame=frame.older()\n    thread=gdb.selected_thread()\n    sample['selected_thread_stack']={'thread_num':thread.num,'ptid':list(thread.ptid),'walked_frames':len(frames),'truncated':frame is not None,'top':frames[:30],'bottom':frames[-30:]}\n   except BaseException as stack_error:sample['stack_error']=repr(stack_error)\n   sample['stack_elapsed_seconds']=time.monotonic()-stack_started;save()\n  gdb.execute('continue')\nexcept BaseException as error:state['error']=repr(error);save()\n'''\ndef run(command,output,targets,cap):\n output.mkdir();status=output/'counter-status.json';programlog=output/'program.log';programlog.touch();config=output/'config.json';helper=output/'gdb-helper.py'\n manifest=json.loads(MANIFEST.read_text());write(config,{'status':str(status),'manifest':manifest,'shell_args':shlex.join(command[1:]),'quoted_log':shlex.quote(str(programlog)),'stack_indices':[1,3]});helper.write_text('CONFIG='+repr(str(config))+'\\n'+HELPER)\n debugger=[str(GDB),'-nx','--batch','-ex','set pagination off','-ex','set confirm off','-ex','set debuginfod enabled off','-ex','set non-stop off','-ex','handle SIGINT stop print nopass','-ex','set may-call-functions off','-ex','python exec(compile(open('+repr(str(helper))+').read(),'+repr(str(helper))+',\"exec\"))','--args']+command\n report={'command':command,'binary_sha256':digest(command[0]),'driver_sha256':digest(__file__),'cleanup_proxy_sha256':PROXY_SHA,'gdb_sha256':GDB_SHA,'manifest_sha256':digest(MANIFEST),'targets_seconds':targets,'cap_seconds':cap,'log_cap_bytes':8*1024*1024,'GOOSE_ROUNDS':'1','instrumentation_only':True,'signal_requests':[]};write(output/'result.json',report)\n child=None;started=time.monotonic();index=0;old={}\n def cancel(sig,frame):raise KeyboardInterrupt(str(sig))\n for sig in [signal.SIGINT,signal.SIGTERM,signal.SIGHUP]:old[sig]=signal.signal(sig,cancel)\n try:\n  with (output/'gdb.log').open('ab') as log:\n   child=subprocess.Popen(debugger,stdout=log,stderr=subprocess.STDOUT,start_new_session=True,env={**os.environ,'GOOSE_ROUNDS':'1'})\n   while child.poll() is None:\n    elapsed=time.monotonic()-started\n    if elapsed>=cap-.5:report['stop_reason']='fixed measurement cap';break\n    if programlog.stat().st_size>report['log_cap_bytes'] or (output/'gdb.log').stat().st_size>report['log_cap_bytes']:report['stop_reason']='bounded log cap';break\n    if index<len(targets) and elapsed>=targets[index]:\n     report['signal_requests'].append({'target':targets[index],'elapsed':elapsed});proxy.send(child.pid,signal.SIGINT);index+=1\n    time.sleep(.01)\n except BaseException as error:report['driver_error']=repr(error)\n finally:\n  if child is not None:\n   report['cleanup_groups']=proxy.cleanup(child);report['gdb_exit_code']=child.returncode\n   deadline=time.monotonic()+.2\n   while time.monotonic()<deadline:\n    try:\n     pid,_=os.waitpid(-1,os.WNOHANG)\n     if pid==0:time.sleep(.01)\n    except ChildProcessError:break\n   report['remaining_groups']=sorted(proxy.groups(child.pid)-{child.pid})\n  for sig,handler in old.items():signal.signal(sig,handler)\n report['elapsed_seconds']=time.monotonic()-started;report['counter_state']=json.loads(status.read_text()) if status.exists() else {};report['program_log_bytes']=programlog.stat().st_size;report['program_c_exists']=(output/'blot_goose.c').exists();write(output/'result.json',report);return report\nif sys.argv[1:]==['--self-test']:\n output=BASE/'verification'/('work410-selftest-'+str(time.time_ns()));fixture=BASE/'verification/gdb-workcounts-telemetry-v2-reader/fixture';r=run([str(fixture)],output,[.25,.5],1.2);samples=r['counter_state'].get('samples',[])\n assert len(samples)==2 and not r['counter_state'].get('error') and not r['remaining_groups'],r\n assert samples[1]['words'][3]>samples[0]['words'][3]>0,r\n assert samples[1].get('selected_thread_stack',{}).get('walked_frames',0)>0,r\n write(BASE/'verification/work410-driver-selftest.json',{'status':'PASS','result':str(output/'result.json'),'driver_sha256':digest(__file__),'samples':2,'elapsed_seconds':r['elapsed_seconds'],'remaining_groups':r['remaining_groups']});print(str(output));sys.exit(0)\nassert sys.argv[1:]==['--run'], 'use --self-test or --run'\nassert digest(BINARY)==BINARY_SHA\nq=json.loads((BASE/'work-telemetry-v2-build/qualification.json').read_text());assert q.get('candidate_binary_sha256',q.get('binary_sha256'))==BINARY_SHA\nfrozen=BASE/'verification/build-409-inputs/compiler-goose'\ndef inputs(base):\n paths=set((base/'src').rglob('*.goose'));paths.update((base/'native').rglob('*.c'));paths.update((base/'native').rglob('*.h'));paths.add(base/'build.py');paths.discard(base/'src/source_identity.goose');return {str(p.relative_to(base)):digest(p) for p in sorted(paths)}\nsource_matrix=inputs(frozen)\nassert len(source_matrix)==442 and hashlib.sha256(json.dumps(source_matrix,sort_keys=True,separators=(',',':')).encode()).hexdigest()=='002b20dbf14a2374c7685eb7ec0ff6389255b6958618eee7a4ebe44c8ced2443'\nassert source_matrix==inputs(ROOT/'compiler-goose')\nassert digest(MANIFEST)=='9754815dc6dbd83de241fadb449c2acc7905e63e6be6462a1ec19e02dce9f2b3'\nassert digest(BASE/'work-telemetry-v2-build/tiny-reader/receipt.json')\nmanifest=json.loads(MANIFEST.read_text())\nbuild_receipt=json.loads((BASE/'work-telemetry-v2-build/build-receipt.json').read_text())\nassert build_receipt['source_files']==manifest['source_files']\nassert build_receipt['binary_sha256']==BINARY_SHA\nfor name,expected in manifest['source_files'].items():\n path=BASE/'work-telemetry-v2-candidate/source'/name\n assert digest(path)==expected,name\n\noutput=BASE/'verification/work410';assert not output.exists()\ncommand=[str(BINARY),'-o',str(output/'blot_goose.c'),'--header',str(output/'blot_goose.h'),'-O0','--stdlib','/home/jacobt/src/goose-to-wasm/build/source/stdlib',str(frozen/'src/main.goose')]\nprint('Work410 measurement folder: '+str(output),flush=True)\nwrite(BASE/'verification/work410-source-pins.json',{'source409_inputs':len(source_matrix),'source_matrix_sha256':'002b20dbf14a2374c7685eb7ec0ff6389255b6958618eee7a4ebe44c8ced2443','binary_sha256':BINARY_SHA,'manifest_sha256':digest(MANIFEST),'driver_sha256':digest(__file__),'qualification_sha256':digest(BASE/'work-telemetry-v2-build/qualification.json'),'tiny_actual_reader_sha256':digest(BASE/'work-telemetry-v2-build/tiny-reader/receipt.json')})\nr=run(command,output,[5,20,50,90,115],120);print(json.dumps({'result':str(output/'result.json'),'elapsed_seconds':r['elapsed_seconds'],'samples':len(r['counter_state'].get('samples',[])),'stop_reason':r.get('stop_reason'),'remaining_groups':r.get('remaining_groups')}));sys.exit(0)\n"
+    },
+    "driver_selftest": {
+      "sha256": "a4999a00e94bc59a6e1f65e52d2bd9d7f28aed70831c67a23fc3cfdc1f748ab4",
+      "contents": {
+        "status": "PASS",
+        "result": "/home/jacobt/src/blot2/build/goose-port/verification/work410-selftest-1794158413865195515/result.json",
+        "driver_sha256": "07c101587278c36c14c3008a930dbaaea37fb1607f772ace098df172ea75f3f6",
+        "samples": 2,
+        "elapsed_seconds": 0.7915714399860008,
+        "remaining_groups": []
+      }
+    },
+    "program_trace": {
+      "sha256": "aa3b6da35d6de79eb570dc0084615daf5a5716b7522c86c2c53b65ff37ff299a",
+      "contents": "round 2 of borrowedParameter begins (1 members)\nround 2 of get begins (5 members)\nround 3 of get begins (5 members)\nround 2 of admitted begins (1 members)\nround 2 of parse begins (1 members)\nround 2 of expression begins (1 members)\n/home/jacobt/src/blot2/build/goose-port/verification/build-409-inputs/compiler-goose/src/backend/wasm_lifetimes.goose:293: warning: redundant &: own binds by reference here without it (\u00a74.1)\n/home/jacobt/src/blot2/build/goose-port/verification/build-409-inputs/compiler-goose/src/backend/wasm_lifetimes.goose:275: warning: redundant &: own binds by reference here without it (\u00a74.1)\nround 2 of borrowedParameter begins (1 members)\nround 2 of borrowedParameter begins (1 members)\nround 2 of boundScopes begins (1 members)\nround 2 of coreInvocation begins (1 members)\nround 2 of walkEqual begins (5 members)\nround 2 of walkOperation begins (5 members)\nround 2 of tyOpened begins (3 members)\nround 2 of argumentMaskDepth begins (1 members)\nround 2 of elementsDepth begins (1 members)\nround 2 of projectDepth begins (1 members)\nround 2 of invokeDepth begins (1 members)\nround 2 of parameterDepth begins (1 members)\nround 2 of pattern begins (1 members)\nround 2 of inputBodyWithOwners begins (16 members)\nround 2 of inputBodyCheck: growths changed\nround 3 of inputBodyWithOwners begins (16 members)\nround 3 of closureCall: growths changed\nround 4 of inputBodyWithOwners begins (16 members)\nround 2 of corePattern begins (1 members)\nround 2 of coreCaptures begins (2 members)\nround 2 of coreParameters begins (2 members)\nround 2 of coreCaptures begins (2 members)\nround 2 of parameterDepth begins (1 members)\nround 2 of pattern begins (1 members)\nround 2 of capture begins (10 members)\nround 2 of application: class stores changed\nround 3 of capture begins (10 members)\nround 2 of equivalentDepth begins (1 members)\nround 2 of mentionsRegion begins (2 members)\nround 2 of pattern begins (1 members)\nround 2 of expression begins (12 members)\nround 2 of application: class stores changed\nround 3 of expression begins (12 members)\nround 3 of captureMatch: class stores changed\nround 4 of expression begins (12 members)\nround 2 of hasRow begins (1 members)\nround 2 of safeClosing begins (1 members)\nround 2 of valueOrigins begins (1 members)\nround 2 of callbackCreators begins (1 members)\nround 2 of versionReachable begins (1 members)\nround 2 of callResult begins (2 members)\nround 2 of callRows: growths changed\nround 3 of callResult begins (2 members)\nround 2 of reachable begins (1 members)\nround 2 of expression begins (1 members)\nround 2 of expression begins (1 members)\nround 2 of expression begins (1 members)\nround 2 of select begins (1 members)\nround 2 of selectAcross begins (1 members)\nround 2 of expression begins (1 members)\nround 2 of payloadDepth begins (1 members)\nround 2 of matchTypes begins (1 members)\nround 2 of equalStorage begins (1 members)\nround 2 of payloadDepth begins (1 members)\nround 2 of expression begins (3 members)\nround 2 of liveLoans begins (1 members)\nround 2 of pattern begins (1 members)\nround 2 of expression begins (12 members)\nround 2 of application: class stores changed\nround 3 of expression begins (12 members)\nround 3 of captureMatch: class stores changed\nround 4 of expression begins (12 members)\nround 2 of activeType begins (1 members)\nround 2 of carriesLoan begins (2 members)\nround 2 of pattern begins (1 members)\nround 2 of capture begins (6 members)\nround 2 of expression begins (20 members)\nround 2 of staging: growths changed\nround 3 of expression begins (20 members)\nround 2 of pattern begins (1 members)\nround 2 of expression begins (12 members)\nround 3 of expression begins (12 members)\nround 3 of captureMatch: class stores changed\nround 4 of expression begins (12 members)\nround 2 of inside begins (5 members)\nround 2 of inside begins (5 members)\nround 2 of readLoanData begins (1 members)\nround 2 of captureIssueWithRows begins (1 members)\nround 2 of operationTypeShape begins (1 members)\nround 2 of walkEqual begins (5 members)\nround 2 of resolveOperationRow begins (34 members)\nround 2 of resolveOperationArguments: growths changed\nround 3 of resolveOperationRow begins (34 members)\nround 3 of resolveQuantified: growths changed\nround 4 of resolveOperationRow begins (34 members)\nround 4 of substituteQuantified: growths changed\nround 5 of resolveOperationRow begins (34 members)\nround 2 of visit begins (4 members)\nround 2 of visitQuantifier: growths changed\nround 3 of visit begins (4 members)\nround 2 of substituteDepth begins (10 members)\nround 2 of substituteNode: class stores changed\nround 3 of substituteDepth begins (10 members)\nround 2 of unify begins (9 members)\nround 2 of unifyWalk: class stores changed\nround 3 of unify begins (9 members)\nround 2 of walk begins (17 members)\nround 2 of walkQuantifier: growths changed\nround 3 of walk begins (17 members)\nround 3 of rowWitnessMode: growths changed\nround 4 of walk begins (17 members)\nround 2 of operationTypeShape begins (1 members)\nround 2 of resolveOperationRow begins (34 members)\nround 2 of resolveOperationArguments: growths changed\nround 3 of resolveOperationRow begins (34 members)\nround 3 of resolveQuantified: growths changed\nround 4 of resolveOperationRow begins (34 members)\nround 4 of substituteQuantified: growths changed\nround 5 of resolveOperationRow begins (34 members)\nround 2 of visit begins (4 members)\nround 2 of visitQuantifier: growths changed\nround 3 of visit begins (4 members)\nround 2 of substituteDepth begins (10 members)\nround 2 of substituteNode: class stores changed\nround 3 of substituteDepth begins (10 members)\nround 2 of unify begins (9 members)\nround 2 of unifyEffects: growths changed\nround 3 of unify begins (9 members)\nround 2 of matchPrincipalMode begins (17 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (17 members)\nround 3 of rowWitnessMode: growths changed\nround 4 of matchPrincipalMode begins (17 members)\nround 2 of equalOwnedRows begins (1 members)\nround 2 of matchType begins (1 members)\nround 2 of data begins (4 members)\nround 2 of dataRow: growths changed\nround 3 of data begins (4 members)\nround 2 of matchPrincipalMode begins (10 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (10 members)\nround 3 of rowWitnessMode: growths changed\nround 4 of matchPrincipalMode begins (10 members)\nround 2 of knownInstanceDepth begins (1 members)\nround 2 of walk begins (17 members)\nround 2 of walkQuantifier: growths changed\nround 3 of walk begins (17 members)\nround 3 of rowWitnessMode: growths changed\nround 4 of walk begins (17 members)\nround 2 of matchPrincipalMode begins (9 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (9 members)\nround 2 of matchPrincipalMode begins (9 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (9 members)\nround 2 of validateOwner begins (17 members)\nround 2 of resolvePrincipalProjectionMode: class stores changed\nround 3 of validateOwner begins (17 members)\nround 2 of matchPrincipalMode begins (9 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (9 members)\nround 2 of matchPrincipalMode begins (10 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (10 members)\nround 3 of rowWitnessMode: growths changed\nround 4 of matchPrincipalMode begins (10 members)\nround 2 of copy begins (15 members)\nround 3 of copy begins (15 members)\nround 2 of sharedDataPrefix begins (1 members)\nround 2 of matchDepth begins (2 members)\nround 2 of closedType begins (1 members)\nround 2 of quantifiedDepth begins (1 members)\nround 2 of sourceInstance begins (1 members)\nround 2 of matchSubstitution begins (1 members)\nround 2 of sealWitness begins (1 members)\nround 2 of scopeType begins (1 members)\nround 2 of goalFootprint begins (2 members)\nround 2 of scopeType begins (1 members)\nround 2 of goalFootprint begins (2 members)\nround 2 of corePattern begins (1 members)\nround 2 of coreCaptures begins (2 members)\nround 2 of coreParameters begins (2 members)\nround 2 of appendSlice begins (13 members)\nround 2 of capturedReferences: growths changed\nround 3 of appendSlice begins (13 members)\nround 3 of patternCaptures: growths changed\nround 4 of appendSlice begins (13 members)\nround 2 of capturesOpening begins (6 members)\nround 2 of patternCaptures: growths changed\nround 3 of capturesOpening begins (6 members)\nround 2 of binds begins (1 members)\nround 2 of openingOperation begins (1 members)\nround 2 of sharedDataPrefix begins (1 members)\nround 2 of knownInstanceDepth begins (1 members)\nround 2 of closedType begins (1 members)\nround 2 of binds begins (1 members)\nround 2 of openingOperation begins (1 members)\nround 2 of authorityRow begins (2 members)\nround 2 of matchDepth begins (1 members)\nround 2 of matchDepth begins (1 members)\nround 2 of matchDepth begins (1 members)\nround 2 of matchDepth begins (1 members)\nround 2 of constructorPatternMode begins (2 members)\nround 2 of irrefutable begins (1 members)\nround 2 of patternMode begins (2 members)\nround 2 of constructorPatternMode: class stores changed\nround 3 of patternMode begins (2 members)\nround 2 of captureIssueWithRows begins (1 members)\nround 2 of enclosing begins (1 members)\nround 2 of check begins (281 members)\nround 3 of check begins (281 members)\nround 3 of taskOperands: class stores changed\nround 4 of check begins (281 members)\nround 4 of goalGivenMode: class stores changed\nround 5 of check begins (281 members)\nround 2 of readLoanData begins (1 members)\nround 2 of captureIssueWithRows begins (1 members)\nround 2 of spawnValue begins (1 members)\nround 2 of spawnValue begins (1 members)\nround 2 of matchPrincipalMode begins (10 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (10 members)\nround 3 of rowWitnessMode: growths changed\nround 4 of matchPrincipalMode begins (10 members)\nround 2 of equalOwnedRows begins (1 members)\nround 2 of liftableDepth begins (1 members)\nround 2 of node begins (17 members)\nround 2 of task: class stores changed\nround 3 of node begins (17 members)\nround 2 of capture begins (6 members)\nround 2 of authorityDepth begins (2 members)\nround 2 of equal begins (2 members)\nround 2 of walk begins (2 members)\nround 2 of walkRow: class stores changed\nround 3 of walk begins (2 members)\nround 2 of projectDepth begins (4 members)\nround 2 of projectNodeDepth: class stores changed\nround 3 of projectDepth begins (4 members)\nround 2 of captureBindings begins (1 members)\nround 2 of select begins (1 members)\nround 2 of matches begins (1 members)\nround 2 of pattern begins (1 members)\nround 2 of expression begins (29 members)\nround 2 of expression: class stores changed\nround 3 of expression begins (29 members)\nround 3 of freeScopeValue: class stores changed\nround 4 of expression begins (29 members)\nround 2 of ty begins (12 members)\nround 2 of copyQuantified: growths changed\nround 3 of ty begins (12 members)\nround 2 of ty begins (8 members)\nround 2 of node: growths changed\nround 3 of ty begins (8 members)\nround 2 of substituteDepth begins (10 members)\nround 2 of substituteNode: class stores changed\nround 3 of substituteDepth begins (10 members)\nround 2 of projectDepth begins (4 members)\nround 2 of projectNodeDepth: class stores changed\nround 3 of projectDepth begins (4 members)\nround 2 of matchDepth begins (3 members)\nround 2 of matchRowDepth: growths changed\nround 3 of matchDepth begins (3 members)\nround 2 of unrestrictedAssociatedNode begins (1 members)\nround 2 of ty begins (4 members)\nround 2 of tyInner: class stores changed\nround 3 of ty begins (4 members)\nround 2 of projectDepth begins (4 members)\nround 2 of projectNodeDepth: class stores changed\nround 3 of projectDepth begins (4 members)\nround 2 of resolveInner begins (45 members)\nround 2 of resolveInner: class stores changed\nround 3 of resolveInner begins (45 members)\nround 3 of projectNodeDepth: class stores changed\nround 4 of resolveInner begins (45 members)\nround 2 of compare begins (1 members)\nround 2 of intern begins (1 members)\nround 2 of importTerm begins (1 members)\nround 2 of lookup begins (1 members)\nround 2 of summaryCall begins (11 members)\nround 2 of summaryInvocation: growths changed\nround 3 of summaryCall begins (11 members)\nround 2 of assume begins (2 members)\nround 2 of walk begins (18 members)\nround 3 of walk begins (18 members)\nround 2 of owned begins (2 members)\nround 2 of owned begins (2 members)\nround 2 of authority begins (1 members)\nround 2 of capture begins (2 members)\nround 2 of captureMatch: growths changed\nround 3 of capture begins (2 members)\nround 2 of expression begins (7 members)\nround 2 of referenceValue: class stores changed\nround 3 of expression begins (7 members)\nround 2 of callableArity begins (1 members)\nround 2 of noStore begins (1 members)\nround 2 of expression begins (1 members)\nround 2 of ty begins (6 members)\nround 2 of row: growths changed\nround 3 of ty begins (6 members)\nround 2 of closed begins (2 members)\nround 2 of closedRow: growths changed\nround 3 of closed begins (2 members)\nround 2 of projectDepth begins (4 members)\nround 2 of projectNodeDepth: class stores changed\nround 3 of projectDepth begins (4 members)\nround 2 of projectDepth begins (4 members)\nround 2 of projectNodeDepth: class stores changed\nround 3 of projectDepth begins (4 members)\nround 2 of unrestrictedAssociatedNode begins (1 members)\nround 2 of projection begins (41 members)\nround 3 of projection begins (41 members)\nround 3 of projectNodeDepth: class stores changed\nround 4 of projection begins (41 members)\nround 2 of evidenceType begins (4 members)\nround 2 of evidenceGraph: growths changed\nround 3 of evidenceType begins (4 members)\nround 2 of normalizeProjection begins (2 members)\nround 2 of unifyAssociated begins (2 members)\nround 2 of unifyAssociatedPair: growths changed\nround 3 of unifyAssociated begins (2 members)\nround 2 of sourceType begins (4 members)\nround 2 of sourceRow: growths changed\nround 3 of sourceType begins (4 members)\nround 2 of projectRowDepth begins (4 members)\nround 2 of projectRowBody: class stores changed\nround 3 of projectRowDepth begins (4 members)\nround 3 of projectNodeDepth: class stores changed\nround 4 of projectRowDepth begins (4 members)\nround 2 of importImplementation begins (1 members)\nround 2 of sourceDataMode begins (3 members)\nround 2 of sourceData: growths changed\nround 3 of sourceDataMode begins (3 members)\nround 2 of callerDependent begins (1 members)\nround 2 of parameterOperand begins (1 members)\nround 2 of projectDepth begins (4 members)\nround 2 of projectNodeDepth: class stores changed\nround 3 of projectDepth begins (4 members)\nround 2 of projectRowDepth begins (4 members)\nround 2 of projectNodeDepth: class stores changed\nround 3 of projectRowDepth begins (4 members)\nround 2 of matchDepth begins (3 members)\nround 2 of matchRowDepth: class stores changed\nround 3 of matchDepth begins (3 members)\nround 2 of pinIntact begins (2 members)\nround 2 of expression begins (1 members)\nround 2 of expression begins (1 members)\nround 2 of select begins (1 members)\nround 2 of selectAcross begins (1 members)\nround 2 of expression begins (1 members)\nround 2 of payloadDepth begins (1 members)\nround 2 of equalStorage begins (1 members)\nround 2 of payloadDepth begins (1 members)\nround 2 of mentionsRegion begins (2 members)\nround 2 of pattern begins (1 members)\nround 2 of unaryCoreWithOwners begins (16 members)\nround 2 of inputBodyCheck: growths changed\nround 3 of unaryCoreWithOwners begins (16 members)\nround 3 of closureCall: growths changed\nround 4 of unaryCoreWithOwners begins (16 members)\nround 2 of inside begins (5 members)\nround 2 of readLoanData begins (1 members)\nround 2 of captureIssueWithRows begins (1 members)\nround 2 of spawnValue begins (1 members)\nround 2 of spawnValue begins (1 members)\nround 2 of matchPrincipalMode begins (10 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (10 members)\nround 3 of rowWitnessMode: growths changed\nround 4 of matchPrincipalMode begins (10 members)\nround 2 of equalOwnedRows begins (1 members)\nround 2 of liftableDepth begins (1 members)\nround 2 of constructorPatternMode begins (2 members)\nround 2 of patternMode begins (2 members)\nround 2 of constructorPatternMode: class stores changed\nround 3 of patternMode begins (2 members)\nround 2 of node begins (37 members)\nround 2 of task: class stores changed\nround 3 of node begins (37 members)\nround 3 of branch: growths changed\nround 4 of node begins (37 members)\nround 2 of visit begins (4 members)\nround 2 of siteClosure: growths changed\nround 3 of visit begins (4 members)\nround 2 of authorityDepth begins (2 members)\nround 2 of matchPrincipalMode begins (10 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (10 members)\nround 3 of rowWitnessMode: growths changed\nround 4 of matchPrincipalMode begins (10 members)\nround 2 of owned begins (2 members)\nround 2 of owned begins (2 members)\nround 2 of pattern begins (1 members)\nround 2 of expression begins (12 members)\nround 2 of application: class stores changed\nround 3 of expression begins (12 members)\nround 3 of captureMatch: class stores changed\nround 4 of expression begins (12 members)\nround 2 of spawnValue begins (1 members)\nround 2 of spawnValue begins (1 members)\nround 2 of matchPrincipalMode begins (9 members)\nround 2 of matchQuantifiedMode: growths changed\nround 3 of matchPrincipalMode begins (9 members)\nround 2 of owned begins (2 members)\nround 2 of owned begins (2 members)\nround 2 of principalType begins (2 members)\nround 2 of internFields begins (4 members)\nround 2 of internFields: live shrinks changed\nround 3 of internFields begins (4 members)\nround 3 of intern: live shrinks changed\nround 4 of internFields begins (4 members)\nround 2 of semanticType begins (6 members)\nround 2 of row: growths changed\nround 3 of semanticType begins (6 members)\nround 3 of shape: growths changed\nround 4 of semanticType begins (6 members)\nround 2 of typeId begins (2 members)\nround 2 of row: growths changed\nround 3 of typeId begins (2 members)\nround 2 of usageView begins (1 members)\nround 2 of codeType begins (1 members)\nround 2 of matchCodeShape begins (1 members)\nround 2 of closedDataShape begins (1 members)\nround 2 of transferDataFacts begins (1 members)\nround 2 of substituteDepth begins (10 members)\nround 2 of substituteNode: class stores changed\nround 3 of substituteDepth begins (10 members)\nround 2 of firstOrderDataDepth begins (2 members)\nround 2 of firstOrderDataNode: growths changed\nround 3 of firstOrderDataDepth begins (2 members)\nround 2 of openCovariantDepth begins (3 members)\nround 2 of openCovariantDepth: live shrinks changed\nround 3 of openCovariantDepth begins (3 members)\nround 2 of resolveInner begins (1 members)\nround 2 of ty begins (2 members)\nround 2 of unifyAssociated begins (2 members)\nround 2 of unifyAssociatedPair: growths changed\nround 3 of unifyAssociated begins (2 members)\nround 2 of intern begins (4 members)\nround 2 of intern: live shrinks changed\nround 3 of intern begins (4 members)\nround 2 of fromSolverDepth begins (4 members)\nround 2 of fromSolverDepth: live shrinks changed\nround 3 of fromSolverDepth begins (4 members)\nround 2 of versionType begins (1 members)\nround 2 of tyOwned begins (3 members)\nround 2 of typeShape: growths changed\nround 3 of tyOwned begins (3 members)\nround 2 of versionType begins (1 members)\nround 2 of value begins (1 members)\nround 2 of walk begins (2 members)\nround 2 of walkRow: class stores changed\nround 3 of walk begins (2 members)\nround 2 of ty begins (6 members)\nround 2 of row: growths changed\nround 3 of ty begins (6 members)\nround 2 of matchesAnchor begins (1 members)\nround 2 of pinIntact begins (2 members)\nround 2 of semanticType begins (6 members)\nround 2 of row: growths changed\nround 3 of semanticType begins (6 members)\nround 3 of shape: growths changed\nround 4 of semanticType begins (6 members)\nround 2 of matchesAnchor begins (1 members)\nround 2 of codeType begins (1 members)\nround 2 of matchCodeShape begins (1 members)\nround 2 of matchDepth begins (3 members)\nround 2 of matchRowDepth: growths changed\nround 3 of matchDepth begins (3 members)\nround 2 of closed begins (2 members)\nround 2 of closedRow: growths changed\nround 3 of closed begins (2 members)\nround 2 of closeRetainedFunctionRows begins (1 members)\nround 2 of semanticType begins (6 members)\nround 2 of row: growths changed\nround 3 of semanticType begins (6 members)\nround 3 of shape: growths changed\nround 4 of semanticType begins (6 members)\nround 2 of matchesAnchor begins (1 members)\nround 2 of nominal begins (2 members)\nround 2 of liftableValue begins (1 members)\nround 2 of callerDependent begins (1 members)\nround 2 of containsReflectionType begins (1 members)\nround 2 of normalize begins (1 members)\nround 2 of visit begins (1 members)\nround 2 of prepare begins (3 members)\nround 2 of prepareAll: growths changed\nround 3 of prepare begins (3 members)\nround 2 of irrefutable begins (1 members)\nround 2 of region begins (2 members)\nround 2 of pure begins (1 members)\nround 2 of expression begins (1 members)\nround 2 of pattern begins (1 members)\nround 2 of program begins (1 members)\nround 2 of collect begins (1 members)\nround 2 of independent begins (1 members)\nround 2 of check begins (1 members)\nround 2 of substituteDepth begins (10 members)\nround 2 of substituteNode: class stores changed\nround 3 of substituteDepth begins (10 members)\nround 2 of packPayloadNode begins (1 members)\nround 2 of drain begins (263 members)\nround 2 of drain: a variable outside it changed\nround 3 of drain begins (265 members)\nround 3 of callableScope: growths changed\nround 4 of drain begins (265 members)\nround 4 of admitSummaryResult: class stores changed\nround 5 of drain begins (265 members)\n"
+    },
+    "raw_blocks": [
+      {
+        "sha256": "306f3f7bc01f7f5753079637d31a205d54812803550a7b1a23b29543e19b83c1",
+        "hex": "524f5745534f4f4702000000000000003a00000000000000756a030000000000400d0000000000000a0100000000000070090000000000001e490000000000007600010000000000ac3f000000000000ad01000000000000740b000000000000470b0000000000000f00000000000000570000000000000007020000000000002200000000000000050000000000000001490000000000007c020200000000008d60050000000000069c3000000000006c5b000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000600000000000000000000000000000001000000000000001a070100000000002aad020000000000741c000000000000443d000000000000babb020000000000927d07000000000060110000000000009b0d0000000000009b0d000000000000af3b000000000000ec9f010000000000af450100000000004d3d3b0000000000a88627030000000021dc000000000000a9000600000000001e00000000000000430000000000000061090000000000004c09000000000000a70700000000000002000000000000004b0801000000000030000000000000000f000000000000004400000000000000c991300000000000"
+      },
+      {
+        "sha256": "03568cfe26c8f573d24c8c45fd8e98d02dd0a6405366dbd2418d0e07a50df644",
+        "hex": "524f5745534f4f4702000000000000003a00000000000000fa4a0400000000004c0d0000000000000a010000000000001f1000000000000024c7000000000000eefd020000000000f2b6000000000000b306000000000000791700000000000047170000000000001000000000000000a700000000000000aa070000000000001901000000000000050000000000000003c7000000000000edcc1300000000007cfa350000000000221fbb170000000031a0050000000000c8000000000000001001000000000000880000000000000002000000000000000100000000000000060000000000000000000000000000000100000000000000bd852400000000004ffb2201000000003da50100000000008d550500000000006d6b3900000000004bdeb200000000007511000000000000a70d000000000000a70d000000000000bb3b00000000000058a00100000000002e4a010000000000dfcb010100000000dd2da214000000000022020000000000deaf0e000000000022000000000000004300000000000000500f000000000000b70e00000000000073070000000000000400000000000000b687240000000000020100000000000011000000000000007800000000000000be34ba1700000000"
+      },
+      {
+        "sha256": "15d2cae28c0ee939e2782486d9a2fd73750fa37b25e9117a48e1a2560c9731df",
+        "hex": "524f5745534f4f4702000000000000003a00000000000000d97c070000000000bb0d0000000000000a01000000000000aa2e000000000000aa0002000000000095b714000000000001d2010000000000080c0000000000001a3c000000000000bb3b0000000000001b000000000000006801000000000000700d00000000000019010000000000000500000000000000670002000000000025852800000000002262610000000000a667202a00000000bea20a00000000007a0300000000000058040000000000002c0200000000000002000000000000001600000000000000cc030000000000000c0000000000000002000000000000001cdf3c00000000003b15a30100000000e7df020000000000fc36090000000000103d6a00000000005230390100000000968a0000000000006dd10000000000006cd1000000000000c3b502000000000037351a000000000066002a00000000005608ae0200000000443a338300000000b61505000000000048bc20000000000044000000000000005900000000000000a92e0000000000009e2e0000000000009f2e000000000000030000000000000069f13c000000000002010000000000002200000000000000f70000000000000013e01d2a00000000"
+      },
+      {
+        "sha256": "ee4b7a94e6ef1b64e0530be06e1e0784015e0b86b1f894f6af3a0c1e79a81b18",
+        "hex": "524f5745534f4f4702000000000000003a0000000000000025e5080000000000e70d0000000000000a0100000000000056350000000000006c6a02000000000089cb170000000000f934020000000000340e0000000000000d45000000000000c7440000000000001f000000000000008301000000000000c00f00000000000019010000000000000500000000000000466a0200000000008a99400000000000583d880000000000f83a703a0000000085801100000000000e05000000000000f405000000000000fa0200000000000002000000000000003c00000000000000740a0000000000000c0000000000000002000000000000008cc5570000000000adfbfb0400000000d890050000000000ffa70f00000000000b5bc300000000004dda1e02000000008733070000000000ed7c070000000000ec7c070000000000176f1f0000000000ad5e7601000000000895550100000000383e35040000000009c3e6b401000000aa200600000000006902260000000000270000000000000060000000000000005d3400000000000038340000000000008f180000000000000300000000000000f614580000000000850200000000000022000000000000000c0100000000000077536d3a00000000"
+      },
+      {
+        "sha256": "6014b4a673dd8c1783206c65818384f3fa6bbe0a1b6f07f25b431e70f379667f",
+        "hex": "524f5745534f4f4702000000000000003a0000000000000033361a0000000000ee0d0000000000000a01000000000000483b000000000000b0b702000000000055361a0000000000697c0200000000004510000000000000124d000000000000e94c0000000000001f000000000000008501000000000000d21100000000000019010000000000000500000000000000a7b702000000000044b1560000000000b7f7a9000000000050539d4d00000000110c180000000000da05000000000000c006000000000000600300000000000002000000000000008702000000000000a4180000000000005e00000000000000020000000000000007b0710000000000f0c9d10800000000ca36080000000000d70616000000000076581a010000000028fffe020000000042220d00000000004a1b0d0000000000491b0d000000000059c539000000000082a7b50200000000f30e6602000000001d9027050000000009d3e5d801000000c4ed0600000000002ed72900000000000a000000000000006000000000000000473b000000000000473b0000000000008f180000000000000500000000000000b905720000000000850200000000000022000000000000000d010000000000004e359a4d00000000"
+      }
+    ],
+    "interpretation": [
+      "Volatile counters and debugger stops perturb timing. Source409 differs from397; do not compare elapsed progression with400 as speed evidence.",
+      "Final 115s snapshot: 1,302,156,112 raw visits, 1,301,951,822 identity skips (99.98431%). Remainder 204,290 is an upper bound on relevant remaps because inprogress skips are included.",
+      "Positive ClassAt lookup is now small: 5,681,476 calls and 11,138,999 parameter tests. The old400 positive-index hypothesis is low priority.",
+      "TypeEq 7,933,907,721 and 86,478,877 array visits remain large. 15,176 specializations and 19,689 normal body completions show continuing work; maximum SCC round5.",
+      "Optional20/90 stacks sample selected thread1 waiting inRunOnCompilerStack, not activecompilerworker. They provide NO hotspot attribution or phase percentages.",
+      "Next prototype is ordered live event selection indexed at3actualroot/srcwrite sites; preserve current event filtering, interval/order and classread normalization, including classification changes.",
+      "All5 raw464B blocks independently match full58word manifests/JSON; cleanup process groups empty. No full compiler or runtime qualification."
+    ]
   }
 }

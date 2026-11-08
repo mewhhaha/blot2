@@ -243,5 +243,9 @@ permits; no unchanged retry or cap growth.
 returning a scalar; branch casts, errors and recursive tail stay ordered. Both
 checkers pass 42 controls and two local-borrow escape negatives. The whole run
 caps at 120.281s with zero diagnostics and no C output; no qualification or
-completed speed claim. Next: fresh instrumentation-only work measurement from
-57bb on unchanged 409, with 58-word ABI2 counters and the same 120s cap.
+completed speed claim. Measurement 410 (same 120s cap) reads five valid ABI2 snapshots and reaps in
+119.671s. At 115s, 1.302 billion raw visits are 99.98431% identity skips; positive
+ClassAt work is small, while 7.934 billion TypeEq calls remain. Both sampled
+stacks are waiting main-thread frames, so provide no hotspot attribution.
+Next: indexed live raw-event selection at its 3 write sites, preserving event
+order, current-field checks and classread normalization. No new IR or cap growth.
