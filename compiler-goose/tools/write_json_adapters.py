@@ -1,3 +1,4 @@
+from dispatch_hooks import write_generated
 from pathlib import Path
 import re
 ROOT=Path(__file__).resolve().parents[1] / 'src'
@@ -233,4 +234,4 @@ for inner, width, _ in sorted(arrays):
     seen.add(key)
     # Fixed arrays are JSON arrays, including u8; only byte slices are strings.
     out.append('fn write<JsonWriter>(writer:JsonWriter&,values:'+inner+'['+str(width)+'])->blot_error::Error {let opened=beginArray(writer);if opened!=blot_error::Error.none {return opened;}for value in values {let error=element(writer,value);if error!=blot_error::Error.none {return error;}}return endArray(writer);}')
-(ROOT/'support/json_adapters.goose').write_text('\n'.join(out)+'\n')
+write_generated(ROOT/'support/json_adapters.goose','\n'.join(out)+'\n','blot_json')

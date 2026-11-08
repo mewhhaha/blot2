@@ -217,7 +217,7 @@ fn kindFromCode(code: u32) -> Kind, blot_error::Error {
 }
 
 fn blot_structural::equal(left: blot_check_numeric_proof_terms::Kind, right: blot_check_numeric_proof_terms::Kind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_numeric_proof_terms::Kind) { blot_structural::hash(sink, blot_check_numeric_proof_terms::kindCode(value) as! u8); }
+fn blot_check_numeric_proof_terms::blotStructuralHash<S>(value: blot_check_numeric_proof_terms::Kind,sink: S&) { blot_structural::hash(sink, blot_check_numeric_proof_terms::kindCode(value) as! u8); }
 
 fn tagCode(value: Tag) -> u32 {
     match value {
@@ -242,7 +242,7 @@ fn tagFromCode(code: u32) -> Tag, blot_error::Error {
 }
 
 fn blot_structural::equal(left: blot_check_numeric_proof_terms::Tag, right: blot_check_numeric_proof_terms::Tag) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_numeric_proof_terms::Tag) { blot_structural::hash(sink, blot_check_numeric_proof_terms::tagCode(value) as! u8); }
+fn blot_check_numeric_proof_terms::blotStructuralHash<S>(value: blot_check_numeric_proof_terms::Tag,sink: S&) { blot_structural::hash(sink, blot_check_numeric_proof_terms::tagCode(value) as! u8); }
 
 fn relationCode(value: Relation) -> u32 {
     match value {
@@ -267,4 +267,4 @@ fn relationFromCode(code: u32) -> Relation, blot_error::Error {
 }
 
 fn blot_structural::equal(left: blot_check_numeric_proof_terms::Relation, right: blot_check_numeric_proof_terms::Relation) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_numeric_proof_terms::Relation) { blot_structural::hash(sink, blot_check_numeric_proof_terms::relationCode(value) as! u8); }
+fn blot_check_numeric_proof_terms::blotStructuralHash<S>(value: blot_check_numeric_proof_terms::Relation,sink: S&) { blot_structural::hash(sink, blot_check_numeric_proof_terms::relationCode(value) as! u8); }

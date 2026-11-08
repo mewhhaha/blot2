@@ -137,4 +137,4 @@ fn opFromCode(code: u32) -> Op, blot_error::Error {
 }
 
 fn blot_structural::equal(left: blot_check_typed_staging::Op, right: blot_check_typed_staging::Op) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_typed_staging::Op) { blot_structural::hash(sink, blot_check_typed_staging::opCode(value) as! u32); }
+fn blot_check_typed_staging::blotStructuralHash<S>(value: blot_check_typed_staging::Op,sink: S&) { blot_structural::hash(sink, blot_check_typed_staging::opCode(value) as! u32); }

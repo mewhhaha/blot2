@@ -329,7 +329,7 @@ fn tagFromCode(code: u32) -> Tag, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_capability_contracts::Tag, right: blot_check_capability_contracts::Tag) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_contracts::Tag) { blot_structural::hash(sink, blot_check_capability_contracts::tagCode(value) as! u8); }
+fn blot_check_capability_contracts::blotStructuralHash<S>(value: blot_check_capability_contracts::Tag,sink: S&) { blot_structural::hash(sink, blot_check_capability_contracts::tagCode(value) as! u8); }
 fn projectionCode(value: Projection) -> u32 {
     match value {
         index => { return 0; },
@@ -346,7 +346,7 @@ fn projectionFromCode(code: u32) -> Projection, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_capability_contracts::Projection, right: blot_check_capability_contracts::Projection) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_contracts::Projection) { blot_structural::hash(sink, blot_check_capability_contracts::projectionCode(value) as! u8); }
+fn blot_check_capability_contracts::blotStructuralHash<S>(value: blot_check_capability_contracts::Projection,sink: S&) { blot_structural::hash(sink, blot_check_capability_contracts::projectionCode(value) as! u8); }
 
 
 

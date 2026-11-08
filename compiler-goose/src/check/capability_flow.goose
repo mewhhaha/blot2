@@ -536,7 +536,7 @@ fn contractFromCode(code: u32) -> Contract, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_capability_flow::Contract, right: blot_check_capability_flow::Contract) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_flow::Contract) { blot_structural::hash(sink, blot_check_capability_flow::contractCode(value) as! u8); }
+fn blot_check_capability_flow::blotStructuralHash<S>(value: blot_check_capability_flow::Contract,sink: S&) { blot_structural::hash(sink, blot_check_capability_flow::contractCode(value) as! u8); }
 fn parameterResultCode(value: ParameterResult) -> u32 {
     match value {
         product => { return 0; },
@@ -561,7 +561,7 @@ fn parameterResultFromCode(code: u32) -> ParameterResult, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_capability_flow::ParameterResult, right: blot_check_capability_flow::ParameterResult) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_flow::ParameterResult) { blot_structural::hash(sink, blot_check_capability_flow::parameterResultCode(value) as! u8); }
+fn blot_check_capability_flow::blotStructuralHash<S>(value: blot_check_capability_flow::ParameterResult,sink: S&) { blot_structural::hash(sink, blot_check_capability_flow::parameterResultCode(value) as! u8); }
 fn constructionKindCode(value: ConstructionKind) -> u32 {
     match value {
         computation => { return 0; },
@@ -578,4 +578,4 @@ fn constructionKindFromCode(code: u32) -> ConstructionKind, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_capability_flow::ConstructionKind, right: blot_check_capability_flow::ConstructionKind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_flow::ConstructionKind) { blot_structural::hash(sink, blot_check_capability_flow::constructionKindCode(value) as! u8); }
+fn blot_check_capability_flow::blotStructuralHash<S>(value: blot_check_capability_flow::ConstructionKind,sink: S&) { blot_structural::hash(sink, blot_check_capability_flow::constructionKindCode(value) as! u8); }

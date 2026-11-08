@@ -195,7 +195,7 @@ fn opFromCode(code: u32) -> Op, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_task_types::Op, right: blot_check_task_types::Op) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_task_types::Op) { blot_structural::hash(sink, blot_check_task_types::opCode(value) as! u32); }
+fn blot_check_task_types::blotStructuralHash<S>(value: blot_check_task_types::Op,sink: S&) { blot_structural::hash(sink, blot_check_task_types::opCode(value) as! u32); }
 fn captureIssueCode(value: CaptureIssue) -> u32 {
     match value {
         transfer => { return 0; },
@@ -214,7 +214,7 @@ fn captureIssueFromCode(code: u32) -> CaptureIssue, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_task_types::CaptureIssue, right: blot_check_task_types::CaptureIssue) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_task_types::CaptureIssue) { blot_structural::hash(sink, blot_check_task_types::captureIssueCode(value) as! u8); }
+fn blot_check_task_types::blotStructuralHash<S>(value: blot_check_task_types::CaptureIssue,sink: S&) { blot_structural::hash(sink, blot_check_task_types::captureIssueCode(value) as! u8); }
 
 
 

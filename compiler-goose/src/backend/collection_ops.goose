@@ -41,6 +41,6 @@ fn lookup(name: const u8[:]) -> blot_support::Option<Primitive> {
     return blot_support::none<Primitive>();
 }
 
-fn blot_structural::hash<S>(sink:S&,value:blot_backend_collection_ops::Op) {blot_structural::hash(sink,blot_backend_collection_ops::opCode(value));}
+fn blot_backend_collection_ops::blotStructuralHash<S>(value:blot_backend_collection_ops::Op,sink:S&) {blot_structural::hash(sink,blot_backend_collection_ops::opCode(value));}
 
 fn blot_structural::equal(left:blot_backend_collection_ops::Op,right:blot_backend_collection_ops::Op)->bool {return left==right;}

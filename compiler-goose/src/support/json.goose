@@ -30,7 +30,7 @@ fn key(writer: Writer&,name: const u8[:]) -> blot_error::Error { let separated =
 fn field<T>(writer: Writer&,name: const u8[:],value: T) -> blot_error::Error { let named = key(writer,name); if named != blot_error::Error.none { return named; } return write(writer,value); }
 fn element<T>(writer: Writer&,value: T) -> blot_error::Error { let separated = separator(writer,FrameKind.array); if separated != blot_error::Error.none { return separated; } return write(writer,value); }
 fn nullValue(writer: Writer&) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } writer.out.append("null"); return blot_error::Error.none; }
-fn write(writer: Writer&,value: bool) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } if value { writer.out.append("true"); } else { writer.out.append("false"); } return blot_error::Error.none; }
+fn blot_json::blotJsonWrite(value: bool,writer: blot_json::Writer&) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } if value { writer.out.append("true"); } else { writer.out.append("false"); } return blot_error::Error.none; }
 fn unsignedValue(writer: Writer&,value: u64) -> blot_error::Error {
     if writer.failure != blot_error::Error.none { return writer.failure; } let quoted = writer.options.emit_nonportable_numbers_as_strings && value > 9007199254740991;
     if quoted { writer.out.push('"'); } format(writer.out,value); if quoted { writer.out.push('"'); } return blot_error::Error.none;
@@ -39,38 +39,38 @@ fn signedValue(writer: Writer&,value: i64) -> blot_error::Error {
     if writer.failure != blot_error::Error.none { return writer.failure; } let quoted = writer.options.emit_nonportable_numbers_as_strings && (value < -9007199254740991 || value > 9007199254740991);
     if quoted { writer.out.push('"'); } format(writer.out,value); if quoted { writer.out.push('"'); } return blot_error::Error.none;
 }
-fn write(writer: Writer&,value: u8) -> blot_error::Error { unsignedValue(writer,value as u64) }
-fn write(writer: Writer&,value: u16) -> blot_error::Error { unsignedValue(writer,value as u64) }
-fn write(writer: Writer&,value: u32) -> blot_error::Error { unsignedValue(writer,value as u64) }
-fn write(writer: Writer&,value: u64) -> blot_error::Error { unsignedValue(writer,value) }
-fn write(writer: Writer&,value: i8) -> blot_error::Error { signedValue(writer,value as i64) }
-fn write(writer: Writer&,value: i16) -> blot_error::Error { signedValue(writer,value as i64) }
-fn write(writer: Writer&,value: i32) -> blot_error::Error { signedValue(writer,value as i64) }
-fn write(writer: Writer&,value: i64) -> blot_error::Error { signedValue(writer,value) }
-fn write(writer: Writer&,value: f32) -> blot_error::Error {
+fn blot_json::blotJsonWrite(value: u8,writer: blot_json::Writer&) -> blot_error::Error { blot_json::unsignedValue(writer,value as u64) }
+fn blot_json::blotJsonWrite(value: u16,writer: blot_json::Writer&) -> blot_error::Error { blot_json::unsignedValue(writer,value as u64) }
+fn blot_json::blotJsonWrite(value: u32,writer: blot_json::Writer&) -> blot_error::Error { blot_json::unsignedValue(writer,value as u64) }
+fn blot_json::blotJsonWrite(value: u64,writer: blot_json::Writer&) -> blot_error::Error { blot_json::unsignedValue(writer,value) }
+fn blot_json::blotJsonWrite(value: i8,writer: blot_json::Writer&) -> blot_error::Error { blot_json::signedValue(writer,value as i64) }
+fn blot_json::blotJsonWrite(value: i16,writer: blot_json::Writer&) -> blot_error::Error { blot_json::signedValue(writer,value as i64) }
+fn blot_json::blotJsonWrite(value: i32,writer: blot_json::Writer&) -> blot_error::Error { blot_json::signedValue(writer,value as i64) }
+fn blot_json::blotJsonWrite(value: i64,writer: blot_json::Writer&) -> blot_error::Error { blot_json::signedValue(writer,value) }
+fn blot_json::blotJsonWrite(value: f32,writer: blot_json::Writer&) -> blot_error::Error {
     if writer.failure != blot_error::Error.none { return writer.failure; }
     if value != value || value - value != 0.0 {
-        if !writer.options.emit_nonportable_numbers_as_strings { return nullValue(writer); } if value != value { return quoted(writer,"nan"); } if value < 0.0 { return quoted(writer,"-inf"); } return quoted(writer,"inf");
+        if !writer.options.emit_nonportable_numbers_as_strings { return blot_json::nullValue(writer); } if value != value { return blot_json::quoted(writer,"nan"); } if value < 0.0 { return blot_json::quoted(writer,"-inf"); } return blot_json::quoted(writer,"inf");
     }
     format(writer.out,value); return blot_error::Error.none;
 }
-fn write(writer: Writer&,value: f64) -> blot_error::Error {
+fn blot_json::blotJsonWrite(value: f64,writer: blot_json::Writer&) -> blot_error::Error {
     if writer.failure != blot_error::Error.none { return writer.failure; }
     if value != value || value - value != 0.0 {
-        if !writer.options.emit_nonportable_numbers_as_strings { return nullValue(writer); } if value != value { return quoted(writer,"nan"); } if value < 0.0 { return quoted(writer,"-inf"); } return quoted(writer,"inf");
+        if !writer.options.emit_nonportable_numbers_as_strings { return blot_json::nullValue(writer); } if value != value { return blot_json::quoted(writer,"nan"); } if value < 0.0 { return blot_json::quoted(writer,"-inf"); } return blot_json::quoted(writer,"inf");
     }
     format(writer.out,value); return blot_error::Error.none;
 }
-fn write(writer: Writer&,value: const u8[:]) -> blot_error::Error {
-    if !writer.options.emit_strings_as_arrays { return quoted(writer,value); } let opened = beginArray(writer); if opened != blot_error::Error.none { return opened; }
-    for byte in value { let error = element(writer,byte); if error != blot_error::Error.none { return error; } } return endArray(writer);
+fn blot_json::blotJsonWrite(value: const u8[:],writer: blot_json::Writer&) -> blot_error::Error {
+    if !writer.options.emit_strings_as_arrays { return blot_json::quoted(writer,value); } let opened = blot_json::beginArray(writer); if opened != blot_error::Error.none { return opened; }
+    for byte in value { let error = blot_json::element(writer,byte); if error != blot_error::Error.none { return error; } } return blot_json::endArray(writer);
 }
-fn write<T>(writer: Writer&,values: const T[:]) -> blot_error::Error {
-    let opened = beginArray(writer); if opened != blot_error::Error.none { return opened; } for value in values { let error = element(writer,value); if error != blot_error::Error.none { return error; } } return endArray(writer);
+fn blot_json::blotJsonWrite<T>(values: const T[:],writer: blot_json::Writer&) -> blot_error::Error {
+    let opened = blot_json::beginArray(writer); if opened != blot_error::Error.none { return opened; } for value in values { let error = blot_json::element(writer,value); if error != blot_error::Error.none { return error; } } return blot_json::endArray(writer);
 }
-fn write<T>(writer: Writer&,value: blot_support::Option<T>) -> blot_error::Error { if !value.present { return nullValue(writer); } return write(writer,value.value); }
-fn write<T>(writer: Writer&,value: T?) -> blot_error::Error { if value == null { return nullValue(writer); } return write(writer,value); }
-fn write(writer: Writer&,value: Raw) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } writer.out.append(value.bytes); return blot_error::Error.none; }
+fn blot_support::blotJsonWrite<T>(value: blot_support::Option<T>,writer: blot_json::Writer&) -> blot_error::Error { if !value.present { return blot_json::nullValue(writer); } return blot_json::write(writer,value.value); }
+fn blot_json::blotJsonWrite<T>(value: T?,writer: blot_json::Writer&) -> blot_error::Error { if value == null { return blot_json::nullValue(writer); } return blot_json::write(writer,value); }
+fn blot_json::blotJsonWrite(value: Raw,writer: blot_json::Writer&) -> blot_error::Error { if writer.failure != blot_error::Error.none { return writer.failure; } writer.out.append(value.bytes); return blot_error::Error.none; }
 fn sourceName(name: const u8[:]) -> const u8[:] {
     if name == "unsigned32" { return "u32"; } if name == "floating32" { return "f32"; } if name == "block_" { return "block"; } if name == "loop_" { return "loop"; } if name == "match_" { return "match"; } if name == "opaque_" { return "opaque"; } if name == "guard_" { return "guard"; } if name == "recursive_" { return "recursive"; } if name == "reusable_" { return "reusable"; } if name == "simd_" { return "simd"; } if name == "namespace_" { return "namespace"; } if name == "varint_" { return "varint"; } return name;
 }
@@ -96,3 +96,6 @@ fn unionValue<T>(writer: Writer&,value: T) -> blot_error::Error {
 }
 
 fn objectField(writer: Writer&,name: const u8[:]) -> blot_error::Error { return key(writer,name); }
+
+fn write<JsonWriter,T>(writer:JsonWriter&,value:T)->blot_error::Error {return value.blotJsonWrite(writer);}
+fn write(writer:Writer&,value:const u8[:])->blot_error::Error {return blotJsonWrite(value,writer);}

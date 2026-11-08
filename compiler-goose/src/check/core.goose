@@ -1031,38 +1031,38 @@ fn lower(tree, names, checked, tables) -> Module, blot_error::Error { return blo
 fn lowerWithOrigins(tree, names, checked, diagnostic_origins, tables) -> Module, blot_error::Error { return blot_check_core_builder::lowerWithOrigins(tree, names, checked, diagnostic_origins, tables); }
 
 fn blot_structural::equal(left: blot_check_core::Tag, right: blot_check_core::Tag) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::Tag) { blot_structural::hash(sink, blot_check_core::tagCode(value) as! u8); }
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::Tag,sink: S&) { blot_structural::hash(sink, blot_check_core::tagCode(value) as! u8); }
 
 fn blot_structural::equal(left: blot_check_core::PrimitiveKind, right: blot_check_core::PrimitiveKind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::PrimitiveKind) { blot_structural::hash(sink, blot_check_core::primitiveKindCode(value) as! u8); }
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::PrimitiveKind,sink: S&) { blot_structural::hash(sink, blot_check_core::primitiveKindCode(value) as! u8); }
 
 fn blot_structural::equal(left: blot_check_core::Op, right: blot_check_core::Op) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::Op) { blot_structural::hash(sink, blot_check_core::opCode(value) as! u8); }
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::Op,sink: S&) { blot_structural::hash(sink, blot_check_core::opCode(value) as! u8); }
 
 fn blot_structural::equal(left: blot_check_core::PatternTag, right: blot_check_core::PatternTag) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::PatternTag) { blot_structural::hash(sink, blot_check_core::patternTagCode(value) as! u8); }
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::PatternTag,sink: S&) { blot_structural::hash(sink, blot_check_core::patternTagCode(value) as! u8); }
 
 fn blot_structural::equal(left: blot_check_core::UpdateKind, right: blot_check_core::UpdateKind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::UpdateKind) { blot_structural::hash(sink, blot_check_core::updateKindCode(value) as! u8); }
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::UpdateKind,sink: S&) { blot_structural::hash(sink, blot_check_core::updateKindCode(value) as! u8); }
 
 fn blot_structural::equal(left: blot_check_core::ResolverOperation, right: blot_check_core::ResolverOperation) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::ResolverOperation) { blot_structural::hash(sink, blot_check_core::resolverOperationCode(value) as! u8); }
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::ResolverOperation,sink: S&) { blot_structural::hash(sink, blot_check_core::resolverOperationCode(value) as! u8); }
 
 fn blot_structural::equal(left: blot_check_core::RequestDecisionKind, right: blot_check_core::RequestDecisionKind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::RequestDecisionKind) { blot_structural::hash(sink, blot_check_core::requestDecisionKindCode(value) as! u32); }
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::RequestDecisionKind,sink: S&) { blot_structural::hash(sink, blot_check_core::requestDecisionKindCode(value) as! u32); }
 
 fn blot_structural::equal(left: blot_check_core::LoopKind, right: blot_check_core::LoopKind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::LoopKind) { blot_structural::hash(sink, blot_check_core::loopKindCode(value) as! u8); }
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::LoopKind,sink: S&) { blot_structural::hash(sink, blot_check_core::loopKindCode(value) as! u8); }
 
 fn blot_structural::equal(left: blot_check_core::Code, right: blot_check_core::Code) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::Code) { blot_structural::hash(sink, blot_check_core::codeCode(value) as! u8); }
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::Code,sink: S&) { blot_structural::hash(sink, blot_check_core::codeCode(value) as! u8); }
 fn blot_structural::equal(left: blot_check_core::DictionaryProof, right: blot_check_core::DictionaryProof) -> bool {
     match left {
         selected l => { match right { selected r => { return l.value == r.value; }, _ => { return false; }, } },
         given l => { match right { given r => { return blot_structural::equal(l.value, r.value); }, _ => { return false; }, } },
     }
 }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_core::DictionaryProof) {
+fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::DictionaryProof,sink: S&) {
     match value {
         selected v => { blot_structural::hash(sink, 0 as u8); blot_structural::hash(sink, v.value); },
         given v => { blot_structural::hash(sink, 1 as u8); blot_structural::hash(sink, v.value); },

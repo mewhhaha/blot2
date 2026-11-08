@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import sys
 from source_model import clean, balanced, split
+from dispatch_hooks import write_generated,transformed_custom_types
 
 ROOT = Path(__file__).resolve().parents[1] / 'src'
 TARGET = ROOT / 'support/structural_adapters.goose'
@@ -65,6 +66,7 @@ for path in sorted(ROOT.rglob('*.goose')):
         if generic:
             qualified += '<' + generic + '>'
         structs[qualified] = generic, module
+    custom_hash.update(transformed_custom_types(source))
     for declaration in re.finditer(r'\bfn\s+blot_structural::(equal|hash)(?:<[^>]+>)?\s*\([^)]*\)', source):
         # Existing hooks use concrete qualified types. Keep their source-shaped
         # enum widths and union payload rules instead of replacing them.
@@ -113,4 +115,4 @@ for name, variants in {
         out.append('fn hash<StructuralSink>(sink:StructuralSink&,value:'+name+') {match value {'+''.join(arms)+'}}')
 for name,hook in enum_equalities().items():
     if name not in custom_equal:out.append(hook)
-TARGET.write_text('\n'.join(out) + '\n')
+write_generated(TARGET,'\n'.join(out) + '\n','blot_structural')

@@ -653,7 +653,7 @@ fn kindFromCode(code: u32) -> Kind, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_capability_lifetimes::Kind, right: blot_check_capability_lifetimes::Kind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_lifetimes::Kind) { blot_structural::hash(sink, blot_check_capability_lifetimes::kindCode(value) as! u8); }
+fn blot_check_capability_lifetimes::blotStructuralHash<S>(value: blot_check_capability_lifetimes::Kind,sink: S&) { blot_structural::hash(sink, blot_check_capability_lifetimes::kindCode(value) as! u8); }
 fn edgeKindCode(value: EdgeKind) -> u32 {
     match value {
         value => { return 0; },
@@ -674,7 +674,7 @@ fn edgeKindFromCode(code: u32) -> EdgeKind, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_capability_lifetimes::EdgeKind, right: blot_check_capability_lifetimes::EdgeKind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_lifetimes::EdgeKind) { blot_structural::hash(sink, blot_check_capability_lifetimes::edgeKindCode(value) as! u8); }
+fn blot_check_capability_lifetimes::blotStructuralHash<S>(value: blot_check_capability_lifetimes::EdgeKind,sink: S&) { blot_structural::hash(sink, blot_check_capability_lifetimes::edgeKindCode(value) as! u8); }
 
 
 

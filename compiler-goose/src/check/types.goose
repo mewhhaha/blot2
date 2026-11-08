@@ -1870,13 +1870,13 @@ recursive fn openCovariantNode(self_: Store&, root: Id, memo: dictionary<Covaria
 }
 
 fn blot_structural::equal(left: blot_check_types::Tag, right: blot_check_types::Tag) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_types::Tag) { blot_structural::hash(sink, blot_check_types::tagCode(value) as! u8); }
+fn blot_check_types::blotStructuralHash<S>(value: blot_check_types::Tag,sink: S&) { blot_structural::hash(sink, blot_check_types::tagCode(value) as! u8); }
 
 fn blot_structural::equal(left: blot_check_types::Operator, right: blot_check_types::Operator) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_types::Operator) { blot_structural::hash(sink, blot_check_types::operatorCode(value) as! u8); }
+fn blot_check_types::blotStructuralHash<S>(value: blot_check_types::Operator,sink: S&) { blot_structural::hash(sink, blot_check_types::operatorCode(value) as! u8); }
 
 fn blot_structural::equal(left: blot_check_types::ObligationKind, right: blot_check_types::ObligationKind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_types::ObligationKind) { blot_structural::hash(sink, blot_check_types::obligationKindCode(value) as! u8); }
+fn blot_check_types::blotStructuralHash<S>(value: blot_check_types::ObligationKind,sink: S&) { blot_structural::hash(sink, blot_check_types::obligationKindCode(value) as! u8); }
 fn usageKindFromCode(code: u32) -> UsageKind, bool { if code > 7 { return 0, false; } return code, true; }
 
 

@@ -27,28 +27,22 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen 298
-replaces the type-argument stack's five stored reusable pools with two ordinary
-invocation-local owners. Owner-bound cached metadata ranges remove its snapshot
-buffer and environment map; the global owner-ID mint order remains. The exact
-candidate matches an adapted original-algorithm oracle for 1,503 operations twice
-on current 869 and official checkers; 11 semantic mutations and strict owner tests
-reject. Fixture non-common payload is 15,340 vs 55,321B, excluding publisher payload,
-runtime pages/freelists/headers; no whole-compiler memory or speed gain is claimed.
-An existing active-Frame getter recovers the exact Generator owner, clearing the
-old importer retention error; 16 focused authority controls pass. 56 mutable empty
-record fields use their declared typed defaults. Whole parsing passes 440 files.
-The completed run hits the 120s emission cap after 120.329s total with no captured
-source diagnostic and no compiler C/header/executable. This is incomplete
-checking, not a pass or proof the former boundary completed. childrenFields now
-accepts only the original extra slice and scalar Node fields, preserving its
-six slice expressions and u32 arithmetic. Five compact controls pass; the old
-compact method also passes, so actual 295 remains its original failure witness.
-The dispatch-only 297 experiment failed and was removed; 296 was cancelled after a
-focused alias error. Whole-build caps stay 120/300s while a separate adapter
-namespace-dispatch prototype is reviewed. Focused controls retain exact
-source/carrier limits. Private checker bounds stay 1M clone / 100k tail with 201 frontend /
-8 runtime controls. Failing prefixes are not completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen 300
+routes every hash/JSON adapter through its nominal namespace. Global hash/write
+families fall from 3,005/3,325 heads to 1/2; equality is unchanged. All 2,921 generated
+hash and 3,304 JSON heads retain their original bodies/types; 50 custom hashes and
+5 JSON overrides pass independent inversion. Actual-schema gates preserve 11,365
+hash bytes, custom diagnostic JSON, aliases, refs, nullable values and evaluation
+order. No completed compiler-speed result is claimed.
+The type-argument journal retains its focused oracle/ownership qualification;
+fixture non-common payload is 15,340 vs 55,321B, excluding runtime overhead. Whole
+parsing passes 440 files. The completed build stops after 97.094s with 1 captured
+code_expectation child-slice error, now attributed to scalar id. C emission,
+linking and execution remain pending. Dispatch/scalar-helper rewrites failed;
+current direct Node borrow also fails in the full context, despite compact
+branch/alias/bounds/escape controls passing. A checker/root-analysis investigation
+is active; no more blind variants or cap increases. Stage/overall caps remain
+120/300s with 3s partial first-error collection. The Zig oracle is unchanged.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

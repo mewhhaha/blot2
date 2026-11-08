@@ -78,7 +78,7 @@ fn kindFromCode(code: u32) -> Kind, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_staging_origins::Kind, right: blot_check_staging_origins::Kind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_staging_origins::Kind) { blot_structural::hash(sink, blot_check_staging_origins::kindCode(value) as! u8); }
+fn blot_check_staging_origins::blotStructuralHash<S>(value: blot_check_staging_origins::Kind,sink: S&) { blot_structural::hash(sink, blot_check_staging_origins::kindCode(value) as! u8); }
 
 
 

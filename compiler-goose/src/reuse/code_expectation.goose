@@ -34,19 +34,16 @@ struct Store {
     next: Ids&, buckets: dictionary<u64, Id>&,
 }
 fn node(view: View, id: Id) -> Node { view.nodes[id] }
-fn childrenFields(extra: const Id[:], tag: Tag, a: u32, b: u32, c: u32) -> const Id[:] {
-    match tag {
-        product => { return extra[a..a + b]; },
-        record => { return extra[a..a + b * 2]; },
-        nominal => { return extra[c + 1..c + 1 + extra[c]]; },
-        forall => { return extra[c..c + b]; },
-        existential => { return extra[c..c + b]; },
-        _ => { return extra[..0]; },
-    }
-}
 fn children(view: View, id: Id) -> const Id[:] {
-    let n = view.node(id);
-    return childrenFields(view.extra, n.tag, n.a, n.b, n.c);
+    let n: const Node& = view.nodes[id];
+    match n.tag {
+        product => { return view.extra[n.a..n.a + n.b]; },
+        record => { return view.extra[n.a..n.a + n.b * 2]; },
+        nominal => { return view.extra[n.c + 1..n.c + 1 + view.extra[n.c]]; },
+        forall => { return view.extra[n.c..n.c + n.b]; },
+        existential => { return view.extra[n.c..n.c + n.b]; },
+        _ => { return view.extra[..0]; },
+    }
 }
 fn init(nodes: Nodes&, extra: Ids&, next: Ids&, buckets: dictionary<u64, Id>&) -> Store, Error {
     nodes.clear(); extra.clear(); next.clear(); ::clear(buckets);

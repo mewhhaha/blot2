@@ -51,17 +51,24 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 298 inputs. Whole parsing passes
-440 files. Its completed run hits the 120s program-emission cap after 120.329s total,
-with no source diagnostic captured and no C/header/executable. This is incomplete
-checking, not a pass or proof that a previous method completed. The final child
-slice helper accepts only original extra plus scalar tag/a/b/c parameters. Its
-match body preserves all six original expressions and u32 arithmetic. Five
-compact controls preserve branches, addresses, bounds and escape checks; the old
-compact method also passes, leaving actual 295 as the original failure witness.
-Dispatch-only 297 failed and was removed; 296 was cancelled after a focused alias
-error. Caps remain 120/300s while a separate complete adapter namespace-dispatch
-prototype is reviewed. The 3s first-error window remains partial.
+per stage. This checkpoint preserves exact frozen 300 inputs. Whole parsing passes
+440 files. Its completed run stops after 97.094s with one child-slice return-root
+error attributed to scalar id in code_expectation. No C/header/executable exists.
+The earlier match dispatch/scalar-helper variants and the current direct caller
+Node borrow did not resolve this wide-context boundary. All compact variants
+pass branch/content/address/bounds/escape controls, so they do not reproduce the
+real failure. Root-analysis investigation is active; caps stay 120/300s.
+Complete hash/JSON adapters now dispatch by receiver's nominal namespace: global
+hash/write sets shrink 3,005/3,325→1/2 while equality stays unchanged. Independent
+inversion preserves all 2,921 generated hash/3,304 JSON heads, 50 custom hashes and 5
+custom JSON projections. Actual-schema current 869 gates preserve 11,365 hash bytes,
+all diagnostic wire tags and ref/alias/snapshot/evaluation behavior. One concrete
+byte-slice public facade retains empty-literal behavior. Equality sharding was
+rejected because its generic bridges changed existing slice/array inference.
+Source generators emit the new hooks; generated output was not manually patched.
+The isolated 299 run hit the prior local-Node error at 96.937s; baseline 298 timed out
+120s without diagnostics. Different failing/incomplete prefixes establish no
+completed compiler speedup or runtime parity.
 The independently reviewed 35 recursion annotations use three concrete callback
 bindings; a broader merged-callback graph was rejected. Six scheme constructor
 factories pass ten controls on official/8335 and five on currently selected869.

@@ -220,11 +220,11 @@ fn operatorMember(operator: blot_check_types::Operator) -> Text {
     }
 }
 
-fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Candidate) -> blot_error::Error { if writer.failure == blot_error::Error.none { writer.failure = value.jsonStringify(writer); } return writer.failure; }
-fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Explanation) -> blot_error::Error { if writer.failure == blot_error::Error.none { writer.failure = value.jsonStringify(writer); } return writer.failure; }
-fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Side) -> blot_error::Error { return writer.enumValue(value); }
-fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Outcome) -> blot_error::Error { return writer.enumValue(value); }
-fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::ContextKind) -> blot_error::Error { return writer.enumValue(value); }
+fn blot_reuse_dispatch_explanation::blotJsonWrite(value: blot_reuse_dispatch_explanation::Candidate,writer: blot_json::Writer&) -> blot_error::Error { if writer.failure == blot_error::Error.none { writer.failure = value.jsonStringify(writer); } return writer.failure; }
+fn blot_reuse_dispatch_explanation::blotJsonWrite(value: blot_reuse_dispatch_explanation::Explanation,writer: blot_json::Writer&) -> blot_error::Error { if writer.failure == blot_error::Error.none { writer.failure = value.jsonStringify(writer); } return writer.failure; }
+fn blot_reuse_dispatch_explanation::blotJsonWrite(value: blot_reuse_dispatch_explanation::Side,writer: blot_json::Writer&) -> blot_error::Error { return writer.enumValue(value); }
+fn blot_reuse_dispatch_explanation::blotJsonWrite(value: blot_reuse_dispatch_explanation::Outcome,writer: blot_json::Writer&) -> blot_error::Error { return writer.enumValue(value); }
+fn blot_reuse_dispatch_explanation::blotJsonWrite(value: blot_reuse_dispatch_explanation::ContextKind,writer: blot_json::Writer&) -> blot_error::Error { return writer.enumValue(value); }
 
 // Existing payload ownership keeps these unchanged runs live through transfer.
 fn canonicalText(value:Text)->Text{if !value.present {return blot_support::none<const u8[:]>();}return blot_support::some<const u8[:]>(text_runs.realloc_slice(value.value,value.value.len));}

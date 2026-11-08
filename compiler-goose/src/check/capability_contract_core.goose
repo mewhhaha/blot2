@@ -366,7 +366,7 @@ fn functionUseFromCode(code: u32) -> FunctionUse, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_capability_contract_core::FunctionUse, right: blot_check_capability_contract_core::FunctionUse) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_capability_contract_core::FunctionUse) { blot_structural::hash(sink, blot_check_capability_contract_core::functionUseCode(value) as! u8); }
+fn blot_check_capability_contract_core::blotStructuralHash<S>(value: blot_check_capability_contract_core::FunctionUse,sink: S&) { blot_structural::hash(sink, blot_check_capability_contract_core::functionUseCode(value) as! u8); }
 
 fn ensureCallables(self_:Builder&, contract_store: Store&, view_module: const Module&, module_owners: const ModuleRef[:], callable_table: Callables&,minimum:i64)->Error {let budget .= contract_store.budget;if !budget {return blot_error::Error.none;}return blot_check_logical_scratch_budget::ensure(budget,self_.callable_allocation,minimum);}
 fn releaseCallables(self_:Builder&, contract_store: Store&, view_module: const Module&, module_owners: const ModuleRef[:], callable_table: Callables&) {let budget .= contract_store.budget;if budget {blot_check_logical_scratch_budget::release(budget,self_.callable_allocation);}blot_support_pooled_buffer::deinit(callable_table,callable_runs);}

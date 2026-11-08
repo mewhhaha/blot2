@@ -66,7 +66,7 @@ fn kindFromCode(code: u32) -> Kind, blot_error::Error {
 }
 
 fn blot_structural::equal(left: blot_check_parameter_patterns::Kind, right: blot_check_parameter_patterns::Kind) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_parameter_patterns::Kind) { blot_structural::hash(sink, blot_check_parameter_patterns::kindCode(value) as! u8); }
+fn blot_check_parameter_patterns::blotStructuralHash<S>(value: blot_check_parameter_patterns::Kind,sink: S&) { blot_structural::hash(sink, blot_check_parameter_patterns::kindCode(value) as! u8); }
 
 type Error=blot_error::Error;
 

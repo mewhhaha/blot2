@@ -419,7 +419,7 @@ fn tailFromCode(code: u32, value: u32) -> Tail, Error {
     match code { 0 => { return Tail.closed, blot_error::Error.none; }, 1 => { return Tail.variable { value , ..}, blot_error::Error.none; }, 2 => { return Tail.parameter { value , ..}, blot_error::Error.none; }, 3 => { return Tail.formal { value , ..}, blot_error::Error.none; }, _ => { return Tail.closed, blot_error::Error.invalid_artifact; }, }
 }
 fn blot_structural::equal(left: blot_check_effects::Tail, right: blot_check_effects::Tail) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_effects::Tail) {
+fn blot_check_effects::blotStructuralHash<S>(value: blot_check_effects::Tail,sink: S&) {
     blot_structural::hash(sink, blot_check_effects::tailCode(value) as! u8);
     match value { closed => {}, variable v => { blot_structural::hash(sink, v.value); }, parameter v => { blot_structural::hash(sink, v.value); }, formal v => { blot_structural::hash(sink, v.value); }, }
 }

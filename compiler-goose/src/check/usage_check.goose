@@ -386,7 +386,7 @@ fn outcomeFromCode(code: u32) -> Outcome, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_usage_check::Outcome, right: blot_check_usage_check::Outcome) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_usage_check::Outcome) { blot_structural::hash(sink, blot_check_usage_check::outcomeCode(value) as! u8); }
+fn blot_check_usage_check::blotStructuralHash<S>(value: blot_check_usage_check::Outcome,sink: S&) { blot_structural::hash(sink, blot_check_usage_check::outcomeCode(value) as! u8); }
 fn modeCode(value: Mode) -> u32 {
     match value {
         affine => { return 0; },
@@ -403,7 +403,7 @@ fn modeFromCode(code: u32) -> Mode, blot_error::Error {
     }
 }
 fn blot_structural::equal(left: blot_check_usage_check::Mode, right: blot_check_usage_check::Mode) -> bool { return left == right; }
-fn blot_structural::hash<S>(sink: S&, value: blot_check_usage_check::Mode) { blot_structural::hash(sink, blot_check_usage_check::modeCode(value) as! u8); }
+fn blot_check_usage_check::blotStructuralHash<S>(value: blot_check_usage_check::Mode,sink: S&) { blot_structural::hash(sink, blot_check_usage_check::modeCode(value) as! u8); }
 
 
 
