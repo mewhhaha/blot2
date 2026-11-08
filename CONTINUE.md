@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen407 is the current source checkpoint. Selected private checker 57bb3e81
+Frozen408 is the current source checkpoint. Selected private checker 57bb3e81
 adds two bounded optimizations to 678b88: a call-local raw-store identity skip
 and visited-type buckets keyed only by kind/nominal declaration. Relevant
 store mappings and possible-match type comparisons retain their original
@@ -232,3 +232,9 @@ Both checkers pass 280 fault-prefix/cleanup cases; local payload escapes still
 reject. No new authority, payload allocation or copy. Its 101.946s run clears
 Project retention and reaches executeProjectJob with a nullable Engine field.
 Use the existing local borrow/assert narrowing pattern next; no C output yet.
+
+408 narrows the worker Engine field through the existing local borrow/assert
+pattern; exact source review passes. Its 120.308s capped run captures one new
+recursive-cycle lifetime error at inputCallbackRecipe (check.goose2003), with
+no C/header/executable. Subtract the borrowed Recipe carrier if source proof
+permits; no unchanged retry or cap growth.
