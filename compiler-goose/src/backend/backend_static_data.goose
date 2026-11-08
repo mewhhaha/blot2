@@ -157,7 +157,7 @@ recursive fn serializeCarrier(self_: State&,g: Generator&,value: ValueId,from: u
     let address,error = aggregate(); leaves.deinit(); words.deinit(); return address,error;
 }
 reusable[] var goal_runs: blot_check_types::Obligation[>..] = [];
-fn copyGoals(values: const blot_check_types::Obligation[:]) -> blot_check_types::Obligation[:] { if values.len == 0 { return []; } let result = goal_runs.alloc_slice(values.len); for index in 0..values.len { result[index] = values[index]; } return result; }
+fn copyGoals(values: const blot_check_types::Obligation[:]) -> blot_check_types::Obligation[:] { if values.len == 0 { return default<blot_check_types::Obligation[:]>(); } let result = goal_runs.alloc_slice(values.len); for index in 0..values.len { result[index] = values[index]; } return result; }
 fn freeGoals(values: blot_check_types::Obligation[:]) { if values.len != 0 { goal_runs.free_slice(values); } }
 recursive fn serializePackage(self_: State&,g: Generator&,value: ValueId,ty: u32,depth: i64) -> u32,Error {
     let info = g.evaluator.valueInfo(value); let package = g.representations.store.node(ty);

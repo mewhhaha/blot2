@@ -32,7 +32,7 @@ fn possible(source: const Module&) -> bool { if !source.arena.present || source.
 fn own(view: Extension&,id: u32) -> Function?,Error {
     if !view.active || id >= view.module.functions.len { return null,blot_error::Error.invalid_function_reference; } if id < view.original_functions && !view.owned.items[id] { let error = view.module.materializeBody(id); if error != blot_error::Error.none { return null,error; } view.owned.items[id] = true; } return view.module.functions[id],blot_error::Error.none;
 }
-fn mutableInstructions(view: Extension&,id: u32) -> Instruction[:],Error { let body,error = own(view,id); if error != blot_error::Error.none { return [],error; } assert(body != null); return view.module.instructions[body.instructions.start..body.instructions.start + body.instructions.len],blot_error::Error.none; }
+fn mutableInstructions(view: Extension&,id: u32) -> Instruction[:],Error { let body,error = own(view,id); if error != blot_error::Error.none { return default<Instruction[:]>(),error; } assert(body != null); return view.module.instructions[body.instructions.start..body.instructions.start + body.instructions.len],blot_error::Error.none; }
 fn replaceBody(view: Extension&,id: u32,code: const Instruction[:]) -> Error { let body,error = own(view,id); if error != blot_error::Error.none { return error; } assert(body != null); return view.module.publishInstructions(id,code); }
 fn detachedInto(view: Extension&,source: const Module&) -> Error {
     assert(!(view.module .== source)); deinit(view); let destination .= view.module;

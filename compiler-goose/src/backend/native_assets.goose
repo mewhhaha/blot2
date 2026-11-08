@@ -16,8 +16,7 @@ struct Modules {storage: Module[:] = default<Module[:]>(),items: Module[:] = def
 struct Sources {storage: blot_reuse_source_overlays::Source[:] = default<blot_reuse_source_overlays::Source[:]>(),items: blot_reuse_source_overlays::Source[:] = default<blot_reuse_source_overlays::Source[:]>()}
 struct Dependencies {storage: Dependency[:] = default<Dependency[:]>(),items: Dependency[:] = default<Dependency[:]>()}
 struct Resources {storage: Resource[:] = default<Resource[:]>(),items: Resource[:] = default<Resource[:]>()}
-struct TextRun {start:i64=0,len:i64=0}
-struct Texts {storage: TextRun[:] = default<TextRun[:]>(),items: TextRun[:] = default<TextRun[:]>()}
+struct Texts {storage: const u8[:][:] = default<const u8[:][:]>(),items: const u8[:][:] = default<const u8[:][:]>()}
 struct Candidate {owner_id: u64 = 0,allocation_index:i64=-1,modules: Modules = Modules {..},sources: Sources = Sources {..},dependencies: Dependencies = Dependencies {..},resources: Resources = Resources {..},texts: Texts = Texts {..},stats: Stats = Stats {..},issue: blot_support::Option<Issue> = blot_support::none<Issue>()}
 struct Session {options: Options = Options {..},last: Candidate? = null,texts: Texts = Texts {..},owned_definitions: Definition[:] = default<Definition[:]>(),owned_roots: const u8[:][:] = default<const u8[:][:]>()}
 fn jsonStringify(self_: Definition,writer: blot_json::Writer&) -> blot_error::Error {writer.beginObject();writer.field("module",self_.module);writer.field("path",self_.path);writer.field("kind",self_.kind);writer.field("type",self_.ty);writer.field("export",self_.export_name);writer.field("mediaType",self_.mediaType);writer.endObject();return writer.failure;}
@@ -38,12 +37,12 @@ reusable[] var module_runs: Module[>..] = [];
 reusable[] var source_runs: Source[>..] = [];
 reusable[] var dependency_runs: Dependency[>..] = [];
 reusable[] var resource_runs: Resource[>..] = [];
-reusable[] var text_runs: TextRun[>..] = [];
+reusable[] var text_runs: const u8[:][>..] = [];
 reusable[] var text_bytes: u8[>..] = [];
 reusable[] var definition_runs: Definition[>..] = [];
 reusable[] var root_runs: const u8[:][>..] = [];
-fn own<C>(self_: C&,bytes: const u8[:]) -> const u8[:],Error {if bytes.len == 0 {return default<const u8[:]>(),blot_error::Error.none;}let copied = text_bytes.alloc_slice(bytes.len);for index in 0..bytes.len {copied[index] = bytes[index];}let first:const u8& =copied[0];let start=text_bytes.index_of(first);let error = blot_support_pooled_buffer::push(self_.texts,TextRun{start,copied.len},text_runs);if error != blot_error::Error.none {text_bytes.free_slice(copied);return default<const u8[:]>(),error;}return copied,blot_error::Error.none;}
-fn freeTexts(self_: Texts&) {for run in self_.items {if run.len == 0 {continue;}text_bytes.free_slice(text_bytes[run.start..run.start + run.len]);}blot_support_pooled_buffer::deinit(self_,text_runs);}
+fn own<C>(self_: C&,bytes: const u8[:]) -> const u8[:],Error {if bytes.len == 0 {return default<const u8[:]>(),blot_error::Error.none;}let copied = text_bytes.alloc_slice(bytes.len);for index in 0..bytes.len {copied[index] = bytes[index];}let text:const u8[:] =copied;let error = blot_support_pooled_buffer::push(self_.texts,text,text_runs);if error != blot_error::Error.none {text_bytes.free_slice(copied);return default<const u8[:]>(),error;}return copied,blot_error::Error.none;}
+fn freeTexts(self_: Texts&) {for bytes in self_.items {if bytes.len == 0 {continue;}text_bytes.free_slice(bytes);}blot_support_pooled_buffer::deinit(self_,text_runs);}
 fn push(self_: Modules&,module: Module) -> Error {return blot_support_pooled_buffer::push(self_,module,module_runs);}
 fn push(self_: Sources&,source: Source) -> Error {return blot_support_pooled_buffer::push(self_,source,source_runs);}
 fn push(self_: Dependencies&,dependency: Dependency) -> Error {return blot_support_pooled_buffer::push(self_,dependency,dependency_runs);}
@@ -54,7 +53,7 @@ fn validPath(path: const u8[:]) -> bool {if path.len == 0 || path[0] != '/' || !
 fn validMediaType(value: const u8[:]) -> bool {if value.len == 0 || value.len > 1024 {return false;}for byte in value {if byte == '\r' || byte == '\n' || byte == 0 {return false;}}var at: i64 = 0;var units: i64 = 0;while at < value.len {let point,length,valid = blot_backend_native_asset_readers::decodePoint(value,at);if !valid {return false;}at += length;units++;if point > 65535 {units++;}if units > 256 {return false;}}return true;}
 fn identifier(name: const u8[:],upper: bool) -> bool {if name.len == 0 || name == "_" {return false;}if upper {if name[0] < 'A' || name[0] > 'Z' {return false;}for builtin in ["Unit","Bool","U32","F32","Array","List"] {if name == builtin {return false;}}}else if (name[0] < 'a' || name[0] > 'z') && name[0] != '_' {return false;}for byte in name[1..] {if !((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') || (byte >= '0' && byte <= '9') || byte == '_') {return false;}}for word in ["const","let","type","data","effect","is","func","do","use","return","yield","break","for","ever","in","case","of","if","then","else","as","import","infix","infixl","infixr","self","where"] {if word == name {return false;}}return true;}
 fn copyDefinition<C>(self_: C&,definition: Definition) -> Definition,Error {
-    var result = definition;let module,error = self_.own(definition.module);if error != blot_error::Error.none {return Definition {..},error;}result.module = module;let path,path_error = self_.own(definition.path);if path_error != blot_error::Error.none {return Definition {..},path_error;}result.path = path;
+    var result = Definition {kind:definition.kind,..};let module,error = self_.own(definition.module);if error != blot_error::Error.none {return Definition {..},error;}result.module = module;let path,path_error = self_.own(definition.path);if path_error != blot_error::Error.none {return Definition {..},path_error;}result.path = path;
     if definition.ty.present {let value,error = self_.own(definition.ty.value);if error != blot_error::Error.none {return Definition {..},error;}result.ty = blot_support::some(value);}if definition.export_name.present {let value,error = self_.own(definition.export_name.value);if error != blot_error::Error.none {return Definition {..},error;}result.export_name = blot_support::some(value);}if definition.mediaType.present {let value,error = self_.own(definition.mediaType.value);if error != blot_error::Error.none {return Definition {..},error;}result.mediaType = blot_support::some(value);}return result,blot_error::Error.none;
 }
 fn init(options: Options) -> Session,Error {
@@ -73,7 +72,7 @@ fn definitionLess(left: Definition,right: Definition) -> bool {return utf16Less(
 fn dependencyLess(left: Dependency,right: Dependency) -> bool {return utf16Less(left.path,right.path);}
 fn resourceLess(left: Resource,right: Resource) -> bool {return utf16Less(left.key,right.key);}
 fn join<C>(self_: C&,left: const u8[:],right: const u8[:]) -> const u8[:],Error {var joined: u8[>..] = [];joined.append(left);if left.len != 0 && right.len != 0 {if left[left.len - 1] != '/' && right[0] != '/' {joined.push('/');}if left[left.len - 1] == '/' && right[0] == '/' {joined.append(right[1..]);}else {joined.append(right);}}else {joined.append(right);}return self_.own(joined);}
-fn canonical(self_: Candidate&,path: const u8[:]) -> const u8[:],Error {var name: u8[>..<] = [];let error = blot_reuse_source_overlays::canonicalPath(path,name);if error != blot_error::Error.none {return [],error;}return self_.own(name);}
+fn canonical(self_: Candidate&,path: const u8[:]) -> const u8[:],Error {var name: u8[>..<] = [];let error = blot_reuse_source_overlays::canonicalPath(path,name);if error != blot_error::Error.none {return default<const u8[:]>(),error;}return self_.own(name);}
 fn basename(path: const u8[:]) -> const u8[:] {var first = path.len;while first != 0 && path[first - 1] != '/' {first--;}return path[first..];}
 struct Definitions {storage: Definition[:] = default<Definition[:]>(),items: Definition[:] = default<Definition[:]>()}
 fn push(self_: Definitions&,definition: Definition) -> Error {return blot_support_pooled_buffer::push(self_,definition,definition_runs);}
@@ -102,20 +101,20 @@ fn ioName(errno: i32,reading: bool) -> const u8[:] {
 fn inputFailure(candidate: Candidate&,filename: const u8[:],errno: i32,reading: bool) -> Error {var text: u8[>..] = [];format(text,"Unable to read asset: ",ioName(errno,reading));let message,error = candidate.own(text);if error != blot_error::Error.none {return error;}candidate.fail(filename,"asset_input",message);return blot_error::Error.none;}
 fn readInput(candidate: Candidate&,filename: const u8[:],path: const u8[:]) -> const u8[:],bool,Error {
     var terminated: u8[>..] = [];terminated.append(path);terminated.push(0);var fd: i32 = -1;
-    loop {fd = blot_native::open_read(terminated[0]);if fd >= 0 {break;}let errno = blot_native::last_errno();if errno == 4 {continue;}let error = inputFailure(candidate,filename,errno,false);return [],false,error;}
+    loop {fd = blot_native::open_read(terminated[0]);if fd >= 0 {break;}let errno = blot_native::last_errno();if errno == 4 {continue;}let error = inputFailure(candidate,filename,errno,false);return default<const u8[:]>(),false,error;}
     var bytes: u8[>..<] = [];
     fn capture() -> const u8[:],bool,Error {
         loop {
             let start = bytes.len;let amount = min(65536,maximum_file + 1 - start);bytes.resize(start + amount,0);let count = blot_native::read(fd,bytes[start],amount as u64);
-            if count < 0 {let errno = blot_native::last_errno();bytes.resize(start);if errno == 4 || errno == 110 {continue;}let error = inputFailure(candidate,filename,errno,true);return [],false,error;}
-            bytes.resize(start + count);if bytes.len > maximum_file {candidate.fail(filename,"asset_limit","Asset input exceeds 16 MiB");return [],false,blot_error::Error.none;}if count == 0 {break;}
+            if count < 0 {let errno = blot_native::last_errno();bytes.resize(start);if errno == 4 || errno == 110 {continue;}let error = inputFailure(candidate,filename,errno,true);return default<const u8[:]>(),false,error;}
+            bytes.resize(start + count);if bytes.len > maximum_file {candidate.fail(filename,"asset_limit","Asset input exceeds 16 MiB");return default<const u8[:]>(),false,blot_error::Error.none;}if count == 0 {break;}
         }
         let owned,error = candidate.own(bytes);return owned,error == blot_error::Error.none,error;
     }
     let bytes_out,present,error = capture();blot_native::close(fd);return bytes_out,present,error;
 }
 fn digest(bytes: const u8[:]) -> u8[64] {var state = blot_support_sha256::init();blot_support_sha256::update(state,bytes);let hash = blot_support_sha256::final(state);let alphabet = "0123456789abcdef";var result: u8[64] = [0;64];for byte,index in hash {result[index * 2] = alphabet[byte >> 4];result[index * 2 + 1] = alphabet[byte & 15];}return result;}
-fn resourceKey(candidate: Candidate&,path: const u8[:],media: const u8[:],digest: const u8[:]) -> const u8[:],Error {var bytes: u8[>..] = [];var writer = blot_json::Writer {out: bytes,options: blot_json::Options {..},..};writer.beginArray();writer.element(path);writer.element(media);writer.element(digest);writer.endArray();if writer.failure != blot_error::Error.none {return [],writer.failure;}return candidate.own(bytes);}
+fn resourceKey(candidate: Candidate&,path: const u8[:],media: const u8[:],digest: const u8[:]) -> const u8[:],Error {var bytes: u8[>..] = [];var writer = blot_json::Writer {out: bytes,options: blot_json::Options {..},..};writer.beginArray();writer.element(path);writer.element(media);writer.element(digest);writer.endArray();if writer.failure != blot_error::Error.none {return default<const u8[:]>(),writer.failure;}return candidate.own(bytes);}
 fn prepare(self_: Session&,entry: const u8[:],sources: const Source[:],asset_sources: const Source[:]) -> Candidate?,Error {
     if candidates.len >= 4294967295 {return null,blot_error::Error.out_of_memory;}let candidate_index=candidates.alloc_index(Candidate {owner_id: blot_native::fresh_owner_id(),..});let candidate:Candidate& =candidates[candidate_index];candidate.allocation_index=candidate_index;let overlay,overlay_error = blot_reuse_source_overlays::init(asset_sources,blot_reuse_project::Options {..});if overlay_error != blot_error::Error.none {candidate.deinit();return null,overlay_error;}var overrides = overlay;var definitions = Definitions {..};var discovered = Definitions {..};
     fn capture() -> Error {

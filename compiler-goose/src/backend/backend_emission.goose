@@ -304,11 +304,11 @@ reusable[] var owned_bindings: StaticBinding[>..] = [];
 reusable[] var owned_instances: LocalInstance[>..] = [];
 reusable[] var owned_mappings: Mapping[>..] = [];
 reusable[] var owned_rows: RowMapping[>..] = [];
-fn freeWords(values: const u32[:]) { if values.len != 0 { let first: const u32& = values[0]; let at = owned_words.index_of(first); owned_words.free_slice(owned_words[at..at + values.len]); } }
-fn freeRoles(values: const blot_backend_runtime_ir::Role[:]) { if values.len != 0 { let first: const blot_backend_runtime_ir::Role& = values[0]; let at = owned_roles.index_of(first); owned_roles.free_slice(owned_roles[at..at + values.len]); } }
-fn freeMappings(values: const Mapping[:]) { if values.len != 0 { let first: const Mapping& = values[0]; let at = owned_mappings.index_of(first); owned_mappings.free_slice(owned_mappings[at..at + values.len]); } }
-fn freeRows(values: const RowMapping[:]) { if values.len != 0 { let first: const RowMapping& = values[0]; let at = owned_rows.index_of(first); owned_rows.free_slice(owned_rows[at..at + values.len]); } }
-fn deinit(field: FieldPlan&) { if field.variants.len != 0 { let first: const blot_check_core::ProjectionVariant& = field.variants[0]; let at = owned_variants.index_of(first); owned_variants.free_slice(owned_variants[at..at + field.variants.len]); } freeWords(field.slots); field.variants = []; field.slots = []; }
+fn freeWords(values: const u32[:]) { if values.len != 0 { owned_words.free_slice(values); } }
+fn freeRoles(values: const blot_backend_runtime_ir::Role[:]) { if values.len != 0 { owned_roles.free_slice(values); } }
+fn freeMappings(values: const Mapping[:]) { if values.len != 0 { owned_mappings.free_slice(values); } }
+fn freeRows(values: const RowMapping[:]) { if values.len != 0 { owned_rows.free_slice(values); } }
+fn deinit(field: FieldPlan&) { if field.variants.len != 0 { owned_variants.free_slice(field.variants); } freeWords(field.slots); field.variants = []; field.slots = []; }
 fn deinit(projection: ProjectionPlan&) { match projection { field p=>{ var field = p.value; field.deinit(); },_=>{}, } }
 fn deinit(preparation: TemplatePreparation&) { freeWords(preparation.capture_types); freeRoles(preparation.capture_roles); preparation.capture_types = []; preparation.capture_roles = []; }
 fn deinit(plan: StaticClosurePlan&) { freeWords(plan.captured); freeMappings(plan.mappings); freeRows(plan.rows); plan.captured = []; plan.mappings = []; plan.rows = []; }
@@ -317,11 +317,11 @@ fn deinit(plan: ApplyPlan&) { if plan.static_closure.present { plan.static_closu
 recursive fn deinit(plan: Plan&,bodies: blot_backend_resolved_body::Store<Plan>&) {
     match plan {
         staging p=>{ if p.value.body.present { bodies.release(p.value.body.value); } },
-        instances p=>{ for instance in p.value { bodies.release(instance.body); } if p.value.len != 0 { let first: const LocalInstance& = p.value[0]; let at = owned_instances.index_of(first); owned_instances.free_slice(owned_instances[at..at + p.value.len]); } },
+        instances p=>{ for instance in p.value { bodies.release(instance.body); } if p.value.len != 0 { owned_instances.free_slice(p.value); } },
         request p=>{ var request = p.value; request.deinit(); },
-        pattern p=>{ if p.value.present && p.value.value.len != 0 { let first: const StaticBinding& = p.value.value[0]; let at = owned_bindings.index_of(first); owned_bindings.free_slice(owned_bindings[at..at + p.value.value.len]); } },
+        pattern p=>{ if p.value.present && p.value.value.len != 0 { owned_bindings.free_slice(p.value.value); } },
         template p=>{ var preparation = p.value; preparation.deinit(); },projection p=>{ if p.value.present { var projection = p.value.value; projection.deinit(); } },
-        update_locations p=>{ for field in p.value { field.deinit(); } if p.value.len != 0 { let first: const FieldPlan& = p.value[0]; let at = owned_fields.index_of(first); owned_fields.free_slice(owned_fields[at..at + p.value.len]); } },
+        update_locations p=>{ for field in p.value { field.deinit(); } if p.value.len != 0 { owned_fields.free_slice(p.value); } },
         named p=>{ var named = p.value; named.deinit(); },application p=>{ var application = p.value; application.deinit(); },
         resolver p=>{ match p.value { call c=>{ var call = c.value; call.deinit(); },_=>{}, } },
         dispatch p=>{ match p.value { selected s=>{ var call = s.call; call.deinit(); },_=>{}, } },_=>{},
@@ -937,8 +937,8 @@ recursive fn prepareInstances(owner: Owner&,decisions: const InstanceDecisions&,
  var rows = RowBuffer {..};
     recursive fn cleanup_continuation_45() -> LocalInstance[:],Error {
 
-    for index in 0..decision.count { mappings.clear(); rows.clear(); let facts = withFacts(owner.mappings,decisions.factsAt(decision,index),mappings); if facts != blot_error::Error.none { return [],facts; } let row_facts = withFacts(owner.row_mappings,decisions.rowsAt(decision,index),rows); if row_facts != blot_error::Error.none { return [],row_facts; }
-        let body,error = prepareMapped(owner,producer,depth + 1,false,mappings.items,rows.items,null); if error != blot_error::Error.none { return [],error; } instances[index] = LocalInstance { decision.layouts[index],body , ..}; prepared++;
+    for index in 0..decision.count { mappings.clear(); rows.clear(); let facts = withFacts(owner.mappings,decisions.factsAt(decision,index),mappings); if facts != blot_error::Error.none { return default<LocalInstance[:]>(),facts; } let row_facts = withFacts(owner.row_mappings,decisions.rowsAt(decision,index),rows); if row_facts != blot_error::Error.none { return default<LocalInstance[:]>(),row_facts; }
+        let body,error = prepareMapped(owner,producer,depth + 1,false,mappings.items,rows.items,null); if error != blot_error::Error.none { return default<LocalInstance[:]>(),error; } instances[index] = LocalInstance { decision.layouts[index],body , ..}; prepared++;
     } published = true; return instances,blot_error::Error.none;
 
     }
@@ -1652,10 +1652,10 @@ fn resolveProjection(owner: Owner&,original: blot_check_core::Projection,variant
         } if variants.items.len != 0 { return projection,blot_error::Error.none; }
     } return projection,generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.unresolved_type);
 }
-fn copyWords(values: const u32[:]) -> u32[:] { if values.len == 0 { return []; } let copy = owned_words.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
-fn copyMappings(values: const Mapping[:]) -> Mapping[:] { if values.len == 0 { return []; } let copy = owned_mappings.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
-fn copyRows(values: const RowMapping[:]) -> RowMapping[:] { if values.len == 0 { return []; } let copy = owned_rows.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
-fn copyVariants(values: const blot_check_core::ProjectionVariant[:]) -> blot_check_core::ProjectionVariant[:] { if values.len == 0 { return []; } let copy = owned_variants.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
+fn copyWords(values: const u32[:]) -> u32[:] { if values.len == 0 { return default<u32[:]>(); } let copy = owned_words.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
+fn copyMappings(values: const Mapping[:]) -> Mapping[:] { if values.len == 0 { return default<Mapping[:]>(); } let copy = owned_mappings.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
+fn copyRows(values: const RowMapping[:]) -> RowMapping[:] { if values.len == 0 { return default<RowMapping[:]>(); } let copy = owned_rows.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
+fn copyVariants(values: const blot_check_core::ProjectionVariant[:]) -> blot_check_core::ProjectionVariant[:] { if values.len == 0 { return default<blot_check_core::ProjectionVariant[:]>(); } let copy = owned_variants.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
 fn prepareField(owner: Owner&,id: u32,index: u32,sizes: bool) -> FieldPlan,Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var projection = source.projection(index); var variants = VariantBuffer {..};
     recursive fn cleanup_continuation_17() -> FieldPlan,Error {
@@ -1685,8 +1685,8 @@ fn prepareUpdateLocations(owner: Owner&,id: u32) -> FieldPlan[:],Error {
     assert(owner.preparing); let source .= owner.generator.unit(owner.unit_id); var fields = FieldBuffer {..}; var published = false;
     recursive fn cleanup_continuation_15() -> FieldPlan[:],Error {
  let selectors = source.updateSelectors(id);
-    if selectors.len == 0 { for index in source.updatePath(id) { let field,error = prepareField(owner,id,index,true); if error != blot_error::Error.none { return [],error; } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); return [],appended; } } }
-    else { for selector in selectors { if selector.kind == blot_check_core::UpdateKind.field { let field,error = prepareField(owner,id,selector.projection,true); if error != blot_error::Error.none { return [],error; } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); return [],appended; } } } }
+    if selectors.len == 0 { for index in source.updatePath(id) { let field,error = prepareField(owner,id,index,true); if error != blot_error::Error.none { return default<FieldPlan[:]>(),error; } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); return default<FieldPlan[:]>(),appended; } } }
+    else { for selector in selectors { if selector.kind == blot_check_core::UpdateKind.field { let field,error = prepareField(owner,id,selector.projection,true); if error != blot_error::Error.none { return default<FieldPlan[:]>(),error; } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); return default<FieldPlan[:]>(),appended; } } } }
     var output: FieldPlan[:] = default<FieldPlan[:]>(); if fields.items.len != 0 { let owned = owned_fields.alloc_slice(fields.items.len); for field,index in fields.items { owned[index] = field; } output = owned; } published = true; return output,blot_error::Error.none;
 
     }
@@ -2616,7 +2616,7 @@ fn descriptor(owner: Owner&,function: u32,environment: blot_support::Option<u32>
     let stored = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::Closure_function),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,environment.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,blot_runtime_runtime_layout::Closure_environment),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address)]); return stored;
 }
 fn callableImplementationLayout(owner: Owner&,id: u32) -> u32,Error { let source .= owner.generator.unit(owner.unit_id); let value,error = codeLayout(owner,source.typeOf(id),source.span(id)); if error != blot_error::Error.none { return 0,error; } let node = owner.generator.representations.store.node(value); if node.tag == blot_backend_layout::Tag.universal { return node.a,blot_error::Error.none; } return value,blot_error::Error.none; }
-fn copyRoles(values: const blot_backend_runtime_ir::Role[:]) -> blot_backend_runtime_ir::Role[:] { if values.len == 0 { return []; } let copy = owned_roles.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
+fn copyRoles(values: const blot_backend_runtime_ir::Role[:]) -> blot_backend_runtime_ir::Role[:] { if values.len == 0 { return default<blot_backend_runtime_ir::Role[:]>(); } let copy = owned_roles.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
 fn prepareTemplate(owner: Owner&,id: u32) -> TemplatePreparation,Error {
     assert(owner.preparing); var capture_types = WordBuffer {..}; var capture_roles = RoleBuffer {..}; var templates = blot_backend_substitution_buffers::Entries {..}; var values = blot_backend_substitution_buffers::Entries {..}; var static_types = WordBuffer {..};
     recursive fn prepare() -> TemplatePreparation,Error {

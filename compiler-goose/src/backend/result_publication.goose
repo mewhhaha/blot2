@@ -53,7 +53,7 @@ fn stageInputs(owner: Owner,units: const blot_check_core::Module[:],catalog: Inp
     let error = retainInputs(); if error != blot_error::Error.none { pins.deinit(); return error; } assert(next == count); state.pins = pins; state.inputs_staged = true; return blot_error::Error.none;
 }
 fn inputUnits(owner: Owner,source: const blot_check_core::Module[:]) -> const blot_check_core::Module[:],Error {
-    if owner.slot == 0 { return source,blot_error::Error.none; } if !valid(owner) || !states[owner.slot - 1].inputs_staged || !sameUnits(states[owner.slot - 1].pins.units,source) { return [],blot_error::Error.invalid_artifact; } return states[owner.slot - 1].pins.units,blot_error::Error.none;
+    if owner.slot == 0 { return source,blot_error::Error.none; } if !valid(owner) || !states[owner.slot - 1].inputs_staged || !sameUnits(states[owner.slot - 1].pins.units,source) { return default<const blot_check_core::Module[:]>(),blot_error::Error.invalid_artifact; } return states[owner.slot - 1].pins.units,blot_error::Error.none;
 }
 fn prepare(owner: Owner,epoch: u64,units: const blot_check_core::Module[:],catalog: InputOwner,unit_owners: const InputOwner[:],seed_owners: const InputOwner[:],module_pins: const blot_reuse_code_artifacts::ModulePin[:]) -> Pins,Error {
     if !valid(owner) || !resultValid(owner,epoch,false) { return Pins {..},blot_error::Error.invalid_artifact; } let state = states[owner.slot - 1];

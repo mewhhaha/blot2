@@ -46,8 +46,8 @@ recursive fn release<E>(store: Store<E>&,body: u32) {
     while cursor != 0 {
         let slot = store.slots[cursor - 1]; var entry: E = slot.payload; entry.deinit(store); store.entries.remove(NodeKey { body,slot.node , ..}); cursor = slot.next;
     }
-    if snapshot.mappings.len != 0 { let first: const blot_backend_layout::Mapping& = snapshot.mappings[0]; let at = owned_mappings.index_of(first); owned_mappings.free_slice(owned_mappings[at..at + snapshot.mappings.len]); }
-    if snapshot.rows.len != 0 { let first: const blot_backend_layout::RowMapping& = snapshot.rows[0]; let at = owned_rows.index_of(first); owned_rows.free_slice(owned_rows[at..at + snapshot.rows.len]); }
+    if snapshot.mappings.len != 0 { owned_mappings.free_slice(snapshot.mappings); }
+    if snapshot.rows.len != 0 { owned_rows.free_slice(snapshot.rows); }
     // Payload bytes are released together after every attempt. No reference to
     // them enters retained artifacts, whose descriptors contain numeric IDs.
 }

@@ -17,7 +17,7 @@ fn contains(set: Set,key: u32) -> bool {
     if set.slots.len == 0 { return false; } let hash = ::hash(key); let tag = (hash as! u32) | 2147483648; let mask = set.slots.len - 1; var index = (hash & (mask as u64)) as i64;
     while true { let slot = set.slots[index]; if slot.tag == tag && slot.key == key { return true; } if slot.tag == 0 { return false; } index = (index + 1) & mask; }
 }
-fn deinit(set: Set&) { if set.slots.len != 0 { let first: const SetSlot& = set.slots[0]; let at = owned_sets.index_of(first); owned_sets.free_slice(owned_sets[at..at + set.slots.len]); } set.slots = []; }
+fn deinit(set: Set&) { if set.slots.len != 0 { owned_sets.free_slice(set.slots); } set.slots = []; }
 fn deinit(quantified: Quantified&) { quantified.types.deinit(); quantified.rows.deinit(); }
 fn has(quantified: Quantified,variable: u32,row: bool) -> bool { if row { return quantified.rows.contains(variable); } return quantified.types.contains(variable); }
 fn addVariables<T>(set: dictionary<u32,bool>&,types: const T&,lists: const blot_check_types::List[:]) { for list in lists { for variable in types.list(list) { set.insert(variable,true); } } }
@@ -44,12 +44,12 @@ fn build<T,C,F>(keys: i64,context: C,item_pool: T[>..]&) -> Table<T>,Error {
     while index > 0 { offsets[index] = offsets[index - 1]; index--; } offsets[0] = 0; return Table<T> { offsets,items , ..},blot_error::Error.none;
 }
 fn deinit<T>(table: Table<T>&,item_pool: T[>..]&) {
-    if table.offsets.len != 0 { let first: const u32& = table.offsets[0]; let at = owned_words.index_of(first); owned_words.free_slice(owned_words[at..at + table.offsets.len]); }
+    if table.offsets.len != 0 { owned_words.free_slice(table.offsets); }
     if table.items.len != 0 { item_pool.free_slice(table.items); } table.offsets = []; table.items = [];
 }
 fn deinit(table: Table<u32>&) { deinit(table,owned_words); }
 fn deinit(table: Table<Exit>&) { deinit(table,owned_exits); }
-fn get<T>(table: const Table<T>&,key: u32) -> const T[:] { if key as i64 + 1 >= table.offsets.len { return []; } return table.items[table.offsets[key]..table.offsets[key + 1]]; }
+fn get<T>(table: const Table<T>&,key: u32) -> const T[:] { if key as i64 + 1 >= table.offsets.len { return default<const T[:]>(); } return table.items[table.offsets[key]..table.offsets[key + 1]]; }
 fn ownReference(source: const blot_check_core::Module&,unit: u32,id: u32) -> blot_support::Option<u32> {
     let reference = source.reference(id); if reference.unit != 0 && reference.unit != unit && reference.unit != source.unit { return blot_support::none<u32>(); } if reference.binding >= source.bindings.len { return blot_support::none<u32>(); } return blot_support::some(reference.binding);
 }
@@ -104,7 +104,7 @@ fn ensure(uses: Uses&,source: const blot_check_core::Module&,unit: u32,need: Nee
                 if parent.count < 3 { parent.count++; } parents[child] = packParent(parent);
             }
         }
-        if uses.parents.len != 0 { let first: const u64& = uses.parents[0]; let at = owned_parents.index_of(first); owned_parents.free_slice(owned_parents[at..at + uses.parents.len]); } uses.parents = parents; uses.has_parents = true;
+        if uses.parents.len != 0 { owned_parents.free_slice(uses.parents); } uses.parents = parents; uses.has_parents = true;
     }
     if need.flow && !uses.has_flow {
         var definitions = Table<u32> {..}; var inputs = Table<u32> {..}; var carries = Table<u32> {..}; var exits = Table<u32> {..}; var values = Table<Exit> {..}; var carry_loops: Carry[:] = default<Carry[:]>(); var published = false;
@@ -126,7 +126,7 @@ fn ensure(uses: Uses&,source: const blot_check_core::Module&,unit: u32,need: Nee
         } return __cleanup_result_116_0; } values = value_table;
         carry_loops = owned_carries.alloc_slice(source.loop_carries.len);
         for node,index in source.nodes { if node.tag != blot_check_core::Tag.loop_ { continue; } let range = source.loopInfo(index as u32).carries; for position in 0..range.len { carry_loops[range.start + position] = Carry { index as u32,position as u32 , ..}; } }
-        uses.definitions.deinit(); uses.inputs.deinit(); uses.carries.deinit(); uses.exits.deinit(); uses.values.deinit(); if uses.carry_loops.len != 0 { let first: const Carry& = uses.carry_loops[0]; let at = owned_carries.index_of(first); owned_carries.free_slice(owned_carries[at..at + uses.carry_loops.len]); }
+        uses.definitions.deinit(); uses.inputs.deinit(); uses.carries.deinit(); uses.exits.deinit(); uses.values.deinit(); if uses.carry_loops.len != 0 { owned_carries.free_slice(uses.carry_loops); }
         uses.definitions = definitions; uses.inputs = inputs; uses.carries = carries; uses.exits = exits; uses.values = values; uses.carry_loops = carry_loops; uses.has_flow = true; published = true;
      {
             if !published { definitions.deinit(); inputs.deinit(); carries.deinit(); exits.deinit(); values.deinit(); if carry_loops.len != 0 { owned_carries.free_slice(carry_loops); } }
@@ -134,9 +134,9 @@ fn ensure(uses: Uses&,source: const blot_check_core::Module&,unit: u32,need: Nee
     return blot_error::Error.none;
 }
 fn deinit(uses: Uses&) {
-    uses.references.deinit(); if uses.flags.len != 0 { let first: const Flags& = uses.flags[0]; let at = owned_flags.index_of(first); owned_flags.free_slice(owned_flags[at..at + uses.flags.len]); }
-    if uses.parents.len != 0 { let first: const u64& = uses.parents[0]; let at = owned_parents.index_of(first); owned_parents.free_slice(owned_parents[at..at + uses.parents.len]); }
-    uses.definitions.deinit(); uses.inputs.deinit(); uses.carries.deinit(); uses.exits.deinit(); uses.values.deinit(); if uses.carry_loops.len != 0 { let first: const Carry& = uses.carry_loops[0]; let at = owned_carries.index_of(first); owned_carries.free_slice(owned_carries[at..at + uses.carry_loops.len]); } uses = Uses {..};
+    uses.references.deinit(); if uses.flags.len != 0 { owned_flags.free_slice(uses.flags); }
+    if uses.parents.len != 0 { owned_parents.free_slice(uses.parents); }
+    uses.definitions.deinit(); uses.inputs.deinit(); uses.carries.deinit(); uses.exits.deinit(); uses.values.deinit(); if uses.carry_loops.len != 0 { owned_carries.free_slice(uses.carry_loops); } uses = Uses {..};
 }
 fn flagsOf(uses: const Uses&,binding: u32) -> Flags { if binding < uses.flags.len { return uses.flags[binding]; } return Flags {..}; }
 fn parentOf(uses: const Uses&,id: u32) -> Parent { assert(uses.has_parents); if id >= uses.parents.len { return Parent {..}; } return unpackParent(uses.parents[id]); }

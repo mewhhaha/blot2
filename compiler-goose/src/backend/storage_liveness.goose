@@ -5,7 +5,7 @@ import support.error;
 type Error = blot_error::Error;
 reusable[] var use_runs: u32[>..] = [];
 fn count(module: const blot_check_core::Module&,root: u32) -> u32[:],Error {
-    let uses = use_runs.alloc_slice(module.bindings.len); for &use in uses { use = 0; } var budget: i64 = 100000; let error = visit(module,root,uses,0,budget); if error != blot_error::Error.none { use_runs.free_slice(uses); return [],error; } return uses,blot_error::Error.none;
+    let uses = use_runs.alloc_slice(module.bindings.len); for &use in uses { use = 0; } var budget: i64 = 100000; let error = visit(module,root,uses,0,budget); if error != blot_error::Error.none { use_runs.free_slice(uses); return default<u32[:]>(),error; } return uses,blot_error::Error.none;
 }
 fn release(uses: u32[:]) { if uses.len != 0 { use_runs.free_slice(uses); } }
 fn reference(module: const blot_check_core::Module&,binding: blot_check_core::BindingRef,uses: u32[:]) { if (binding.unit == 0 || binding.unit == module.unit) && binding.binding < uses.len { if uses[binding.binding] != 4294967295 { uses[binding.binding]++; } } }

@@ -18,9 +18,9 @@ struct Facts { name: const u8[:], hidden: bool, variants: const Variant[:] }
 reusable[] var owned_children: u32[>..] = [];
 reusable[] var owned_fields: Field[>..] = [];
 reusable[] var owned_variants: Variant[>..] = [];
-fn copyChildren(source: const u32[:]) -> const u32[:] { if source.len == 0 { return []; } let out = owned_children.alloc_slice(source.len); for child,index in source { out[index] = child; } return out; }
-fn copyFields(source: const Field[:]) -> const Field[:] { if source.len == 0 { return []; } let out = owned_fields.alloc_slice(source.len); for field,index in source { out[index] = field; } return out; }
-fn copyVariants(source: const Variant[:]) -> const Variant[:] { if source.len == 0 { return []; } let out = owned_variants.alloc_slice(source.len); for variant,index in source { out[index] = variant; } return out; }
+fn copyChildren(source: const u32[:]) -> const u32[:] { if source.len == 0 { return default<const u32[:]>(); } let out = owned_children.alloc_slice(source.len); for child,index in source { out[index] = child; } return out; }
+fn copyFields(source: const Field[:]) -> const Field[:] { if source.len == 0 { return default<const Field[:]>(); } let out = owned_fields.alloc_slice(source.len); for field,index in source { out[index] = field; } return out; }
+fn copyVariants(source: const Variant[:]) -> const Variant[:] { if source.len == 0 { return default<const Variant[:]>(); } let out = owned_variants.alloc_slice(source.len); for variant,index in source { out[index] = variant; } return out; }
 fn deinit(node: Node) {
     if node.children.len != 0 { let first: const u32& = node.children[0]; let start = owned_children.index_of(first); owned_children.free_slice(owned_children[start..start + node.children.len]); }
     if node.fields.len != 0 { let first: const Field& = node.fields[0]; let start = owned_fields.index_of(first); owned_fields.free_slice(owned_fields[start..start + node.fields.len]); }

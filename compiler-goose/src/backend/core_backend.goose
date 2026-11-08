@@ -788,9 +788,9 @@ reusable[] var retained_values: blot_eval_core_eval::RetainedValue[>..] = [];
 reusable[] var retained_children: blot_eval_core_eval::RetainedCapture[>..] = [];
 recursive fn releaseRetainedCapture(capture: blot_eval_core_eval::RetainedCapture) {
     for child in capture.captures { releaseRetainedCapture(child); }
-    if capture.rows.len != 0 { let first: const blot_eval_type_evidence::RowMapping& = capture.rows[0]; let at = retained_rows.index_of(first); retained_rows.free_slice(retained_rows[at..at + capture.rows.len]); }
-    if capture.values.len != 0 { let first: const blot_eval_core_eval::RetainedValue& = capture.values[0]; let at = retained_values.index_of(first); retained_values.free_slice(retained_values[at..at + capture.values.len]); }
-    if capture.captures.len != 0 { let first: const blot_eval_core_eval::RetainedCapture& = capture.captures[0]; let at = retained_children.index_of(first); retained_children.free_slice(retained_children[at..at + capture.captures.len]); }
+    if capture.rows.len != 0 { retained_rows.free_slice(capture.rows); }
+    if capture.values.len != 0 { retained_values.free_slice(capture.values); }
+    if capture.captures.len != 0 { retained_children.free_slice(capture.captures); }
 }
 recursive fn retainedCapture(generator: Generator&, binding: blot_check_core::BindingId, template: CapturedTemplate, depth: i64) -> blot_eval_core_eval::RetainedCapture, blot_error::Error {
     if depth >= 256 { return default<blot_eval_core_eval::RetainedCapture>(), fail(generator, template.unit, template.node, blot_check_diagnostic_code::Code.complexity); }

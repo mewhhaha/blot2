@@ -11,16 +11,16 @@ type Ref = blot_check_core::BindingRef;
 struct Node {unit: u32,id: u32}
 struct Limits {nodes_per_module: i64 = 100000}
 reusable[] var binding_runs: Ref[>..] = [];
-fn ownBindings(values: const Ref[:]) -> Ref[:] {if values.len == 0 {return [];}let result = binding_runs.alloc_slice(values.len);for index in 0..values.len {result[index] = values[index];}return result;}
+fn ownBindings(values: const Ref[:]) -> Ref[:] {if values.len == 0 {return default<Ref[:]>();}let result = binding_runs.alloc_slice(values.len);for index in 0..values.len {result[index] = values[index];}return result;}
 fn release(values: const Ref[:]) {if values.len != 0 {let first: const Ref& = values[0];let start = binding_runs.index_of(first);binding_runs.free_slice(binding_runs[start..start + values.len]);}}
 fn discover(units: const Module[:],roots: const Node[:],follow_arrays: bool,limits: Limits) -> Ref[:],Error {
     var pending: Node[>..<] = [];var seen: dictionary<u64,bool> = dictionary<u64,bool> {};var globals: Ref[>..] = [];var remaining: i64[>..] = [];for unit in units {remaining.push(limits.nodes_per_module);}pending.append(roots);
     while pending.len != 0 {
-        let current = pending[pending.len - 1];pending.resize(pending.len - 1);if current.id == 0 {continue;}if current.unit == 0 || current.unit > units.len {return [],blot_error::Error.invalid_global;}let key = (current.unit as u64 << 32) | current.id;if seen.get(key) {continue;}seen.insert(key,true);if remaining[current.unit - 1] == 0 {return [],blot_error::Error.limit;}remaining[current.unit - 1]--;
-        let module: const Module& = units[current.unit - 1];if current.id >= module.nodes.len {return [],blot_error::Error.invalid_global;}let node = module.node(current.id);for child in module.children(current.id) {pending.push(Node {unit: module.unit,id: child});}
+        let current = pending[pending.len - 1];pending.resize(pending.len - 1);if current.id == 0 {continue;}if current.unit == 0 || current.unit > units.len {return default<Ref[:]>(),blot_error::Error.invalid_global;}let key = (current.unit as u64 << 32) | current.id;if seen.get(key) {continue;}seen.insert(key,true);if remaining[current.unit - 1] == 0 {return default<Ref[:]>(),blot_error::Error.limit;}remaining[current.unit - 1]--;
+        let module: const Module& = units[current.unit - 1];if current.id >= module.nodes.len {return default<Ref[:]>(),blot_error::Error.invalid_global;}let node = module.node(current.id);for child in module.children(current.id) {pending.push(Node {unit: module.unit,id: child});}
         match node.tag {
             reference,call=>{
-                var target = Ref {..};if node.tag == blot_check_core::Tag.call {target = module.call(current.id).target;}else {target = module.reference(current.id);}if target.unit == 0 {target.unit = module.unit;}if target.unit == 0 || target.unit > units.len {return [],blot_error::Error.invalid_global;}let owner: const Module& = units[target.unit - 1];if target.binding == 0 || target.binding >= owner.bindings.len {return [],blot_error::Error.invalid_global;}let binding = owner.binding(target.binding);if binding.kind != blot_reuse_principal_interface::Kind.global {continue;}
+                var target = Ref {..};if node.tag == blot_check_core::Tag.call {target = module.call(current.id).target;}else {target = module.reference(current.id);}if target.unit == 0 {target.unit = module.unit;}if target.unit == 0 || target.unit > units.len {return default<Ref[:]>(),blot_error::Error.invalid_global;}let owner: const Module& = units[target.unit - 1];if target.binding == 0 || target.binding >= owner.bindings.len {return default<Ref[:]>(),blot_error::Error.invalid_global;}let binding = owner.binding(target.binding);if binding.kind != blot_reuse_principal_interface::Kind.global {continue;}
                 if blot_backend_storage_collections::element(owner,binding.ty).present {var found = false;for prior in globals {if prior == target {found = true;break;}}if !found {globals.push(target);}if !follow_arrays {continue;}}
                 let body .= owner.body(target.binding);if body {pending.push(Node {unit: owner.unit,id: body.root});}
             },
@@ -58,4 +58,4 @@ fn planWithLimits(units: const Module[:],entry: u32,limits: Limits) -> Plan,Erro
     }
     let result,result_error = order();if !transferred {for item in entries {release(item.dependencies);}}release(bindings);return result,result_error;
 }
-fn collect(units: const Module[:],entry: u32) -> Ref[:],Error {let initialized,error = plan(units,entry);if error != blot_error::Error.none {return [],error;}var evidence = initialized;var bindings: Ref[>..] = [];for item in evidence.initializers {bindings.push(item.target);}let result = ownBindings(bindings);evidence.deinit();return result,blot_error::Error.none;}
+fn collect(units: const Module[:],entry: u32) -> Ref[:],Error {let initialized,error = plan(units,entry);if error != blot_error::Error.none {return default<Ref[:]>(),error;}var evidence = initialized;var bindings: Ref[>..] = [];for item in evidence.initializers {bindings.push(item.target);}let result = ownBindings(bindings);evidence.deinit();return result,blot_error::Error.none;}

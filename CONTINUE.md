@@ -27,13 +27,14 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen226
-checkpoints scoped implementation evidence, explicit collection-op hash width,
-asset lifecycle receipts, stable checkpoint locals and specialization initialization.
-Actual focused native laws pass official and selected checkers, with controlled
-semantic leaves disclosed.225 was cancelled after22.5s when a focused fixture
-caught a scratch initializer omission;226 includes its fix. Whole-program emission,
-linking and execution remain pending. The prior nominal-identity/reachability
+including its source delta and byte-exact tracked recipe reconstruction. Frozen227
+checkpoints the next ownership/API batch,46 typed empty-slice returns and23 direct
+slice-pool frees. Build227 collects282 diagnostics across51 files after56.43s;
+repeated generated slice identity and enum-codec errors dominate. Serialization,
+archive/reuse and frontend/driver repair groups are active. Latest focused resolve
+and asset lifecycle controls qualify their own recorded source hashes, including
+later working-tree corrections; they are not frozen227 whole-runtime evidence.
+Whole-program emission, linking and execution remain pending. The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.

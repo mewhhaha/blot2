@@ -71,5 +71,5 @@ fn release(values:const Symbol[:]) {if values.len==0 {return;}let first:const Sy
 fn collect(tree:const Tree&,pool:const Pool&,iterator_pattern:u32,body:u32)->const Symbol[:],Error {
  // Owners stay in this nonrecursive wrapper, and the result owns a separate run.
  var shadowed:dictionary<Symbol,u32> =dictionary<Symbol,u32> {};var seen:dictionary<Symbol,bool> =dictionary<Symbol,bool> {};var trail:Symbol[>..<]=[];var targets:Symbol[>..<]=[];
- var collector=Collector {tree,pool,shadowed,seen,trail,targets, ..};let error=collector.scope(body,iterator_pattern,0);if error!=blot_error::Error.none {return [],error;}let result=returned.alloc_slice(targets.len);for value,index in targets {result[index]=value;}return result,blot_error::Error.none;
+ var collector=Collector {tree,pool,shadowed,seen,trail,targets, ..};let error=collector.scope(body,iterator_pattern,0);if error!=blot_error::Error.none {return default<const Symbol[:]>(),error;}let result=returned.alloc_slice(targets.len);for value,index in targets {result[index]=value;}return result,blot_error::Error.none;
 }

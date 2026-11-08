@@ -5408,6 +5408,59 @@
       "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-225-inputs/compiler-goose/build/blotc-goose",
       "executable_exists": false,
       "cancellation_reason": "coordinator stopped after22.5s when focused fixture found missing scratch policy initializer; no whole-check conclusion"
+    },
+    "build226": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-226-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 46.692,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-226.log",
+      "capture_seconds": 0.3166,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-226-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-226-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "build227": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-227-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 56.434,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 15.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-227.log",
+      "capture_seconds": 0.282,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-227-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-227-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostics": {
+        "errors": 282,
+        "files": 51,
+        "qualification": "15s diagnostic collection window after first source failure; no program emitted"
+      }
     }
   },
   "given_equations": {
@@ -7721,6 +7774,1244 @@
           "/home/jacobt/src/blot2/build/goose-port/restart-default-laws/assets/private-test"
         ]
       }
+    ]
+  },
+  "pooled_slice_free": {
+    "qualification": "native pooled slice API probe and production source audit; full optimized-body lifecycle unqualified",
+    "compiler_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+    "fixture_sha256": "1964cf969507b1de827f3d0d3150f8c36a77291eb68643189c04022c91d79265",
+    "source_sha256": "6c289e38110397e6e91099d0a7f62057f3c6ebe61b5ed182268948b0d290d40a",
+    "checks": {
+      "selected_emit": 0,
+      "clang_link": 0,
+      "execute_allocate_readback_free_reallocate_free": 0,
+      "official_emit": 0,
+      "official_clang_link": 0,
+      "official_execute": 0
+    },
+    "production_change": "Six index-of/reconstructed-slice frees become direct free_slice on identical slice pointer/length; one mutable empty reset uses typed null slice",
+    "remaining_index_of_calls": 0,
+    "limits": "probe uses u32 element lane; production source parse passes; no whole cleanup runtime claim"
+  },
+  "typed_empty_slice_returns": {
+    "evidence.json": {
+      "scope": "compiler-goose/src/**/*.goose; excludes filenames containing adapter/codec and native_assets.goose",
+      "method": "Text audit: tracked nearest preceding fn declaration and selected only return [] where signature return tuple contains a slice type [:]. Native dynamic arrays [>..] and [] are excluded. No compilation/build performed.",
+      "raw_return_empty_occurrences_scanned": 80,
+      "confirmed_candidate_occurrences": 46,
+      "candidate_function_count": 27,
+      "candidates": [
+        {
+          "file": "compiler-goose/src/backend/activation_intersection.goose",
+          "line": 61,
+          "count_on_line": 3,
+          "signature": "fn rowEntries(self_:Scan&,id:u32)->const RowEntry[:] {if self_.failure!=blot_error::Error.none || id==0 {return [];}if id>self_.model.rows.spans.len {self_.decline();return [];}let span=self_.model.rows.spans[id-1];if span.start>self_.model.rows.entries.len || span.len>self_.model.rows.entries.len-span.start {self_.decline();return [];}return self_.model.rows.entries[span.start..span.start+span.len];}"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 940,
+          "count_on_line": 2,
+          "signature": "recursive fn cleanup_continuation_45() -> LocalInstance[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 941,
+          "count_on_line": 1,
+          "signature": "recursive fn cleanup_continuation_45() -> LocalInstance[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1655,
+          "count_on_line": 1,
+          "signature": "fn copyWords(values: const u32[:]) -> u32[:] { if values.len == 0 { return []; } let copy = owned_words.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1656,
+          "count_on_line": 1,
+          "signature": "fn copyMappings(values: const Mapping[:]) -> Mapping[:] { if values.len == 0 { return []; } let copy = owned_mappings.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1657,
+          "count_on_line": 1,
+          "signature": "fn copyRows(values: const RowMapping[:]) -> RowMapping[:] { if values.len == 0 { return []; } let copy = owned_rows.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1658,
+          "count_on_line": 1,
+          "signature": "fn copyVariants(values: const blot_check_core::ProjectionVariant[:]) -> blot_check_core::ProjectionVariant[:] { if values.len == 0 { return []; } let copy = owned_variants.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1688,
+          "count_on_line": 2,
+          "signature": "recursive fn cleanup_continuation_15() -> FieldPlan[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1689,
+          "count_on_line": 2,
+          "signature": "recursive fn cleanup_continuation_15() -> FieldPlan[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 2619,
+          "count_on_line": 1,
+          "signature": "fn copyRoles(values: const blot_backend_runtime_ir::Role[:]) -> blot_backend_runtime_ir::Role[:] { if values.len == 0 { return []; } let copy = owned_roles.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_static_data.goose",
+          "line": 160,
+          "count_on_line": 1,
+          "signature": "fn copyGoals(values: const blot_check_types::Obligation[:]) -> blot_check_types::Obligation[:] { if values.len == 0 { return []; } let result = goal_runs.alloc_slice(values.len); for index in 0..values.len { result[index] = values[index]; } return result; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/cohort_candidate.goose",
+          "line": 35,
+          "count_on_line": 1,
+          "signature": "fn mutableInstructions(view: Extension&,id: u32) -> Instruction[:],Error { let body,error = own(view,id); if error != blot_error::Error.none { return [],error; } assert(body != null); return view.module.instructions[body.instructions.start..body.instructions.start + body.instructions.len],blot_error::Error.none; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/host_cleanup_shapes.goose",
+          "line": 21,
+          "count_on_line": 1,
+          "signature": "fn copyChildren(source: const u32[:]) -> const u32[:] { if source.len == 0 { return []; } let out = owned_children.alloc_slice(source.len); for child,index in source { out[index] = child; } return out; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/host_cleanup_shapes.goose",
+          "line": 22,
+          "count_on_line": 1,
+          "signature": "fn copyFields(source: const Field[:]) -> const Field[:] { if source.len == 0 { return []; } let out = owned_fields.alloc_slice(source.len); for field,index in source { out[index] = field; } return out; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/host_cleanup_shapes.goose",
+          "line": 23,
+          "count_on_line": 1,
+          "signature": "fn copyVariants(source: const Variant[:]) -> const Variant[:] { if source.len == 0 { return []; } let out = owned_variants.alloc_slice(source.len); for variant,index in source { out[index] = variant; } return out; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/loop_targets.goose",
+          "line": 74,
+          "count_on_line": 1,
+          "signature": "fn collect(tree:const Tree&,pool:const Pool&,iterator_pattern:u32,body:u32)->const Symbol[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/memory_profile.goose",
+          "line": 48,
+          "count_on_line": 1,
+          "signature": "fn metadata(self_:Profile)->u8[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/resolved_call.goose",
+          "line": 14,
+          "count_on_line": 1,
+          "signature": "fn copyArrows(values: const Arrow[:]) -> Arrow[:] { if values.len == 0 { return []; } let copied = owned_arrows.alloc_slice(values.len); for value,index in values { copied[index] = value; } return copied; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/resolved_flow.goose",
+          "line": 22,
+          "count_on_line": 1,
+          "signature": "fn copyOperations(values: const u32[:]) -> const u32[:] { if values.len == 0 { return []; } let out = owned_operations.alloc_slice(values.len); for value,index in values { out[index] = value; } return out; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/result_publication.goose",
+          "line": 56,
+          "count_on_line": 1,
+          "signature": "fn inputUnits(owner: Owner,source: const blot_check_core::Module[:]) -> const blot_check_core::Module[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_global_footprint.goose",
+          "line": 40,
+          "count_on_line": 2,
+          "signature": "fn ownSlots(self_: Index&,values: const i64[:]) -> const i64[:],Error {if values.len == 0 {return [],blot_error::Error.none;}let owned = slots_pool.alloc_slice(values.len);for index in 0..values.len {owned[index] = values[index];}let error = blot_support_pooled_buffer::push(self_.slot_runs,SlotRun {items: owned},slot_run_pool);if error != blot_error::Error.none {slots_pool.free_slice(owned);return [],error;}return owned,blot_error::Error.none;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_global_footprint.goose",
+          "line": 41,
+          "count_on_line": 2,
+          "signature": "fn ownNodes(self_: Index&,values: const Node[:]) -> const Node[:],Error {if values.len == 0 {return [],blot_error::Error.none;}let owned = nodes_pool.alloc_slice(values.len);for index in 0..values.len {owned[index] = values[index];}let error = blot_support_pooled_buffer::push(self_.node_runs,NodeRun {items: owned},node_run_pool);if error != blot_error::Error.none {nodes_pool.free_slice(owned);return [],error;}return owned,blot_error::Error.none;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_global_footprint.goose",
+          "line": 91,
+          "count_on_line": 1,
+          "signature": "fn slots(self_: Index&,unit: u32,root: u32,scheme: blot_check_types::Scheme) -> const i64[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_global_footprint.goose",
+          "line": 94,
+          "count_on_line": 1,
+          "signature": "fn slots(self_: Index&,unit: u32,root: u32,scheme: blot_check_types::Scheme) -> const i64[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 14,
+          "count_on_line": 1,
+          "signature": "fn ownBindings(values: const Ref[:]) -> Ref[:] {if values.len == 0 {return [];}let result = binding_runs.alloc_slice(values.len);for index in 0..values.len {result[index] = values[index];}return result;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 19,
+          "count_on_line": 2,
+          "signature": "fn discover(units: const Module[:],roots: const Node[:],follow_arrays: bool,limits: Limits) -> Ref[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 20,
+          "count_on_line": 1,
+          "signature": "fn discover(units: const Module[:],roots: const Node[:],follow_arrays: bool,limits: Limits) -> Ref[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 23,
+          "count_on_line": 2,
+          "signature": "fn discover(units: const Module[:],roots: const Node[:],follow_arrays: bool,limits: Limits) -> Ref[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 61,
+          "count_on_line": 1,
+          "signature": "fn collect(units: const Module[:],entry: u32) -> Ref[:],Error {let initialized,error = plan(units,entry);if error != blot_error::Error.none {return [],error;}var evidence = initialized;var bindings: Ref[>..] = [];for item in evidence.initializers {bindings.push(item.target);}let result = ownBindings(bindings);evidence.deinit();return result,blot_error::Error.none;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_liveness.goose",
+          "line": 8,
+          "count_on_line": 1,
+          "signature": "fn count(module: const blot_check_core::Module&,root: u32) -> u32[:],Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_result_alias.goose",
+          "line": 12,
+          "count_on_line": 3,
+          "signature": "fn analyze(module: const blot_backend_wasm::Module&,function: u32,first: u32,words: i64,output: const blot_backend_runtime_code::Local[:]) -> const u32[:],blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_result_alias.goose",
+          "line": 13,
+          "count_on_line": 2,
+          "signature": "fn analyze(module: const blot_backend_wasm::Module&,function: u32,first: u32,words: i64,output: const blot_backend_runtime_code::Local[:]) -> const u32[:],blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_result_alias.goose",
+          "line": 15,
+          "count_on_line": 1,
+          "signature": "fn analyze(module: const blot_backend_wasm::Module&,function: u32,first: u32,words: i64,output: const blot_backend_runtime_code::Local[:]) -> const u32[:],blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/backend/unit_index.goose",
+          "line": 52,
+          "count_on_line": 1,
+          "signature": "fn get<T>(table: const Table<T>&,key: u32) -> const T[:] { if key as i64 + 1 >= table.offsets.len { return []; } return table.items[table.offsets[key]..table.offsets[key + 1]]; }"
+        }
+      ],
+      "source_sha256_by_file": {
+        "compiler-goose/src/backend/activation_intersection.goose": "386f34d3a26837c0b92be3df7220d7ff7bb0da94e3d28166bac50b1409964af4",
+        "compiler-goose/src/backend/backend_emission.goose": "f7c14b1839c62d752abbc8baa1d17edcae5db53989d8f88de28d2eb8d2bd7bc8",
+        "compiler-goose/src/backend/backend_static_data.goose": "fe160ee68b713ac115fe3fa5b0dcb1702e7722dd9b9e86db96feb8c71b577036",
+        "compiler-goose/src/backend/cohort_candidate.goose": "827920de241d158e4b3fd7c08708f41831e820097ca786c81b1322f12fcd2f16",
+        "compiler-goose/src/backend/host_cleanup_shapes.goose": "e436e9fa57977a6f5159e01c11fcdf742761f3ae09ffc6948f5290d29a06fe98",
+        "compiler-goose/src/backend/loop_targets.goose": "3e4763970a92deb62ce4cb1ccec072a5a08792f97b98d09ce4b2df1cc49472a8",
+        "compiler-goose/src/backend/memory_profile.goose": "f890833dbcbe8f7b2990a26e5e55c267e5355f2f25ed17499517f4d662d1f56e",
+        "compiler-goose/src/backend/resolved_call.goose": "2984b921cfeb2731801015a1ae69e582eb92927fed23816041bcc2f444a3b5a3",
+        "compiler-goose/src/backend/resolved_flow.goose": "13941136392200d391b41e59cc3fa0a9d371f06690a05224fcd6a366c60760b9",
+        "compiler-goose/src/backend/result_publication.goose": "14b5a1b17b1ca38e35fb06b66b1878e0481107f6b05264a56f4814abb27c0705",
+        "compiler-goose/src/backend/storage_global_footprint.goose": "52d3bef97e531d0808aed710fefd5000de9bfed403d801793828144c66b9d235",
+        "compiler-goose/src/backend/storage_globals.goose": "7b0146f67968b96752d34c51ab98b956cec6eca915773f6887c6809aa37d1851",
+        "compiler-goose/src/backend/storage_liveness.goose": "a9fb4ec624ca3175a3280722588efb72e180f788e7650f42d3e34cacf765f2b5",
+        "compiler-goose/src/backend/storage_result_alias.goose": "f691ffe2572d5b4268b292ac0aa2f53e6afd498982183bbaaa7d99f399fd8df1",
+        "compiler-goose/src/backend/unit_index.goose": "b03cad3e69fe0d241caa47229341ca5d0172bf1b76539d07e664c6a43f209fac"
+      },
+      "excluded_non_slice_occurrences": [
+        {
+          "file": "compiler-goose/src/backend/runtime_job.goose",
+          "line": 25,
+          "count_on_line": 1,
+          "nearby_signature": "fn captureMembers(module: const Module&) -> blot_runtime_region_runtime::Member[] { if module.regions.present { return copy(module.regions.value.plan.members); } return []; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/runtime_job.goose",
+          "line": 26,
+          "count_on_line": 1,
+          "nearby_signature": "fn captureScopes(module: const Module&) -> blot_runtime_region_runtime::Scope[] { if module.regions.present { return copy(module.regions.value.scopes); } return []; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/runtime_parallel.goose",
+          "line": 34,
+          "count_on_line": 1,
+          "nearby_signature": "fn cachedLocals(body: blot_support::Option<Body>) -> u8[] { if body.present { return body.value.locals; } return []; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/runtime_parallel.goose",
+          "line": 35,
+          "count_on_line": 1,
+          "nearby_signature": "fn cachedCode(body: blot_support::Option<Body>) -> blot_backend_runtime_ir::Instruction[] { if body.present { return body.value.instructions; } return []; }"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2282,
+          "count_on_line": 1,
+          "nearby_signature": "fn arguments(self_:PuritySource&,identity:Identity,kind:blot_eval_purity_type_key::Kind,actual:const u32[:])->u32[>..],blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2283,
+          "count_on_line": 2,
+          "nearby_signature": "fn arguments(self_:PuritySource&,identity:Identity,kind:blot_eval_purity_type_key::Kind,actual:const u32[:])->u32[>..],blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2285,
+          "count_on_line": 1,
+          "nearby_signature": "fn arguments(self_:PuritySource&,identity:Identity,kind:blot_eval_purity_type_key::Kind,actual:const u32[:])->u32[>..],blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2286,
+          "count_on_line": 5,
+          "nearby_signature": "fn arguments(self_:PuritySource&,identity:Identity,kind:blot_eval_purity_type_key::Kind,actual:const u32[:])->u32[>..],blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2287,
+          "count_on_line": 1,
+          "nearby_signature": "fn arguments(self_:PuritySource&,identity:Identity,kind:blot_eval_purity_type_key::Kind,actual:const u32[:])->u32[>..],blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/effects.goose",
+          "line": 106,
+          "count_on_line": 1,
+          "nearby_signature": "fn freeVariables(self_: Store&, root: Id) -> u32[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/effects.goose",
+          "line": 406,
+          "count_on_line": 1,
+          "nearby_signature": "fn operationSet(self_: const Store&, root: Id) -> Label[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/numeric_proof_contracts.goose",
+          "line": 45,
+          "count_on_line": 1,
+          "nearby_signature": "fn instantiate(self_: Signature, destination: blot_check_numeric_proof_terms::Store&, arguments: const Id[:]) -> Proposition[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/numeric_proof_contracts.goose",
+          "line": 46,
+          "count_on_line": 1,
+          "nearby_signature": "fn instantiate(self_: Signature, destination: blot_check_numeric_proof_terms::Store&, arguments: const Id[:]) -> Proposition[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/numeric_proof_contracts.goose",
+          "line": 49,
+          "count_on_line": 1,
+          "nearby_signature": "fn instantiate(self_: Signature, destination: blot_check_numeric_proof_terms::Store&, arguments: const Id[:]) -> Proposition[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/numeric_proof_contracts.goose",
+          "line": 53,
+          "count_on_line": 1,
+          "nearby_signature": "fn instantiate(self_: Signature, destination: blot_check_numeric_proof_terms::Store&, arguments: const Id[:]) -> Proposition[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/numeric_proof_contracts.goose",
+          "line": 54,
+          "count_on_line": 1,
+          "nearby_signature": "fn instantiate(self_: Signature, destination: blot_check_numeric_proof_terms::Store&, arguments: const Id[:]) -> Proposition[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/numeric_proof_terms.goose",
+          "line": 129,
+          "count_on_line": 1,
+          "nearby_signature": "fn importMany(self_: Store&, source: View, proofs: const Proposition[:], boundary: Boundary, substitution: Substitution) -> Proposition[>..], blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/record_order.goose",
+          "line": 34,
+          "count_on_line": 1,
+          "nearby_signature": "fn destinations(source, record: blot_check_types::Node, names: const Names&) -> u32[>..], blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/record_order.goose",
+          "line": 39,
+          "count_on_line": 1,
+          "nearby_signature": "fn destinations(source, record: blot_check_types::Node, names: const Names&) -> u32[>..], blot_error::Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/types.goose",
+          "line": 1441,
+          "count_on_line": 1,
+          "nearby_signature": "fn freeVariablesMode(self_: Store&, root: Id, bounded: bool) -> Id[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/types.goose",
+          "line": 1442,
+          "count_on_line": 1,
+          "nearby_signature": "fn freeVariablesMode(self_: Store&, root: Id, bounded: bool) -> Id[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/types.goose",
+          "line": 1447,
+          "count_on_line": 1,
+          "nearby_signature": "fn freeVariablesMode(self_: Store&, root: Id, bounded: bool) -> Id[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/types.goose",
+          "line": 1478,
+          "count_on_line": 1,
+          "nearby_signature": "fn freeRowVariablesMode(self_: Store&, root: Id, bounded: bool) -> u32[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/types.goose",
+          "line": 1479,
+          "count_on_line": 1,
+          "nearby_signature": "fn freeRowVariablesMode(self_: Store&, root: Id, bounded: bool) -> u32[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/types.goose",
+          "line": 1483,
+          "count_on_line": 1,
+          "nearby_signature": "fn freeRowVariablesMode(self_: Store&, root: Id, bounded: bool) -> u32[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/types.goose",
+          "line": 1484,
+          "count_on_line": 1,
+          "nearby_signature": "fn freeRowVariablesMode(self_: Store&, root: Id, bounded: bool) -> u32[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/check/types.goose",
+          "line": 1488,
+          "count_on_line": 1,
+          "nearby_signature": "fn freeRowVariablesMode(self_: Store&, root: Id, bounded: bool) -> u32[>..], Error {"
+        },
+        {
+          "file": "compiler-goose/src/eval/implementation_patterns.goose",
+          "line": 33,
+          "count_on_line": 2,
+          "nearby_signature": "fn rowBinders(store: Store&,declaration: Declaration) -> u32[>..],Error {"
+        }
+      ]
+    },
+    "batch-replacements.json": {
+      "operation": "Replace audited return [] slice literals with default<exact declared first slice return type>()",
+      "audit_source_sha256_by_file": {
+        "compiler-goose/src/backend/activation_intersection.goose": "386f34d3a26837c0b92be3df7220d7ff7bb0da94e3d28166bac50b1409964af4",
+        "compiler-goose/src/backend/backend_emission.goose": "f7c14b1839c62d752abbc8baa1d17edcae5db53989d8f88de28d2eb8d2bd7bc8",
+        "compiler-goose/src/backend/backend_static_data.goose": "fe160ee68b713ac115fe3fa5b0dcb1702e7722dd9b9e86db96feb8c71b577036",
+        "compiler-goose/src/backend/cohort_candidate.goose": "827920de241d158e4b3fd7c08708f41831e820097ca786c81b1322f12fcd2f16",
+        "compiler-goose/src/backend/host_cleanup_shapes.goose": "e436e9fa57977a6f5159e01c11fcdf742761f3ae09ffc6948f5290d29a06fe98",
+        "compiler-goose/src/backend/loop_targets.goose": "3e4763970a92deb62ce4cb1ccec072a5a08792f97b98d09ce4b2df1cc49472a8",
+        "compiler-goose/src/backend/memory_profile.goose": "f890833dbcbe8f7b2990a26e5e55c267e5355f2f25ed17499517f4d662d1f56e",
+        "compiler-goose/src/backend/resolved_call.goose": "2984b921cfeb2731801015a1ae69e582eb92927fed23816041bcc2f444a3b5a3",
+        "compiler-goose/src/backend/resolved_flow.goose": "13941136392200d391b41e59cc3fa0a9d371f06690a05224fcd6a366c60760b9",
+        "compiler-goose/src/backend/result_publication.goose": "14b5a1b17b1ca38e35fb06b66b1878e0481107f6b05264a56f4814abb27c0705",
+        "compiler-goose/src/backend/storage_global_footprint.goose": "52d3bef97e531d0808aed710fefd5000de9bfed403d801793828144c66b9d235",
+        "compiler-goose/src/backend/storage_globals.goose": "7b0146f67968b96752d34c51ab98b956cec6eca915773f6887c6809aa37d1851",
+        "compiler-goose/src/backend/storage_liveness.goose": "a9fb4ec624ca3175a3280722588efb72e180f788e7650f42d3e34cacf765f2b5",
+        "compiler-goose/src/backend/storage_result_alias.goose": "f691ffe2572d5b4268b292ac0aa2f53e6afd498982183bbaaa7d99f399fd8df1",
+        "compiler-goose/src/backend/unit_index.goose": "b03cad3e69fe0d241caa47229341ca5d0172bf1b76539d07e664c6a43f209fac"
+      },
+      "after_source_sha256_by_file": {
+        "compiler-goose/src/backend/activation_intersection.goose": "d89e44b8699550d1b87b5b10e17e87a6162b44816a65eea752d0cd78ec8a5c04",
+        "compiler-goose/src/backend/backend_emission.goose": "ab9d54b97e89f66df8841cfc63337783be0722a0f3b75667ec8f9dfa45759032",
+        "compiler-goose/src/backend/backend_static_data.goose": "e60594bed6a639149c52d711b785a4487d403b3fec3f1a194ad7a7360f5ead8a",
+        "compiler-goose/src/backend/cohort_candidate.goose": "e276859c04d7d14d0fb7360439683aa8f33eca13c160e152f82cb74187f76430",
+        "compiler-goose/src/backend/host_cleanup_shapes.goose": "064bd5a75872b8479e68316621425ce795a139742d88fa0e391c045c025be571",
+        "compiler-goose/src/backend/loop_targets.goose": "4e57b0d93c3ed6ff1951f2fc516090110c4ec00f18a193994c31088abace7ac9",
+        "compiler-goose/src/backend/memory_profile.goose": "f8e27281737c50ee8b146f55a756047a055d355cff17eaad15fc372209f2e906",
+        "compiler-goose/src/backend/resolved_call.goose": "4c3d07ceddae51117b106b51f966978e52d8888254954d9f1e208abc3bbc3616",
+        "compiler-goose/src/backend/resolved_flow.goose": "cda615a1a92c89e0a113d94c6c434bd8e65ab6b2f2242cfb9b6fa17271f9cb37",
+        "compiler-goose/src/backend/result_publication.goose": "10f392a8ddefed733ed515a509439a2d90d132ca0a8fa42a14dc5d7e05cc2ddd",
+        "compiler-goose/src/backend/storage_global_footprint.goose": "9c331091b2cc1fc98a4963c85050fd69b22fe93e9399ae7acad2342bb9594d5e",
+        "compiler-goose/src/backend/storage_globals.goose": "e872f42c1fe6efc2e46b25cad41c1e95008f6bd05d5eec75ee4c132f1b6751c0",
+        "compiler-goose/src/backend/storage_liveness.goose": "bf8b9bd39a1aacb85d2429b46590c038f8d2af4225afba512a33449696ca5de2",
+        "compiler-goose/src/backend/storage_result_alias.goose": "f80577373d161d588980cd31831c369cbd9b81b436ecd298e78e84cda38f4194",
+        "compiler-goose/src/backend/unit_index.goose": "8149ed6267be64f6c24abe9d3399e87af42093c4de6a89d53c98e437f14fcf8c"
+      },
+      "replacement_occurrences": 46,
+      "candidate_functions": 27,
+      "files": 15,
+      "callsites": [
+        {
+          "file": "compiler-goose/src/backend/activation_intersection.goose",
+          "line": 61,
+          "return_slice_type": "const RowEntry[:]",
+          "replacements_on_line": 3,
+          "line_contains_typed_default": true,
+          "post_line": "fn rowEntries(self_:Scan&,id:u32)->const RowEntry[:] {if self_.failure!=blot_error::Error.none || id==0 {return default<const RowEntry[:]>();}if id>self_.model.rows.spans.len {self_.decline();return default<const RowEntry[:]>();}let span=self_.model.rows.spans[id-1];if span.start>self_.model.rows.entries.len || span.len>self_.model.rows.entries.len-span.start {self_.decline();return default<const RowEntry[:]>();}return self_.model.rows.entries[span.start..span.start+span.len];}"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 940,
+          "return_slice_type": "LocalInstance[:]",
+          "replacements_on_line": 2,
+          "line_contains_typed_default": true,
+          "post_line": "    for index in 0..decision.count { mappings.clear(); rows.clear(); let facts = withFacts(owner.mappings,decisions.factsAt(decision,index),mappings); if facts != blot_error::Error.none { return default<LocalInstance[:]>(),facts; } let row_facts = withFacts(owner.row_mappings,decisions.rowsAt(decision,index),rows); if row_facts != blot_error::Error.none { return default<LocalInstance[:]>(),row_facts; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 941,
+          "return_slice_type": "LocalInstance[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "        let body,error = prepareMapped(owner,producer,depth + 1,false,mappings.items,rows.items,null); if error != blot_error::Error.none { return default<LocalInstance[:]>(),error; } instances[index] = LocalInstance { decision.layouts[index],body , ..}; prepared++;"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1655,
+          "return_slice_type": "u32[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyWords(values: const u32[:]) -> u32[:] { if values.len == 0 { return default<u32[:]>(); } let copy = owned_words.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1656,
+          "return_slice_type": "Mapping[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyMappings(values: const Mapping[:]) -> Mapping[:] { if values.len == 0 { return default<Mapping[:]>(); } let copy = owned_mappings.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1657,
+          "return_slice_type": "RowMapping[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyRows(values: const RowMapping[:]) -> RowMapping[:] { if values.len == 0 { return default<RowMapping[:]>(); } let copy = owned_rows.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1658,
+          "return_slice_type": "blot_check_core::ProjectionVariant[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyVariants(values: const blot_check_core::ProjectionVariant[:]) -> blot_check_core::ProjectionVariant[:] { if values.len == 0 { return default<blot_check_core::ProjectionVariant[:]>(); } let copy = owned_variants.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1688,
+          "return_slice_type": "FieldPlan[:]",
+          "replacements_on_line": 2,
+          "line_contains_typed_default": true,
+          "post_line": "    if selectors.len == 0 { for index in source.updatePath(id) { let field,error = prepareField(owner,id,index,true); if error != blot_error::Error.none { return default<FieldPlan[:]>(),error; } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); return default<FieldPlan[:]>(),appended; } } }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1689,
+          "return_slice_type": "FieldPlan[:]",
+          "replacements_on_line": 2,
+          "line_contains_typed_default": true,
+          "post_line": "    else { for selector in selectors { if selector.kind == blot_check_core::UpdateKind.field { let field,error = prepareField(owner,id,selector.projection,true); if error != blot_error::Error.none { return default<FieldPlan[:]>(),error; } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); return default<FieldPlan[:]>(),appended; } } } }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 2619,
+          "return_slice_type": "blot_backend_runtime_ir::Role[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyRoles(values: const blot_backend_runtime_ir::Role[:]) -> blot_backend_runtime_ir::Role[:] { if values.len == 0 { return default<blot_backend_runtime_ir::Role[:]>(); } let copy = owned_roles.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/backend_static_data.goose",
+          "line": 160,
+          "return_slice_type": "blot_check_types::Obligation[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyGoals(values: const blot_check_types::Obligation[:]) -> blot_check_types::Obligation[:] { if values.len == 0 { return default<blot_check_types::Obligation[:]>(); } let result = goal_runs.alloc_slice(values.len); for index in 0..values.len { result[index] = values[index]; } return result; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/cohort_candidate.goose",
+          "line": 35,
+          "return_slice_type": "Instruction[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn mutableInstructions(view: Extension&,id: u32) -> Instruction[:],Error { let body,error = own(view,id); if error != blot_error::Error.none { return default<Instruction[:]>(),error; } assert(body != null); return view.module.instructions[body.instructions.start..body.instructions.start + body.instructions.len],blot_error::Error.none; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/host_cleanup_shapes.goose",
+          "line": 21,
+          "return_slice_type": "const u32[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyChildren(source: const u32[:]) -> const u32[:] { if source.len == 0 { return default<const u32[:]>(); } let out = owned_children.alloc_slice(source.len); for child,index in source { out[index] = child; } return out; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/host_cleanup_shapes.goose",
+          "line": 22,
+          "return_slice_type": "const Field[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyFields(source: const Field[:]) -> const Field[:] { if source.len == 0 { return default<const Field[:]>(); } let out = owned_fields.alloc_slice(source.len); for field,index in source { out[index] = field; } return out; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/host_cleanup_shapes.goose",
+          "line": 23,
+          "return_slice_type": "const Variant[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyVariants(source: const Variant[:]) -> const Variant[:] { if source.len == 0 { return default<const Variant[:]>(); } let out = owned_variants.alloc_slice(source.len); for variant,index in source { out[index] = variant; } return out; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/loop_targets.goose",
+          "line": 74,
+          "return_slice_type": "const Symbol[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": " var collector=Collector {tree,pool,shadowed,seen,trail,targets, ..};let error=collector.scope(body,iterator_pattern,0);if error!=blot_error::Error.none {return default<const Symbol[:]>(),error;}let result=returned.alloc_slice(targets.len);for value,index in targets {result[index]=value;}return result,blot_error::Error.none;"
+        },
+        {
+          "file": "compiler-goose/src/backend/memory_profile.goose",
+          "line": 48,
+          "return_slice_type": "u8[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "    var bytes:u8[>..]=[];var writer=blot_json::Writer{out:bytes,options:blot_json::Options{..},..};writer.beginObject();writer.field(\"version\",2);writer.field(\"identity\",Digest{self_.identity});writer.field(\"base\",self_.base);writer.field(\"counters\",self_.counters);writer.field(\"row_bytes\",row_bytes);writer.field(\"total_row\",self_.sites.len+1);writer.field(\"categories\",category_names[..]);writer.field(\"category_row\",self_.sites.len+2);writer.field(\"metrics\",metric_names[..]);writer.field(\"sources\",sources[..]);writer.field(\"sites\",Sites{self_.sites});writer.field(\"compiler_identity\",optionalDigest(self_.compiler_identity));writer.field(\"shadow_slots\",shadow_slots);writer.field(\"reserved_bytes\",self_.end-self_.base);writer.field(\"offset_encoding\",\"utf8_bytes\");writer.field(\"aggregation\",\"source site plus up to four source-emission inline callers; later machine-inlined instances of the same origin are aggregated\");writer.field(\"cycle_candidate_reason\",\"owning fields without a lifetime-stable no_cycle proof; candidate counts identify admitted objects, not all attempted enqueues\");writer.field(\"unknown_row\",0);writer.key(\"status_bits\");writer.beginObject();writer.field(\"shadow_full\",1);writer.field(\"missing_allocation\",2);writer.field(\"counter_overflow\",4);writer.endObject();writer.endObject();if writer.failure!=blot_error::Error.none {return default<u8[:]>(),writer.failure;}let result=metadata_bytes.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result,blot_error::Error.none;"
+        },
+        {
+          "file": "compiler-goose/src/backend/resolved_call.goose",
+          "line": 14,
+          "return_slice_type": "Arrow[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyArrows(values: const Arrow[:]) -> Arrow[:] { if values.len == 0 { return default<Arrow[:]>(); } let copied = owned_arrows.alloc_slice(values.len); for value,index in values { copied[index] = value; } return copied; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/resolved_flow.goose",
+          "line": 22,
+          "return_slice_type": "const u32[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn copyOperations(values: const u32[:]) -> const u32[:] { if values.len == 0 { return default<const u32[:]>(); } let out = owned_operations.alloc_slice(values.len); for value,index in values { out[index] = value; } return out; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/result_publication.goose",
+          "line": 56,
+          "return_slice_type": "const blot_check_core::Module[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "    if owner.slot == 0 { return source,blot_error::Error.none; } if !valid(owner) || !states[owner.slot - 1].inputs_staged || !sameUnits(states[owner.slot - 1].pins.units,source) { return default<const blot_check_core::Module[:]>(),blot_error::Error.invalid_artifact; } return states[owner.slot - 1].pins.units,blot_error::Error.none;"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_global_footprint.goose",
+          "line": 40,
+          "return_slice_type": "const i64[:]",
+          "replacements_on_line": 2,
+          "line_contains_typed_default": true,
+          "post_line": "fn ownSlots(self_: Index&,values: const i64[:]) -> const i64[:],Error {if values.len == 0 {return default<const i64[:]>(),blot_error::Error.none;}let owned = slots_pool.alloc_slice(values.len);for index in 0..values.len {owned[index] = values[index];}let error = blot_support_pooled_buffer::push(self_.slot_runs,SlotRun {items: owned},slot_run_pool);if error != blot_error::Error.none {slots_pool.free_slice(owned);return default<const i64[:]>(),error;}return owned,blot_error::Error.none;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_global_footprint.goose",
+          "line": 41,
+          "return_slice_type": "const Node[:]",
+          "replacements_on_line": 2,
+          "line_contains_typed_default": true,
+          "post_line": "fn ownNodes(self_: Index&,values: const Node[:]) -> const Node[:],Error {if values.len == 0 {return default<const Node[:]>(),blot_error::Error.none;}let owned = nodes_pool.alloc_slice(values.len);for index in 0..values.len {owned[index] = values[index];}let error = blot_support_pooled_buffer::push(self_.node_runs,NodeRun {items: owned},node_run_pool);if error != blot_error::Error.none {nodes_pool.free_slice(owned);return default<const Node[:]>(),error;}return owned,blot_error::Error.none;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_global_footprint.goose",
+          "line": 91,
+          "return_slice_type": "const i64[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "        let value,error = self_.edges(node);if error != blot_error::Error.none {return default<const i64[:]>(),error;}if value.all {blot_support_pooled_map::insert(self_.completed,query,self_.all,completed_map_pool);return self_.all,blot_error::Error.none;}for slot in value.slots {selected[slot] = true;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_global_footprint.goose",
+          "line": 94,
+          "return_slice_type": "const i64[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "    var selected_slots: i64[>..] = [];for present,slot in selected {if present {selected_slots.push(slot);}}let result,error = self_.ownSlots(selected_slots);if error != blot_error::Error.none {return default<const i64[:]>(),error;}blot_support_pooled_map::insert(self_.completed,query,result,completed_map_pool);return result,blot_error::Error.none;"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 14,
+          "return_slice_type": "Ref[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn ownBindings(values: const Ref[:]) -> Ref[:] {if values.len == 0 {return default<Ref[:]>();}let result = binding_runs.alloc_slice(values.len);for index in 0..values.len {result[index] = values[index];}return result;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 19,
+          "return_slice_type": "Ref[:]",
+          "replacements_on_line": 2,
+          "line_contains_typed_default": true,
+          "post_line": "        let current = pending[pending.len - 1];pending.resize(pending.len - 1);if current.id == 0 {continue;}if current.unit == 0 || current.unit > units.len {return default<Ref[:]>(),blot_error::Error.invalid_global;}let key = (current.unit as u64 << 32) | current.id;if seen.get(key) {continue;}seen.insert(key,true);if remaining[current.unit - 1] == 0 {return default<Ref[:]>(),blot_error::Error.limit;}remaining[current.unit - 1]--;"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 20,
+          "return_slice_type": "Ref[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "        let module: const Module& = units[current.unit - 1];if current.id >= module.nodes.len {return default<Ref[:]>(),blot_error::Error.invalid_global;}let node = module.node(current.id);for child in module.children(current.id) {pending.push(Node {unit: module.unit,id: child});}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 23,
+          "return_slice_type": "Ref[:]",
+          "replacements_on_line": 2,
+          "line_contains_typed_default": true,
+          "post_line": "                var target = Ref {..};if node.tag == blot_check_core::Tag.call {target = module.call(current.id).target;}else {target = module.reference(current.id);}if target.unit == 0 {target.unit = module.unit;}if target.unit == 0 || target.unit > units.len {return default<Ref[:]>(),blot_error::Error.invalid_global;}let owner: const Module& = units[target.unit - 1];if target.binding == 0 || target.binding >= owner.bindings.len {return default<Ref[:]>(),blot_error::Error.invalid_global;}let binding = owner.binding(target.binding);if binding.kind != blot_reuse_principal_interface::Kind.global {continue;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_globals.goose",
+          "line": 61,
+          "return_slice_type": "Ref[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn collect(units: const Module[:],entry: u32) -> Ref[:],Error {let initialized,error = plan(units,entry);if error != blot_error::Error.none {return default<Ref[:]>(),error;}var evidence = initialized;var bindings: Ref[>..] = [];for item in evidence.initializers {bindings.push(item.target);}let result = ownBindings(bindings);evidence.deinit();return result,blot_error::Error.none;}"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_liveness.goose",
+          "line": 8,
+          "return_slice_type": "u32[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "    let uses = use_runs.alloc_slice(module.bindings.len); for &use in uses { use = 0; } var budget: i64 = 100000; let error = visit(module,root,uses,0,budget); if error != blot_error::Error.none { use_runs.free_slice(uses); return default<u32[:]>(),error; } return uses,blot_error::Error.none;"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_result_alias.goose",
+          "line": 12,
+          "return_slice_type": "const u32[:]",
+          "replacements_on_line": 3,
+          "line_contains_typed_default": true,
+          "post_line": "    if words > 9223372036854775807 - first as i64 { return default<const u32[:]>(),blot_error::Error.none; } let end = first as i64 + words; let parameters = module.parameters(function).len; let locals = module.locals(function).len; if locals > 9223372036854775807 - parameters { return default<const u32[:]>(),blot_error::Error.none; } if end > 4294967295 || end > parameters + locals { return default<const u32[:]>(),blot_error::Error.none; }"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_result_alias.goose",
+          "line": 13,
+          "return_slice_type": "const u32[:]",
+          "replacements_on_line": 2,
+          "line_contains_typed_default": true,
+          "post_line": "    var candidate = false; for word in output { if word.id >= first && word.id < end { candidate = true; break; } } if !candidate { return default<const u32[:]>(),blot_error::Error.none; } let code = blot_backend_wasm::instructions(module,function); for instruction in code { if instruction.op == blot_backend_runtime_ir::OP_ownership || instruction.op == blot_backend_runtime_ir::OP_resource_retire { return default<const u32[:]>(),blot_error::Error.none; } }"
+        },
+        {
+          "file": "compiler-goose/src/backend/storage_result_alias.goose",
+          "line": 15,
+          "return_slice_type": "const u32[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "    if count == 0 { written_runs.free_slice(written); return default<const u32[:]>(),blot_error::Error.none; } let result = alias_runs.alloc_slice(output.len); for word,index in output { result[index] = absent; if word.id >= first && word.id < end && !written[word.id - first] { result[index] = word.id - first; } } written_runs.free_slice(written); return result,blot_error::Error.none;"
+        },
+        {
+          "file": "compiler-goose/src/backend/unit_index.goose",
+          "line": 52,
+          "return_slice_type": "const T[:]",
+          "replacements_on_line": 1,
+          "line_contains_typed_default": true,
+          "post_line": "fn get<T>(table: const Table<T>&,key: u32) -> const T[:] { if key as i64 + 1 >= table.offsets.len { return default<const T[:]>(); } return table.items[table.offsets[key]..table.offsets[key + 1]]; }"
+        }
+      ],
+      "checks": {
+        "official_full_source_parse": "pass",
+        "parse_command": "python3 compiler-goose/tools/check_source.py --phase parse --timeout 30 --log empty-slice-return-batch",
+        "parse_seconds": 0.952,
+        "parse_summary": "parsed ok: 36150 top-level declarations, 439 file(s)",
+        "git_diff_check": "pass",
+        "whole_tests_or_builds": "not run"
+      },
+      "limits": "No native_assets.goose, generated adapter/codec files, dynamic-array owning return paths, or algorithm/cleanup changes included."
+    }
+  },
+  "pooled_slice_free_followon_audit": {
+    "scope": "23 audited exact pool.index_of(first) then free reconstructed pool range patterns; excludes backend/native_assets.goose, optimized_bodies.goose, eval/implementation_evidence.goose, selected_implementation_admission.goose",
+    "replacement_count": 23,
+    "files": 7,
+    "method": "Confirmed first came from the same slice at index 0, at came from that pool.index_of(first), the pool matched at free_slice receiver, and slice end used the full source slice length. Replaced only lookup plus reconstructed range with POOL.free_slice(slice); preserved nonempty guards. Other first/at use, assertions, start/index names, and alternate ranges were excluded.",
+    "source_sha256_before_reconstructed_from_exact_edits": {
+      "compiler-goose/src/backend/backend_emission.goose": "ab9d54b97e89f66df8841cfc63337783be0722a0f3b75667ec8f9dfa45759032",
+      "compiler-goose/src/backend/core_backend.goose": "7f92f7eb03ff4d4ff5908ffb7537e5eb8376bc72bc0f2c2d37d3c767c6feefad",
+      "compiler-goose/src/backend/memory_profile.goose": "f8e27281737c50ee8b146f55a756047a055d355cff17eaad15fc372209f2e906",
+      "compiler-goose/src/backend/resolved_body.goose": "04911673ea8908226ef2468d062d4bc0d29809bccad4d2c342884ff2d1e64962",
+      "compiler-goose/src/backend/resolved_call.goose": "4c3d07ceddae51117b106b51f966978e52d8888254954d9f1e208abc3bbc3616",
+      "compiler-goose/src/backend/resolved_flow.goose": "cda615a1a92c89e0a113d94c6c434bd8e65ab6b2f2242cfb9b6fa17271f9cb37",
+      "compiler-goose/src/backend/unit_index.goose": "8149ed6267be64f6c24abe9d3399e87af42093c4de6a89d53c98e437f14fcf8c"
+    },
+    "source_sha256_after": {
+      "compiler-goose/src/backend/backend_emission.goose": "be084c704a176ef3fdbfd02f71dce17d6fe0698494a926a938fcfb6eb7acdcf2",
+      "compiler-goose/src/backend/core_backend.goose": "e940d3a8f9310814830fc8c5d36536dbdcc0084289c4f07ca4e659a27e64414b",
+      "compiler-goose/src/backend/memory_profile.goose": "70c1c4e60d5e71a83109ccb0957d27ccbbeea133bd874ee730d8e5d4090e8ca9",
+      "compiler-goose/src/backend/resolved_body.goose": "09fdb2573ec19d648ac4ac5a7536855bb953113126e731732eebae973319ed9d",
+      "compiler-goose/src/backend/resolved_call.goose": "702d5a7047c233244f6829a74818c503a81fefbb2a7c2072f7b9eaeafd709882",
+      "compiler-goose/src/backend/resolved_flow.goose": "b107745a5352aa67936ff8183115f88fe41d0d628ae214e9e4ca64bdf4c4428c",
+      "compiler-goose/src/backend/unit_index.goose": "674653fcbfa2a3eae310bae7d0a9f073f60c04b5c705286372a895bfdc6661f9"
+    },
+    "callsites": [
+      {
+        "file": "compiler-goose/src/backend/backend_emission.goose",
+        "line": 324,
+        "pool": "owned_fields",
+        "slice": "p.value",
+        "before": "let first: const FieldPlan& = p.value[0]; let at = owned_fields.index_of(first); owned_fields.free_slice(owned_fields[at..at + p.value.len]);",
+        "after": "owned_fields.free_slice(p.value);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/backend_emission.goose",
+        "line": 322,
+        "pool": "owned_bindings",
+        "slice": "p.value.value",
+        "before": "let first: const StaticBinding& = p.value.value[0]; let at = owned_bindings.index_of(first); owned_bindings.free_slice(owned_bindings[at..at + p.value.value.len]);",
+        "after": "owned_bindings.free_slice(p.value.value);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/backend_emission.goose",
+        "line": 320,
+        "pool": "owned_instances",
+        "slice": "p.value",
+        "before": "let first: const LocalInstance& = p.value[0]; let at = owned_instances.index_of(first); owned_instances.free_slice(owned_instances[at..at + p.value.len]);",
+        "after": "owned_instances.free_slice(p.value);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/backend_emission.goose",
+        "line": 311,
+        "pool": "owned_variants",
+        "slice": "field.variants",
+        "before": "let first: const blot_check_core::ProjectionVariant& = field.variants[0]; let at = owned_variants.index_of(first); owned_variants.free_slice(owned_variants[at..at + field.variants.len]);",
+        "after": "owned_variants.free_slice(field.variants);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/backend_emission.goose",
+        "line": 310,
+        "pool": "owned_rows",
+        "slice": "values",
+        "before": "let first: const RowMapping& = values[0]; let at = owned_rows.index_of(first); owned_rows.free_slice(owned_rows[at..at + values.len]);",
+        "after": "owned_rows.free_slice(values);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/backend_emission.goose",
+        "line": 309,
+        "pool": "owned_mappings",
+        "slice": "values",
+        "before": "let first: const Mapping& = values[0]; let at = owned_mappings.index_of(first); owned_mappings.free_slice(owned_mappings[at..at + values.len]);",
+        "after": "owned_mappings.free_slice(values);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/backend_emission.goose",
+        "line": 308,
+        "pool": "owned_roles",
+        "slice": "values",
+        "before": "let first: const blot_backend_runtime_ir::Role& = values[0]; let at = owned_roles.index_of(first); owned_roles.free_slice(owned_roles[at..at + values.len]);",
+        "after": "owned_roles.free_slice(values);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/backend_emission.goose",
+        "line": 307,
+        "pool": "owned_words",
+        "slice": "values",
+        "before": "let first: const u32& = values[0]; let at = owned_words.index_of(first); owned_words.free_slice(owned_words[at..at + values.len]);",
+        "after": "owned_words.free_slice(values);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/core_backend.goose",
+        "line": 793,
+        "pool": "retained_children",
+        "slice": "capture.captures",
+        "before": "let first: const blot_eval_core_eval::RetainedCapture& = capture.captures[0]; let at = retained_children.index_of(first); retained_children.free_slice(retained_children[at..at + capture.captures.len]);",
+        "after": "retained_children.free_slice(capture.captures);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/core_backend.goose",
+        "line": 792,
+        "pool": "retained_values",
+        "slice": "capture.values",
+        "before": "let first: const blot_eval_core_eval::RetainedValue& = capture.values[0]; let at = retained_values.index_of(first); retained_values.free_slice(retained_values[at..at + capture.values.len]);",
+        "after": "retained_values.free_slice(capture.values);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/core_backend.goose",
+        "line": 791,
+        "pool": "retained_rows",
+        "slice": "capture.rows",
+        "before": "let first: const blot_eval_type_evidence::RowMapping& = capture.rows[0]; let at = retained_rows.index_of(first); retained_rows.free_slice(retained_rows[at..at + capture.rows.len]);",
+        "after": "retained_rows.free_slice(capture.rows);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/memory_profile.goose",
+        "line": 45,
+        "pool": "metadata_bytes",
+        "slice": "bytes",
+        "before": "let first:const u8& =bytes[0];let at=metadata_bytes.index_of(first);metadata_bytes.free_slice(metadata_bytes[at..at+bytes.len]);",
+        "after": "metadata_bytes.free_slice(bytes);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/resolved_body.goose",
+        "line": 50,
+        "pool": "owned_rows",
+        "slice": "snapshot.rows",
+        "before": "let first: const blot_backend_layout::RowMapping& = snapshot.rows[0]; let at = owned_rows.index_of(first); owned_rows.free_slice(owned_rows[at..at + snapshot.rows.len]);",
+        "after": "owned_rows.free_slice(snapshot.rows);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/resolved_body.goose",
+        "line": 49,
+        "pool": "owned_mappings",
+        "slice": "snapshot.mappings",
+        "before": "let first: const blot_backend_layout::Mapping& = snapshot.mappings[0]; let at = owned_mappings.index_of(first); owned_mappings.free_slice(owned_mappings[at..at + snapshot.mappings.len]);",
+        "after": "owned_mappings.free_slice(snapshot.mappings);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/resolved_call.goose",
+        "line": 11,
+        "pool": "owned_arrows",
+        "slice": "values",
+        "before": "let first: const Arrow& = values[0]; let at = owned_arrows.index_of(first); owned_arrows.free_slice(owned_arrows[at..at + values.len]);",
+        "after": "owned_arrows.free_slice(values);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/resolved_flow.goose",
+        "line": 23,
+        "pool": "owned_operations",
+        "slice": "request.operations",
+        "before": "let first: const u32& = request.operations[0]; let at = owned_operations.index_of(first); owned_operations.free_slice(owned_operations[at..at + request.operations.len]);",
+        "after": "owned_operations.free_slice(request.operations);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/unit_index.goose",
+        "line": 139,
+        "pool": "owned_carries",
+        "slice": "uses.carry_loops",
+        "before": "let first: const Carry& = uses.carry_loops[0]; let at = owned_carries.index_of(first); owned_carries.free_slice(owned_carries[at..at + uses.carry_loops.len]);",
+        "after": "owned_carries.free_slice(uses.carry_loops);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/unit_index.goose",
+        "line": 138,
+        "pool": "owned_parents",
+        "slice": "uses.parents",
+        "before": "let first: const u64& = uses.parents[0]; let at = owned_parents.index_of(first); owned_parents.free_slice(owned_parents[at..at + uses.parents.len]);",
+        "after": "owned_parents.free_slice(uses.parents);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/unit_index.goose",
+        "line": 137,
+        "pool": "owned_flags",
+        "slice": "uses.flags",
+        "before": "let first: const Flags& = uses.flags[0]; let at = owned_flags.index_of(first); owned_flags.free_slice(owned_flags[at..at + uses.flags.len]);",
+        "after": "owned_flags.free_slice(uses.flags);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/unit_index.goose",
+        "line": 129,
+        "pool": "owned_carries",
+        "slice": "uses.carry_loops",
+        "before": "let first: const Carry& = uses.carry_loops[0]; let at = owned_carries.index_of(first); owned_carries.free_slice(owned_carries[at..at + uses.carry_loops.len]);",
+        "after": "owned_carries.free_slice(uses.carry_loops);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/unit_index.goose",
+        "line": 107,
+        "pool": "owned_parents",
+        "slice": "uses.parents",
+        "before": "let first: const u64& = uses.parents[0]; let at = owned_parents.index_of(first); owned_parents.free_slice(owned_parents[at..at + uses.parents.len]);",
+        "after": "owned_parents.free_slice(uses.parents);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/unit_index.goose",
+        "line": 47,
+        "pool": "owned_words",
+        "slice": "table.offsets",
+        "before": "let first: const u32& = table.offsets[0]; let at = owned_words.index_of(first); owned_words.free_slice(owned_words[at..at + table.offsets.len]);",
+        "after": "owned_words.free_slice(table.offsets);",
+        "nonempty_guard_preserved": true
+      },
+      {
+        "file": "compiler-goose/src/backend/unit_index.goose",
+        "line": 20,
+        "pool": "owned_sets",
+        "slice": "set.slots",
+        "before": "let first: const SetSlot& = set.slots[0]; let at = owned_sets.index_of(first); owned_sets.free_slice(owned_sets[at..at + set.slots.len]);",
+        "after": "owned_sets.free_slice(set.slots);",
+        "nonempty_guard_preserved": true
+      }
+    ],
+    "checks": {
+      "whole_source_parse": "pass",
+      "parse_seconds": 0.952,
+      "parse_output": "parsed ok: 36148 top-level declarations, 439 file(s)",
+      "git_diff_check": "pass",
+      "tests_builds": "not run"
+    },
+    "limitations": "Source audit and parser only; no runtime test in this batch."
+  },
+  "resolve_engine": {
+    "results.json": {
+      "coverage": {
+        "inputs": {
+          "compiler-goose/src/eval/implementation_evidence.goose": "8081d30c9f16a8a1b1c146142e8141c0443610da436050470e84651dd8037b0c",
+          "compiler-goose/src/reuse/dispatch_explanation.goose": "26695ff6d763dc86c342f8e85b1f2bec8724003c5bf0f5167be2c876e362e71f",
+          "compiler-goose/src/reuse/principal_interface.goose": "0041ef21999b3039c319319160a17b7e44cf88562e4cf1b201a2bd9e5ba9a3bc",
+          "compiler-goose/src/eval/implementation_predicates.goose": "984a2ead5f7f7f6733d977aaa3dbf8a4f3e3b2f6072ed07b042b45f405c03e4f"
+        },
+        "coverage": "Actual resolve/resolveInner/proveRequirement, finite owner, trace, sorting, active stack, cache, publication and rollback bodies. Type matching/projection, projection recursion, predicate proof construction and unrestricted-type checks controlled. Module retains accessed fields; actual catalog Implementation/Member shapes. Scalar deterministic hash and no-diagnostic identity leaf."
+      },
+      "runs": [
+        {
+          "name": "positive-official",
+          "command": [
+            "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "run",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/src/main.goose"
+          ],
+          "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "seconds": 0.16053799699875526,
+          "exit": 0,
+          "stdout": "PASS real implementation resolve\n",
+          "expected_rejection": false
+        },
+        {
+          "name": "positive-selected",
+          "command": [
+            "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+            "run",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/src/main.goose"
+          ],
+          "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+          "seconds": 0.15574636399833253,
+          "exit": 0,
+          "stdout": "PASS real implementation resolve\n",
+          "expected_rejection": false
+        },
+        {
+          "name": "record-default-official",
+          "command": [
+            "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "check",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/record-default/main.goose"
+          ],
+          "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "seconds": 0.04647637699963525,
+          "exit": 1,
+          "stdout": "",
+          "expected_rejection": true
+        },
+        {
+          "name": "record-default-selected",
+          "command": [
+            "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+            "check",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/record-default/main.goose"
+          ],
+          "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+          "seconds": 0.04918541799997911,
+          "exit": 1,
+          "stdout": "",
+          "expected_rejection": true
+        },
+        {
+          "name": "host-copy-official",
+          "command": [
+            "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "run",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/host-copy/main.goose"
+          ],
+          "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "seconds": 0.1377064900007099,
+          "exit": 1,
+          "stdout": "",
+          "expected_rejection": true
+        },
+        {
+          "name": "host-copy-selected",
+          "command": [
+            "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+            "run",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/host-copy/main.goose"
+          ],
+          "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+          "seconds": 0.13775404100306332,
+          "exit": 1,
+          "stdout": "",
+          "expected_rejection": true
+        },
+        {
+          "name": "slice-order-official",
+          "command": [
+            "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "check",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/slice-order/main.goose"
+          ],
+          "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "seconds": 0.03332955799851334,
+          "exit": 1,
+          "stdout": "",
+          "expected_rejection": true
+        },
+        {
+          "name": "slice-order-selected",
+          "command": [
+            "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+            "check",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/slice-order/main.goose"
+          ],
+          "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+          "seconds": 0.03779025399853708,
+          "exit": 1,
+          "stdout": "",
+          "expected_rejection": true
+        },
+        {
+          "name": "recursive-official",
+          "command": [
+            "/home/jacobt/src/goose-to-wasm/build/native/goose",
+            "check",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/recursive/main.goose"
+          ],
+          "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+          "seconds": 0.0424564279965125,
+          "exit": 1,
+          "stdout": "",
+          "expected_rejection": true
+        },
+        {
+          "name": "recursive-selected",
+          "command": [
+            "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+            "check",
+            "--stdlib",
+            "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+            "build/goose-port/implementation-resolve-laws/recursive/main.goose"
+          ],
+          "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+          "seconds": 0.04667911100113997,
+          "exit": 1,
+          "stdout": "",
+          "expected_rejection": true
+        }
+      ],
+      "fixture_inputs": {
+        "build/goose-port/implementation-resolve-laws/src/backend/runtime_identity.goose": "9f4da118f3a000b7fad5000f04dd1d8a462799ba5624ba7de3ad9834bbd6339f",
+        "build/goose-port/implementation-resolve-laws/src/check/check.goose": "46486c6e3bcdbe1e1440d927c5f7a21b7e980fe0d673ac0d34966f67752663c5",
+        "build/goose-port/implementation-resolve-laws/src/check/check_packet_owner.goose": "0fa3885d8dfc2ff37aee52178a72ba0f1012e17951ea60bbd25241929244e4b3",
+        "build/goose-port/implementation-resolve-laws/src/check/core.goose": "aad6de5620575f242d92207d4245ed694d820da9bde2759766dd2e51eeea3091",
+        "build/goose-port/implementation-resolve-laws/src/check/types.goose": "131d2233bbc18b2b213681d8e015b2229ae1c35fb559e3cf88f79bf3337863c9",
+        "build/goose-port/implementation-resolve-laws/src/eval/implementation_evidence.goose": "6466496e07f2691751d70074461e6bdd94fb6d69d66c7b93e91e9e62fc4ec194",
+        "build/goose-port/implementation-resolve-laws/src/eval/implementation_predicates.goose": "be481bc721563a064b736cd315ea8ea77572fcfcc91c6f3954a5d6e775ce63dd",
+        "build/goose-port/implementation-resolve-laws/src/eval/implementation_trace.goose": "c2036d02479c49f4efb66d0de20735071582a3809528f86357f2d5fbf052b5c0",
+        "build/goose-port/implementation-resolve-laws/src/eval/selected_implementation_admission.goose": "cace2cbd34f3fa9289af66c60745f999718c34f352fa2a29f8a8430af03c326f",
+        "build/goose-port/implementation-resolve-laws/src/eval/semantic_evidence_import.goose": "d5ff2268ccd606916aa69e15a189cbf9aa150c53f92cfbacc013b8a9526c3187",
+        "build/goose-port/implementation-resolve-laws/src/eval/type_evidence.goose": "50e0d556ea7ed36744aa9673357244b35caeb411adab68e617989e9c3d2c2d2f",
+        "build/goose-port/implementation-resolve-laws/src/identity.goose": "71b5f9c74cfb86924dc3e320d97d4311d52938ffdf552d7395c3d4cf173702bd",
+        "build/goose-port/implementation-resolve-laws/src/main.goose": "ae4258b273a68761f20e4befc0546e2e7dd3622eadb5efafbc12ba8d34d3c4ee",
+        "build/goose-port/implementation-resolve-laws/src/parse/ast.goose": "b532bd3ba25dc1bea5d3cd689f4ba37b37d4b38daf866f4830c59dab6a550e2a",
+        "build/goose-port/implementation-resolve-laws/src/parse/symbols.goose": "1d19df930df2ee8cb75a0eb2c38cba7f93581f48ac8166e20de3e0a2860a2a34",
+        "build/goose-port/implementation-resolve-laws/src/reuse/dispatch_explanation.goose": "0d53c2b82e10eb5cbcb831cfaa43e59d5a4f4e3b2ce99a8052e9c1cb18cd2f0e",
+        "build/goose-port/implementation-resolve-laws/src/reuse/principal_interface.goose": "2248e984f08ab2e147d46fcdffe972950bf066505a5b6deb5bcec2f17bf73d2c",
+        "build/goose-port/implementation-resolve-laws/src/support/error.goose": "4446b5b4ac13bbf4c572cf899e6a0833e7feb2879f5c00d02ff1d9f30aa10510",
+        "build/goose-port/implementation-resolve-laws/src/support/native.goose": "00f1a0e4315ac1e6d3e33769cc8d9177e363af6e0922670ae317c9d770f2ac85",
+        "build/goose-port/implementation-resolve-laws/src/support/option.goose": "d3aaff7d9f5eac6886390577d3531dd9df9d479c07a8068a7c1a819e106b4362",
+        "build/goose-port/implementation-resolve-laws/src/support/pooled_buffer.goose": "0abc8f75822daf37b091b8e926fc7858c0a49af4a51dbf2f1ad1bc81909bac26",
+        "build/goose-port/implementation-resolve-laws/src/support/pooled_map.goose": "805d8959690a6535030df9f665a57d28977f26d575eefb9c7d118d644414046e"
+      },
+      "scripts": {
+        "build/goose-port/implementation-resolve-laws/make.py": "1be4293799a9640bb47d86b51001bca8e34bec8057022028a2d3557bc0cb1718",
+        "build/goose-port/implementation-resolve-laws/run.py": "4e5c203dfdbf43e529db09ce46ac6acb259190591388f9243f780db6face9a74"
+      },
+      "laws": [
+        "21 real resolve executions across3 reuse rounds",
+        "selection/cache/host read mutation and cached read Error",
+        "zero fuel/missing implementation/overlap canonical order",
+        "recursive evidence rejected and nested contract proof child publication",
+        "type matcher OutOfMemory propagates",
+        "all active/provisional stacks unwind; failed paths roll back proof/argument/bucket publication"
+      ]
+    },
+    "source-audit.json": {
+      "inputs": {
+        "compiler-goose/src/eval/implementation_evidence.goose": "8081d30c9f16a8a1b1c146142e8141c0443610da436050470e84651dd8037b0c",
+        "compiler-goose/src/reuse/dispatch_explanation.goose": "26695ff6d763dc86c342f8e85b1f2bec8724003c5bf0f5167be2c876e362e71f",
+        "compiler-goose/src/reuse/principal_interface.goose": "0041ef21999b3039c319319160a17b7e44cf88562e4cf1b201a2bd9e5ba9a3bc",
+        "compiler-goose/src/eval/implementation_predicates.goose": "984a2ead5f7f7f6733d977aaa3dbf8a4f3e3b2f6072ed07b042b45f405c03e4f"
+      },
+      "coverage": "Actual resolve/resolveInner/proveRequirement, finite owner, trace, sorting, active stack, cache, publication and rollback bodies. Type matching/projection, projection recursion, predicate proof construction and unrestricted-type checks controlled. Module retains accessed fields; actual catalog Implementation/Member shapes. Scalar deterministic hash and no-diagnostic identity leaf."
+    }
+  },
+  "asset_owner_final": {
+    "production_hashes": {
+      "native_assets": "112211783d7b4adf36e7aa284b3335af095214b4b3379a55e91e19d98abe54ba",
+      "backend_checkpoint": "81f13396ab7ed7592934ae08ee5e633e894f07705cae0905596b33e714d9bdeb"
+    },
+    "receipts": {
+      "narrow": {
+        "path": "build/goose-port/restart-default-laws/narrow/evidence.json",
+        "sha256": "7863e50f139eba1d8ae9329957733e602435a658d06b8f15bbe2cbc961b6a57f",
+        "both_binaries_emit_link_run": true
+      },
+      "assets": {
+        "path": "build/goose-port/restart-default-laws/assets/evidence.json",
+        "sha256": "c2a5aeb92813df08259ed6d6d2feb37f637699dca6569afdc61a783974df6e06",
+        "both_binaries_emit_link_run": true
+      },
+      "helpers": {
+        "path": "build/goose-port/restart-default-laws/helpers/evidence.json",
+        "sha256": "a8f25a8f5b4ab746308a42b618074a18f945d907369260f965dbbbe2bbe78ccc",
+        "both_binaries_emit_link_run": true
+      }
+    },
+    "coverage": {
+      "narrow": "actual outer defaults/Options+Session+Checkpoint slots/valid/deinit; live cell aliasing and local optional consumer; reduced archive scalar leaves",
+      "assets": "27 actual init/deinit/commit/freshCandidate-allocation-prefix runs; empty+nonempty+reference options, mutable input independence, validation errors, first/growth text buffer allocation failures, repeateddeinit, replacementcandidate cleanup/headerreuse/monotonic IDs; active bytes and buffer runs zero after each",
+      "helpers": "actual own/canonical/readInput/resourceKey; success/openfail/readfail/EINTR+timeout retry/emptyEOF andclose counts, exact JSONkey; canonicalPath and nativeI/O deterministic controlled leaves"
+    },
+    "negative": "old Options roots=[] default reproduces temporaryescape onboth; direct nullable-slot & and getter attempts reject with exacttype mismatch; local capture into globalStorage rejected9.2",
+    "source_changes": "typednil defaults/returns/resets; live nominal optional slots; Candidate allocation_index+canonicalidentity guard; directfree_slice retains original textregistry afterconstviewpush; copyDefinition freshkind-only shell canonicalizes absentOption payloads thenowns presentfields",
+    "limitations": [
+      "No full native_assets.prepare/filesystem/generator execution; helper nativeI/O/canonicalPath controlled",
+      "Checkpoint archive/optimizer payload leaves reduced; real archive decode/rollback/ABI unchanged bythisrepair but fullintegrationroot227",
+      "Native heap OOM traps do not establish recoverableOOM parity; injected helper capacity failures only",
+      "narrow fixture pinned earlier identical outer slots/default behavior; current Candidate gained private scalarallocation_index since thatnarrowrecordcapture"
+    ],
+    "artifacts": [
+      "repair.json",
+      "native-assets-owner-repair.json",
+      "native-assets-direct-free-repair.json",
+      "native-assets-empty-returns.json",
+      "default-negative-evidence.json",
+      "assets/official-emit.log",
+      "direct-free-probe/official-explicit.log"
     ]
   }
 }

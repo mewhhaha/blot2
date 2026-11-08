@@ -51,7 +51,7 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen226 inputs with the accepted
+per stage. This checkpoint preserves exact frozen227 inputs with the accepted
 global-filter checker. Build222 stops after46.13s at hash/asset/decoder API errors;
 223 advances to an unused Instance slice-field escape after46.64s.224 removes
 those two unobserved fields; substitution still fills the caller-owned buffers.
@@ -74,6 +74,17 @@ scratch policy. Both native fixtures execute on official and selected checkers.
 225 was cancelled after22.5s when its concurrent focused fixture caught the
 scratch-policy initializer omission;226 includes that repair. Source-only checkpoint
 and focused controls do not establish whole-program qualification.
+
+Frozen227 also contains46 mechanically typed empty-slice returns and23 direct
+pool frees. Identical pointer/length runs can be freed without first recovering
+an index from a borrowed reference; official and selected native probes execute
+that API. Asset TextRun sidecars were therefore removed in favor of the original
+slice registry. Build227 collects282 diagnostics across51 files after56.43s
+(15s after the first error), revealing broad generated identity/enum-codec,
+archive/reuse and frontend/driver API repair groups. Whole program C is absent.
+Later actual resolve tests expose/fix copied Host state through reference binding;
+these and final asset laws qualify their exact recorded working-tree hashes.
+They do not retroactively qualify frozen227 or the full compiler.
 
 ScopeKey and three principal-interface enum hash hooks now match native golden
 streams. Decoder allocations dispatch by the actual owner type at121 generated
