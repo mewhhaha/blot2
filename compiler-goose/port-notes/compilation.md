@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen354 is the current source checkpoint. Selected private checker
+Frozen355 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -121,7 +121,10 @@ slot's bounds and exact header identity; its outer invocation owns the slot unti
 the synchronous callback returns. This grants no stale-after-reuse authority.
 Sixteen reduced controls execute on official and selected Goose. Its87.297s run
 clears that boundary and reaches recursive result stores in constant-receipt
-demand queries. The exact callback cycle and those stores are next.
+demand queries. Frozen355 handles the ten-head cycle, two typed query stores and
+pure lookup/storage constructors. Independent review checks thirty concrete
+edges and preserves every Input field, default and cleanup point. Its87.474s
+run reaches pooled record insertion provenance; that boundary is next.
 The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo

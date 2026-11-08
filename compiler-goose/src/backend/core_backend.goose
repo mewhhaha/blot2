@@ -580,7 +580,7 @@ fn completedMemberLookup(generator: Generator&, session: blot_eval_core_eval::Se
 }
 recursive fn lookupSpecialization(generator: Generator&, session: blot_eval_core_eval::Session&, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error { return completedQueryLookup(generator, session, input, expected); }
 fn lookupMemberSpecialization(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error { return completedMemberLookup(generator, session, target, input, expected); }
-fn constantLookup(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, inputs: blot_reuse_constant_receipt::Inputs) -> blot_support::Option<blot_reuse_constant_receipt::Lookup>, blot_error::Error {
+recursive fn constantLookup(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, inputs: blot_reuse_constant_receipt::Inputs) -> blot_support::Option<blot_reuse_constant_receipt::Lookup>, blot_error::Error {
     if !(session .== generator.evaluator) { return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none; }
     let constant .= generator.constant_state; if constant { let owned:Generator& =blot_compile_workspace::canonicalGenerator(generator); return constant.lookup(owned, target, inputs); } return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none;
 }
