@@ -22,7 +22,7 @@ fn operationArguments(self_: View, label: Label) -> const u32[:] { let span = op
 fn rowLabels(self_: View, row: Id) -> const Label[:] { if row == 0 { return self_.labels[..0]; } let span = self_.rows[row]; return self_.labels[span.start..span.start + span.len]; }
 struct Snapshot { operations: const Operation[:], arguments: const u32[:], rows: const Row[:], labels: const Label[:], owner_id: u64 }
 struct SnapshotTables { operations: Operation[>..]&, arguments: u32[>..]&, rows: Row[>..]&, labels: Label[>..]& }
-fn view(self_: const Snapshot&) -> View { return View { self_.operations, self_.arguments, self_.rows, self_.labels, self_.owner_id }; }
+fn view(self_: Snapshot) -> View { return View { self_.operations, self_.arguments, self_.rows, self_.labels, self_.owner_id }; }
 fn deinit(self_: Snapshot&) { self_.operations = default<const blot_check_effect_evidence::Operation[:]>(); self_.arguments = default<const u32[:]>(); self_.rows = default<const blot_check_effect_evidence::Row[:]>(); self_.labels = default<const blot_check_effect_evidence::Label[:]>(); self_.owner_id = 0; }
 struct OperationBuffer { storage: Operation[:]=default<Operation[:]>(),items: Operation[:]=default<Operation[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_OperationBuffer: Operation[>..]=[];

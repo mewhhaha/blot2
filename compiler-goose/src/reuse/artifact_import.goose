@@ -122,7 +122,7 @@ struct Importer {
     allocation_owner: u64 = 0, census: Census = Census {..}, old: const Pools? = null, units: const Module[:] = default<const Module[:]>(),
     names: blot_support::Option<IdentityMetadata>, unit_map: u32[:] = default<u32[:]>(), symbol_map: u32[:] = default<u32[:]>(), stable: bool[:] = default<bool[:]>(),
     code_gate: blot_support::Option<blot_reuse_code_body_validity::Gate>, semantic_catalogs: bool = false,
-    closed_evidence: blot_support::Option<blot_eval_semantic_evidence_import::PooledImporter>, enabled: bool = false, generator_owner: u64 = 0,
+    closed_evidence: blot_support::Option<blot_eval_semantic_evidence_import::RetainedImporter>, enabled: bool = false, generator_owner: u64 = 0,
     expression_nodes: ExpressionMap = ExpressionMap {..}, layouts: WordMap = WordMap {..}, semantic: EvidenceMap = EvidenceMap {..},
     rows: RowMap = RowMap {..}, template_keys: SubstitutionMap = SubstitutionMap {..}, row_keys: SubstitutionMap = SubstitutionMap {..},
     captures: WordMap = WordMap {..}, value_anchors: WordMap = WordMap {..},
@@ -821,9 +821,9 @@ fn importClosedEvidence<G>(self_: Importer&, g: G&, id: u32) -> blot_support::Op
     let __old:const Pools& =requiredPools(self_.old); let view = __old.evaluator.evidence.view(); var remaining: i64 = 65536;
     if view.closed(id, 0, remaining) != blot_error::Error.none { return blot_support::none<u32>(), blot_error::Error.none; }
     if !self_.closed_evidence.present {
-        self_.closed_evidence = blot_support::some(blot_eval_semantic_evidence_import::initPooled(view, blot_eval_type_evidence::canonicalStore(g.evaluator.storage.evidence), depth_limit, false));
+        self_.closed_evidence = blot_support::some(blot_eval_semantic_evidence_import::initRetained(blot_eval_type_evidence::canonicalStore(g.evaluator.storage.evidence), depth_limit, false));
     }
-    let value, failure = self_.closed_evidence.value.ty(id, 0);
+    let value, failure = self_.closed_evidence.value.tyWithSource(view,id, 0);
     if failure == blot_error::Error.none { self_.semantic.insert(key, value); }
     return optionalImported(value, failure);
 }

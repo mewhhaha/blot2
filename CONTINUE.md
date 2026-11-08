@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen326 replaces Session's Generator backpointer with the existing scalar
+Frozen328 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -61,7 +61,11 @@ Its82.987s run reaches cached evidence-store destination provenance. Frozen326
 reconstitutes that borrowed store through its existing lease/generation and nine
 exact reference checks.32 focused controls pass, but the79.101s actual run still
 stops at the source-view cache boundary. Two readonly Snapshot projections by
-value are the next source experiment. Source and frontier differ,
+value alone did not fix the actual source path. Frozen328 keeps only destination
+and memo maps in the retained cache; a scoped reader borrows the source View per
+call. This supports real unleased worker inputs without new lifetime authority.
+Focused memo/fuel/mint/cleanup/escape controls pass; its76.804s run clears that
+cache boundary and reaches a temporary result-return lifetime error. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
 comparison or Gdev result exists for the port. Caps remain 120/300s with a 3s

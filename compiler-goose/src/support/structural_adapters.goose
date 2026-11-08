@@ -4397,6 +4397,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_semantic_evidence_i
 fn blot_eval_semantic_evidence_import::blotStructuralHash<StructuralSink>(value:blot_eval_semantic_evidence_import::Importer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_semantic_evidence_import::PooledImporter)->bool {return equalFields(left,right);}
 fn blot_eval_semantic_evidence_import::blotStructuralHash<StructuralSink>(value:blot_eval_semantic_evidence_import::PooledImporter,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_semantic_evidence_import::RetainedImporter)->bool {return equalFields(left,right);}
+fn blot_eval_semantic_evidence_import::blotStructuralHash<StructuralSink>(value:blot_eval_semantic_evidence_import::RetainedImporter,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_semantic_evidence_import::RetainedReader)->bool {return equalFields(left,right);}
+fn blot_eval_semantic_evidence_import::blotStructuralHash<StructuralSink>(value:blot_eval_semantic_evidence_import::RetainedReader,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_semantic_evidence_import::WordBuffer)->bool {return equalFields(left,right);}
 fn blot_eval_semantic_evidence_import::blotStructuralHash<StructuralSink>(value:blot_eval_semantic_evidence_import::WordBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_semantic_evidence_import::WordMap)->bool {return equalFields(left,right);}

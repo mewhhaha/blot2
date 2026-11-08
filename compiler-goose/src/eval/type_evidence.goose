@@ -136,7 +136,7 @@ fn openBodyWithGoals(self_: View,id: Id,binders: const Id[:],goals: const Goal[:
 fn openBody(self_: View,id: Id,binders: const Id[:],remaining: i64&,seen: bool[:]) -> Error { return openBodyWithGoals(self_,id,binders,[],remaining,seen); }
 fn closed(self_: View,id: Id,depth: i64,remaining: i64&) -> Error { let err=validateGoalTablesWithBudget(self_,remaining); if err!=blot_error::Error.none { return err; } var frames: ScopeFrame[128]=[ScopeFrame {..};128]; return walk(self_,id,depth,remaining,frames,0,false,default<bool[:]>(),false); }
 struct Snapshot { owner_id: u64=blot_native::fresh_owner_id(),nodes: const Node[:],extra: const Id[:],effects: blot_check_effect_evidence::Snapshot,quantifier_goals: const QuantifierGoals[:]=default<const QuantifierGoals[:]>(),quantifier_obligations: const Goal[:]=default<const Goal[:]>() }
-fn view(self_: const Snapshot&) -> View { return View {self_.owner_id,self_.nodes,self_.extra,self_.effects.view(),self_.quantifier_goals,self_.quantifier_obligations}; }
+fn view(self_: Snapshot) -> View { return View {self_.owner_id,self_.nodes,self_.extra,self_.effects.view(),self_.quantifier_goals,self_.quantifier_obligations}; }
 struct NodeBuffer { storage: Node[:]=default<Node[:]>(),items: Node[:]=default<Node[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_NodeBuffer: Node[>..]=[];
 fn ensure(self_: NodeBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_NodeBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
