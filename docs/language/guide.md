@@ -27,9 +27,9 @@ deno task blot build examples/lists.blot build/lists.wasm
 ```
 
 Blot compiles to Wasm; a host loads the module and calls its entrypoints, the
-`entry const` and `entry let` declarations of the file you compile. In the
-sibling gdev checkout, `just run` starts Deno Desktop/WebGPU with source hot
-reload.
+`entry func`, `entry const` and `entry let` declarations of the file you
+compile. In the sibling gdev checkout, `just run` starts Deno Desktop/WebGPU
+with source hot reload.
 
 An edit loop compiles with the development tier (`codegenTier: "development"` in
 a project session), which skips the optional scalar and vector passes and
@@ -100,6 +100,14 @@ value. The current implementation admits one declaration per name; overloads
 and local named-function hoisting remain part of the
 [language migration](NEXT_MIGRATION.md). Use `let f = func ...` for local closures.
 
+Static associated functions use qualified names, for example
+`func Vec2.add (left: Vec2) -> (right: Vec2): Vec2 => ...`.
+Bare function names start with a lowercase letter or underscore.
+A declaration's `where` follows its result type:
+`func eq (left: a) -> (right: a): Bool where { Eq a } => return Eq.eq left right`.
+Such declarations require written parameter and result types; ordinary function
+values retain binding signatures and their existing predicate rules.
+
 For many same-typed arguments, use a parameter record as a named-call
 convention. The record type gives names a public interface, so renaming a field
 requires updating callers. Field expressions run once in their written order,
@@ -107,12 +115,12 @@ even when that differs from the record type's order; unknown and duplicate
 supplied fields receive diagnostics at the supplied field.
 
 ```blot
-const rectangle = func (left: U32) -> (top: U32) -> (width: U32) -> (height: U32) => return
+func rectangle (left: U32) -> (top: U32) -> (width: U32) -> (height: U32) => return
   @u32.add (@u32.add left top) (@u32.mul width height)
 const placed = rectangle 2 3
-const named_rectangle = func (args: { left: U32, top: U32, width: U32, height: U32 }) => return
+func named_rectangle (args: { left: U32, top: U32, width: U32, height: U32 }) => return
   rectangle args.left args.top args.width args.height
-entry const area = func () => return named_rectangle { height: 4, width: 5, top: 3, left: 2 }
+entry func area () => return named_rectangle { height: 4, width: 5, top: 3, left: 2 }
 ```
 
 A record parameter gives callers named fields in any order. Small scalar-record
@@ -120,15 +128,15 @@ helpers can be inlined without a record allocation in optimized builds; the
 development tier may allocate a temporary record.
 
 ```blot
-const twice = func value => return value + value
-const apply_twice = func transform => return func value => return transform (transform value)
-entry const factorial = func (value: U32) : U32 => return do:
+func twice value => return value + value
+func apply_twice transform => return func value => return transform (transform value)
+entry func factorial (value: U32) : U32 => return do:
   if value <= 1:
     break 1
   break value * factorial (value - 1)
 
-entry const offset = func value => return value + 1.0
-entry const answer = func (value: F32) : F32 => return apply_twice offset (twice value)
+entry func offset value => return value + 1.0
+entry func answer (value: F32) : F32 => return apply_twice offset (twice value)
 entry let delayed = func () => return (func () => return factorial 5) ()
 ```
 
@@ -161,7 +169,7 @@ suggestions from unsaved buffers. See the
 explained below.
 
 ```text
-const unfinished = func (value: U32) : F32 => return @hole
+func unfinished (value: U32) : F32 => return @hole
 // Unfilled expression; expected: F32; in scope: value: U32
 ```
 
@@ -200,14 +208,14 @@ Keep `return value` where the intent is to leave the whole function, including
 from a nested match arm. A bare `break` still leaves only the nearest loop.
 
 ```blot
-entry const choose = func (flag: Bool) : U32 => return do:
+entry func choose (flag: Bool) : U32 => return do:
   let inner = do:
     if flag:
       return 7
     break 3
   break inner + 1
 
-entry const from_case = func (flag: Bool) : U32 => return do:
+entry func from_case (flag: Bool) : U32 => return do:
   case flag of
     true => do:
       return 42
@@ -218,7 +226,7 @@ entry const from_case = func (flag: Bool) : U32 => return do:
 
 ```blot
 type Beat is data = $Up | $Down
-entry const count = func (up: Bool) : U32 => return do:
+entry func count (up: Bool) : U32 => return do:
   let beat = if up then $Up else $Down
   let total = 0
   case beat of
@@ -231,9 +239,9 @@ entry const count = func (up: Bool) : U32 => return do:
 
 ```blot
 type Builder is data = $Builder U32
-const add_step = func amount => return func builder => return case builder of
+func add_step amount => return func builder => return case builder of
   $Builder value => $Builder (value + amount)
-const plugin = func builder => return do:
+func plugin builder => return do:
   builder := add_step 10 self
   builder := add_step 20 self
   break builder
@@ -244,7 +252,7 @@ const application = do:
   builder := add_step 12 self
   break builder
 
-entry const answer = func () => return case application of
+entry func answer () => return case application of
   $Builder value => value
 ```
 
@@ -294,7 +302,7 @@ iteration.
 
 ```blot
 type Candidate is data = $Keep U32 | $Skip
-entry const kept_total = func () => return do:
+entry func kept_total () => return do:
   let total = 0
   for candidate in #[$Skip, $Keep 2, $Keep 5]:
     let $Keep value = candidate else:
@@ -306,19 +314,19 @@ entry const kept_total = func () => return do:
 ```
 
 ```blot
-entry const sum_to = func (end: U32) => return do:
+entry func sum_to (end: U32) => return do:
   let total = 0
   for index in 0..end:
     total := self + index
   break total
 
-entry const weighted = func () => return do:
+entry func weighted () => return do:
   let total = 0
   for (value, weight) in [(2, 3), (4, 5)]:
     total := self + value * weight
   break total
 
-entry const first_five = func () => return do:
+entry func first_five () => return do:
   let count = 0
   for 0..5:
     count := self + 1
@@ -349,13 +357,13 @@ shorthand.
 type Entry { head, tail } is data = $Entry { head, tail }
 type Pair [left, right] is data = $Pair (left, right)
 type Curried left => type right is data = $Curried (left, right)
-const first = func (entry: Entry { head: U32, tail: a }) : U32 => return do:
+func first (entry: Entry { head: U32, tail: a }) : U32 => return do:
   let $Entry { head } = entry
   break head
-const number = func (pair: (Curried U32) Bool) => return do:
+func number (pair: (Curried U32) Bool) => return do:
   let $Curried (value, flag) = pair
   break value
-entry const answer = func () => return first ($Entry { head: 42, tail: true })
+entry func answer () => return first ($Entry { head: 42, tail: true })
 ```
 
 Transparent aliases name an existing type without introducing a constructor or
@@ -377,7 +385,7 @@ type Coordinate = F32
 type Pair a = (a, a)
 type Position = Pair Coordinate
 const origin: Position = (0.0, 0.0)
-entry const horizontal = func () => return @product.get origin 0
+entry func horizontal () => return @product.get origin 0
 ```
 
 Currying is explicit in the declaration. `Curried U32` remains a constructor;
@@ -420,7 +428,7 @@ const extend: a -> b -> c where { Merge [a, b, c] } =
   func left => return func right => return @record.merge left right
 const original = { x: 40, enabled: false }
 const updated = extend original { enabled: true, extra: 2 }
-entry const answer = func () => return @u32.add updated.x updated.extra
+entry func answer () => return @u32.add updated.x updated.extra
 ```
 
 Tuples use `(a, b)`; project with patterns or `@product.get tuple 0` with a
@@ -436,19 +444,19 @@ failure branch.
 ```blot
 type Vec2 is data = $Vec2 { x: F32, y: F32 }
 entry const selected = 7
-const length = func position => return do:
+func length position => return do:
   let $Vec2 { x, y } = position
   break F32.sqrt (x * x + y * y)
-const unpack = func candidate => return do:
+func unpack candidate => return do:
   let $Some value = candidate else:
     break 0
   break value
 
-entry const distance = func () => return length ($Vec2 { y: 4.0, x: 3.0 })
-entry const classify = func (key: U32) => return case key, true of
+entry func distance () => return length ($Vec2 { y: 4.0, x: 3.0 })
+entry func classify (key: U32) => return case key, true of
   ^selected, true => unpack ($Some 42)
   _, _ => 0
-entry const conditional = func () => return do:
+entry func conditional () => return do:
   if let $Some (number, true) = $Some (42, true):
     break number
   break 0
@@ -499,7 +507,7 @@ argument locations. These spans use UTF-8 byte offsets, like the primary
 diagnostic.
 
 ```text
-entry const answer = func () => return 1 + 2.5
+entry func answer () => return 1 + 2.5
 // missing_associated; `+` (add): left U32 incompatible, right F32 incompatible
 ```
 
@@ -533,7 +541,7 @@ const position = path.make (func source => return source.position)
 const x = path.make (func source => return source.x)
   (func replacement => return func source => return @record.merge source { x: replacement })
 const position_x = path.compose position x
-entry const answer = func () => return do:
+entry func answer () => return do:
   let original = { position: { x: 40, y: 7 }, health: 2 }
   let changed = path.set position_x 2.5 original
   break @f32.add (path.get position_x changed) (@u32.to_f32 original.health)
@@ -572,7 +580,7 @@ entry const same_value = 1 == 2
 entry const same_type = $Type 1 == $Type 2
 entry const same_nominal = $Type $Count == $Type ($Count 42)
 entry const different = $Type $Count != $Type $Other
-entry const compare = func () => return do:
+entry func compare () => return do:
   let head = $Type $Count
   let witness = $Type ($Count 0)
   break head == witness
@@ -582,8 +590,8 @@ entry const compare = func () => return do:
 type Box a is data = $Box a
 const Box.add = func left => return func right => return case left, right of
   $Box a, $Box b => $Box (a + b)
-const twice = func value => return value + value
-entry const answer = func (value: F32) => return case twice ($Box value) of
+func twice value => return value + value
+entry func answer (value: F32) => return case twice ($Box value) of
   $Box result => result
 ```
 
@@ -617,10 +625,10 @@ space (`f #[1]`), or write `f(#[1])`.
 Spreads append or prepend while preserving written evaluation order:
 
 ```blot
-const prepend = func value => return func values => return [value, ...values]
-const append = func value => return func values => return [...values, value]
-const surrounded = func values => return [0, ...values, 99]
-const append_array = func value => return func values => return #[...values, value]
+func prepend value => return func values => return [value, ...values]
+func append value => return func values => return [...values, value]
+func surrounded values => return [0, ...values, 99]
+func append_array value => return func values => return #[...values, value]
 ```
 
 The spread operand must have the same collection type as the result. One spread
@@ -657,7 +665,7 @@ const Countdown.next = func (cursor: Countdown) => return do:
   break if remaining == 0 then $Nothing
     else $Some (remaining, $Countdown (remaining - 1))
 
-entry const sum = func count => return do:
+entry func sum count => return do:
   let total = 0
   for value in $Countdown count:
     total := self + value
@@ -681,7 +689,7 @@ exhausted cursor trap. They do not add indexing to List.
 
 ```blot
 import * as iter from "std/iter"
-const selected = func count => return
+func selected count => return
   iter.collect_list (iter.take count
     (iter.map (func value => return value * 2)
       (iter.filter (func value => return value > 2) [1, 2, 3, 4, 5])))
@@ -738,7 +746,7 @@ collections.
 
 ```blot
 import * as array from "std/array"
-entry const answer = func () => return do:
+entry func answer () => return do:
   let payload = #[10, 20, 30, 40]
   let ranges = #[{ start: 1, count: 2 }, { start: 0, count: 1 }]
   let copied = array.flatten ranges payload
@@ -785,13 +793,13 @@ Import `std/array` for `generate`, `fill`, `length`, `is_empty`,
 import * as array from "std/array"
 
 const squares = array.generate 4 (func index => return index * index)
-entry const total = func () => return array.fold_left U32.add 0 squares
-entry const snapshot = func () => return do:
+entry func total () => return array.fold_left U32.add 0 squares
+entry func snapshot () => return do:
   let values = #[1, 2]
   let original = @storage.copy values
   values[0] := self + 40
   break original[0] + values[0]
-const checked = func index => return squares.get(index)
+func checked index => return squares.get(index)
 ```
 
 Import `std/list` for `generate`, `fill`, `from_array`, `to_array`, `length`,
@@ -829,7 +837,7 @@ operators and receiver members such as `dot`, `length`, and `normalized`.
 import * as array from "std/array"
 import { Vec2 } from "std/vector"
 
-entry const total_length = func () => return
+entry func total_length () => return
   #[$Vec2 { x: 3.0, y: 4.0 }, $Vec2 { x: 0.0, y: 0.0 }]
   |> array.map .length
   |> array.fold_left .add 0.0
@@ -847,8 +855,8 @@ Text has no implicit IO.
 ```blot
 import * as text from "std/text"
 
-entry const greeting = func () => return text.join " " #["Hello,", "世界🙂"]
-entry const label = func (count: U32) => return
+entry func greeting () => return text.join " " #["Hello,", "世界🙂"]
+entry func label (count: U32) => return
   text.join "" #["count=", text.format count]
 ```
 
@@ -879,8 +887,8 @@ on the source functions:
 
 ```blot
 import * as simd from "std/simd"
-const translated = func lanes => return simd.u32_add lanes (1, 2, 3, 4)
-const scaled = func lanes => return simd.f32_mul lanes (2.0, 2.0, 2.0, 2.0)
+func translated lanes => return simd.u32_add lanes (1, 2, 3, 4)
+func scaled lanes => return simd.f32_mul lanes (2.0, 2.0, 2.0, 2.0)
 ```
 
 Every operation with a scalar counterpart gives the bits of that scalar kernel
@@ -958,17 +966,17 @@ effects unhandled. Closures retain their latent effects.
 
 ```blot
 type Reader a is effect = { ask: Unit -> a }
-const read_twice = func () => return do:
+func read_twice () => return do:
   use first <- Reader.ask U32 ()
   use second <- Reader.ask U32 ()
   break first + second
 
 const reader = @effect.provider (Reader.ask U32) (func () => return 21)
-entry const mocked = func () => return do reader:
+entry func mocked () => return do reader:
   use answer <- read_twice ()
   break answer
 
-entry const main = func (read: Unit -> U32 ! {Foreign}) => return do (@effect.provider (Reader.ask U32) read):
+entry func main (read: Unit -> U32 ! {Foreign}) => return do (@effect.provider (Reader.ask U32) read):
   use answer <- read_twice ()
   break answer
 
@@ -990,7 +998,7 @@ is one `case request of`, with distinct `effect` clauses and exactly one
 ```blot
 type Validate is effect = { check: U32 -> U32 }
 
-const checked = func computation => return do:
+func checked computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -1000,7 +1008,7 @@ const checked = func computation => return do:
       complete value =>
         break value
 
-entry const answer = func () => return checked (@computation (func () => return do:
+entry func answer () => return checked (@computation (func () => return do:
   use first <- Validate.check 40
   use second <- Validate.check 2
   break first + second
@@ -1039,18 +1047,18 @@ type State a is effect = {
 }
 type Get a is effect = Unit -> a
 
-const increment = func () => return do:
+func increment () => return do:
   use count <- State.get U32 ()
   use State.set U32 (count + 1)
   break count
 
-entry const counted = func () => return do:
+entry func counted () => return do:
   let (next, previous) = do (@effect.state (State.get U32) (State.set U32) 41):
     break increment ()
   break next + previous
 
 const fixed = @effect.provider (Get U32) (func () => return 7)
-entry const read_fixed = func () => return do fixed:
+entry func read_fixed () => return do fixed:
   break Get U32 ()
 ```
 
@@ -1074,15 +1082,15 @@ type State a is effect = {
 }
 type Counter is data = $Counter U32
 
-const get = func (witness: p -> a) : a => return State.get ()
-const set = func value => return State.set value
+func get (witness: p -> a) : a => return State.get ()
+func set value => return State.set value
 
-const increment = func () => return do:
+func increment () => return do:
   use counter <- get $Counter
   let $Counter value = counter
   break set ($Counter (value + 1))
 
-entry const answer = func () => return do:
+entry func answer () => return do:
   let ($Counter next, _) = @effect.run State.get State.set ($Counter 41) increment
   break next
 ```
@@ -1189,7 +1197,7 @@ constraints explicitly after a complete binding annotation:
 const twice: a -> a where { associated "add" a a a } = func value => return value + value
 const first: a -> b where { field "first" a b } = func value => return value.first
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
-entry const answer = func () => return twice 21
+entry func answer () => return twice 21
 ```
 
 The `where` clause is available on top-level `const`/`let` and local `let`;
@@ -1235,7 +1243,7 @@ type Project [owner, value] is contract = { field "value" owner value }
 type Box a is data = $Box { value: a }
 const twice: a -> a where { Arithmetic a } = func value => return value + value
 const read: a -> b where { Project [a, b] } = func box => return box.value
-entry const answer = func () => return twice (read ($Box { value: 21 }))
+entry func answer () => return twice (read ($Box { value: 21 }))
 ```
 
 Every use instantiates the contract's type and effect-row parameters separately.
@@ -1254,7 +1262,7 @@ type Identity a is contract = { type Item = a }
 type Source s is contract = { type Item, const first: s -> (Source.Item s) }
 type View a = Identity.Item a
 const keep: a -> (Identity.Item a) where { Identity a } = func value => return value
-entry const answer = func () => return keep 42
+entry func answer () => return keep 42
 ```
 
 A projection such as `Identity.Item U32` supplies the contract's complete
@@ -1287,7 +1295,7 @@ impl ArraySource a : Source (Array a) = {
 }
 const read: s -> (Source.Item s) where { Source s } =
   func values => return Source.first values
-entry const first = func () => return read #[42]
+entry func first () => return read #[42]
 ```
 
 Heads must be disjoint across the acquired public module graph, irrespective of
@@ -1316,7 +1324,7 @@ With several tags, the nearest runs first: `@[f] @[g] const x = value` binds
 tags, including when the initializer is a function.
 
 ```blot
-const add = func amount => return func value => return value + amount
+func add amount => return func value => return value + amount
 @[add 1]
 @[func value => return value * 2] entry const answer: U32 = 20
 @[add 1] entry let started: U32 = 41
@@ -1341,7 +1349,7 @@ Wasm module.
 time, and `break` supplies the resulting value:
 
 ```blot
-entry const answer = func () => return #do:
+entry func answer () => return #do:
   let base = 40
   break base + 2
 ```
@@ -1359,7 +1367,7 @@ reserved slots count against the evaluator's storage limit.
 literal for all length modes:
 
 ```blot
-entry const answer = func () => return do:
+entry func answer () => return do:
   let fixed: Array U32 = #[7]
   let growing: GrowArray U32 = #[41]
   let resizable: ResizeArray U32 = #[]
@@ -1414,8 +1422,8 @@ Imports precede declarations: `import * as math from "./math"` or
 `import { Point as Position, distance } from "./geometry"`. Relative paths may
 omit `.blot`; the CLI maps `std/` to the source library. Cycles are errors.
 Top-level declarations are public by default. `private` before a value, alias,
-data, contract or effect declaration keeps its name inside its defining module;
-constructors and operations inherit that visibility. `private entry const` keeps
+data, contract, effect or named function declaration keeps its name inside its defining module;
+constructors and operations inherit that visibility. `private entry func` keeps
 the host export while hiding the Blot import. Importing a type does not import
 differently named constructors. Imported operator functions need local fixity
 declarations. `export { answer as forwarded, Token } from "./producer"` forwards
@@ -1440,20 +1448,21 @@ values, or types and references to host resource snapshots. See
 is an explicit host parser boundary; the native CLI alone does not choose file
 parsers.
 
-`entry const` and `entry let` mark host entrypoints. Exactly the entry module's
-entry declarations become Wasm exports, under their own names; a build needs at
+`entry func`, `entry const` and `entry let` mark host entrypoints. Exactly the
+entry module's entry declarations become Wasm exports, under their own names; a build needs at
 least one, and nothing else is exported. An entry's final type must fit the
 guest ABI: functions over Unit, U32, F32, Bool, Array U32 or Array F32 (or one
 scalar `! {Foreign}` callback) that handle every other effect, and Unit, U32,
 F32 or Bool values. A generic entry, an `Array` value or a function that leaves
 an effect unhandled is an error. Only the entry module reaches the host, so a
 module it imports cannot declare entries. `entry` is contextual: it is a
-modifier only before `const` or `let` at the start of a top-level declaration
-and an ordinary name everywhere else (`func entry => return entry` is fine).
+modifier only before `func`, `const` or `let` at the start of a top-level
+declaration and an ordinary name everywhere else (`func entry => return entry`
+is fine).
 
 ```blot
-const helper = func (value: U32) => return value + 1
-entry const answer = func () => return helper 41
+func helper (value: U32) => return value + 1
+entry func answer () => return helper 41
 entry let started: U32 = helper 1
 ```
 
@@ -1464,8 +1473,10 @@ budget no longer fails the build. Associated dispatch is selected while
 specializing, so a missing implementation such as `true + false` is reported
 only in reachable code.
 
-Functions are ordinary values: write `const name = func argument => return body`
-or `let name = func argument => return body` at the top level.
+Function values remain ordinary values: write `const name = func argument =>
+return body` or `let name = func argument => return body` when a function value
+is intended. Use `func name argument => return body` for a named module
+function.
 `const name = expression` evaluates at compile time under a step budget.
 `let name = expression` initializes once at runtime when the module starts, if
 an entry reaches it. Compile-time expressions can build immutable values,
@@ -1481,7 +1492,7 @@ passed without being called. This conservative rule can reject a deferred cycle
 such as:
 
 ```text
-const read = func () => return value
+func read () => return value
 let value = (func ignored => return 42) read // rejected: initialization_cycle
 ```
 
@@ -1493,10 +1504,10 @@ Monadic blocks use an ordinary prelude adapter:
 
 ```blot
 const try = monad Maybe
-const sequence = func candidate => return do try:
+func sequence candidate => return do try:
   use value <- candidate
   break value + 1
-entry const answer = func () => return Maybe.unwrap_or 0 (sequence ($Some 41))
+entry func answer () => return Maybe.unwrap_or 0 (sequence ($Some 41))
 ```
 
 `use` calls the selected type's `bind` with the remaining block as a function.
@@ -1515,9 +1526,9 @@ call stack; failure skips later steps, and `break value` still exits the nearest
 `do`. Custom monads need an `iterate` member only for blocks containing loops.
 
 ```blot
-const step = func count => return
+func step count => return
   if count < 42 then $Some ($Continue (count + 1)) else $Some ($Done count)
-entry const answer = func () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)
+entry func answer () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)
 ```
 
 Not yet executable: collection patterns, general text, F64, general type-valued
@@ -1553,8 +1564,8 @@ chooses that type's ordinary `from` function. Primitive implementations use
 default target when the context leaves it ambiguous.
 
 ```blot
-entry const normalized = func (first: U32) => return from first / 6555.0
-entry const explicit = func (value: U32) => return do:
+entry func normalized (first: U32) => return from first / 6555.0
+entry func explicit (value: U32) => return do:
   let converted: F32 = from value
   break converted
 entry const different = if :1 == :2.0 then false else true
@@ -1580,11 +1591,11 @@ and `or` are primitive short-circuit operators; their right operand runs only
 when needed. Function arguments otherwise evaluate eagerly.
 
 ```blot
-const choose = func enabled -> callback => return
+func choose enabled -> callback => return
   if enabled then callback () else 42
-entry const answer = func () => return
+entry func answer () => return
   choose false (func () => return @panic "unused callback")
-entry const fallback = func () => return
+entry func fallback () => return
   Maybe.unwrap_or_else (func () => return 42) $Nothing
 ```
 
@@ -1606,7 +1617,7 @@ type Choice is data =
   | $Second U32
   | $Empty
 
-entry const answer = func value => return case $Second value of
+entry func answer value => return case $Second value of
   $First amount | $Second amount if amount >= 40 => amount
   $First amount | $Second amount => amount + 2
   $Empty => 0

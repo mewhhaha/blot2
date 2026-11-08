@@ -1,7 +1,7 @@
 // Structural equality is opt-in for application data. This contract lives in
 // an explicit module so unrelated projects keep the small bootstrap prelude.
 type Eq a is contract = { const eq: a -> a -> Bool }
-const eq: a -> a -> Bool where { Eq a } = func left -> right => return Eq.eq left right
+func eq (left: a) -> (right: a): Bool where { Eq a } => return Eq.eq left right
 
 impl Boolean : Eq Bool = {
   const eq = func left -> right => return Bool.eq left right,
@@ -13,7 +13,7 @@ impl Float : Eq F32 = {
   const eq = func left -> right => return F32.eq left right,
 }
 
-const equal_array: Array a -> Array a -> Bool where { Eq a } = func left -> right => return do:
+func equal_array (left: Array a) -> (right: Array a): Bool where { Eq a } => return do:
   if left.length != right.length:
     break false
   let same = true

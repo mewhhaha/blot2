@@ -752,6 +752,12 @@
         "boundary": {
           "kind": "root"
         }
+      },
+      {
+        "rule": "function_name",
+        "boundary": {
+          "kind": "root"
+        }
       }
     ],
     "semantics": {

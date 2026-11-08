@@ -19,23 +19,23 @@ infixl 70 (*) = mul
 infixl 70 (/) = div
 infixl 70 (%) = rem
 
-const add = func left -> right => return @type.call "add" left right
-const sub = func left -> right => return @type.call "sub" left right
-const mul = func left -> right => return @type.call "mul" left right
-const div = func left -> right => return @type.call "div" left right
-const rem = func left -> right => return @type.call "rem" left right
-const bit_and = func left -> right => return @type.call "bit_and" left right
-const bit_or = func left -> right => return @type.call "bit_or" left right
-const bit_xor = func left -> right => return @type.call "bit_xor" left right
-const shl = func value -> count => return @type.call "shl" value count
-const shr = func value -> count => return @type.call "shr" value count
-const bit_not = func value => return value.bit_not
-const eq = func left -> right => return @type.call "eq" left right
-const ne = func left -> right => return @type.call "ne" left right
-const lt = func left -> right => return @type.call "lt" left right
-const le = func left -> right => return @type.call "le" left right
-const gt = func left -> right => return @type.call "gt" left right
-const ge = func left -> right => return @type.call "ge" left right
+func add left -> right => return @type.call "add" left right
+func sub left -> right => return @type.call "sub" left right
+func mul left -> right => return @type.call "mul" left right
+func div left -> right => return @type.call "div" left right
+func rem left -> right => return @type.call "rem" left right
+func bit_and left -> right => return @type.call "bit_and" left right
+func bit_or left -> right => return @type.call "bit_or" left right
+func bit_xor left -> right => return @type.call "bit_xor" left right
+func shl value -> count => return @type.call "shl" value count
+func shr value -> count => return @type.call "shr" value count
+func bit_not value => return value.bit_not
+func eq left -> right => return @type.call "eq" left right
+func ne left -> right => return @type.call "ne" left right
+func lt left -> right => return @type.call "lt" left right
+func le left -> right => return @type.call "le" left right
+func gt left -> right => return @type.call "gt" left right
+func ge left -> right => return @type.call "ge" left right
 
 type Maybe a is data = $Some a | $Nothing
 type Result [value, error] is data = $Ok value | $Err error
@@ -45,31 +45,31 @@ type Type witness is data = $Type witness
 type Text = Array U32
 
 // The expected result selects its type's ordinary `from` member.
-const from = func value => return @type.result "from" value
+func from value => return @type.result "from" value
 
 // A resolver sequences through the selected type's ordinary pure/bind members.
-const monad = func constructor => return @do.monad constructor
-const F32.from = func value => return value.to_f32
-const U32.from = func value => return value.to_u32
-const F32.to_f32 = func (value: F32) => return value
-const U32.to_u32 = func (value: U32) => return value
+func monad constructor => return @do.monad constructor
+func F32.from value => return value.to_f32
+func U32.from value => return value.to_u32
+func F32.to_f32 (value: F32) => return value
+func U32.to_u32 (value: U32) => return value
 
-const identity = func value => return value
-const apply = func function -> value => return function value
-const pipe = func value -> function => return function value
-const always = func value -> ignored => return value
-const compose = func outer -> inner -> value => return outer (inner value)
-const flip = func combine -> right -> left => return combine left right
-const on = func combine -> project -> left -> right => return
+func identity value => return value
+func apply function -> value => return function value
+func pipe value -> function => return function value
+func always value -> ignored => return value
+func compose outer -> inner -> value => return outer (inner value)
+func flip combine -> right -> left => return combine left right
+func on combine -> project -> left -> right => return
   combine (project left) (project right)
 
-const Bool.not = func value => return if value then false else true
-const Bool.eq = func left -> right => return if left then right else Bool.not right
-const Bool.ne = func left -> right => return Bool.not (Bool.eq left right)
+func Bool.not value => return if value then false else true
+func Bool.eq left -> right => return if left then right else Bool.not right
+func Bool.ne left -> right => return Bool.not (Bool.eq left right)
 
-const Type.eq = func left -> right => return case left, right of
+func Type.eq left -> right => return case left, right of
   $Type a, $Type b => @type.same a b
-const Type.ne = func left -> right => return Bool.not (Type.eq left right)
+func Type.ne left -> right => return Bool.not (Type.eq left right)
 
 const U32.add = @u32.add
 const U32.sub = @u32.sub
@@ -80,16 +80,16 @@ const U32.rem = @u32.rem
 const U32.bit_and = @u32.bit_and
 const U32.bit_or = @u32.bit_or
 const U32.bit_xor = @u32.bit_xor
-const U32.bit_not = func value => return @u32.bit_xor value 0xFFFFFFFF
+func U32.bit_not value => return @u32.bit_xor value 0xFFFFFFFF
 const U32.shl = @u32.shl
 const U32.shr = @u32.shr
-const U32.abs = func value => return value
+func U32.abs value => return value
 const U32.eq = @u32.eq
 const U32.lt = @u32.lt
-const U32.ne = func left -> right => return Bool.not (U32.eq left right)
-const U32.le = func left -> right => return Bool.not (U32.lt right left)
-const U32.gt = func left -> right => return U32.lt right left
-const U32.ge = func left -> right => return Bool.not (U32.lt left right)
+func U32.ne left -> right => return Bool.not (U32.eq left right)
+func U32.le left -> right => return Bool.not (U32.lt right left)
+func U32.gt left -> right => return U32.lt right left
+func U32.ge left -> right => return Bool.not (U32.lt left right)
 const U32.to_f32 = @u32.to_f32
 
 const F32.add = @f32.add
@@ -110,19 +110,19 @@ const F32.ceil = @f32.ceil
 const F32.trunc = @f32.trunc
 // Truncates toward zero and saturates; NaN/negative values become zero.
 const F32.to_u32 = @f32.to_u32
-const F32.min = func left -> right => return if F32.lt left right then left else right
-const F32.max = func left -> right => return if F32.gt left right then left else right
-const F32.clamp = func low -> high -> value => return
+func F32.min left -> right => return if F32.lt left right then left else right
+func F32.max left -> right => return if F32.gt left right then left else right
+func F32.clamp low -> high -> value => return
   F32.min high (F32.max low value)
-const F32.lerp = func left -> right -> weight => return
+func F32.lerp left -> right -> weight => return
   F32.add left (F32.mul (F32.sub right left) weight)
-const F32.square = func value => return F32.mul value value
-const F32.length3 = func x -> y -> z => return
+func F32.square value => return F32.mul value value
+func F32.length3 x -> y -> z => return
   F32.sqrt (F32.add (F32.add (F32.square x) (F32.square y)) (F32.square z))
-const F32.is_finite = func value => return F32.le (F32.abs value) 3.402823466e38
+func F32.is_finite value => return F32.le (F32.abs value) 3.402823466e38
 
 // A positive finite period wraps finite values into [0, period).
-const F32.wrap = func period -> value => return do:
+func F32.wrap period -> value => return do:
   let wrapped = F32.sub value (F32.mul period (F32.floor (F32.div value period)))
   if F32.ge wrapped period:
     break 0.0
@@ -130,20 +130,20 @@ const F32.wrap = func period -> value => return do:
     break F32.add wrapped period
   break wrapped
 
-const F32.lerp_angle = func left -> right -> weight => return do:
+func F32.lerp_angle left -> right -> weight => return do:
   let difference = F32.sub (F32.wrap 6.283185307 (F32.add (F32.sub right left) 3.141592654)) 3.141592654
   break F32.add left (F32.mul difference weight)
 
 // Split 2*pi keeps range reduction accurate for |radians| <= 8192.
 // Outside that explicit range, trig returns NaN instead of inaccurate geometry.
-const f32_reduced_radians = func value => return do:
+func f32_reduced_radians value => return do:
   if F32.gt (F32.abs value) 8192.0:
     break F32.div 0.0 0.0
   let turns = F32.floor (F32.add (F32.mul value 0.15915494309189535) 0.5)
   break F32.sub (F32.sub value (F32.mul turns 6.28125)) (F32.mul turns 0.001935307179586477)
 
 // Fold to [-pi/2, pi/2], then evaluate the degree-11 Taylor polynomial.
-const f32_sin_reduced = func angle => return do:
+func f32_sin_reduced angle => return do:
   let x = if F32.gt angle 1.570796327 then F32.sub 3.141592654 angle
     else if F32.lt angle (-1.570796327) then F32.sub (-3.141592654) angle
     else angle
@@ -154,7 +154,7 @@ const f32_sin_reduced = func angle => return do:
   let term_3 = F32.add (-1.666666666666667e-1) (F32.mul square term_5)
   break F32.mul x (F32.add 1.0 (F32.mul square term_3))
 
-const f32_cos_reduced = func value => return do:
+func f32_cos_reduced value => return do:
   let angle = F32.abs value
   let outside = F32.gt angle 1.570796327
   let x = if outside then F32.sub 3.141592654 angle else angle
@@ -167,25 +167,25 @@ const f32_cos_reduced = func value => return do:
   let result = F32.add 1.0 (F32.mul square term_2)
   break if outside then F32.neg result else result
 
-const F32.sin = func value => return f32_sin_reduced (f32_reduced_radians value)
-const F32.cos = func value => return f32_cos_reduced (f32_reduced_radians value)
-const F32.sin_cos = func value => return do:
+func F32.sin value => return f32_sin_reduced (f32_reduced_radians value)
+func F32.cos value => return f32_cos_reduced (f32_reduced_radians value)
+func F32.sin_cos value => return do:
   let angle = f32_reduced_radians value
   break (f32_sin_reduced angle, f32_cos_reduced angle)
 
 // Like division, tan is unbounded near odd multiples of pi/2.
-const F32.tan = func value => return do:
+func F32.tan value => return do:
   let angle = f32_reduced_radians value
   break F32.div (f32_sin_reduced angle) (f32_cos_reduced angle)
 
 const pi = 3.141592653589793
 const tau = 6.283185307179586
-const abs = func value => return value.abs
-const min = func left -> right => return if left < right then left else right
-const max = func left -> right => return if left > right then left else right
-const clamp = func low -> high -> value => return min high (max low value)
-const lerp = func left -> right => return @type.call "lerp" left right
-const square = func value => return value * value
+func abs value => return value.abs
+func min left -> right => return if left < right then left else right
+func max left -> right => return if left > right then left else right
+func clamp low -> high -> value => return min high (max low value)
+func lerp left -> right => return @type.call "lerp" left right
+func square value => return value * value
 const sqrt = F32.sqrt
 const floor = F32.floor
 const ceil = F32.ceil
@@ -198,19 +198,19 @@ const wrap = F32.wrap
 const lerp_angle = F32.lerp_angle
 const is_finite = F32.is_finite
 const saturate = clamp 0.0 1.0
-const smoothstep = func low -> high -> value => return do:
+func smoothstep low -> high -> value => return do:
   let t = saturate ((value - low) / (high - low))
   break t * t * (3.0 - 2.0 * t)
 
-const Maybe.pure = func value => return $Some value
-const Maybe.map = func transform -> candidate => return case candidate of
+func Maybe.pure value => return $Some value
+func Maybe.map transform -> candidate => return case candidate of
   $Some value => $Some (transform value)
   $Nothing => $Nothing
-const Maybe.bind = func candidate -> next => return case candidate of
+func Maybe.bind candidate -> next => return case candidate of
   $Some value => next value
   $Nothing => $Nothing
 // Finish each callback before advancing, so iteration uses constant stack.
-const Maybe.iterate = func initial -> step => return do:
+func Maybe.iterate initial -> step => return do:
   let state = initial
   for ever:
     use candidate <- step state
@@ -219,36 +219,36 @@ const Maybe.iterate = func initial -> step => return do:
     let $Some ($Continue next) = candidate else:
       break $Nothing
     state := next
-const Maybe.unwrap_or = func fallback -> candidate => return case candidate of
+func Maybe.unwrap_or fallback -> candidate => return case candidate of
   $Some value => value
   $Nothing => fallback
-const Maybe.is_some = func candidate => return case candidate of
+func Maybe.is_some candidate => return case candidate of
   $Some _ => true
   $Nothing => false
-const Maybe.filter = func predicate -> candidate => return case candidate of
+func Maybe.filter predicate -> candidate => return case candidate of
   $Some value => if predicate value then candidate else $Nothing
   $Nothing => $Nothing
-const Maybe.flatten = func candidate => return case candidate of
+func Maybe.flatten candidate => return case candidate of
   $Some inner => inner
   $Nothing => $Nothing
-const Maybe.unwrap_or_else = func fallback -> candidate => return case candidate of
+func Maybe.unwrap_or_else fallback -> candidate => return case candidate of
   $Some value => value
   $Nothing => fallback ()
-const Maybe.to_result = func error -> candidate => return case candidate of
+func Maybe.to_result error -> candidate => return case candidate of
   $Some value => $Ok value
   $Nothing => $Err error
 
-const Result.pure = func value => return $Ok value
-const Result.map = func transform -> candidate => return case candidate of
+func Result.pure value => return $Ok value
+func Result.map transform -> candidate => return case candidate of
   $Ok value => $Ok (transform value)
   $Err error => $Err error
-const Result.map_error = func transform -> candidate => return case candidate of
+func Result.map_error transform -> candidate => return case candidate of
   $Ok value => $Ok value
   $Err error => $Err (transform error)
-const Result.bind = func candidate -> next => return case candidate of
+func Result.bind candidate -> next => return case candidate of
   $Ok value => next value
   $Err error => $Err error
-const Result.iterate = func initial -> step => return do:
+func Result.iterate initial -> step => return do:
   let state = initial
   for ever:
     use candidate <- step state
@@ -259,44 +259,44 @@ const Result.iterate = func initial -> step => return do:
         break $Ok result
       if let $Err error = candidate:
         break $Err error
-const Result.unwrap_or = func fallback -> candidate => return case candidate of
+func Result.unwrap_or fallback -> candidate => return case candidate of
   $Ok value => value
   $Err _ => fallback
-const Result.unwrap_or_else = func fallback -> candidate => return case candidate of
+func Result.unwrap_or_else fallback -> candidate => return case candidate of
   $Ok value => value
   $Err _ => fallback ()
-const Result.to_maybe = func candidate => return case candidate of
+func Result.to_maybe candidate => return case candidate of
   $Ok value => $Some value
   $Err _ => $Nothing
 
-const Array.length: Array a -> U32 = func values => return @array.length values
-const GrowArray.length = func (values: GrowArray a): U32 => return @storage.length values
-const ResizeArray.length = func (values: ResizeArray a): U32 => return @storage.length values
-const View.length = func (values: View a): U32 => return @storage.length values
-const Array.at = func (values: Array a) -> (index: U32) => return @array.get values index
-const GrowArray.at = func (values: GrowArray a) -> (index: U32) => return @storage.read values index
-const ResizeArray.at = func (values: ResizeArray a) -> (index: U32) => return @storage.read values index
-const View.at = func (values: View a) -> (index: U32) => return @storage.read values index
-const Array.from_list: List a -> Array a = func values => return @array.from_list values
-const List.from_array: Array a -> List a = func values => return @list.from_array values
-const List.length: List a -> U32 = func values => return @list.length values
-const List.is_empty: List a -> Bool = func values => return List.length values == 0
-const Array.is_empty: Array a -> Bool = func values => return Array.length values == 0
-const Array.get: Array a -> U32 -> Maybe a = func values -> index => return do:
+func Array.length (values: Array a): U32 => return @array.length values
+func GrowArray.length (values: GrowArray a): U32 => return @storage.length values
+func ResizeArray.length (values: ResizeArray a): U32 => return @storage.length values
+func View.length (values: View a): U32 => return @storage.length values
+func Array.at (values: Array a) -> (index: U32) => return @array.get values index
+func GrowArray.at (values: GrowArray a) -> (index: U32) => return @storage.read values index
+func ResizeArray.at (values: ResizeArray a) -> (index: U32) => return @storage.read values index
+func View.at (values: View a) -> (index: U32) => return @storage.read values index
+func Array.from_list (values: List a): Array a => return @array.from_list values
+func List.from_array (values: Array a): List a => return @list.from_array values
+func List.length (values: List a): U32 => return @list.length values
+func List.is_empty (values: List a): Bool => return List.length values == 0
+func Array.is_empty (values: Array a): Bool => return Array.length values == 0
+func Array.get (values: Array a) -> (index: U32): Maybe a => return do:
   if index < Array.length values:
     break $Some (@array.get values index)
   break $Nothing
-const Array.set: Array a -> U32 -> a -> Maybe (Array a) = func values -> index -> value => return do:
+func Array.set (values: Array a) -> (index: U32) -> (value: a): Maybe (Array a) => return do:
   if index < Array.length values:
     break $Some (@array.set values index value)
   break $Nothing
 
 // Iteration is ordinary associated dispatch. A step returns an item and the
 // next immutable cursor; retaining either cursor preserves its own position.
-const List.iter = func values => return @list.cursor values
-const Array.iter = func values => return @array.cursor values
-const Cursor.iter = func (cursor: Cursor collection) => return cursor
-const Cursor.next = func cursor => return
+func List.iter values => return @list.cursor values
+func Array.iter values => return @array.cursor values
+func Cursor.iter (cursor: Cursor collection) => return cursor
+func Cursor.next cursor => return
   if @cursor.has cursor
   then $Some (@cursor.value cursor, @cursor.advance cursor)
   else $Nothing
@@ -304,22 +304,22 @@ const Cursor.next = func cursor => return
 // Pool iteration borrows a captured range. Growth preserves its addresses and
 // initial length; shortening the owner while traversal is live is rejected.
 type PoolCursor a is data = $PoolCursor { values: &[a], index: U32 }
-const GrowArray.iter = func (values: GrowArray a) => return $PoolCursor {values: &values[0..values.length], index: 0}
-const ResizeArray.iter = func (values: ResizeArray a) => return $PoolCursor {values: &values[0..values.length], index: 0}
-const View.iter = func (values: &[a]) => return $PoolCursor {values, index: 0}
-const PoolCursor.next = func (cursor: PoolCursor a) => return
+func GrowArray.iter (values: GrowArray a) => return $PoolCursor {values: &values[0..values.length], index: 0}
+func ResizeArray.iter (values: ResizeArray a) => return $PoolCursor {values: &values[0..values.length], index: 0}
+func View.iter (values: &[a]) => return $PoolCursor {values, index: 0}
+func PoolCursor.next (cursor: PoolCursor a) => return
   if cursor.index < cursor.values.length
   then $Some (cursor.values[cursor.index], $PoolCursor {values: cursor.values, index: cursor.index + 1})
   else $Nothing
 
 // Mutation dispatch keeps the owner mode explicit in each selected signature.
-const GrowArray.push = func (values: GrowArray a) -> (value: a) => return @storage.push values value
-const ResizeArray.push = func (values: ResizeArray a) -> (value: a) => return @storage.push values value
-const ResizeArray.truncate = func (values: ResizeArray a) -> (count: U32) => return @storage.truncate values count
-const Array.write = func (values: Array a) -> (index: U32) -> (value: a) => return @storage.write (&values[index]) value
-const GrowArray.write = func (values: GrowArray a) -> (index: U32) -> (value: a) => return @storage.write (&values[index]) value
-const ResizeArray.write = func (values: ResizeArray a) -> (index: U32) -> (value: a) => return @storage.write (&values[index]) value
-const Array.view = func (values: Array a) -> (start: U32) -> (end: U32) => return @storage.view values start end
-const GrowArray.view = func (values: GrowArray a) -> (start: U32) -> (end: U32) => return @storage.view values start end
-const ResizeArray.view = func (values: ResizeArray a) -> (start: U32) -> (end: U32) => return @storage.view values start end
-const View.view = func (values: &[a]) -> (start: U32) -> (end: U32) => return @storage.view values start end
+func GrowArray.push (values: GrowArray a) -> (value: a) => return @storage.push values value
+func ResizeArray.push (values: ResizeArray a) -> (value: a) => return @storage.push values value
+func ResizeArray.truncate (values: ResizeArray a) -> (count: U32) => return @storage.truncate values count
+func Array.write (values: Array a) -> (index: U32) -> (value: a) => return @storage.write (&values[index]) value
+func GrowArray.write (values: GrowArray a) -> (index: U32) -> (value: a) => return @storage.write (&values[index]) value
+func ResizeArray.write (values: ResizeArray a) -> (index: U32) -> (value: a) => return @storage.write (&values[index]) value
+func Array.view (values: Array a) -> (start: U32) -> (end: U32) => return @storage.view values start end
+func GrowArray.view (values: GrowArray a) -> (start: U32) -> (end: U32) => return @storage.view values start end
+func ResizeArray.view (values: ResizeArray a) -> (start: U32) -> (end: U32) => return @storage.view values start end
+func View.view (values: &[a]) -> (start: U32) -> (end: U32) => return @storage.view values start end

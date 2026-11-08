@@ -1,11 +1,11 @@
 import * as tree from "./_summary_tree"
 
 opaque type Summary s = tree.Tree s
-const build = func (combine: s -> s -> s) -> (identity: s) -> values => return do:
+func build (combine: s -> s -> s) -> (identity: s) -> values => return do:
   use value <- tree.build combine values
   break $Summary value
-const length = func ($Summary value) => return tree.length value
-const get = func index -> ($Summary value) => return tree.get index value
-const query = func (combine: s -> s -> s) -> identity -> start -> count -> ($Summary value) => return tree.query combine identity start count value
-const set = func (combine: s -> s -> s) -> index -> value -> ($Summary original) => return $Summary (tree.set combine index value original)
-const concat = func (combine: s -> s -> s) -> ($Summary left) -> ($Summary right) => return $Summary (tree.concat combine left right)
+func length ($Summary value) => return tree.length value
+func get index -> ($Summary value) => return tree.get index value
+func query (combine: s -> s -> s) -> identity -> start -> count -> ($Summary value) => return tree.query combine identity start count value
+func set (combine: s -> s -> s) -> index -> value -> ($Summary original) => return $Summary (tree.set combine index value original)
+func concat (combine: s -> s -> s) -> ($Summary left) -> ($Summary right) => return $Summary (tree.concat combine left right)

@@ -2,42 +2,42 @@
 type Vec2 is data = $Vec2 { x: F32, y: F32 }
 type Vec3 is data = $Vec3 { x: F32, y: F32, z: F32 }
 
-const Vec2.add: Vec2 -> Vec2 -> Vec2 = func a -> b => return
+func Vec2.add (a: Vec2) -> (b: Vec2): Vec2 => return
   $Vec2 { x: a.x + b.x, y: a.y + b.y }
-const Vec2.sub: Vec2 -> Vec2 -> Vec2 = func a -> b => return
+func Vec2.sub (a: Vec2) -> (b: Vec2): Vec2 => return
   $Vec2 { x: a.x - b.x, y: a.y - b.y }
-const Vec2.mul: Vec2 -> F32 -> Vec2 = func value -> scale => return
+func Vec2.mul (value: Vec2) -> (scale: F32): Vec2 => return
   $Vec2 { x: value.x * scale, y: value.y * scale }
-const Vec2.div: Vec2 -> F32 -> Vec2 = func value -> scale => return
+func Vec2.div (value: Vec2) -> (scale: F32): Vec2 => return
   $Vec2 { x: value.x / scale, y: value.y / scale }
-const Vec2.lerp: Vec2 -> Vec2 -> F32 -> Vec2 = func a -> b -> weight => return
+func Vec2.lerp (a: Vec2) -> (b: Vec2) -> (weight: F32): Vec2 => return
   $Vec2 { x: F32.lerp a.x b.x weight, y: F32.lerp a.y b.y weight }
-const Vec2.dot: Vec2 -> Vec2 -> F32 = func a -> b => return a.x * b.x + a.y * b.y
-const Vec2.length_squared = func value => return Vec2.dot value value
-const Vec2.length = func value => return sqrt (Vec2.length_squared value)
+func Vec2.dot (a: Vec2) -> (b: Vec2): F32 => return a.x * b.x + a.y * b.y
+func Vec2.length_squared value => return Vec2.dot value value
+func Vec2.length value => return sqrt (Vec2.length_squared value)
 // Zero normalizes to zero. Other inputs follow F32 arithmetic.
-const Vec2.normalized = func value => return do:
+func Vec2.normalized value => return do:
   let length = Vec2.length value
   break if length == 0.0 then value else value / length
 
-const Vec3.add: Vec3 -> Vec3 -> Vec3 = func a -> b => return
+func Vec3.add (a: Vec3) -> (b: Vec3): Vec3 => return
   $Vec3 { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }
-const Vec3.sub: Vec3 -> Vec3 -> Vec3 = func a -> b => return
+func Vec3.sub (a: Vec3) -> (b: Vec3): Vec3 => return
   $Vec3 { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }
-const Vec3.mul: Vec3 -> F32 -> Vec3 = func value -> scale => return
+func Vec3.mul (value: Vec3) -> (scale: F32): Vec3 => return
   $Vec3 { x: value.x * scale, y: value.y * scale, z: value.z * scale }
-const Vec3.div: Vec3 -> F32 -> Vec3 = func value -> scale => return
+func Vec3.div (value: Vec3) -> (scale: F32): Vec3 => return
   $Vec3 { x: value.x / scale, y: value.y / scale, z: value.z / scale }
-const Vec3.lerp: Vec3 -> Vec3 -> F32 -> Vec3 = func a -> b -> weight => return
+func Vec3.lerp (a: Vec3) -> (b: Vec3) -> (weight: F32): Vec3 => return
   $Vec3 { x: F32.lerp a.x b.x weight, y: F32.lerp a.y b.y weight, z: F32.lerp a.z b.z weight }
-const Vec3.dot: Vec3 -> Vec3 -> F32 = func a -> b => return a.x * b.x + a.y * b.y + a.z * b.z
-const Vec3.cross: Vec3 -> Vec3 -> Vec3 = func a -> b => return $Vec3 {
+func Vec3.dot (a: Vec3) -> (b: Vec3): F32 => return a.x * b.x + a.y * b.y + a.z * b.z
+func Vec3.cross (a: Vec3) -> (b: Vec3): Vec3 => return $Vec3 {
   x: a.y * b.z - a.z * b.y,
   y: a.z * b.x - a.x * b.z,
   z: a.x * b.y - a.y * b.x,
 }
-const Vec3.length_squared = func value => return Vec3.dot value value
-const Vec3.length = func value => return sqrt (Vec3.length_squared value)
-const Vec3.normalized = func value => return do:
+func Vec3.length_squared value => return Vec3.dot value value
+func Vec3.length value => return sqrt (Vec3.length_squared value)
+func Vec3.normalized value => return do:
   let length = Vec3.length value
   break if length == 0.0 then value else value / length

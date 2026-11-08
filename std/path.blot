@@ -5,22 +5,22 @@ type Path [source, target, focus, replacement] is data = $Path {
   write: replacement -> source -> target,
 }
 
-const make = func read -> write => return $Path { read, write }
+func make read -> write => return $Path { read, write }
 const identity = make (func value => return value) (func replacement -> _ => return replacement)
 
-const get = func path -> source => return do:
+func get path -> source => return do:
   let $Path { read, write: _ } = path
   break read source
 
-const set = func path -> replacement -> source => return do:
+func set path -> replacement -> source => return do:
   let $Path { read: _, write } = path
   break write replacement source
 
-const modify = func path -> transform -> source => return do:
+func modify path -> transform -> source => return do:
   let $Path { read, write } = path
   break write (transform (read source)) source
 
-const compose = func outer -> inner => return do:
+func compose outer -> inner => return do:
   let $Path { read: read_outer, write: write_outer } = outer
   let $Path { read: read_inner, write: write_inner } = inner
   break make

@@ -9678,7 +9678,25 @@ const Engine = struct {
     }
     fn beginQualification(self: *Engine, scope: ast.Id, where_node: ast.Id, annotation_node: ast.Id, value: ast.Id) T.Error!void {
         if (where_node == 0) return;
-        if (annotation_node == 0) try self.diagnostic(.invalid_constraint, where_node);
+        if (annotation_node == 0) {
+            // A named header carries its written signature on the curried
+            // lambda chain instead of a separate value annotation.
+            var annotated = false;
+            if (self.tree.node(scope).tag == .value_decl and self.tree.valueDecl(scope).function_declaration) {
+                var body = value;
+                while (self.tree.node(body).tag == .lambda) {
+                    const lambda_node = self.tree.node(body);
+                    const parameter = self.tree.parameter(lambda_node.a);
+                    if (!parameter.is_unit and parameter.annotation == 0) break;
+                    if (lambda_node.c != 0) {
+                        annotated = true;
+                        break;
+                    }
+                    body = lambda_node.b;
+                }
+            }
+            if (!annotated) try self.diagnostic(.invalid_constraint, where_node);
+        }
         const node = self.tree.node(where_node);
         const start: u32 = @intCast(self.declared_obligations.items.len);
         var predicates: std.ArrayList(T.Obligation) = .empty;

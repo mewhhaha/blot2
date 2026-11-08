@@ -1,0 +1,498 @@
+{
+  "date": "2026-11-08",
+  "scope": "Named module function source migration; remaining RFC 46 stages are pending",
+  "checkpoints": {
+    "pen": "4dedcf886b40c8ca3b66292195dd8b1d7d6392ff",
+    "ink": "ad3ebae3238ed865f9a78ec8e4635061594b7d87",
+    "gdev": "9f4358c3bcd315f43c4a5a621b6bff96ac1666c2"
+  },
+  "zig": "0.17.0",
+  "source_census": {
+    "std": {
+      "files": 13,
+      "named_module_functions": 353,
+      "old_module_const_lambdas": 0,
+      "source_digest": "363884fb0bb1e3e1b547a3b534f859f5678a5f35378ace7fa4fd317ee1242d01",
+      "base_commit": "852918210472d4964aade1bc6b088c3c7193a31a"
+    },
+    "ink": {
+      "files": 325,
+      "named_module_functions": 3506,
+      "old_module_const_lambdas": 0,
+      "source_digest": "1289568d9236eb3a13a2cb63a23556cd4cc17a3e6d84189789e3419985dd294b",
+      "base_commit": "06156a322b43e8ea04c6f6c69b99d893b6a04807"
+    },
+    "gdev": {
+      "files": 444,
+      "named_module_functions": 5105,
+      "old_module_const_lambdas": 0,
+      "source_digest": "62e708c5a33aec708ebe0e6a797f1ae682ed7a92455e047f7c7075351c158f6b",
+      "base_commit": "6aa5d97484d4b9f7386f4eb64d2492369e307a7b"
+    }
+  },
+  "preserved": [
+    "ABI 8",
+    "session protocol 2",
+    "Gdev saved framing schema 26",
+    "numeric tables and assets",
+    "ordinary function values, aliases, local closures and impl members"
+  ],
+  "language_changes": [
+    "qualified named module declarations reuse existing static member identities",
+    "declaration where clauses preserve fully written principal parameter/result types",
+    "Goose parser/checker sources mirror Zig; whole Goose compiler remains unqualified"
+  ],
+  "generated_sources": {
+    "pen_and_ink_modules": 28,
+    "named_functions_in_those_modules": 276,
+    "gdev_asset_modules": 9,
+    "generation": "Actual changed emitters regenerate outputs; source-only font generation reads committed numeric atlas inputs",
+    "public_codec_helpers": "lowercase snake_case; all call sites migrated",
+    "pen_unit_tests": 10,
+    "suite_discovery_tests": 8,
+    "ink_generator_laws": 2,
+    "freshness": "Both Pen targets and all six Ink jobs pass"
+  },
+  "frontend_api_inventory": {
+    "mode": "Original entries demoted and scalar probe emitted; not original export/runtime qualification",
+    "total_files": 782,
+    "passed": 776,
+    "expected_rejections": 6,
+    "unexpected_failures": 0,
+    "std": {
+      "passed": 13,
+      "milliseconds": 172.51583,
+      "compiler_identity": "6bf307babad85488f6f73e1c8d833eae6af3dd2fa660dfd839ff2cb71623e779"
+    },
+    "ink": {
+      "passed": 322,
+      "expected_rejections": 3,
+      "build_batches": 14,
+      "batch_milliseconds": 13509.194219999998,
+      "compiler_identity": "234d1cdb47bfe6ce172c9cd45cd33f5a38d561d4f057355f5d0b7ff07aad8a8a"
+    },
+    "gdev": {
+      "complete": true,
+      "passed": 441,
+      "expectedRejections": 3,
+      "unexpectedFailures": 0,
+      "compilerGroups": {
+        "d1b707785acc209eedee25188a1ab4537e99276a85fdd3fbdc4d73eecc94f536": {
+          "passed": 288,
+          "expectedRejections": 0,
+          "unexpectedFailures": 0,
+          "reports": [
+            "build/named-source-migration/gdev-batched-audit.json"
+          ]
+        },
+        "ad7e22f4cd8e1ef32a0c0f49568840f7df1ea9d6e49d4c1c4b221101ed1480f0": {
+          "passed": 153,
+          "expectedRejections": 3,
+          "unexpectedFailures": 0,
+          "reports": [
+            "build/named-source-migration/gdev-remainder-01.json",
+            "build/named-source-migration/gdev-remainder-02.json",
+            "build/named-source-migration/gdev-remainder-03.json",
+            "build/named-source-migration/gdev-remainder-04.json",
+            "build/named-source-migration/gdev-remainder-05.json"
+          ]
+        }
+      },
+      "note": "Original report and remainder reports have separate compiler identities; no single-binary qualification is claimed.",
+      "classificationNote": "Three raw failed singleton outcomes in gdev-remainder-03.json match manifest filename, stage and code exactly and are classified expected-rejection here. Raw reports are unchanged."
+    },
+    "gdev_limit": "288 safe-build cases and 156 fast-build cases share frozen source, with separate binary identities; no single-binary whole-runtime claim"
+  },
+  "development": {
+    "report": {
+      "path": "build/bench/named-source-migration-dev/run-2a57131480494dbc/results.json",
+      "sha256": "26d46e19fb77195f419220931035fa7f9406a47d75331bd5c4e187c9ea3c73a8"
+    },
+    "success": true,
+    "seconds": 17.61847532,
+    "compiled_native_laws": 2974,
+    "selected_native_laws": 17,
+    "guest_host_checks": 34,
+    "compiler_sha256": "d85d9777708d270eaba26423a236b899f95948722cc8bacd4f30bbd4588944b3",
+    "native_binary_sha256": "9d1e5f63d643fe6e0dc53293f12f07733a896e01e52028bd248ea4cda6be55ca"
+  },
+  "affected_native_full_allocation_failures": {
+    "binary": "/home/jacobt/src/blot2/compiler/zig-out-native-dev/bin/blot-tests",
+    "binary_sha256": "9d1e5f63d643fe6e0dc53293f12f07733a896e01e52028bd248ea4cda6be55ca",
+    "family": "build/bench/named-source-migration-dev/run-2a57131480494dbc/results.json",
+    "family_sha256": "26d46e19fb77195f419220931035fa7f9406a47d75331bd5c4e187c9ea3c73a8",
+    "command": [
+      "compiler/zig-out-native-dev/bin/blot-tests",
+      "--allocation-failures=full",
+      "--test=parse.parser_tests.test.named function declarations share curried lambda IR and preserve local entry private and tag metadata",
+      "--test=parse.parser_tests.test.named function declarations release parameter and attribute scratch through allocation failures",
+      "--test=parse.parser_tests.test.qualified named headers preserve declaration predicates and final result effects through allocation failures",
+      "--test=parse.parser_tests.test.local named functions do not consume anonymous function expression statements",
+      "--test=parse.parser_tests.test.named functions retain return parameter and identifier diagnostics and recover later declarations",
+      "--test=check.check_result_tests.test.named module functions preserve principal inference recursion and ordinary function values",
+      "--test=check.check_result_tests.test.qualified named functions and written predicates preserve ordinary value controls through OOM",
+      "--test=check.check_result_tests.test.named declaration predicates require a complete written signature and reject missing coverage",
+      "--test=check.check_result_tests.test.named function tags preserve every dispatch parameter and written result while allowing new effects through OOM",
+      "--test=parse.lexer_tests.test.flat tokens preserve longest matches and source byte spans",
+      "--test=eval.core_eval_tests.test.selected contract source interfaces do not evaluate method constant dependencies",
+      "--test=parse.parser_tests.test.functions require explicit return and reject whitespace separated parameters",
+      "--test=check.check_result_tests.test.explicit function returns cover every path without borrowing nested function or block exits through OOM",
+      "--test=parse.parser_tests.test.multi-parameter lambda sugar lowers to a curried chain with the result on the final stage",
+      "--test=parse.parser_tests.test.long curried parameter lists release fallback storage through allocation faults",
+      "--test=parse.parser_tests.test.return exits a function while break value finishes a do and bare break exits a loop",
+      "--test=parse.parser_tests.test.dollar constructors and run staging preserve list arrays and spaced dollar application through OOM"
+    ],
+    "seconds": 9.249299275004887,
+    "exit_code": 0,
+    "expected_tests": [
+      "parse.parser_tests.test.named function declarations share curried lambda IR and preserve local entry private and tag metadata",
+      "parse.parser_tests.test.named function declarations release parameter and attribute scratch through allocation failures",
+      "parse.parser_tests.test.qualified named headers preserve declaration predicates and final result effects through allocation failures",
+      "parse.parser_tests.test.local named functions do not consume anonymous function expression statements",
+      "parse.parser_tests.test.named functions retain return parameter and identifier diagnostics and recover later declarations",
+      "check.check_result_tests.test.named module functions preserve principal inference recursion and ordinary function values",
+      "check.check_result_tests.test.qualified named functions and written predicates preserve ordinary value controls through OOM",
+      "check.check_result_tests.test.named declaration predicates require a complete written signature and reject missing coverage",
+      "check.check_result_tests.test.named function tags preserve every dispatch parameter and written result while allowing new effects through OOM",
+      "parse.lexer_tests.test.flat tokens preserve longest matches and source byte spans",
+      "eval.core_eval_tests.test.selected contract source interfaces do not evaluate method constant dependencies",
+      "parse.parser_tests.test.functions require explicit return and reject whitespace separated parameters",
+      "check.check_result_tests.test.explicit function returns cover every path without borrowing nested function or block exits through OOM",
+      "parse.parser_tests.test.multi-parameter lambda sugar lowers to a curried chain with the result on the final stage",
+      "parse.parser_tests.test.long curried parameter lists release fallback storage through allocation faults",
+      "parse.parser_tests.test.return exits a function while break value finishes a do and bare break exits a loop",
+      "parse.parser_tests.test.dollar constructors and run staging preserve list arrays and spaced dollar application through OOM"
+    ],
+    "results": [
+      {
+        "name": "eval.core_eval_tests.test.selected contract source interfaces do not evaluate method constant dependencies",
+        "duration_ns": 81544951,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_result_tests.test.explicit function returns cover every path without borrowing nested function or block exits through OOM",
+        "duration_ns": 1766418415,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_result_tests.test.named module functions preserve principal inference recursion and ordinary function values",
+        "duration_ns": 1376543,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_result_tests.test.named function tags preserve every dispatch parameter and written result while allowing new effects through OOM",
+        "duration_ns": 5098649890,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_result_tests.test.qualified named functions and written predicates preserve ordinary value controls through OOM",
+        "duration_ns": 1989000422,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_result_tests.test.named declaration predicates require a complete written signature and reject missing coverage",
+        "duration_ns": 1094325,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.lexer_tests.test.flat tokens preserve longest matches and source byte spans",
+        "duration_ns": 89501,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.dollar constructors and run staging preserve list arrays and spaced dollar application through OOM",
+        "duration_ns": 6973556,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.multi-parameter lambda sugar lowers to a curried chain with the result on the final stage",
+        "duration_ns": 79351,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.functions require explicit return and reject whitespace separated parameters",
+        "duration_ns": 297096,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.long curried parameter lists release fallback storage through allocation faults",
+        "duration_ns": 834229,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.return exits a function while break value finishes a do and bare break exits a loop",
+        "duration_ns": 101253,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.named function declarations share curried lambda IR and preserve local entry private and tag metadata",
+        "duration_ns": 184592,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.named function declarations release parameter and attribute scratch through allocation failures",
+        "duration_ns": 3245523,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.local named functions do not consume anonymous function expression statements",
+        "duration_ns": 80884,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.named functions retain return parameter and identifier diagnostics and recover later declarations",
+        "duration_ns": 295503,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.qualified named headers preserve declaration predicates and final result effects through allocation failures",
+        "duration_ns": 2576719,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      }
+    ],
+    "success": true
+  },
+  "host_and_editor": {
+    "passed": 39,
+    "ignored": 1,
+    "ignored_test": "formatter preserves source and forwarded opaque project Wasm identical (optional compiler fixture)",
+    "note": "38 passed in combined run; its audit integration test initially lacked --allow-run and passed when rerun with required permissions",
+    "editor": "10 corpus cases, 18 highlight fixtures and four public examples pass",
+    "derive_renderer": "qualified Eq and generic Codec generated headers parse; impl members stay values"
+  },
+  "executed_wasm": {
+    "named_function_laws_passed": 6,
+    "stdlib_laws_passed": 8,
+    "restoration_tests_passed": 2,
+    "restoration": "Original development/optimized tests include sync/JSPI conversions, malformed inputs and recovery",
+    "compiler_sha256": "945b20501860ed5b85d4f27fbac8a4624398fe22dbc48f98be9003c6ea05dd05",
+    "codegen_backend": "native fast development compiler",
+    "existing_gaps": [
+      {
+        "law": "first stdlib scan/compaction law",
+        "diagnostic": "emit/storage_unsupported at 922..978",
+        "same_original_and_migrated": true
+      },
+      {
+        "law": "Ink codec full original export module",
+        "diagnostic": "emit/storage_unsupported at 0..0",
+        "control": "Original 325 Ink plus 13 std overlays match migrated diagnostic; see raw bundle"
+      }
+    ]
+  },
+  "goose": {
+    "parser_engine_seconds": 2.302,
+    "whole_graph_parse": "36950 top-level declarations,440files",
+    "whole_compiler_executable": false,
+    "mirrored_checker_semantics": "unqualified"
+  },
+  "full_gate": {
+    "report": {
+      "path": "build/bench/named-source-migration-full/timings.json",
+      "sha256": "813cef01e64540d92cdb93967f027521df95bcfe21a53726e51b225249c288d6"
+    },
+    "success": false,
+    "seconds": 145.61574363900002,
+    "phases": [
+      {
+        "name": "smoke-build",
+        "code": 0,
+        "wall_seconds": 0.5118076730000001
+      },
+      {
+        "name": "smoke",
+        "code": 0,
+        "wall_seconds": 2.769483131
+      },
+      {
+        "name": "harness",
+        "code": 0,
+        "wall_seconds": 21.814773132000003
+      },
+      {
+        "name": "native-compile",
+        "code": 0,
+        "wall_seconds": 10.057954804000001
+      },
+      {
+        "name": "release-build",
+        "code": 124,
+        "wall_seconds": 120.255586229
+      },
+      {
+        "name": "native-run",
+        "code": 130,
+        "wall_seconds": 107.52341018000001
+      }
+    ],
+    "reason": "LLVM release-build exceeded 120s and native sibling execution was cancelled; no full pass"
+  },
+  "actual_gdev_main": {
+    "success": false,
+    "status": "timeout_incomplete",
+    "total_ms": 30003.329063,
+    "cap_ms": 30000,
+    "compiler_sha256": "945b20501860ed5b85d4f27fbac8a4624398fe22dbc48f98be9003c6ea05dd05",
+    "fresh_png": false,
+    "new_release_artifact": false
+  },
+  "raw_evidence": {
+    "path": "benchmarks/evidence/qualification/2026-11-08-named-source-migration.raw.json.gz",
+    "sha256": "8eeb7d5a1b0ca3e15e41d780f6e4542d0b84848888064e889687c136549f19d2"
+  },
+  "qualifies_release": false,
+  "performance_claim": null
+}

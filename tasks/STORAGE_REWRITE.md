@@ -3,6 +3,11 @@
 Current priority: implement language [RFC #46](https://github.com/mewhhaha/blot2/issues/46)
 in Zig first, then mirror the checked behavior in Goose. Track the complete
 target and pending stages in [the language migration](../docs/language/NEXT_MIGRATION.md).
+The named-function source migration covers std, Ink and Gdev: 8,964 functions
+across 782 source files, with 776 frontend/API passes and six expected rejections.
+See [the qualified scope](../benchmarks/evidence/qualification/2026-11-08-named-source-migration.json).
+This completes the named-function migration; the remaining RFC stages and full
+release/Main qualification are pending.
 The Goose compiler remains an experiment; isolated parser checks do not qualify
 the whole port. Preserve the original pinned Zig oracle for old-language work.
 

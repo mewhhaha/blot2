@@ -822,19 +822,23 @@ const Parser = struct {
     fn functionDeclaration(self: *Parser, attributes: ast.List, start: u32, modifier: symbols.Symbol, flags: u32) Error!Id {
         const function_start = (try self.expect(.kw_func)).start;
         const name_point = self.current().start;
-        const name = try self.lowerIdentifier();
+        const name_token = self.current();
+        if (name_token.tag == .kw_true or name_token.tag == .kw_false) return self.identifierSyntaxAt(name_token);
+        const name = try self.qualified();
+        if (name_token.tag == .type_identifier and self.tokens[self.index - 1].start == name_token.start) return self.identifierSyntaxAt(name_token);
         try self.enter();
         defer self.depth -= 1;
-        const body = try self.lambdaTail(function_start);
-        const declaration_id = try self.add(.value_decl, name, body, try self.extra(&.{ 0, modifier, 0, 0, 0, attributes.start, attributes.len, flags | 2, 0 }), start);
+        var constraints: Where = .{};
+        const body = try self.lambdaTail(function_start, &constraints);
+        const declaration_id = try self.add(.value_decl, name, body, try self.extra(&.{ 0, modifier, 0, constraints.predicates.start, constraints.predicates.len, attributes.start, attributes.len, flags | 2, constraints.node }), start);
         try self.tree.constant_names.append(self.allocator, .{ .declaration = declaration_id, .point = name_point });
         return declaration_id;
     }
     fn lambda(self: *Parser) Error!Id {
         const start = (try self.expect(.kw_func)).start;
-        return self.lambdaTail(start);
+        return self.lambdaTail(start, null);
     }
-    fn lambdaTail(self: *Parser, start: u32) Error!Id {
+    fn lambdaTail(self: *Parser, start: u32, declaration_where: ?*Where) Error!Id {
         const Parameter = struct { node: Id, pattern: Id, name: symbols.Symbol, start: u32 };
         var fixed: [8]Parameter = undefined;
         var overflow: std.ArrayList(Parameter) = .empty;
@@ -874,6 +878,7 @@ const Parser = struct {
             if (count >= 256) return self.fail(.nesting_limit);
         }
         const result = if (self.eat(.colon)) try self.typeExpression() else 0;
+        if (declaration_where) |constraints| constraints.* = try self.whereClause();
         _ = try self.expect(.fat_arrow);
         const returned = self.eat(.kw_return);
         if (!returned and !self.at(.kw_do)) return self.fail(.function_return_required);

@@ -54,6 +54,7 @@
 (named_function_header parameter: (identifier) @variable.parameter)
 (named_function_header parameter: (parenthesized (identifier) @variable.parameter))
 (qualified_function_name name: (identifier) @function)
+(qualified_function_name owner: (identifier) @namespace)
 (infix_function "`" @operator)
 (infix_function name: (identifier) @function)
 (infix_function qualifier: (identifier) @namespace)

@@ -558,15 +558,17 @@ recursive fn expression(p: Parser&,source: const u8[:],tokens: const Token[:]) -
  { p.depth--; } }
 recursive fn function_declaration(p:Parser&,source:const u8[:],tokens:const Token[:],attributes:List,start:u32,modifier:Symbol,flags:u32)->Id {
  let function_start=expect(p,source,tokens,t_kw_func).start;if p.failure!=blot_error::Error.none {return 0;}
- let name_point=current(p,source,tokens).start;let name=lower_identifier(p,source,tokens);if p.failure!=blot_error::Error.none {return 0;}
- if !enter(p,source,tokens) {return 0;}let body=lambda_tail(p,source,tokens,function_start);p.depth--;if p.failure!=blot_error::Error.none {return 0;}
- let declaration_id=add(p,source,tokens,a_value_decl,name,body,extra(p,source,tokens,[0 as u32,modifier,0,0,0,attributes.start,attributes.len,flags|2,0]),start);if p.failure!=blot_error::Error.none {return 0;}
+ let name_token=current(p,source,tokens);if name_token.tag==t_kw_true||name_token.tag==t_kw_false {return identifier_syntax_at(p,name_token);}
+ let name_point=name_token.start;let name=qualified(p,source,tokens);if p.failure!=blot_error::Error.none {return 0;}
+ if name_token.tag==t_type_identifier&&tokens[p.index-1].start==name_token.start {return identifier_syntax_at(p,name_token);}
+ var constraints=Where {};if !enter(p,source,tokens) {return 0;}let body=lambda_tail(p,source,tokens,function_start,true,constraints);p.depth--;if p.failure!=blot_error::Error.none {return 0;}
+ let declaration_id=add(p,source,tokens,a_value_decl,name,body,extra(p,source,tokens,[0 as u32,modifier,0,constraints.predicates.start,constraints.predicates.len,attributes.start,attributes.len,flags|2,constraints.node]),start);if p.failure!=blot_error::Error.none {return 0;}
  p.tree.constant_names.push(blot_parse_ast::RuntimeName{declaration_id,name_point});return declaration_id;
 }
 recursive fn lambda(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
- let start=expect(p,source,tokens,t_kw_func).start;if p.failure!=blot_error::Error.none {return 0;}return lambda_tail(p,source,tokens,start);
+ let start=expect(p,source,tokens,t_kw_func).start;if p.failure!=blot_error::Error.none {return 0;}var constraints=Where {};return lambda_tail(p,source,tokens,start,false,constraints);
 }
-recursive fn lambda_tail(p:Parser&,source:const u8[:],tokens:const Token[:],start:u32)->Id {
+recursive fn lambda_tail(p:Parser&,source:const u8[:],tokens:const Token[:],start:u32,declaration:bool,declaration_where:Where&)->Id {
  var parameters=ScratchLambdaParameterBuffer {};
  while p.failure==blot_error::Error.none {
   let point=current(p,source,tokens).start; var unit=false; var name: Symbol=0; var annotation: Id=0; var constraints=Where {}; var pattern_parameter: Id=0;
@@ -580,7 +582,7 @@ recursive fn lambda_tail(p:Parser&,source:const u8[:],tokens:const Token[:],star
   if p.failure!=blot_error::Error.none { let __cleanup_result_38_0: Id = 0; parameters.deinit(); return __cleanup_result_38_0; } if pattern_parameter!=0 { p.tree.extra.items[p.tree.node(parameter).c]|=4; }
   parameters.push(LambdaParameter {parameter,pattern_parameter,name,point}); if !eat(p,source,tokens,t_arrow) { break; } if parameters.len>=256 { let __cleanup_result_39_0: Id = fail(p,source,tokens,c_nesting_limit); parameters.deinit(); return __cleanup_result_39_0; }
  }
- var result: Id=0; if eat(p,source,tokens,t_colon) { result=type_expression(p,source,tokens); } expect(p,source,tokens,t_fat_arrow); let returned=eat(p,source,tokens,t_kw_return);
+ var result: Id=0; if eat(p,source,tokens,t_colon) { result=type_expression(p,source,tokens); } if declaration { declaration_where=where_clause(p,source,tokens); } expect(p,source,tokens,t_fat_arrow); let returned=eat(p,source,tokens,t_kw_return);
  if !returned&&!at(p,source,tokens,t_kw_do) { let __cleanup_result_40_0: Id = fail(p,source,tokens,c_function_return_required); parameters.deinit(); return __cleanup_result_40_0; } var body=expression(p,source,tokens); if p.failure!=blot_error::Error.none { let __cleanup_result_41_0: Id = 0; parameters.deinit(); return __cleanup_result_41_0; }
  if !returned { p.tree.extra.items[p.tree.node(parameters.items[parameters.len-1].node).c]|=2; }
  var index=parameters.len;

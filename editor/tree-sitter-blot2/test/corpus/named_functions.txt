@@ -48,3 +48,54 @@ private entry func answer () => do:
   (operator)
   (keyword)
   (identifier))
+
+==================
+Qualified module functions and declaration constraints
+==================
+
+func Vec3.add (left: Vec3) -> (right: Vec3): Vec3 => return left
+func eq (left: a) -> (right: a): Bool where {Eq a} => return Eq.eq left right
+
+---
+
+(source_file
+  (named_function_header
+    (qualified_function_name
+      (type_identifier)
+      (identifier))
+    (parenthesized
+      (identifier)
+      (separator)
+      (type_identifier))
+    (parenthesized
+      (identifier)
+      (separator)
+      (type_identifier)))
+  (separator)
+  (type_identifier)
+  (operator)
+  (keyword)
+  (identifier)
+  (named_function_header
+    (identifier)
+    (parenthesized
+      (identifier)
+      (separator)
+      (identifier))
+    (parenthesized
+      (identifier)
+      (separator)
+      (identifier)))
+  (separator)
+  (type_identifier)
+  (where_clause
+    (braced
+      (type_identifier)
+      (identifier)))
+  (operator)
+  (keyword)
+  (type_identifier)
+  (member
+    (identifier))
+  (identifier)
+  (identifier))

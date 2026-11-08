@@ -4,7 +4,7 @@ type Codec a is contract = {
   const encode: a -> Array U32,
   const decode: Array U32 -> Maybe a,
 }
-const encode: a -> Array U32 where { Codec a } = func value => return Codec.encode value
+func encode (value: a): Array U32 where { Codec a } => return Codec.encode value
 
 impl Unsigned : Codec U32 = {
   const encode = func value => return #[value],
@@ -21,7 +21,7 @@ impl Boolean : Codec Bool = {
 }
 
 // Each array element is length-framed so a nested codec can have any width.
-const sequence_encode: Array a -> Array U32 where { Codec a } = func values => return do:
+func sequence_encode (values: Array a): Array U32 where { Codec a } => return do:
   let out: List U32 = [values.length]
   for value in values:
     let payload = encode value
@@ -29,7 +29,7 @@ const sequence_encode: Array a -> Array U32 where { Codec a } = func values => r
     for word in payload:
       out := [...self, word]
   break Array.from_list out
-const sequence_decode: Array U32 -> Maybe (Array a) where { Codec a } = func words => return do:
+func sequence_decode (words: Array U32): Maybe (Array a) where { Codec a } => return do:
   if words.length == 0:
     return $Nothing
   let count = words[0]
@@ -57,9 +57,9 @@ impl Sequence a : Codec (Array a) where { Codec a } = {
 }
 
 // Field framing is deliberately separate from a source declaration's order.
-const frame = func (field_id: U32) -> (payload: Array U32) : Array U32 => return
+func frame (field_id: U32) -> (payload: Array U32) : Array U32 => return
   @array.concat #[field_id, payload.length] payload
-const take_field = func (field_id: U32) -> (words: Array U32) : Maybe (Array U32, Array U32) => return do:
+func take_field (field_id: U32) -> (words: Array U32) : Maybe (Array U32, Array U32) => return do:
   if words.length < 2 or words[0] != field_id:
     return $Nothing
   let width = words[1]

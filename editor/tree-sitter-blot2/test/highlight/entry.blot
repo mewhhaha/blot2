@@ -33,3 +33,15 @@ entry constancy
 "entry const answer = 42"
 // ^ string
 // ^ !keyword.storage.modifier
+
+func Vec3.add (left: Vec3) -> (right: Vec3): Vec3 => return left
+// <- keyword.function
+//        ^^^ function
+
+func eq (left: a) -> (right: a): Bool where {Eq a} => return Eq.eq left right
+//   ^^ function
+//                                   ^^^^^ keyword.control
+
+func namespace.member value => return value
+//   ^^^^^^^^^ namespace
+//             ^^^^^^ function

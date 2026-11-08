@@ -146,6 +146,7 @@ export type LiteralKind =
   | "func"
   | "->"
   | "return"
+  | "."
   | "effect"
   | "data"
   | "|"
@@ -159,7 +160,6 @@ export type LiteralKind =
   | "^"
   | ")"
   | "`"
-  | "."
   | "!"
   | "wherE"
   | "code"
@@ -281,6 +281,7 @@ export type RuleName =
   | "value_declaration"
   | "named_function_declaration"
   | "named_function"
+  | "function_name"
   | "effect_declaration"
   | "effect_type"
   | "effect_signature"
@@ -575,11 +576,19 @@ export interface NamedFunctionDeclarationCursor extends RuleCursorBase<"named_fu
 
 export interface NamedFunctionCursor extends RuleCursorBase<"named_function"> {
   field(name: "body"): DoBlockCursor | ExpressionCursor;
-  field(name: "name"): SourceIdentifierCursor;
+  field(name: "name"): FunctionNameCursor;
   field(name: "parameter"): ReadonlyArray<ParameterCursor>;
   field(name: "result"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
+  field(name: "where"): WhereClauseCursor | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: "parameter"): ReadonlyArray<ParameterCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface FunctionNameCursor extends RuleCursorBase<"function_name"> {
+  field(name: "rest"): ReadonlyArray<readonly [TokenCursor<"literal", ".">, TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor]>;
+  field(name: "root"): TokenCursor<"named", "TYPE_IDENT"> | SourceIdentifierCursor;
+  field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
@@ -1407,6 +1416,7 @@ export type AnyRuleCursor =
   | ValueDeclarationCursor
   | NamedFunctionDeclarationCursor
   | NamedFunctionCursor
+  | FunctionNameCursor
   | EffectDeclarationCursor
   | EffectTypeCursor
   | EffectSignatureCursor

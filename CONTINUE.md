@@ -3,51 +3,56 @@
 ## Current frontier
 
 Implement [RFC #46](https://github.com/mewhhaha/blot2/issues/46) in Zig first,
-then mirror checked behavior in Goose. The complete target and remaining stages
-are in [the migration index](docs/language/NEXT_MIGRATION.md). The latest RFC
-requires immutable collections with automatic admitted copies/last-use moves;
-the current compiler still implements named-owner alias writes.
+then mirror checked behavior in Goose. The remaining stages are in
+[the migration index](docs/language/NEXT_MIGRATION.md). Immutable collections,
+automatic admitted copies, overloads, parameterized namespaces and staged scopes
+remain pending; named-owner writes still describe the current memory model.
 
-The first batch adds named **module** `func` declarations using the existing
-lambda/checker/Core path. Curried calls, partial applications, entries,
-private imports, forward references, recursion and whole-function tags execute.
-Tags must preserve every dispatch parameter and written result type, while
-allowing different inferred effects. Ordinary value tags retain their behavior.
-The host formatter/parser and Tree-sitter grammar follow the same spelling.
-There is one declaration per name: overloads, namespace ownership, richer
-parameter clauses and local hoisting are pending. Local declarations parse but
-are not semantically implemented; do not count parser acceptance as support.
-The owner's question about removing local hoisting remains unanswered, so it
-has not been removed from the target.
+The named-function source migration is complete across **782 Blot files**:
+**353 std / 3,506 Ink / 5,105 Gdev module functions** now use named declarations.
+No module `const name = func` definitions remain in those trees. Genuine
+function aliases, local closures and implementation value members remain.
+Qualified declarations reuse existing member identities; declaration `where`
+clauses preserve complete written parameter/result signatures. Tags, entries,
+privacy, recursion and currying keep their checked behavior. Updated emitters
+regenerate Pen bindings, codecs, behavior/dataflow and text/font/rock helpers.
+Codec helper names are lowercase snake_case, including their callers. Assets,
+numeric tables, packet order, ABI 8/session 2 and saved schema 26 are unchanged.
 
-All **2,971 native laws compile without LLVM**. The development family passes
-**14 native / 31 guest-host checks in 22.55s**; all 14 selected native laws also
-pass exhaustive allocation failures in 7.16s. Five final named-function guest
-laws pass against the native-backend fast compiler. Goose mirrors the parser
-and tag check: its parser engine executes in 2.40s, and the complete import graph
-parses. The mirrored checker has not been semantically qualified.
+All **2,974 native laws compile without LLVM**. The development family passes
+**17 native / 32 guest-host checks in 17.62s**; all 17 selected laws also pass
+exhaustive allocation failures in **9.25s**. Host/tooling checks pass 39 laws
+with one optional compiler-fixture skip; editor/generator/freshness checks pass.
+Six named-function and eight stdlib executed-Wasm laws pass, as do both original
+Gdev restoration tests across tiers and sync/JSPI. Existing stdlib and full Ink
+codec emission gaps reproduce identically with original source overlays.
+
+The complete frontend/API inventory covers **776 passes + six exact expected
+rejections**, with zero unexpected failures. Standard-library coverage is 13
+files; Ink is 322 + three; Gdev is 441 + three. Gdev's first 288 files use the
+safe native compiler, its remaining 156 the fast native build. Both identities
+and the unchanged source digest are pinned; this is not single-binary runtime
+qualification. Batched imports reduce repeated auditing; failures bisect to
+singletons, and interrupted batches remain unqualified.
 
 The final full gate is **incomplete**: LLVM release compilation hit its 120s
-phase cap and cancelled native execution. The cache prune needed to recover
-space also exposed stale Options manifests; those were invalidated and a real
-list fixture rebuilt successfully. Do not keep rerunning LLVM per edit.
-Gdev compilation with the fast native-backend candidate hit its 15s cap; no
-fresh frame or release performance claim is made. Qualification details and
-identities are in [the batch evidence](benchmarks/evidence/qualification/2026-11-08-named-functions.json).
+phase cap and cancelled native execution. Actual Main hits its 30s cap with the
+fast native-backend compiler; no fresh Wasm or PNG exists. Do not repeat long
+release builds per edit. The pre-existing default release executable is an older
+candidate; use the explicitly identified development compiler for these checks.
+Full original-export, release and Main/frame qualification remain pending.
+See [the exact batch evidence and compressed raw reports](benchmarks/evidence/qualification/2026-11-08-named-source-migration.json).
 
-The Goose port remains source-only: no whole compiler C/header/executable or
-end-to-end parity result exists. Preserve the original pinned Zig oracle and
-sibling sources/assets; the new Zig language candidate is a separate identity.
-The previous Goose repair frontier remains `LegacyProof.resolve`'s
-`withImporter` callback lifetime. Four production entry paths pass their older
-combined partial check on 34f7a396, not the current mirrored checker. Before
-further callback rewrites, expose the original `StoreEvent.at` location at
-`ApplyCalleeStores`; keep the call location primary.
-
-Use `python3 compiler-goose/tools/check_engines.py` for concrete production
-paths in a bounded batch. This is explicitly partial and emits no compiler.
-Repair whole families, validate once per batch, and avoid per-edit synthetic
-fixtures. Use Astra only for a specific snag; never Terra.
+Goose mirrors the new parser/checker rules. Its parser engine passes in 2.30s
+and the full import graph parses, but no whole compiler executable or semantic
+qualification exists. Preserve the original pinned Zig oracle for old-language
+comparisons. The previous whole-port frontier remains `LegacyProof.resolve`'s
+`withImporter` callback lifetime. Its four production entry-path checks qualify
+34f7a396, not the current mirrored checker. Expose `StoreEvent.at` at
+`ApplyCalleeStores` before more callback rewrites; keep the call location primary.
+Use coherent bounded families, not per-edit synthetic fixtures. Astra is for a
+specific snag; never Terra. Local named-function hoisting remains pending and
+has not been cut from the RFC.
 
 The normal private checker is `0c235f03...`: exported roots first, nominal
 identity/reference reachability, lazy overload diagnostics, visited-type buckets,

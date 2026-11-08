@@ -37,6 +37,31 @@ entry func answer ()=> do:
   equal(await formatSource(source.replaceAll("\n", "\r\n")), formatted);
 });
 
+Deno.test("formatter preserves qualified function names and declaration constraints", async () => {
+  const source = `func Vec3.add (left:Vec3)->(right:Vec3):Vec3=> return left
+func eq (left:a)->(right:a):Bool where{Eq a}=> return Eq.eq left right
+func keep value where{Eq a}=> return value
+`;
+  const formatted = await formatSource(source);
+  equal(
+    formatted.includes(
+      "func Vec3.add (left: Vec3) -> (right: Vec3): Vec3 => return left",
+    ),
+    true,
+  );
+  equal(
+    formatted.includes(
+      "func eq (left: a) -> (right: a): Bool where { Eq a } => return Eq.eq left right",
+    ),
+    true,
+  );
+  equal(
+    formatted.includes("func keep value where { Eq a } => return value"),
+    true,
+  );
+  equal(await formatSource(formatted), formatted);
+});
+
 Deno.test("formatter preserves spark and receive boundaries", async () => {
   const source =
     `entry const sparked = func () => return @task.scope (func group => return do:

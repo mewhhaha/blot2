@@ -890,8 +890,9 @@ test "named functions retain return parameter and identifier diagnostics and rec
         "func missing (value: U32) => value\n",
         "func missing => return 1\n",
         "func Name value => return value\n",
-        "func namespace.member value => return value\n",
+        "func Namespace. => return 1\n",
         "func spaced first second => return first\n",
+        "const identity where { type_rep a } = func (value: a): a => return value\n",
         "entry private func hidden value => return value\n",
     }) |invalid| {
         const source = try std.mem.concat(std.testing.allocator, u8, &.{ invalid, "func later value => return value\n" });
@@ -905,4 +906,44 @@ test "named functions retain return parameter and identifier diagnostics and rec
         try std.testing.expectEqualStrings("later", pool.get(tree.valueDecl(tree.roots.items[0]).name));
         try std.testing.expect(tree.valueDecl(tree.roots.items[0]).function_declaration);
     }
+}
+
+fn qualifiedNamedHeaders(allocator: std.mem.Allocator) !void {
+    const source =
+        \\private func Vec3.add (left: a) -> (right: a): a ! {| e} where { Add a } => return left
+        \\const Vec3.zero = 0
+        \\func namespace.member value => return value
+        \\const callback = func value => return value
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parsed(allocator, source, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    try std.testing.expectEqual(@as(usize, 4), tree.roots.items.len);
+    const id = tree.roots.items[0];
+    const declaration = tree.valueDecl(id);
+    try std.testing.expect(declaration.function_declaration and tree.declarationTraits(id).private);
+    try std.testing.expectEqualStrings("Vec3.add", pool.get(declaration.name));
+    try std.testing.expectEqual(@as(ast.Id, 0), declaration.annotation);
+    try std.testing.expect(declaration.where_node != 0);
+    try std.testing.expectEqual(@as(u32, 1), declaration.where.len);
+    const where_node = tree.node(declaration.where_node);
+    try std.testing.expectEqual(declaration.where.start, where_node.a);
+    try std.testing.expectEqual(declaration.where.len, where_node.b);
+    const outer = tree.node(declaration.body);
+    const inner = tree.node(outer.b);
+    try std.testing.expectEqual(ast.Tag.lambda, outer.tag);
+    try std.testing.expectEqual(@as(ast.Id, 0), outer.c);
+    try std.testing.expectEqual(ast.Tag.lambda, inner.tag);
+    try std.testing.expectEqual(ast.Tag.type_effect, tree.node(inner.c).tag);
+    try std.testing.expectEqualStrings("Vec3.zero", pool.get(tree.valueDecl(tree.roots.items[1]).name));
+    try std.testing.expect(!tree.valueDecl(tree.roots.items[1]).function_declaration);
+    try std.testing.expectEqualStrings("namespace.member", pool.get(tree.valueDecl(tree.roots.items[2]).name));
+    try std.testing.expect(!tree.valueDecl(tree.roots.items[3]).function_declaration);
+}
+
+test "qualified named headers preserve declaration predicates and final result effects through allocation failures" {
+    try qualifiedNamedHeaders(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, qualifiedNamedHeaders, .{});
 }

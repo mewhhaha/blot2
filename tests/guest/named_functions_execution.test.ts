@@ -156,3 +156,45 @@ func increment (value: U32) : U32 => return hidden value
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("qualified named functions and explicit declaration predicates preserve const controls and effects", async () => {
+  for (const declaration of [
+    "const eq: a -> a -> Bool where { Eq a } = func left -> right => return Eq.eq left right",
+    "func eq (left: a) -> (right: a): Bool where { Eq a } => return Eq.eq left right",
+  ]) {
+    await compileAndRun(
+      `type Eq a is contract = { const eq: a -> a -> Bool }
+impl Unsigned: Eq U32 = { const eq = func left -> right => return @u32.eq left right }
+type Box is data = $Box U32
+func Box.from (value: U32): Box => return $Box value
+const Box.zero = $Box 0
+func from (value: U32): Box => return @type.result "from" value
+func unbox (box: Box): U32 => return case box of
+  $Box value => value
+${declaration}
+type Trace is effect = { trace: U32 -> Unit }
+func traced (value: U32): U32 ! {Trace} => return do:
+  Trace.trace value
+  break value
+entry func equal (value: U32): Bool => return eq value 42
+entry func answer (): U32 => return @u32.add (unbox (from 42)) (unbox Box.zero)
+const provider = @effect.provider Trace.trace (func value => return ())
+entry func effectful (value: U32): U32 => return do provider:
+  break traced value
+`,
+      (guest) => {
+        equal(guest.call("answer", null), 42);
+        equal(guest.call("equal", 42), true);
+        equal(guest.call("equal", 41), false);
+        equal(guest.call("effectful", 42), 42);
+      },
+      { prelude: "none" },
+    );
+  }
+  await compileExpectedFailure(
+    "func invalid (value: a): a where {} => return value.field\n",
+    "missing_predicate",
+    undefined,
+    { prelude: "none" },
+  );
+});

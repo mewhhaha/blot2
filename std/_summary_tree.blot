@@ -11,24 +11,24 @@ private type Node s is data =
   }
 opaque type Tree s = Node s
 
-private const node_length = func (node: Node s) : U32 => return case node of
+private func node_length (node: Node s) : U32 => return case node of
   $Empty => 0
   $Leaf _ => 1
   $Branch { length } => length
-private const node_height = func (node: Node s) : U32 => return case node of
+private func node_height (node: Node s) : U32 => return case node of
   $Empty => 0
   $Leaf _ => 1
   $Branch { height } => height
-private const node_total = func identity -> (node: Node s) => return case node of
+private func node_total identity -> (node: Node s) => return case node of
   $Empty => identity
   $Leaf value => value
   $Branch { total } => total
-private const nonempty_total = func (node: Node s) => return case node of
+private func nonempty_total (node: Node s) => return case node of
   $Empty => @panic "empty summary branch"
   $Leaf value => value
   $Branch { total } => total
 
-private const branch = func (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s => return do:
+private func branch (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s => return do:
   if @u32.eq (node_length left) 0:
     break right
   if @u32.eq (node_length right) 0:
@@ -49,7 +49,7 @@ private const branch = func (combine: s -> s -> s) -> (left: Node s) -> (right: 
   }
 
 // Joining descends the taller boundary spine, then restores AVL balance.
-private const balance = func (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s => return do:
+private func balance (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s => return do:
   if U32.gt (node_height left) (@u32.add (node_height right) 1):
     let $Branch { left: far, right: near } = left else:
       break @panic "invalid summary height"
@@ -68,7 +68,7 @@ private const balance = func (combine: s -> s -> s) -> (left: Node s) -> (right:
     break branch combine (branch combine left middle_left) (branch combine middle_right far)
   break branch combine left right
 
-private const join = func (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s => return do:
+private func join (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s => return do:
   if @u32.eq (node_length left) 0:
     break right
   if @u32.eq (node_length right) 0:
@@ -83,14 +83,14 @@ private const join = func (combine: s -> s -> s) -> (left: Node s) -> (right: No
     break balance combine (join combine left near) far
   break branch combine left right
 
-private const drop_first = func (combine: s -> s -> s) -> (node: Node s) : Node s => return case node of
+private func drop_first (combine: s -> s -> s) -> (node: Node s) : Node s => return case node of
   $Empty => @panic "summary index out of bounds"
   $Leaf _ => $Empty
   $Branch { left, right } => join combine (drop_first combine left) right
 
 // Buffer a complete first window before running any user reducer. Incomplete
 // input never computes a summary and is never polled after its first end.
-private const read_nodes = func (identity: s) -> (count: U32) -> (cursor: i) : Maybe (Node s, i) => return do:
+private func read_nodes (identity: s) -> (count: U32) -> (cursor: i) : Maybe (Node s, i) => return do:
   if @u32.eq count 0:
     break $Some ($Empty, cursor)
   if @u32.eq count 1:
@@ -110,37 +110,37 @@ private const read_nodes = func (identity: s) -> (count: U32) -> (cursor: i) : M
     height := node_height right
   break $Some ($Branch { length: count, height: @u32.add height 1, total: identity, left, right }, rest)
 
-private const reduced = func (combine: s -> s -> s) -> (node: Node s) : Node s => return case node of
+private func reduced (combine: s -> s -> s) -> (node: Node s) : Node s => return case node of
   $Empty => $Empty
   $Leaf value => $Leaf value
   $Branch { left, right } => branch combine (reduced combine left) (reduced combine right)
-private const folded = func step -> initial -> (node: Node s) => return case node of
+private func folded step -> initial -> (node: Node s) => return case node of
   $Empty => initial
   $Leaf value => step initial value
   $Branch { left, right } => do:
     use accumulated <- folded step initial left
     break folded step accumulated right
 
-const length = func ($Tree node) => return node_length node
-const total = func identity -> ($Tree node) => return node_total identity node
-const read = func identity -> count -> cursor => return do:
+func length ($Tree node) => return node_length node
+func total identity -> ($Tree node) => return node_total identity node
+func read identity -> count -> cursor => return do:
   use result <- read_nodes identity count cursor
   let $Some (node, rest) = result else:
     break $Nothing
   break $Some ($Tree node, rest)
-const reduce = func (combine: s -> s -> s) -> ($Tree node) => return $Tree (reduced combine node)
-const fold = func step -> initial -> ($Tree node) => return folded step initial node
-private const first_node = func (node: Node s) : s => return case node of
+func reduce (combine: s -> s -> s) -> ($Tree node) => return $Tree (reduced combine node)
+func fold step -> initial -> ($Tree node) => return folded step initial node
+private func first_node (node: Node s) : s => return case node of
   $Empty => @panic "summary index out of bounds"
   $Leaf value => value
   $Branch { left } => first_node left
-const first = func ($Tree node) => return first_node node
-const shift = func (combine: s -> s -> s) -> value -> ($Tree node) => return $Tree (join combine (drop_first combine node) ($Leaf value))
+func first ($Tree node) => return first_node node
+func shift (combine: s -> s -> s) -> value -> ($Tree node) => return $Tree (join combine (drop_first combine node) ($Leaf value))
 
 // Equal-height runs merge once per internal node. The forest has at most
 // 32 entries for a U32 length, and its final joins preserve source order.
 private type Forest s is data = $Done | $More (Node s, Forest s)
-const build = func (combine: s -> s -> s) -> values => return do:
+func build (combine: s -> s -> s) -> values => return do:
   let forest: Forest s = $Done
   use cursor <- values.iter
   for ever:
@@ -165,19 +165,19 @@ const build = func (combine: s -> s -> s) -> values => return do:
     forest := rest
   break $Tree node
 
-private const get_node = func (index: U32) -> (node: Node s) : s => return case node of
+private func get_node (index: U32) -> (node: Node s) : s => return case node of
   $Empty => @panic "summary index out of bounds"
   $Leaf value => value
   $Branch { left, right } => do:
     if @u32.lt index (node_length left):
       break get_node index left
     break get_node (@u32.sub index (node_length left)) right
-const get = func (index: U32) -> ($Tree node) => return do:
+func get (index: U32) -> ($Tree node) => return do:
   if Bool.not (@u32.lt index (node_length node)):
     break @panic "summary index out of bounds"
   break get_node index node
 
-private const query_node = func (combine: s -> s -> s) -> identity -> (start: U32) -> (count: U32) -> (node: Node s) : s => return do:
+private func query_node (combine: s -> s -> s) -> identity -> (start: U32) -> (count: U32) -> (node: Node s) : s => return do:
   if @u32.eq count 0:
     break identity
   if @u32.eq start 0:
@@ -194,7 +194,7 @@ private const query_node = func (combine: s -> s -> s) -> identity -> (start: U3
       if U32.le count left_count:
         break query_node combine identity start count left
       break combine (query_node combine identity start left_count left) (query_node combine identity 0 (@u32.sub count left_count) right)
-const query = func (combine: s -> s -> s) -> identity -> (start: U32) -> (count: U32) -> ($Tree node) => return do:
+func query (combine: s -> s -> s) -> identity -> (start: U32) -> (count: U32) -> ($Tree node) => return do:
   let size = node_length node
   if U32.gt start size:
     break @panic "summary range out of bounds"
@@ -202,15 +202,15 @@ const query = func (combine: s -> s -> s) -> identity -> (start: U32) -> (count:
     break @panic "summary range out of bounds"
   break query_node combine identity start count node
 
-private const set_node = func (combine: s -> s -> s) -> (index: U32) -> value -> (node: Node s) : Node s => return case node of
+private func set_node (combine: s -> s -> s) -> (index: U32) -> value -> (node: Node s) : Node s => return case node of
   $Empty => @panic "summary index out of bounds"
   $Leaf _ => $Leaf value
   $Branch { left, right } => do:
     if @u32.lt index (node_length left):
       break branch combine (set_node combine index value left) right
     break branch combine left (set_node combine (@u32.sub index (node_length left)) value right)
-const set = func (combine: s -> s -> s) -> (index: U32) -> value -> ($Tree node) => return do:
+func set (combine: s -> s -> s) -> (index: U32) -> value -> ($Tree node) => return do:
   if Bool.not (@u32.lt index (node_length node)):
     break @panic "summary index out of bounds"
   break $Tree (set_node combine index value node)
-const concat = func (combine: s -> s -> s) -> ($Tree left) -> ($Tree right) => return $Tree (join combine left right)
+func concat (combine: s -> s -> s) -> ($Tree left) -> ($Tree right) => return $Tree (join combine left right)

@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  auditBatches,
   auditProject,
   demoteEntries,
   selectPaths,
@@ -9,12 +10,71 @@ import {
 
 Deno.test("migration overlays demote exports without altering names or bodies", () => {
   const source =
-    "// entry const ignored = 2\nentry const answer = func () => return 42\nentry let rows: ResizeArray U32 = #[]\n";
+    "// entry const ignored = 2\nentry const answer = func () => return 42\nentry let rows: ResizeArray U32 = #[]\n  entry func answer_named () => return 42\n";
   assert.equal(
     demoteEntries(source),
-    "// entry const ignored = 2\nconst answer = func () => return 42\nlet rows: ResizeArray U32 = #[]\n",
+    "// entry const ignored = 2\nconst answer = func () => return 42\nlet rows: ResizeArray U32 = #[]\n  func answer_named () => return 42\n",
   );
   assert.equal(demoteEntries(demoteEntries(source)), demoteEntries(source));
+});
+
+Deno.test("batched frontend coverage isolates rejections and never passes a failed or unscheduled file", async () => {
+  const calls: string[][] = [];
+  const outcomes = new Map<string, boolean>();
+  const batches: { files: string[]; split: boolean }[] = [];
+  const selected = [
+    "a.blot",
+    "bad.blot",
+    "c.blot",
+    "d.blot",
+    "expected.blot",
+    "unreached.blot",
+  ];
+  await assert.rejects(() =>
+    auditBatches({
+      selected,
+      batchSize: 4,
+      expectedFiles: new Set(["expected.blot"]),
+      build: async (files) => {
+        calls.push([...files]);
+        if (files.includes("unreached.blot")) {
+          throw new Error("transport stopped");
+        }
+        // c and d each pass but cannot share an import graph; bad never passes.
+        const success = !files.includes("bad.blot") &&
+          !files.includes("expected.blot") &&
+          !(files.includes("c.blot") && files.includes("d.blot"));
+        return { success, diagnostics: [] };
+      },
+      batch: async (batch) => {
+        batches.push(batch);
+      },
+      result: async (files, result) => {
+        for (const file of files) {
+          assert.equal(
+            outcomes.has(file),
+            false,
+            "A file has exactly one final outcome",
+          );
+          outcomes.set(file, result.success);
+        }
+      },
+    }), /transport stopped/);
+  assert.deepEqual([...outcomes], [
+    ["a.blot", true],
+    ["bad.blot", false],
+    ["c.blot", true],
+    ["d.blot", true],
+    ["expected.blot", false],
+  ]);
+  assert.equal(outcomes.has("unreached.blot"), false);
+  assert.ok(calls.some((files) => files.length === 4));
+  assert.ok(batches.some((batch) => batch.split));
+  assert.ok(
+    calls.filter((files) => files.includes("expected.blot")).every((files) =>
+      files.length === 1
+    ),
+  );
 });
 
 Deno.test("migration path selection respects directory boundaries", () => {
@@ -47,7 +107,7 @@ Deno.test("frontend audit checks unused declarations and exact rejection expecta
     );
     await Deno.writeTextFile(
       resolve(project, "valid.blot"),
-      "entry const answer = func () : U32 => return 42\n",
+      "entry func answer () : U32 => return 42\n",
     );
     const invalid = "const unused: U32 = true\n";
     await Deno.writeTextFile(resolve(project, "invalid.blot"), invalid);

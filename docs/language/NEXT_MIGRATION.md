@@ -28,13 +28,14 @@ tracks the migration; [guide.md](guide.md) remains the executable reference.
 
 | Stage | Zig | Goose |
 | --- | --- | --- |
-| Named module declarations, entries, tags, imports | Affected checks pass | Parser checked; checker mirrored |
+| Named module declarations, qualified names, predicates, entries, tags, imports | Affected checks pass | Parser checked; checker mirrored |
 | Local declaration policy, overload resolution and parameter clauses | Pending | Pending |
 | Parameterized namespaces and member lookup | Pending | Pending |
 | Type values, `#type_of` and symbolic validation | Pending | Pending |
 | Staged statements, capabilities and tracked build inputs | Pending | Pending |
 | Immutable collections, moves and automatic copy admission | Pending | Pending |
-| Library/application migration and superseded surface removal | Pending | Pending |
+| Standard library, Ink and Gdev named-function source migration | Source migrated; qualification recorded in CONTINUE.md | Uses Zig candidate |
+| Remaining RFC library/application migration and surface removal | Pending | Pending |
 | Optional runtime type descriptors | Later | Later |
 
 The existing Goose port remains an experiment: it has no whole compiler

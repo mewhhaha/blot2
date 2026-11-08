@@ -1,28 +1,28 @@
-const generate = func count -> generator => return @list.generate count generator
-const fill = func count -> value => return @list.fill count value
-const from_array = func values => return @list.from_array values
-const to_array = func values => return @array.from_list values
-const length = func values => return @list.length values
-const is_empty = func values => return List.is_empty values
-const append = func value -> values => return @list.append values value
-const prepend = func value -> values => return @list.prepend values value
-const map = func transform -> (values: List a) => return [transform value | value <- values]
-const filter = func predicate -> (values: List a) => return [value | value <- values, predicate value]
-const fold_left = func reduce -> initial -> (values: List a) => return do:
+func generate count -> generator => return @list.generate count generator
+func fill count -> value => return @list.fill count value
+func from_array values => return @list.from_array values
+func to_array values => return @array.from_list values
+func length values => return @list.length values
+func is_empty values => return List.is_empty values
+func append value -> values => return @list.append values value
+func prepend value -> values => return @list.prepend values value
+func map transform -> (values: List a) => return [transform value | value <- values]
+func filter predicate -> (values: List a) => return [value | value <- values, predicate value]
+func fold_left reduce -> initial -> (values: List a) => return do:
   let state = initial
   for value in values:
     use next <- reduce state value
     state := next
   break state
 
-const any = func predicate -> (values: List a) => return do:
+func any predicate -> (values: List a) => return do:
   for value in values:
     use found <- predicate value
     if found:
       break true
   break false
 
-const all = func predicate -> (values: List a) => return do:
+func all predicate -> (values: List a) => return do:
   for value in values:
     use accepted <- predicate value
     if Bool.not accepted:
@@ -30,17 +30,17 @@ const all = func predicate -> (values: List a) => return do:
   break true
 
 // Flat immutable sequences copy elements into independent result storage.
-const concat = func left -> right => return @list.concat left right
-const slice = func start -> count -> values => return @list.slice values start count
-const split_at = func index -> values => return
+func concat left -> right => return @list.concat left right
+func slice start -> count -> values => return @list.slice values start count
+func split_at index -> values => return
   (slice 0 index values, slice index (values.length - index) values)
-const take = func count -> values => return slice 0 (min count values.length) values
-const drop = func count -> values => return do:
+func take count -> values => return slice 0 (min count values.length) values
+func drop count -> values => return do:
   let start = min count values.length
   break slice start (values.length - start) values
 
 // Positions refer to the original list; replacement results preserve inputs.
-const splice = func start -> delete_count -> replacement -> values => return do:
+func splice start -> delete_count -> replacement -> values => return do:
   if start > values.length or delete_count > values.length - start:
     break @panic "list splice range is out of bounds"
   if delete_count == 0 and replacement.is_empty:
@@ -51,7 +51,7 @@ const splice = func start -> delete_count -> replacement -> values => return do:
 // Edit rows are flat. Replacement ranges refer to one independent immutable
 // sequence, and edit positions always refer to the original source sequence.
 // Validate every source/replacement span before allocating the result.
-const splice_many = func (edits: List {start: U32, delete_count: U32, replacement: {start: U32, count: U32}}) -> (replacements: List a) -> (values: List a) => return do:
+func splice_many (edits: List {start: U32, delete_count: U32, replacement: {start: U32, count: U32}}) -> (replacements: List a) -> (values: List a) => return do:
   let end = 0
   for edit in edits:
     if edit.start < end or edit.start > values.length or edit.delete_count > values.length - edit.start:

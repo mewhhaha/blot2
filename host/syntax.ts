@@ -90,8 +90,9 @@ function annotationWhere(
     if (annotationDepth !== undefined && braces < annotationDepth) {
       annotationDepth = undefined;
     }
-    if (text === ":" && annotationColon(index)) annotationDepth = braces;
-    else if (
+    if (text === "func" || (text === ":" && annotationColon(index))) {
+      annotationDepth = braces;
+    } else if (
       annotationDepth === braces &&
       ["\uE000", "=", "=>", "<-", ":="].includes(text)
     ) annotationDepth = undefined;

@@ -1,27 +1,27 @@
-const generate = func count -> generator => return @array.generate count generator
-const fill = func count -> value => return @array.fill count value
-const length = func values => return values.length
-const is_empty = func values => return values.length == 0
+func generate count -> generator => return @array.generate count generator
+func fill count -> value => return @array.fill count value
+func length values => return values.length
+func is_empty values => return values.length == 0
 
 // at and replace trap on an invalid index; get and set return Nothing instead.
-const at = func index -> values => return values.at index
-const replace = func index -> value -> values => return @array.set values index value
+func at index -> values => return values.at index
+func replace index -> value -> values => return @array.set values index value
 
-const get = func index -> values => return
+func get index -> values => return
   if index < values.length then $Some (values.at index) else $Nothing
-const set = func index -> value -> values => return Array.set values index value
+func set index -> value -> values => return Array.set values index value
 
-const map = func transform -> values => return
+func map transform -> values => return
   generate values.length (func index => return transform (values.at index))
 
 // start/count, followed by the collection, like at/get/replace/set above.
-const slice = func start -> count -> values => return do:
+func slice start -> count -> values => return do:
   if start > values.length or count > values.length - start:
     @panic "array slice out of bounds"
   return generate count (func index => return values.at (start + index))
 
 // Inclusive U32 scan into one independent destination.
-const prefix_sums = func (values: Array U32) : Array U32 => return do:
+func prefix_sums (values: Array U32) : Array U32 => return do:
   let result: Array U32 = fill values.length 0
   let total = 0
   for index in 0..values.length:
@@ -30,14 +30,14 @@ const prefix_sums = func (values: Array U32) : Array U32 => return do:
   break result
 
 // One traversal; append into an owner whose growth capability is consumed.
-const indices = func (keep: Array Bool) => return do:
+func indices (keep: Array Bool) => return do:
   let selected: GrowArray U32 = #[]
   for index in 0..keep.length:
     if keep[index]:
       @storage.push selected index
   break @storage.freeze selected
 
-const filter = func (predicate: a -> Bool) -> values => return do:
+func filter (predicate: a -> Bool) -> values => return do:
   let selected: GrowArray a = #[]
   for index in 0..values.length:
     let value = values.at index
@@ -45,7 +45,7 @@ const filter = func (predicate: a -> Bool) -> values => return do:
       @storage.push selected value
   break @storage.freeze selected
 
-const filter_map = func (transform: a -> Maybe b) -> values => return do:
+func filter_map (transform: a -> Maybe b) -> values => return do:
   let selected: GrowArray b = #[]
   for index in 0..values.length:
     let value = values.at index
@@ -55,14 +55,14 @@ const filter_map = func (transform: a -> Maybe b) -> values => return do:
   break @storage.freeze selected
 
 // Append readable elements in source order into the caller's named owner.
-const append_into = func (destination: GrowArray a) -> source => return do:
+func append_into (destination: GrowArray a) -> source => return do:
   for index in 0 .. source.length:
     destination.push (source.at index)
 
 // Ranges name one separately owned readable payload. Validate every range and
 // the combined length before constructing an independent flat result.
 // Reader form binds the result element type without exposing private evidence.
-const flatten_read = func (read: U32 -> a) -> (length: U32) -> ranges => return do:
+func flatten_read (read: U32 -> a) -> (length: U32) -> ranges => return do:
   let total = 0
   for index in 0 .. ranges.length:
     let range = ranges.at index
@@ -78,10 +78,10 @@ const flatten_read = func (read: U32 -> a) -> (length: U32) -> ranges => return 
     for offset in 0 .. range.count:
       result.push (read (range.start + offset))
   return @storage.freeze result
-const flatten = func ranges -> payload => return
+func flatten ranges -> payload => return
   flatten_read (func (index: U32) => return payload.at index) payload.length ranges
 
-const concat = func left -> right : Array a => return do:
+func concat left -> right : Array a => return do:
   let left_count: U32 = left.length
   let right_count: U32 = right.length
   let count: U32 = left_count + right_count
@@ -93,7 +93,7 @@ const concat = func left -> right : Array a => return do:
     if index < left_count then read_left index else read_right (index - left_count))
 
 // Explicitly copy any readable collection, including a borrowed view.
-const push = func (value: a) -> values : Array a => return do:
+func push (value: a) -> values : Array a => return do:
   let count: U32 = values.length
   if count == 0xFFFFFFFF:
     @panic "array append length overflow"
@@ -101,10 +101,10 @@ const push = func (value: a) -> values : Array a => return do:
   return generate (count + 1) (func (index: U32) : a => return if index == count then value else read index)
 
 // zip stops at the end of the shorter input.
-const zip = func left -> right => return
+func zip left -> right => return
   generate (min left.length right.length) (func index => return (left.at index, right.at index))
 
-const unzip = func values => return do:
+func unzip values => return do:
   let left = map (func pair => return do:
     let (left, _) = pair
     break left) values
@@ -113,7 +113,7 @@ const unzip = func values => return do:
     break right) values
   break (left, right)
 
-const unzip3 = func values => return do:
+func unzip3 values => return do:
   let first = map (func triple => return do:
     let (value, _, _) = triple
     break value) values
@@ -125,7 +125,7 @@ const unzip3 = func values => return do:
     break value) values
   break (first, second, third)
 
-const fold_left = func reduce -> initial -> values => return do:
+func fold_left reduce -> initial -> values => return do:
   let state = initial
   for index in 0..values.length:
     let value = values.at index
@@ -133,7 +133,7 @@ const fold_left = func reduce -> initial -> values => return do:
     state := next
   break state
 
-const any = func predicate -> values => return do:
+func any predicate -> values => return do:
   for index in 0..values.length:
     let value = values.at index
     use found <- predicate value
@@ -141,7 +141,7 @@ const any = func predicate -> values => return do:
       break true
   break false
 
-const all = func predicate -> values => return do:
+func all predicate -> values => return do:
   for index in 0..values.length:
     let value = values.at index
     use accepted <- predicate value

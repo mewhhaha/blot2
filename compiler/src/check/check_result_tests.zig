@@ -329,3 +329,62 @@ test "storage modes contextualize fresh literals without coercing existing array
     try storageModes(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, storageModes, .{});
 }
+
+fn namedQualifiedPredicates(allocator: std.mem.Allocator) !void {
+    for ([_][]const u8{
+        "const eq: a -> a -> Bool where { Eq a } = func left -> right => return Eq.eq left right\n",
+        "func eq (left: a) -> (right: a): Bool where { Eq a } => return Eq.eq left right\n",
+    }) |declaration| {
+        const text = try std.mem.concat(allocator, u8, &.{
+            "type Eq a is contract = { const eq: a -> a -> Bool }\n",
+            "impl Unsigned: Eq U32 = { const eq = func left -> right => return @u32.eq left right }\n",
+            "type Box is data = $Box U32\n",
+            "func Box.from (value: U32): Box => return $Box value\n",
+            "const Box.zero = $Box 0\n",
+            "func from (value: U32): Box => return @type.result \"from\" value\n",
+            declaration,
+            "entry func same (): Bool => return eq 42 42\n",
+            "entry func boxed (): Box => return from 42\n",
+        });
+        defer allocator.free(text);
+        var fixture = try Fixture.init(allocator, text);
+        defer fixture.deinit(allocator);
+        try fixture.valid();
+        var found = false;
+        for (fixture.checked.bindings) |binding| {
+            if (binding.kind != .global or !std.mem.eql(u8, fixture.pool.get(binding.name), "eq")) continue;
+            found = true;
+            try std.testing.expectEqual(@as(u32, 1), binding.scheme.variables.len);
+            try std.testing.expectEqual(@as(u32, 0), binding.scheme.row_variables.len);
+            try std.testing.expectEqual(@as(u32, 1), binding.scheme.obligations.len);
+            const predicate = fixture.checked.obligations[binding.scheme.obligations.start];
+            try std.testing.expectEqual(T.ObligationKind.contract, predicate.kind);
+            try std.testing.expect(predicate.explicit and predicate.qualification_span != null);
+            const outer = fixture.checked.types.node(binding.scheme.root);
+            const inner = fixture.checked.types.node(outer.b);
+            try std.testing.expectEqual(T.Tag.function, outer.tag);
+            try std.testing.expectEqual(T.Tag.function, inner.tag);
+            try std.testing.expectEqual(outer.a, inner.a);
+            try std.testing.expectEqual(T.boolean, inner.b);
+        }
+        try std.testing.expect(found);
+    }
+}
+
+test "qualified named functions and written predicates preserve ordinary value controls through OOM" {
+    try namedQualifiedPredicates(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, namedQualifiedPredicates, .{});
+}
+
+test "named declaration predicates require a complete written signature and reject missing coverage" {
+    for ([_]struct { declaration: []const u8, code: check.Code }{
+        .{ .declaration = "func identity value: a where { type_rep a } => return value\n", .code = .invalid_constraint },
+        .{ .declaration = "func identity (value: a) where { type_rep a } => return value\n", .code = .invalid_constraint },
+        .{ .declaration = "func identity (value: a): b where {} => return value.field\n", .code = .missing_predicate },
+    }) |item| {
+        var fixture = try Fixture.init(a, item.declaration);
+        defer fixture.deinit(a);
+        try std.testing.expect(fixture.checked.diagnostics.len != 0);
+        try std.testing.expectEqual(item.code, fixture.checked.diagnostics[0].code);
+    }
+}

@@ -109,7 +109,7 @@ fn named_local_ambiguity() {
  tree.deinit();names.deinit();
 }
 fn named_recovery() {
- for invalid in ["func missing value => value\n", "func missing => return 1\n", "func Name value => return value\n", "func scope.member value => return value\n"] {
+ for invalid in ["func missing value => value\n", "func missing => return 1\n", "func Name value => return value\n", "func Scope. => return 1\n", "const identity where { type_rep a } = func (value: a): a => return value\n"] {
   var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
   var tree,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
   let source=str(invalid,"func later value => return value\n");parse_source(source,names,tree);
@@ -118,6 +118,21 @@ fn named_recovery() {
   tree.deinit();names.deinit();
  }
 }
+fn qualified_named_headers() {
+ var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
+ var tree,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
+ parse_source("private func Vec3.add (left: a) -> (right: a): a ! {| e} where { Add a } => return left\nconst Vec3.zero = 0\nfunc namespace.member value => return value\nconst callback = func value => return value\n",names,tree);
+ assert(tree.diagnostics.len==0&&tree.roots.len==4);
+ let id=tree.roots.items[0];let declaration=tree.value_decl(id);
+ assert(declaration.function_declaration&&blot_parse_ast::declaration_traits(tree,id).private&&names.get(declaration.name)=="Vec3.add"&&declaration.annotation==0);
+ assert(declaration.where_node!=0&&declaration.where.len==1);
+ let clause=tree.node(declaration.where_node);assert(declaration.where.start==clause.a&&declaration.where.len==clause.b);
+ let outer=tree.node(declaration.body);let inner=tree.node(outer.b);
+ assert(outer.tag==blot_parse_ast::tag_lambda&&outer.c==0&&inner.tag==blot_parse_ast::tag_lambda&&tree.node(inner.c).tag==blot_parse_ast::tag_type_effect);
+ let zero=tree.value_decl(tree.roots.items[1]);assert(names.get(zero.name)=="Vec3.zero"&&!zero.function_declaration);
+ assert(names.get(tree.value_decl(tree.roots.items[2]).name)=="namespace.member"&&!tree.value_decl(tree.roots.items[3]).function_declaration);
+ tree.deinit();names.deinit();
+}
 fn main() {
- for cycle in 0..3 {values();fixities();recovery();staging();depth_limit();named_functions();named_local_ambiguity();named_recovery();}
+ for cycle in 0..3 {values();fixities();recovery();staging();depth_limit();named_functions();named_local_ambiguity();named_recovery();qualified_named_headers();}
 }

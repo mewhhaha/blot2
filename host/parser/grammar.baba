@@ -35,7 +35,8 @@ declaration_attribute = ("@" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
 value_declaration = (modifier:source_identifier? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
 named_function_declaration = (modifier:source_identifier? value:named_function) ;
-named_function = ("func" name:source_identifier parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:expression | body:do_block)) ;
+named_function = ("func" name:function_name parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? where:where_clause? "=>" ("return" body:expression | body:do_block)) ;
+function_name = (root:source_identifier rest:("." (source_identifier | TYPE_IDENT))* | root:TYPE_IDENT rest:("." (source_identifier | TYPE_IDENT))+) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
 effect_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" "effect" "=" (operations:effect_operations | signature:effect_signature)) ;
 // A bare record declares operations; signatures start with a type name or group.
@@ -57,7 +58,7 @@ type_field = (name:source_identifier (":" value:type_expression)?) ;
 type_expression = (head:type_application results:("->" type_application)* effects:effect_row?) ;
 effect_row = ("!" "{" (labels:type_application ("," labels:type_application)*)? ("|" tail:source_identifier)? "}") ;
 // The frontend promotes `where` to this same-width private marker only after
-// an annotation. Other uses remain ordinary source_identifier, including type variables.
+// an annotation or function header. Other uses remain ordinary source_identifier.
 where_clause = (marker:"wherE" body:constraint_body) ;
 contract_body = ("{" LAYOUT_NEWLINE? (members:contract_member ("," LAYOUT_NEWLINE? members:contract_member)* ","?)? LAYOUT_NEWLINE? "}") ;
 contract_member = (contract_type_member | contract_value_member | constraint_predicate) ;

@@ -70,9 +70,12 @@ export const devCheckAreas = {
     native: [
       "parse.parser_tests.test.named function declarations share curried lambda IR and preserve local entry private and tag metadata",
       "parse.parser_tests.test.named function declarations release parameter and attribute scratch through allocation failures",
+      "parse.parser_tests.test.qualified named headers preserve declaration predicates and final result effects through allocation failures",
       "parse.parser_tests.test.local named functions do not consume anonymous function expression statements",
       "parse.parser_tests.test.named functions retain return parameter and identifier diagnostics and recover later declarations",
       "check.check_result_tests.test.named module functions preserve principal inference recursion and ordinary function values",
+      "check.check_result_tests.test.qualified named functions and written predicates preserve ordinary value controls through OOM",
+      "check.check_result_tests.test.named declaration predicates require a complete written signature and reject missing coverage",
       "check.check_result_tests.test.named function tags preserve every dispatch parameter and written result while allowing new effects through OOM",
       "parse.lexer_tests.test.flat tokens preserve longest matches and source byte spans",
       "eval.core_eval_tests.test.selected contract source interfaces do not evaluate method constant dependencies",

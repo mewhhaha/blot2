@@ -105,7 +105,10 @@ export default grammar({
       prec(
         3,
         seq(
-          field("owner", $.type_identifier),
+          field("owner", choice($.identifier, $.type_identifier)),
+          repeat(
+            seq(".", field("owner", choice($.identifier, $.type_identifier))),
+          ),
           ".",
           field("name", $.identifier),
         ),
@@ -130,7 +133,7 @@ export default grammar({
             optional(alias("private", $.private_modifier)),
             optional(alias("entry", $.entry_modifier)),
             "func",
-            field("name", $.identifier),
+            field("name", choice($.identifier, $.qualified_function_name)),
             field("parameter", $._parameter),
             repeat(seq("->", field("parameter", $._parameter))),
           ),

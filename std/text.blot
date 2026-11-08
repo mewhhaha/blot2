@@ -1,12 +1,12 @@
 // Text is an Array U32 of Unicode scalar values. Equality compares scalar
 // sequences exactly; it does not normalize Unicode.
 const empty: Text = ""
-const length = func (value: Text) => return value.length
-const is_empty = func (value: Text) => return value.length == 0
-const at = func index -> (value: Text) => return value[index]
-const concat = func (left: Text) -> (right: Text) : Text => return @array.concat left right
+func length (value: Text) => return value.length
+func is_empty (value: Text) => return value.length == 0
+func at index -> (value: Text) => return value[index]
+func concat (left: Text) -> (right: Text) : Text => return @array.concat left right
 
-const equal = func (left: Text) -> (right: Text) : Bool => return do:
+func equal (left: Text) -> (right: Text) : Bool => return do:
   if left.length != right.length:
     break false
   for index in 0..left.length:
@@ -14,26 +14,26 @@ const equal = func (left: Text) -> (right: Text) : Bool => return do:
       return false
   break true
 
-const valid_scalar = func value => return
+func valid_scalar value => return
   value <= 0x10FFFF and (value < 0xD800 or value > 0xDFFF)
-const from_scalars = func (values: Array U32) : Maybe Text => return do:
+func from_scalars (values: Array U32) : Maybe Text => return do:
   for value in values:
     if Bool.not (valid_scalar value):
       return $Nothing
   break $Some values
-const scalars = func (value: Text) => return value
+func scalars (value: Text) => return value
 
 // Append into a persistent List; one conversion produces the final Array.
 type Builder = List U32
-const builder = func () : Builder => return []
-const push = func scalar -> (out: Builder) => return [...out, scalar]
-const append = func (value: Text) -> (out: Builder) : Builder => return do:
+func builder () : Builder => return []
+func push scalar -> (out: Builder) => return [...out, scalar]
+func append (value: Text) -> (out: Builder) : Builder => return do:
   let result = out
   for scalar in value:
     result := [...self, scalar]
   break result
-const finish = func (out: Builder) : Text => return Array.from_list out
-const join = func (separator: Text) -> (pieces: Array Text) : Text => return do:
+func finish (out: Builder) : Text => return Array.from_list out
+func join (separator: Text) -> (pieces: Array Text) : Text => return do:
   let out = builder ()
   let first = true
   for piece in pieces:
@@ -43,16 +43,16 @@ const join = func (separator: Text) -> (pieces: Array Text) : Text => return do:
     first := false
   break finish out
 
-const decimal_digits = func value -> collected => return
+func decimal_digits value -> collected => return
   if value < 10 then [value + 48, ...collected]
   else decimal_digits (value / 10) [value % 10 + 48, ...collected]
-const from_u32 = func (value: U32) : Text => return
+func from_u32 (value: U32) : Text => return
   Array.from_list (decimal_digits value [])
-const append_u32 = func value -> out => return append (from_u32 value) out
+func append_u32 value -> out => return append (from_u32 value) out
 
 // Fixed decimal places (0..6), rounded half away from zero. Return Nothing
 // for NaN, infinities, excessive precision, or a scaled value outside U32.
-const from_f32_fixed = func (places: U32) -> (value: F32) : Maybe Text => return do:
+func from_f32_fixed (places: U32) -> (value: F32) : Maybe Text => return do:
   if places > 6 or Bool.not (F32.is_finite value):
     return $Nothing
   let factor = 1
@@ -81,8 +81,8 @@ impl Decimal : Format U32 = { const format = func value => return from_u32 value
 impl Boolean : Format Bool = {
   const format = func value => return if value then "true" else "false",
 }
-const format: a -> Text where { Format a } = func value => return Format.format value
-const format_sequence: Array a -> Text where { Format a } = func values => return do:
+func format (value: a): Text where { Format a } => return Format.format value
+func format_sequence (values: Array a): Text where { Format a } => return do:
   let out = append "[" (builder ())
   let first = true
   for value in values:

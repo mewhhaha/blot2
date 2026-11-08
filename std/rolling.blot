@@ -1,7 +1,7 @@
 import * as iter from "./iter"
 import * as tree from "./_summary_tree"
 
-const fold = func step -> initial -> (width: U32) -> values => return do:
+func fold step -> initial -> (width: U32) -> values => return do:
   if @u32.eq width 0:
     break @panic "rolling requires a positive width"
   break iter.map (iter.fold_left step initial) (iter.windows width values)
@@ -13,12 +13,12 @@ opaque type Monoid [i, s, f] = {
   identity: s,
   window: Maybe (tree.Tree s),
 }
-const monoid = func (combine: s -> s -> s) -> (identity: s) -> (width: U32) -> values => return do:
+func monoid (combine: s -> s -> s) -> (identity: s) -> (width: U32) -> values => return do:
   if @u32.eq width 0:
     break @panic "rolling requires a positive width"
   break $Monoid { width, cursor: values.iter, combine, identity, window: $Nothing }
-const Monoid.iter = func (state: Monoid [i, s, f]) => return state
-const Monoid.next = func (state: Monoid [i, s, f]) => return case state.window of
+func Monoid.iter (state: Monoid [i, s, f]) => return state
+func Monoid.next (state: Monoid [i, s, f]) => return case state.window of
   $Nothing => do:
     use result <- tree.read state.identity state.width state.cursor
     let $Some (buffer, rest) = result else:
@@ -41,12 +41,12 @@ opaque type Group [i, s, f, g] = {
   window: Maybe (tree.Tree s),
   total: s,
 }
-const group = func (combine: s -> s -> s) -> (inverse: s -> s) -> (identity: s) -> (width: U32) -> values => return do:
+func group (combine: s -> s -> s) -> (inverse: s -> s) -> (identity: s) -> (width: U32) -> values => return do:
   if @u32.eq width 0:
     break @panic "rolling requires a positive width"
   break $Group { width, cursor: values.iter, combine, inverse, identity, window: $Nothing, total: identity }
-const Group.iter = func (state: Group [i, s, f, g]) => return state
-const Group.next = func (state: Group [i, s, f, g]) => return case state.window of
+func Group.iter (state: Group [i, s, f, g]) => return state
+func Group.next (state: Group [i, s, f, g]) => return case state.window of
   $Nothing => do:
     use result <- tree.read state.identity state.width state.cursor
     let $Some (buffer, rest) = result else:

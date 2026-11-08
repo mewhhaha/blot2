@@ -44,11 +44,37 @@ private entry func answer () => do:
       const invalid of [
         "func missing => return 1\n",
         "func missing () = 1\n",
-        "func namespace.member value => return value\n",
         "func Name value => return value\n",
         "const value = func named value => return value\n",
       ]
     ) throws(() => frontend.parse(invalid), SourceError);
+  } finally {
+    frontend.dispose();
+  }
+});
+
+Deno.test("named functions preserve qualified identities and declaration constraints", async () => {
+  const frontend = await createFrontend();
+  const source =
+    `func Vec3.add (left: Vec3) -> (right: Vec3): Vec3 => return left
+func namespace.member value => return value
+func eq (left: a) -> (right: a): Bool where {Eq a} => return Eq.eq left right
+func keep value where {Eq a} => return value
+`;
+  try {
+    const rows = normalizedNodes(frontend.parse(source).root, source);
+    equal(rows.filter((row) => row.kind === "named_function").length, 4);
+    equal(rows.filter((row) => row.kind === "where_clause").length, 2);
+    equal(
+      rows.filter((row) => row.kind === "function_name" && row.field === "name")
+        .length,
+      4,
+    );
+    ok(rows.some((row) => row.field === "root" && row.text === "Vec3"));
+    throws(
+      () => frontend.parse("func Name value => return value\n"),
+      SourceError,
+    );
   } finally {
     frontend.dispose();
   }

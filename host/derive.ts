@@ -207,7 +207,7 @@ export function deriveEqualityAndDebug(
     return lines;
   });
   const eq = [
-    `const ${shape.name}.eq = func left => return func right => return case left, right of`,
+    `func ${shape.name}.eq left -> right => return case left, right of`,
     ...eqArms,
     `  _, _ => false`,
   ].join("\n");
@@ -423,9 +423,12 @@ export function deriveCodec(
     ? ` ${shape.parameters[0]}`
     : ` [${shape.parameters.join(", ")}]`;
   const requirement = requirements(shape, "_derive_codec.Codec");
-  const encodeAnnotation = shape.parameters.length
-    ? `: ${typeHead(shape)} -> Array U32${requirement}`
-    : "";
+  let encodeParameter = "value";
+  let encodeResult = "";
+  if (shape.parameters.length) {
+    encodeParameter = `(value: ${typeHead(shape)})`;
+    encodeResult = `: Array U32${requirement}`;
+  }
   const decodeArms = plans.flatMap(
     ({ constructor, variant, fields, fixed }) => {
       const lines = [
@@ -528,7 +531,7 @@ export function deriveCodec(
     },
   );
   return [
-    `const ${encodeName}${encodeAnnotation} = func value => return case value of`,
+    `func ${encodeName} ${encodeParameter}${encodeResult} => return case value of`,
     ...encodeArms,
     `impl ${shape.name}DerivedCodec${parameter} : _derive_codec.Codec ${
       typeHead(shape)
