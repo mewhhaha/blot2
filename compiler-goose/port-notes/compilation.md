@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen393 is the current source checkpoint. Selected private checker
+Frozen395 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -126,8 +126,15 @@ preserve the source owner; valid allocation/mint and restore-tail order stay
 unchanged. Invalid tokens intentionally reject before arena metadata, with the
 existing scratch cleanup but changed invalid-token allocation/mint prefix.
 The contract-method loop uses scalar count/reloaded IDs. Its110.028s run clears
-that boundary and reaches the equivalent aggregate child-slice borrow. Three
-same-protocol loops and the mutable ragged-header reference fix are next.
+that boundary and reaches the equivalent aggregate child-slice borrow. Frozen394
+uses scalar count/ID reloads in three same-protocol loops and corrects the ragged
+header binding to preserve actual written/reserved/published mutations. Frozen395
+retains resolver bounds/arity/provider ordering and reloads scalar arguments at
+their original evaluation point. Exact chained source review passes, adding no
+allocation, copying or fuel. Its118.841s run reaches matchInputs' source iterator.
+Seven audited callback-crossing getter sites plus equivalent nested loops are
+next. One necessary attempt will carry the existing append-safe stack profiler
+within the unchanged120/300-second caps; instrumented time is labeled separately.
 No whole compiler C, header or executable has been emitted; source acceptance
 is not runtime qualification.
 

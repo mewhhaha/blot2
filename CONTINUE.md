@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen393 is the current source checkpoint. RegionSnapshot is now only a
+Frozen395 is the current source checkpoint. RegionSnapshot is now only a
 lease/generation handle; its existing lease owns State and solver metadata.
 Restore creates one invocation-local payload view after solver restore succeeds.
 The rewrite removes400lines/15948bytes and reduces the static Session type proxy
@@ -51,8 +51,13 @@ Malformed tokens now reject before arena metadata use with existing scratch
 cleanup; their invalid-token allocation/mint prefix intentionally changes.
 Valid-path allocation and ID order are preserved. contractMethod now iterates
 scalar child count/IDs without copying. Its110.028s run clears that loop and
-reaches aggregate's equivalent child-slice borrow. Three loop reloads and the
-confirmed mutable ragged-header reference fix are next.
+reaches aggregate's equivalent child-slice borrow. Frozen394 reloads scalar IDs
+in aggregate/blockChildren/arrayOperation and borrows the live ragged header so
+written/reserved/published updates reach its owner. Frozen395 preserves resolver
+arity/provider order while reloading argument IDs. Exact source review passes.
+Its118.841s run reaches matchInputs iteration. Seven audited getter/callback
+cases and equivalent nested loops are next; a current stack profile will run
+inside that necessary attempt under the unchanged120-second stage cap.
 No compiler C/header/executable or executed-Wasm/Gdev result exists for the port.
 
 Current representation repairs use the existing Session→Generator Frame token
