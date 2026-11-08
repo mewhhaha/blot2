@@ -602,10 +602,15 @@ fn principalGraphLookup(generator: Generator&, key: blot_eval_core_eval::Princip
     return old.metadata.principal_graphs.lookup(key, state.gate);
 }
 fn principalRecord(generator: Generator&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options, solved: blot_eval_core_eval::SolvedEvidence, inputs: const blot_reuse_principal_inputs::Key&?) -> blot_error::Error {
-    var selected .= inputs;
-    if selected == null { let principal .= generator.principal_state; if principal { selected .= principal.last_inputs; } }
-    if selected == null { let persisted .= generator.persisted_principals; if persisted { if persisted.last_inputs.present { selected .= persisted.last_inputs.value; } } }
-    let artifacts .= generator.artifacts; if artifacts { return artifacts.recordPrincipal(target, options, solved, selected); } return blot_error::Error.none;
+    if inputs != null { return publishPrincipalRecord(generator, target, options, solved, inputs); }
+    let principal .= generator.principal_state;
+    if principal { let selected .= principal.last_inputs; if selected != null { return publishPrincipalRecord(generator, target, options, solved, selected); } }
+    let persisted .= generator.persisted_principals;
+    if persisted { if persisted.last_inputs.present { return publishPrincipalRecord(generator, target, options, solved, persisted.last_inputs.value); } }
+    return publishPrincipalRecord(generator, target, options, solved, null);
+}
+fn publishPrincipalRecord(generator: Generator&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options, solved: blot_eval_core_eval::SolvedEvidence, inputs: const blot_reuse_principal_inputs::Key&?) -> blot_error::Error {
+    let artifacts .= generator.artifacts; if artifacts { return artifacts.recordPrincipal(target, options, solved, inputs); } return blot_error::Error.none;
 }
 fn principalStats(generator: const Generator&) -> blot_reuse_principal_evidence_reuse::Stats {
     var result = generator.principal_stats; let principal .= generator.principal_state; if principal { result = principal.stats; } result.fresh_regions = generator.evaluator.principal_regions;

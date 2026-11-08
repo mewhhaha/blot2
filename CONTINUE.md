@@ -39,9 +39,10 @@ fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged
 
 Source repairs now cover PrincipalVisit capacity initialization, canonical
 Session/Generator publication, summary-job compaction and the concrete recursive
-summary callback cycle. Frozen 312 adds two local optional-read narrowings. The
-actual 312 build clears those optional reads and stops after 110.088s at a
-reference stored after a recursive call in principalEvidenceRegionInner. Whole parsing passes 440 files. No whole-program C,
+summary callback cycle. Frozen 314 adds separate per-owner principal-record selection, six nullable
+field repairs and fourteen declarations for concrete callback cycles. The actual
+build reaches recorder restoration and stops after 110.213s: a callback-context
+reference cannot be stored back into the registered Session. Whole parsing passes 440 files. No whole-program C,
 header, executable, Wasm comparison or Gdev result exists yet. Caps remain
 120/300s with a 3s first-error collection window. Focused controls qualify only
 their named source/carriers; source checkpoints remain unverified whole-compiler

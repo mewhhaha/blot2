@@ -391,7 +391,7 @@ fn deinit(self_: DescriptorCalls&) { self_.recursion.deinit(); if self_.global_f
 struct MethodSelector { units: const blot_check_core::Module[:],entry: u32,allocation_owner: u64,session: blot_eval_core_eval::Session? = null,bounds: blot_check_scheme_equations::Workspace& }
 fn deinit(self_: MethodSelector&) { if self_.session { blot_eval_core_eval::deinitOwnedSession(self_.session); self_.session .= null; } self_.bounds.deinit(); }
 fn get(self_: MethodSelector&) -> blot_eval_core_eval::Session?,blot_error::Error {
-    if self_.session == null { let session,error = blot_eval_core_eval::initOwnedSession(self_.units,self_.allocation_owner); if error != blot_error::Error.none { return null,error; } assert(session); self_.session .= session; self_.session.diagnostic_context.entry = self_.entry; } return self_.session,blot_error::Error.none;
+    if self_.session == null { let session,error = blot_eval_core_eval::initOwnedSession(self_.units,self_.allocation_owner); if error != blot_error::Error.none { return null,error; } assert(session); self_.session .= session; session.diagnostic_context.entry = self_.entry; } return self_.session,blot_error::Error.none;
 }
 struct Generator {
     metadata: Metadata&,uses: const u32[:] = default<const u32[:]>(),active_goals: const blot_check_core::Obligation[:] = default<const blot_check_core::Obligation[:]>(),entry_unit: u32,

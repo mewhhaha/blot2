@@ -51,7 +51,7 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 312 inputs and selects private
+per stage. This checkpoint preserves exact frozen 314 inputs and selects private
 checker ce317 explicitly. Its preceding one-condition ContentsReadBack correction
 recognizes the existing global-only null-root bound without changing alternatives
 or exactness. Stock b27 and 869 false positives reproduce in four functions.
@@ -71,9 +71,16 @@ Generator boundaries retain exact registry/slot/pointer checks. Ten annotations
 follow the concrete summary callback cycle; seven nonrecursive constructors or
 setters preserve original defaults, values and evaluation order. Independent
 inversion reviews and focused controls retain their exact limits in the receipt.
-Actual 312 clears both optional reads and stops after 110.088s at a reference
-stored after a recursive call in principalEvidenceRegionInner. The next repair
-extracts its record-publication tail through an ordinary nonrecursive boundary. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
+The post-solve principal-record tail now uses a nonrecursive boundary; separate
+per-owner bindings preserve input priority without mixing roots. Seventeen reduced
+precedence/null/artifact cases match on both checkers; two omission mutations trap.
+Six further nullable-field accesses retain original guard order through locals.
+Fourteen declarations follow two concrete retained/principal query callback cycles;
+eight constructor/setter helpers preserve defaults, types and assignment order.
+Actual 314 reaches recorder restoration and stops after 110.213s: a reference
+loaded through the callback context cannot be restored into the registered Session.
+A frozen semantic-worker-only entry is being prepared to measure shorter repair
+iterations without changing the real evaluator/Generator ownership paths. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
 remain 120/300s with a 3s first-error window. Earlier dispatch and scalar-helper
 experiments failed and were removed after the private correctness fix; original
 code_expectation children source is restored. Whole compiler/runtime parity is

@@ -424,20 +424,20 @@ fn refineFresh(self_: Service&, call: RefinementCall) -> blot_eval_core_eval::So
         if self_.evaluator.steps != before_steps { publication |= 256; } if tape.views.len != 0 { publication |= 512; }
     }
     if call.enabled && mappingItems(call.shapes).len == 0 {
-        assert(self_.cache); let recorded = self_.cache.recordRefinement(Record { root: call.root, expected: call.expected, seeds: call.seeds, rows: call.rows, result: output, tape: tape, observed: observation, before_values: before_values, before_children: before_children, before_steps: before_steps , ..});
+        let cache .= self_.cache; assert(cache); let recorded = cache.recordRefinement(Record { root: call.root, expected: call.expected, seeds: call.seeds, rows: call.rows, result: output, tape: tape, observed: observation, before_values: before_values, before_children: before_children, before_steps: before_steps , ..});
         if recorded != blot_error::Error.none { output.deinit(); return default<blot_eval_core_eval::SolvedEvidence>(), recorded; }
     }
-    if call.profiling && self_.timing != null {
+    if call.profiling { let profiling_timing .= self_.timing; if profiling_timing != null {
         var record_rejections: u8 = 0;
         for before, index in before_record_declines { if self_.refinement_stats.record_declines[index] != before { record_rejections |= (1 as u8) << index as u32; } }
         var admission: u8 = 0; if self_.cache == null { admission |= 1; } if call.has_instances { admission |= 2; } if call.captures.len != 0 { admission |= 4; } if self_.code_projection.present { admission |= 8; } if old_tape != null { admission |= 16; }
         if call.enabled { if self_.refinement_stats.recorded != before_recorded { publication |= 2048; } else { publication |= 1024; } }
         var source: u32 = 0; var closure = false; match call.root { body b => { source = b.target.binding; }, closure c => { source = c.catalog; closure = true; } }
-        self_.timing.refinements.add(blot_backend_backend_timing::RefinementRequest {
+        profiling_timing.refinements.add(blot_backend_backend_timing::RefinementRequest {
             cost: blot_backend_backend_timing::RefinementCost { admission: admission, publication: publication, rejected_candidates: call.rejected_candidates, record_rejections: record_rejections, requests: 1, nodes: (self_.evaluator.counters.inference_specialization_nodes - before_nodes) as u64 , ..},
             unit: call.unit, source: source, closure: closure, expected: call.expected, seeds: call.seeds.len, rows: call.rows.len,
          ..});
-    }
+    } }
     return output, blot_error::Error.none;
 
     }
@@ -461,7 +461,7 @@ fn refineMappingsCapturesSink(self_: Service&, unit_id: u32, root: EvidenceRoot,
  let partial,projection_error = physicalProjection(self_.layouts,shapes); if projection_error != blot_error::Error.none { return projection_error; }
     var physical = partial; if self_.code_projection.present { physical = mappingTarget(self_.code_projection.value); }
     var owned_projection = OwnedProjection { unit: unit_id, mappings: mappings, physical: physical , ..}; let projection = blot_eval_core_eval::CodeProjection.owned { owned_projection , ..};
-    var timing = blot_support::none<blot_backend_backend_timing::Scope>(); if self_.timing != null { timing = blot_support::some(self_.timing.enter(blot_backend_backend_timing::Phase.specialization)); }
+    var timing = blot_support::none<blot_backend_backend_timing::Scope>(); let timing_work .= self_.timing; if timing_work != null { timing = blot_support::some(timing_work.enter(blot_backend_backend_timing::Phase.specialization)); }
     recursive fn cleanup_continuation_4() -> Error {
 
     self_.refinement_stats.requests++;
@@ -483,10 +483,10 @@ fn refineMappingsCapturesSink(self_: Service&, unit_id: u32, root: EvidenceRoot,
     let result, result_error = self_.bridge.toCodeExpectation(expected); if result_error != blot_error::Error.none { return representationError(self_, result_error, unit_id, span, FailureCode.unresolved_type); }
     var has_instances = false; for entry in mappingItems(mappings) { has_instances = has_instances || entry.instance.decl != 0; }
     let enabled = !has_instances && self_.cache != null && captures.len == 0 && !self_.code_projection.present && self_.evaluator.receipt_tape == null;
-    var profiling = false; if self_.timing != null { profiling = self_.timing.clock.enabled; }
+    var profiling = false; let profiling_work .= self_.timing; if profiling_work != null { profiling = profiling_work.clock.enabled; }
     var before_reasons: i64[9] = [0; 9]; if profiling { before_reasons = self_.refinement_stats.reasons; }
     var cached = blot_support::none<blot_eval_core_eval::SolvedEvidence>();
-    if enabled { assert(self_.cache); let value, error = self_.cache.lookupRefinement(root, self_.bridge.partialView(), result, seeds.items, row_seeds.items); if error != blot_error::Error.none { return error; } cached = value; }
+    if enabled { let cache .= self_.cache; assert(cache); let value, error = cache.lookupRefinement(root, self_.bridge.partialView(), result, seeds.items, row_seeds.items); if error != blot_error::Error.none { return error; } cached = value; }
     var rejected_candidates: u16 = 0;
     if profiling { for before, index in before_reasons { if self_.refinement_stats.reasons[index] != before { rejected_candidates |= (1 as u16) << index as u32; } } }
     var solved: blot_eval_core_eval::SolvedEvidence;

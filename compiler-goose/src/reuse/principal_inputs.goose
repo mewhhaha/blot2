@@ -357,7 +357,7 @@ fn key(self_: const Recorder&) -> blot_support::Option<Key> { if self_.failure()
     return blot_support::some(Key { self_.empty_call_inputs, self_.source_complete, self_.sources.items, self_.interfaces.items, self_.source_units.items,
         self_.reads.items, self_.plain_reads.items, self_.plain_publications.items, self_.call_publications.items, self_.call_reads.items, self_.summary_reads.items, self_.summary_publications.items , ..});
 }
-fn withRecorder<C,F>(session: const blot_eval_core_eval::Session&,context: C&) -> Error { var owner,error=initRecorderOwner(session); if error!=blot_error::Error.none { return error; } let recorder=owner.borrow(); assert(recorder); let result=F(context,recorder); let allocation_error=recorder.failure(); owner.deinit(); if result!=blot_error::Error.none { return result; } return allocation_error; }
+recursive fn withRecorder<C,F>(session: const blot_eval_core_eval::Session&,context: C&) -> Error { var owner,error=initRecorderOwner(session); if error!=blot_error::Error.none { return error; } let recorder=owner.borrow(); assert(recorder); let result=F(context,recorder); let allocation_error=recorder.failure(); owner.deinit(); if result!=blot_error::Error.none { return result; } return allocation_error; }
 // Shrinking a retained typed run releases its exact allocation extent.
 fn shrinkCallPublications(self_: Key&, length: i64) {
     assert(length >= 0 && length <= self_.call_publications.len);
