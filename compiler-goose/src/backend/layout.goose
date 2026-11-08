@@ -196,8 +196,8 @@ fn internRecord(store: Store&, values: const u32[:]) -> Id, blot_error::Error {
     for index in 1..count { if fields[index * 2] == fields[(index - 1) * 2] { return 0, blot_error::Error.type_mismatch; } }
     return intern(store, Tag.record, 0, 0, fields);
 }
-fn internFields(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:]) -> Id, blot_error::Error { return internFieldsWithDictionaries(store, tag, a, b, row, values, [], false); }
-fn internFieldsWithDictionaries(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:], slots: const Id[:], dictionary_abi: bool) -> Id, blot_error::Error {
+recursive fn internFields(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:]) -> Id, blot_error::Error { return internFieldsWithDictionaries(store, tag, a, b, row, values, [], false); }
+recursive fn internFieldsWithDictionaries(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:], slots: const Id[:], dictionary_abi: bool) -> Id, blot_error::Error {
     if tag == Tag.nominal && a == blot_check_task_types::handle.unit && b == blot_check_task_types::handle.decl { return intern(store, Tag.product, 0, 0, [blot_check_types::u32_type, blot_check_types::u32_type]); }
     if tag == Tag.nominal && blot_check_typed_staging::isIdentity(a, b) { return 0, blot_error::Error.unresolved_type; }
     if tag != Tag.state_provider && tag != Tag.scoped && tag != Tag.opened && tag != Tag.associated && ((row != unknown_row && row >= store.effects.rows.len) || (row != 0 && tag != Tag.function && tag != Tag.provider)) { return 0, blot_error::Error.type_mismatch; }
@@ -557,28 +557,40 @@ fn rowToEvidence(store: Store&, target: blot_eval_type_evidence::Store&, row: u3
 fn rowFromEvidence(store: Store&, view: blot_eval_type_evidence::View, row: u32) -> u32, blot_error::Error { var budget: i64 = 1000000; return fromEvidenceRow(store, view, row, 0, budget); }
 recursive fn toEvidenceRow(store: Store&, target: blot_eval_type_evidence::Store&, row: u32, depth: i64, budget: i64&, bound_arity: u32) -> u32, blot_error::Error {
     if depth >= 1024 || budget == 0 { return 0, blot_error::Error.evidence_limit; } if row == unknown_row { return 0, blot_error::Error.unresolved_type; } budget--;
-    var labels: u32[>..<] = []; var arguments: u32[>..<] = [];
+        var labels=blot_eval_type_evidence::WordBuffer{};
+    var arguments=blot_eval_type_evidence::WordBuffer{};
+    recursive fn convertRow()->u32,blot_error::Error {
+
     let source = store.effects.view();
     for label in source.rowLabels(row) {
         arguments.clear();
-        for argument in source.operationArguments(label) { let selected, error = toEvidenceDepth(store, target, argument, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } arguments.push(selected); }
-        let operation = source.operation(label); let mapped, error = target.effects.internOperationInstance(operation.identity, arguments, operation.instance); if error != blot_error::Error.none { return 0, error; } labels.push(mapped);
+        for argument in source.operationArguments(label) { let selected, error = toEvidenceDepth(store, target, argument, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
+        let operation = source.operation(label); let mapped, error = target.effects.internOperationInstance(operation.identity, arguments.items, operation.instance); if error != blot_error::Error.none { return 0, error; } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
     let old_formal = store.effects.rows.items[row].formal; var formal: u32 = 0;
     if old_formal != 0 { let selected, error = toEvidenceDepth(store, target, old_formal, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } formal = selected; }
-    return target.effects.internRowWithFormal(labels, formal);
+    return target.effects.internRowWithFormal(labels.items, formal);
+
+    }
+    let result,error=convertRow();arguments.deinit();labels.deinit();return result,error;
 }
 recursive fn fromEvidenceRow(store: Store&, view: blot_eval_type_evidence::View, row: u32, depth: i64, budget: i64&) -> u32, blot_error::Error {
     if row >= view.effects.rows.len { return 0, blot_error::Error.unresolved_type; } if depth >= 1024 || budget == 0 { return 0, blot_error::Error.layout_limit; } budget--;
-    var labels: u32[>..<] = []; var arguments: u32[>..<] = [];
+        var labels=blot_eval_type_evidence::WordBuffer{};
+    var arguments=blot_eval_type_evidence::WordBuffer{};
+    recursive fn convertRow()->u32,blot_error::Error {
+
     for label in view.effects.rowLabels(row) {
         arguments.clear();
-        for argument in view.effects.operationArguments(label) { let selected, error = fromEvidenceDepth(store, view, argument, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } arguments.push(selected); }
-        let operation = view.effects.operation(label); let mapped, error = store.effects.internOperationInstance(operation.identity, arguments, operation.instance); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);
+        for argument in view.effects.operationArguments(label) { let selected, error = fromEvidenceDepth(store, view, argument, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
+        let operation = view.effects.operation(label); let mapped, error = store.effects.internOperationInstance(operation.identity, arguments.items, operation.instance); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
     let old_formal = view.effects.rows[row].formal; var formal: Id = 0;
     if old_formal != 0 { let selected, error = fromEvidenceDepth(store, view, old_formal, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } formal = selected; }
-    let result, error = store.effects.internRowWithFormal(labels, formal); if error != blot_error::Error.none { return 0, effectError(error); } return result, blot_error::Error.none;
+    let result, error = store.effects.internRowWithFormal(labels.items, formal); if error != blot_error::Error.none { return 0, effectError(error); } return result, blot_error::Error.none;
+
+    }
+    let result,error=convertRow();arguments.deinit();labels.deinit();return result,error;
 }
 fn toCodeExpectation(store: Store&, target: blot_reuse_code_expectation::Store&, id: Id) -> u32, blot_error::Error { var budget: i64 = 1000000; return toExpectationDepth(store, target, id, 0, budget); }
 fn expectationError(error: blot_error::Error) -> blot_error::Error { if error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.layout_limit; }
@@ -698,13 +710,21 @@ recursive fn fromSolverRow(store: Store&, source: blot_check_types::Store&, row:
     let kind, tail = tailInfo(source.row(root).tail); if kind != 0 && kind != 3 { return unknown_row, blot_error::Error.none; }
     var formal: Id = 0;
     if kind == 3 { let selected, error = fromSolverDepth(store, source, tail, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } formal = selected; if node(store, formal).tag != Tag.opened || node(store, formal).c != 1 { return 0, blot_error::Error.type_mismatch; } }
-    var labels: u32[>..<] = []; var arguments: u32[>..<] = []; var source_labels: u32[>..<] = []; source_labels.append(source.rowLabels(root));
-    for label in source_labels {
-        arguments.clear(); var source_arguments: u32[>..<] = []; source_arguments.append(source.operationArguments(label)); let identity = source.operation(label).identity;
-        for argument in source_arguments { let child, error = fromSolverDepth(store, source, argument, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } arguments.push(child); }
-        let mapped, error = store.effects.internOperationInstance(identity, arguments, blot_check_types::selectionAtom(source, source.operation(label).instance)); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);
+        var labels=blot_eval_type_evidence::WordBuffer{};
+    var arguments=blot_eval_type_evidence::WordBuffer{};
+    var source_labels=blot_eval_type_evidence::WordBuffer{};
+    var source_arguments=blot_eval_type_evidence::WordBuffer{};
+    recursive fn convertRow()->u32,blot_error::Error {
+   source_labels.append(source.rowLabels(root));if source_labels.failure!=blot_error::Error.none {return 0,source_labels.failure;}
+    for label in source_labels.items {
+        arguments.clear();  source_arguments.clear();source_arguments.append(source.operationArguments(label));if source_arguments.failure!=blot_error::Error.none {return 0,source_arguments.failure;} let identity = source.operation(label).identity;
+        for argument in source_arguments.items { let child, error = fromSolverDepth(store, source, argument, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } arguments.push(child);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
+        let mapped, error = store.effects.internOperationInstance(identity, arguments.items, blot_check_types::selectionAtom(source, source.operation(label).instance)); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
-    let result, error = store.effects.internRowWithFormal(labels, formal); if error != blot_error::Error.none { return 0, effectError(error); } return result, blot_error::Error.none;
+    let result, error = store.effects.internRowWithFormal(labels.items, formal); if error != blot_error::Error.none { return 0, effectError(error); } return result, blot_error::Error.none;
+
+    }
+    let result,error=convertRow();source_arguments.deinit();source_labels.deinit();arguments.deinit();labels.deinit();return result,error;
 }
 fn deinit(closed: ClosedLayouts&) { closed.kinds.clear(); closed.kind_bytes.clear(); closed.layouts.clear(); }
 fn deinit(store: Store&) {

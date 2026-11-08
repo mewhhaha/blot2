@@ -51,7 +51,10 @@ An optional private bootstrap-checker experiment is reproducible with
 `python3 compiler-goose/tools/build_goose_checker.py`. It requires the pinned
 sibling Goose source/build and Clang 23.1.4, copies and patches privately, and
 prints its cached binary path as JSON. Pass that path explicitly to `--goose`;
-the installed compiler and ordinary toolchain remain unchanged. Its measured
+the installed compiler and ordinary toolchain remain unchanged. The default
+cumulative expansion bound stays 100,000 cloned nodes. The explicit
+`--expansion-node-limit 1000000` candidate raises that bound for this large port;
+the separate tail-shape traversal bound stays 100,000. Its measured
 improvement is for an older failing prefix, not completed compiler builds; see
 the compilation frontier for exact evidence and limits.
 

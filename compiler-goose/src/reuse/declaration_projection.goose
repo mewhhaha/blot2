@@ -126,7 +126,7 @@ fn scanNode(self_: Scan&, id: u32) {
         computation, effect_scope, result_associated => { self_.node(n.a); },
         project => { self_.node(n.a); self_.projection(n.b); },
         construct => { self_.node(n.b); },
-        closure => { let value = self_.projectedItem(self_.old.closures, self_.current.closures, n.a); if self_.failure != blot_error::Error.none { return; } if self_.closures { self_.closures.push(n.a); } self_.binding(value.qualifier); self_.binding(value.parameter.binding); self_.bindingList(value.captures); self_.node(value.body); },
+        closure => { let value = self_.projectedItem(self_.old.closures, self_.current.closures, n.a); if self_.failure != blot_error::Error.none { return; } let closures .= self_.closures; if closures { closures.push(n.a); } self_.binding(value.qualifier); self_.binding(value.parameter.binding); self_.bindingList(value.captures); self_.node(value.body); },
         apply => { self_.node(n.a); self_.node(n.b); },
         effect_reflection => { if n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.count) || n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.has) || n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.same) { self_.node(n.b); self_.node(n.c); } },
         operation_value => { let value = self_.projectedItem(self_.old.operation_values, self_.current.operation_values, n.a); self_.node(value.witness); },

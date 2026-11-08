@@ -11,6 +11,7 @@ import eval.semantic_evidence_import;
 import backend.layout;
 import backend.runtime_identity;
 import backend.runtime_operations;
+import backend.optimizer_buffers;
 import backend.wasm;
 import reuse.code_artifacts;
 import reuse.code_body_validity;
@@ -108,8 +109,13 @@ struct TextMap { table: blot_support_pooled_map::Map<const u8[:],u32> = blot_sup
 reusable[] var textmap_slots: dictionary_slot<const u8[:],u32>[>..] = [];
 fn get(self_: const TextMap&, key: const u8[:]) -> u32? { return blot_support_pooled_map::get(self_.table, key); }
 fn contains(self_: const TextMap&, key: const u8[:]) -> bool { return blot_support_pooled_map::contains(self_.table, key); }
-fn insert(self_: TextMap&, key: const u8[:], value: u32) { blot_support_pooled_map::insert(self_.table, key, value, textmap_slots); }
-fn deinit(self_: TextMap&) { blot_support_pooled_map::deinit(self_.table, textmap_slots); }
+reusable[] var textmap_bytes:u8[>..]=[];
+fn insert(self_:TextMap&,key:const u8[:],value:u32) {
+ if self_.table.slots.len==0 {blot_support_pooled_map::grow(self_.table,8,textmap_slots);}else if (self_.table.count+1)*3>self_.table.slots.len*2 {blot_support_pooled_map::grow(self_.table,self_.table.slots.len*2,textmap_slots);}
+ let slots=textmap_slots.realloc_slice(self_.table.slots,self_.table.slots.len);let hash=::hash(key);let tag=(hash as! u32)|2147483648;let mask=slots.len-1;var index=(hash & (mask as u64)) as i64;
+ loop {let present=slots[index].tag;if present==0 {let owned=textmap_bytes.alloc_slice(key.len);for byte,at in key {owned[at]=byte;}let copied:const u8[:]=owned;slots[index]=dictionary_slot<const u8[:],u32>{copied,value,tag};self_.table.count++;return;}if present==tag && slots[index].key==key {slots[index].val=value;return;}index=(index+1)&mask;}
+}
+fn deinit(self_:TextMap&) {for slot in self_.table.slots {if slot.tag!=0 && slot.key.len!=0 {textmap_bytes.free_slice(slot.key);}}blot_support_pooled_map::deinit(self_.table,textmap_slots);}
 struct Importer {
     allocation_owner: u64 = 0, census: Census = Census {..}, old: const Pools? = null, units: const Module[:] = default<const Module[:]>(),
     names: blot_support::Option<IdentityMetadata>, unit_map: u32[:] = default<u32[:]>(), symbol_map: u32[:] = default<u32[:]>(), stable: bool[:] = default<bool[:]>(),
@@ -874,7 +880,7 @@ fn indexOperationLabels(self_: const Importer&, labels: u32[:], symbols: TextMap
         symbols.insert(operation.key, index as u32);
     }
     if !__old.identity.present { return blot_error::Error.declined; }
-    var entries: blot_backend_runtime_operations::Entry[>..<] = []; var bytes: u8[>..<] = [];
+    var entries: blot_backend_runtime_operations::Entry[>..<] = []; var bytes=blot_backend_optimizer_buffers::Bytes{};
     var keys: dictionary<u64,u32> = dictionary<u64,u32>{}; var relocations: blot_backend_runtime_operations::Relocation[>..<] = [];
     var scratch = blot_backend_runtime_operations::initProject(entries, bytes, keys, relocations, __old.identity.value.view());
     let view = __old.evaluator.evidence.view(); var failure = blot_error::Error.none;
@@ -885,7 +891,7 @@ fn indexOperationLabels(self_: const Importer&, labels: u32[:], symbols: TextMap
         let index = symbols.get(scratch.key(scratch.entries[candidate - 1]));
         if index && labels[index] == 0 { labels[index] = label as u32; }
     }
-    scratch.deinit(); return failure;
+    scratch.deinit();bytes.deinit();return failure;
 }
 fn operationScope<G>(self_: Importer&, g: G&, id: u32) -> Error {
     let bound = self_.bind(g); if bound != blot_error::Error.none { return bound; }

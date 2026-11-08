@@ -692,6 +692,7 @@ struct Qualified {
     namespace_: blot_parse_symbols::Symbol,
     member: blot_parse_symbols::Symbol
 }
+fn hash(key:Qualified)->u64 {return ::hash_combine(::hash(key.namespace_),::hash(key.member));}
 struct QualifiedResolution {
     namespace_: blot_parse_symbols::Symbol,
     binding: BindingId
@@ -1196,7 +1197,7 @@ fn message(self_:Diagnostic)->const u8[:] {
     }
 }
 fn sourceDeclaration(binding:Binding)->SourceDeclaration {return SourceDeclaration{binding.capability_flow,binding.capability_parameters,binding.private,binding.name,binding.declaration,binding.kind,binding.named_function,binding.external, ..};}
-fn declarationCatalog(producer)->DeclarationCatalog {return DeclarationCatalog {types:blot_check_frozen_types::Source.store{producer.types, ..},parameter_patterns:blot_check_frozen_types::Patterns.store{producer.parameter_patterns, ..},nominals:producer.nominals,constructors:producer.constructors,effect_families:producer.effect_families,effect_templates:producer.effect_templates,associated:producer.associated,unit:producer.unit,contracts:producer.contracts,contract_predicates:producer.contract_predicates,contract_members:producer.contract_members,implementations:producer.implementations,implementation_predicates:producer.implementation_predicates,implementation_members:producer.implementation_members, ..};}
+fn declarationCatalog(producer)->DeclarationCatalog {return DeclarationCatalog {types:blot_check_frozen_types::Source.store{blot_check_types::canonical(producer.types.lease,producer.types.owner_generation), ..},parameter_patterns:blot_check_frozen_types::Patterns.store{producer.parameter_patterns, ..},nominals:producer.nominals,constructors:producer.constructors,effect_families:producer.effect_families,effect_templates:producer.effect_templates,associated:producer.associated,unit:producer.unit,contracts:producer.contracts,contract_predicates:producer.contract_predicates,contract_members:producer.contract_members,implementations:producer.implementations,implementation_predicates:producer.implementation_predicates,implementation_members:producer.implementation_members, ..};}
 fn catalog(self_:ImportedCatalog)->DeclarationCatalog {
     let owner .= self_.frozen;if owner {return DeclarationCatalog {types:blot_check_frozen_types::Source.frozen{owner.graph, ..},parameter_patterns:blot_check_frozen_types::Patterns.frozen{owner.patterns, ..},nominals:owner.nominals,constructors:owner.constructors,effect_families:owner.effect_families,effect_templates:owner.effect_templates,associated:owner.associated,unit:owner.unit,contracts:owner.contracts,contract_predicates:owner.contract_predicates,contract_members:owner.contract_members,implementations:owner.implementations,implementation_predicates:owner.implementation_predicates,implementation_members:owner.implementation_members, ..};}
     let producer .= self_.producer; assert(producer); return declarationCatalog(producer);

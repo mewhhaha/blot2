@@ -287,3 +287,9 @@ fn compileMode<E>(executor:E&,workspace:Workspace&,entry_path:const u8[:],output
 fn compile<E>(executor:E&,workspace:Workspace&,entry_path:const u8[:],output_identity:blot_support::Option<const u8[:]>,options:blot_reuse_project::Options,dependency:OwnedFrozen&)->Result,Error {return compileMode(executor,workspace,entry_path,output_identity,options,dependency,false,CompileOptions{..});}
 fn compileOwned<E>(executor:E&,workspace:Workspace&,entry_path:const u8[:],output_identity:blot_support::Option<const u8[:]>,options:blot_reuse_project::Options,dependency:OwnedFrozen&)->Result,Error {return compileMode(executor,workspace,entry_path,output_identity,options,dependency,true,CompileOptions{..});}
 fn compileOwnedWithOptions<E>(executor:E&,workspace:Workspace&,entry_path:const u8[:],output_identity:blot_support::Option<const u8[:]>,options:blot_reuse_project::Options,dependency:OwnedFrozen&,backend_options:CompileOptions)->Result,Error {return compileMode(executor,workspace,entry_path,output_identity,options,dependency,true,backend_options);}
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_dependency::HoleDetails)->bool {return true;}
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_dependency::ExplanationDetails)->bool {return true;}
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_dependency::ContextDetails)->bool {return true;}

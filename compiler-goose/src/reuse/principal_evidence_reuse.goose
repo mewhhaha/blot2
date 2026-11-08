@@ -205,9 +205,10 @@ fn sourcesEqual(self_: State&, target: BindingRef, inputs: const Inputs&) -> boo
     if !self_.gate.enabled { return self_.sourceDeclined(SourceDecline { target: target, reason: SourceReason.disabled , ..}), blot_error::Error.none; }
     if self_.gate.constant_types { return self_.sourceDeclined(SourceDecline { target: target, reason: SourceReason.constant_types , ..}), blot_error::Error.none; }
     if !inputs.source_complete { return self_.sourceDeclined(SourceDecline { target: target, reason: SourceReason.incomplete , ..}), blot_error::Error.none; }
-    assert(self_.old);
+    let old .= self_.old; assert(old);
+    let pools .= old.metadata.pools; assert(pools.present);
     for unit in inputs.source_units {
-        if unit == 0 || unit > self_.gate.units.len || !blot_reuse_principal_input_image::moduleEqual(self_.old.metadata.pools.value.modules[unit - 1].module, self_.gate.units[unit - 1]) { return self_.sourceDeclined(SourceDecline { target: target, source: BindingRef { unit, 0 , ..}, reason: SourceReason.module_image , ..}), blot_error::Error.none; }
+        if unit == 0 || unit > self_.gate.units.len || !blot_reuse_principal_input_image::moduleEqual(pools.value.modules[unit - 1].module, self_.gate.units[unit - 1]) { return self_.sourceDeclined(SourceDecline { target: target, source: BindingRef { unit, 0 , ..}, reason: SourceReason.module_image , ..}), blot_error::Error.none; }
     }
     for source in inputs.interfaces {
         let admitted, error = self_.gate.admitsCompletedInterface(source); if error != blot_error::Error.none { return false, error; }

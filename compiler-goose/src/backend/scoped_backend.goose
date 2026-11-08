@@ -2509,7 +2509,7 @@ fn compileScoped(workspace: blot_backend_core_backend::CompileWorkspace&,units: 
     let result,error = run(); generator.deinit(); methods.deinit(); outlining.deinit(); shared_calls.deinit(); descriptor_calls.deinit(); field_recipes.deinit(); scalar_admission.deinit(); active_calls.deinit(); capacity_requests.deinit(); dispatches.deinit(); metadata.deinit(); proof_cache.work .= null; return result,error;
 }
 fn compileWithOptions(workspace: blot_backend_core_backend::CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32,options: CompileOptions) -> blot_backend_core_backend::Result,Error {
-    let space = blot_phase_profile::enterSpace(blot_phase_profile::Space.core); var views: blot_check_frozen_core_validation::ModuleRef[>..<] = []; for &module in units { views.push(blot_check_frozen_core_validation::ModuleRef { value: module,..}); }
+    let space = blot_phase_profile::enterSpace(blot_phase_profile::Space.core); var views: blot_check_frozen_core_validation::ModuleRef[>..] = []; for &module in units { views.push(blot_check_frozen_core_validation::ModuleRef { value: module,..}); }
     recursive fn compileModule() -> blot_backend_core_backend::Result,Error {
         if blot_phase_profile::currentTrace() != null && options.identity.present { for module in units { let path = options.identity.value.owner(module.unit); if path.present { blot_phase_profile::traceModule(module.unit,path.value,0); } } } if options.work_limits.expressions == 0 { return scopedFailure(workspace,entry,"Scoped emission requires a positive expression allowance"),blot_error::Error.none; }
         var reused_core: i64 = 0; var bounds_failed = false; let validation_trace = blot_phase_profile::region("owned.validate-core",entry,0,0);

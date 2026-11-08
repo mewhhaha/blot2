@@ -139,9 +139,10 @@ fn matchesPrevious(self_:Snapshot&,previous:View,trivia:bool)->bool,Error {
 }
 fn sameTokens(left:const u8[:],right:const u8[:])->bool,Error {
  var old_tokens:blot_parse_token::Token[>..<]=[];var old_comments:blot_parse_token::Token[>..<]=[];var old_issues:blot_parse_lexer::Diagnostic[>..<]=[];var before=blot_parse_lexer::init(old_tokens,old_comments,old_issues);let error=blot_parse_lexer::lex(left,before);if error==blot_error::Error.out_of_memory {return false,error;}if error!=blot_error::Error.none {return false,blot_error::Error.none;}
- var new_tokens:blot_parse_token::Token[>..<]=[];var new_comments:blot_parse_token::Token[>..<]=[];var new_issues:blot_parse_lexer::Diagnostic[>..<]=[];var after=blot_parse_lexer::init(new_tokens,new_comments,new_issues);let error=blot_parse_lexer::lex(right,after);if error==blot_error::Error.out_of_memory {return false,error;}if error!=blot_error::Error.none {return false,blot_error::Error.none;}
+ if right.len>0xffffffff {return false,blot_error::Error.none;}var right_snapshot:u8[>..]=[];right_snapshot.append(right);
+ var new_tokens:blot_parse_token::Token[>..<]=[];var new_comments:blot_parse_token::Token[>..<]=[];var new_issues:blot_parse_lexer::Diagnostic[>..<]=[];var after=blot_parse_lexer::init(new_tokens,new_comments,new_issues);let error=blot_parse_lexer::lex(right_snapshot,after);if error==blot_error::Error.out_of_memory {return false,error;}if error!=blot_error::Error.none {return false,blot_error::Error.none;}
  if old_issues.len!=0 || new_issues.len!=0 || old_tokens.len!=new_tokens.len {return false,blot_error::Error.none;}
- for old,index in old_tokens {let new=new_tokens[index];if old.tag!=new.tag || blot_parse_token::text(old,left)!=blot_parse_token::text(new,right) {return false,blot_error::Error.none;}if index!=0 && (old_tokens[index-1].end==old.start)!=(new_tokens[index-1].end==new.start) {return false,blot_error::Error.none;}}return true,blot_error::Error.none;
+ for old,index in old_tokens {let new=new_tokens[index];if old.tag!=new.tag || blot_parse_token::text(old,left)!=blot_parse_token::text(new,right_snapshot) {return false,blot_error::Error.none;}if index!=0 && (old_tokens[index-1].end==old.start)!=(new_tokens[index-1].end==new.start) {return false,blot_error::Error.none;}}return true,blot_error::Error.none;
 }
 fn releaseMask(mask:bool[:]) {if mask.len!=0 {mask_pool.free_slice(mask);}}
 fn reusableModules(self_:Snapshot&,seed:const blot_reuse_frozen_dependency::FrozenDependency&)->blot_support::Option<bool[:]>,Error {return self_.reuseMask(seed,true);}

@@ -131,5 +131,5 @@ fn createArchiveCapture(self_:Factory&)->Capture?,u64,Error {
 }
 fn destroyArchiveCapture(self_:Factory&,token:u64) {
     let found=blot_support_pooled_map::get(capture_tokens,token);assert(found!=null);let at:u32=found;assert(at<capture_owners.len);let state:CaptureOwner& =capture_owners[at];assert(state.live && state.token==token);
-    blot_support_pooled_map::remove(capture_tokens,token);state.canonical.deinit();assert(state.metadata!=null && state.emission!=null);state.metadata.releasePooled();state.emission.releasePooled();state.canonical=Capture{..};state.live=false;capture_owners.free(at);
+    blot_support_pooled_map::remove(capture_tokens,token);state.canonical.deinit();let metadata .=state.metadata;let emission .=state.emission;assert(metadata!=null && emission!=null);metadata.releasePooled();emission.releasePooled();state.canonical=Capture{..};state.live=false;capture_owners.free(at);
 }

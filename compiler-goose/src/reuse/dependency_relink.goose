@@ -81,7 +81,7 @@ fn moduleWith<M>(storage:Owner&,owner:Module&,map:M) {
  for &value in storage.mutable(owner.operation_values) {identity(map,value.identity);value.instance.unit=map.unit(value.instance.unit);}
 }
 fn checkWords(words:const u32[:],roles:const u8[:],count:i64)->Error {for word,index in words {if roles[index]==1&&word>=count {return blot_error::Error.invalid_artifact;}}return blot_error::Error.none;}
-fn prepare(value:const blot_reuse_frozen_dependency::FrozenDependency&,pool:const blot_parse_symbols::Pool&,candidate:blot_parse_symbols::Pool&,names:u32[>..<]&,roles:Slots[>..<]&)->Error {
+fn prepare(value:const blot_reuse_frozen_dependency::FrozenDependency&,pool:const blot_parse_symbols::Pool&,candidate:blot_parse_symbols::Pool&,names:u32[>..]&,roles:Slots[>..<]&)->Error {
  for index in pool.entries.len {let id,error=candidate.intern(pool.get((index+1) as u32));if error!=blot_error::Error.none {return error;}}
  if value.symbols[0].text.len!=0 {return blot_error::Error.invalid_artifact;}names.resize(value.symbols.len,0);
  for old,index in value.symbols[1..] {let id,error=candidate.intern(old.text);if error!=blot_error::Error.none {return error;}names[index+1]=id;}
@@ -98,7 +98,7 @@ fn prepare(value:const blot_reuse_frozen_dependency::FrozenDependency&,pool:cons
 fn relink(storage:Owner&,value:blot_reuse_frozen_dependency::FrozenDependency&,pool:blot_parse_symbols::Pool&,units:const u32[:])->Error {
  if units.len!=value.modules.len||value.symbols.len==0||value.symbols.len>0xffffffff {return blot_error::Error.invalid_artifact;}
  for id,index in units {if id==0||id==0xffffffff {return blot_error::Error.invalid_artifact;}for previous in units[..index] {if previous==id {return blot_error::Error.invalid_artifact;}}}
- var candidate,error=blot_parse_symbols::initPooled();if error!=blot_error::Error.none {return error;}var names:u32[>..<]=[];var roles:Slots[>..<]=[];
+ var candidate,error=blot_parse_symbols::initPooled();if error!=blot_error::Error.none {return error;}var names:u32[>..]=[];var roles:Slots[>..<]=[];
  let admitted=prepare(value,pool,candidate,names,roles);
  if admitted!=blot_error::Error.none {for &entry in roles {entry.deinit();}candidate.deinit();return admitted;}
  let previous=copy(pool);pool=candidate;candidate=previous;let map=Dictionary {names,units, ..};

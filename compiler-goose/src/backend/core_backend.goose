@@ -579,7 +579,7 @@ fn lookupSpecialization(generator: Generator&, session: blot_eval_core_eval::Ses
 fn lookupMemberSpecialization(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error { return completedMemberLookup(generator, session, target, input, expected); }
 fn constantLookup(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, inputs: blot_reuse_constant_receipt::Inputs) -> blot_support::Option<blot_reuse_constant_receipt::Lookup>, blot_error::Error {
     if !(session .== generator.evaluator) { return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none; }
-    if generator.constant_state != null { return generator.constant_state.lookup(generator, target, inputs); } return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none;
+    let constant .= generator.constant_state; if constant { return constant.lookup(generator, target, inputs); } return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none;
 }
 fn principalLookup(generator: Generator&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options) -> blot_support::Option<blot_eval_core_eval::SolvedEvidence>, blot_error::Error {
     if generator.persisted_principals != null { generator.persisted_principals.clearInputs(); }
@@ -1789,7 +1789,7 @@ fn deinit(result: Result&) {
     let capture .= result.capture; if capture { capture.deinit(); } result.capture .= null; result.allocation_emission .= null; result.explanation .= null; result.startup_observation .= null;
     if result.output_owner.slot != 0 { result.output_owner.deinit(); }
     if result.publication_owner.slot != 0 { blot_backend_result_publication::releaseResult(result.publication_owner,result.publication_epoch,result.publication_pinned); }
-    result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = []; result.active = false; result.detached = false; result.message_source = []; result.diagnostic = blot_support::none<Diagnostic>(); result.bytes .= inactive_result_bytes; result.owned_message .= inactive_result_message;
+    result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = default<const blot_check_core::Module[:]>(); result.active = false; result.detached = false; result.message_source = default<const u8[:]>(); result.diagnostic = blot_support::none<Diagnostic>(); result.bytes .= inactive_result_bytes; result.owned_message .= inactive_result_message;
 }
 fn deinit(run: CompileRun&) {
     if run.optimized != null { run.optimized.deinit(); } if run.vectors != null { run.vectors.deinit(); } if run.candidate != null { run.candidate.deinit(); } if run.origins != null { run.origins.deinit(); }
@@ -2465,6 +2465,6 @@ fn detachResult(result: Result&) -> blot_error::Error {
     if result.allocation_emission { entry.allocation = result.allocation_emission; result.allocation_emission = blot_backend_allocation_emission::Snapshot {..}; result.allocation_emission .= entry.allocation; }
     if result.startup_observation { entry.startup = result.startup_observation; result.startup_observation = blot_backend_startup_emission_facts::Snapshot {..}; result.startup_observation .= entry.startup; }
     if result.explanation { entry.explanation = result.explanation; result.explanation = blot_reuse_dispatch_explanation::Explanation {..}; result.explanation .= entry.explanation; }
-    result.bytes .= entry.bytes; result.owned_message .= entry.message; if result.diagnostic.present { result.diagnostic.value.detail = entry.diagnostic_text.items; } result.message_source = []; result.detached = true;
-    if result.publication_owner.slot != 0 { blot_backend_result_publication::releaseResult(result.publication_owner,result.publication_epoch,result.publication_pinned); } result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = []; return blot_error::Error.none;
+    result.bytes .= entry.bytes; result.owned_message .= entry.message; if result.diagnostic.present { result.diagnostic.value.detail = entry.diagnostic_text.items; } result.message_source = default<const u8[:]>(); result.detached = true;
+    if result.publication_owner.slot != 0 { blot_backend_result_publication::releaseResult(result.publication_owner,result.publication_epoch,result.publication_pinned); } result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = default<const blot_check_core::Module[:]>(); return blot_error::Error.none;
 }

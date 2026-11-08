@@ -143,11 +143,11 @@ var catalog_qualified:dictionary<Qualified,BindingId> = dictionary<Qualified,Bin
 var catalog_external_targets:dictionary<ExternalTarget,BindingId> = dictionary<ExternalTarget,BindingId>{};
 var catalog_globals:dictionary<blot_parse_symbols::Symbol,BindingId> = dictionary<blot_parse_symbols::Symbol,BindingId>{};
 var catalog_overrides:dictionary<blot_parse_symbols::Symbol,OperatorOverride> = dictionary<blot_parse_symbols::Symbol,OperatorOverride>{};
-var imports_private_scopes:blot_check_check_scheme_import::WordMap;
-var imports_mapping:blot_check_check_scheme_import::WordMap;
-var imports_row_variables:blot_check_check_scheme_import::WordMap;
-var imports_rows:blot_check_check_scheme_import::WordMap;
-var imports_labels:blot_check_check_scheme_import::WordMap;
+var imports_private_scopes:blot_check_check_scheme_import::WordMap=blot_check_check_scheme_import::WordMap{..};
+var imports_mapping:blot_check_check_scheme_import::WordMap=blot_check_check_scheme_import::WordMap{..};
+var imports_row_variables:blot_check_check_scheme_import::WordMap=blot_check_check_scheme_import::WordMap{..};
+var imports_rows:blot_check_check_scheme_import::WordMap=blot_check_check_scheme_import::WordMap{..};
+var imports_labels:blot_check_check_scheme_import::WordMap=blot_check_check_scheme_import::WordMap{..};
 var proof_header_value_slots:u32[>..]=[];
 var proof_header_proof_slots:u32[>..]=[];
 var proof_header_values:blot_check_numeric_proof_terms::Kind[>..]=[];

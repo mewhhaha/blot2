@@ -107,7 +107,7 @@ struct ContextDetails {contexts:const blot_check_check::DiagnosticContext[:]}
 fn checkRejected(source:const u8[:],pool:Pool&,entry:u32,origins:blot_check_check::ModuleOrigins,issue:blot_check_check::Diagnostic)->Lowered,Error {
     let code=blot_reuse_dependency_consumer::codeName(issue.code);let contexts=issue.contexts[..issue.context_len];var publication=blot_parse_syntax_diagnostics::Publication{cause:blot_parse_syntax_diagnostics::native_detail,code:code,span:issue.span,message:issue.message(),..};
     if issue.hole.present {return publishedRejected(entry,"check-project",source,publication,HoleDetails{issue.hole.value});}if issue.explanation.present {return publishedRejected(entry,"check-project",source,publication,ExplanationDetails{issue.explanation.value,contexts});}if contexts.len!=0 {return publishedRejected(entry,"check-project",source,publication,ContextDetails{contexts});}
-    if issue.purity.present {let witness=issue.purity.value;var label:const u8[:]=default<const u8[:]>();if !witness.operation_name.present && !witness.foreign {let name,error=origins.name(witness.identity.unit,entry);if error!=blot_error::Error.none {return Lowered.inactive,error;}label=name;}var text:u8[>..<]=[];let error=blot_reuse_purity_diagnostics::format(pool,label,witness,text);if error!=blot_error::Error.none {return Lowered.inactive,error;}publication.message=text[..];return publishedRejected(entry,"check-project",source,publication,[witness][..]);}
+    if issue.purity.present {let witness=issue.purity.value;var label:const u8[:]=default<const u8[:]>();if !witness.operation_name.present && !witness.foreign {let name,error=origins.name(witness.identity.unit,entry);if error!=blot_error::Error.none {return Lowered.inactive,error;}label=name;}var text:u8[>..<]=[];let error=blot_reuse_purity_diagnostics::format(pool,label,witness,text);if error!=blot_error::Error.none {return Lowered.inactive,error;}var actual=publication;actual.message=text[..];return publishedRejected(entry,"check-project",source,actual,[witness][..]);}
     if issue.numeric_literal.present {let detail=issue.numeric_literal.value;publication.actual_token=detail.actual_token;return publishedRejected(entry,"check-project",source,publication,[detail][..]);}if issue.symbol==0 {return rejected(entry,"check-project",code,issue.span,issue.message());}var message:u8[>..<]=[];message.append(issue.message());if code=="unknown_intrinsic" || code=="unknown_record_field" {message.append(" ");}else {message.append(": ");}message.append(pool.get(issue.symbol));return rejected(entry,"check-project",code,issue.span,message[..]);
 }
 fn checkEntry(source:const u8[:],pool:Pool&,tree:Tree&,entry:u32,prelude:u32,inputs:Inputs&)->Lowered,Error {
@@ -134,3 +134,9 @@ fn compileMode<P>(provider:P&,workspace:Workspace&,entry_identity:const u8[:],so
         let result,failure=emitLowered(workspace,owner,bundle,payload.ir,payload.stats,names);owner.deinit();lowered.deinit();return result,failure;
     }}
 }
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_dependency_project_consumer::HoleDetails)->bool {return true;}
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_dependency_project_consumer::ExplanationDetails)->bool {return true;}
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_dependency_project_consumer::ContextDetails)->bool {return true;}

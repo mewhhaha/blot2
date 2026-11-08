@@ -153,9 +153,7 @@ fn detailWrite(writer:Writer&,value:blot_parse_ast::NumericFault)->Error {writer
 fn detailWrite(writer:Writer&,value:blot_check_check::DiagnosticContextKind)->Error {return writer.enumValue(value);}
 fn detailWrite(writer:Writer&,value:blot_reuse_dispatch_explanation::Explanation)->Error {return value.jsonStringify(writer);}
 fn detailWrite(writer:Writer&,value:blot_reuse_hole_diagnostics::Snapshot)->Error {return value.jsonStringify(writer);}
-fn forwardedDetails<T>(details:T)->bool {var forwarded=false;const for <N,A> in fields<T> {if N=="hole" || N=="explanation" || N=="contexts" {forwarded=true;}}return forwarded;}
 fn forwardedDetails<T>(details:const T[:])->bool {return false;}
-fn forwardedDetails<T>(details:T[:])->bool {return false;}
 fn publishedDiagnostic<T>(unit:u32,stage:const u8[:],source:const u8[:],publication:blot_parse_syntax_diagnostics::Publication,details:T)->Diagnostic,Error {
  let created,error=init(unit,stage,publication.code,publication.span,publication.message);if error!=blot_error::Error.none {return Diagnostic{},error;}var result=created;var published=false;
  var bytes:u8[>..]=[];var writer=Writer{out:bytes,options:blot_json::Options{}};let error=detailWrite(writer,details);if error!=blot_error::Error.none {let __cleanup_result_1_0: Diagnostic = Diagnostic{}; let __cleanup_result_1_1: Error = error; {if !published {result.deinit();}} return __cleanup_result_1_0, __cleanup_result_1_1;}if writer.failure!=blot_error::Error.none {let __cleanup_result_2_0: Diagnostic = Diagnostic{}; let __cleanup_result_2_1: Error = writer.failure; {if !published {result.deinit();}} return __cleanup_result_2_0, __cleanup_result_2_1;}
@@ -251,3 +249,7 @@ fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::Hole
 fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::ExplanationDetails)->Error {return detailRecord(writer,value);}
 
 fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::ContextDetails)->Error {return detailRecord(writer,value);}
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_dependency_consumer::HoleDetails)->bool {return true;}
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_dependency_consumer::ExplanationDetails)->bool {return true;}

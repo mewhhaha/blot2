@@ -216,7 +216,7 @@ fn read(self_:FileInputs&,path:const u8[:],maximum:i64,output:u8[>..<]&)->Error 
     if failure!=blot_error::Error.none {output.resize(before);}return failure;
 }
 fn resolve(self_:FileInputs&,source_filename:const u8[:],raw:const u8[:],options:Options,output:u8[>..<]&)->Error {self_.last_cause=default<const u8[:]>();return resolveImportPath(source_filename,raw,options,output);}
-fn deinitScratch<P>(self_:Loader<P>&) {self_.files.clear();self_.visits.clear();self_.stack.clear();self_.inherited_fixities.clear();}
+fn deinitScratch<P>(self_:Loader<P>&) {::clear(self_.files);self_.visits.clear();self_.stack.clear();self_.inherited_fixities.clear();}
 fn report<P>(self_:Loader<P>&,origin:Origin,code:Code,target:const u8[:],cause:blot_support::Option<const u8[:]>)->Error {
     var name:Symbol=0;let interned,error=self_.project.symbols.intern(target);
     if error==blot_error::Error.out_of_memory {return error;}if error==blot_error::Error.none {name=interned;}

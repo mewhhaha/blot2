@@ -39,7 +39,7 @@ fn capture(source:const u8[:],position:u32)->blot_support::Option<Probe>,Error {
   if token.tag==blot_parse_token::l_paren || token.tag==blot_parse_token::l_bracket {if depth==closing.len {recover=false;break;}var close:u8=')';if token.tag==blot_parse_token::l_bracket {close=']';}closing[depth]=close;depth++;}
   else if token.tag==blot_parse_token::r_paren || token.tag==blot_parse_token::r_bracket {var close:u8=')';if token.tag==blot_parse_token::r_bracket {close=']';}if depth==0 || closing[depth-1]!=close {recover=false;break;}depth--;}
  }
- if !recover {depth=0;}var bytes:u8[>..];bytes.append(source[..original_start]);let marker_start=bytes.len as u32;bytes.append(member_marker);let marker_end=bytes.len as u32;bytes.append(source[replace.end..]);while depth!=0 {depth--;bytes.push(closing[depth]);}
+ if !recover {depth=0;}var bytes:u8[>..]=[];bytes.append(source[..original_start]);let marker_start=bytes.len as u32;bytes.append(member_marker);let marker_end=bytes.len as u32;bytes.append(source[replace.end..]);while depth!=0 {depth--;bytes.push(closing[depth]);}
  let owned=repaired_sources.alloc_slice(bytes.len);for byte,index in bytes {owned[index]=byte;}return blot_support::some(Probe{source:owned,replace:replace,prefix:prefix,kind:kind,marker:Span{marker_start,marker_end},original_start:original_start,original_end:replace.end,original_length:source.len as u32}),blot_error::Error.none;
 }
 

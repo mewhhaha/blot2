@@ -37,8 +37,7 @@ source/toolchain manifest. From attempt175, an immutable input copy is kept at
 copying. Capture175 costs 0.1865 seconds. Later live edits cannot mix with those
 inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
-(currently45 seconds),
-then terminates the build and its compiler process group. A timeout is not a pass.
+(currently 45 seconds), then terminates the build and its compiler process group. A timeout is not a pass.
 
 Checkpoint `0e84f55bea07a49cf3fb74957923779ff717ada7` preserves the first
 frame, recursive-scratch, constructor and slice-selection repairs. Later repairs
@@ -52,17 +51,15 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen232 inputs. Build231 captured385
-errors across60 files;232 captured14 across12 files in86.32s under the same45s
-collection window. The opt-in1M cumulative clone-expansion checker passes201
-frontend and8 runtime parity controls plus bounded expansion controls; its
-independent tail-shape limit stays100k. Current source is still unverified as a
-whole compiler. The evidence pins all108 reconstructed checker source files. Build222 stops after46.13s at hash/asset/decoder API errors;
-223 advances to an unused Instance slice-field escape after46.64s.224 removes
-those two unobserved fields; substitution still fills the caller-owned buffers.
-Build224 stops after46.82s at a missing implementation-evidence scoped helper,
-collection-operation hash hook and asset text ownership. Those follow-on repairs
-remain in progress; whole emission/link/CLI/Wasm qualification remains pending.
+per stage. This checkpoint preserves exact frozen233 inputs. The completed233
+log captures30 diagnostics across20 files in86.81s, after232 captured48 across32.
+One actual module-stamp publication boundary remains even though focused saved
+header/reset controls pass. C emission, linking, CLI and Wasm qualification remain
+pending. Diagnostic counts now come only from completed logs. Both source runs
+use a45-second diagnostic window; their durations are failing-prefix observations.
+The opt-in1M cumulative clone-expansion checker passes201 frontend and8 runtime
+parity controls plus bounded expansion controls; its independent tail-shape limit
+stays100k. The evidence pins all108 reconstructed checker source files.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
 through one callback boundary. Actual core/snapshot admission methods use explicit
@@ -145,7 +142,7 @@ Both reviews,14 AST laws,256 ordered comparisons,201 frontend and eight runtime
 parity controls pass. These are not completed compiler timings. The
 [accepted receipt](../../benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json)
 pins the candidate and incremental source patch. The tracked builder recipe now
-reconstructs all108 candidate source files byte-for-byte with zero fuzz or offset;
+reconstructs all 108 candidate source files byte-for-byte with zero fuzz or offset;
 no rebuild was needed to verify adoption. Installed Goose and Zig are unchanged.
 
 

@@ -27,16 +27,18 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen232
-checkpoints the broad owner/publication and recursive API repair batch. Focused
-buffer, query, retained-state, decoder and framing fixtures pass their pinned
-controls. The latest whole run stops after86.32s with14 captured diagnostics
-across12 files in a45s diagnostic window, down from385 across60 files in231.
-The opt-in private checker raises cumulative const-for clone expansion from100k
-to1M; its separate tail traversal stays100k.201 frontend and8 runtime controls
-match the preceding checker, and over-budget expansion still rejects. These are
-bounded failing-prefix runs, not completed compiler timings. Component receipts
-qualify exact hashes; whole-program emission, linking and execution remain pending.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen233
+checkpoints recursive scratch, canonical type-store, diagnostic dispatch and
+retained-key ownership repairs. Native append-only module-stamp entries preserve
+exact saved headers; their focused runtime/reset controls pass, but one actual
+whole-context storage error remains. The latest whole run stops after 86.81s
+with 30 diagnostics across 20 files, including a standard-library instantiation,
+down from 48 across 32 files in232. C emission, linking and execution remain
+pending. The opt-in private checker raises cumulative const-for clone expansion
+from100k to1M; its separate tail traversal stays100k. Its201 frontend and8
+runtime controls match the preceding checker, and over-budget expansion rejects.
+Component receipts qualify exact hashes; bounded failing runs do not establish
+completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

@@ -64,3 +64,5 @@ fn projectDiagnostics(writer:blot_io::Writer,filename:const u8[:],loaded:blot_re
   else {error=namedDiagnostic(writer,path,"check-project",item.codeName(),item.span,item.message(),loaded.symbols,item.symbol);}if error!=blot_error::Error.none {return error;}
  }return blot_error::Error.none;
 }
+
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_cli::ContextDetails)->bool {return true;}

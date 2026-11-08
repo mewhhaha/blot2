@@ -83,7 +83,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_check_core::BindingRef[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_check_core::BindingRef[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -115,7 +115,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_check_core::ErasedDeclarationReference[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_check_core::ErasedDeclarationReference[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -143,7 +143,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_check_types::Obligation[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_check_types::Obligation[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -193,7 +193,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_check_core::Binding[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_check_core::Binding[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -225,7 +225,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_check_core::CallInfo[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_check_core::CallInfo[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -253,7 +253,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_check_core::Obligation[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_check_core::Obligation[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -285,7 +285,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_check_core::Associated[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_check_core::Associated[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -313,7 +313,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_reuse_principal_interface::Implementation[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_reuse_principal_interface::Implementation[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -359,7 +359,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_reuse_principal_interface::ImplementationMember[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_reuse_principal_interface::ImplementationMember[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -395,7 +395,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_reuse_principal_interface::SelectedProof[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_reuse_principal_interface::SelectedProof[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -427,7 +427,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_check_core::ResolverInfo[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_check_core::ResolverInfo[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -557,7 +557,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_reuse_principal_interface::Binding[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_reuse_principal_interface::Binding[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -635,7 +635,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_reuse_frozen_dependency::Export[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_reuse_frozen_dependency::Export[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -667,7 +667,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_reuse_frozen_dependency::Fixity[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_reuse_frozen_dependency::Fixity[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
@@ -711,7 +711,7 @@ for &item in value {let error=scan(item,targets,remaining,changed);if error!=blo
 
 }
 
-fn rewriteOwned<O>(owner:O&,value:const blot_reuse_frozen_dependency::Module[:]&,targets:Targets,remaining:i64&,changed:bool&)->Error {
+fn rewriteOwned<O>(owner:O&,value:const blot_reuse_frozen_dependency::Module[:],targets:Targets,remaining:i64&,changed:bool&)->Error {
 let charged=visit(remaining);if charged!=blot_error::Error.none {return charged;}
 
 let items=owner.mutable(value);for &item in items {let error=rewriteOwned(owner,item,targets,remaining,changed);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;

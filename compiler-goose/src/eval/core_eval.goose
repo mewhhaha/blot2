@@ -1414,6 +1414,11 @@ fn contains(self_: const SummaryKeysMap&,key: CallSummaryKey) -> bool { return s
 fn insert(self_: SummaryKeysMap&,key: CallSummaryKey,value: i64) { var view=blot_support_pooled_map::Map<CallSummaryKey,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_SummaryKeysMap); self_.count=view.count; self_.slots=view.slots; }
 fn remove(self_: SummaryKeysMap&,key: CallSummaryKey) { var view=blot_support_pooled_map::Map<CallSummaryKey,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: SummaryKeysMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
+fn reserve(self_: SummaryKeysMap&,needed: i64) {
+ if needed<=0||needed<=self_.slots.len-(self_.slots.len+2)/3 {return;}
+ var capacity=max(8,self_.slots.len);while needed>capacity-(capacity+2)/3 {assert(capacity<=0x3fffffffffffffff);capacity*=2;}
+ var view=blot_support_pooled_map::Map<CallSummaryKey,i64> {count:self_.count,slots:self_.slots};blot_support_pooled_map::grow(view,capacity,pool_SummaryKeysMap);self_.slots=view.slots;
+}
 fn release(self_: SummaryKeysMap&) { if self_.slots.len!=0 { pool_SummaryKeysMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<CallSummaryKey,i64>[:]>(); self_.count=0; }
 
 struct SummaryActiveMap { count: i64=0,slots: dictionary_slot<Target,i64>[:]=default<dictionary_slot<Target,i64>[:]>() }
@@ -1567,7 +1572,7 @@ fn getInner(self_: PrincipalQueries&,key: PrincipalGraphKey,session: const Sessi
  if self_.owner!=session.owner_id||self_.units!=unitsIdentity(session)||self_.unit_count!=session.units.len { return PrincipalAnswer {}; } if self_.claim==PrincipalClaim.source_description&&self_.declines.contains(key) { return PrincipalAnswer {found:true}; }
  let adapter=PrincipalAdapter {self_.claim}; var cursor=self_.table.candidates(adapter.fingerprint(PrincipalQueryKey {key,self_.claim,self_.force_collision}),blot_reuse_semantic_query_table::Order.oldest_first); var remaining=self_.lookup_budget;
  loop { let position=cursor.next(); if !position.present { break; } if !inspect(self_,remaining,false) { return PrincipalAnswer {}; } let record=self_.table.records[position.value]; if record.key.source!=key { continue; } var valid=true;
-  for fact,index in record.dependencies.plain { if !inspect(self_,remaining,true) { return PrincipalAnswer {}; } if !fact.read { continue; } var actual=blot_support::none<bool>(); let known=session.specializations.plain_nominals.get(fact.key); if known { actual=blot_support::some(known); } if record.dependencies.has_writes { var prior=index; while prior!=0 { prior--; if !inspect(self_,remaining,true) { return PrincipalAnswer {}; } let write=record.dependencies.plain[prior]; if !write.read&&write.key==fact.key { actual=blot_support::some(write.plain); break; } } } if fact.present { valid=valid&&actual.present&&actual.value==fact.plain; } else { valid=valid&&!actual.present; } if !valid { break; } }
+  for fact,index in record.dependencies.plain { if !inspect(self_,remaining,true) { return PrincipalAnswer {}; } if !fact.read { continue; } var actual=blot_support::none<bool>(); let known=session.specializations.plain_nominals.get(fact.key); if known { actual=blot_support::some<bool>(known); } if record.dependencies.has_writes { var prior=index; while prior!=0 { prior--; if !inspect(self_,remaining,true) { return PrincipalAnswer {}; } let write=record.dependencies.plain[prior]; if !write.read&&write.key==fact.key { actual=blot_support::some(write.plain); break; } } } if fact.present { valid=valid&&actual.present&&actual.value==fact.plain; } else { valid=valid&&!actual.present; } if !valid { break; } }
   if valid { return PrincipalAnswer {true,record.value.graph}; }
  } return PrincipalAnswer {};
 }

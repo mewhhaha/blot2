@@ -1,9 +1,52 @@
 """Emit explicit struct hooks; Goose ranks generic overloads without specificity."""
 from pathlib import Path
 import re
+import sys
+from source_model import clean, balanced, split
 
 ROOT = Path(__file__).resolve().parents[1] / 'src'
 TARGET = ROOT / 'support/structural_adapters.goose'
+# Concrete equality covers only explicitly selected private domains. Tagged
+# enums compare their active payload fields, never owner addresses or padding.
+ENUM_EQUALITY = {
+    'blot_backend_layout::Tag': ('backend/layout.goose', 'Tag'),
+    'blot_eval_eval_values::ValueKind': ('eval/eval_values.goose', 'ValueKind'),
+    'blot_eval_eval_values::ClosureOrigin': ('eval/eval_values.goose', 'ClosureOrigin'),
+    'blot_eval_type_evidence::Tag': ('eval/type_evidence_schema.goose', 'Tag'),
+    'blot_eval_implementation_evidence::ProofKind': ('eval/implementation_evidence.goose', 'ProofKind'),
+    'blot_reuse_code_artifacts::Request': ('reuse/code_artifacts.goose', 'Request'),
+    'blot_reuse_code_artifacts::OperationLocation': ('reuse/code_artifacts.goose', 'OperationLocation'),
+}
+def enum_equalities():
+    result={}
+    for qualified,(path,name) in ENUM_EQUALITY.items():
+        source=clean((ROOT/path).read_text());match=re.search(r'\benum\s+'+name+r'\s*\{',source);opening=match.end()-1
+        variants=[]
+        for part in split(source[opening+1:balanced(source,opening)]):
+            variant=re.match(r'\s*(\w+)',part)[1]
+            fields=[]
+            if '{' in part:
+                for field in split(part[part.index('{')+1:part.rindex('}')]):
+                    found=re.match(r'\s*(\w+)\s*:',field)
+                    if found:fields.append(found[1])
+            variants.append((variant,fields))
+        prefix='fn equal(left:'+qualified+',right:'+qualified+')->bool {'
+        if not any(fields for _,fields in variants):result[qualified]=prefix+'return left==right;}'
+        else:
+            arms=[]
+            for variant,fields in variants:
+                check='true'
+                if fields:check=' && '.join('equal(a.'+field+',b.'+field+')' for field in fields)
+                payload=' a' if fields else '';other=' b' if fields else ''
+                arms.append(variant+payload+'=>{match right {'+variant+other+'=>{return '+check+';},_=>{return false;}}},')
+            result[qualified]=prefix+'match left {'+''.join(arms)+'}}'
+    return result
+if sys.argv[1:]==['--repair-enum-equality']:
+    source=TARGET.read_text();count=0
+    for name,hook in enum_equalities().items():
+        if re.search(r'fn equal(?:<[^>]+>)?\(left:[^,]+,\s*right:\s*'+re.escape(name)+r'\)',source):continue
+        source+='\n'+hook+'\n';count+=1
+    TARGET.write_text(source);print('Added',count,'enum equality hooks');raise SystemExit(0)
 structs = {}
 custom_equal = set()
 custom_hash = set()
@@ -68,4 +111,6 @@ for name, variants in {
         for ordinal, variant in enumerate(variants):
             arms.append(variant+'=>{hash(sink,'+str(ordinal)+' as u8);},')
         out.append('fn hash<StructuralSink>(sink:StructuralSink&,value:'+name+') {match value {'+''.join(arms)+'}}')
+for name,hook in enum_equalities().items():
+    if name not in custom_equal:out.append(hook)
 TARGET.write_text('\n'.join(out) + '\n')
