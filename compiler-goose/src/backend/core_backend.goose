@@ -475,10 +475,10 @@ fn seedNamedInstance<M>(generator: Generator&, key: Key, mappings: M&) -> blot_e
     return blot_error::Error.none;
 }
 fn findRetained(generator: Generator&, retained: blot_reuse_artifact_fragment::State&, request: blot_reuse_code_artifacts::Request) -> blot_support::Option<u32>, blot_error::Error {
-    let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.lookup); let found, error = retained.find(generator, request); timing.deinit(); return found, error;
+    let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.lookup); let owned:Generator& =blot_compile_workspace::canonicalGenerator(generator); let found, error = retained.find(owned, request); timing.deinit(); return found, error;
 }
 fn reconstructRetained(generator: Generator&, retained: blot_reuse_artifact_fragment::State&, id: u32, request: blot_reuse_code_artifacts::Request, scope: blot_reuse_code_artifacts::Scope&?) -> u32, blot_error::Error {
-    let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.replay); let rebuilt, error = retained.reconstruct(generator, id, request, scope); timing.deinit(); return rebuilt, error;
+    let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.replay); let owned:Generator& =blot_compile_workspace::canonicalGenerator(generator); let rebuilt, error = retained.reconstruct(owned, id, request, scope); timing.deinit(); return rebuilt, error;
 }
 fn replayRequest(generator: Generator&, request: blot_reuse_code_artifacts::Request) -> u32, blot_error::Error {
     match request {
@@ -514,10 +514,12 @@ fn publishRetainedResult(generator: Generator&, request: blot_reuse_code_artifac
 }
 fn unusedAggregate(generator: Generator&, unit_id: u32, binding: blot_check_core::BindingId) -> bool, blot_error::Error {
     block { let known = generator.planning.discard_proofs.get(unit_id); if known { return known.admits(binding), blot_error::Error.none; } }
-    let proof,error = blot_backend_discarded_bindings::init(generator.planning.discard_flags, generator.unit(unit_id), unit_id);if error!=blot_error::Error.none {return false,error;}
-    let admitted = proof.admits(binding); generator.planning.discard_proofs.insert(unit_id, proof); return admitted, blot_error::Error.none;
+    let owned:Generator& =blot_compile_workspace::canonicalGenerator(generator);
+    let proof,error = blot_backend_discarded_bindings::init(owned.planning.discard_flags, owned.unit(unit_id), unit_id);if error!=blot_error::Error.none {return false,error;}
+    let admitted = proof.admits(binding); owned.planning.discard_proofs.insert(unit_id, proof); return admitted, blot_error::Error.none;
 }
-fn specializer(generator: Generator&) -> blot_eval_specialization::Service, blot_error::Error {
+fn specializer(source: Generator&) -> blot_eval_specialization::Service, blot_error::Error {
+    let generator:Generator& =blot_compile_workspace::canonicalGenerator(source);
     let bridge, error = generator.representations.representationBridge(generator.evaluator.evidenceStore());
     return blot_eval_specialization::Service { timing: generator.work_timing, units: generator.units, evaluator: generator.evaluator, layouts: generator.representations.store, bridge: bridge, refinement_stats: generator.refinement_stats, refinement_regions: generator.work.refinement_regions, cache: generator , ..}, error;
 }
@@ -570,17 +572,17 @@ fn mapCapturedFunction<M,R>(generator: Generator&, unit_id: u32, function_type: 
 }
 fn completedQueryLookup(generator: Generator&, session: blot_eval_core_eval::Session&, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error {
     if !(session .== generator.evaluator) { return blot_support::none<u32>(), blot_error::Error.none; }
-    let query .= generator.query_state; if query { return query.lookup(generator, input, expected); } return blot_support::none<u32>(), blot_error::Error.none;
+    let query .= generator.query_state; if query { let owned:Generator& =blot_compile_workspace::canonicalGenerator(generator); return query.lookup(owned, input, expected); } return blot_support::none<u32>(), blot_error::Error.none;
 }
 fn completedMemberLookup(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error {
     if !(session .== generator.evaluator) { return blot_support::none<u32>(), blot_error::Error.none; }
-    let query .= generator.query_state; if query { return query.lookupMember(generator, target, input, expected); } return blot_support::none<u32>(), blot_error::Error.none;
+    let query .= generator.query_state; if query { let owned:Generator& =blot_compile_workspace::canonicalGenerator(generator); return query.lookupMember(owned, target, input, expected); } return blot_support::none<u32>(), blot_error::Error.none;
 }
 fn lookupSpecialization(generator: Generator&, session: blot_eval_core_eval::Session&, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error { return completedQueryLookup(generator, session, input, expected); }
 fn lookupMemberSpecialization(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error { return completedMemberLookup(generator, session, target, input, expected); }
 fn constantLookup(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, inputs: blot_reuse_constant_receipt::Inputs) -> blot_support::Option<blot_reuse_constant_receipt::Lookup>, blot_error::Error {
     if !(session .== generator.evaluator) { return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none; }
-    let constant .= generator.constant_state; if constant { return constant.lookup(generator, target, inputs); } return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none;
+    let constant .= generator.constant_state; if constant { let owned:Generator& =blot_compile_workspace::canonicalGenerator(generator); return constant.lookup(owned, target, inputs); } return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none;
 }
 fn principalLookup(source: Generator&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options) -> blot_support::Option<blot_eval_core_eval::SolvedEvidence>, blot_error::Error {
     let generator:Generator& =blot_compile_workspace::canonicalGenerator(source);

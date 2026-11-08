@@ -76,7 +76,7 @@ fn destroyContexts(state:FrameState&) {
  // transfer may already have moved its metadata/token out of this frame.
  var publication=blot_backend_result_publication::Owner{..};
  if state.workspace {
-  let workspace .= state.workspace;publication=workspace.publication_owner;
+  let workspace .= state.workspace;assert(workspace);publication=workspace.publication_owner;
   workspace.origins.deinit();workspace.candidate.deinit();workspace.vectors.deinit();
   workspace.replay_origins.deinit();workspace.replay_candidate.deinit();workspace.replay_vectors.deinit();workspace.replay_module.deinit();
   workspace.retained.deinit();workspace.principal_state.deinit();workspace.persisted_principals.deinit();workspace.query_state.deinit();workspace.constant_state.deinit();

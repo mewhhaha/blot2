@@ -248,3 +248,74 @@
      }
      if (!known) return false;
      out.Add(r);
+
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2211,2 +2211,3 @@
+-    bool TryMatch(SFunction *sf, Call *c, vector<Val> &argvals, MatchInfo &mi, string &why,
+-                  bool defaults = false);
++    // A null why omits only discarded failure rendering, never matching work.
++    bool TryMatch(SFunction *sf, Call *c, vector<Val> &argvals, MatchInfo &mi,
++                  string *why = nullptr, bool defaults = false);
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -877,2 +877 @@
+-        string why;
+-        if (!TryMatch(sf, c, argvals, mi, why)) continue;
++        if (!TryMatch(sf, c, argvals, mi)) continue;
+--- a/src/typecheck_calls.h
++++ b/src/typecheck_calls.h
+@@ -578,2 +578,6 @@
+-        if (!TryMatch(sf, c, argvals, mi, why, true)) {
+-            if (failures)
++        string *explanation = nullptr;
++        // Either success list makes ResolveCall's no-match text unreachable.
++        // Keep trying every candidate, in order, for ranking and ambiguity.
++        if (failures && tied.empty() && converting.empty()) explanation = &why;
++        if (!TryMatch(sf, c, argvals, mi, explanation, true)) {
++            if (explanation)
+@@ -710 +714 @@
+-                                string &why, bool defaults) {
++                                string *why, bool defaults) {
+@@ -722 +726 @@
+-        why = cat("too few arguments: ", (int64_t)K, " given, ", R < P ? "at least " : "",
++        if (why) *why = cat("too few arguments: ", (int64_t)K, " given, ", R < P ? "at least " : "",
+@@ -727 +731 @@
+-        if (argvals[i].type != fntype) { why = "too many arguments"; return false; }
++        if (argvals[i].type != fntype) { if (why) *why = "too many arguments"; return false; }
+@@ -731 +735 @@
+-        why = "too many explicit type arguments";
++        if (why) *why = "too many explicit type arguments";
+@@ -796 +800 @@
+-                    why = "function values bind to generic parameters, not untyped ones";
++                    if (why) *why = "function values bind to generic parameters, not untyped ones";
+@@ -801 +805 @@
+-                    why = cat("cannot infer a type for argument ", (int64_t)i + 1);
++                    if (why) *why = cat("cannot infer a type for argument ", (int64_t)i + 1);
+@@ -812 +816 @@
+-                why = cat("argument ", (int64_t)i + 1, ": cannot pass ", TypeStr(at), " as ",
++                if (why) *why = cat("argument ", (int64_t)i + 1, ": cannot pass ", TypeStr(at), " as ",
+@@ -816,3 +820,7 @@
+-                if (av.litelems && st && !LitElemsAt(av, st, tofloat, &litwhy) &&
+-                    !litwhy.empty())
+-                    Append(why, ": ", litwhy);
++                if (av.litelems && st) {
++                    string *explanation = nullptr;
++                    if (why) explanation = &litwhy;
++                    // Preserve the original literal check and its interning work.
++                    if (!LitElemsAt(av, st, tofloat, explanation) && why && !litwhy.empty())
++                        Append(*why, ": ", litwhy);
++                }
+@@ -838 +846 @@
+-            why = cat("cannot infer ", g, ", which the default of parameter ",
++            if (why) *why = cat("cannot infer ", g, ", which the default of parameter ",
+@@ -848 +856 @@
+-        why = need ? cat((int64_t)need, " function value(s) for ",
++        if (why) *why = need ? cat((int64_t)need, " function value(s) for ",
+@@ -872 +880 @@
+-            why = cat("cannot infer the type of parameter ", sf->params[i].name,
++            if (why) *why = cat("cannot infer the type of parameter ", sf->params[i].name,
+@@ -1134,2 +1142 @@
+-                string why;
+-                if (!TryMatch(sf, c, vals, mi, why, defaults)) continue;
++                if (!TryMatch(sf, c, vals, mi, nullptr, defaults)) continue;

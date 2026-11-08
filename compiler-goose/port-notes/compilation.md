@@ -51,20 +51,33 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 301 inputs and selects private
-checker 4e93 explicitly. Its one-condition ContentsReadBack fix recognizes the
-existing global-only null-root bound without changing alternatives or exactness.
-Both stock b27 and 869 false positives reproduce in 4 functions, including an unused
-scalar parameter and the actual inactive-reference Expected variant. Ten valid
-cases execute on 4e93; 26 strict mutation/escape/shrink/identity negatives still
-reject, and 201 frontend/8 executed-runtime cases have exact prior 869 parity. All 108
-source files reconstruct from the tracked patch with zero fuzz/offset. No upstream,
-installed or default tool is modified. Original children source is restored.
-The actual run clears its old false error and stops after 98.681s with one genuine
-nondefaultable PrincipalVisit scratch-slot error. Whole parsing passes 440 files;
-no C/header/executable exists yet. Caps remain 120/300s. Earlier dispatch and
-scalar-helper experiments failed and were removed; compact old/new controls did
-not reproduce the checker defect until the recursive/inactive-variant trigger.
+per stage. This checkpoint preserves exact frozen 312 inputs and selects private
+checker ce317 explicitly. Its preceding one-condition ContentsReadBack correction
+recognizes the existing global-only null-root bound without changing alternatives
+or exactness. Stock b27 and 869 false positives reproduce in four functions.
+Ten valid cases execute; 26 strict mutation/escape/shrink/identity negatives reject.
+The added performance change skips diagnostic text only when no-match diagnostics
+cannot be consumed, retaining matcher work and candidate ordering. Against 4e93,
+201 frontend/8 runtime/20 focused outcomes match, as do 15 emitted-C comparisons.
+Five paired same-CPU synthetic checks improve 24–32% at 512–2048 overloads;
+direct controls are within 2%. These do not establish a whole-port improvement.
+The tracked patch reconstructs all 108 source files with zero fuzz/offset. No
+upstream, installed or default tool is modified.
+
+Source 302–312 repairs nondefaultable PrincipalVisit capacity slots, optional
+field loads, Session diagnostic publication, fieldType's actual tuple API,
+recursive region worklist attachment and summary-job compaction. Canonical
+Generator boundaries retain exact registry/slot/pointer checks. Ten annotations
+follow the concrete summary callback cycle; seven nonrecursive constructors or
+setters preserve original defaults, values and evaluation order. Independent
+inversion reviews and focused controls retain their exact limits in the receipt.
+Actual 312 clears both optional reads and stops after 110.088s at a reference
+stored after a recursive call in principalEvidenceRegionInner. The next repair
+extracts its record-publication tail through an ordinary nonrecursive boundary. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
+remain 120/300s with a 3s first-error window. Earlier dispatch and scalar-helper
+experiments failed and were removed after the private correctness fix; original
+code_expectation children source is restored. Whole compiler/runtime parity is
+still pending.
 Complete hash/JSON adapters now dispatch by receiver's nominal namespace: global
 hash/write sets shrink 3,005/3,325→1/2 while equality stays unchanged. Independent
 inversion preserves all 2,921 generated hash/3,304 JSON heads, 50 custom hashes and 5

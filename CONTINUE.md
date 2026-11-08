@@ -27,21 +27,26 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen 301
-uses a checked private Goose correctness fix. Stock and prior checkers misread an
-explicit global-only provenance bound as unknown, incorrectly blaming an unused
-scalar parameter in four functions. The one-condition fix preserves alternatives
-and exactness; 10 positive cases execute, 26 independent strict negatives reject,
-and 201 frontend/8 executed-runtime cases match the prior checker exactly. The
-tracked recipe reconstructs all 108 source files byte-exactly. Installed tools,
-upstream checkout and Zig oracle are unchanged.
-Original code_expectation children source is restored, and the actual build
-clears that false error. Whole parsing passes 440 files. The completed run stops
-after 98.681s with 1 genuine PrincipalVisit spare-capacity default error; its graph
-field has no default. C emission/linking/execution remain pending. Caps stay
-120/300s with 3s partial first-error collection. Complete hash/JSON namespace
-adapters and the journal retain their focused qualification; no completed compiler
-speed or whole-runtime parity is established.
+including its source delta and byte-exact tracked recipe reconstruction. Private
+checker ce317 now also defers unused overload diagnostic formatting. The preceding
+global-bound correctness fix preserves all provenance alternatives and exactness;
+10 positive cases execute and 26 strict negatives reject. The formatting candidate
+matches 201 frontend cases, 8 executed runtimes, 20 focused cases and 15 emitted-C
+comparisons. Same-CPU synthetic overload checks improve 24–32% at 512–2048 heads;
+direct-call controls stay within 2%. This is not whole-port performance evidence.
+The tracked recipe reconstructs all 108 checker source files byte-exactly with no
+fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
+
+Source repairs now cover PrincipalVisit capacity initialization, canonical
+Session/Generator publication, summary-job compaction and the concrete recursive
+summary callback cycle. Frozen 312 adds two local optional-read narrowings. The
+actual 312 build clears those optional reads and stops after 110.088s at a
+reference stored after a recursive call in principalEvidenceRegionInner. Whole parsing passes 440 files. No whole-program C,
+header, executable, Wasm comparison or Gdev result exists yet. Caps remain
+120/300s with a 3s first-error collection window. Focused controls qualify only
+their named source/carriers; source checkpoints remain unverified whole-compiler
+work. Complete hash/JSON namespace adapters and the journal retain their focused
+qualification. No completed compiler speed or whole-runtime parity is established.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 
