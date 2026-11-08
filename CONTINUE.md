@@ -40,132 +40,33 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-The checkpoint through frozen376 replaces Session's Generator backpointer with the existing scalar
-Frame token. Lookup retains live generation, current-frame, registry bounds and
-exact Session/Generator/Workspace identity checks. Three source files change;
-normal writers leave all generated adapters unchanged. Fourteen reduced Frame
-controls pass, and independent inversion preserves the surrounding source.
-The static declaration graph falls 939→506; this is not an instantiated-type or
-time measurement. Six readonly Plan parameters also pass the small view by value
-through the actual forwarding chain; local-reference escapes still reject.
+Frozen377 is the current source checkpoint. The owned-constraint constructor
+preserves all 31 fields and keeps region/principal name pools distinct. Its
+99.336s run clears the previous name-transfer error and reaches publication of
+PrincipalGraph. Next, preserve the graph's ten copied slice families, its
+transferred StoreSnapshot and exactly one fresh graph ID while removing the
+original description's borrowed provenance. No extra clone is authorized merely
+as a type-checking workaround.
 
-Actual321 reaches a new active-seed-borrow diagnostic after 74.174s, compared with
-320's 115.636s at the preceding Plan binding error. Frozen322 returns the same
-live anchor prefix through its named pool; concrete clone-path analysis excludes
-anchor invalidation. Its74.494s run reached another readonly Plan forwarding
-path. Frozen324 passes that path by value and indexes live mapping/row buffer
-item views; the74.640s actual run reaches an importer call API mismatch. Frozen325 fixes
-that Option API, two pure reference selectors, nine descriptor reservations with
-original error order, typed BufferMap capacity and two children item views.
-Its82.987s run reaches cached evidence-store destination provenance. Frozen326
-reconstitutes that borrowed store through its existing lease/generation and nine
-exact reference checks.32 focused controls pass, but the79.101s actual run still
-stops at the source-view cache boundary. Two readonly Snapshot projections by
-value alone did not fix the actual source path. Frozen328 keeps only destination
-and memo maps in the retained cache; a scoped reader borrows the source View per
-call. This supports real unleased worker inputs without new lifetime authority.
-Focused memo/fuel/mint/cleanup/escape controls pass; its76.804s run clears that
-cache boundary and reaches a temporary result-return lifetime error. Frozen329
-returns a validated live pool prefix on success and empty output on error before
-original cleanup; focused transfer/escape controls pass. Frozen330 also creates a
-readonly mapping header before Option wrapping. Its77.047s run reaches a nullable
-PrincipalGraph conversion. Frozen333 retains each missing/null branch before
-three local graph narrowings, fixes the readonly encoded view, and handles two
-concrete source/evidence callback cycles with pure factories and original-point
-setters. Its80.617s run reaches an owned recursive-result return; successful
-three-pool reconstitution clears that return in334. Subsequent checked batches
-move the judgment tail, preserve lexical subspan bounds, fix specialization hash
-streams, reconstitute owned receipt/proof payloads, qualify local map dispatch,
-and narrow a retained-record local. Actual342 stops after84.048s at proof
-metadata descriptor iteration. Frozen346 fixes the actual records view/callback/typed-empty APIs, supplies the
-existing private Session identity to its one-layout Probe, and handles the exact
-17-function proof callback cycle. Registered Tape/Observation owners replace
-stack headers stored in Session; pointers clear before owners are released.
-Its97.810s run reaches a new recovered-proof recursive assignment. Frozen348
-uses a typed setter there and splits private layout import from proof evaluation.
-The scalar expected ID lives in Session evidence; importer/layout owners end
-before recursive proof work. This avoids unsupported recursive local growers
-without a new storage registry. Earlier frees change allocation interleaving.
-Its84.214s run reaches Candidate Plan-header retention. A by-value field alone
-did not clear it. Frozen350 passes Plan explicitly to its two consumers instead
-of retaining it in Candidate; its83.663s run reaches a missing QueryStorage
-root_buffer default, defined as null in the native oracle. Frozen352 restores
-that declaration and routes six existing recorder assignments through the typed
-setter at their original points. Its87.459s check reaches a MemberTrace missing
-entries initializer. Frozen353 initializes that fixed scratch capacity and
-restores the native-null QueryScratch policy default. Its86.662s run reaches
-trace-header provenance through the callback context. Frozen354 uses a checked
-existing-slot lookup while the outer call keeps the trace slot live, and handles
-the exact partial-array callback cycle. Sixteen reduced controls execute on both
-checkers. Its87.297s run clears that boundary and reaches recursive result stores
-in constant-receipt demand queries. Frozen355 handles that ten-head cycle and
-uses typed query setters and pure lookup/storage constructors. Independent
-review preserves all Input fields, defaults and cleanup order. Its87.474s run
-reaches pooled record insertion provenance. Frozen356 reconstructs the already
-owned record through its five named slice pools and exact optional output-header
-identity; fourteen reduced controls pass on both checkers. No allocation or
-payload copy is added. Frozen357 passes scalarRoot's readonly view by value,
-matching the native oracle and all five callers. Its89.755s run reaches an
-integer-enum switch missing a fallback. Frozen358 adds an invalid-value abort,
-preserving all four native enum cases. Frozen359 constructs panic diagnostics
-through the registered Session and its invocation-live module catalog, preserving
-the original message slice without allocation. Independent review checks the
-catalog lifetime and existing-diagnostic guard. Its92.853s run reaches a mutable
-Flow variable inferred as one variant. Frozen360–362 annotate four parent enum
-variables, extract three ragged constructors, preserve diagnostic/region restore
-order through typed setters, and mark the exact prepare/prepareAll recursion.
-Independent source review passes. Counter's fixed scratch capacity now defaults
-to zero; its runtime cost is unmeasured. Its92.737s run reaches Frame descriptor
-retention in the pooled RaggedRegion. That region only reads Frame.owner_id at
-two sites. Frozen363 retains only that scalar, preserving both identity guards
-and passing the original full Frame to execution. Exact source review confirms
-no allocation, payload copy or owner-ID mint. Its92.917s run clears that boundary
-and reaches a missing fixed-capacity Plan.aliases initializer in indexed building.
-Frozen364 initializes that capacity and the native-undefined edit capacity;
-active prefixes and counts are unchanged. Frozen365 restores analyze's native
-optional-plan API and retains only IndexedRegion's frame ID, forwarding the
-existing caller Frame to its sole edit helper. Exact source review preserves
-accepted-path scalar/header aliases, identity guards and cleanup order. Its
-92.873s run clears those boundaries and reaches a recursive constant-recorder
-restore. Frozen366 routes twelve remaining stores in four already-recursive
-functions through the existing typed setter, preserving branch/cleanup order.
-Frozen367 makes an append-only ModuleRef temporary grow-only and passes its
-explicit slice to synchronous validation. Six reduced controls pass on both
-checkers; its93.248s run clears that borrow boundary and reaches direct indexing
-of RecorderInterfacesBuffer. Frozen368 uses its live items view and applies the
-audited grow-only pattern to five other append-only ModuleRef temporaries.
-Exact source inverses preserve all other code. Its93.316s run reaches a target
-parameter shadowing the lookup function. Frozen369 qualifies that exact call;
-Frozen370 lifts the plain requirement span into its optional Constraint field at
-the original evaluation point. Neighboring fields and existing name ownership
-remain unchanged. Its94.534s run reaches a redundant ImportPrincipal callback
-header copyback. Frozen371 removes that unchanged header assignment after exact
-callback review; pointee mutations already reach the caller. Frozen372 gives
-the private SmallOutput free-ID stack a grow-only backing and scalar active
-count. Exact source review and two executed original/new controls preserve
-LIFO IDs and every slot payload field across more than 2,000 transitions.
-Its95.334s run reaches another global-buffer alias at the same collectCallAt
-argument slice. Frozen373 copies those ordered child IDs into an invocation-owned
-named scratch run, preserving getter order and freeing it immediately after
-the call returns. Exact source review and two nested-copy controls pass. Its
-97.185s run clears the global alias boundary and reaches an empty UpdateStep
-placeholder initializer. Frozen374–375 replace that unused initializer with a
-typed declaration and explicitly narrow the guarded normalization tape. Exact
-callback review preserves its live owner and cleanup. Its98.567s run reaches
-owned Constraint bulk-append provenance. Frozen376 canonicalizes owned payloads
-after the original bulk reserve; exact source review preserves overflow,
-failure and length behavior. Its110.572s run used a bounded 15-second diagnostic
-window but yielded only one error. That batching experiment is rejected;
-three-second collection resumes. The new frontier is copyPrincipalConstraints'
-whole-record taint after replacing its copied name; direct owned-name record
-construction is next. Caps remain 120/300 seconds.
-No whole compiler success follows. Source and frontier differ,
-so this is shorter repair iteration, not a paired full-compile speed result.
-Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
-comparison or Gdev result exists for the port. Caps remain 120/300s with a 3s
-first-error window. The optional-global index showed no gain beyond controls and
-remains unselected; a query-specific array-cache gate passed correctness but regressed
-its measured stresses and remains unselected. Preserve the exact source/carrier limits in the linked evidence.
+Current representation repairs use the existing Session→Generator Frame token
+with live generation, current-frame and exact registered Session/Generator/
+Workspace identity checks. Retained import caches borrow source Views only per
+invocation. Readonly Plan headers travel explicitly; unused retained evaluator
+Frames are reduced to their existing identity scalar. Layout import ends before
+recursive proof evaluation. Named-pool receipts reconstruct already-live owned
+runs; range checks or owner IDs alone never establish liveness. Callback restores
+and cleanup retain their reviewed order. The collector's one new argument-ID
+copy and fixed scratch initialization costs remain unmeasured.
+
+Whole parsing passes 440 files, but no compiler C/header/executable, executed-Wasm
+comparison or Gdev result exists. These are failing-prefix measurements, not
+completed compilation timings or parity. Bounded attempts keep 120/300-second
+stage/overall caps and a three-second first-error window. One 15-second window
+returned only one error after110.572s and was rejected. Optional-global indexing
+showed no gain beyond controls; the array-cache gate regressed its stresses;
+both remain unselected. Exact repairs, rejected experiments and carrier limits
+remain in the linked qualification evidence and the
+[pinned repair history](https://github.com/mewhhaha/blot2/blob/a20bb37f4b1014bea338335e3802ebaaaad434af/CONTINUE.md).
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
 Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.
