@@ -5,6 +5,7 @@ import dictionary;
 import parse.ast;
 import check.core;
 import check.types;
+import check.effect_evidence;
 import check.check;
 import eval.core_eval;
 import eval.type_evidence;
@@ -383,6 +384,11 @@ recursive fn row<G>(self_: Importer&, g: G&, domain: Domain, id: u32, depth: i64
 fn sourceTypeWord(self_:const Importer&,domain:Domain,index:i64)->u32 {
  let old:const Pools& =requiredPools(self_.old);if domain==Domain.semantic {return old.evaluator.evidence.extra[index];}return old.layouts.extra[index];
 }
+fn sourceEffects(self_:const Importer&,domain:Domain)->blot_check_effect_evidence::View {
+    let old:const Pools& =requiredPools(self_.old);var source=old.layouts.effects.view();
+    if domain==Domain.semantic {source=old.evaluator.evidence.effects.view();}
+    return source;
+}
 fn sourceEffectLabel(self_:const Importer&,domain:Domain,index:i64)->u32 {
     let old:const Pools& =requiredPools(self_.old);if domain==Domain.semantic {return old.evaluator.evidence.effects.labels[index];}return old.layouts.effects.labels[index];
 }
@@ -392,8 +398,7 @@ fn sourceEffectArgument(self_:const Importer&,domain:Domain,index:i64)->u32 {
 recursive fn rowInto<G>(self_: Importer&, g: G&, domain: Domain, id: u32, depth: i64, imported: blot_reuse_source_value_template::WordBuffer&, arguments: blot_reuse_source_value_template::WordBuffer&) -> u32, Error {
     var label_start:i64=0;var label_count:i64=0;
     {
-        let old:const Pools& =requiredPools(self_.old);var source=old.layouts.effects.view();
-        if domain==Domain.semantic {source=old.evaluator.evidence.effects.view();}
+        let source=sourceEffects(self_,domain);
         if id>=source.rows.len {return 0,blot_error::Error.declined;}
         let span=source.rows[id];let labels,error=bounded(source.labels,span.start,span.len);
         if error!=blot_error::Error.none {return 0,convert(error);}
@@ -405,8 +410,7 @@ recursive fn rowInto<G>(self_: Importer&, g: G&, domain: Domain, id: u32, depth:
         let label=sourceEffectLabel(self_,domain,label_start+label_index);
         var operation=default<blot_check_effect_evidence::Operation>();var old_arg_count:i64=0;
         {
-            let old:const Pools& =requiredPools(self_.old);var source=old.layouts.effects.view();
-            if domain==Domain.semantic {source=old.evaluator.evidence.effects.view();}
+            let source=sourceEffects(self_,domain);
             if label==0 || label>=source.operations.len {return 0,blot_error::Error.declined;}
             operation=source.operations[label];
             if operation.instance.unit!=0 || operation.instance.decl!=0 {return 0,blot_error::Error.declined;}
