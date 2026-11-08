@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-The checkpoint through frozen375 replaces Session's Generator backpointer with the existing scalar
+The checkpoint through frozen376 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -152,9 +152,13 @@ the call returns. Exact source review and two nested-copy controls pass. Its
 placeholder initializer. Frozen374–375 replace that unused initializer with a
 typed declaration and explicitly narrow the guarded normalization tape. Exact
 callback review preserves its live owner and cleanup. Its98.567s run reaches
-owned Constraint bulk-append provenance; the existing owned-transfer recipe is
-next. One bounded 15-second diagnostic collection window will test multi-root
-error batching, keeping the same 120/300-second stage/overall caps.
+owned Constraint bulk-append provenance. Frozen376 canonicalizes owned payloads
+after the original bulk reserve; exact source review preserves overflow,
+failure and length behavior. Its110.572s run used a bounded 15-second diagnostic
+window but yielded only one error. That batching experiment is rejected;
+three-second collection resumes. The new frontier is copyPrincipalConstraints'
+whole-record taint after replacing its copied name; direct owned-name record
+construction is next. Caps remain 120/300 seconds.
 No whole compiler success follows. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm

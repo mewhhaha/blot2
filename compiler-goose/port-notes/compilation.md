@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen375 is the current source checkpoint. Selected private checker
+Frozen376 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -190,10 +190,15 @@ copy/allocation cost and physical OOM behavior remain unmeasured. Frozen374–37
 remove the unused UpdateStep initializer after its full branch assignments and
 narrow the normalization tape at its original use. Exact callback review keeps
 the TapeOwner live through normalization and clears its pointer before teardown.
-Its98.567s run reaches owned Constraint bulk-append provenance. The existing
-owned-transfer recipe is next. One 15-second diagnostic-collection experiment
-will test independent-root error batching within the unchanged 120/300-second
-stage/overall caps; it is not a pass or an open-ended compilation.
+Its98.567s run reaches owned Constraint bulk-append provenance. Frozen376 uses
+the existing canonical owned-name transfer after the original bulk reserve.
+Exact source review preserves overflow, sticky failure, reserve order and length
+updates; its two real sources are live region constraints with already-owned
+names, in a distinct source pool. Its110.572s run uses a bounded 15-second
+diagnostic window but returns only one error. The batching experiment is rejected;
+three-second collection resumes under unchanged 120/300-second stage/overall
+caps. The new frontier is copyPrincipalConstraints' whole-record taint after
+replacing a copied name; direct owned-name construction is next.
 No whole compiler C, header or executable has been emitted.
 The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
