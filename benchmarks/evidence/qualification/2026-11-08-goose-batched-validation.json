@@ -146,6 +146,45 @@
           }
         ]
       }
+    },
+    {
+      "batch": "selected-batch-4",
+      "snapshot": "8dc5f816",
+      "result": {
+        "partial": true,
+        "seconds": 79.253,
+        "results": [
+          {
+            "partial": true,
+            "engines": [
+              "check"
+            ],
+            "exit": 1,
+            "seconds": 39.24,
+            "stop": "completed",
+            "errors": [
+              {
+                "file": "/home/jacobt/src/blot2/build/goose-port/verification/batch-4-inputs/compiler-goose/src/backend/loop_targets.goose",
+                "line": 22,
+                "message": "error: cannot call pattern, which may shrink self_: the for loop at /home/jacobt/src/blot2/build/goose-port/verification/batch-4-inputs/compiler-goose/src/backend/loop_targets.goose:22 iterates self_.tree.children(id), which may refer into self_ (\u00a75.2)"
+              }
+            ],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "independent"
+            ],
+            "exit": 0,
+            "seconds": 79.195,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          }
+        ],
+        "full_qualification": false
+      }
     }
   ],
   "source_files": [
@@ -159,6 +198,7 @@
     "compiler-goose/src/source_identity.goose",
     "compiler-goose/tools/build_goose_checker.py"
   ],
-  "next": "convert append-only lowering Tables as one grow-only family; rerun affected roots, then full build after partial frontiers clear",
-  "oracle": "native Zig compiler unchanged; ABI8/session2 preserved"
+  "next": "backend loop-target AST spans; remaining lowering List-domain/API family",
+  "oracle": "native Zig compiler unchanged; ABI8/session2 preserved",
+  "source_batch": "59 append-only Table owners become grow-only; redundant proof-header staging removed; existing final dependency Owner copies payloads directly"
 }

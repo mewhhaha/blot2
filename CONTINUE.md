@@ -10,8 +10,10 @@ Work in large source batches. The current batch repairs 51 immutable AST loops,
 API/domain mismatches, signed metrics, five lowering Scratch containers and
 owned proof/evidence publication. Runtime and semantic production entry paths
 pass their partial checks. Checker/lower/independent paths are being repaired;
-latest lowering frontier is `quoteCaptures` retaining grow-shrink Tables views.
-All 59 Tables fields are append-only and should become grow-only together.
+Independent-proof path now also passes its partial check. Lowering has converted
+all 59 append-only Table owners to grow-only and removed redundant proof-header
+staging. Remaining frontiers are backend loop-target AST spans and lowering
+List-domain/API mismatches; the latter validate in about three seconds.
 
 Use `python3 compiler-goose/tools/check_engines.py` for five concrete production
 paths in parallel (`--engines check lower independent` narrows a batch).

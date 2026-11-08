@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": null
   },
-  "digest": "863e1476c2638b336059e7624de0b2695aeccc042b9825564d7ba9499c249fc7",
+  "digest": "732efa9a169920dafd2a305b0245ea6006f02a7cf4b78605cef1b6afc919d0f1",
   "goose": null,
   "qualification": "unverified source and build inputs",
   "resource_roots": [],
@@ -799,9 +799,9 @@
       "sha256": "4e27db917fbd1fa44ac8ec8211a5822304e1f6210c0642ae8b40f28b860ecd80"
     },
     {
-      "bytes": 257343,
+      "bytes": 257353,
       "path": "src/check/core_builder.goose",
-      "sha256": "fc0de14dcdfa2b7bb145cd6008735f20e1be215eeb8b3a6e06e02162f1d3a236"
+      "sha256": "c867b01c23daca695c7d631c0d7d37c90fadf985bb3dc95ad2ee5025a38c4102"
     },
     {
       "bytes": 12677,

@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--engines', nargs='+', choices=ENGINES, default=ENGINES)
     parser.add_argument('--timeout', type=float, default=120)
     parser.add_argument('--jobs', type=int, default=5)
+    parser.add_argument('--source', type=Path, default=ROOT / 'compiler-goose/src/_diagnostic_roots.goose')
     parser.add_argument('--output', type=Path, default=ROOT / 'build/goose-port/engine-checks')
     args = parser.parse_args()
     if not args.goose.exists():
@@ -34,7 +35,8 @@ def main():
         def check_one(key):
             output = args.output / key
             command = ['python3', str(Path(__file__).resolve()), '--goose', str(args.goose.resolve()),
-                       '--engines', key, '--jobs', '1', '--timeout', str(args.timeout), '--output', str(output)]
+                       '--engines', key, '--jobs', '1', '--timeout', str(args.timeout), '--output', str(output),
+                       '--source', str(args.source.resolve())]
             checked = subprocess.run(command, capture_output=True, text=True)
             result = output / 'result.json'
             if result.exists():
@@ -59,7 +61,7 @@ def main():
         return 0
     args.output.mkdir(parents=True, exist_ok=True)
     log_path = args.output / 'diagnostics.log'
-    command = [str(args.goose.resolve()), 'check', str(ROOT / 'compiler-goose/src/_diagnostic_roots.goose'),
+    command = [str(args.goose.resolve()), 'check', str(args.source.resolve()),
                '--stdlib', str(ROOT.parent / 'goose-to-wasm/build/source/stdlib')]
     environment = dict(os.environ)
     environment['GOOSE_DIAGNOSTIC_ROOTS'] = ','.join('blot_diagnostic_roots::' + key for key in args.engines)

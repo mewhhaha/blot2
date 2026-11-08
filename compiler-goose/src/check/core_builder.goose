@@ -41,65 +41,64 @@ type Identity=blot_check_types::NominalIdentity;
 type Module=blot_check_core::Module;
 struct Source {tree:const blot_parse_ast::Tree&,names:const blot_parse_symbols::Pool&,checked:const blot_check_check::Checked&,diagnostic_origins:blot_check_check::ModuleOrigins=blot_check_check::ModuleOrigins{..}}
 struct Tables {
-field_names:blot_check_core::FieldName[>..<]&,
-request_loops:blot_check_core::RequestLoopInfo[>..<]&,
-request_arms:blot_check_core::RequestArm[>..<]&,
-tag_calls:blot_check_core::Id[>..<]&,
-nodes:blot_check_core::Node[>..<]&,
-spans:blot_check_core::Span[>..<]&,
-extra:blot_check_core::Id[>..<]&,
-type_nodes:blot_check_types::Node[>..<]&,
-quantifier_goals:blot_check_types::QuantifierGoals[>..<]&,
-quantifier_obligations:blot_check_types::Obligation[>..<]&,
-type_extra:blot_check_types::Id[>..<]&,
-effect_rows:blot_check_effects::Row[>..<]&,
-effect_labels:blot_check_effects::Label[>..<]&,
-effect_operations:blot_check_types::Operation[>..<]&,
-bindings:blot_check_core::Binding[>..<]&,
-bodies:blot_check_core::Body[>..<]&,
-parameters:blot_check_core::Parameter[>..<]&,
-runtime_names:blot_check_core::RuntimeName[>..<]&,
-source_names:blot_check_core::RuntimeName[>..<]&,
-erased_declaration_references:blot_check_core::ErasedDeclarationReference[>..<]&,
-references:blot_check_core::BindingRef[>..<]&,
-calls:blot_check_core::CallInfo[>..<]&,
-merges:blot_check_core::Merge[>..<]&,
-merge_ranges:blot_check_core::List[>..<]&,
-name_bytes:u8[>..<]&,
-obligations:blot_check_core::Obligation[>..<]&,
-diagnostics:blot_check_core::Diagnostic[>..<]&,
-nominals:blot_check_core::Nominal[>..<]&,
-operation_names:blot_check_core::OperationName[>..<]&,
-constructors:blot_check_core::Constructor[>..<]&,
-projections:blot_check_core::Projection[>..<]&,
-projection_variants:blot_check_core::ProjectionVariant[>..<]&,
-patterns:blot_check_core::Pattern[>..<]&,
-pattern_rows:blot_check_core::PatternRow[>..<]&,
-match_arms:blot_check_core::MatchArm[>..<]&,
-matches:blot_check_core::MatchInfo[>..<]&,
-updates:blot_check_core::UpdateInfo[>..<]&,
-update_steps:blot_check_core::UpdateStep[>..<]&,
-closures:blot_check_core::ClosureInfo[>..<]&,
-associated:blot_check_core::Associated[>..<]&,
-contracts:blot_check_core::Contract[>..<]&,
-contract_members:blot_check_core::ContractMember[>..<]&,
-implementations:blot_check_core::Implementation[>..<]&,
-implementation_members:blot_check_core::ImplementationMember[>..<]&,
-member_templates:blot_check_core::MemberTemplate[>..<]&,
-selected_proofs:blot_check_core::SelectedProof[>..<]&,
-selected_members:blot_check_core::ImplementationMember[>..<]&,
-selected_edges:u32[>..<]&,
-selected_uses:blot_check_core::SelectedUse[>..<]&,
-dictionary_selections:blot_check_core::DictionarySelection[>..<]&,
-dictionary_uses:blot_check_core::DictionaryUse[>..<]&,
-primitives:blot_check_core::Primitive[>..<]&,
-loops:blot_check_core::LoopInfo[>..<]&,
-loop_carries:blot_check_core::LoopCarry[>..<]&,
-resolver_ops:blot_check_core::ResolverInfo[>..<]&,
-operation_values:blot_check_core::OperationValue[>..<]&,
-handle_effects:blot_check_core::HandleEffects[>..<]&,
-dispatch_signatures:blot_check_types::Id[>..<]&,
-proof_contracts:blot_check_core::ProofContract[>..<]&,
+field_names:blot_check_core::FieldName[>..]&,
+request_loops:blot_check_core::RequestLoopInfo[>..]&,
+request_arms:blot_check_core::RequestArm[>..]&,
+tag_calls:blot_check_core::Id[>..]&,
+nodes:blot_check_core::Node[>..]&,
+spans:blot_check_core::Span[>..]&,
+extra:blot_check_core::Id[>..]&,
+type_nodes:blot_check_types::Node[>..]&,
+quantifier_goals:blot_check_types::QuantifierGoals[>..]&,
+quantifier_obligations:blot_check_types::Obligation[>..]&,
+type_extra:blot_check_types::Id[>..]&,
+effect_rows:blot_check_effects::Row[>..]&,
+effect_labels:blot_check_effects::Label[>..]&,
+effect_operations:blot_check_types::Operation[>..]&,
+bindings:blot_check_core::Binding[>..]&,
+bodies:blot_check_core::Body[>..]&,
+parameters:blot_check_core::Parameter[>..]&,
+runtime_names:blot_check_core::RuntimeName[>..]&,
+source_names:blot_check_core::RuntimeName[>..]&,
+erased_declaration_references:blot_check_core::ErasedDeclarationReference[>..]&,
+references:blot_check_core::BindingRef[>..]&,
+calls:blot_check_core::CallInfo[>..]&,
+merges:blot_check_core::Merge[>..]&,
+merge_ranges:blot_check_core::List[>..]&,
+name_bytes:u8[>..]&,
+obligations:blot_check_core::Obligation[>..]&,
+diagnostics:blot_check_core::Diagnostic[>..]&,
+nominals:blot_check_core::Nominal[>..]&,
+operation_names:blot_check_core::OperationName[>..]&,
+constructors:blot_check_core::Constructor[>..]&,
+projections:blot_check_core::Projection[>..]&,
+projection_variants:blot_check_core::ProjectionVariant[>..]&,
+patterns:blot_check_core::Pattern[>..]&,
+pattern_rows:blot_check_core::PatternRow[>..]&,
+match_arms:blot_check_core::MatchArm[>..]&,
+matches:blot_check_core::MatchInfo[>..]&,
+updates:blot_check_core::UpdateInfo[>..]&,
+update_steps:blot_check_core::UpdateStep[>..]&,
+closures:blot_check_core::ClosureInfo[>..]&,
+associated:blot_check_core::Associated[>..]&,
+contracts:blot_check_core::Contract[>..]&,
+contract_members:blot_check_core::ContractMember[>..]&,
+implementations:blot_check_core::Implementation[>..]&,
+implementation_members:blot_check_core::ImplementationMember[>..]&,
+member_templates:blot_check_core::MemberTemplate[>..]&,
+selected_proofs:blot_check_core::SelectedProof[>..]&,
+selected_members:blot_check_core::ImplementationMember[>..]&,
+selected_edges:u32[>..]&,
+selected_uses:blot_check_core::SelectedUse[>..]&,
+dictionary_selections:blot_check_core::DictionarySelection[>..]&,
+dictionary_uses:blot_check_core::DictionaryUse[>..]&,
+primitives:blot_check_core::Primitive[>..]&,
+loops:blot_check_core::LoopInfo[>..]&,
+loop_carries:blot_check_core::LoopCarry[>..]&,
+resolver_ops:blot_check_core::ResolverInfo[>..]&,
+operation_values:blot_check_core::OperationValue[>..]&,
+handle_effects:blot_check_core::HandleEffects[>..]&,
+dispatch_signatures:blot_check_types::Id[>..]&,
 }
 struct ResolverLoopFrame {source:u32,cursor:u32,parameter:u32,finalizer:u32,continued:u32,continue_constructor:u32}
 struct RequestCallbackFrame {loop_:u32,return_target:u32,decision_type:u32,state_type:u32}
@@ -318,7 +317,9 @@ struct QuoteCaptureWalk {builder:Builder&,graph:Module,captures:WordBuffer&,epoc
 recursive fn visit(self_:QuoteCaptureWalk&,id:u32,stage:u8,at:i64)->Error {if id==0 {return blot_error::Error.none;}if stage==0 {return self_.builder.nodeCaptures(id,self_.epoch,self_.captures,at);}if at>=1024 || stage>=128 || self_.remaining==0 {return blot_error::Error.core_limit;}self_.remaining-=1;let node=self_.graph.node(id);if node.tag==blot_check_core::Tag.staging {let op,error=blot_check_typed_staging::opFromCode(node.c);if error!=blot_error::Error.none {return blot_error::Error.core_limit;}if op==blot_check_typed_staging::Op.quote {return self_.visit(node.a,stage+1,at+1);}if op==blot_check_typed_staging::Op.lift || op==blot_check_typed_staging::Op.splice {return self_.visit(node.a,stage-1,at+1);}}if node.tag==blot_check_core::Tag.closure {return self_.visit(self_.graph.closures[node.a].body,stage,at+1);}let previous_stage=self_.stage;let previous_depth=self_.depth;self_.stage=stage;self_.depth=at;let error=blot_eval_body_recipe::appendChildren(self_,self_.graph,id,false);self_.stage=previous_stage;self_.depth=previous_depth;if error==blot_error::Error.plan_limit {return blot_error::Error.core_limit;}return error;}
 fn append(self_:QuoteCaptureWalk&,id:u32)->Error {let error=self_.visit(id,self_.stage,self_.depth+1);if error==blot_error::Error.out_of_memory {return error;}if error!=blot_error::Error.none {return blot_error::Error.plan_limit;}return blot_error::Error.none;}
 fn appendSlice(self_:QuoteCaptureWalk&,ids:const u32[:])->Error {for id in ids {let error=self_.append(id);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;}
-fn quoteCaptures(self_:Builder&,root:u32,epoch:u32,captures:WordBuffer&,depth:i64)->Error {let graph=Module{ request_loops:self_.tables.request_loops, request_arms:self_.tables.request_arms, types:blot_check_core::emptyTypes(), nodes:self_.tables.nodes, spans:self_.tables.spans, extra:self_.tables.extra, bindings:self_.tables.bindings, bodies:self_.tables.bodies, parameters:self_.tables.parameters, references:self_.tables.references, calls:self_.tables.calls, merges:self_.tables.merges, merge_ranges:self_.tables.merge_ranges, names:default<u8[:]>(), obligations:self_.tables.obligations, pattern_rows:self_.tables.pattern_rows, match_arms:self_.tables.match_arms, matches:self_.tables.matches, updates:self_.tables.updates, update_steps:self_.tables.update_steps, closures:self_.tables.closures, loops:self_.tables.loops, loop_carries:self_.tables.loop_carries, resolver_ops:self_.tables.resolver_ops, operation_values:self_.tables.operation_values, diagnostics:self_.tables.diagnostics, body_lowerings:self_.scratch.body_lowerings, .. };var walk=QuoteCaptureWalk{builder:self_,graph:graph,captures:captures,epoch:epoch,depth:depth, ..};return walk.visit(root,1,depth);}
+fn quoteCaptureGraph(tables:Tables,body_lowerings:i64)->Module {return Module{ request_loops:tables.request_loops, request_arms:tables.request_arms, types:blot_check_core::emptyTypes(), nodes:tables.nodes, spans:tables.spans, extra:tables.extra, bindings:tables.bindings, bodies:tables.bodies, parameters:tables.parameters, references:tables.references, calls:tables.calls, merges:tables.merges, merge_ranges:tables.merge_ranges, names:default<u8[:]>(), obligations:tables.obligations, pattern_rows:tables.pattern_rows, match_arms:tables.match_arms, matches:tables.matches, updates:tables.updates, update_steps:tables.update_steps, closures:tables.closures, loops:tables.loops, loop_carries:tables.loop_carries, resolver_ops:tables.resolver_ops, operation_values:tables.operation_values, diagnostics:tables.diagnostics, body_lowerings:body_lowerings, .. };}
+fn quoteCaptureWalk(builder:Builder&,graph:Module,captures:WordBuffer&,epoch:u32,depth:i64)->QuoteCaptureWalk {return QuoteCaptureWalk{builder:builder,graph:graph,captures:captures,epoch:epoch,depth:depth, ..};}
+fn quoteCaptures(self_:Builder&,root:u32,epoch:u32,captures:WordBuffer&,depth:i64)->Error {let graph=quoteCaptureGraph(self_.tables,self_.scratch.body_lowerings);var walk=quoteCaptureWalk(self_,graph,captures,epoch,depth);return walk.visit(root,1,depth);}
 recursive fn closureExpression(self_:Builder&,source:u32,ty:u32,depth:i64)->u32,Error {let syntax=self_.source.tree.node(source);let parameter_type,error=self_.typeOf(syntax.a);if error!=blot_error::Error.none {return 0,error;}let parameter=blot_check_core::Parameter{binding:self_.source.checked.resolved[syntax.a],ty:parameter_type,span:self_.source.checked.diagnosticSpan(self_.source.tree,syntax.a),inferred:self_.source.tree.parameter(syntax.a).annotation==0 && !self_.source.tree.parameter(syntax.a).is_unit, ..};let previous=self_.scratch.return_target;let previous_function=self_.scratch.function_target;var function_block:u32=0;if wordContains(self_.source.checked.function_exit_lambdas,source) {let reserved,error=self_.reserve(syntax.b);if error!=blot_error::Error.none {return 0,error;}function_block=reserved;}self_.scratch.return_target=0;self_.scratch.function_target=function_block;let body_value,error=self_.expression(syntax.b,depth+1);self_.scratch.return_target=previous;self_.scratch.function_target=previous_function;if error!=blot_error::Error.none {return 0,error;}var body=body_value;if function_block!=0 {let signature,error=self_.callableType(ty);if error!=blot_error::Error.none {return 0,error;}if signature.tag!=blot_check_types::Tag.function {return 0,blot_error::Error.core_limit;}let completion,error=self_.make(syntax.b,blot_check_core::Node{tag:blot_check_core::Tag.return_,ty:blot_check_types::never,a:body_value,b:function_block, ..});if error!=blot_error::Error.none {return 0,error;}let children,error=self_.save([completion]);if error!=blot_error::Error.none {return 0,error;}self_.tables.nodes[function_block]=blot_check_core::Node{tag:blot_check_core::Tag.block_,ty:signature.b,a:children.start,b:children.len, ..};body=function_block;}let index,error=self_.captureClosure(body,parameter,ty,source);if error!=blot_error::Error.none {return 0,error;}if source<self_.source.checked.lambda_closed_rows.len {let rows,error=self_.projectedRowVariables(self_.source.checked.lambda_closed_rows[source]);if error!=blot_error::Error.none {return 0,error;}self_.tables.closures[index].closed_rows=rows;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.closure,ty:ty,a:index, ..});}
 fn captureClosure(self_:Builder&,body:u32,parameter:blot_check_core::Parameter,function_type:u32,introduction:u32)->u32,Error {if self_.scratch.definition_epochs.len==0 {let error=self_.allocateEmpty(self_.scratch.definition_epochs,self_.tables.bindings.len);if error!=blot_error::Error.none {return 0,error;}let error=self_.allocateEmpty(self_.scratch.reference_epochs,self_.tables.bindings.len);if error!=blot_error::Error.none {return 0,error;}}let error=self_.growCaptureEpochs(self_.scratch.definition_epochs);if error!=blot_error::Error.none {return 0,error;}let error=self_.growCaptureEpochs(self_.scratch.reference_epochs);if error!=blot_error::Error.none {return 0,error;}let epochs_error=resizeVisitEpochs(self_,self_.tables.nodes.len);if epochs_error!=blot_error::Error.none {return 0,epochs_error;}if self_.scratch.capture_epoch==0xffffffff {return 0,blot_error::Error.core_limit;}self_.scratch.capture_epoch+=1;let epoch=self_.scratch.capture_epoch;if parameter.binding!=0 {self_.scratch.definition_epochs[parameter.binding]=epoch;}for use in self_.tables.dictionary_uses {if use.introduction!=0 && use.introduction==introduction {self_.scratch.definition_epochs[use.binding]=epoch;}}var captures=WordBuffer{..};let result,error=captureClosureValues(self_,body,parameter,function_type,epoch,captures);blot_check_core_builder::deinit(captures);return result,error;}
 fn captureClosureValues(self_:Builder&,body:u32,parameter:blot_check_core::Parameter,function_type:u32,epoch:u32,captures:WordBuffer&)->u32,Error {let error=self_.nodeCaptures(body,epoch,captures,0);if error!=blot_error::Error.none {return 0,error;}var count:i64=0;for binding in captures.items {if self_.scratch.definition_epochs[binding]!=epoch {captures.items[count]=binding;count+=1;}}let range,error=self_.save(captures.items[..count]);if error!=blot_error::Error.none {return 0,error;}let index=self_.tables.closures.len as u32;self_.tables.closures.push(blot_check_core::ClosureInfo{body:body,parameter:parameter,captures:range,function_type:function_type, ..});return index,blot_error::Error.none;}
@@ -372,8 +373,8 @@ recursive fn applicationValues(self_:Builder&,source:u32,depth:i64,backwards:App
  if syntax.tag==blot_parse_ast::tag_intrinsic {let task=blot_check_task_types::lookup(self_.source.names.get(syntax.a));if task.present {let operation=task.value;if backwards.items.len!=blot_check_task_types::arity(operation) {return 0,blot_error::Error.core_limit;}var values:u32[3]=[0;3];for index in 0..backwards.items.len {let value,error=self_.expression(backwards.items[backwards.items.len-index-1].value,depth+1);if error!=blot_error::Error.none {return 0,error;}values[index]=value;}let operands,error=self_.save(values[..backwards.items.len]);if error!=blot_error::Error.none {return 0,error;}var selected=operation;     if (operation==blot_check_task_types::Op.join || operation==blot_check_task_types::Op.receive) && self_.tables.type_nodes[self_.tables.nodes[values[0]].ty].tag==blot_check_types::Tag.product {selected=blot_check_task_types::Op.collect;}          let __field_order_218_tag: blot_check_core::Tag = blot_check_core::Tag.task; let __field_order_219_a: u32 = operands.start; let __field_order_220_b: u32 = operands.len; let __field_order_221_c: u32 = blot_check_task_types::opCode(selected); let __field_order_222_ty: blot_check_types::Id = result; return self_.make(source,blot_check_core::Node{ tag: __field_order_218_tag, ty: __field_order_222_ty, a: __field_order_219_a, b: __field_order_220_b, c: __field_order_221_c, .. });}}
  for loan in self_.source.checked.usage_loans {if loan.source!=source {continue;}if loan.acquire!=0 {let acquire,error=self_.expression(loan.acquire,depth+1);if error!=blot_error::Error.none {return 0,error;}let release,error=self_.expression(loan.release,depth+1);if error!=blot_error::Error.none {return 0,error;}if loan.callback==0 {if backwards.items.len!=2 {return 0,blot_error::Error.core_limit;}return self_.make(source,blot_check_core::Node{ tag:blot_check_core::Tag.resource_acquire, ty:result, a:acquire, b:release, .. });}if backwards.items.len!=3 {return 0,blot_error::Error.core_limit;}let callback,error=self_.expression(loan.callback,depth+1);if error!=blot_error::Error.none {return 0,error;}return self_.make(source,blot_check_core::Node{ tag:blot_check_core::Tag.resource_scope, ty:result, a:acquire, b:release, c:callback, .. });}if backwards.items.len!=2 {return 0,blot_error::Error.core_limit;}let left,error=self_.expression(backwards.items[1].value,depth+1);if error!=blot_error::Error.none {return 0,error;}let right,error=self_.expression(backwards.items[0].value,depth+1);if error!=blot_error::Error.none {return 0,error;}var mutable:u32=0;if loan.mutable {mutable=1;}return self_.make(source,blot_check_core::Node{ tag:blot_check_core::Tag.usage_borrow, ty:result, a:left, b:right, c:mutable, .. });}
  if syntax.tag==blot_parse_ast::tag_intrinsic {let name=self_.source.names.get(syntax.a);if name=="@resource.release" || name=="@usage.share" || name=="@usage.read" || name=="@usage.length" {if backwards.items.len!=1 {return 0,blot_error::Error.core_limit;}let input,error=self_.expression(backwards.items[0].value,depth+1);if error!=blot_error::Error.none {return 0,error;}if name=="@resource.release" {return self_.make(source,blot_check_core::Node{ tag:blot_check_core::Tag.resource_release, ty:result, a:input, .. });}if name=="@usage.share" {return self_.make(source,blot_check_core::Node{ tag:blot_check_core::Tag.usage_share, ty:result, a:input, .. });}var operation:u32=0;if name=="@usage.length" {let payload=self_.tables.type_nodes[self_.tables.type_nodes[self_.tables.nodes[input].ty].a];operation=1;if payload.tag==blot_check_types::Tag.list {operation=2;}}return self_.make(source,blot_check_core::Node{ tag:blot_check_core::Tag.usage_read, ty:result, a:input, b:operation, .. });}
- if self_.source.tree.has_typed_staging {let operation=blot_check_typed_staging::lookup(name);if operation.present {if backwards.items.len!=blot_check_typed_staging::arity(operation.value) {return 0,blot_error::Error.core_limit;}let left,error=self_.expression(backwards.items[backwards.items.len-1].value,depth+1);if error!=blot_error::Error.none {return 0,error;}var right:u32=0;if backwards.items.len==2 {let value,error=self_.expression(backwards.items[0].value,depth+1);if error!=blot_error::Error.none {return 0,error;}right=value;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.staging,ty:result,a:left,b:right,c:blot_check_typed_staging::opCode(operation.value), ..});}}
- if self_.source.tree.has_numeric_proofs {let relation=blot_check_numeric_proof_terms::constructor(name);if relation.present {if backwards.items.len!=2 {return 0,blot_error::Error.core_limit;}var matched=false;for introduction in self_.source.checked.proof_bodies.introductions {if self_.scratch.proof_visits>=65536 {return 0,blot_error::Error.core_limit;}self_.scratch.proof_visits+=1;if introduction.source!=source {continue;}if introduction.proposition.relation!=relation.value || introduction.arguments[0]!=backwards.items[1].value || introduction.arguments[1]!=backwards.items[0].value {return 0,blot_error::Error.core_limit;}matched=true;break;}if !matched || self_.tables.type_nodes[result].tag!=blot_check_types::Tag.erased_proof {return 0,blot_error::Error.core_limit;}let left,error=self_.expression(backwards.items[1].value,depth+1);if error!=blot_error::Error.none {return 0,error;}let right,error=self_.expression(backwards.items[0].value,depth+1);if error!=blot_error::Error.none {return 0,error;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.proof_guard,ty:result,a:left,b:right,c:blot_check_numeric_proof_terms::relationCode(relation.value), ..});}}
+ if self_.source.tree.has_typed_staging {let operation,present=blot_check_typed_staging::lookup(name);if present {if backwards.items.len!=blot_check_typed_staging::arity(operation) {return 0,blot_error::Error.core_limit;}let left,error=self_.expression(backwards.items[backwards.items.len-1].value,depth+1);if error!=blot_error::Error.none {return 0,error;}var right:u32=0;if backwards.items.len==2 {let value,error=self_.expression(backwards.items[0].value,depth+1);if error!=blot_error::Error.none {return 0,error;}right=value;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.staging,ty:result,a:left,b:right,c:blot_check_typed_staging::opCode(operation), ..});}}
+ if self_.source.tree.has_numeric_proofs {let relation,present=blot_check_numeric_proof_terms::constructor(name);if present {if backwards.items.len!=2 {return 0,blot_error::Error.core_limit;}var matched=false;for introduction in self_.source.checked.proof_bodies.introductions {if self_.scratch.proof_visits>=65536 {return 0,blot_error::Error.core_limit;}self_.scratch.proof_visits+=1;if introduction.source!=source {continue;}if introduction.proposition.relation!=relation || introduction.arguments[0]!=backwards.items[1].value || introduction.arguments[1]!=backwards.items[0].value {return 0,blot_error::Error.core_limit;}matched=true;break;}if !matched || self_.tables.type_nodes[result].tag!=blot_check_types::Tag.erased_proof {return 0,blot_error::Error.core_limit;}let left,error=self_.expression(backwards.items[1].value,depth+1);if error!=blot_error::Error.none {return 0,error;}let right,error=self_.expression(backwards.items[0].value,depth+1);if error!=blot_error::Error.none {return 0,error;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.proof_guard,ty:result,a:left,b:right,c:blot_check_numeric_proof_terms::relationCode(relation), ..});}}
  let special,error=applicationSpecial(self_,source,callee,syntax,result,depth,backwards.items);if error!=blot_error::Error.none {return 0,error;}if special.present {return special.value,blot_error::Error.none;}}
  var index=backwards.items.len;while index!=0 {index-=1;let value,error=self_.expression(backwards.items[index].value,depth+1);if error!=blot_error::Error.none {return 0,error;}let error=blot_check_core_builder::append(arguments,value);if error!=blot_error::Error.none {return 0,error;}}
  if syntax.tag==blot_parse_ast::tag_constructor_ref {var catalog:u32=0;if callee<self_.source.checked.constructor_resolved.len {catalog=self_.source.checked.constructor_resolved[callee];}if catalog==0 || arguments.items.len!=1 {let error=self_.diagnostic(blot_check_core::Code.invalid_call,source);return 0,error;}let payload=self_.source.checked.constructors[catalog].payload;var record:u32=0;if !self_.source.checked.nominals[self_.source.checked.constructors[catalog].nominal].is_opaque && payload!=0 && self_.source.checked.types.node(payload).tag==blot_check_types::Tag.record {record=1;}return self_.make(source,blot_check_core::Node{tag:blot_check_core::Tag.construct,ty:result,a:catalog,b:arguments.items[0],c:record, ..});}
@@ -457,7 +458,7 @@ fn projectedTypeList(self_:Builder&,source:blot_check_types::List)->blot_check_t
 fn projectedRows(self_:Builder&,source:blot_check_types::List)->blot_check_types::List,Error {var values=WordBuffer{..};for id in self_.source.checked.types.list(source) {let value,error=self_.projectRow(id,0);if error!=blot_error::Error.none {blot_check_core_builder::deinit(values);return blot_check_types::List{..},error;}let error=blot_check_core_builder::append(values,value);if error!=blot_error::Error.none {blot_check_core_builder::deinit(values);return blot_check_types::List{..},error;}}let result,error=self_.saveTypes(values.items);blot_check_core_builder::deinit(values);return result,error;}
 fn projectedRowVariables(self_:Builder&,source:blot_check_types::List)->blot_check_types::List,Error {var values=WordBuffer{..};for id in self_.source.checked.types.list(source) {let value,error=self_.projectRowVariable(id);if error!=blot_error::Error.none {blot_check_core_builder::deinit(values);return blot_check_types::List{..},error;}let error=blot_check_core_builder::append(values,value);if error!=blot_error::Error.none {blot_check_core_builder::deinit(values);return blot_check_types::List{..},error;}}let result,error=self_.saveTypes(values.items);blot_check_core_builder::deinit(values);return result,error;}
 fn catalogPredicate(self_:Builder&,value:blot_check_types::Obligation,explicit:bool)->Error {let ty,error=self_.projectType(value.ty,0);if error!=blot_error::Error.none {return error;}let result,error=self_.projectType(value.result,0);if error!=blot_error::Error.none {return error;}let other,error=self_.projectType(value.other,0);if error!=blot_error::Error.none {return error;}let signature,error=self_.projectType(value.signature,0);if error!=blot_error::Error.none {return error;}self_.tables.obligations.push(blot_check_core::Obligation{ty:ty,kind:value.kind,span:self_.source.checked.diagnosticSpan(self_.source.tree,value.source),name:value.name,result:result,other:other,signature:signature,operator:value.operator,identity:value.identity,explicit:explicit,qualification_span:value.qualification_span,qualification_unit:value.qualification_unit, ..});return blot_error::Error.none;}
-fn allCatalogs(self_:Builder&)->Error {for contract in self_.source.checked.proof_contracts {self_.tables.proof_contracts.push(blot_check_core::ProofContract{binding:contract.binding,header:contract.header, ..});}for metadata in self_.source.checked.nominals {let constructors,error=self_.save(self_.source.checked.types.list(metadata.constructors));if error!=blot_error::Error.none {return error;}let display,error=self_.nominalDiagnosticNames(metadata);if error!=blot_error::Error.none {return error;}let parameters,error=self_.projectedTypeList(metadata.parameters);if error!=blot_error::Error.none {return error;}let variables,error=self_.projectedTypeList(metadata.variables);if error!=blot_error::Error.none {return error;}self_.tables.nominals.push(blot_check_core::Nominal{affine:metadata.affine,has_usage:metadata.has_usage,closed_storage:metadata.closed_storage,private:metadata.private,is_opaque:metadata.is_opaque,storage:metadata.storage,diagnostic_name:display.name,diagnostic_origin:display.origin,identity:metadata.identity,parameters:parameters,variables:variables,constructors:constructors, ..});}for metadata in self_.source.checked.effect_templates {if metadata.identity.decl==0 || metadata.family==0 {continue;}let family=self_.source.checked.effect_families[metadata.family];if family.name==0 || (!family.callable && metadata.name==0) {continue;}let origin,error=self_.source.diagnostic_origins.name(metadata.identity.unit,self_.source.checked.unit);if error==blot_error::Error.out_of_memory {return error;}if error!=blot_error::Error.none {continue;}var bytes=NameBuffer{..};let failure=operationDiagnosticName(self_,metadata,family,origin,bytes);bytes.deinit(name_runs);if failure!=blot_error::Error.none {return failure;}}
+fn allCatalogs(self_:Builder&)->Error {for metadata in self_.source.checked.nominals {let constructors,error=self_.save(self_.source.checked.types.list(metadata.constructors));if error!=blot_error::Error.none {return error;}let display,error=self_.nominalDiagnosticNames(metadata);if error!=blot_error::Error.none {return error;}let parameters,error=self_.projectedTypeList(metadata.parameters);if error!=blot_error::Error.none {return error;}let variables,error=self_.projectedTypeList(metadata.variables);if error!=blot_error::Error.none {return error;}self_.tables.nominals.push(blot_check_core::Nominal{affine:metadata.affine,has_usage:metadata.has_usage,closed_storage:metadata.closed_storage,private:metadata.private,is_opaque:metadata.is_opaque,storage:metadata.storage,diagnostic_name:display.name,diagnostic_origin:display.origin,identity:metadata.identity,parameters:parameters,variables:variables,constructors:constructors, ..});}for metadata in self_.source.checked.effect_templates {if metadata.identity.decl==0 || metadata.family==0 {continue;}let family=self_.source.checked.effect_families[metadata.family];if family.name==0 || (!family.callable && metadata.name==0) {continue;}let origin,error=self_.source.diagnostic_origins.name(metadata.identity.unit,self_.source.checked.unit);if error==blot_error::Error.out_of_memory {return error;}if error!=blot_error::Error.none {continue;}var bytes=NameBuffer{..};let failure=operationDiagnosticName(self_,metadata,family,origin,bytes);bytes.deinit(name_runs);if failure!=blot_error::Error.none {return failure;}}
  for contract in self_.source.checked.contracts {if contract.members.len==0 {continue;}let start=self_.tables.contract_members.len as u32;for old in self_.source.checked.contract_members[contract.members.start..contract.members.start+contract.members.len] {var member=old;let root,error=self_.projectType(old.root,0);if error!=blot_error::Error.none {return error;}member.root=root;self_.tables.contract_members.push(member);}let predicate_start=self_.tables.obligations.len as u32;for value in self_.source.checked.contract_predicates[contract.predicates.start..contract.predicates.start+contract.predicates.len] {let error=catalogPredicate(self_,value,value.explicit);if error!=blot_error::Error.none {return error;}}let parameters,error=self_.projectedTypeList(contract.parameters);if error!=blot_error::Error.none {return error;}let variables,error=self_.projectedTypeList(contract.variables);if error!=blot_error::Error.none {return error;}let row_variables,error=self_.projectedRowVariables(contract.row_variables);if error!=blot_error::Error.none {return error;}let names,error=self_.saveTypes(self_.source.checked.types.list(contract.row_parameter_names));if error!=blot_error::Error.none {return error;}let rows,error=self_.projectedRows(contract.row_parameters);if error!=blot_error::Error.none {return error;}self_.tables.contracts.push(blot_check_core::Contract{private:contract.private,identity:contract.identity,name:contract.name,parameters:parameters,variables:variables,row_variables:row_variables,predicates:blot_check_types::List{start:predicate_start,len:contract.predicates.len, ..},members:blot_check_types::List{start:start,len:contract.members.len, ..},requires_implementation:contract.requires_implementation,row_parameter_names:names,row_parameters:rows, ..});}
  for metadata in self_.source.checked.constructors {let scheme,error=self_.projectScheme(metadata.scheme,false);if error!=blot_error::Error.none {return error;}let payload,error=self_.projectType(metadata.payload,0);if error!=blot_error::Error.none {return error;}self_.tables.constructors.push(blot_check_core::Constructor{identity:metadata.identity,nominal:metadata.nominal,tag:metadata.tag,scheme:scheme,payload:payload, ..});}for metadata in self_.source.checked.associated {let error=self_.saveFieldName(metadata.member);if error!=blot_error::Error.none {return error;}self_.tables.associated.push(blot_check_core::Associated{identity:metadata.identity,member:metadata.member,operator:metadata.operator,target:self_.target(metadata.binding), ..});}return self_.implementationCatalog();}
 type NameBuffer=blot_support_pooled_buffer::Buffer<u8>;
@@ -478,7 +479,7 @@ fn allBodiesValue(self_:Builder&,certificates:List[:])->Error {if self_.source.c
 struct FieldNameOrder {items:blot_check_core::FieldName[:]}
 fn lessThan(self_:FieldNameOrder,left:i64,right:i64)->bool {return self_.items[left].symbol<self_.items[right].symbol;}
 fn swap(self_:FieldNameOrder,left:i64,right:i64) {let value=self_.items[left];self_.items[left]=self_.items[right];self_.items[right]=value;}
-fn finish(self_:Tables&,owner:blot_reuse_dependency_payload::Owner&,body_lowerings:i64,effect_variable_count:u32,ast_map:const u32[:])->Module,Error {
+fn finish(self_:Tables&,owner:blot_reuse_dependency_payload::Owner&,body_lowerings:i64,effect_variable_count:u32,ast_map:const u32[:],source_proofs:const blot_check_core::ProofContract[:])->Module,Error {
  var result=default<Module>();result.body_lowerings=body_lowerings;result.owner_id=blot_native::fresh_owner_id();result.types.owner_id=blot_native::fresh_owner_id();
  blot_check_source_sort::pdqContext(0,self_.field_names.len,FieldNameOrder{items:self_.field_names[..], ..});
  let field_names,error=blot_reuse_dependency_payload::copy<blot_check_core::FieldName>(owner,self_.field_names[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.field_names=field_names;
@@ -539,13 +540,13 @@ fn finish(self_:Tables&,owner:blot_reuse_dependency_payload::Owner&,body_lowerin
  let operation_values,error=blot_reuse_dependency_payload::copy<blot_check_core::OperationValue>(owner,self_.operation_values[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.operation_values=operation_values;
  let handle_effects,error=blot_reuse_dependency_payload::copy<blot_check_core::HandleEffects>(owner,self_.handle_effects[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.handle_effects=handle_effects;
  let dispatch_signatures,error=blot_reuse_dependency_payload::copy<blot_check_types::Id>(owner,self_.dispatch_signatures[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.dispatch_signatures=dispatch_signatures;
- let proof_contracts,error=blot_reuse_dependency_payload::copy<blot_check_core::ProofContract>(owner,self_.proof_contracts[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.proof_contracts=proof_contracts;
+ let proof_contracts,error=blot_reuse_dependency_payload::alloc<blot_check_core::ProofContract>(owner,source_proofs.len);if error!=blot_error::Error.none {return default<Module>(),error;}result.proof_contracts=proof_contracts;
 
  result.types.effects.variable_count=effect_variable_count;
  for node in result.types.nodes {if node.tag==blot_check_types::Tag.forall || node.tag==blot_check_types::Tag.existential {result.has_rank_contracts=true;}if node.tag==blot_check_types::Tag.usage {result.has_usage_contracts=true;}if node.tag==blot_check_types::Tag.erased_proof {result.has_numeric_proofs=true;}}
  for nominal in result.nominals {if nominal.has_usage {result.has_usage_contracts=true;}}
  blot_check_quantifier_goals::sort(quantifier_goals);
- for &contract in result.proof_contracts {let value_slots,error=blot_reuse_dependency_payload::copy<u32>(owner,contract.header.value_slots);if error!=blot_error::Error.none {return default<Module>(),error;}let proof_slots,error=blot_reuse_dependency_payload::copy<u32>(owner,contract.header.proof_slots);if error!=blot_error::Error.none {return default<Module>(),error;}let values,error=blot_reuse_dependency_payload::copy<blot_check_numeric_proof_terms::Kind>(owner,contract.header.values);if error!=blot_error::Error.none {return default<Module>(),error;}let operands,error=blot_reuse_dependency_payload::copy<blot_check_numeric_proof_terms::Term>(owner,contract.header.operands);if error!=blot_error::Error.none {return default<Module>(),error;}let requirements,error=blot_reuse_dependency_payload::copy<blot_check_numeric_proof_contracts::Requirement>(owner,contract.header.requirements);if error!=blot_error::Error.none {return default<Module>(),error;}contract.header.value_slots=value_slots;contract.header.proof_slots=proof_slots;contract.header.values=values;contract.header.operands=operands;contract.header.requirements=requirements;}
+ for contract,index in source_proofs {let value_slots,error=blot_reuse_dependency_payload::copy<u32>(owner,contract.header.value_slots);if error!=blot_error::Error.none {return default<Module>(),error;}let proof_slots,error=blot_reuse_dependency_payload::copy<u32>(owner,contract.header.proof_slots);if error!=blot_error::Error.none {return default<Module>(),error;}let values,error=blot_reuse_dependency_payload::copy<blot_check_numeric_proof_terms::Kind>(owner,contract.header.values);if error!=blot_error::Error.none {return default<Module>(),error;}let operands,error=blot_reuse_dependency_payload::copy<blot_check_numeric_proof_terms::Term>(owner,contract.header.operands);if error!=blot_error::Error.none {return default<Module>(),error;}let requirements,error=blot_reuse_dependency_payload::copy<blot_check_numeric_proof_contracts::Requirement>(owner,contract.header.requirements);if error!=blot_error::Error.none {return default<Module>(),error;}result.proof_contracts[index]=blot_check_core::ProofContract{binding:contract.binding,header:blot_check_numeric_proof_headers::Owned{arity:contract.header.arity,value_slots:value_slots,proof_slots:proof_slots,values:values,operands:operands,requirements:requirements,result:contract.header.result, ..}, ..};}
  for &use in result.dictionary_uses {if use.introduction==0 {continue;}let mapped=ast_map[use.introduction];assert(mapped!=0);use.introduction=mapped;if result.node(mapped).tag==blot_check_core::Tag.closure {use.introduction=result.closures[result.node(mapped).a].body;}}
  for &selection in result.dictionary_selections {match selection.proof {selected payload=>{},given payload=>{var given=payload.value;if given.introduction==0 {continue;}let mapped=ast_map[given.introduction];assert(mapped!=0);given.introduction=mapped;if result.node(mapped).tag==blot_check_core::Tag.closure {given.introduction=result.closures[result.node(mapped).a].body;}selection.proof=blot_check_core::DictionaryProof.given{value:given, ..};},}}
  return result,blot_error::Error.none;
@@ -572,72 +573,71 @@ fn deinit(self_:Builder&) {
 
 fn lower(tree:const blot_parse_ast::Tree&,names:const blot_parse_symbols::Pool&,checked:const blot_check_check::Checked&)->blot_reuse_dependency_payload::Owned<Module>,Error {return lowerWithOrigins(tree,names,checked,blot_check_check::ModuleOrigins{..});}
 fn lowerWithOrigins(tree:const blot_parse_ast::Tree&,names:const blot_parse_symbols::Pool&,checked:const blot_check_check::Checked&,diagnostic_origins:blot_check_check::ModuleOrigins)->blot_reuse_dependency_payload::Owned<Module>,Error {
- var table_field_names:blot_check_core::FieldName[>..<]=[];
- var table_request_loops:blot_check_core::RequestLoopInfo[>..<]=[];
- var table_request_arms:blot_check_core::RequestArm[>..<]=[];
- var table_tag_calls:blot_check_core::Id[>..<]=[];
- var table_nodes:blot_check_core::Node[>..<]=[];
- var table_spans:blot_check_core::Span[>..<]=[];
- var table_extra:blot_check_core::Id[>..<]=[];
- var table_type_nodes:blot_check_types::Node[>..<]=[];
- var table_quantifier_goals:blot_check_types::QuantifierGoals[>..<]=[];
- var table_quantifier_obligations:blot_check_types::Obligation[>..<]=[];
- var table_type_extra:blot_check_types::Id[>..<]=[];
- var table_effect_rows:blot_check_effects::Row[>..<]=[];
- var table_effect_labels:blot_check_effects::Label[>..<]=[];
- var table_effect_operations:blot_check_types::Operation[>..<]=[];
- var table_bindings:blot_check_core::Binding[>..<]=[];
- var table_bodies:blot_check_core::Body[>..<]=[];
- var table_parameters:blot_check_core::Parameter[>..<]=[];
- var table_runtime_names:blot_check_core::RuntimeName[>..<]=[];
- var table_source_names:blot_check_core::RuntimeName[>..<]=[];
- var table_erased_declaration_references:blot_check_core::ErasedDeclarationReference[>..<]=[];
- var table_references:blot_check_core::BindingRef[>..<]=[];
- var table_calls:blot_check_core::CallInfo[>..<]=[];
- var table_merges:blot_check_core::Merge[>..<]=[];
- var table_merge_ranges:blot_check_core::List[>..<]=[];
- var table_name_bytes:u8[>..<]=[];
- var table_obligations:blot_check_core::Obligation[>..<]=[];
- var table_diagnostics:blot_check_core::Diagnostic[>..<]=[];
- var table_nominals:blot_check_core::Nominal[>..<]=[];
- var table_operation_names:blot_check_core::OperationName[>..<]=[];
- var table_constructors:blot_check_core::Constructor[>..<]=[];
- var table_projections:blot_check_core::Projection[>..<]=[];
- var table_projection_variants:blot_check_core::ProjectionVariant[>..<]=[];
- var table_patterns:blot_check_core::Pattern[>..<]=[];
- var table_pattern_rows:blot_check_core::PatternRow[>..<]=[];
- var table_match_arms:blot_check_core::MatchArm[>..<]=[];
- var table_matches:blot_check_core::MatchInfo[>..<]=[];
- var table_updates:blot_check_core::UpdateInfo[>..<]=[];
- var table_update_steps:blot_check_core::UpdateStep[>..<]=[];
- var table_closures:blot_check_core::ClosureInfo[>..<]=[];
- var table_associated:blot_check_core::Associated[>..<]=[];
- var table_contracts:blot_check_core::Contract[>..<]=[];
- var table_contract_members:blot_check_core::ContractMember[>..<]=[];
- var table_implementations:blot_check_core::Implementation[>..<]=[];
- var table_implementation_members:blot_check_core::ImplementationMember[>..<]=[];
- var table_member_templates:blot_check_core::MemberTemplate[>..<]=[];
- var table_selected_proofs:blot_check_core::SelectedProof[>..<]=[];
- var table_selected_members:blot_check_core::ImplementationMember[>..<]=[];
- var table_selected_edges:u32[>..<]=[];
- var table_selected_uses:blot_check_core::SelectedUse[>..<]=[];
- var table_dictionary_selections:blot_check_core::DictionarySelection[>..<]=[];
- var table_dictionary_uses:blot_check_core::DictionaryUse[>..<]=[];
- var table_primitives:blot_check_core::Primitive[>..<]=[];
- var table_loops:blot_check_core::LoopInfo[>..<]=[];
- var table_loop_carries:blot_check_core::LoopCarry[>..<]=[];
- var table_resolver_ops:blot_check_core::ResolverInfo[>..<]=[];
- var table_operation_values:blot_check_core::OperationValue[>..<]=[];
- var table_handle_effects:blot_check_core::HandleEffects[>..<]=[];
- var table_dispatch_signatures:blot_check_types::Id[>..<]=[];
- var table_proof_contracts:blot_check_core::ProofContract[>..<]=[];
- var builder=Builder{source:Source{tree:tree,names:names,checked:checked,diagnostic_origins:diagnostic_origins, ..},tables:Tables{field_names:table_field_names,request_loops:table_request_loops,request_arms:table_request_arms,tag_calls:table_tag_calls,nodes:table_nodes,spans:table_spans,extra:table_extra,type_nodes:table_type_nodes,quantifier_goals:table_quantifier_goals,quantifier_obligations:table_quantifier_obligations,type_extra:table_type_extra,effect_rows:table_effect_rows,effect_labels:table_effect_labels,effect_operations:table_effect_operations,bindings:table_bindings,bodies:table_bodies,parameters:table_parameters,runtime_names:table_runtime_names,source_names:table_source_names,erased_declaration_references:table_erased_declaration_references,references:table_references,calls:table_calls,merges:table_merges,merge_ranges:table_merge_ranges,name_bytes:table_name_bytes,obligations:table_obligations,diagnostics:table_diagnostics,nominals:table_nominals,operation_names:table_operation_names,constructors:table_constructors,projections:table_projections,projection_variants:table_projection_variants,patterns:table_patterns,pattern_rows:table_pattern_rows,match_arms:table_match_arms,matches:table_matches,updates:table_updates,update_steps:table_update_steps,closures:table_closures,associated:table_associated,contracts:table_contracts,contract_members:table_contract_members,implementations:table_implementations,implementation_members:table_implementation_members,member_templates:table_member_templates,selected_proofs:table_selected_proofs,selected_members:table_selected_members,selected_edges:table_selected_edges,selected_uses:table_selected_uses,dictionary_selections:table_dictionary_selections,dictionary_uses:table_dictionary_uses,primitives:table_primitives,loops:table_loops,loop_carries:table_loop_carries,resolver_ops:table_resolver_ops,operation_values:table_operation_values,handle_effects:table_handle_effects,dispatch_signatures:table_dispatch_signatures,proof_contracts:table_proof_contracts, ..},scratch:Scratch{..}, ..};
+ var table_field_names:blot_check_core::FieldName[>..]=[];
+ var table_request_loops:blot_check_core::RequestLoopInfo[>..]=[];
+ var table_request_arms:blot_check_core::RequestArm[>..]=[];
+ var table_tag_calls:blot_check_core::Id[>..]=[];
+ var table_nodes:blot_check_core::Node[>..]=[];
+ var table_spans:blot_check_core::Span[>..]=[];
+ var table_extra:blot_check_core::Id[>..]=[];
+ var table_type_nodes:blot_check_types::Node[>..]=[];
+ var table_quantifier_goals:blot_check_types::QuantifierGoals[>..]=[];
+ var table_quantifier_obligations:blot_check_types::Obligation[>..]=[];
+ var table_type_extra:blot_check_types::Id[>..]=[];
+ var table_effect_rows:blot_check_effects::Row[>..]=[];
+ var table_effect_labels:blot_check_effects::Label[>..]=[];
+ var table_effect_operations:blot_check_types::Operation[>..]=[];
+ var table_bindings:blot_check_core::Binding[>..]=[];
+ var table_bodies:blot_check_core::Body[>..]=[];
+ var table_parameters:blot_check_core::Parameter[>..]=[];
+ var table_runtime_names:blot_check_core::RuntimeName[>..]=[];
+ var table_source_names:blot_check_core::RuntimeName[>..]=[];
+ var table_erased_declaration_references:blot_check_core::ErasedDeclarationReference[>..]=[];
+ var table_references:blot_check_core::BindingRef[>..]=[];
+ var table_calls:blot_check_core::CallInfo[>..]=[];
+ var table_merges:blot_check_core::Merge[>..]=[];
+ var table_merge_ranges:blot_check_core::List[>..]=[];
+ var table_name_bytes:u8[>..]=[];
+ var table_obligations:blot_check_core::Obligation[>..]=[];
+ var table_diagnostics:blot_check_core::Diagnostic[>..]=[];
+ var table_nominals:blot_check_core::Nominal[>..]=[];
+ var table_operation_names:blot_check_core::OperationName[>..]=[];
+ var table_constructors:blot_check_core::Constructor[>..]=[];
+ var table_projections:blot_check_core::Projection[>..]=[];
+ var table_projection_variants:blot_check_core::ProjectionVariant[>..]=[];
+ var table_patterns:blot_check_core::Pattern[>..]=[];
+ var table_pattern_rows:blot_check_core::PatternRow[>..]=[];
+ var table_match_arms:blot_check_core::MatchArm[>..]=[];
+ var table_matches:blot_check_core::MatchInfo[>..]=[];
+ var table_updates:blot_check_core::UpdateInfo[>..]=[];
+ var table_update_steps:blot_check_core::UpdateStep[>..]=[];
+ var table_closures:blot_check_core::ClosureInfo[>..]=[];
+ var table_associated:blot_check_core::Associated[>..]=[];
+ var table_contracts:blot_check_core::Contract[>..]=[];
+ var table_contract_members:blot_check_core::ContractMember[>..]=[];
+ var table_implementations:blot_check_core::Implementation[>..]=[];
+ var table_implementation_members:blot_check_core::ImplementationMember[>..]=[];
+ var table_member_templates:blot_check_core::MemberTemplate[>..]=[];
+ var table_selected_proofs:blot_check_core::SelectedProof[>..]=[];
+ var table_selected_members:blot_check_core::ImplementationMember[>..]=[];
+ var table_selected_edges:u32[>..]=[];
+ var table_selected_uses:blot_check_core::SelectedUse[>..]=[];
+ var table_dictionary_selections:blot_check_core::DictionarySelection[>..]=[];
+ var table_dictionary_uses:blot_check_core::DictionaryUse[>..]=[];
+ var table_primitives:blot_check_core::Primitive[>..]=[];
+ var table_loops:blot_check_core::LoopInfo[>..]=[];
+ var table_loop_carries:blot_check_core::LoopCarry[>..]=[];
+ var table_resolver_ops:blot_check_core::ResolverInfo[>..]=[];
+ var table_operation_values:blot_check_core::OperationValue[>..]=[];
+ var table_handle_effects:blot_check_core::HandleEffects[>..]=[];
+ var table_dispatch_signatures:blot_check_types::Id[>..]=[];
+ var builder=Builder{source:Source{tree:tree,names:names,checked:checked,diagnostic_origins:diagnostic_origins, ..},tables:Tables{field_names:table_field_names,request_loops:table_request_loops,request_arms:table_request_arms,tag_calls:table_tag_calls,nodes:table_nodes,spans:table_spans,extra:table_extra,type_nodes:table_type_nodes,quantifier_goals:table_quantifier_goals,quantifier_obligations:table_quantifier_obligations,type_extra:table_type_extra,effect_rows:table_effect_rows,effect_labels:table_effect_labels,effect_operations:table_effect_operations,bindings:table_bindings,bodies:table_bodies,parameters:table_parameters,runtime_names:table_runtime_names,source_names:table_source_names,erased_declaration_references:table_erased_declaration_references,references:table_references,calls:table_calls,merges:table_merges,merge_ranges:table_merge_ranges,name_bytes:table_name_bytes,obligations:table_obligations,diagnostics:table_diagnostics,nominals:table_nominals,operation_names:table_operation_names,constructors:table_constructors,projections:table_projections,projection_variants:table_projection_variants,patterns:table_patterns,pattern_rows:table_pattern_rows,match_arms:table_match_arms,matches:table_matches,updates:table_updates,update_steps:table_update_steps,closures:table_closures,associated:table_associated,contracts:table_contracts,contract_members:table_contract_members,implementations:table_implementations,implementation_members:table_implementation_members,member_templates:table_member_templates,selected_proofs:table_selected_proofs,selected_members:table_selected_members,selected_edges:table_selected_edges,selected_uses:table_selected_uses,dictionary_selections:table_dictionary_selections,dictionary_uses:table_dictionary_uses,primitives:table_primitives,loops:table_loops,loop_carries:table_loop_carries,resolver_ops:table_resolver_ops,operation_values:table_operation_values,handle_effects:table_handle_effects,dispatch_signatures:table_dispatch_signatures, ..},scratch:Scratch{..}, ..};
 
  let initialized,error=blot_reuse_dependency_payload::init();if error!=blot_error::Error.none {return default<blot_reuse_dependency_payload::Owned<Module>>(),error;}var owner=initialized;
  var capability_nodes:blot_check_capability_contracts::Term[>..]=[];var capability_words:u32[>..]=[];var capability_bindings:blot_check_capability_contracts::Binding[>..]=[];
  var declarations:blot_reuse_declaration_dependencies::Recipe[>..<]=[];var references:blot_check_core::BindingRef[>..<]=[];var members:blot_check_core::DependencyMember[>..<]=[];
  let module,failure=lowerOwned(builder,owner,blot_check_capability_contracts::CollectionTables{nodes:capability_nodes,words:capability_words,bindings:capability_bindings, ..},declarations,references,members);builder.deinit();if failure!=blot_error::Error.none {owner.deinit();return default<blot_reuse_dependency_payload::Owned<Module>>(),failure;}return blot_reuse_dependency_payload::Owned<Module>{value:module,owner:owner, ..},blot_error::Error.none;
 }
-fn lowerOwned(builder:Builder&,owner:blot_reuse_dependency_payload::Owner&,capabilities:blot_check_capability_contracts::CollectionTables,declarations:blot_reuse_declaration_dependencies::Recipe[>..<]&,references:blot_check_core::BindingRef[>..<]&,members:blot_check_core::DependencyMember[>..<]&)->Module,Error {let error=builder.initialize();if error!=blot_error::Error.none {return default<Module>(),error;}if builder.source.checked.diagnostics.len!=0 {let error=builder.diagnostic(blot_check_core::Code.unchecked,0);if error!=blot_error::Error.none {return default<Module>(),error;}}else {let error=builder.allBindings();if error!=blot_error::Error.none {return default<Module>(),error;}let error=builder.allCatalogs();if error!=blot_error::Error.none {return default<Module>(),error;}let error=builder.allBodies();if error!=blot_error::Error.none {return default<Module>(),error;}}for goal in builder.tables.obligations {let error=builder.saveFieldName(goal.name);if error!=blot_error::Error.none {return default<Module>(),error;}}let finished,error=builder.tables.finish(owner,builder.scratch.body_lowerings,builder.scratch.effect_variable_count,builder.scratch.ast_map);if error!=blot_error::Error.none {return default<Module>(),error;}var result=finished;let collection,error=builder.source.checked.capability_contracts.select(builder.source.checked.bindings,[],false,capabilities);if error!=blot_error::Error.none {return default<Module>(),error;}let nodes,error=blot_reuse_dependency_payload::copy<blot_check_capability_contracts::Term>(owner,collection.nodes);if error!=blot_error::Error.none {return default<Module>(),error;}let words,error=blot_reuse_dependency_payload::copy<u32>(owner,collection.words);if error!=blot_error::Error.none {return default<Module>(),error;}let bindings,error=blot_reuse_dependency_payload::copy<blot_check_capability_contracts::Binding>(owner,collection.bindings);if error!=blot_error::Error.none {return default<Module>(),error;}result.capability_contracts=blot_check_capability_contracts::Collection{nodes:nodes,words:words,bindings:bindings, ..};result.unit=builder.source.checked.unit;let error=blot_reuse_declaration_dependencies::capture(result,declarations,references,members);if error!=blot_error::Error.none {return default<Module>(),error;}let declaration_dependencies,error=blot_reuse_dependency_payload::copy<blot_check_core::DeclarationDependencies>(owner,declarations[..]);if error!=blot_error::Error.none {return default<Module>(),error;}let dependency_references,error=blot_reuse_dependency_payload::copy<blot_check_core::BindingRef>(owner,references[..]);if error!=blot_error::Error.none {return default<Module>(),error;}let dependency_members,error=blot_reuse_dependency_payload::copy<blot_check_core::DependencyMember>(owner,members[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.declaration_dependencies=declaration_dependencies;result.dependency_references=dependency_references;result.dependency_members=dependency_members;return result,blot_error::Error.none;}
+fn lowerOwned(builder:Builder&,owner:blot_reuse_dependency_payload::Owner&,capabilities:blot_check_capability_contracts::CollectionTables,declarations:blot_reuse_declaration_dependencies::Recipe[>..<]&,references:blot_check_core::BindingRef[>..<]&,members:blot_check_core::DependencyMember[>..<]&)->Module,Error {let error=builder.initialize();if error!=blot_error::Error.none {return default<Module>(),error;}if builder.source.checked.diagnostics.len!=0 {let error=builder.diagnostic(blot_check_core::Code.unchecked,0);if error!=blot_error::Error.none {return default<Module>(),error;}}else {let error=builder.allBindings();if error!=blot_error::Error.none {return default<Module>(),error;}let error=builder.allCatalogs();if error!=blot_error::Error.none {return default<Module>(),error;}let error=builder.allBodies();if error!=blot_error::Error.none {return default<Module>(),error;}}for goal in builder.tables.obligations {let error=builder.saveFieldName(goal.name);if error!=blot_error::Error.none {return default<Module>(),error;}}var source_proofs:const blot_check_core::ProofContract[:]=[];if builder.source.checked.diagnostics.len==0 {source_proofs=builder.source.checked.proof_contracts;}let finished,error=builder.tables.finish(owner,builder.scratch.body_lowerings,builder.scratch.effect_variable_count,builder.scratch.ast_map,source_proofs);if error!=blot_error::Error.none {return default<Module>(),error;}var result=finished;let collection,error=builder.source.checked.capability_contracts.select(builder.source.checked.bindings,[],false,capabilities);if error!=blot_error::Error.none {return default<Module>(),error;}let nodes,error=blot_reuse_dependency_payload::copy<blot_check_capability_contracts::Term>(owner,collection.nodes);if error!=blot_error::Error.none {return default<Module>(),error;}let words,error=blot_reuse_dependency_payload::copy<u32>(owner,collection.words);if error!=blot_error::Error.none {return default<Module>(),error;}let bindings,error=blot_reuse_dependency_payload::copy<blot_check_capability_contracts::Binding>(owner,collection.bindings);if error!=blot_error::Error.none {return default<Module>(),error;}result.capability_contracts=blot_check_capability_contracts::Collection{nodes:nodes,words:words,bindings:bindings, ..};result.unit=builder.source.checked.unit;let error=blot_reuse_declaration_dependencies::capture(result,declarations,references,members);if error!=blot_error::Error.none {return default<Module>(),error;}let declaration_dependencies,error=blot_reuse_dependency_payload::copy<blot_check_core::DeclarationDependencies>(owner,declarations[..]);if error!=blot_error::Error.none {return default<Module>(),error;}let dependency_references,error=blot_reuse_dependency_payload::copy<blot_check_core::BindingRef>(owner,references[..]);if error!=blot_error::Error.none {return default<Module>(),error;}let dependency_members,error=blot_reuse_dependency_payload::copy<blot_check_core::DependencyMember>(owner,members[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.declaration_dependencies=declaration_dependencies;result.dependency_references=dependency_references;result.dependency_members=dependency_members;return result,blot_error::Error.none;}
 
 fn selectedAccessPath(self_:const Builder&,source:u32)->const u32[:] {if source<self_.source.checked.access_paths.len {return self_.source.checked.types.list(self_.source.checked.access_paths[source]);}return default<const u32[:]>();}
