@@ -39,10 +39,11 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen409 is the current source checkpoint. The selected private checker is
-`57bb3e817a5edab895f90cb518812299f1076a49127c3509b37f57a45515e847`.
-It retains 678b88's exported-root scheduling and adds a call-local raw-store
-identity skip plus traversal-local visited-type buckets. All 201 frontend,
+Frozen412 is the current source checkpoint. The selected private checker is
+`0c235f038e1b40a7ff59abd140b666abef2b6b33d98b18753b33172f6dcef653`.
+It retains 57bb's exported-root scheduling, raw-store identity skip and
+visited-type buckets, adding live historical event indexing. Candidate queries
+check current keys/classread normalization and return original ascending IDs. All 201 frontend,
 8 runtime / 7 focused / 12 emitted-C controls and eight extra store controls pass. 8,192 extracted store
 comparisons (also ASan/UBSan) and 300 visited-type laws preserve original order,
 relevant lookups and error/effect traces. The tracked recipe reconstructs all 108
@@ -189,7 +190,7 @@ its diagnostics qualify its recorded input tree only.
 The installed upstream Goose remains unchanged, SHA256
 `b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2`.
 Repair attempts explicitly select the optional private checker, SHA256
-`57bb3e817a5edab895f90cb518812299f1076a49127c3509b37f57a45515e847`.
+`0c235f038e1b40a7ff59abd140b666abef2b6b33d98b18753b33172f6dcef653`.
 The tracked recipe reconstructs all 108 selected source files byte-exactly; its
 accepted changes and independent controls are pinned in the receipt above.
 `tools/build_goose_checker.py` and `tools/goose-containment.patch` preserve its
@@ -279,3 +280,15 @@ ClassAt work is small, while 7.934 billion TypeEq calls remain. Both sampled
 stacks are waiting main-thread frames, so provide no hotspot attribution.
 Next: indexed live raw-event selection at its 3 write sites, preserving event
 order, current-field checks and classread normalization. No new IR or cap growth.
+
+The selected index candidate 411 passes 201 frontend / 8 runtime / 7 focused / 12 emitted-C controls plus
+eight store controls, 24,576 state/order and 49,152 query comparisons and
+ASan/UBSan. Same 409 authored inputs reach a new scalarArgumentPossible AST
+child-loop borrow in 107.649s; no compiler C/header/executable. All-relevant
+projected replay regresses 2.15x; preserve that limit. Exact 108 source recipe
+reconstruction passes without another build. No completed speed comparison.
+
+412 reloads scalar AST child IDs in scalarArgumentPossible while preserving
+full initial validation, iteration order, depth and false/error exits. Exact
+source review passes. Its 107.049s run reaches operationValue readonly Option
+overload mismatch; no C/header/executable.

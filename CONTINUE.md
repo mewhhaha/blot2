@@ -40,8 +40,10 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen409 is the current source checkpoint. Selected private checker 57bb3e81
-adds two bounded optimizations to 678b88: a call-local raw-store identity skip
+Frozen412 is the current source checkpoint.
+Selected private checker 0c235f03 adds live raw-event indexing to 57bb3e81.
+Its historical postings are filtered by current keys/normalization and sorted
+to preserve the original log order. It retains the earlier optimizations: a call-local raw-store identity skip
 and visited-type buckets keyed only by kind/nominal declaration. Relevant
 store mappings and possible-match type comparisons retain their original
 order. It passes 201 frontend / 8 runtime / 7 focused / 12 emitted-C controls and eight extra store controls;
@@ -58,7 +60,7 @@ completed compiler speed or parity result exists. Allocation-only prototypes
 controls and rejected experiments remain in the linked global-filter receipt.
 
 Recent source fixes reload immutable pattern children as scalar IDs and narrow
-the borrowed Engine before cleanup.405 makes two fresh packet decode temporaries
+the borrowed Engine before cleanup. 405 makes two fresh packet decode temporaries
 mutable before readonly use; 36 extracted decoder laws pass on both checkers.
 406 adds the generated Range codec and sends BodyOffers as symbol/presence/cache
 payload, reconstructing child ownership. Both checkers pass 20 offer laws and
@@ -249,3 +251,15 @@ ClassAt work is small, while 7.934 billion TypeEq calls remain. Both sampled
 stacks are waiting main-thread frames, so provide no hotspot attribution.
 Next: indexed live raw-event selection at its 3 write sites, preserving event
 order, current-field checks and classread normalization. No new IR or cap growth.
+
+Index 411 passes the 201 frontend / 8 runtime / 7 focused / 12 emitted-C controls and eight store controls,
+24,576 event-state/order and 49,152 query comparisons plus ASan/UBSan. Its
+107.649s run reaches scalarArgumentPossible immutable child-loop borrowing
+where 409 capped with no diagnostic. All-relevant synthetic replay costs 2.15x;
+retain that limitation and measure future dense cases. No completed compiler
+speed or whole-runtime result. Recipe reconstructs all 108 source files exactly.
+
+412 reloads scalar AST child IDs in scalarArgumentPossible while preserving
+full initial validation, iteration order, depth and false/error exits. Exact
+source review passes. Its 107.049s run reaches operationValue readonly Option
+overload mismatch; no C/header/executable.

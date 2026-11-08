@@ -465,3 +465,94 @@
      ArrayElemsReached(t, check, open);
      assert(TypeArgsEq(check, it->second));
  #endif
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2476,6 +2476,56 @@
+     // (ast.h StoreEvent), program-wide: a function value's body stores into
+     // its lexical function's containers while being checked in another frame.
+     vector<StoreEvent> storeevents;
++    // Historical postings keep absolute event IDs. Replays may rewrite an old
++    // ID, so insertion stays sorted; live keys are checked at every query.
++    unordered_map<VarDef *, vector<size_t>> storeeventkeys;
++    vector<size_t> storeeventclassreads;
++    static void IndexStoreEventId(vector<size_t> &ids, size_t id) {
++        if (ids.empty() || ids.back() < id) ids.push_back(id);
++        else {
++            auto at = lower_bound(ids.begin(), ids.end(), id);
++            if (at == ids.end() || *at != id) ids.insert(at, id);
++        }
++    }
++    void IndexStoreEvent(size_t id) {
++        const auto &e = storeevents[id];
++        if (e.root) IndexStoreEventId(storeeventkeys[e.root], id);
++        if (e.src && e.src != e.root) IndexStoreEventId(storeeventkeys[e.src], id);
++        if (e.classread) IndexStoreEventId(storeeventclassreads, id);
++    }
++    void AppendStoreEventLog(const StoreEvent &e) {
++        auto id = storeevents.size();
++        storeevents.push_back(e);
++        IndexStoreEvent(id);
++    }
++    void ReplaceStoreEventLog(size_t id, const StoreEvent &e) {
++        storeevents[id] = e;
++        IndexStoreEvent(id);
++    }
++    vector<size_t> StoreEventCandidates(size_t begin, size_t end,
++                                        const unordered_set<VarDef *> &keys) {
++        vector<size_t> ids;
++        for (auto key : keys) {
++            auto found = storeeventkeys.find(key);
++            if (found == storeeventkeys.end()) continue;
++            const auto &postings = found->second;
++            for (auto at = lower_bound(postings.begin(), postings.end(), begin);
++                 at != postings.end() && *at < end; ++at) {
++                const auto &e = storeevents[*at];
++                if (e.root == key || e.src == key) ids.push_back(*at);
++            }
++        }
++        // A classread on an unrelated event can still need normalization.
++        // Its source's live classification is deliberately not cached.
++        for (auto at = lower_bound(storeeventclassreads.begin(), storeeventclassreads.end(), begin);
++             at != storeeventclassreads.end() && *at < end; ++at) {
++            const auto &e = storeevents[*at];
++            if (e.classread && !IsClassRoot(e.src)) ids.push_back(*at);
++        }
++        sort(ids.begin(), ids.end());
++        ids.erase(unique(ids.begin(), ids.end()), ids.end());
++        return ids;
++    }
+     Node *fitnode = nullptr;         // The node MustFit is fitting, for RecordStore.
+     // The deepest root among the references a literal under construction
+     // holds: its holder root (§9.2). Each literal owns its accumulator, so
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1486,7 +1486,7 @@
+ // the container is storage of the caller's, which a parameter's class root
+ // stands for -- the call sites map those back (§3.5).
+ inline void TypeCheck::AddStoreEvent(const StoreEvent &e) {
+-    storeevents.push_back(e);
++    AppendStoreEventLog(e);
+     madestores.push_back(e);
+     NoteSlotStore(e);
+     if (e.container->type || e.container->isglobal) return;
+@@ -1793,7 +1793,8 @@
+             if (auto root = spec->params[p]->ref.Root()) rawclasses.insert(root);
+             if (auto view = ViewClassOf(spec, p)) rawclasses.insert(view);
+         }
+-    for (auto i = rec->eventstart; i < end; i++) {
++    auto rawids = StoreEventCandidates(rec->eventstart, end, rawclasses);
++    for (auto i : rawids) {
+         const auto &raw = storeevents[i];
+         // A back edge leaves its own activation's variables unchanged.
+         if (spec->inprogress && raw.container && raw.container->ownerspec == spec) continue;
+@@ -1820,8 +1821,8 @@
+             e.root = a.root;
+             e.exact = a.exact;
+             e.src = src;
+-            if (k == 0) storeevents[i] = e;
+-            else storeevents.push_back(e);
++            if (k == 0) ReplaceStoreEventLog(i, e);
++            else AppendStoreEventLog(e);
+         }
+     }
+     }
