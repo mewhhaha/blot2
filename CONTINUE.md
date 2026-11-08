@@ -69,7 +69,12 @@ unused this capture fits the callback's small buffer. It matches201frontend,
 819100allocations→0. However its398 whole attempt also times out120.291s with
 zero diagnostics/C on the same442authored inputs as397. It remains unselected;
 no whole gain is demonstrated. A dedicated non-owning AST child visitor is the
-next isolated prototype; all actual uses must remain synchronous/copy-equivalent.
+next isolated prototype; all actual uses remain synchronous/copy-equivalent.
+That ChildVisitor candidate e083ca53 passes201frontend/8runtime/7focused/12C parity,
+19semantic+ASan/UBSan cases and removes synthetic callback allocations. Attempt399
+still times out120.299s with zero diagnostics/C on the same442authored inputs.
+It also remains unselected. Next: measure completed checking/effect-replay work
+inside the fixed cap and target repeated algorithmic work, without blind reruns.
 No compiler C/header/executable or executed-Wasm/Gdev result exists for the port.
 
 Current representation repairs use the existing Session→Generator Frame token

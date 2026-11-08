@@ -149,7 +149,15 @@ Its398 attempt still times out120.291s with zero diagnostics/C versus397's
 120.269s timeout on matching442authored inputs. It remains unselected: no whole
 progress is demonstrated. The next prototype targets Node::Children's owning
 callback wrapper across synchronous visitors; retention, copy/mutable semantics
-and temporary lifetimes need separate proof before qualification or use.
+and temporary lifetimes are audited for all50current calls/37overrides. Candidate
+e083ca53 changes only two headers, keeps override bodies/RunChildren unchanged,
+and matches201frontend/8runtime/7focused/12C programs. Nineteen semantic cases
+plus ASan/UBSan pass; synthetic medians12.373→4.655ms,819100allocations→0. Its399
+attempt still times out120.299s with zero diagnostics/C on matching442authored
+inputs. It remains unselected. Both valid allocation levers have no demonstrated
+whole-prefix progress under this censored cap. The next investigation measures
+completed specs/effect events/traversal work and repeated SCC/global-root replay;
+no identical rerun, larger cap or unchecked memoization is authorized.
 No whole compiler C, header or executable has been emitted; source acceptance
 is not runtime qualification.
 
