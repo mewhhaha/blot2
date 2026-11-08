@@ -185,20 +185,234 @@
         ],
         "full_qualification": false
       }
+    },
+    {
+      "batch": "selected-batch-5",
+      "result": {
+        "partial": true,
+        "seconds": 84.835,
+        "results": [
+          {
+            "partial": true,
+            "engines": [
+              "runtime"
+            ],
+            "exit": 0,
+            "seconds": 2.143,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "semantic"
+            ],
+            "exit": 0,
+            "seconds": 84.713,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "check"
+            ],
+            "exit": 1,
+            "seconds": 43.85,
+            "stop": "completed",
+            "errors": [
+              {
+                "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+                "line": 2631,
+                "message": "error: storing a reference rooted at work, which does not outlive the destination: it is reached through a reference that may point into the caller's storage behind self_ (\u00a79.2)"
+              }
+            ],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "lower"
+            ],
+            "exit": 0,
+            "seconds": 5.047,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "independent"
+            ],
+            "exit": 0,
+            "seconds": 83.911,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-6",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 39.246,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2304,
+            "message": "error: storing a reference that may point into a grow-shrink array reached through the caller's storage behind self_: such a reference lives in a variable, is passed down or returned, and is never stored (\u00a75.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-7",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 39.389,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/purity_type_key.goose",
+            "line": 59,
+            "message": "error: typeKey calls into its recursive cycle while non-fixed-size local logical (declared at /home/jacobt/src/blot2/compiler-goose/src/eval/purity_type_key.goose:59) is in scope (\u00a77.8): end its scope before the call"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-8",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 39.053,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/purity_type_key.goose",
+            "line": 52,
+            "message": "error: unknown function: std::compare"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-9",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 38.473,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2384,
+            "message": "error: storing a reference rooted at group, which does not outlive the destination (\u00a79.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-10",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 38.359,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2392,
+            "message": "error: storing a reference rooted at self_, which does not outlive the destination: it is reached through a reference that may point into pool_blot_check_check__Diagnostic (\u00a79.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-11",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 40.149,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2967,
+            "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-12",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 41.052,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1823,
+            "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8): the recursive call at /home/jacobt/src/blot2/compiler-goose/src/check/check.goose:2189 passes self_ rooted differently from the cycle's entry call"
+          }
+        ],
+        "full_qualification": false
+      }
     }
   ],
   "source_files": [
     "compiler-goose/README.md",
     "compiler-goose/build/source-identity.json",
+    "compiler-goose/src/backend/loop_targets.goose",
+    "compiler-goose/src/check/capability_contracts.goose",
     "compiler-goose/src/check/check.goose",
     "compiler-goose/src/check/core.goose",
     "compiler-goose/src/check/core_builder.goose",
     "compiler-goose/src/eval/core_eval.goose",
+    "compiler-goose/src/eval/purity_type_key.goose",
     "compiler-goose/src/reuse/independent_worker.goose",
     "compiler-goose/src/source_identity.goose",
     "compiler-goose/tools/build_goose_checker.py"
   ],
-  "next": "backend loop-target AST spans; remaining lowering List-domain/API family",
+  "next": "checker recursive Engine root identity at resolveAlias/annotationBody; four production roots pass, whole ordinary compile pending",
   "oracle": "native Zig compiler unchanged; ABI8/session2 preserved",
-  "source_batch": "59 append-only Table owners become grow-only; redundant proof-header staging removed; existing final dependency Owner copies payloads directly"
+  "source_batch": "Lowering API/domain family and typed scratch cleanup; fixed loop-target scratch; loop and component publication; purity recursive arguments and actual-context cleanup; nonrecursive replay-copier initialization"
 }

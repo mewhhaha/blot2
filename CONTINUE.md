@@ -6,14 +6,12 @@ The Zig-to-Goose experiment in `compiler-goose/` is still source-only: no
 whole compiler C/header/executable or end-to-end parity result exists. Keep
 `compiler/`, the pinned Zig oracle and existing siblings unchanged.
 
-Work in large source batches. The current batch repairs 51 immutable AST loops,
-API/domain mismatches, signed metrics, five lowering Scratch containers and
-owned proof/evidence publication. Runtime and semantic production entry paths
-pass their partial checks. Checker/lower/independent paths are being repaired;
-Independent-proof path now also passes its partial check. Lowering has converted
-all 59 append-only Table owners to grow-only and removed redundant proof-header
-staging. Remaining frontiers are backend loop-target AST spans and lowering
-List-domain/API mismatches; the latter validate in about three seconds.
+Work in large source batches. Runtime, semantic, lowering and independent-proof
+production entry paths pass their partial checks. Lowering now uses grow-only
+append tables and the correct type/proof domains. Backend loop-target traversal
+uses fixed scratch descriptors and reloads immutable AST children by identity.
+The remaining checker path is advancing through inference/purity ownership
+boundaries; whole compilation remains pending.
 
 Use `python3 compiler-goose/tools/check_engines.py` for five concrete production
 paths in parallel (`--engines check lower independent` narrows a batch).
