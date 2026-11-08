@@ -51,7 +51,7 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 314 inputs and selects private
+per stage. This checkpoint preserves exact frozen 317 inputs and selects private
 checker ce317 explicitly. Its preceding one-condition ContentsReadBack correction
 recognizes the existing global-only null-root bound without changing alternatives
 or exactness. Stock b27 and 869 false positives reproduce in four functions.
@@ -77,10 +77,16 @@ precedence/null/artifact cases match on both checkers; two omission mutations tr
 Six further nullable-field accesses retain original guard order through locals.
 Fourteen declarations follow two concrete retained/principal query callback cycles;
 eight constructor/setter helpers preserve defaults, types and assignment order.
-Actual 314 reaches recorder restoration and stops after 110.213s: a reference
-loaded through the callback context cannot be restored into the registered Session.
-A frozen semantic-worker-only entry is being prepared to measure shorter repair
-iterations without changing the real evaluator/Generator ownership paths. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
+Three callback Session bindings now use the exact existing canonical registry
+lookup before saving references; previous restoration order is unchanged. Both
+principalEvidence and raggedBlock now consume their actual Option+Error API. A
+nine-field ConstantRun factory preserves Frame by value and explicit defaults.
+Actual 317 clears those boundaries and stops after 117.786s at old-reference
+retention in constant_receipt_reuse.init. A semantic-worker-only entry hit its
+20s cap with no diagnostic/C, establishing no faster loop. Four sparse samples
+of real instrumented316 locate root/store replay and specialization traversal;
+they do not establish time percentages. Ordered global-optional indexing and
+export-first standalone checking are private candidates under review. Whole parsing passes 440 files; no C/header/executable exists yet. Caps
 remain 120/300s with a 3s first-error window. Earlier dispatch and scalar-helper
 experiments failed and were removed after the private correctness fix; original
 code_expectation children source is restored. Whole compiler/runtime parity is
