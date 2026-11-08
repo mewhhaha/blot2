@@ -6,7 +6,7 @@ import support.error;
 import support.json;
 enum Kind {json,catalog,text,tunables,wgsl,reference}
 struct Definition {module: const u8[:],path: const u8[:],kind: Kind,ty: blot_support::Option<const u8[:]> = blot_support::none<const u8[:]>(),export_name: blot_support::Option<const u8[:]> = blot_support::none<const u8[:]>(),mediaType: blot_support::Option<const u8[:]> = blot_support::none<const u8[:]>()}
-struct Options {imports: const Definition[:] = default<const Definition[:]>(),roots: const (const u8[:])[:] = []}
+struct Options {imports: const Definition[:] = default<const Definition[:]>(),roots: const (const u8[:])[:] = default<const (const u8[:])[:]>()}
 struct Stats {parsed: i64 = 0,reused: i64 = 0,inputBytes: i64 = 0,generatedBytes: i64 = 0}
 struct Dependency {path: const u8[:],sha256: blot_support::Option<u8[64]>}
 struct Resource {id: u32,path: const u8[:],mediaType: const u8[:],sha256: u8[64],bytes: const u8[:],key: const u8[:]}

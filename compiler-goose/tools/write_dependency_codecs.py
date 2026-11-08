@@ -1,9 +1,28 @@
 # Source authoring only: native wire declarations -> concrete Goose codecs.
 # Never executes either compiler, a checker, tests, formatting or qualification.
 from pathlib import Path
-import re,json
+import re,json,sys
 REPO=Path(__file__).resolve().parents[2]
 ROOT=REPO/'compiler/src';GOOSE=REPO/'compiler-goose/src'
+OWNER_DISPATCH='''// Decode storage belongs to the concrete caller's allocation journal.
+fn allocateDecoded<T>(owner:Owner&,length:i64)->T[:],Error {return blot_reuse_dependency_format::alloc<T>(owner,length);}
+fn allocateDecoded<T>(owner:blot_reuse_dependency_payload::Owner&,length:i64)->T[:],Error {return blot_reuse_dependency_payload::alloc<T>(owner,length);}
+'''
+if sys.argv[1:]==['--repair-owner-dispatch']:
+ # Preserve later syntax/semantic repairs when updating this generator frontier.
+ path=GOOSE/'reuse/dependency_format_codecs.goose'
+ source=path.read_text()
+ source,count=re.subn(r'blot_reuse_dependency_format::alloc<([^;]+?)>\(reader\.owner,([^;]*?)\)',r'allocateDecoded<\1>(reader.owner,\2)',source)
+ source,receiver_count=re.subn(r'reader\.owner\.alloc<([^;]+?)>\(([^;]*?)\)',r'allocateDecoded<\1>(reader.owner,\2)',source)
+ count+=receiver_count
+ if not count and OWNER_DISPATCH not in source:raise SystemExit('no decoder allocation sites found')
+ if OWNER_DISPATCH not in source:
+  source=source.replace('struct Void {}\n','struct Void {}\n'+OWNER_DISPATCH)
+ if 'import reuse.dependency_payload;' not in source:
+  source=source.replace('import reuse.dependency_format;','import reuse.dependency_format;\nimport reuse.dependency_payload;')
+ path.write_text(source)
+ print(f'Updated {count} decoder allocation sites')
+ raise SystemExit(0)
 from source_model import clean,balanced,split
 def fields(body):
  out=[]
@@ -242,11 +261,11 @@ def scalar_bounds(p):
  if p=='usize':return 0,0x7fffffffffffffff
  if p=='isize':return -0x8000000000000000,0x7fffffffffffffff
  bits=int(p[1:]);return ((0,(1<<bits)-1) if p[0]=='u' else (-(1<<(bits-1)),(1<<(bits-1))-1))
-imports={'support.error','support.option','support.native','support.blake3','reuse.dependency_format','check.core','check.types'}
+imports={'support.error','support.option','support.native','support.blake3','reuse.dependency_format','reuse.dependency_payload','check.core','check.types'}
 for d in ORDER:
  for namespace in re.findall(r'\b(blot_\w+)::',actual(d)):
   if namespace in GF:imports.add(GF[namespace])
-lines=['// Concrete native-schema wire codecs, authored from frozen declarations.\n// Package/anonymous/generic native type-name spellings remain unqualified.\nnamespace blot_reuse_dependency_format;\n']+['import '+p+';\n' for p in sorted(imports)]+['struct Void {}\n']
+lines=['// Concrete native-schema wire codecs, authored from frozen declarations.\n// Package/anonymous/generic native type-name spellings remain unqualified.\nnamespace blot_reuse_dependency_format;\n']+['import '+p+';\n' for p in sorted(imports)]+['struct Void {}\n',OWNER_DISPATCH]
 for d in ORDER:
  t=actual(d);name=proc(d);kind=d['kind']
  # The schema's spelling is independent of Goose public/private owner fields.
@@ -343,14 +362,14 @@ for d in ORDER:
   if d['name']=='check.capability_flow.Parameters':lines.append('if !result.valid() {'+error_return(d,'Error.invalid_artifact')+'}')
   if t in G and G[t][0]=='struct' and 'owner_id' in dict(G[t][1]):lines.append('result.owner_id=blot_native::fresh_owner_id();')
   if d['name']=='check.core.Module':
-   lines.append('var packages=false;for node in result.nodes {if node.tag==blot_check_core::Tag.package_pack {packages=true;break;}}if packages && result.nodes.len!=0 {let lane,error=reader.owner.alloc<u32>(result.nodes.len);if error!=Error.none {'+error_return(d)+'}for node,index in result.nodes {lane[index]=node.a;}result.package_payloads=lane;}')
+   lines.append('var packages=false;for node in result.nodes {if node.tag==blot_check_core::Tag.package_pack {packages=true;break;}}if packages && result.nodes.len!=0 {let lane,error=allocateDecoded<u32>(reader.owner,result.nodes.len);if error!=Error.none {'+error_return(d)+'}for node,index in result.nodes {lane[index]=node.a;}result.package_payloads=lane;}')
   lines.append('return result,Error.none;')
  elif kind=='array':
   child=d['children'][0];lines.append(f'var result=default<{t}>();for index in 0..{d["count"]} '+step(d,f'read_{proc(child)}(reader,level+1)','result[index]')+'return result,Error.none;')
  elif kind=='slice':
   child=d['children'][0];w=minimum(child);lines.append('let count,error=reader.varint();if error!=Error.none {'+error_return(d)+'}if count>0xffffffff {'+error_return(d,'Error.invalid_artifact')+'}if reader.remaining<0 || count>reader.remaining as u64 {'+error_return(d,'Error.artifact_limit')+'}reader.remaining-=count as i64;')
   if w:lines.append(f'if count>((reader.bytes.len-reader.at)/{w}) as u64 {{{error_return(d,"Error.invalid_artifact")}}}')
-  lines.append(f'let result,error=reader.owner.alloc<{actual(child)}>(count as i64);if error!=Error.none {{{error_return(d)}}}')
+  lines.append(f'let result,error=allocateDecoded<{actual(child)}>(reader.owner,count as i64);if error!=Error.none {{{error_return(d)}}}')
   if child['name']=='u8':lines.append('let bytes,error=reader.take(count as i64);if error!=Error.none {'+error_return(d)+'}for byte,index in bytes {result[index]=byte;}')
   else:lines.append('for index in 0..count as i64 '+step(d,f'read_{proc(child)}(reader,level+1)','result[index]'))
   lines.append('return result,Error.none;')

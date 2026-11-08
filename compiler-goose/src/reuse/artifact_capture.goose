@@ -102,7 +102,8 @@ fn selectionStable(self_: const Capture&, units: const blot_check_core::Module[:
 }
 fn deinit(self_: Capture&) {
     self_.executable_queries.deinit();
-    if self_.optimized { self_.optimized.deinit(); self_.optimized .= null; }
+    let optimized .= self_.optimized;
+    if optimized { optimized.deinit(); self_.optimized .= null; }
     self_.emission.deinit(); self_.metadata.deinit(); self_.executable_queries_complete = false;
 }
 

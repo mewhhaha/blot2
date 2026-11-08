@@ -8,7 +8,7 @@ import check.core;
 type Error = blot_error::Error;
 struct Image { bytes: const u8[:] = default<const u8[:]>(), lease: u32 = 0, generation: u64 = 0 }
 struct Lease { references: u64 = 0, generation: u64 = 0 }
-reusable[] var image_leases: Lease[>..] = [];
+reusable var image_leases: Lease[>..] = [];
 reusable[] var image_bytes: u8[>..] = [];
 var next_generation: u64 = 1;
 fn live(self_: Image) -> bool { return self_.lease != 0 && self_.lease <= image_leases.len && image_leases[self_.lease - 1].references != 0 && image_leases[self_.lease - 1].generation == self_.generation; }

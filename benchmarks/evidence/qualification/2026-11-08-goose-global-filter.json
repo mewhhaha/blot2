@@ -5335,6 +5335,54 @@
       "live_matches_frozen": true,
       "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-222-inputs/compiler-goose/build/blotc-goose",
       "executable_exists": false
+    },
+    "build223": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-223-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 46.639,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-223.log",
+      "capture_seconds": 0.3545,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-223-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-223-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
+    },
+    "build224": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-224-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 46.824,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-224.log",
+      "capture_seconds": 0.5068,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-224-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-224-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false
     }
   },
   "given_equations": {
@@ -5524,5 +5572,1198 @@
       "/home/jacobt/src/blot2/build/goose-port/global-root-filter-experiment/compiler-filter/goose": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43"
     },
     "original_and_candidate_sources_unchanged": true
+  },
+  "source222_repairs": {
+    "native_hash_hooks": {
+      "hash-hooks-laws/REPORT.json": {
+        "source_hashes": {
+          "associated_admission": "f209b3a0495358e7a39a377cae506182bf71e6b2772ad18d7324431cdfbb6995",
+          "structural_generator": "68e2c692cc3b35d1abee911a4fe340b54544cca49b5972f3b088409d490636a1"
+        },
+        "tracked_changes": "ScopeKey native hash/import;3 fixed-width PI enum entries in generator input. Root regenerated generated adapters. PI source declarations unchanged.",
+        "native_key_semantics": "Both id and row participate; standard dictionary hashing need not match Zig AutoHashMap physical layout, and this ScopeKey seen map is only probed/inserted, never iterated. Equality includes all fields.",
+        "runtime_both_compilers": {
+          "enum_variants": 7,
+          "enum_equality_comparisons": 17,
+          "member_record_streams": 5,
+          "ScopeKey_edge_cases": 12,
+          "same_low8bit_collision_keys": 8,
+          "operations": "growth,duplicate update,lookup,backshift removal,reinsert,clear"
+        },
+        "zig_oracle": "Zig0.17.0 -fno-llvm;actual compiler/src/structural.zig; anonymous enum variant lists mechanically extracted from native PI declarations; exact scalar record schemas.14 golden byte streams+Wyhash0 digests agree with Goose; enums1byte,member streams17bytes,ScopeKey5bytes; padding excluded.",
+        "negative_controls": "remove only native ScopeKey hash or3 enum hooks =>expected missing hash diagnostic both compilers",
+        "limitations": "Focused hash/dictionary laws, not whole compiler/runtime qualification; source enum-width oracle mirrors exercised anonymous field schemas rather than importing full PI dependency graph.",
+        "artifacts": [
+          "evidence.json",
+          "negative-evidence.json",
+          "zig-oracle.json",
+          "source-audit.json",
+          "make.py",
+          "golden.py",
+          "zig_oracle.py",
+          "negative.py"
+        ]
+      }
+    },
+    "generic_decoder_owner": {
+      "decode-owner-laws/results.json": {
+        "coverage": {
+          "inputs": {
+            "compiler-goose/src/reuse/dependency_format_owners.goose": "a97f63a6683e7ebb0586dbf2152120b185e05e763a1cbe172ac7cd8b22101fca",
+            "compiler-goose/src/reuse/dependency_payload.goose": "0ab1d0d7782adf3f8ace570d4268b18c72ecee63d3abf5d0c1daca443578e5e4",
+            "compiler-goose/src/reuse/frozen_dependency.goose": "f10f84e214a91f396906e599d466caae54535dfadc47dd5d65cdeb34637c65e9",
+            "compiler-goose/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+            "compiler-goose/src/reuse/dependency_format.goose": "69562e0a799aca7c9978be8d9bd7491293b55bc13a29fad36e9b7142c3268b6b",
+            "compiler-goose/src/reuse/dependency_format_codecs.goose": "1ab5000a73abd3874778682ed6a10541ab78e5e60e8c377751ec33d43558e74d"
+          },
+          "adaptation": "Full production Decoder and exact selected codec/allocator functions; owner Run/pools and matching free branches narrowed to u8,u32,Symbol. Deterministic fresh_owner_id leaf. Full archive envelope, unrelated record schemas and physical OOM are not covered."
+        },
+        "laws_per_owner": 13,
+        "repetitions_per_owner": 4,
+        "runs": [
+          {
+            "name": "official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/decode-owner-laws/src/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "seconds": 0.05735693099995842,
+            "exit": 0,
+            "stdout": "PASS decoder owners: both journals, u8/u32/Symbol, exact byte/value order, empty, depth/element/count limits, truncated bytes/varint, partial rollback and lease reuse\n",
+            "stderr": "parsed ok: 66 top-level declarations, 7 file(s)\ntypechecked ok: 54 specialization(s), 11 struct/3 enum instance(s); optimized -O2: 20 inlined, 0 base case(s), 6 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 25/66 index and 0/2 slice checks\n"
+          },
+          {
+            "name": "selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/decode-owner-laws/src/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "seconds": 0.06426054300391115,
+            "exit": 0,
+            "stdout": "PASS decoder owners: both journals, u8/u32/Symbol, exact byte/value order, empty, depth/element/count limits, truncated bytes/varint, partial rollback and lease reuse\n",
+            "stderr": "parsed ok: 66 top-level declarations, 7 file(s)\ntypechecked ok: 54 specialization(s), 11 struct/3 enum instance(s); optimized -O2: 20 inlined, 0 base case(s), 6 folded, 0 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 25/66 index and 0/2 slice checks\n"
+          },
+          {
+            "name": "negative-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/decode-owner-laws/negative/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "seconds": 0.015080033001140691,
+            "exit": 1,
+            "expected_rejection": true,
+            "diagnostic": "no matching overload for call to blot_reuse_dependency_format::alloc"
+          },
+          {
+            "name": "negative-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/decode-owner-laws/negative/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "seconds": 0.017920152000442613,
+            "exit": 1,
+            "expected_rejection": true,
+            "diagnostic": "no matching overload for call to blot_reuse_dependency_format::alloc"
+          }
+        ],
+        "fixture_inputs": {
+          "build/goose-port/decode-owner-laws/src/main.goose": "7aed3578cb177d53ead44041f83181ade256018f7332c12252a26fa17eb261bc",
+          "build/goose-port/decode-owner-laws/src/reuse/dependency_format.goose": "f726e83df4c71dedd7f13388cab93b0545059db464ead81c7aa228b40f28be36",
+          "build/goose-port/decode-owner-laws/src/reuse/dependency_format_owners.goose": "9e76b9f8e1add0baef4e7a11420fa6de3f05f1ca34b3a9be764ba537f19c81be",
+          "build/goose-port/decode-owner-laws/src/reuse/dependency_payload.goose": "49618813edca8b0f68cedef121179f9bd497a5d88939ae5c75d1505ec53a589f",
+          "build/goose-port/decode-owner-laws/src/reuse/frozen_dependency.goose": "df487133d1c1117aa61a657af8988ff933b4f7c38e1b90e894b67afe68b228d5",
+          "build/goose-port/decode-owner-laws/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+          "build/goose-port/decode-owner-laws/src/support/native.goose": "1d394d9f5a6a82c14d763721984acafff5e7ecf147b2f9c8f45b94b3d4ab1e07"
+        },
+        "scripts": {
+          "build/goose-port/decode-owner-laws/make.py": "4c57a1f0098221e391572e898fe2ddfe8d4caed6dbcb54e403fad5ad5d4a0ba1",
+          "build/goose-port/decode-owner-laws/run.py": "0c4f988d57041077d86c7635f5af5f356e78a9e6e92ccddcfa95ff87d51118d6"
+        }
+      },
+      "decode-owner-laws/source-audit.json": {
+        "inputs": {
+          "compiler-goose/src/reuse/dependency_format_owners.goose": "a97f63a6683e7ebb0586dbf2152120b185e05e763a1cbe172ac7cd8b22101fca",
+          "compiler-goose/src/reuse/dependency_payload.goose": "0ab1d0d7782adf3f8ace570d4268b18c72ecee63d3abf5d0c1daca443578e5e4",
+          "compiler-goose/src/reuse/frozen_dependency.goose": "f10f84e214a91f396906e599d466caae54535dfadc47dd5d65cdeb34637c65e9",
+          "compiler-goose/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+          "compiler-goose/src/reuse/dependency_format.goose": "69562e0a799aca7c9978be8d9bd7491293b55bc13a29fad36e9b7142c3268b6b",
+          "compiler-goose/src/reuse/dependency_format_codecs.goose": "1ab5000a73abd3874778682ed6a10541ab78e5e60e8c377751ec33d43558e74d"
+        },
+        "adaptation": "Full production Decoder and exact selected codec/allocator functions; owner Run/pools and matching free branches narrowed to u8,u32,Symbol. Deterministic fresh_owner_id leaf. Full archive envelope, unrelated record schemas and physical OOM are not covered."
+      },
+      "decode-owner-laws/target-audit.json": {
+        "original_source_sha256": "87e07db3d9af38cbb777be8d40e054a85e5f60598f922b781c55271cee791a51",
+        "source_sha256": "1ab5000a73abd3874778682ed6a10541ab78e5e60e8c377751ec33d43558e74d",
+        "generator_sha256": "ecb5518a9a3876ec29e532479888d1f6af3a05fac7303c0e69087424d6dbe4b6",
+        "allocation_targets": 121,
+        "exact_reverse_audit": true,
+        "repair_mode_idempotent": true,
+        "scope": "Only dependency_payload import, two owner delegates, and decode allocation call targets change. All guards, remaining debits, allocation/read/copy order, wire writers and descriptions unchanged. Normal generator templates emit same dispatcher for slices and package reconstruction."
+      }
+    },
+    "diagnostic_json_publication": {
+      "dispatch-json-laws/results.json": {
+        "coverage": {
+          "inputs": {
+            "compiler-goose/src/reuse/dispatch_explanation.goose": "26695ff6d763dc86c342f8e85b1f2bec8724003c5bf0f5167be2c876e362e71f",
+            "compiler-goose/src/support/json.goose": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed",
+            "compiler-goose/src/support/option.goose": "83daa905847ce8a0c3ed7a16f22424a41622b0b8624b9dc30a648a0bca8205d6",
+            "compiler-goose/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+            "compiler-goose/src/check/types.goose": "9d73562bb34877b9aa936f5fa29e08a806dccacc038f551d0ae89943a49abc2a",
+            "compiler-goose/src/parse/ast.goose": "8fe8ecb1ad3d280e35fbbc130d27dfb635300bdc98b1b9a99cb162768c2b4da0",
+            "compiler-goose/src/support/json_adapters.goose": "bda0eb75bda95040d3a4a6f576551071fd6b636d443e8bffae59ebff354b2a69"
+          },
+          "coverage": "Full actual dispatch_explanation, JSON Writer, option and errors; four exact production JSON adapters. Only Operator and Span declarations retained from type/parse modules; no dependency semantics mocked."
+        },
+        "runs": [
+          {
+            "name": "official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/src/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 0,
+            "seconds": 0.13487633200566052,
+            "stdout": "PASS dispatch JSON: all enum tags, field order, optional omission, origin/steps/contexts, Error returns, sticky failure and depth failure prefix\n",
+            "stderr": "parsed ok: 249 top-level declarations, 9 file(s)\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:42: warning: redundant `as u64`: a u8 converts to u64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:43: warning: redundant `as u64`: a u16 converts to u64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:44: warning: redundant `as u64`: a u32 converts to u64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:46: warning: redundant `as i64`: an i8 converts to i64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:47: warning: redundant `as i64`: an i16 converts to i64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:48: warning: redundant `as i64`: an i32 converts to i64 implicitly here\ntypechecked ok: 325 specialization(s), 16 struct/6 enum instance(s); optimized -O2: 407 inlined, 0 base case(s), 0 folded, 19 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 8/104 index and 9/15 slice checks\n"
+          },
+          {
+            "name": "selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/src/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 0,
+            "seconds": 0.15804046799894422,
+            "stdout": "PASS dispatch JSON: all enum tags, field order, optional omission, origin/steps/contexts, Error returns, sticky failure and depth failure prefix\n",
+            "stderr": "parsed ok: 249 top-level declarations, 9 file(s)\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:42: warning: redundant `as u64`: a u8 converts to u64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:43: warning: redundant `as u64`: a u16 converts to u64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:44: warning: redundant `as u64`: a u32 converts to u64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:46: warning: redundant `as i64`: an i8 converts to i64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:47: warning: redundant `as i64`: an i16 converts to i64 implicitly here\nbuild/goose-port/dispatch-json-laws/src/support/json.goose:48: warning: redundant `as i64`: an i32 converts to i64 implicitly here\ntypechecked ok: 325 specialization(s), 16 struct/6 enum instance(s); optimized -O2: 407 inlined, 0 base case(s), 0 folded, 19 propagated, 0 tail loop(s), 0 reassociated\nbce: elided 8/104 index and 9/15 slice checks\n"
+          },
+          {
+            "name": "negative-Candidate-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-Candidate/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.030468622004264034,
+            "expected_rejection": "got void"
+          },
+          {
+            "name": "negative-Candidate-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-Candidate/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.023639749000722077,
+            "expected_rejection": "got void"
+          },
+          {
+            "name": "negative-Explanation-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-Explanation/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.04327068800193956,
+            "expected_rejection": "initializer has no value"
+          },
+          {
+            "name": "negative-Explanation-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-Explanation/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.037271934997988865,
+            "expected_rejection": "initializer has no value"
+          },
+          {
+            "name": "negative-Outcome-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-Outcome/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.021959855999739375,
+            "expected_rejection": "got void"
+          },
+          {
+            "name": "negative-Outcome-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-Outcome/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.027937890001339838,
+            "expected_rejection": "got void"
+          },
+          {
+            "name": "negative-ContextKind-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-ContextKind/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.029542960997787304,
+            "expected_rejection": "got void"
+          },
+          {
+            "name": "negative-ContextKind-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-ContextKind/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.15483113699883688,
+            "expected_rejection": "got void"
+          },
+          {
+            "name": "negative-fit-buffer-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-fit-buffer/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.0488403869967442,
+            "expected_rejection": "cannot pass u8[>..<]& as u8[>..]&"
+          },
+          {
+            "name": "negative-fit-buffer-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/negative-fit-buffer/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.03410983300273074,
+            "expected_rejection": "cannot pass u8[>..<]& as u8[>..]&"
+          }
+        ],
+        "laws": [
+          "12 fixed Outcome strings",
+          "6 reflected Side strings",
+          "2 reflected ContextKind strings",
+          "20 enum sticky failures",
+          "Candidate optional origin omission",
+          "Explanation empty steps/contexts omission",
+          "nested origin/steps/contexts byte exact field order",
+          "Candidate and Explanation sticky failure",
+          "depth-256 empty and depth-255 exact failure prefix",
+          "field Error return",
+          "fit 3000-byte operand truncation and cleanup"
+        ],
+        "fixture_inputs": {
+          "build/goose-port/dispatch-json-laws/src/adapters.goose": "4d6050b7f8100d258ff4ace01a245d6bc21e098fdc132334f3c9088b8caf59db",
+          "build/goose-port/dispatch-json-laws/src/check/types.goose": "e549e2216d3ee4c67b0db037bbf375d0465c19e837792f74d8fbb1462372a609",
+          "build/goose-port/dispatch-json-laws/src/main.goose": "9054947defe22278f985dd0f0adde4a6e5afdaebecf31c40c2c23cfc06735748",
+          "build/goose-port/dispatch-json-laws/src/parse/ast.goose": "da9a6c208a5e8ea1fc5c088f91a92c188b1131229497b0ad4d947be4774ad824",
+          "build/goose-port/dispatch-json-laws/src/reuse/dispatch_explanation.goose": "26695ff6d763dc86c342f8e85b1f2bec8724003c5bf0f5167be2c876e362e71f",
+          "build/goose-port/dispatch-json-laws/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+          "build/goose-port/dispatch-json-laws/src/support/json.goose": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed",
+          "build/goose-port/dispatch-json-laws/src/support/option.goose": "83daa905847ce8a0c3ed7a16f22424a41622b0b8624b9dc30a648a0bca8205d6"
+        },
+        "scripts": {
+          "build/goose-port/dispatch-json-laws/make.py": "c1da92ab4382c20f2d2fd394ae87365ca867e12eac944c6dd56556b72e810cf8",
+          "build/goose-port/dispatch-json-laws/run.py": "cf30b7a174b329326eb787ff9ad8e9cc8c9263ee201bcfbd9615f4f43173e5b1"
+        }
+      },
+      "dispatch-json-laws/source-audit.json": {
+        "inputs": {
+          "compiler-goose/src/reuse/dispatch_explanation.goose": "26695ff6d763dc86c342f8e85b1f2bec8724003c5bf0f5167be2c876e362e71f",
+          "compiler-goose/src/support/json.goose": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed",
+          "compiler-goose/src/support/option.goose": "83daa905847ce8a0c3ed7a16f22424a41622b0b8624b9dc30a648a0bca8205d6",
+          "compiler-goose/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+          "compiler-goose/src/check/types.goose": "9d73562bb34877b9aa936f5fa29e08a806dccacc038f551d0ae89943a49abc2a",
+          "compiler-goose/src/parse/ast.goose": "8fe8ecb1ad3d280e35fbbc130d27dfb635300bdc98b1b9a99cb162768c2b4da0",
+          "compiler-goose/src/support/json_adapters.goose": "bda0eb75bda95040d3a4a6f576551071fd6b636d443e8bffae59ebff354b2a69"
+        },
+        "coverage": "Full actual dispatch_explanation, JSON Writer, option and errors; four exact production JSON adapters. Only Operator and Span declarations retained from type/parse modules; no dependency semantics mocked."
+      },
+      "dispatch-json-laws/builder-results.json": {
+        "source_sha256": "26695ff6d763dc86c342f8e85b1f2bec8724003c5bf0f5167be2c876e362e71f",
+        "coverage": "Complete production Builder finish and JSON/runtime. Accounting adds scalar copyText/freeText counters; failure control substitutes JSON toBytes error only. No physical OOM/RSS claim.",
+        "runs": [
+          {
+            "name": "snapshot-accounting-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/snapshot-accounting/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 0,
+            "seconds": 0.10853633900114801,
+            "stdout": "PASS snapshot accounting: original 27B/5 runs; publication 40B/7 copies (27B/5 additional); peak live text67B; result40B; final0B\n",
+            "expected_rejection": null
+          },
+          {
+            "name": "snapshot-accounting-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/snapshot-accounting/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 0,
+            "seconds": 0.12479144100507256,
+            "stdout": "PASS snapshot accounting: original 27B/5 runs; publication 40B/7 copies (27B/5 additional); peak live text67B; result40B; final0B\n",
+            "expected_rejection": null
+          },
+          {
+            "name": "fit-failure-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/fit-failure/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 0,
+            "seconds": 0.06391631600126857,
+            "stdout": "PASS fit failure: Builder consumed, all12 original/snapshot/text runs freed, default result\n",
+            "expected_rejection": null
+          },
+          {
+            "name": "fit-failure-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/fit-failure/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 0,
+            "seconds": 0.060841279999294784,
+            "stdout": "PASS fit failure: Builder consumed, all12 original/snapshot/text runs freed, default result\n",
+            "expected_rejection": null
+          },
+          {
+            "name": "shallow-candidates-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/shallow-candidates/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.04287073800514918,
+            "stdout": "",
+            "expected_rejection": "does not outlive"
+          },
+          {
+            "name": "shallow-candidates-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/shallow-candidates/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.053924491003272124,
+            "stdout": "",
+            "expected_rejection": "does not outlive"
+          },
+          {
+            "name": "shallow-steps-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/shallow-steps/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.036313001000962686,
+            "stdout": "",
+            "expected_rejection": "does not outlive"
+          },
+          {
+            "name": "shallow-steps-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/shallow-steps/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.05337857300037285,
+            "stdout": "",
+            "expected_rejection": "does not outlive"
+          },
+          {
+            "name": "local-escape-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/local-escape/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.026427238997712266,
+            "stdout": "",
+            "expected_rejection": "dies with this function"
+          },
+          {
+            "name": "local-escape-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/dispatch-json-laws/local-escape/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.03448706999915885,
+            "stdout": "",
+            "expected_rejection": "dies with this function"
+          }
+        ],
+        "accounting": {
+          "source_text_bytes": 27,
+          "source_runs": 5,
+          "publication_bytes_including_existing_operation_member": 40,
+          "publication_runs_including_existing_operation_member": 7,
+          "additional_snapshot_bytes": 27,
+          "additional_snapshot_runs": 5,
+          "peak_live_text_bytes": 67,
+          "result_live_text_bytes": 40,
+          "after_deinit_live_text_bytes": 0,
+          "bounded_producer_max_additional_bytes": 7168,
+          "bounded_producer_max_additional_runs": 28,
+          "excludes": "record arrays, pool reservation and RSS; inputs bypassing ownText/own can exceed max_text"
+        },
+        "scripts": {
+          "build/goose-port/dispatch-json-laws/make.py": "c1da92ab4382c20f2d2fd394ae87365ca867e12eac944c6dd56556b72e810cf8",
+          "build/goose-port/dispatch-json-laws/builder.py": "85f1329ec22a0d97203fc49e4e3fb350a7eb1cc5102e287ec6b5c5653081aac6"
+        }
+      }
+    },
+    "validation_image_slot_pool": {
+      "validation-image-laws/evidence.json": {
+        "qualification": "focused native lifecycle laws; whole compiler unverified",
+        "production_sha256": "f469b66c7c858e7382786104727b2c773c2d9faf5a9d26d887ba016368b47d12",
+        "change": "individual Lease slots use reusable pool; byte storage remains reusable[] slice pool",
+        "limits": "exact production image functions except Module-specific hashing overload/import excluded; actual scalar structural hash, error, option, bytes and native declarations retained",
+        "coverage": [
+          "capture/matches mismatch",
+          "retained reference survives first deinit",
+          "final deinit invalidates stale handle",
+          "slot reuse has new generation",
+          "double deinit of cleared handle",
+          "zero budget declines without charge"
+        ],
+        "runs": [
+          {
+            "label": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "commands": [
+              [
+                "../goose-to-wasm/build/native/goose",
+                "--standalone",
+                "-O0",
+                "--debug",
+                "--stdlib",
+                "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+                "-o",
+                "build/goose-port/validation-image-laws/official.c",
+                "build/goose-port/validation-image-laws/src/main.goose"
+              ],
+              [
+                "clang-23",
+                "-std=gnu11",
+                "-O0",
+                "-pthread",
+                "build/goose-port/validation-image-laws/official.c",
+                "-lm",
+                "-ldl",
+                "-o",
+                "build/goose-port/validation-image-laws/official"
+              ],
+              [
+                "build/goose-port/validation-image-laws/official"
+              ]
+            ],
+            "exit_codes": [
+              0,
+              0,
+              0
+            ],
+            "emitted_c_sha256": "9c418c613b3eb2a66774e3591e8f3d9a541cc355ccfe4b75d88a78a9d75ae3e9",
+            "executable_sha256": "b407bd295e4004163607327cdfa8a6c6fae7e079260f095c1f6ece6c8ff3b12f"
+          },
+          {
+            "label": "selected",
+            "compiler_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "commands": [
+              [
+                "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+                "--standalone",
+                "-O0",
+                "--debug",
+                "--stdlib",
+                "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+                "-o",
+                "build/goose-port/validation-image-laws/selected.c",
+                "build/goose-port/validation-image-laws/src/main.goose"
+              ],
+              [
+                "clang-23",
+                "-std=gnu11",
+                "-O0",
+                "-pthread",
+                "build/goose-port/validation-image-laws/selected.c",
+                "-lm",
+                "-ldl",
+                "-o",
+                "build/goose-port/validation-image-laws/selected"
+              ],
+              [
+                "build/goose-port/validation-image-laws/selected"
+              ]
+            ],
+            "exit_codes": [
+              0,
+              0,
+              0
+            ],
+            "emitted_c_sha256": "9c418c613b3eb2a66774e3591e8f3d9a541cc355ccfe4b75d88a78a9d75ae3e9",
+            "executable_sha256": "69b6bf398cb6dba52cfc2c071ca6fc707ac656ae4fe56676d0e0404a53c1853b"
+          }
+        ]
+      }
+    },
+    "native_scalar_append_residuals": {
+      "schema_version": 1,
+      "audit": "Residual native scalar append sites in check.goose",
+      "source": {
+        "file": "compiler-goose/src/check/check.goose",
+        "sha256": "60a050b41c3c361796d8bd80e65d8775f82787cfa3c3b5f5ef57adb07767085e"
+      },
+      "method": "Source declaration and RHS type inspection only; no build or compiler parse run.",
+      "changes": [
+        {
+          "line": 1435,
+          "receiver": "out",
+          "receiver_type": "u8[>..<]&",
+          "receiver_declaration": "decimal(out:u8[>..<]&, value:u32)",
+          "rhs": "digits[count]",
+          "rhs_type": "u8",
+          "rhs_declaration": "digits:u8[10]"
+        },
+        {
+          "line": 1656,
+          "receiver": "self_.name_bytes",
+          "receiver_type": "u8[>..<]&",
+          "receiver_declaration": "Engine.name_bytes:u8[>..<]& (check.goose:740)",
+          "rhs": "'.' as u8",
+          "rhs_type": "u8"
+        },
+        {
+          "line": 1741,
+          "receiver": "self_.name_bytes",
+          "receiver_type": "u8[>..<]&",
+          "receiver_declaration": "Engine.name_bytes:u8[>..<]& (check.goose:740)",
+          "rhs": "'.' as u8",
+          "rhs_type": "u8",
+          "occurrences": 2
+        },
+        {
+          "line": 2038,
+          "receiver": "self_.scope_lifetimes",
+          "receiver_type": "blot_check_types::Id[>..<]&",
+          "receiver_declaration": "Engine.scope_lifetimes:blot_check_types::Id[>..<]& (check.goose:792)",
+          "rhs": "self_.types.node(views[0]).a",
+          "rhs_type": "blot_check_types::Id/u32",
+          "rhs_declaration": "Type node field a is the type ID used to extend scope_lifetimes"
+        },
+        {
+          "line": 2194,
+          "receiver": "output",
+          "receiver_type": "blot_check_types::Obligation[>..<]&",
+          "receiver_declaration": "predicateAppend(output:blot_check_types::Obligation[>..<]&, value:blot_check_types::Obligation)",
+          "rhs": "value",
+          "rhs_type": "blot_check_types::Obligation"
+        },
+        {
+          "line": 2937,
+          "receiver": "self_.projection_catalog",
+          "receiver_type": "Projection[>..<]&",
+          "receiver_declaration": "Engine.projection_catalog:Projection[>..<]& (check.goose:929)",
+          "rhs": "work.field_plans[index]",
+          "rhs_type": "Projection",
+          "rhs_declaration": "BodyReplayWork.field_plans:Projection[:] (check.goose:2910)"
+        },
+        {
+          "line": 2943,
+          "receiver": "self_.projection_catalog",
+          "receiver_type": "Projection[>..<]&",
+          "receiver_declaration": "Engine.projection_catalog:Projection[>..<]& (check.goose:929)",
+          "rhs": "work.access_plans[access_index]",
+          "rhs_type": "Projection",
+          "rhs_declaration": "BodyReplayWork.access_plans:Projection[:] (check.goose:2910)"
+        }
+      ],
+      "verification": {
+        "git_diff_check": "passed",
+        "builds_run": false,
+        "source_files_modified_for_receipt": false
+      }
+    },
+    "server_boundary": {
+      "results.json": {
+        "coverage": {
+          "inputs": {
+            "compiler-goose/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+            "compiler-goose/src/support/option.goose": "83daa905847ce8a0c3ed7a16f22424a41622b0b8624b9dc30a648a0bca8205d6",
+            "compiler-goose/src/support/json.goose": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed",
+            "compiler-goose/src/reuse/artifact_capture.goose": "c43fc44c7eb8c02b8a3064d9cbfe1601ca1f5c54b07aa45fdb7c3d5cfced791a",
+            "compiler-goose/src/reuse/restart_cache.goose": "474e25e9c77400b5c9f21ca5899666a10f3089ba3f3bbcdda7d31ad7829d3a38",
+            "compiler-goose/src/backend/native_assets.goose": "ad5775621693504b5fcbbcab29d18a3d8c98ae1c9ef06626a5b453a26a059ad3",
+            "compiler-goose/src/reuse/source_overlays.goose": "0b9f4e779667475fa00d48eaf11e780f3bce9a16be59b4403cfa26fbd06b2ed0",
+            "compiler-goose/src/parse/ast.goose": "8fe8ecb1ad3d280e35fbbc130d27dfb635300bdc98b1b9a99cb162768c2b4da0",
+            "compiler-goose/src/check/diagnostic_location.goose": "6afbdf5909f6a69eaf923272f3b74cbc217803d845b574e583d2c31bc0603a53",
+            "compiler-goose/src/reuse/zig_project_server.goose": "d92b6d542af9b6621dbbd457bd289a0a2496cce29e0d336840d7f93660b864d2",
+            "compiler-goose/src/reuse/zig_project_server_build.goose": "6a9a7f4aa7db4867e9965d7ac160410f7527afcfe8bf4898ab9abd1a872adb48",
+            "compiler-goose/src/support/json_adapters.goose": "d670176ef6a93872da8190a9096f363857640141fcc019a87003e3bde6c8e232"
+          },
+          "coverage": "Exact Capture declaration/init/deinit with controlled deinit leaves. Exact restart File/Report/note/save/capture/writeLocked, controlled filesystem/encoder producer leaves. Exact issue/IssueDetails/Diagnostic and BuildReply declarations/serializers; accessed Emission fields modeled, full native asset declarations, controlled BuildStats JSON leaf. Actual JSON Writer and selected exact adapters. No process, filesystem, full asset preparation or compiler semantics qualification."
+        },
+        "runs": [
+          {
+            "name": "positive-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/src/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 0,
+            "seconds": 0.11230646500189323,
+            "stdout": "PASS boundary repairs: optimized nullable cleanup order, const checkpoint forwarding/release, diagnostic payload enum widening, stable asset stats JSON\n",
+            "expected_rejection": false,
+            "diagnostics": []
+          },
+          {
+            "name": "positive-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "run",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/src/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 0,
+            "seconds": 0.1034908460060251,
+            "stdout": "PASS boundary repairs: optimized nullable cleanup order, const checkpoint forwarding/release, diagnostic payload enum widening, stable asset stats JSON\n",
+            "expected_rejection": false,
+            "diagnostics": []
+          },
+          {
+            "name": "optimized-field-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/optimized-field/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.04451950600196142,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/optimized-field/reuse/artifact_capture.goose:16: error: no matching overload for call to deinit"
+            ]
+          },
+          {
+            "name": "optimized-field-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/optimized-field/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.04179139999905601,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/optimized-field/reuse/artifact_capture.goose:16: error: no matching overload for call to deinit"
+            ]
+          },
+          {
+            "name": "optimized-typed-field-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/optimized-typed-field/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.041937326997867785,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/optimized-typed-field/reuse/artifact_capture.goose:16: error: expected a value of type blot_backend_optimized_bodies::Capture&, got blot_backend_optimized_bodies::Capture?"
+            ]
+          },
+          {
+            "name": "optimized-typed-field-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/optimized-typed-field/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.03975685199839063,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/optimized-typed-field/reuse/artifact_capture.goose:16: error: expected a value of type blot_backend_optimized_bodies::Capture&, got blot_backend_optimized_bodies::Capture?"
+            ]
+          },
+          {
+            "name": "checkpoint-const-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/checkpoint-const/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.02451602699875366,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/checkpoint-const/reuse/restart_cache.goose:17: error: expected a value of type blot_support::Option<const u8[:]>, got blot_support::Option<u8[:]>"
+            ]
+          },
+          {
+            "name": "checkpoint-const-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/checkpoint-const/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.040650290000485256,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/checkpoint-const/reuse/restart_cache.goose:17: error: expected a value of type blot_support::Option<const u8[:]>, got blot_support::Option<u8[:]>"
+            ]
+          },
+          {
+            "name": "prior-const-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/prior-const/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.040103150000504684,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/prior-const/reuse/restart_cache.goose:19: error: expected a value of type blot_support::Option<const u8[:]>, got blot_support::Option<u8[:]>"
+            ]
+          },
+          {
+            "name": "prior-const-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/prior-const/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.023625214002095163,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/prior-const/reuse/restart_cache.goose:19: error: expected a value of type blot_support::Option<const u8[:]>, got blot_support::Option<u8[:]>"
+            ]
+          },
+          {
+            "name": "issue-bytes-variant-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/issue-bytes-variant/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.0306644860029337,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/issue-bytes-variant/reuse/zig_project_server.goose:14: error: expected a value of type blot_support::Option<blot_reuse_zig_project_server::IssueDetails>, got blot_support::Option<blot_reuse_zig_project_server::IssueDetails.bytes>"
+            ]
+          },
+          {
+            "name": "issue-bytes-variant-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/issue-bytes-variant/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.022700626999721862,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/issue-bytes-variant/reuse/zig_project_server.goose:14: error: expected a value of type blot_support::Option<blot_reuse_zig_project_server::IssueDetails>, got blot_support::Option<blot_reuse_zig_project_server::IssueDetails.bytes>"
+            ]
+          },
+          {
+            "name": "issue-explanation-variant-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/issue-explanation-variant/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.022879595999256708,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/issue-explanation-variant/reuse/zig_project_server.goose:15: error: expected a value of type blot_support::Option<blot_reuse_zig_project_server::IssueDetails>, got blot_support::Option<blot_reuse_zig_project_server::IssueDetails.explanation>"
+            ]
+          },
+          {
+            "name": "issue-explanation-variant-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/issue-explanation-variant/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.023431805995642208,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/issue-explanation-variant/reuse/zig_project_server.goose:15: error: expected a value of type blot_support::Option<blot_reuse_zig_project_server::IssueDetails>, got blot_support::Option<blot_reuse_zig_project_server::IssueDetails.explanation>"
+            ]
+          },
+          {
+            "name": "explanation-field-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/explanation-field/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.04106978799973149,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/explanation-field/reuse/zig_project_server.goose:15: error: expected a value of type const blot_reuse_dispatch_explanation::Explanation&, got blot_reuse_dispatch_explanation::Explanation?"
+            ]
+          },
+          {
+            "name": "explanation-field-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/explanation-field/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.04105527000501752,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/explanation-field/reuse/zig_project_server.goose:15: error: expected a value of type const blot_reuse_dispatch_explanation::Explanation&, got blot_reuse_dispatch_explanation::Explanation?"
+            ]
+          },
+          {
+            "name": "assets-typed-field-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/assets-typed-field/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.045256206998601556,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/assets-typed-field/reuse/zig_project_server.goose:21: error: expected a value of type const blot_backend_native_assets::Candidate&, got blot_backend_native_assets::Candidate?"
+            ]
+          },
+          {
+            "name": "assets-typed-field-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/assets-typed-field/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.03970438199758064,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/assets-typed-field/reuse/zig_project_server.goose:21: error: expected a value of type const blot_backend_native_assets::Candidate&, got blot_backend_native_assets::Candidate?"
+            ]
+          },
+          {
+            "name": "path-temporaries-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/path-temporaries/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.029611625002871733,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/path-temporaries/reuse/restart_cache.goose:8: error: storing a reference rooted at <temporary>, which does not outlive the destination (\u00a79.2)"
+            ]
+          },
+          {
+            "name": "path-temporaries-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/path-temporaries/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.023219511997012887,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/path-temporaries/reuse/restart_cache.goose:8: error: storing a reference rooted at <temporary>, which does not outlive the destination (\u00a79.2)"
+            ]
+          },
+          {
+            "name": "filename-rebind-official",
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/filename-rebind/main.goose"
+            ],
+            "binary_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "exit": 1,
+            "seconds": 0.043236035999143496,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/filename-rebind/reuse/zig_project_server.goose:14: error: re-binding filename with a reference rooted at a different scope depth is not supported; declare a new variable (\u00a79.2): filename is bound to one rooted at static data, and this one is rooted at the caller's storage behind result (emission)"
+            ]
+          },
+          {
+            "name": "filename-rebind-selected",
+            "command": [
+              "build/goose-port/global-root-filter-experiment/compiler-filter/goose",
+              "check",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "build/goose-port/server-boundary-laws/filename-rebind/main.goose"
+            ],
+            "binary_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
+            "exit": 1,
+            "seconds": 0.043706429998565,
+            "stdout": "",
+            "expected_rejection": true,
+            "diagnostics": [
+              "build/goose-port/server-boundary-laws/filename-rebind/reuse/zig_project_server.goose:14: error: re-binding filename with a reference rooted at a different scope depth is not supported; declare a new variable (\u00a79.2): filename is bound to one rooted at static data, and this one is rooted at the caller's storage behind result (emission)"
+            ]
+          }
+        ],
+        "fixture_inputs": {
+          "build/goose-port/server-boundary-laws/src/adapters.goose": "2cd2c6dc69b7fd024a62f60fc5fa9f9288f3264015e69114d3aa257c973b8d19",
+          "build/goose-port/server-boundary-laws/src/backend/backend_checkpoint.goose": "84ae2b4ecac2042d913164b16d6aa18d1acf7cd0f683b037fe0e48142cf19cd0",
+          "build/goose-port/server-boundary-laws/src/backend/core_backend.goose": "a61233c931cfd1a064f311147d3fa018de0d1ac7e1b2a0a5f97de6e9dd16355c",
+          "build/goose-port/server-boundary-laws/src/backend/native_assets.goose": "9b354b4ebeb0cd84e0e63be51f811b6b327b926b5d680cc7fd2752b831b425da",
+          "build/goose-port/server-boundary-laws/src/backend/optimized_bodies.goose": "63dc47b32b9dfc2a533bc9b7bc220801649208d43ed3aba9ea6ccf2949d3fc2a",
+          "build/goose-port/server-boundary-laws/src/check/core.goose": "f4b07bbb793f66bc089a7902455b9b463992131dcaf1519799d29c57152ab75d",
+          "build/goose-port/server-boundary-laws/src/check/diagnostic_location.goose": "5cd683c25e6cb94f2153dbe0197ffed81a1f891188e2146efb34f208e1e798c8",
+          "build/goose-port/server-boundary-laws/src/check/staging_origins.goose": "fe742351bd2a9aae8e9044a1fb270a939a90ccd2e1b5504d9f0d4b3f4bcc3978",
+          "build/goose-port/server-boundary-laws/src/fixture.goose": "79e4da1944e9d20363395374cc9623f4254e7fb13e2a047609eab90cc27634e2",
+          "build/goose-port/server-boundary-laws/src/main.goose": "16c95d145b3fda00df9c6a757505ea5ed47994a67b6c393942246e0bf253c48a",
+          "build/goose-port/server-boundary-laws/src/parse/ast.goose": "da9a6c208a5e8ea1fc5c088f91a92c188b1131229497b0ad4d947be4774ad824",
+          "build/goose-port/server-boundary-laws/src/phase_profile.goose": "588793824e9bac7f2be46cf9d048f6ef913ca017c36db2a0f6552b32a6eef527",
+          "build/goose-port/server-boundary-laws/src/reuse/artifact_capture.goose": "4776defb1892324225e6c052a6615ac40b7934ff28d4a0bfdfbee6441e910ce2",
+          "build/goose-port/server-boundary-laws/src/reuse/artifact_emitter.goose": "ea9b86e5b748cbee57572a385fd33dc98fdd961074bb317eb7f9900e1f229f6f",
+          "build/goose-port/server-boundary-laws/src/reuse/code_artifacts.goose": "cb819df732f0f6bdd9af5d08f23850ef8be78639a9da548ca24d357bc037a979",
+          "build/goose-port/server-boundary-laws/src/reuse/dependency_format.goose": "20778c0448693effe5cd0024e8130413a87b8e00773c8c7c53cb5c60090fd9da",
+          "build/goose-port/server-boundary-laws/src/reuse/dependency_payload.goose": "3a3915b17f614844c5a00cf8311a8790e585a148a2517b9f3847344d02edb532",
+          "build/goose-port/server-boundary-laws/src/reuse/dispatch_explanation.goose": "b1ee746ce4b23b961921798fa150cd1e7dde37dfccf0428ea7b3fe2c2509cf2a",
+          "build/goose-port/server-boundary-laws/src/reuse/executable_query.goose": "ca84600aa3cdbd7ffeb1806ec198d6d45ca99cf339ef80c8166371ae867b9809",
+          "build/goose-port/server-boundary-laws/src/reuse/partial_dependency.goose": "7e52d4b4d8b959c8a52f129c90bbd487e8f78ce3a9125c31b87c4f60ad7d84a8",
+          "build/goose-port/server-boundary-laws/src/reuse/restart_cache.goose": "8fbdda23f2210a486062ffd7989d1248ac3ac671d2c98038296882ee20db113b",
+          "build/goose-port/server-boundary-laws/src/reuse/retained_revision.goose": "16f9e42aed45b748e66af3ebbdb8eaf49659ddfb9f6b5e0f3a4a8a1af63f92bb",
+          "build/goose-port/server-boundary-laws/src/reuse/source_overlays.goose": "dc80f2c2ed0da1231d2d28436670de03ab3dc005718506a989d925a9614183d9",
+          "build/goose-port/server-boundary-laws/src/reuse/zig_project_server.goose": "87f50178426fef58d8d9851d8edeb7ae10a0227601c7fee2dae5bf7b73c16843",
+          "build/goose-port/server-boundary-laws/src/support/error.goose": "4446b5b4ac13bbf4c572cf899e6a0833e7feb2879f5c00d02ff1d9f30aa10510",
+          "build/goose-port/server-boundary-laws/src/support/json.goose": "997a0fbf26a259a36cb3c6b93ea71626981b40814d5cbae2041891ca3d76acb5",
+          "build/goose-port/server-boundary-laws/src/support/native.goose": "f769060b82a91b1d2b4e271630085d1c2b622445a757f1d57ab8ccee409e3a7e",
+          "build/goose-port/server-boundary-laws/src/support/option.goose": "d3aaff7d9f5eac6886390577d3531dd9df9d479c07a8068a7c1a819e106b4362"
+        },
+        "scripts": {
+          "build/goose-port/server-boundary-laws/make.py": "f2bd13d075cf4b970bfbb9912b72e47315eed12e547fe332e07ff93771b8ea21",
+          "build/goose-port/server-boundary-laws/run.py": "6c0ee9cb65a58c8f750fd3ec0bc67b9cf4e5838e24179313699e67acd0a1cd28"
+        },
+        "laws": [
+          "optimized present/absent repeated cleanup exact call order",
+          "checkpoint success/limit/encoder failure/lock failure exact publication and release order",
+          "prior checkpoint retained until all parts encoded; per-part release once",
+          "publish failure and detached report writer",
+          "missing checkpoint and missing output/seed",
+          "forwarded frontend and backend explanation exact Diagnostic JSON",
+          "related filename required and filename override selected without copies",
+          "BuildReply assets present/absent exact conditional JSON/sticky writer error"
+        ]
+      },
+      "source-audit.json": {
+        "inputs": {
+          "compiler-goose/src/support/error.goose": "9e78fa56c17f0b20c2d3bd5ee3e4b2ec9e09b8562fe6d77221087208120aabaf",
+          "compiler-goose/src/support/option.goose": "83daa905847ce8a0c3ed7a16f22424a41622b0b8624b9dc30a648a0bca8205d6",
+          "compiler-goose/src/support/json.goose": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed",
+          "compiler-goose/src/reuse/artifact_capture.goose": "c43fc44c7eb8c02b8a3064d9cbfe1601ca1f5c54b07aa45fdb7c3d5cfced791a",
+          "compiler-goose/src/reuse/restart_cache.goose": "474e25e9c77400b5c9f21ca5899666a10f3089ba3f3bbcdda7d31ad7829d3a38",
+          "compiler-goose/src/backend/native_assets.goose": "ad5775621693504b5fcbbcab29d18a3d8c98ae1c9ef06626a5b453a26a059ad3",
+          "compiler-goose/src/reuse/source_overlays.goose": "0b9f4e779667475fa00d48eaf11e780f3bce9a16be59b4403cfa26fbd06b2ed0",
+          "compiler-goose/src/parse/ast.goose": "8fe8ecb1ad3d280e35fbbc130d27dfb635300bdc98b1b9a99cb162768c2b4da0",
+          "compiler-goose/src/check/diagnostic_location.goose": "6afbdf5909f6a69eaf923272f3b74cbc217803d845b574e583d2c31bc0603a53",
+          "compiler-goose/src/reuse/zig_project_server.goose": "d92b6d542af9b6621dbbd457bd289a0a2496cce29e0d336840d7f93660b864d2",
+          "compiler-goose/src/reuse/zig_project_server_build.goose": "6a9a7f4aa7db4867e9965d7ac160410f7527afcfe8bf4898ab9abd1a872adb48",
+          "compiler-goose/src/support/json_adapters.goose": "d670176ef6a93872da8190a9096f363857640141fcc019a87003e3bde6c8e232"
+        },
+        "coverage": "Exact Capture declaration/init/deinit with controlled deinit leaves. Exact restart File/Report/note/save/capture/writeLocked, controlled filesystem/encoder producer leaves. Exact issue/IssueDetails/Diagnostic and BuildReply declarations/serializers; accessed Emission fields modeled, full native asset declarations, controlled BuildStats JSON leaf. Actual JSON Writer and selected exact adapters. No process, filesystem, full asset preparation or compiler semantics qualification."
+      }
+    }
   }
 }

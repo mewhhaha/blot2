@@ -427,10 +427,14 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_array_cost_expla
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_array_cost_explanation::Snapshot) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::Checkpoint)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_backend_checkpoint::Checkpoint) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::OptimizerSlot)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_backend_checkpoint::OptimizerSlot) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::Report)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_backend_checkpoint::Report) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::SemanticOwner)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_backend_checkpoint::SemanticOwner) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::SemanticSlot)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_backend_checkpoint::SemanticSlot) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::Storage)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_backend_checkpoint::Storage) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::Wire)->bool {return equalFields(left,right);}
@@ -6179,5 +6183,11 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_work_counters::SchemeMem
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_work_counters::SchemeMembership) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_interface::Kind)->bool {return left==right;}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_principal_interface::Kind) {match value {global=>{hash(sink,0 as u8);},local=>{hash(sink,1 as u8);},parameter=>{hash(sink,2 as u8);},external=>{hash(sink,3 as u8);},}}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_interface::ContractMemberKind)->bool {return left==right;}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_principal_interface::ContractMemberKind) {match value {defined_type=>{hash(sink,0 as u8);},abstract_type=>{hash(sink,1 as u8);},value=>{hash(sink,2 as u8);},}}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_interface::ImplementationMemberKind)->bool {return left==right;}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_principal_interface::ImplementationMemberKind) {match value {type_=>{hash(sink,0 as u8);},value=>{hash(sink,1 as u8);},}}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_interface::SelectedProofKind)->bool {return left==right;}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_principal_interface::SelectedProofKind) {match value {implementation=>{hash(sink,0 as u8);},predicate=>{hash(sink,1 as u8);},}}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_opaque_storage::Kind)->bool {return left==right;}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_opaque_storage::Kind) {match value {unknown=>{hash(sink,0 as u8);},unit=>{hash(sink,1 as u8);},boolean=>{hash(sink,2 as u8);},unsigned32=>{hash(sink,3 as u8);},floating32=>{hash(sink,4 as u8);},reference=>{hash(sink,5 as u8);},parameter=>{hash(sink,6 as u8);},}}

@@ -51,12 +51,25 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen222 inputs, which select the
-accepted global-filter checker. It stops after46.13s with multiple source errors:
-missing ScopeKey/enum hash hooks, asset/checkpoint defaults and optional references,
-generic decoder owner allocation, JSON result types and image-pool kind. Targeted
-repairs continue in the working tree. Whole emission/link/CLI/Wasm qualification
-remains pending.
+per stage. This checkpoint preserves exact frozen224 inputs with the accepted
+global-filter checker. Build222 stops after46.13s at hash/asset/decoder API errors;
+223 advances to an unused Instance slice-field escape after46.64s.224 removes
+those two unobserved fields; substitution still fills the caller-owned buffers.
+Build224 stops after46.82s at a missing implementation-evidence scoped helper,
+collection-operation hash hook and asset text ownership. Those follow-on repairs
+remain in progress; whole emission/link/CLI/Wasm qualification remains pending.
+
+ScopeKey and three principal-interface enum hash hooks now match native golden
+streams. Decoder allocations dispatch by the actual owner type at121 generated
+sites, with idempotent generator repair support. Checkpoint nullable cells use
+single-field nominal slots, preserving live-cell references and mutation order.
+Typed empty asset and restart-path defaults avoid references into temporaries.
+Diagnostic JSON methods return sticky writer errors; explanation publication
+snapshots candidate/step text before releasing Builder originals. Focused native
+execution covers publication lifetimes, aliases, bounds, failure cleanup and pool
+reuse. The bounded extra text copy is measured separately from compiler timing.
+Eight remaining confirmed native element appends use push; slice and custom-buffer
+append APIs retain their behavior. Whole-program qualification remains pending.
 
 Given-equation normalization uses lexical memo-hit scopes and fixed pooled scratch
 instead of native dynamic locals across its recursive cycle.123 executed controls

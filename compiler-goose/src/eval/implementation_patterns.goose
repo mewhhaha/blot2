@@ -8,7 +8,7 @@ import dictionary;
 type Store=blot_check_types::Store;
 type Declaration=blot_reuse_principal_interface::Implementation;
 type Error=blot_error::Error;
-struct Instance { variables: const u32[:],rows: const u32[:],head: blot_check_types::List }
+struct Instance { head: blot_check_types::List }
 struct Work { id: u32,row: bool=false,depth: i64=0 }
 fn chargeGraph(store: Store&,root: u32) -> Error {
  var pending: Work[>..<]=[Work {id:root}]; var seen: dictionary<u64,bool> = dictionary<u64,bool>{};
@@ -40,7 +40,7 @@ fn instantiate(store: Store&,declaration: Declaration,variables: u32[>..<]&,rows
  let row_start=rows.len; for i in 0..old_rows.len { let id,failure=store.freshEffects(); if failure!=blot_error::Error.none { return default<Instance>(),failure; } rows.push(id); }
  var before: u32[>..]=[]; before.append(store.list(declaration.head)); var head: u32[>..]=[];
  for root in before { let failure=chargeGraph(store,root); if failure!=blot_error::Error.none { return default<Instance>(),failure; } let resolved,e1=store.resolve(root,0); if e1!=blot_error::Error.none { return default<Instance>(),e1; } let substituted,e2=store.substituteWithRows(resolved,old,variables[variable_start..],old_rows,rows[row_start..]); if e2!=blot_error::Error.none { return default<Instance>(),e2; } head.push(substituted); }
- let list,e3=store.saveList(head); if e3!=blot_error::Error.none { return default<Instance>(),e3; } return Instance {variables[variable_start..],rows[row_start..],list},blot_error::Error.none;
+ let list,e3=store.saveList(head); if e3!=blot_error::Error.none { return default<Instance>(),e3; } return Instance {list},blot_error::Error.none;
 }
 fn matches(store: Store&,declaration: Declaration,actual: const u32[:]) -> bool,Error {
  if actual.len!=declaration.head.len { return false,blot_error::Error.none; } let point=store.mark();
@@ -81,5 +81,5 @@ fn instantiateRuns(store: Store&,declaration: Declaration,variables: u32[:],rows
  for &row in rows { let fresh,error=store.freshEffects(); if error!=blot_error::Error.none { return default<Instance>(),error; } row=fresh; }
  for root,index in store.list(declaration.head) { before[index]=root; }
  for root,index in before { let charged=chargeGraph(store,root); if charged!=blot_error::Error.none { return default<Instance>(),charged; } let resolved,error=store.resolve(root,0); if error!=blot_error::Error.none { return default<Instance>(),error; } let substituted,failure=store.substituteWithRows(resolved,old,variables,old_rows,rows); if failure!=blot_error::Error.none { return default<Instance>(),failure; } head[index]=substituted; }
- let list,error=store.saveList(head); if error!=blot_error::Error.none { return default<Instance>(),error; } return Instance {variables,rows,list},blot_error::Error.none;
+ let list,error=store.saveList(head); if error!=blot_error::Error.none { return default<Instance>(),error; } return Instance {list},blot_error::Error.none;
 }

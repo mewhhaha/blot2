@@ -12,6 +12,7 @@ import support.error;
 import support.native;
 
 import support.structural;
+import std;
 type Error = blot_error::Error;
 type Id = blot_check_types::Id;
 type List = blot_check_types::List;
@@ -19,6 +20,7 @@ type Source = blot_check_frozen_types::Source;
 type Types = blot_check_core::Types;
 type Copier = blot_reuse_principal_type_graph::FrozenCopy;
 struct ScopeKey { id: u32, row: bool }
+fn hash(value: ScopeKey) -> u64 { return ::hash_combine(::hash(value.id), ::hash(value.row)); }
 struct Work { id: u32, row: bool = false, depth: u32 = 0 }
 fn charge(remaining: i64&) -> Error { if remaining == 0 { return blot_error::Error.invalid_artifact; } remaining -= 1; return blot_error::Error.none; }
 fn convert(error: Error) -> Error { if error == blot_error::Error.none || error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.invalid_artifact; }

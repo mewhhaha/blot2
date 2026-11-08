@@ -93,7 +93,7 @@ fn fit(self_: Explanation&) -> Error {
     for candidate in self_.candidates { if candidate.side == Side.implementation { needs_bound = true; } }
     if !needs_bound { return blot_error::Error.none; }
     loop {
-        var bytes: u8[>..<] = []; let error = blot_json::toBytes(self_, bytes);
+        var bytes: u8[>..] = []; let error = blot_json::toBytes(self_, bytes);
         if error != blot_error::Error.none { return error; } if bytes.len <= max_bytes { return blot_error::Error.none; }
         self_.truncated = true; var removed = false;
         for &step in self_.steps { if removeText(step.ty) || removeText(step.member) { removed = true; break; } }
@@ -151,11 +151,24 @@ fn own(self_: Builder&, bytes: u8[>..<]&) -> const u8[:], Error {
 }
 fn finish(self_: Builder&, operation: Text, member: Text) -> Explanation, Error {
     var result = Explanation { truncated: self_.truncated , ..};
-    if self_.len != 0 { let out = candidate_runs.alloc_slice(self_.len); for index in self_.len { out[index] = self_.candidates[index]; } result.candidates = out; }
-    if self_.step_len != 0 { let out = step_runs.alloc_slice(self_.step_len); for index in self_.step_len { out[index] = self_.steps[index]; } result.steps = out; }
-    self_.len = 0; self_.step_len = 0;
+    if self_.len != 0 {
+        let out = candidate_runs.alloc_slice(self_.len);
+        for index in self_.len {
+            let old = self_.candidates[index];
+            out[index] = Candidate { side: old.side, operand: cloneText(old.operand), outcome: old.outcome , ..};
+            if old.origin.present { out[index].origin = blot_support::some(old.origin.value.clone()); }
+        }
+        result.candidates = out;
+    }
+    if self_.step_len != 0 {
+        let out = step_runs.alloc_slice(self_.step_len);
+        for index in self_.step_len { let old = self_.steps[index]; out[index] = Step { cloneText(old.member), cloneText(old.ty), old.outcome , ..}; }
+        result.steps = out;
+    }
     if operation.present { result.operation = blot_support::some(copyText(operation.value[..boundary(operation.value, max_text)])); }
     if member.present { if member.value.len > max_text { self_.truncated = true; } result.member = blot_support::some(copyText(member.value[..boundary(member.value, max_text)])); }
+    // Publication snapshots own their text; arguments may still name Builder text.
+    self_.deinit();
     let error = result.fit(); if error != blot_error::Error.none { result.deinit(); return Explanation {..}, error; } return result, blot_error::Error.none;
 }
 fn boundary(text: const u8[:], limit: i64) -> i64 {
@@ -207,8 +220,8 @@ fn operatorMember(operator: blot_check_types::Operator) -> Text {
     }
 }
 
-fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Candidate) { if writer.failure == blot_error::Error.none { writer.failure = value.jsonStringify(writer); } }
-fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Explanation) { if writer.failure == blot_error::Error.none { writer.failure = value.jsonStringify(writer); } }
+fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Candidate) -> blot_error::Error { if writer.failure == blot_error::Error.none { writer.failure = value.jsonStringify(writer); } return writer.failure; }
+fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Explanation) -> blot_error::Error { if writer.failure == blot_error::Error.none { writer.failure = value.jsonStringify(writer); } return writer.failure; }
 fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Side) -> blot_error::Error { return writer.enumValue(value); }
-fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Outcome) { writer.enumValue(value); }
-fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::ContextKind) { writer.enumValue(value); }
+fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::Outcome) -> blot_error::Error { return writer.enumValue(value); }
+fn blot_json::write(writer: blot_json::Writer&, value: blot_reuse_dispatch_explanation::ContextKind) -> blot_error::Error { return writer.enumValue(value); }
