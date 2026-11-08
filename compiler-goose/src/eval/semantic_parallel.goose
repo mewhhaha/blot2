@@ -28,7 +28,7 @@ fn take<S>(self_: Batch&,index: i64,stats: S&) -> Record,bool,Error {
   stats.independent_rechecked+=counts.independent_rechecked; stats.independent_reused+=counts.independent_reused; stats.independent_declined+=counts.independent_declined; stats.independent_regions+=counts.independent_regions; stats.independent_nodes+=counts.independent_nodes;
   for count,j in counts.independent_rejections { stats.independent_rejections[j]+=count; } self_.slots[i].counts=Counts {};
   if self_.slots[i].failed { return default<Record>(),false,blot_error::Error.out_of_memory; }
-  if self_.slots[i].cached>=0 { if self_.retained==null { return default<Record>(),false,blot_error::Error.invalid_artifact; } let record,error=self_.retained.items[self_.slots[i].cached].clone(); return record,error==blot_error::Error.none,error; }
+  if self_.slots[i].cached>=0 { let retained .=self_.retained; if retained==null { return default<Record>(),false,blot_error::Error.invalid_artifact; } let record,error=retained.items[self_.slots[i].cached].clone(); return record,error==blot_error::Error.none,error; }
   let record=self_.slots[i].record; self_.slots[i].record.present=false; return record.value,record.present,blot_error::Error.none;
  }
  return default<Record>(),false,blot_error::Error.none;
@@ -43,7 +43,7 @@ fn run<C>(requests: const Request[:],requested: u8,context: C&,owned_requests: R
  var batch=Batch {owned_requests.items[request_start..],owned_slots.items[slot_start..],1,null}; var cancellation=blot_eval_semantic_job_batch::Cancellation {};
  let joined,error=blot_eval_semantic_job_batch::runInto<Result,Request,C,Outcomes>(blot_process_pool::Kind.independent,batch.requests,requested,cancellation,context,outcomes); if error!=blot_error::Error.none { return batch,error; } batch.workers=joined.workers;
  for outcome,index in joined.outcomes { match outcome {
-  complete result=>{ batch.slots[index].record=result.value.record; batch.slots[index].counts=result.value.counts; },
+  complete result=>{ batch.slots[index].record=blot_reuse_independent_call_proof::canonicalOwned(result.value.record); batch.slots[index].counts=result.value.counts; },
   out_of_memory=>{ batch.slots[index].failed=true; },
   _=>{},
  } }
@@ -62,7 +62,7 @@ fn deinit(self_: Requests&) { blot_support_pooled_buffer::deinit(self_,pool_Requ
 struct Records { storage: Record[:]=default<Record[:]>(),items: Record[:]=default<Record[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_Records: Record[>..]=[];
 fn ensure(self_: Records&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_Records); if error!=blot_error::Error.none { self_.failure=error; } return error; }
-fn push(self_: Records&,value: Record) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Records); self_.len=self_.items.len; }
+fn push(self_: Records&,value: Record) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,blot_reuse_independent_call_proof::canonicalOwned(value),pool_Records); self_.len=self_.items.len; }
 fn append(self_: Records&,values: const Record[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Records); self_.len=self_.items.len; }
 fn resize(self_: Records&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
 fn resize(self_: Records&,length: i64,value: Record) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }

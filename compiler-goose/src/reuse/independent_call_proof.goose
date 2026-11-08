@@ -27,6 +27,16 @@ fn releaseSources(source: const BindingRef[:]) { if source.len != 0 { proof_sour
 fn releaseScalars(source: const ScalarInput[:]) { if source.len != 0 { proof_scalars.free_slice(source); } }
 fn deinit(self_: Record&) { releaseSources(self_.sources); releaseScalars(self_.scalar_reads); self_.sources = default<BindingRef[:]>(); self_.scalar_reads = default<ScalarInput[:]>(); }
 fn clone(self_: Record) -> Record, Error { var result = self_; result.sources = copySources(self_.sources); result.scalar_reads = copyScalars(self_.scalar_reads); return result, blot_error::Error.none; }
+// The record owns these runs until transfer or deinit.
+fn canonicalOwned(source:Record)->Record {
+ return Record{target:source.target,evidence:source.evidence,options:source.options,depth:source.depth,
+  sources:proof_sources.realloc_slice(source.sources,source.sources.len),
+  scalar_reads:proof_scalars.realloc_slice(source.scalar_reads,source.scalar_reads.len)};
+}
+fn canonicalOwned(source:blot_support::Option<Record>)->blot_support::Option<Record> {
+ if source.present {return blot_support::some(canonicalOwned(source.value));}
+ return blot_support::none<Record>();
+}
 fn reject<S>(state: S&, reason: DeclineReason) -> blot_support::Option<Record> { state.stats.independent_rejections[reasonCode(reason)]++; return blot_support::none<Record>(); }
 fn scalarInput<G>(g: const G&, target: BindingRef) -> blot_support::Option<ScalarInput> {
     let no = blot_support::none<ScalarInput>();

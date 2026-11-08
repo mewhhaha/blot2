@@ -47,8 +47,8 @@ fn buildChecked<S>(session: S&,value: u32,selected: const Interfaces&,limit: i64
  let module=session.units[owner]; let children=session.valueChildren(value);
  if (!allow_empty&&children.len==0)||children.len>session.options.max_children||children.len>limit/4 { return default<Inputs>(),blot_error::Error.declined; }
  let anonymous=root.origin==blot_eval_eval_values::ClosureOrigin.anonymous; if anonymous&&root.identity>=module.closures.len { return default<Inputs>(),blot_error::Error.declined; }
- let bindings=selectedCaptureBindings(module,root.identity,anonymous); var parameters: i64=1;
- if anonymous { if bindings.len!=children.len { return default<Inputs>(),blot_error::Error.declined; } }
+ let binding_count=selectedCaptureBindings(module,root.identity,anonymous).len; var parameters: i64=1;
+ if anonymous { if binding_count!=children.len { return default<Inputs>(),blot_error::Error.declined; } }
  else { let definition=module.body(root.identity); if definition==null||children.len!=root.applied||root.applied>=definition.parameters.len { return default<Inputs>(),blot_error::Error.declined; } parameters=definition.parameters.len-root.applied; }
  var slots: Slot[>..]=[]; var mappings: Mapping[>..]=[]; mappings.append(view.type_mappings[root.mappings.start..root.mappings.start+root.mappings.len]); var rows: RowMapping[>..]=[]; rows.append(view.row_mappings[root.row_mappings.start..root.row_mappings.start+root.row_mappings.len]);
  var values: u32[>..]=[value]; var words: u64[>..]=[];
@@ -61,7 +61,7 @@ fn buildChecked<S>(session: S&,value: u32,selected: const Interfaces&,limit: i64
  for mapping in rows { let error=append(words,[mapping.variable as u64,mapping.evidence as u64],limit,examined); if error!=blot_error::Error.none { return default<Inputs>(),error; } }
  var seen: dictionary<u32,Seen> =dictionary<u32,Seen> {}; var stack: Visit[>..<]=[]; var edges=0;
  for child,index in children {
-  var binding: u32=0; if anonymous { binding=bindings[index]; } else { let body=module.body(root.identity); if body==null { return default<Inputs>(),blot_error::Error.declined; } binding=module.bodyParameters(body)[index].binding; }
+  var binding: u32=0; if anonymous { binding=selectedCaptureBinding(module,root.identity,index); } else { let body=module.body(root.identity); if body==null { return default<Inputs>(),blot_error::Error.declined; } binding=module.bodyParameters(body)[index].binding; }
   if child>=view.values.len||child>=view.value_evidence.len||interface(view,selected,child)==0 { return default<Inputs>(),blot_error::Error.declined; }
   let err=append(words,[0x736c6f74 as u64,binding as u64],limit,examined); if err!=blot_error::Error.none { return default<Inputs>(),err; } stack.push(Visit {value:child,depth:0});
   while stack.len!=0 {
@@ -132,14 +132,15 @@ fn intern<S>(self_:Cache&,session:S&,value:u32,selected:const Interfaces&)->u32,
  assert(valid(self_));self_.requests++;if self_.examined_words>=session.options.max_children {return 0,false,blot_error::Error.none;}
  var examined:i64=0;var input,present,error=buildWithBudget(session,value,selected,session.options.max_children-self_.examined_words,examined,false);self_.examined_words+=examined;
  if error!=blot_error::Error.none||!present {return 0,false,error;}
- {let existing=self_.keys.get(input.words);if existing {let id=copy(existing);input.deinit();self_.reused++;return id,true,blot_error::Error.none;}}
+ {let existing=blot_eval_lexical_capture_inputs::get(self_.keys,input.words);if existing {let id=copy(existing);input.deinit();self_.reused++;return id,true,blot_error::Error.none;}}
  var available=session.options.max_children-self_.retained_words;if available<0 {available=0;}
  if self_.inputs.len>=session.options.max_values||self_.inputs.len>=0xffffffff||input.words.len>available {input.deinit();return 0,false,blot_error::Error.none;}
- self_.keys.reserveOne();let prepared=self_.inputs.ensure(self_.inputs.len+1);if prepared!=blot_error::Error.none {input.deinit();return 0,false,prepared;}
- let index=(self_.inputs.len+1) as u32;self_.keys.insert(input.words,index);self_.inputs.push(input);assert(self_.inputs.failure==blot_error::Error.none);self_.retained_words+=input.words.len;return index,true,blot_error::Error.none;
+ blot_eval_lexical_capture_inputs::reserveOne(self_.keys);let prepared=self_.inputs.ensure(self_.inputs.len+1);if prepared!=blot_error::Error.none {input.deinit();return 0,false,prepared;}
+ let index=(self_.inputs.len+1) as u32;blot_eval_lexical_capture_inputs::insert(self_.keys,input.words,index);self_.inputs.push(input);assert(self_.inputs.failure==blot_error::Error.none);self_.retained_words+=input.words.len;return index,true,blot_error::Error.none;
 }
-fn reset(self_:Cache&) {assert(valid(self_));self_.inputs.clear();self_.keys.clear();self_.owner_id=blot_native::fresh_owner_id();self_.requests=0;self_.reused=0;self_.retained_words=0;self_.examined_words=0;self_.interface_visits=0;}
+fn reset(self_:Cache&) {assert(valid(self_));self_.inputs.clear();blot_eval_lexical_capture_inputs::clear(self_.keys);self_.owner_id=blot_native::fresh_owner_id();self_.requests=0;self_.reused=0;self_.retained_words=0;self_.examined_words=0;self_.interface_visits=0;}
 
+fn selectedCaptureBinding<M>(module:const M&,identity:u32,index:i64)->u32 {return selectedCaptureBindings(module,identity,true)[index];}
 fn selectedCaptureBindings<M>(module:const M&,identity:u32,anonymous:bool)->const u32[:] {if anonymous {let captures=module.closures[identity].captures;return module.extra[captures.start..captures.start+captures.len];}return default<const u32[:]>();}
 
 fn canonicalOwned(source:Inputs)->Inputs {
