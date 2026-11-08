@@ -134,7 +134,7 @@ fn matches(source: const Store&, principal: Id, caller: const Store&, actual: Id
     return true, blot_error::Error.none;
 }
 
-type WordMap=blot_support_pooled_map::Map<u32,u32>;
+struct WordMap { count: i64 = 0, slots: dictionary_slot<u32,u32>[:] = default<dictionary_slot<u32,u32>[:]>() }
 reusable[] var copy_map_slots:dictionary_slot<u32,u32>[>..]=[];
 fn get(self_:const WordMap&,key:u32)->u32? {return blot_support_pooled_map::get(self_,key);}
 fn insert(self_:WordMap&,key:u32,value:u32) {blot_support_pooled_map::insert(self_,key,value,copy_map_slots);}

@@ -4173,8 +4173,8 @@ fn equal<StructuralLeft,O,P,Q>(left:StructuralLeft,right:blot_eval_implementatio
 fn hash<StructuralSink,O,P,Q>(sink:StructuralSink&,value:blot_eval_implementation_admission::Declaration<O,P,Q>) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_implementation_admission::ProjectionWork)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_implementation_admission::ProjectionWork) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_implementation_admission::ScopeAnchor)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_implementation_admission::ScopeAnchor) {hashFields(sink,value);}
+fn equal<StructuralLeft,O>(left:StructuralLeft,right:blot_eval_implementation_admission::ScopeAnchor<O>)->bool {return equalFields(left,right);}
+fn hash<StructuralSink,O>(sink:StructuralSink&,value:blot_eval_implementation_admission::ScopeAnchor<O>) {hashFields(sink,value);}
 fn equal<StructuralLeft,O,P,Q>(left:StructuralLeft,right:blot_eval_implementation_admission::ScopeImport<O,P,Q>)->bool {return equalFields(left,right);}
 fn hash<StructuralSink,O,P,Q>(sink:StructuralSink&,value:blot_eval_implementation_admission::ScopeImport<O,P,Q>) {hashFields(sink,value);}
 fn equal<StructuralLeft,O,P,Q>(left:StructuralLeft,right:blot_eval_implementation_admission::Scopes<O,P,Q>)->bool {return equalFields(left,right);}
@@ -5681,6 +5681,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_type_gra
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_principal_type_graph::MatchedRow) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_type_graph::Pair)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_principal_type_graph::Pair) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_type_graph::WordMap)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_principal_type_graph::WordMap) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_type_graph::Words)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_principal_type_graph::Words) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project::Alias)->bool {return equalFields(left,right);}

@@ -30,8 +30,10 @@ measures 87.430 -> 54.749s. These are failing-prefix gains under separate paired
 conditions, not completed compiler timings. Current source repairs preserve
 exact owner roots, callback cleanup and native array construction. Projection
 frames own binder snapshots across cross-source reentry; focused real interner,
-projection and recursive-scratch fixtures pass. Actual whole checks still stop
-at remaining source errors; program emission, linking and execution are pending. Removing the optional
+projection and recursive-scratch fixtures pass. The latest frozen220 whole
+check reaches its120-second cap without a source diagnostic or program C; late
+checker profiling is the active frontier. Program emission, linking and execution
+remain pending. Removing the optional
 bounds cache may add allocation/runtime cost.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.

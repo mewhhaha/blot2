@@ -51,11 +51,29 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This source checkpoint preserves exact frozen218 inputs. The full
-build clears staging capture, then stops after 104.984 seconds at a fixed
-interface Contract type used with a generic core.Module owner in implementation
-admission. The generic lookup family is the active repair. Whole-program C
-emission, linking and compiler execution remain pending.
+per stage. This source checkpoint preserves exact frozen220 inputs. It reaches
+the120-second cap with no source diagnostic and no program C; this is incomplete
+verification, not a pass. The cap stays fixed. A late-phase profile of the exact
+frozen inputs and selected46 checker is the next measurement. Whole-program
+emission, linking, CLI execution and Wasm comparison remain pending.
+
+Generic implementation admission selects first matching contracts by scalar
+index into its actual immutable owner, supporting both core.Module and Interface
+without nominal record conversions. ScopeImport/ScopeAnchor carry that index;
+four append-only local arrays use grow-only storage so their scoped views are
+legal. Forty-two template cases,126 actual scope-anchor calls, bounds and
+copy-failure controls pass on both checkers; Copier equality/type-copy leaves
+are controlled, and full scope/declaration algorithms are not runtime-qualified.
+WordMap is a nominal record with exactly the old count/slots layout. This fixes
+method lookup in all five Copier maps and external callers; wrappers, pools and
+counters are unchanged. Growth/update/physical restore/clear/lease reuse laws
+pass both checkers; restoring only the alias reproduces the original failure.
+
+A separate source audit covers81 single-element native-array append-to-push
+repairs. Five custom IdBuffer substitutions were identified and reverted before
+frozen220. Receiver/RHS declarations and source hashes are pinned; the broad
+batch remains source-audited rather than a completed checker/runtime result.
+
 
 The entire staging capture checker checks alongside the actual capability engine
 in about 0.42 seconds. Twenty-three runtime capture/report/fuel/cleanup laws pass

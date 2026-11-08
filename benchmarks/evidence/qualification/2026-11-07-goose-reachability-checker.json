@@ -5189,6 +5189,1582 @@
           "stderr": "/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/capture_rights.goose:67: error: optional value must be narrowed (if/guard/assert) before use\n    for node, value in report.nodes { let err = self_.step(); if err != blot_error::Error.none { return err; }\n  in fn blot_check_staging_capture_rights::capture(blot_check_staging_capture_rights::Checker&, u32, u32, const u32[:], const u32[:]) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:29\n  in fn law(i64) instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n  in fn main() instantiated from /home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/main.goose:37\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/effects.goose:82: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:63: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:65: warning: redundant `as u64`: a u32 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/wyhash.goose:68: warning: redundant `as u64`: a u8 converts to u64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:33: warning: redundant `as u16`: a u8 converts to u16 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:38: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:120: warning: redundant `as i64`: a u32 converts to i64 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/support/bytes.goose:130: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:224: warning: redundant `as u32`: ordinal is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/evidence.goose:253: warning: redundant `as u32`: a u8 converts to u32 implicitly here\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:238: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:269: warning: redundant `as u32`: index is already u32\n/home/jacobt/src/blot2/build/goose-port/staging-capture-engine-laws/src/scan.goose:428: warning: redundant `as u32`: index is already u32\n"
         }
       ]
+    },
+    "implementation-template-laws": {
+      "evidence.json": {
+        "passed": true,
+        "source_audit": {
+          "production_sha256": "6a4a1390d885fb6c1eab031c45127b197551cfebc02574b280e5f04c0f1b2976",
+          "actual_declarations": {
+            "core.Module": "abe395e045c8487a51d0fba50673aade69f2b83cf99c3b728904419772f8313a",
+            "Interface": "fbd26c658ca8e2cea1d0ee34bd2453093586f3a478454f2d64a4ed2a47da3ae8",
+            "templatesCopy": "5fbde3b2933bc175c03d772f103a38c1ed4aafb1daf39fd9a484a717285dddab",
+            "scopeAnchor": "11a7b3e8686bde1e2d8d13b27a16177e81ffba7ff2f0f5fcdd91c8ac0bb3bdc9"
+          },
+          "controlled_leaves": [
+            "Copier type comparison/copy",
+            "unused frozen Graph/PatternGraph and numeric-header element layouts",
+            "other unused Module leaf records inherited from full Module fixture"
+          ]
+        },
+        "stages": [
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.03,
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.601,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/official.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.047,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/private.c",
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.566,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/private.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/private-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/implementation-template-laws/private-test"
+            ]
+          }
+        ]
+      },
+      "negative-evidence.json": [
+        {
+          "compiler": "official",
+          "exit": 1,
+          "seconds": 0.02674681400094414,
+          "passed_expected_rejection": true
+        },
+        {
+          "compiler": "private",
+          "exit": 1,
+          "seconds": 0.02076895400387002,
+          "passed_expected_rejection": true
+        }
+      ],
+      "REPORT.json": {
+        "production_sha256": "cf7c407eb6704b920ae28c3c9ae3a00ba35c53e3d5416215398f6e2916521d25",
+        "actual_exact_declaration_matches": {
+          "Templates": "19d2e8fc02cdf421cc21e819130c33b481a7204238f74968bc24d4e2766f42a4",
+          "templatesCopy": "5fbde3b2933bc175c03d772f103a38c1ed4aafb1daf39fd9a484a717285dddab",
+          "Scopes": "60921332727aee5f97f93ada4e5ded93a899c986a8dc513dab9ca9a78bebb341",
+          "ScopeImport": "119d427a07083289dcb3d3735e51e3c67712f2306aaf448a2ccf1d47119e1888",
+          "ScopeAnchor": "317fb926ef38af4855820af92a421d3fd2ec251dd1835ee0780e0ff4542e8f2d",
+          "scopeAnchor": "11a7b3e8686bde1e2d8d13b27a16177e81ffba7ff2f0f5fcdd91c8ac0bb3bdc9"
+        },
+        "templates_cases": 42,
+        "scope_anchor_executions": 126,
+        "owner_shapes": [
+          "actual full core.Module declaration with core.Contract,core.Binding,core.Obligation",
+          "actual full principal.Interface declaration with PI.Contract,PI.Binding,types.Obligation"
+        ],
+        "controls": [
+          "first duplicate matching contract and descriptor",
+          "missing contract or descriptor",
+          "descriptor kind/privacy/binding kind/function checks preserve shortcircuit order",
+          "scheme and argument count mismatch",
+          "prerequisite and self-contract metadata",
+          "duplicate template binding claim",
+          "zero and exhausted fuel with exact counter totals",
+          "injected copy OOM propagation",
+          "zero fuel before malformed span",
+          "kind/privacy failures before invalid descriptor root access",
+          "native contract body metadata and reference validation",
+          "ScopeImport scalar contract carrier into generic immutable-owner ScopeAnchor",
+          "cross-unit nominal anchors",
+          "malformed descriptor spans and binding indices trap for both owners/binaries"
+        ],
+        "receipts": {
+          "runtime": "evidence.json",
+          "bounds": "bounds-evidence.json",
+          "old_nominal_option_rejection": "negative-evidence.json",
+          "stored_slice_minimal_proofs": "../admission-review-laws/{roots,claims,grow-only}.json"
+        },
+        "limitations": [
+          "Copier equality/type copying is controlled, not full type-graph engine execution",
+          "unused frozen Graph/PatternGraph and numeric header leaves plus unused Module leaf records remain reduced",
+          "full scopeImport/declarationCopy/scopesStore algorithms not executed here; exact carrier+scopeAnchor consumers tested and full parent219 handles integration",
+          "native recoverable OOM parity is not claimed"
+        ]
+      }
+    },
+    "native-scalar-append-audit": {
+      "schema_version": 1,
+      "audit": "native scalar/record append replacement audit",
+      "status": "read-only evidence over frozen source; no compiler/build run",
+      "count_remaining_native_call_changes": 81,
+      "change_set": "HEAD to live same-line append(expr) -> push(expr) comparison",
+      "source_identities": {
+        "compiler-goose/src/check/check.goose": {
+          "head_blob": "3360fe1a744d066a7d17c37721e5b3fd4312f03c",
+          "live_sha256": "4178efe08a1dd92c512ffd318b729e2b550eb0e382964f27a448f52929a892ee"
+        },
+        "compiler-goose/src/check/numeric_proof_core.goose": {
+          "head_blob": "f9b6563cd493a297caf43272f5985bcd5b879f38",
+          "live_sha256": "1631ab63636811a5dceca53f896377a9428c6128beee4e81d34cd81b097fe75a"
+        }
+      },
+      "engine_schema_evidence": {
+        "declaration": "compiler-goose/src/check/check.goose struct Engine (line 731 onward); each listed field declaration has native `[>..<]&` type",
+        "field_elements": {
+          "events": {
+            "element_type": "GlobalTrace",
+            "declaration": "check.goose:988 `Engine.events:GlobalTrace[>..<]&}`"
+          },
+          "diagnostics": {
+            "element_type": "Diagnostic",
+            "declaration": "check.goose:855 `Engine.diagnostics: Diagnostic[>..<]&`"
+          },
+          "import_callees": {
+            "element_type": "u32",
+            "declaration": "check.goose:733 `Engine.import_callees: u32[>..<]&`"
+          },
+          "import_variables": {
+            "element_type": "u32",
+            "declaration": "check.goose:734 `Engine.import_variables: u32[>..<]&`"
+          },
+          "obligations": {
+            "element_type": "blot_check_types::Obligation",
+            "declaration": "check.goose:831 `Engine.obligations: blot_check_types::Obligation[>..<]&`"
+          },
+          "pending": {
+            "element_type": "PendingObligation",
+            "declaration": "check.goose:832 `Engine.pending: PendingObligation[>..<]&`"
+          },
+          "body_closed_rows": {
+            "element_type": "ClosedRow",
+            "declaration": "check.goose:803 `Engine.body_closed_rows: ClosedRow[>..<]&`"
+          },
+          "bindings": {
+            "element_type": "Binding",
+            "declaration": "check.goose:826 `Engine.bindings: Binding[>..<]&`"
+          },
+          "contract_predicates": {
+            "element_type": "blot_check_types::Obligation",
+            "declaration": "check.goose:892 `Engine.contract_predicates: blot_check_types::Obligation[>..<]&`"
+          },
+          "contract_members": {
+            "element_type": "ContractMember",
+            "declaration": "check.goose:893 `Engine.contract_members: ContractMember[>..<]&`"
+          },
+          "implementation_predicates": {
+            "element_type": "blot_check_types::Obligation",
+            "declaration": "check.goose:895 `Engine.implementation_predicates: blot_check_types::Obligation[>..<]&`"
+          },
+          "implementation_members": {
+            "element_type": "ImplementationMember",
+            "declaration": "check.goose:896 `Engine.implementation_members: ImplementationMember[>..<]&`"
+          },
+          "implementation_order": {
+            "element_type": "u32",
+            "declaration": "check.goose:907 `Engine.implementation_order: u32[>..<]&`"
+          },
+          "declared_obligations": {
+            "element_type": "blot_check_types::Obligation",
+            "declaration": "check.goose:851 `Engine.declared_obligations: blot_check_types::Obligation[>..<]&`"
+          },
+          "selected_edges": {
+            "element_type": "u32",
+            "declaration": "check.goose:900 `Engine.selected_edges: u32[>..<]&`"
+          },
+          "selected_members": {
+            "element_type": "ImplementationMember",
+            "declaration": "check.goose:899 `Engine.selected_members: ImplementationMember[>..<]&`"
+          },
+          "name_bytes": {
+            "element_type": "u8",
+            "declaration": "check.goose:738 `Engine.name_bytes: u8[>..<]&`"
+          },
+          "dictionary_uses": {
+            "element_type": "DictionaryUse",
+            "declaration": "check.goose:807 `Engine.dictionary_uses: DictionaryUse[>..<]&`"
+          },
+          "selected_uses": {
+            "element_type": "blot_reuse_principal_interface::SelectedUse",
+            "declaration": "check.goose:901 `Engine.selected_uses: blot_reuse_principal_interface::SelectedUse[>..<]&`"
+          },
+          "scope_lifetimes": {
+            "element_type": "blot_check_types::Id",
+            "declaration": "check.goose:792 `Engine.scope_lifetimes: blot_check_types::Id[>..<]&`"
+          },
+          "effect_runners": {
+            "element_type": "EffectRunner",
+            "declaration": "check.goose:799 `Engine.effect_runners: EffectRunner[>..<]&`"
+          },
+          "predicate_origins": {
+            "element_type": "blot_parse_ast::Span",
+            "declaration": "check.goose:852 `Engine.predicate_origins: blot_parse_ast::Span[>..<]&`"
+          },
+          "env": {
+            "element_type": "Entry",
+            "declaration": "check.goose:858 `Engine.env: Entry[>..<]&`"
+          },
+          "cases": {
+            "element_type": "blot_parse_ast::Id",
+            "declaration": "check.goose:946 `Engine.cases: blot_parse_ast::Id[>..<]&`"
+          },
+          "annotation_givens": {
+            "element_type": "blot_check_types::Obligation",
+            "declaration": "check.goose:809 `Engine.annotation_givens: blot_check_types::Obligation[>..<]&`"
+          },
+          "active": {
+            "element_type": "BindingId (=u32)",
+            "declaration": "check.goose:857 `Engine.active: BindingId[>..<]&`"
+          },
+          "function_exit_lambdas": {
+            "element_type": "blot_parse_ast::Id",
+            "declaration": "check.goose:863 `Engine.function_exit_lambdas: blot_parse_ast::Id[>..<]&`"
+          },
+          "computed_variables": {
+            "element_type": "blot_check_types::Id",
+            "declaration": "check.goose:853 `Engine.computed_variables: blot_check_types::Id[>..<]&`"
+          },
+          "computed_rows": {
+            "element_type": "u32",
+            "declaration": "check.goose:854 `Engine.computed_rows: u32[>..<]&`"
+          },
+          "resolver_ops": {
+            "element_type": "ResolverOp",
+            "declaration": "check.goose:932 `Engine.resolver_ops: ResolverOp[>..<]&`"
+          },
+          "computation_annotations": {
+            "element_type": "blot_check_types::Id",
+            "declaration": "check.goose:919 `Engine.computation_annotations: blot_check_types::Id[>..<]&`"
+          },
+          "resolver_loops": {
+            "element_type": "ResolverLoop",
+            "declaration": "check.goose:935 `Engine.resolver_loops: ResolverLoop[>..<]&`"
+          },
+          "usage_loans": {
+            "element_type": "UsageLoan",
+            "declaration": "check.goose:746 `Engine.usage_loans: UsageLoan[>..<]&`"
+          },
+          "rank_implementations": {
+            "element_type": "RankImplementation",
+            "declaration": "check.goose:805 `Engine.rank_implementations: RankImplementation[>..<]&`"
+          },
+          "generative_bindings": {
+            "element_type": "blot_check_generative_schemes::Binder",
+            "declaration": "check.goose:795 `Engine.generative_bindings: blot_check_generative_schemes::Binder[>..<]&`"
+          },
+          "dictionary_selections": {
+            "element_type": "DictionarySelection",
+            "declaration": "check.goose:806 `Engine.dictionary_selections: DictionarySelection[>..<]&`"
+          },
+          "computations": {
+            "element_type": "Computation",
+            "declaration": "check.goose:775 `Engine.computations: Computation[>..<]&`"
+          },
+          "request_loops": {
+            "element_type": "RequestLoop",
+            "declaration": "check.goose:776 `Engine.request_loops: RequestLoop[>..<]&`"
+          },
+          "request_arms": {
+            "element_type": "RequestArm",
+            "declaration": "check.goose:777 `Engine.request_arms: RequestArm[>..<]&`"
+          },
+          "request_controls": {
+            "element_type": "RequestControl",
+            "declaration": "check.goose:778 `Engine.request_controls: RequestControl[>..<]&`"
+          },
+          "reflections": {
+            "element_type": "Reflection",
+            "declaration": "check.goose:779 `Engine.reflections: Reflection[>..<]&`"
+          },
+          "effect_scopes": {
+            "element_type": "EffectScope",
+            "declaration": "check.goose:783 `Engine.effect_scopes: EffectScope[>..<]&`"
+          },
+          "provider_blocks": {
+            "element_type": "ProviderBlock",
+            "declaration": "check.goose:801 `Engine.provider_blocks: ProviderBlock[>..<]&`"
+          },
+          "resolver_blocks": {
+            "element_type": "ResolverBlock",
+            "declaration": "check.goose:931 `Engine.resolver_blocks: ResolverBlock[>..<]&`"
+          },
+          "resolver_joins": {
+            "element_type": "ResolverJoin",
+            "declaration": "check.goose:933 `Engine.resolver_joins: ResolverJoin[>..<]&`"
+          },
+          "resolver_completions": {
+            "element_type": "ResolverCompletion",
+            "declaration": "check.goose:934 `Engine.resolver_completions: ResolverCompletion[>..<]&`"
+          },
+          "operation_uses": {
+            "element_type": "OperationUse",
+            "declaration": "check.goose:818 `Engine.operation_uses: OperationUse[>..<]&`"
+          },
+          "statement_arms": {
+            "element_type": "StatementArm",
+            "declaration": "check.goose:944 `Engine.statement_arms: StatementArm[>..<]&`"
+          }
+        },
+        "trace_sink": {
+          "element_type": "GlobalTrace",
+          "declaration": "compiler-goose/src/check/check.goose:988 struct TraceSink {events:GlobalTrace[>..<]&}"
+        },
+        "numeric_checker": {
+          "element_type": "Condition",
+          "declaration": "compiler-goose/src/check/numeric_proof_core.goose:93 Checker.conditions:Condition[>..<]&"
+        },
+        "scratch_array_rule": "local receivers variables, parameters, constructors, operations, row_parameters, head, names, declared_row_names have explicit u32[>..<] declarations at the listed function source lines; each append RHS is a single u32 value."
+      },
+      "calls": [
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 989,
+          "function": "observe",
+          "receiver": "self_.events",
+          "receiver_declaration": "check.goose:988 `Engine.events:GlobalTrace[>..<]&}`",
+          "element_type": "GlobalTrace",
+          "rhs_expression": "value",
+          "rhs_type": "GlobalTrace",
+          "rhs_type_evidence": "Engine/Checker field is native array of GlobalTrace; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "fn observe(self_:TraceSink&,value:GlobalTrace) {self_.events.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1301,
+          "function": "sourceDeclarationHeader",
+          "receiver": "self_.diagnostics",
+          "receiver_declaration": "check.goose:855 `Engine.diagnostics: Diagnostic[>..<]&`",
+          "element_type": "Diagnostic",
+          "rhs_expression": "diagnostic",
+          "rhs_type": "Diagnostic",
+          "rhs_type_evidence": "Engine/Checker field is native array of Diagnostic; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": ".span(diagnostic.node);if node_span.start<span.start || node_span.end>span.end {continue;}self_.diagnostics.push(diagnostic);self_.source_anno"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1409,
+          "function": "importSchemeBody",
+          "receiver": "self_.import_callees",
+          "receiver_declaration": "check.goose:733 `Engine.import_callees: u32[>..<]&`",
+          "element_type": "u32",
+          "rhs_expression": "callee.value",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Engine/Checker field is native array of u32; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "},0,origin,depth+1);if err!=blot_error::Error.none || !callee.present {return callee,err;}self_.import_callees.push(callee.value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1413,
+          "function": "importSchemeCopied",
+          "receiver": "self_.import_variables",
+          "receiver_declaration": "check.goose:734 `Engine.import_variables: u32[>..<]&`",
+          "element_type": "u32",
+          "rhs_expression": "fresh",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Engine/Checker field is native array of u32; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "urn blot_support::none<u32>(),err;}copier.mapping.insert(copier.source.head(old,0),fresh);self_.import_variables.push(fresh);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1415,
+          "function": "importSchemeCopied",
+          "receiver": "self_.obligations",
+          "receiver_declaration": "check.goose:831 `Engine.obligations: blot_check_types::Obligation[>..<]&`",
+          "element_type": "blot_check_types::Obligation",
+          "rhs_expression": "value",
+          "rhs_type": "blot_check_types::Obligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Obligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "rr!=blot_error::Error.none {return blot_support::none<u32>(),err;}value.signature=copied;}self_.obligations.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1425,
+          "function": "relocateSummary",
+          "receiver": "self_.import_variables",
+          "receiver_declaration": "check.goose:734 `Engine.import_variables: u32[>..<]&`",
+          "element_type": "u32",
+          "rhs_expression": "copied",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Engine/Checker field is native array of u32; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": ");if err!=blot_error::Error.none {self_.import_variables.resize(start);return result,err;}self_.import_variables.push(copied);}let variables,er"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1428,
+          "function": "appendPending",
+          "receiver": "self_.pending",
+          "receiver_declaration": "check.goose:832 `Engine.pending: PendingObligation[>..<]&`",
+          "element_type": "PendingObligation",
+          "rhs_expression": "value",
+          "rhs_type": "PendingObligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of PendingObligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "|| (value.value.kind==blot_check_types::ObligationKind.receiver && !value.value.explicit);self_.pending.push(value);self_.counters.ob"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1481,
+          "function": "recordClosedRows",
+          "receiver": "self_.body_closed_rows",
+          "receiver_declaration": "check.goose:803 `Engine.body_closed_rows: ClosedRow[>..<]&`",
+          "element_type": "ClosedRow",
+          "rhs_expression": "key",
+          "rhs_type": "ClosedRow",
+          "rhs_type_evidence": "Engine/Checker field is native array of ClosedRow; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "able, ..};if !self_.closed_row_keys.contains(key) {self_.closed_row_keys.insert(key,true);self_.body_closed_rows.push(key);}}return blot_err"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1488,
+          "function": "addBinding",
+          "receiver": "self_.bindings",
+          "receiver_declaration": "check.goose:826 `Engine.bindings: Binding[>..<]&`",
+          "element_type": "Binding",
+          "rhs_expression": "value",
+          "rhs_type": "Binding",
+          "rhs_type_evidence": "Engine/Checker field is native array of Binding; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "meters.inputInvokes() {self_.has_input_invocations=true;}let id=self_.bindings.len as u32;self_.bindings.push(value);if self_.tree.has"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1562,
+          "function": "copyNominalBody",
+          "receiver": "variables",
+          "receiver_declaration": "check.goose:1562 local `variables:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "fresh",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "_error::Error.none {return 0,err;}copier.mapping.insert(producer.types.head(old,0),fresh);variables.push(fresh);}var parameters:u"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1562,
+          "function": "copyNominalBody",
+          "receiver": "parameters",
+          "receiver_declaration": "check.goose:1562 local `parameters:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "parameter",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "ters) {let parameter,err=copier.copy(old,0);if err!=blot_error::Error.none {return 0,err;}parameters.push(parameter);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1565,
+          "function": "copyNominalBody",
+          "receiver": "constructors",
+          "receiver_declaration": "check.goose:1565 local `constructors:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "own",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "r.copy(ctor.payload,0);if err!=blot_error::Error.none {return 0,err;}payload=value;}self_.constructors.push(Constructor{identity:c"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1570,
+          "function": "copyEffectFamilyBody",
+          "receiver": "variables",
+          "receiver_declaration": "check.goose:1570 local `variables:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "fresh",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "_error::Error.none {return 0,err;}copier.mapping.insert(producer.types.head(old,0),fresh);variables.push(fresh);}var parameters:u"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1572,
+          "function": "copyEffectFamilyBody",
+          "receiver": "operations",
+          "receiver_declaration": "check.goose:1572 local `operations:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "index",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "ame, ..},index);self_.catalogs.effect_template_identities.insert(template.identity,index);operations.push(index);}let catalog,err="
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1614,
+          "function": "copyContractBody",
+          "receiver": "variables",
+          "receiver_declaration": "check.goose:1614 local `variables:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "fresh",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "_error::Error.none {return 0,err;}copier.mapping.insert(producer.types.head(old,0),fresh);variables.push(fresh);}let rows,err=cop"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1614,
+          "function": "copyContractBody",
+          "receiver": "self_.contract_predicates",
+          "receiver_declaration": "check.goose:892 `Engine.contract_predicates: blot_check_types::Obligation[>..<]&`",
+          "element_type": "blot_check_types::Obligation",
+          "rhs_expression": "predicate",
+          "rhs_type": "blot_check_types::Obligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Obligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "let predicate,err=copyPredicate(copier,old);if err!=blot_error::Error.none {return 0,err;}self_.contract_predicates.push(predicate);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1615,
+          "function": "copyContractBody",
+          "receiver": "row_parameters",
+          "receiver_declaration": "check.goose:1615 local `row_parameters:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "copied",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "ters) {let copied,err=copier.copyRow(old,0);if err!=blot_error::Error.none {return 0,err;}row_parameters.push(copied);}let member_start"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1615,
+          "function": "copyContractBody",
+          "receiver": "self_.contract_members",
+          "receiver_declaration": "check.goose:893 `Engine.contract_members: ContractMember[>..<]&`",
+          "element_type": "ContractMember",
+          "rhs_expression": "member",
+          "rhs_type": "ContractMember",
+          "rhs_type_evidence": "Engine/Checker field is native array of ContractMember; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "rr=copier.copy(old.root,0);if err!=blot_error::Error.none {return 0,err;}member.root=root;self_.contract_members.push(member);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1621,
+          "function": "copyImplementationBody",
+          "receiver": "variables",
+          "receiver_declaration": "check.goose:1621 local `variables:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "fresh",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "_error::Error.none {return 0,err;}copier.mapping.insert(producer.types.head(old,0),fresh);variables.push(fresh);}let rows,err=cop"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1621,
+          "function": "copyImplementationBody",
+          "receiver": "head",
+          "receiver_declaration": "check.goose:1621 local `head:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "copied",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "e.head) {let copied,err=copier.copy(root,0);if err!=blot_error::Error.none {return 0,err;}head.push(copied);}var row_paramete"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1621,
+          "function": "copyImplementationBody",
+          "receiver": "row_parameters",
+          "receiver_declaration": "check.goose:1621 local `row_parameters:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "copied",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "ters) {let copied,err=copier.copyRow(row,0);if err!=blot_error::Error.none {return 0,err;}row_parameters.push(copied);}let predicate_st"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1622,
+          "function": "copyImplementationBody",
+          "receiver": "self_.implementation_predicates",
+          "receiver_declaration": "check.goose:895 `Engine.implementation_predicates: blot_check_types::Obligation[>..<]&`",
+          "element_type": "blot_check_types::Obligation",
+          "rhs_expression": "predicate",
+          "rhs_type": "blot_check_types::Obligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Obligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "let predicate,err=copyPredicate(copier,old);if err!=blot_error::Error.none {return 0,err;}self_.implementation_predicates.push(predicate);}let member_start"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1622,
+          "function": "copyImplementationBody",
+          "receiver": "self_.implementation_members",
+          "receiver_declaration": "check.goose:896 `Engine.implementation_members: ImplementationMember[>..<]&`",
+          "element_type": "ImplementationMember",
+          "rhs_expression": "value",
+          "rhs_type": "ImplementationMember",
+          "rhs_type_evidence": "Engine/Checker field is native array of ImplementationMember; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "err=copier.copy(old.root,0);if err!=blot_error::Error.none {return 0,err;}value.root=root;self_.implementation_members.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1645,
+          "function": "implementationHeader",
+          "receiver": "names",
+          "receiver_declaration": "check.goose:1645 local `names:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "entry.name",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "ared_row_names:u32[>..<]=[];for entry in self_.type_env.items {variables.append(entry.ty);names.push(entry.name);}for entry in sel"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1645,
+          "function": "implementationHeader",
+          "receiver": "row_parameters",
+          "receiver_declaration": "check.goose:1645 local `row_parameters:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "entry.row",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": "ems {variables.append(entry.ty);names.push(entry.name);}for entry in self_.row_env.items {row_parameters.push(entry.row);declared_row_name"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1645,
+          "function": "implementationHeader",
+          "receiver": "declared_row_names",
+          "receiver_declaration": "check.goose:1645 local `declared_row_names:u32[>..<]` declaration on same function source line",
+          "element_type": "u32",
+          "rhs_expression": "entry.name",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Local array declaration is u32[>..<]; RHS is u32 from this function body (fresh/copy result, u32 loop item/index, or typed Engine environment field).",
+          "source_excerpt": ";names.push(entry.name);}for entry in self_.row_env.items {row_parameters.push(entry.row);declared_row_names.push(entry.name);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1656,
+          "function": "implementationHeaderOwned",
+          "receiver": "self_.implementation_members",
+          "receiver_declaration": "check.goose:896 `Engine.implementation_members: ImplementationMember[>..<]&`",
+          "element_type": "ImplementationMember",
+          "rhs_expression": "member",
+          "rhs_type": "ImplementationMember",
+          "rhs_type_evidence": "Engine/Checker field is native array of ImplementationMember; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "l_states.insert(binding,Global{..});member.target=ExternalTarget{self_.unit,binding, ..};}self_.implementation_members.push(member);self_.implementat"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1680,
+          "function": "implementationOrder",
+          "receiver": "self_.implementation_order",
+          "receiver_declaration": "check.goose:907 `Engine.implementation_order: u32[>..<]&`",
+          "element_type": "u32",
+          "rhs_expression": "entry.index",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Engine/Checker field is native array of u32; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "lure;}return self_.diagnostic(Code.associated_limit,0);}for entry in self_.order_entries {self_.implementation_order.push(entry.index);}return blot_erro"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1718,
+          "function": "beginImplementationQualification",
+          "receiver": "self_.declared_obligations",
+          "receiver_declaration": "check.goose:851 `Engine.declared_obligations: blot_check_types::Obligation[>..<]&`",
+          "element_type": "blot_check_types::Obligation",
+          "rhs_expression": "predicate",
+          "rhs_type": "blot_check_types::Obligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Obligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "s[declaration.predicates.start..declaration.predicates.start+declaration.predicates.len] {self_.declared_obligations.push(predicate);let err=self_.app"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1718,
+          "function": "beginImplementationQualification",
+          "receiver": "self_.declared_obligations",
+          "receiver_declaration": "check.goose:851 `Engine.declared_obligations: blot_check_types::Obligation[>..<]&`",
+          "element_type": "blot_check_types::Obligation",
+          "rhs_expression": "proof",
+          "rhs_type": "blot_check_types::Obligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Obligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "s[declaration.predicates.start..declaration.predicates.start+declaration.predicates.len] {self_.declared_obligations.push(predicate);let err=self_"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1732,
+          "function": "proveCalleeEdges",
+          "receiver": "self_.selected_edges",
+          "receiver_declaration": "check.goose:900 `Engine.selected_edges: u32[>..<]&`",
+          "element_type": "u32",
+          "rhs_expression": "edge",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Engine/Checker field is native array of u32; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "r;}edges[index]=child.value;}let start=self_.selected_edges.len as u32;for edge in edges {self_.selected_edges.push(edge);}self_.proved_pre"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1739,
+          "function": "selectImplementationPrerequisites",
+          "receiver": "self_.selected_members",
+          "receiver_declaration": "check.goose:899 `Engine.selected_members: ImplementationMember[>..<]&`",
+          "element_type": "ImplementationMember",
+          "rhs_expression": "member",
+          "rhs_type": "ImplementationMember",
+          "rhs_type_evidence": "Engine/Checker field is native array of ImplementationMember; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "rdinal]=member;}let member_start=self_.selected_members.len as u32;for member in members {self_.selected_members.push(member);}let edge_start=s"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1739,
+          "function": "selectImplementationPrerequisites",
+          "receiver": "self_.selected_edges",
+          "receiver_declaration": "check.goose:900 `Engine.selected_edges: u32[>..<]&`",
+          "element_type": "u32",
+          "rhs_expression": "edge",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Engine/Checker field is native array of u32; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "d_members.push(member);}let edge_start=self_.selected_edges.len as u32;for edge in edges {self_.selected_edges.push(edge);}let proof=self_."
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1741,
+          "function": "memberTemplates",
+          "receiver": "self_.name_bytes",
+          "receiver_declaration": "check.goose:738 `Engine.name_bytes: u8[>..<]&`",
+          "element_type": "u8",
+          "rhs_expression": "byte",
+          "rhs_type": "u8",
+          "rhs_type_evidence": "Engine/Checker field is native array of u8; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "elf_.name_bytes.clear();if key.namespace_!=0 {for byte in self_.pool.get(key.namespace_) {self_.name_bytes.push(byte);}self_.name_bytes"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1741,
+          "function": "memberTemplates",
+          "receiver": "self_.name_bytes",
+          "receiver_declaration": "check.goose:738 `Engine.name_bytes: u8[>..<]&`",
+          "element_type": "u8",
+          "rhs_expression": "byte",
+          "rhs_type": "u8",
+          "rhs_type_evidence": "Engine/Checker field is native array of u8; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "elf_.name_bytes.clear();if key.namespace_!=0 {for byte in self_.pool.get(key.namespace_) {self_.name_bytes.push(byte);}self_.name_bytes"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1741,
+          "function": "memberTemplates",
+          "receiver": "self_.name_bytes",
+          "receiver_declaration": "check.goose:738 `Engine.name_bytes: u8[>..<]&`",
+          "element_type": "u8",
+          "rhs_expression": "byte",
+          "rhs_type": "u8",
+          "rhs_type_evidence": "Engine/Checker field is native array of u8; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "elf_.name_bytes.clear();if key.namespace_!=0 {for byte in self_.pool.get(key.namespace_) {self_.name_bytes.push(byte);}self_.name_bytes"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1749,
+          "function": "finishDictionaryUses",
+          "receiver": "self_.dictionary_uses",
+          "receiver_declaration": "check.goose:807 `Engine.dictionary_uses: DictionaryUse[>..<]&`",
+          "element_type": "DictionaryUse",
+          "rhs_expression": "selected.value",
+          "rhs_type": "DictionaryUse",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "er,goal:given.goal,member:member.value-contract.members.start, ..});}if selected.present {self_.dictionary_uses.push(selected.value);for &pending in s"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1752,
+          "function": "finishSelectedUses",
+          "receiver": "self_.selected_uses",
+          "receiver_declaration": "check.goose:901 `Engine.selected_uses: blot_reuse_principal_interface::SelectedUse[>..<]&`",
+          "element_type": "blot_reuse_principal_interface::SelectedUse",
+          "rhs_expression": "use",
+          "rhs_type": "blot_reuse_principal_interface::SelectedUse",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_reuse_principal_interface::SelectedUse; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": ",seen);if err==blot_error::Error.none {self_.selected_uses.clear();for use in uses.items {self_.selected_uses.push(use);}}blot_support_po"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1761,
+          "function": "resolveContractPredicates",
+          "receiver": "self_.contract_predicates",
+          "receiver_declaration": "check.goose:892 `Engine.contract_predicates: blot_check_types::Obligation[>..<]&`",
+          "element_type": "blot_check_types::Obligation",
+          "rhs_expression": "predicate",
+          "rhs_type": "blot_check_types::Obligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Obligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "rn err;}let start=self_.contract_predicates.len as u32;for predicate in predicates.items {self_.contract_predicates.push(predicate);}self_.contracts["
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 1880,
+          "function": "legacyPrerequisiteImports",
+          "receiver": "self_.selected_edges",
+          "receiver_declaration": "check.goose:900 `Engine.selected_edges: u32[>..<]&`",
+          "element_type": "u32",
+          "rhs_expression": "edge",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Engine/Checker field is native array of u32; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "r;}edges[index]=child.value;}let start=self_.selected_edges.len as u32;for edge in edges {self_.selected_edges.push(edge);}self_.proved_pre"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2027,
+          "function": "taskScopeApplication",
+          "receiver": "self_.scope_lifetimes",
+          "receiver_declaration": "check.goose:792 `Engine.scope_lifetimes: blot_check_types::Id[>..<]&`",
+          "element_type": "blot_check_types::Id",
+          "rhs_expression": "capability",
+          "rhs_type": "blot_check_types::Id",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Id; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "urn 0,err;}let enclosing=self_.task_region_parameter;self_.task_region_parameter=lambda.a;self_.scope_lifetimes.push(capability);self_.active_effe"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2042,
+          "function": "effectScopeArguments",
+          "receiver": "self_.scope_lifetimes",
+          "receiver_declaration": "check.goose:792 `Engine.scope_lifetimes: blot_check_types::Id[>..<]&`",
+          "element_type": "blot_check_types::Id",
+          "rhs_expression": "capability",
+          "rhs_type": "blot_check_types::Id",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Id; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "ped_parameter_type;self_.scoped_parameter=lambda.a;self_.scoped_parameter_type=capability;self_.scope_lifetimes.push(capability);self_.active_effe"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2060,
+          "function": "effectRunnerArguments",
+          "receiver": "self_.effect_runners",
+          "receiver_declaration": "check.goose:799 `Engine.effect_runners: EffectRunner[>..<]&`",
+          "element_type": "EffectRunner",
+          "rhs_expression": "metadata",
+          "rhs_type": "EffectRunner",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "rn 0,err;}if self_.effect_runners.len==0xffffffff {return 0,blot_error::Error.type_limit;}self_.effect_runners.push(metadata);self_.effect_runn"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2069,
+          "function": "projectionOrigin",
+          "receiver": "self_.predicate_origins",
+          "receiver_declaration": "check.goose:852 `Engine.predicate_origins: blot_parse_ast::Span[>..<]&`",
+          "element_type": "blot_parse_ast::Span",
+          "rhs_expression": "span",
+          "rhs_type": "blot_parse_ast::Span",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_parse_ast::Span; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "n.span;if read {span=blot_parse_ast::Span{start:origin.span.end,end:origin.span.end, ..};}self_.predicate_origins.push(span);return self_.pred"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2077,
+          "function": "projectMethod",
+          "receiver": "self_.pending",
+          "receiver_declaration": "check.goose:832 `Engine.pending: PendingObligation[>..<]&`",
+          "element_type": "PendingObligation",
+          "rhs_expression": "deferred",
+          "rhs_type": "PendingObligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of PendingObligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "n(source,name,true);if err!=blot_error::Error.none {return 0,err;}deferred.origin=origin;}self_.pending.push(deferred);return result,blo"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2105,
+          "function": "caseArms",
+          "receiver": "self_.env",
+          "receiver_declaration": "check.goose:858 `Engine.env: Entry[>..<]&`",
+          "element_type": "Entry",
+          "rhs_expression": "entry",
+          "rhs_type": "Entry",
+          "rhs_type_evidence": "Engine/Checker field is native array of Entry; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": " {entry_runs.free_slice(first);}return 0,err;}self_.env.resize(scope);for entry in first {self_.env.push(entry);}if first.len!=0 "
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2105,
+          "function": "caseArms",
+          "receiver": "self_.cases",
+          "receiver_declaration": "check.goose:946 `Engine.cases: blot_parse_ast::Id[>..<]&`",
+          "element_type": "blot_parse_ast::Id",
+          "rhs_expression": "id",
+          "rhs_type": "blot_parse_ast::Id",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_parse_ast::Id; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "eck_types::never;if carrying {self_.statement_arms.push(StatementArm{node:meta[1], ..});}}self_.cases.push(id);return result,blo"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2186,
+          "function": "quantifierBodyGivens",
+          "receiver": "self_.annotation_givens",
+          "receiver_declaration": "check.goose:809 `Engine.annotation_givens: blot_check_types::Obligation[>..<]&`",
+          "element_type": "blot_check_types::Obligation",
+          "rhs_expression": "instantiated",
+          "rhs_type": "blot_check_types::Obligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Obligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "ubstituteGoal(goal,binders,representatives);if err!=blot_error::Error.none {return 0,err;}self_.annotation_givens.push(instantiated);}let frontier=sel"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2205,
+          "function": "beginQualificationPredicates",
+          "receiver": "self_.declared_obligations",
+          "receiver_declaration": "check.goose:851 `Engine.declared_obligations: blot_check_types::Obligation[>..<]&`",
+          "element_type": "blot_check_types::Obligation",
+          "rhs_expression": "constraint",
+          "rhs_type": "blot_check_types::Obligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Obligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "dicates);if err!=blot_error::Error.none {return err;}}for constraint in predicates.items {self_.declared_obligations.push(constraint);let err=self_.app"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2316,
+          "function": "beginGlobal",
+          "receiver": "self_.active",
+          "receiver_declaration": "check.goose:857 `Engine.active: BindingId[>..<]&`",
+          "element_type": "BindingId (=u32)",
+          "rhs_expression": "binding",
+          "rhs_type": "BindingId (=u32)",
+          "rhs_type_evidence": "Engine/Checker field is native array of BindingId (=u32); RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "nding,Global{state:State.active,index:self_.counter,low:self_.counter,on_stack:true, ..});self_.active.push(binding);"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2494,
+          "function": "lambdaExpressionBody",
+          "receiver": "self_.scope_lifetimes",
+          "receiver_declaration": "check.goose:792 `Engine.scope_lifetimes: blot_check_types::Id[>..<]&`",
+          "element_type": "blot_check_types::Id",
+          "rhs_expression": "element_ty",
+          "rhs_type": "blot_check_types::Id",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Id; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": " if symbolic {self_.scope_lifetimes.push(element_ty);self_.active_effe"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2498,
+          "function": "lambdaExpressionBody",
+          "receiver": "self_.function_exit_lambdas",
+          "receiver_declaration": "check.goose:863 `Engine.function_exit_lambdas: blot_parse_ast::Id[>..<]&`",
+          "element_type": "blot_parse_ast::Id",
+          "rhs_expression": "id",
+          "rhs_type": "blot_parse_ast::Id",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_parse_ast::Id; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "red,id);if err!=blot_error::Error.none {return 0,err;}}}if self_.function_exit_target!=0 {self_.function_exit_lambdas.push(id);let resolved,err="
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2557,
+          "function": "blockComputedWork",
+          "receiver": "self_.computed_variables",
+          "receiver_declaration": "check.goose:853 `Engine.computed_variables: blot_check_types::Id[>..<]&`",
+          "element_type": "blot_check_types::Id",
+          "rhs_expression": "variable",
+          "rhs_type": "blot_check_types::Id",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Id; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": ".none {return err;}for variable in values {if !inList(self_.computed_variables,variable) {self_.computed_variables.push(variable);}}let rows,err=se"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2557,
+          "function": "blockComputedWork",
+          "receiver": "self_.computed_rows",
+          "receiver_declaration": "check.goose:854 `Engine.computed_rows: u32[>..<]&`",
+          "element_type": "u32",
+          "rhs_expression": "row",
+          "rhs_type": "u32",
+          "rhs_type_evidence": "Engine/Checker field is native array of u32; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "blot_error::Error.none {return err;}for row in rows {if !inList(self_.computed_rows,row) {self_.computed_rows.push(row);}}}}return blot_e"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2558,
+          "function": "addResolverOp",
+          "receiver": "self_.resolver_ops",
+          "receiver_declaration": "check.goose:932 `Engine.resolver_ops: ResolverOp[>..<]&`",
+          "element_type": "ResolverOp",
+          "rhs_expression": "value",
+          "rhs_type": "ResolverOp",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "ror::Error {if self_.resolver_ops.len>=0xffffffff {return 0,blot_error::Error.type_limit;}self_.resolver_ops.push(value);let index=self_.r"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2570,
+          "function": "letStatementBody",
+          "receiver": "self_.env",
+          "receiver_declaration": "check.goose:858 `Engine.env: Entry[>..<]&`",
+          "element_type": "Entry",
+          "rhs_expression": "success",
+          "rhs_type": "Entry",
+          "rhs_type_evidence": "Engine/Checker field is native array of Entry; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": ".len-1].span.end=self_.diagnostics[self_.diagnostics.len-1].span.start;}self_.env.clear();self_.env.push(success);if success.len!=0"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2583,
+          "function": "requestCapture",
+          "receiver": "self_.computation_annotations",
+          "receiver_declaration": "check.goose:919 `Engine.computation_annotations: blot_check_types::Id[>..<]&`",
+          "element_type": "blot_check_types::Id",
+          "rhs_expression": "action",
+          "rhs_type": "blot_check_types::Id",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Id; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "in(value,action,id);if err!=blot_error::Error.none {return blot_support::none<u32>(),err;}self_.computation_annotations.push(action);let computation,e"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2609,
+          "function": "loopStatementBody",
+          "receiver": "self_.resolver_loops",
+          "receiver_declaration": "check.goose:935 `Engine.resolver_loops: ResolverLoop[>..<]&`",
+          "element_type": "ResolverLoop",
+          "rhs_expression": "monad.value",
+          "rhs_type": "ResolverLoop",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "lt;if self_.resolver_loops.len>=0xffffffff {return Flow{..},blot_error::Error.type_limit;}self_.resolver_loops.push(monad.value);self_.resolver_lo"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2937,
+          "function": "publishBodyReplay",
+          "receiver": "self_.cases",
+          "receiver_declaration": "check.goose:946 `Engine.cases: blot_parse_ast::Id[>..<]&`",
+          "element_type": "blot_parse_ast::Id",
+          "rhs_expression": "id",
+          "rhs_type": "blot_parse_ast::Id",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_parse_ast::Id; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": " for id in ids {if self_.tree.node(id).tag==blot_parse_ast::tag_case_expr {self_.cases.push(id);}}for id,index in"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2940,
+          "function": "replayLocalScheme",
+          "receiver": "self_.obligations",
+          "receiver_declaration": "check.goose:831 `Engine.obligations: blot_check_types::Obligation[>..<]&`",
+          "element_type": "blot_check_types::Obligation",
+          "rhs_expression": "value",
+          "rhs_type": "blot_check_types::Obligation",
+          "rhs_type_evidence": "Engine/Checker field is native array of blot_check_types::Obligation; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "Predicate(copier,ids,bindings,predicate,span);if err!=blot_error::Error.none {return err;}self_.obligations.push(value);}let root,err=cop"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2982,
+          "function": "replayAuxiliary",
+          "receiver": "self_.usage_loans",
+          "receiver_declaration": "check.goose:746 `Engine.usage_loans: UsageLoan[>..<]&`",
+          "element_type": "UsageLoan",
+          "rhs_expression": "value",
+          "rhs_type": "UsageLoan",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.usage_loans.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2983,
+          "function": "replayAuxiliary",
+          "receiver": "self_.rank_implementations",
+          "receiver_declaration": "check.goose:805 `Engine.rank_implementations: RankImplementation[>..<]&`",
+          "element_type": "RankImplementation",
+          "rhs_expression": "value",
+          "rhs_type": "RankImplementation",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.rank_implementations.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2984,
+          "function": "replayAuxiliary",
+          "receiver": "self_.generative_bindings",
+          "receiver_declaration": "check.goose:795 `Engine.generative_bindings: blot_check_generative_schemes::Binder[>..<]&`",
+          "element_type": "blot_check_generative_schemes::Binder",
+          "rhs_expression": "value",
+          "rhs_type": "blot_check_generative_schemes::Binder",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.generative_bindings.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2985,
+          "function": "replayAuxiliary",
+          "receiver": "self_.dictionary_selections",
+          "receiver_declaration": "check.goose:806 `Engine.dictionary_selections: DictionarySelection[>..<]&`",
+          "element_type": "DictionarySelection",
+          "rhs_expression": "value",
+          "rhs_type": "DictionarySelection",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.dictionary_selections.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2986,
+          "function": "replayAuxiliary",
+          "receiver": "self_.dictionary_uses",
+          "receiver_declaration": "check.goose:807 `Engine.dictionary_uses: DictionaryUse[>..<]&`",
+          "element_type": "DictionaryUse",
+          "rhs_expression": "value",
+          "rhs_type": "DictionaryUse",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.dictionary_uses.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2987,
+          "function": "replayAuxiliary",
+          "receiver": "self_.computations",
+          "receiver_declaration": "check.goose:775 `Engine.computations: Computation[>..<]&`",
+          "element_type": "Computation",
+          "rhs_expression": "value",
+          "rhs_type": "Computation",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.computations.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2988,
+          "function": "replayAuxiliary",
+          "receiver": "self_.request_loops",
+          "receiver_declaration": "check.goose:776 `Engine.request_loops: RequestLoop[>..<]&`",
+          "element_type": "RequestLoop",
+          "rhs_expression": "value",
+          "rhs_type": "RequestLoop",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.request_loops.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2989,
+          "function": "replayAuxiliary",
+          "receiver": "self_.request_arms",
+          "receiver_declaration": "check.goose:777 `Engine.request_arms: RequestArm[>..<]&`",
+          "element_type": "RequestArm",
+          "rhs_expression": "value",
+          "rhs_type": "RequestArm",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.request_arms.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2990,
+          "function": "replayAuxiliary",
+          "receiver": "self_.request_controls",
+          "receiver_declaration": "check.goose:778 `Engine.request_controls: RequestControl[>..<]&`",
+          "element_type": "RequestControl",
+          "rhs_expression": "value",
+          "rhs_type": "RequestControl",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.request_controls.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2991,
+          "function": "replayAuxiliary",
+          "receiver": "self_.reflections",
+          "receiver_declaration": "check.goose:779 `Engine.reflections: Reflection[>..<]&`",
+          "element_type": "Reflection",
+          "rhs_expression": "value",
+          "rhs_type": "Reflection",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.reflections.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2992,
+          "function": "replayAuxiliary",
+          "receiver": "self_.effect_scopes",
+          "receiver_declaration": "check.goose:783 `Engine.effect_scopes: EffectScope[>..<]&`",
+          "element_type": "EffectScope",
+          "rhs_expression": "value",
+          "rhs_type": "EffectScope",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.effect_scopes.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2993,
+          "function": "replayAuxiliary",
+          "receiver": "self_.effect_runners",
+          "receiver_declaration": "check.goose:799 `Engine.effect_runners: EffectRunner[>..<]&`",
+          "element_type": "EffectRunner",
+          "rhs_expression": "value",
+          "rhs_type": "EffectRunner",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.effect_runners.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2994,
+          "function": "replayAuxiliary",
+          "receiver": "self_.provider_blocks",
+          "receiver_declaration": "check.goose:801 `Engine.provider_blocks: ProviderBlock[>..<]&`",
+          "element_type": "ProviderBlock",
+          "rhs_expression": "value",
+          "rhs_type": "ProviderBlock",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.provider_blocks.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2995,
+          "function": "replayAuxiliary",
+          "receiver": "self_.resolver_blocks",
+          "receiver_declaration": "check.goose:931 `Engine.resolver_blocks: ResolverBlock[>..<]&`",
+          "element_type": "ResolverBlock",
+          "rhs_expression": "value",
+          "rhs_type": "ResolverBlock",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.resolver_blocks.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2996,
+          "function": "replayAuxiliary",
+          "receiver": "self_.resolver_ops",
+          "receiver_declaration": "check.goose:932 `Engine.resolver_ops: ResolverOp[>..<]&`",
+          "element_type": "ResolverOp",
+          "rhs_expression": "value",
+          "rhs_type": "ResolverOp",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.resolver_ops.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2997,
+          "function": "replayAuxiliary",
+          "receiver": "self_.resolver_joins",
+          "receiver_declaration": "check.goose:933 `Engine.resolver_joins: ResolverJoin[>..<]&`",
+          "element_type": "ResolverJoin",
+          "rhs_expression": "value",
+          "rhs_type": "ResolverJoin",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.resolver_joins.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2998,
+          "function": "replayAuxiliary",
+          "receiver": "self_.resolver_completions",
+          "receiver_declaration": "check.goose:934 `Engine.resolver_completions: ResolverCompletion[>..<]&`",
+          "element_type": "ResolverCompletion",
+          "rhs_expression": "value",
+          "rhs_type": "ResolverCompletion",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.resolver_completions.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2999,
+          "function": "replayAuxiliary",
+          "receiver": "self_.resolver_loops",
+          "receiver_declaration": "check.goose:935 `Engine.resolver_loops: ResolverLoop[>..<]&`",
+          "element_type": "ResolverLoop",
+          "rhs_expression": "value",
+          "rhs_type": "ResolverLoop",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.resolver_loops.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 3000,
+          "function": "replayAuxiliary",
+          "receiver": "self_.operation_uses",
+          "receiver_declaration": "check.goose:818 `Engine.operation_uses: OperationUse[>..<]&`",
+          "element_type": "OperationUse",
+          "rhs_expression": "value",
+          "rhs_type": "OperationUse",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.operation_uses.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 3001,
+          "function": "replayAuxiliary",
+          "receiver": "self_.statement_arms",
+          "receiver_declaration": "check.goose:944 `Engine.statement_arms: StatementArm[>..<]&`",
+          "element_type": "StatementArm",
+          "rhs_expression": "value",
+          "rhs_type": "StatementArm",
+          "rhs_type_evidence": "Engine field has the listed native array element type; RHS is `mapRecord(entry,mapper)`, whose overload returns exactly the same concrete record type as its typed input (body_auxiliary.goose mapRecord overloads).",
+          "source_excerpt": "reuse_body_auxiliary::mapRecord(entry,mapper);if err!=blot_error::Error.none {return err;}self_.statement_arms.push(value);}"
+        },
+        {
+          "file": "compiler-goose/src/check/numeric_proof_core.goose",
+          "line": 106,
+          "function": "condition",
+          "receiver": "self_.conditions",
+          "receiver_declaration": "numeric_proof_core.goose:93 `Checker.conditions:Condition[>..<]&`",
+          "element_type": "Condition",
+          "rhs_expression": "value",
+          "rhs_type": "Condition",
+          "rhs_type_evidence": "Engine/Checker field is native array of Condition; RHS is a single value, not a slice. Enclosing function and exact RHS are included for direct source verification.",
+          "source_excerpt": "ns.len >= self_.values.limits.terms { return 0, blot_error::Error.proof_analysis_limit; } self_.conditions.push(value); return self_.con"
+        }
+      ],
+      "excluded_custom_buffer_calls": [
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2230,
+          "receiver": "candidates.variables",
+          "original_call": "append(variable)",
+          "reason": "IdBuffer = blot_support_pooled_buffer::Buffer<u32>, not native array; must retain custom Buffer append(slice) API"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2242,
+          "receiver": "work.variables",
+          "original_call": "append(variable)",
+          "reason": "IdBuffer = blot_support_pooled_buffer::Buffer<u32>, not native array; must retain custom Buffer append(slice) API"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2246,
+          "receiver": "work.variables",
+          "original_call": "append(variable)",
+          "reason": "IdBuffer = blot_support_pooled_buffer::Buffer<u32>, not native array; must retain custom Buffer append(slice) API"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2255,
+          "receiver": "work.requirement_variables",
+          "original_call": "append(variable)",
+          "reason": "IdBuffer = blot_support_pooled_buffer::Buffer<u32>, not native array; must retain custom Buffer append(slice) API"
+        },
+        {
+          "file": "compiler-goose/src/check/check.goose",
+          "line": 2230,
+          "receiver": "candidates.variables",
+          "original_call": "append(variable)",
+          "reason": "second occurrence on same line; IdBuffer custom Buffer call, excluded from native-array family"
+        }
+      ],
+      "verification": {
+        "git_diff_check": "passed",
+        "source_parse_or_build": "not run",
+        "production_source_edits_after_freeze": "none"
+      }
+    },
+    "principal-copy-map-laws": {
+      "source-audit.json": {
+        "production_sha256": "4c39a583f356cf498f4f017239c8e785cb96dcb16d2526a33aa49dbfdbbf1d48",
+        "actual_records_and_helpers": "WordMap and wrappers, CopyMaps/Copier, pooled init/valid/deinit, charge, external actual saveSchemeMap",
+        "controlled_leaves": "Source frozen Graph and Store graph semantics reduced; lifecycle uses inactive Source, native ownerID is monotonic ABI stub",
+        "unmodified_bodies_sha256": {
+          "get": "765d3660adce8646860f312c61922ecf70ea86839500761c667cd0a2d6fe0978",
+          "insert": "b17597c5cb077178c3f5a9d4e9cf8348e00404d3c1de5b73fd6bf44ed1cd7fd7",
+          "restore": "5ae1d69262a34d6a4c7df0b14fa99c1c50af057571599b8dece4f8143e3904cd",
+          "clear": "b54c7c222d002be33b1bb6b1c4502ceb0f5089f875ead52988e17ec9e27f5fa3",
+          "valid": "777e6b9766608850b6d5b0d3387cb7c32291e5a347beedecdda480ed88fe3790",
+          "initPooled": "a5d5ff30ea10a6cd098b2726895a0561e2c156ec88067455534072c2122f528d",
+          "deinit": "188dc7cc783c98fbfbfeb8eeca53394530df31643673c75bdcacd90c7b425cf1",
+          "charge": "245c42088a6bee3c4b44d6c622487417304f208354e76a5a8c51183a6a68f9fb"
+        }
+      },
+      "evidence.json": {
+        "passed": true,
+        "source_audit": {
+          "production_sha256": "4c39a583f356cf498f4f017239c8e785cb96dcb16d2526a33aa49dbfdbbf1d48",
+          "actual_records_and_helpers": "WordMap and wrappers, CopyMaps/Copier, pooled init/valid/deinit, charge, external actual saveSchemeMap",
+          "controlled_leaves": "Source frozen Graph and Store graph semantics reduced; lifecycle uses inactive Source, native ownerID is monotonic ABI stub",
+          "unmodified_bodies_sha256": {
+            "get": "765d3660adce8646860f312c61922ecf70ea86839500761c667cd0a2d6fe0978",
+            "insert": "b17597c5cb077178c3f5a9d4e9cf8348e00404d3c1de5b73fd6bf44ed1cd7fd7",
+            "restore": "5ae1d69262a34d6a4c7df0b14fa99c1c50af057571599b8dece4f8143e3904cd",
+            "clear": "b54c7c222d002be33b1bb6b1c4502ceb0f5089f875ead52988e17ec9e27f5fa3",
+            "valid": "777e6b9766608850b6d5b0d3387cb7c32291e5a347beedecdda480ed88fe3790",
+            "initPooled": "a5d5ff30ea10a6cd098b2726895a0561e2c156ec88067455534072c2122f528d",
+            "deinit": "188dc7cc783c98fbfbfeb8eeca53394530df31643673c75bdcacd90c7b425cf1",
+            "charge": "245c42088a6bee3c4b44d6c622487417304f208354e76a5a8c51183a6a68f9fb"
+          }
+        },
+        "stages": [
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.02,
+            "command": [
+              "/home/jacobt/src/goose-to-wasm/build/native/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.792,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/official.c",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/owner.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "official",
+            "compiler_sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/official-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "emit",
+            "exit": 0,
+            "seconds": 0.019,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+              "--standalone",
+              "-O0",
+              "--debug",
+              "--stdlib",
+              "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/private.c",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/src/main.goose"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "link",
+            "exit": 0,
+            "seconds": 0.811,
+            "command": [
+              "cc",
+              "-std=c99",
+              "-O0",
+              "-g",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/private.c",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/owner.c",
+              "-lm",
+              "-pthread",
+              "-ldl",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/private-test"
+            ]
+          },
+          {
+            "compiler": "private",
+            "compiler_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+            "stage": "run",
+            "exit": 0,
+            "seconds": 0.001,
+            "command": [
+              "/home/jacobt/src/blot2/build/goose-port/principal-copy-map-laws/private-test"
+            ]
+          }
+        ]
+      },
+      "negative-evidence.json": [
+        {
+          "compiler": "official",
+          "exit": 1,
+          "seconds": 0.015612318995408714,
+          "passed_expected_rejection": true
+        },
+        {
+          "compiler": "private",
+          "exit": 1,
+          "seconds": 0.022649826998531353,
+          "passed_expected_rejection": true
+        }
+      ],
+      "REPORT.json": {
+        "source_sha256": "4c39a583f356cf498f4f017239c8e785cb96dcb16d2526a33aa49dbfdbbf1d48",
+        "single_declaration_change_verified": true,
+        "unchanged": "All method bodies, callsites, pools, counters, copy and allocation order; same count/slots fields, declaration order, element type and defaults",
+        "executed": "official and selected46 emit/link/run actual Copier lifecycle wrappers/maps,100keys across5maps over3reuse rounds; external method resolution, snapshot physical slot restore, clear/count/capacity, deinit/stale lease/reuse, projection charge/error counters",
+        "negative": "Original alias alone restored reproduces3given4needed insert failure on both compilers in external call",
+        "limitations": "Source/Store graph semantic leaves reduced; lifecycle uses inactive Source. Full recursive ty/row/label algorithms are unchanged and not reexecuted here. Owner-ID ABI leaf monotonic stub. No recoverable allocator-OOM claim.",
+        "files": [
+          "evidence.json",
+          "negative-evidence.json",
+          "source-audit.json",
+          "make.py",
+          "negative.py",
+          "run.py"
+        ]
+      }
     }
   },
   "later_attempts": {
@@ -5946,6 +7522,59 @@
       "diagnostic_summary": [
         "eval/implementation_admission.goose:64 generic templatesCopy chooses fixed principal_interface Contract Option but core.Module has core.Contract"
       ]
+    },
+    "build-219": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-219-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 102.548,
+      "stop_reason": "source diagnostic",
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-219.log",
+      "capture_seconds": 0.2767,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-219-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-219-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "diagnostic_summary": [
+        "reuse/principal_type_graph.goose:206 aliased pooled map resolves insert to4arg generic instead of intended3arg wrapper"
+      ],
+      "scope_note": "Five custom-buffer append substitutions in this frozen snapshot were subsequently identified and reverted before220; only81 native-array API fixes remain."
+    },
+    "build-220": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/build/goose-port/verification/build-220-inputs/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--stage-timeout",
+        "120"
+      ],
+      "exit": 1,
+      "seconds": 120.344,
+      "stop_reason": null,
+      "error_grace_seconds": 5.0,
+      "log": "/home/jacobt/src/blot2/build/goose-port/verification/build-220.log",
+      "capture_seconds": 0.2215,
+      "frozen_source": "/home/jacobt/src/blot2/build/goose-port/verification/build-220-inputs/compiler-goose",
+      "live_matches_frozen": true,
+      "executable": "/home/jacobt/src/blot2/build/goose-port/verification/build-220-inputs/compiler-goose/build/blotc-goose",
+      "executable_exists": false,
+      "qualification": "incomplete: program emission stage timed out120s; no source diagnostic/program C/executable"
     }
   },
   "rejected_last_depth": {
