@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/jacobt/src/goose-to-wasm/build/source/stdlib"
   },
-  "digest": "718e7e726c8b581c6a48b79775fbb20a9af2d2ba858db16bf97a7ccaa664e6f5",
+  "digest": "dd9711efe559e9d5038421ce0fa9a63740c7bf482c2991d723b50a58334a7fbe",
   "goose": "/home/jacobt/src/blot2/build/goose-port/export-root-schedule-build/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -159,9 +159,9 @@
       "sha256": "0207ce5fb90b962b09673eef6cb4066ae84697b8eec44e1097781e21494b48a8"
     },
     {
-      "bytes": 976056,
+      "bytes": 976071,
       "path": "src/backend/backend_emission.goose",
-      "sha256": "2abb339deb709f66fea795d985b01d6a0fee027cf3a5fbbe947b3f9aff86acc5"
+      "sha256": "0706525bc6a7e1c61ff732c5eb7ea3b13b3207ef9a97f24d47dcc464d8628f14"
     },
     {
       "bytes": 35831,
@@ -319,9 +319,9 @@
       "sha256": "c360f8922ffaa238ad27de165523271cd8ed0bbd9f3d650a35d77c9ddfa9e6e4"
     },
     {
-      "bytes": 18970,
+      "bytes": 18976,
       "path": "src/backend/memory_profile.goose",
-      "sha256": "70c1c4e60d5e71a83109ccb0957d27ccbbeea133bd874ee730d8e5d4090e8ca9"
+      "sha256": "59c59d7d0cb48db62978e6d80e0e91fa77abae3a1a88e2de634a1735a12a5b90"
     },
     {
       "bytes": 10471,
@@ -524,9 +524,9 @@
       "sha256": "2b817fb1a07121d48383eb8acadb6b96c243fbf5dd626e56553ee4c84d76cea6"
     },
     {
-      "bytes": 692385,
+      "bytes": 692401,
       "path": "src/backend/scoped_backend.goose",
-      "sha256": "8e895ac866b61ecc3ce4bb6a57db272d4abea83200392c8b4d68382f32d0203e"
+      "sha256": "7c2040821822656c771d4b348c3459ea0a894e406794f4d22a089969da34c703"
     },
     {
       "bytes": 27546,
@@ -1274,9 +1274,9 @@
       "sha256": "b71a16bddd7af8d445268c1c89d2486d46a64f54ed8bbb604e5327e80e0d556e"
     },
     {
-      "bytes": 1499007,
+      "bytes": 1499876,
       "path": "src/eval/core_eval.goose",
-      "sha256": "2d74977ce85220ce4b75f241d7f79c0b4a8c29c16b5ae56de2857912b0f5389e"
+      "sha256": "c1b278e3d60ca119b2617c7fa599dd97d9b47dcda1810791286a29d695897260"
     },
     {
       "bytes": 5473,

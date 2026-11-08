@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-The checkpoint through frozen359 replaces Session's Generator backpointer with the existing scalar
+The checkpoint through frozen362 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -111,7 +111,13 @@ preserving all four native enum cases. Frozen359 constructs panic diagnostics
 through the registered Session and its invocation-live module catalog, preserving
 the original message slice without allocation. Independent review checks the
 catalog lifetime and existing-diagnostic guard. Its92.853s run reaches a mutable
-Flow variable inferred as one variant; explicit parent enum typing is next.
+Flow variable inferred as one variant. Frozen360–362 annotate four parent enum
+variables, extract three ragged constructors, preserve diagnostic/region restore
+order through typed setters, and mark the exact prepare/prepareAll recursion.
+Independent source review passes. Counter's fixed scratch capacity now defaults
+to zero; its runtime cost is unmeasured. Its92.737s run reaches Frame descriptor
+retention in the pooled RaggedRegion. That region only reads Frame.owner_id at
+two sites; replacing the retained Frame with that scalar is next.
 No whole compiler success follows. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm

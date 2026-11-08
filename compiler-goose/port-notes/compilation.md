@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen359 is the current source checkpoint. Selected private checker
+Frozen362 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -138,8 +138,14 @@ panic diagnostics through the registered Session and invocation-live module
 catalog; it preserves the original message slice, guard and field order without
 allocation. Independent source review qualifies that scoped catalog lifetime,
 not global ownership of its bytes. Its92.853s run reaches a mutable Flow variable
-inferred as one variant; explicit parent enum typing is next. No whole compiler
-C, header or executable has been emitted.
+inferred as one variant. Frozen360–362 add four explicit parent enum types,
+three ragged constructors, diagnostic/region setters and the exact mutual
+prepare/prepareAll recursion annotations. Independent source review preserves
+all fields, existing Frame.owner_id and cleanup order. Counter's eighty scratch
+locals now default to zero; native unused capacity is undefined and the cost is
+unmeasured. Its92.737s run reaches pooled RaggedRegion Frame retention. The only
+two consumers read Frame.owner_id; replacing the retained Frame with that scalar
+is next. No whole compiler C, header or executable has been emitted.
 The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo
