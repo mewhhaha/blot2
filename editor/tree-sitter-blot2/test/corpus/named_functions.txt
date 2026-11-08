@@ -1,0 +1,50 @@
+==================
+Named function headers preserve modifiers parameters and expression lambdas
+==================
+
+func add left -> right => return left + right
+private entry func answer () => do:
+  func local (value: U32) -> extra => return add value extra
+  let anonymous = func value => return value
+
+---
+
+(source_file
+  (named_function_header
+    (identifier)
+    (identifier)
+    (identifier))
+  (operator)
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (named_function_header
+    (private_modifier)
+    (entry_modifier)
+    (identifier)
+    (parenthesized))
+  (operator)
+  (keyword)
+  (separator)
+  (named_function_header
+    (identifier)
+    (parenthesized
+      (identifier)
+      (separator)
+      (type_identifier))
+    (identifier))
+  (operator)
+  (keyword)
+  (identifier)
+  (identifier)
+  (identifier)
+  (function_binding
+    (binding_keyword)
+    (identifier)
+    (operator)
+    (lambda_header
+      (identifier)))
+  (operator)
+  (keyword)
+  (identifier))

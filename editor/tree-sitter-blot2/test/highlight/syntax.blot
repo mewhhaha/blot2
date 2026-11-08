@@ -1,3 +1,24 @@
+func add left -> right => return left + right
+// <- keyword.function
+//   ^ function
+//       ^ variable.parameter
+//               ^ variable.parameter
+
+private entry func answer () => do:
+// <- keyword.storage.modifier
+//      ^ keyword.storage.modifier
+//            ^ keyword.function
+//                 ^ function
+  func local value => return value
+//^ keyword.function
+//     ^ function
+//           ^ variable.parameter
+
+@[native]
+//^ attribute
+func tagged () => return 42
+//   ^ function
+
 const identity = func value => return value
 //               ^ keyword.function
 //    ^ function

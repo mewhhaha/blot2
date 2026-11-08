@@ -22,7 +22,7 @@ export_declaration = ("exporT" binding:named_import "froM" path:STRING LAYOUT_NE
 namespace_import = ("*" "as" name:source_identifier) ;
 named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?)? "}") ;
 import_binding = (name:(source_identifier | TYPE_IDENT) alias:("as" (source_identifier | TYPE_IDENT))?) ;
-declaration = (visibility:"privatE"? (value:opaque_type | attributes:declaration_attribute* value:(value_declaration | implementation_declaration | data_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity)) LAYOUT_NEWLINE) ;
+declaration = (visibility:"privatE"? (value:opaque_type | attributes:declaration_attribute* value:(value_declaration | named_function_declaration | implementation_declaration | data_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity)) LAYOUT_NEWLINE) ;
 opaque_type = ("opaquE" value:type_alias) ;
 type_alias = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "=" value:type_expression) ;
 contract_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" kind:source_identifier "=" body:contract_body) ;
@@ -34,6 +34,8 @@ implementation_value_member = ("const" name:(source_identifier | TYPE_IDENT) ann
 declaration_attribute = ("@" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
 value_declaration = (modifier:source_identifier? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
+named_function_declaration = (modifier:source_identifier? value:named_function) ;
+named_function = ("func" name:source_identifier parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:expression | body:do_block)) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
 effect_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" "effect" "=" (operations:effect_operations | signature:effect_signature)) ;
 // A bare record declares operations; signatures start with a type name or group.
@@ -127,7 +129,7 @@ pattern_group = ("(" (value:pattern ("," value:pattern)*)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;
 record_pattern_field = (name:source_identifier (":" value:pattern)?) ;
 suite = (LAYOUT_NEWLINE LAYOUT_INDENT statements:statement* LAYOUT_DEDENT) ;
-statement = (value:(binding | rebinding | effect_binding | effect_step | function_exit | result | reply | loop_exit | loop_continue | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
+statement = (value:(named_function | binding | rebinding | effect_binding | effect_step | function_exit | result | reply | loop_exit | loop_continue | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
 binding = ("let" pattern:pattern annotation:(":" type_expression)? where:where_clause? "=" value:expression fallback:binding_else?) ;
 rebinding = (name:source_identifier path:(member_access | index_access)* ":=" value:expression) ;
 index_access = ("[" index:expression "]") ;

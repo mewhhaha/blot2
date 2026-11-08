@@ -1,9 +1,10 @@
 # Owned-storage rewrite: active task index
 
-Current experiment: write the Zig compiler's production behavior in idiomatic
-Goose under `compiler-goose/`, then verify against the preserved Zig oracle.
-Keep the ordinary toolchain and pinned native qualification intact; source
-writing status is not compiler, runtime or performance qualification.
+Current priority: implement language [RFC #46](https://github.com/mewhhaha/blot2/issues/46)
+in Zig first, then mirror the checked behavior in Goose. Track the complete
+target and pending stages in [the language migration](../docs/language/NEXT_MIGRATION.md).
+The Goose compiler remains an experiment; isolated parser checks do not qualify
+the whole port. Preserve the original pinned Zig oracle for old-language work.
 
 The current priorities are shared-kernel runtime, Gdev Wasm size and short
 iterations. Subsecond compilation, sub-five-second Main and 1–2MB remain unmet.

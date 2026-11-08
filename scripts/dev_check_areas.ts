@@ -68,6 +68,12 @@ export const devCheckAreas = {
     description:
       "Function keyword, explicit returns, curried separators and fallthrough rejection.",
     native: [
+      "parse.parser_tests.test.named function declarations share curried lambda IR and preserve local entry private and tag metadata",
+      "parse.parser_tests.test.named function declarations release parameter and attribute scratch through allocation failures",
+      "parse.parser_tests.test.local named functions do not consume anonymous function expression statements",
+      "parse.parser_tests.test.named functions retain return parameter and identifier diagnostics and recover later declarations",
+      "check.check_result_tests.test.named module functions preserve principal inference recursion and ordinary function values",
+      "check.check_result_tests.test.named function tags preserve every dispatch parameter and written result while allowing new effects through OOM",
       "parse.lexer_tests.test.flat tokens preserve longest matches and source byte spans",
       "eval.core_eval_tests.test.selected contract source interfaces do not evaluate method constant dependencies",
       "parse.parser_tests.test.functions require explicit return and reject whitespace separated parameters",
@@ -78,6 +84,7 @@ export const devCheckAreas = {
       "parse.parser_tests.test.dollar constructors and run staging preserve list arrays and spaced dollar application through OOM",
     ],
     guests: [
+      "tests/guest/named_functions_execution.test.ts",
       "tests/host/syntax.test.ts",
       "tests/host/staged_surface.test.ts",
       "tests/guest/boolean_words_execution.test.ts",

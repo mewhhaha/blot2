@@ -1,6 +1,42 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "../../host/format.ts";
 
+Deno.test("formatter preserves named private entry tagged and local curried functions", async () => {
+  const source = `func add (left:U32)->(right:U32):U32=> return left+right
+private func hidden_keep value=> return value
+@[test]
+func tagged ()=> return add 20 22
+entry func answer ()=> do:
+  func local (value:U32)->extra=> return add value extra
+  let anonymous=func value=> return value
+  return local (anonymous 40) 2
+`;
+  const formatted = await formatSource(source);
+  equal(
+    formatted.includes(
+      "func add (left: U32) -> (right: U32): U32 => return left + right",
+    ),
+    true,
+  );
+  equal(
+    formatted.includes("private func hidden_keep value => return value"),
+    true,
+  );
+  equal(
+    formatted.includes("@[test]\nfunc tagged () => return add 20 22"),
+    true,
+  );
+  equal(formatted.includes("entry func answer () => do:"), true);
+  equal(
+    formatted.includes(
+      "  func local (value: U32) -> extra => return add value extra",
+    ),
+    true,
+  );
+  equal(await formatSource(formatted), formatted);
+  equal(await formatSource(source.replaceAll("\n", "\r\n")), formatted);
+});
+
 Deno.test("formatter preserves spark and receive boundaries", async () => {
   const source =
     `entry const sparked = func () => return @task.scope (func group => return do:

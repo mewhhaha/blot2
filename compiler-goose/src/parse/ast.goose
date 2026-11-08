@@ -171,7 +171,7 @@ fn message(value: Diagnostic) -> const u8[:] {
  return "Unknown syntax diagnostic";
 }
 
-struct ValueDecl { name: blot_parse_symbols::Symbol, body: Id, annotation: Id, modifier: blot_parse_symbols::Symbol, runtime: bool, exported: bool, where: List, where_node: Id, attributes: List }
+struct ValueDecl { name: blot_parse_symbols::Symbol, body: Id, annotation: Id, modifier: blot_parse_symbols::Symbol, runtime: bool, exported: bool, function_declaration: bool=false, where: List, where_node: Id, attributes: List }
 struct ImplementationDecl { name: blot_parse_symbols::Symbol, parameters: List, head: Id, members: List, where: List, where_node: Id }
 struct Parameter { name: blot_parse_symbols::Symbol, annotation: Id, is_unit: bool, requires_return: bool, pattern_bound: bool, where: List, where_node: Id }
 struct Binding { pattern: Id, value: Id, annotation: Id, where: List, where_node: Id, fallback: Id }
@@ -410,7 +410,7 @@ fn children(tree: const Tree&, id: Id) -> const Id[:] {
 fn quantifier_predicates(tree: const Tree&, id: Id) -> Id { return tree.extra.items[node(tree,id).c+1]; }
 fn value_decl(tree: const Tree&, id: Id) -> ValueDecl {
  let n=node(tree,id); let x=tree.extra.items[n.c..n.c+9];
- return ValueDecl {n.a,n.b,x[0],x[1],x[2]==1,(x[7]&1)!=0,List {x[3],x[4], ..},x[8],List {x[5],x[6], ..}, ..};
+ return ValueDecl {n.a,n.b,x[0],x[1],x[2]==1,(x[7]&1)!=0,(x[7]&2)!=0,List {x[3],x[4], ..},x[8],List {x[5],x[6], ..}, ..};
 }
 fn implementation(tree: const Tree&, id: Id) -> ImplementationDecl {
  let n=node(tree,id); let x=tree.extra.items[n.c..n.c+6]; let members=node(tree,n.b);

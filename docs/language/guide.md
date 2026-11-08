@@ -82,6 +82,24 @@ meaning in a binding annotation: `const add: U32 -> U32 -> U32 = ...`.
 Whitespace-separated function parameters and implicit function results are
 rejected.
 
+Module functions may also use a named declaration. Parameters, currying, result
+annotations and explicit returns work like function values:
+
+```blot
+func add (left: U32) -> (right: U32): U32 => return @u32.add left right
+const plus_two = add 2
+entry func answer (): U32 => return plus_two 40
+```
+
+`private func` hides a module declaration from imports. Tags may decorate the
+whole function, including `entry func`. Named module functions support forward
+references and recursion. Function tags preserve every parameter type and any
+written result type; wrappers may change inferred effects.
+`const f = func ...` remains an ordinary function
+value. The current implementation admits one declaration per name; overloads
+and local named-function hoisting remain part of the
+[language migration](NEXT_MIGRATION.md). Use `let f = func ...` for local closures.
+
 For many same-typed arguments, use a parameter record as a named-call
 convention. The record type gives names a public interface, so renaming a field
 requires updating callers. Field expressions run once in their written order,
@@ -1290,7 +1308,7 @@ nullary constructor as `(func () => return $Idle)`.
 
 ## Expression tags
 
-Put `@[expression]` before a top-level `const` or `let` to apply the expression
+Put `@[expression]` before a top-level `const`, `let` or named `func` to apply the expression
 as a function to the initializer. A tag can use local names, named imports,
 qualified imports, and function arguments. It may share the declaration line.
 With several tags, the nearest runs first: `@[f] @[g] const x = value` binds

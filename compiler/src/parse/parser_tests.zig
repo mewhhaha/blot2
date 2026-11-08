@@ -807,3 +807,102 @@ test "boolean words are literal patterns and logical precedence is fixed" {
         try std.testing.expect(rejected.diagnostics.items.len != 0);
     }
 }
+
+fn namedFunctionSyntax(allocator: std.mem.Allocator) !void {
+    const source =
+        \\private func helper (first: U32) -> (second: U32) : U32 => return @u32.add first second
+        \\@[decorate]
+        \\entry func main () => do:
+        \\  func local a -> b -> c -> d -> e -> f -> g -> h -> i => return i
+        \\  return local 1 2 3 4 5 6 7 8 9
+        \\const function_value = func value => return value
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parsed(allocator, source, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    try std.testing.expectEqual(@as(usize, 3), tree.roots.items.len);
+    const helper_id = tree.roots.items[0];
+    const helper = tree.valueDecl(helper_id);
+    try std.testing.expect(helper.function_declaration);
+    try std.testing.expect(tree.declarationTraits(helper_id).private);
+    try std.testing.expect(!helper.runtime and !helper.exported);
+    try std.testing.expectEqualStrings("helper", pool.get(helper.name));
+    try std.testing.expectEqual(@as(ast.Id, 0), helper.annotation);
+    const outer = tree.node(helper.body);
+    const inner = tree.node(outer.b);
+    try std.testing.expectEqual(ast.Tag.lambda, outer.tag);
+    try std.testing.expectEqual(ast.Tag.lambda, inner.tag);
+    try std.testing.expectEqual(@as(ast.Id, 0), outer.c);
+    try std.testing.expect(inner.c != 0);
+    const main_id = tree.roots.items[1];
+    const main = tree.valueDecl(main_id);
+    try std.testing.expect(main.function_declaration and main.exported);
+    try std.testing.expectEqual(@as(u32, 3), tree.extra.items[tree.node(main_id).c + 7]);
+    try std.testing.expectEqual(@as(u32, 1), main.attributes.len);
+    const main_lambda = tree.node(main.body);
+    try std.testing.expect(tree.parameter(main_lambda.a).is_unit);
+    try std.testing.expect(tree.parameter(main_lambda.a).requires_return);
+    const statements = tree.children(main_lambda.b);
+    try std.testing.expectEqual(@as(usize, 2), statements.len);
+    try std.testing.expectEqual(ast.Tag.value_decl, tree.node(statements[0]).tag);
+    const local = tree.valueDecl(statements[0]);
+    try std.testing.expect(local.function_declaration);
+    try std.testing.expectEqualStrings("local", pool.get(local.name));
+    var body = local.body;
+    for (0..9) |_| {
+        try std.testing.expectEqual(ast.Tag.lambda, tree.node(body).tag);
+        body = tree.node(body).b;
+    }
+    const function_value = tree.valueDecl(tree.roots.items[2]);
+    try std.testing.expect(!function_value.function_declaration);
+    try std.testing.expectEqual(ast.Tag.lambda, tree.node(function_value.body).tag);
+    try std.testing.expectEqual(tree.nodes.items.len, tree.spans.items.len);
+    for (tree.spans.items) |span| try std.testing.expect(span.start <= span.end and span.end <= source.len);
+}
+
+test "named function declarations share curried lambda IR and preserve local entry private and tag metadata" {
+    try namedFunctionSyntax(std.testing.allocator);
+}
+
+test "named function declarations release parameter and attribute scratch through allocation failures" {
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, namedFunctionSyntax, .{});
+}
+
+test "local named functions do not consume anonymous function expression statements" {
+    const source = "func outer () => do:\n  func value => return value\n  func local value => return value\n  return local 1\n";
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, source, &pool);
+    defer tree.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    const lambda = tree.node(tree.valueDecl(tree.roots.items[0]).body);
+    const statements = tree.children(lambda.b);
+    try std.testing.expectEqual(@as(usize, 3), statements.len);
+    try std.testing.expectEqual(ast.Tag.lambda, tree.node(statements[0]).tag);
+    try std.testing.expectEqual(ast.Tag.value_decl, tree.node(statements[1]).tag);
+    try std.testing.expect(tree.valueDecl(statements[1]).function_declaration);
+}
+
+test "named functions retain return parameter and identifier diagnostics and recover later declarations" {
+    for ([_][]const u8{
+        "func missing (value: U32) => value\n",
+        "func missing => return 1\n",
+        "func Name value => return value\n",
+        "func namespace.member value => return value\n",
+        "func spaced first second => return first\n",
+        "entry private func hidden value => return value\n",
+    }) |invalid| {
+        const source = try std.mem.concat(std.testing.allocator, u8, &.{ invalid, "func later value => return value\n" });
+        defer std.testing.allocator.free(source);
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(std.testing.allocator);
+        var tree = try parsed(std.testing.allocator, source, &pool);
+        defer tree.deinit(std.testing.allocator);
+        try std.testing.expect(tree.diagnostics.items.len != 0);
+        try std.testing.expectEqual(@as(usize, 1), tree.roots.items.len);
+        try std.testing.expectEqualStrings("later", pool.get(tree.valueDecl(tree.roots.items[0]).name));
+        try std.testing.expect(tree.valueDecl(tree.roots.items[0]).function_declaration);
+    }
+}

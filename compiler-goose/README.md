@@ -4,6 +4,9 @@ This is a source port of the compiler in `../compiler/`. The Zig source and
 installed compiler remain the oracle; the ordinary Blot toolchain still uses
 them. `oracle.json` pins the source and executable used for later comparisons.
 The remote tag `goose-port-oracle-156f84b` preserves that Zig source baseline.
+Language changes now follow [RFC #46's Zig-first migration](../docs/language/NEXT_MIGRATION.md).
+Named module functions are mirrored in the parser and checker sources; only
+the parser has executed qualification. The original oracle pin is unchanged.
 
 Every compiler-algorithm module has a first source pass. The complete import
 graph parses under upstream Goose; type and lifetime checking are being

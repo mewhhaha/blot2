@@ -202,6 +202,7 @@ pub const ValueDecl = struct {
     modifier: symbols.Symbol,
     runtime: bool,
     exported: bool,
+    function_declaration: bool = false,
     where: List,
     where_node: Id,
     attributes: List,
@@ -329,12 +330,12 @@ pub const Tree = struct {
         return self.extra.items[value.c + 1];
     }
     // value_decl c points to [annotation,modifier,kind,where start,len,
-    // attributes start,len,flags,where node]. flags bit0=entry; kind 0=const,1=let.
+    // attributes start,len,flags,where node]. flags bit0=entry, bit1=named function; kind 0=const,1=let.
     pub fn valueDecl(self: *const Tree, id: Id) ValueDecl {
         const n = self.node(id);
         std.debug.assert(n.tag == .value_decl);
         const x = self.extra.items[n.c..][0..9];
-        return .{ .name = n.a, .body = n.b, .annotation = x[0], .modifier = x[1], .runtime = x[2] == 1, .exported = x[7] & 1 != 0, .where = .{ .start = x[3], .len = x[4] }, .where_node = x[8], .attributes = .{ .start = x[5], .len = x[6] } };
+        return .{ .name = n.a, .body = n.b, .annotation = x[0], .modifier = x[1], .runtime = x[2] == 1, .exported = x[7] & 1 != 0, .function_declaration = x[7] & 2 != 0, .where = .{ .start = x[3], .len = x[4] }, .where_node = x[8], .attributes = .{ .start = x[5], .len = x[6] } };
     }
     pub fn implementation(self: *const Tree, id: Id) ImplementationDecl {
         const n = self.node(id);

@@ -70,6 +70,18 @@
         }
       },
       {
+        "rule": "named_function_declaration",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "named_function",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
         "rule": "data_type",
         "boundary": {
           "kind": "root"

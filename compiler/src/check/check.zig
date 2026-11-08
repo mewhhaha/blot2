@@ -12696,7 +12696,37 @@ const Engine = struct {
         const result = try self.types.fresh();
         try self.constrain(function_ty, try self.invocation(argument, result), attribute);
         self.expr_types[attribute] = result;
+        if (self.current != 0 and self.bindings.items[self.current].kind == .global) {
+            const declaration = self.tree.valueDecl(self.bindings.items[self.current].declaration);
+            if (declaration.function_declaration and declaration.body == body) try self.namedFunctionTag(body, result, attribute);
+        }
         return result;
+    }
+    fn namedFunctionTag(self: *Engine, body: ast.Id, transformed: T.Id, attribute: ast.Id) T.Error!void {
+        var source = body;
+        var result = transformed;
+        var remaining: usize = 1024;
+        while (self.tree.node(source).tag == .lambda) {
+            if (remaining == 0) return error.TypeLimit;
+            remaining -= 1;
+            const node = self.types.node(self.types.head(result, 0));
+            if (node.tag == .usage or node.tag == .forall) {
+                result = node.a;
+                continue;
+            }
+            const syntax = self.tree.node(source);
+            const output = try self.types.fresh();
+            const arrow = try self.types.functionWithEffects(self.expr_types[syntax.a], output, try self.types.freshEffects());
+            // Tags may change latent effects, but never the written dispatch
+            // parameters. A written result annotation still checks the wrapper.
+            try self.constrain(arrow, result, attribute);
+            if (syntax.c != 0) {
+                const original = self.types.node(self.types.head(self.expr_types[source], 0));
+                try self.constrain(original.b, output, attribute);
+            }
+            source = syntax.b;
+            result = output;
+        }
     }
     fn freshGenerativeInvocation(self: *Engine, source: ast.Id, original: T.Id) T.Error!T.Id {
         if (self.generative_bindings.items.len == 0) return original;

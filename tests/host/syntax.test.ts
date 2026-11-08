@@ -2,6 +2,58 @@ import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { createFrontend, type Cst, SourceError } from "../../host/syntax.ts";
 const syntaxChildren = (children: readonly Cst[]) => children;
 
+Deno.test("named functions retain declaration names parameters and local boundaries", async () => {
+  const frontend = await createFrontend();
+  const source =
+    `func add (left: U32) -> (right: U32): U32 => return left + right
+private func hidden_keep value => return value
+@[test]
+func tagged () => return add 20 22
+private entry func answer () => do:
+  func local (value: U32) -> extra => return add value extra
+  let anonymous = func value => return value
+  return local (anonymous 40) 2
+`;
+  try {
+    const rows = normalizedNodes(frontend.parse(source).root, source);
+    equal(rows.filter((row) => row.kind === "named_function").length, 5);
+    equal(
+      rows.filter((row) => row.kind === "named_function_declaration").length,
+      4,
+    );
+    equal(rows.filter((row) => row.kind === "lambda").length, 1);
+    equal(rows.filter((row) => row.kind === "declaration_attribute").length, 1);
+    ok(rows.some((row) => row.field === "modifier" && row.text === "entry"));
+    equal(
+      normalizedNodes(
+        frontend.parse(source.replaceAll("\n", "\r\n")).root,
+        source.replaceAll("\n", "\r\n"),
+      ),
+      rows,
+    );
+    for (const modifier of ["entry", "private"]) {
+      throws(
+        () =>
+          frontend.parse(
+            `func outer () => do:\n  ${modifier} func local () => return 1\n  return local ()\n`,
+          ),
+        SourceError,
+      );
+    }
+    for (
+      const invalid of [
+        "func missing => return 1\n",
+        "func missing () = 1\n",
+        "func namespace.member value => return value\n",
+        "func Name value => return value\n",
+        "const value = func named value => return value\n",
+      ]
+    ) throws(() => frontend.parse(invalid), SourceError);
+  } finally {
+    frontend.dispose();
+  }
+});
+
 Deno.test("func replaces the function keyword without reserving identifier prefixes", async () => {
   const frontend = await createFrontend();
   try {

@@ -76,6 +76,56 @@ test "explicit function returns cover every path without borrowing nested functi
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, explicitReturns, .{});
 }
 
+test "named module functions preserve principal inference recursion and ordinary function values" {
+    var fixture = try Fixture.init(a,
+        \\func identity value => return value
+        \\func recur (value: U32): U32 => return if @u32.eq value 0 then 0 else recur (@u32.sub value 1)
+        \\const callback = func value => return identity value
+        \\entry func answer (): U32 => return @u32.add (callback 42) (recur 3)
+    );
+    defer fixture.deinit(a);
+    try fixture.valid();
+    var declarations: usize = 0;
+    var values: usize = 0;
+    for (fixture.tree.roots.items) |id| {
+        const declaration = fixture.tree.valueDecl(id);
+        if (declaration.function_declaration) declarations += 1 else values += 1;
+        if (declaration.exported) try std.testing.expect(declaration.function_declaration);
+    }
+    try std.testing.expectEqual(@as(usize, 3), declarations);
+    try std.testing.expectEqual(@as(usize, 1), values);
+}
+
+fn namedFunctionTags(allocator: std.mem.Allocator) !void {
+    const cases = [_]struct { text: []const u8, valid: bool }{
+        .{ .text = "const decorate = func f => return func (x: U32) => return f x\n@[decorate]\nfunc identity (x: U32): U32 => return x\n", .valid = true },
+        .{ .text = "const decorate = func f => return func (x: U32) => return f x\n@[decorate]\nfunc identity (x: U32): U32 ! {} => return x\n", .valid = true },
+        .{ .text = "const decorate = func f => return func (x: U32) => return func (y: U32) => return f x y\n@[decorate]\nfunc add (x: U32) -> (y: U32): U32 => return @u32.add x y\n", .valid = true },
+        .{ .text = "type Trace is effect = { trace: Unit -> Unit }\nconst decorate = func f => return func (x: U32) => return do:\n  Trace.trace ()\n  break f x\n@[decorate]\nfunc identity (x: U32): U32 => return x\n", .valid = true },
+        .{ .text = "const discard = func f => return 42\n@[discard]\nconst value = func (x: U32) => return x\n", .valid = true },
+        .{ .text = "const discard = func f => return 42\n@[discard]\nfunc identity (x: U32) => return x\n", .valid = false },
+        .{ .text = "const replace = func f => return func () => return 42\n@[replace]\nfunc identity (x: U32) => return x\n", .valid = false },
+        .{ .text = "const replace = func f => return func (x: U32) => return func () => return 42\n@[replace]\nfunc add (x: U32) -> (y: U32) => return @u32.add x y\n", .valid = false },
+        .{ .text = "const replace = func f => return func (x: U32) => return true\n@[replace]\nfunc identity (x: U32): U32 => return x\n", .valid = false },
+        .{ .text = "const discard = func f => return 42\nconst restore = func value => return func (x: U32) => return x\n@[restore]\n@[discard]\nfunc identity (x: U32): U32 => return x\n", .valid = false },
+    };
+    for (cases) |item| {
+        var fixture = try Fixture.init(allocator, item.text);
+        defer fixture.deinit(allocator);
+        if (item.valid) {
+            try fixture.valid();
+        } else {
+            try std.testing.expect(fixture.checked.diagnostics.len != 0);
+            try std.testing.expectEqual(check.Code.type_mismatch, fixture.checked.diagnostics[0].code);
+        }
+    }
+}
+
+test "named function tags preserve every dispatch parameter and written result while allowing new effects through OOM" {
+    try namedFunctionTags(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, namedFunctionTags, .{});
+}
+
 test "result directed schemes retain input and expected output across aliases and nominal arguments" {
     var f = try Fixture.init(a, source);
     defer f.deinit(a);

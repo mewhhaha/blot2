@@ -2,31 +2,52 @@
 
 ## Current frontier
 
-The Zig-to-Goose experiment in `compiler-goose/` is still source-only: no
-whole compiler C/header/executable or end-to-end parity result exists. Keep
-`compiler/`, the pinned Zig oracle and existing siblings unchanged.
+Implement [RFC #46](https://github.com/mewhhaha/blot2/issues/46) in Zig first,
+then mirror checked behavior in Goose. The complete target and remaining stages
+are in [the migration index](docs/language/NEXT_MIGRATION.md). The latest RFC
+requires immutable collections with automatic admitted copies/last-use moves;
+the current compiler still implements named-owner alias writes.
 
-The owner is selecting the implementation strategy for language RFC
-[#46](https://github.com/mewhhaha/blot2/issues/46). Its latest sections change
-collections to immutable values with admitted automatic copies/last-use moves;
-that is a semantic change from the current named-owner alias writes. Do not
-silently apply that new behavior while treating the old Zig compiler as its oracle.
+The first batch adds named **module** `func` declarations using the existing
+lambda/checker/Core path. Curried calls, partial applications, entries,
+private imports, forward references, recursion and whole-function tags execute.
+Tags must preserve every dispatch parameter and written result type, while
+allowing different inferred effects. Ordinary value tags retain their behavior.
+The host formatter/parser and Tree-sitter grammar follow the same spelling.
+There is one declaration per name: overloads, namespace ownership, richer
+parameter clauses and local hoisting are pending. Local declarations parse but
+are not semantically implemented; do not count parser acceptance as support.
+The owner's question about removing local hoisting remains unanswered, so it
+has not been removed from the target.
 
-The Goose source checkpoint repairs scalar proof outcomes, 44 retained AST
-bindings across 49 functions, and 15 type-span bindings/114 loops without new
-payload copies. Four production entry paths pass their combined partial check
-on 34f7a396. The remaining checker frontier is a `withImporter` callback lifetime
-at `LegacyProof.resolve`; no whole compiler is emitted. Before further callback
-rewrites, expose the original store location: `ApplyCalleeStores` already has
-`StoreEvent.at` and its raw event index. Keep the call location primary.
-The normal Zig compiler and siblings remain unchanged.
+All **2,971 native laws compile without LLVM**. The development family passes
+**14 native / 31 guest-host checks in 22.55s**; all 14 selected native laws also
+pass exhaustive allocation failures in 7.16s. Five final named-function guest
+laws pass against the native-backend fast compiler. Goose mirrors the parser
+and tag check: its parser engine executes in 2.40s, and the complete import graph
+parses. The mirrored checker has not been semantically qualified.
 
-Use `python3 compiler-goose/tools/check_engines.py` for five concrete production
-paths in parallel (`--engines check lower independent` narrows a batch).
-This is explicitly partial, emits no compiler and never replaces a full build.
-Use actual declarations and the Zig oracle, repair whole families, validate once
-per batch, then run the full build when these frontiers clear. Avoid per-edit
-synthetic fixtures/review/receipts. Use Astra only for a specific snag; never Terra.
+The final full gate is **incomplete**: LLVM release compilation hit its 120s
+phase cap and cancelled native execution. The cache prune needed to recover
+space also exposed stale Options manifests; those were invalidated and a real
+list fixture rebuilt successfully. Do not keep rerunning LLVM per edit.
+Gdev compilation with the fast native-backend candidate hit its 15s cap; no
+fresh frame or release performance claim is made. Qualification details and
+identities are in [the batch evidence](benchmarks/evidence/qualification/2026-11-08-named-functions.json).
+
+The Goose port remains source-only: no whole compiler C/header/executable or
+end-to-end parity result exists. Preserve the original pinned Zig oracle and
+sibling sources/assets; the new Zig language candidate is a separate identity.
+The previous Goose repair frontier remains `LegacyProof.resolve`'s
+`withImporter` callback lifetime. Four production entry paths pass their older
+combined partial check on 34f7a396, not the current mirrored checker. Before
+further callback rewrites, expose the original `StoreEvent.at` location at
+`ApplyCalleeStores`; keep the call location primary.
+
+Use `python3 compiler-goose/tools/check_engines.py` for concrete production
+paths in a bounded batch. This is explicitly partial and emits no compiler.
+Repair whole families, validate once per batch, and avoid per-edit synthetic
+fixtures. Use Astra only for a specific snag; never Terra.
 
 The normal private checker is `0c235f03...`: exported roots first, nominal
 identity/reference reachability, lazy overload diagnostics, visited-type buckets,

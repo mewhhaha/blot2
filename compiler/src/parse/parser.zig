@@ -268,7 +268,7 @@ const Parser = struct {
     fn declarationBody(self: *Parser, declarations_seen: bool, body_declarations_seen: bool, is_opaque: bool) Error!Id {
         _ = body_declarations_seen;
         self.declaration_origin = .{ .start = self.current().start, .end = self.current().end };
-        self.collection_names = 0;
+        if (self.depth == 0) self.collection_names = 0;
         const start = self.current().start;
         if (self.at(.kw_import)) {
             if (declarations_seen) return self.fail(.unexpected_token);
@@ -302,11 +302,12 @@ const Parser = struct {
         }
         var modifier: symbols.Symbol = 0;
         var flags: u32 = 0;
-        if ((self.at(.type_identifier) or self.at(.kw_true) or self.at(.kw_false)) and (self.peek(1) == .kw_const or self.peek(1) == .kw_let)) return self.identifierSyntax();
-        if (self.at(.identifier) and (self.peek(1) == .kw_const or self.peek(1) == .kw_let)) {
+        if ((self.at(.type_identifier) or self.at(.kw_true) or self.at(.kw_false)) and (self.peek(1) == .kw_const or self.peek(1) == .kw_let or self.peek(1) == .kw_func)) return self.identifierSyntax();
+        if (self.at(.identifier) and (self.peek(1) == .kw_const or self.peek(1) == .kw_let or self.peek(1) == .kw_func)) {
             flags = @intFromBool(self.word("entry"));
             modifier = try self.lowerIdentifier();
         }
+        if (self.at(.kw_func)) return self.functionDeclaration(attrs, start, modifier, flags);
         const runtime: u32 = if (self.eat(.kw_const)) 0 else if (self.eat(.kw_let)) 1 else return self.fail(.expected_token);
         const name_point = self.tokens[self.index].start;
         const name = try self.qualified();
@@ -818,8 +819,22 @@ const Parser = struct {
         if (self.at(.kw_case)) return self.caseExpression();
         return self.infix();
     }
+    fn functionDeclaration(self: *Parser, attributes: ast.List, start: u32, modifier: symbols.Symbol, flags: u32) Error!Id {
+        const function_start = (try self.expect(.kw_func)).start;
+        const name_point = self.current().start;
+        const name = try self.lowerIdentifier();
+        try self.enter();
+        defer self.depth -= 1;
+        const body = try self.lambdaTail(function_start);
+        const declaration_id = try self.add(.value_decl, name, body, try self.extra(&.{ 0, modifier, 0, 0, 0, attributes.start, attributes.len, flags | 2, 0 }), start);
+        try self.tree.constant_names.append(self.allocator, .{ .declaration = declaration_id, .point = name_point });
+        return declaration_id;
+    }
     fn lambda(self: *Parser) Error!Id {
         const start = (try self.expect(.kw_func)).start;
+        return self.lambdaTail(start);
+    }
+    fn lambdaTail(self: *Parser, start: u32) Error!Id {
         const Parameter = struct { node: Id, pattern: Id, name: symbols.Symbol, start: u32 };
         var fixed: [8]Parameter = undefined;
         var overflow: std.ArrayList(Parameter) = .empty;
@@ -1429,6 +1444,7 @@ const Parser = struct {
     }
     fn statement(self: *Parser) Error!Id {
         const start = self.current().start;
+        if (self.namedFunctionAhead()) return self.localFunctionDeclaration();
         if (self.eat(.kw_let)) {
             const pat = try self.pattern();
             const annotation = if (self.eat(.colon)) try self.typeExpression() else 0;
@@ -1485,6 +1501,15 @@ const Parser = struct {
             return self.add(.rebind_stmt, target, try self.expression(), 0, start);
         }
         return self.expression();
+    }
+    fn localFunctionDeclaration(self: *Parser) Error!Id {
+        const declaration_id = try self.declaration(false, false);
+        if (self.tree.node(declaration_id).tag != .value_decl or !self.tree.valueDecl(declaration_id).function_declaration) return self.fail(.expected_token);
+        return declaration_id;
+    }
+    fn namedFunctionAhead(self: *const Parser) bool {
+        if (!self.at(.kw_func) or self.peek(1) != .identifier) return false;
+        return self.peek(2) == .identifier or self.peek(2) == .l_paren;
     }
     // A colon also starts an expression witness. Only a top-level left arrow
     // in this statement makes the initial name an effect-binding declaration.

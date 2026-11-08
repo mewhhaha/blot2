@@ -1,0 +1,347 @@
+{
+  "date": "2026-11-08",
+  "feature": "RFC 46 first batch: named module functions",
+  "base_commit": "91313afb412e561e35d8df77903d73d48705c0dc",
+  "zig": "0.17.0",
+  "source_sha256": {
+    "compiler/src/parse/ast.zig": "b9a2b19e674f1f42667ce58a02f8b7bd031e5e124f9cc0ba46568bb4d5a61fc3",
+    "compiler/src/parse/parser.zig": "22200f5b217ae61adc8b3c3dc69defd92c42f38e0183a19a1a9534e8aee08ddb",
+    "compiler/src/check/check.zig": "db233edc9c0c876e5c38fd217774a58acd7d8c89f48bfb120bc9cde9475cca66",
+    "compiler/src/check/check_result_tests.zig": "29637655145059fa05ce78eab959dbd6739d451f5ef56650f174768dd2decaff",
+    "compiler-goose/src/parse/ast.goose": "006703be417d731c5273ef42f778b749c4ce576d27ac0d86aedaec8b58dadb7b",
+    "compiler-goose/src/parse/parser.goose": "3444ee4294f6daa3d2a39f1d1d8224de8eec9911fe383ab02d41a898a90fbd15",
+    "compiler-goose/src/check/check.goose": "4d00a1229d26e4f8748ce65d81eb824de1023963840fe93c21dd0679f8868be6",
+    "compiler-goose/tests/parser.goose": "ae9322bdddd2ae68e39786607994e8e850cb575db1e358c9865aad1fcadd2957",
+    "host/parser/grammar.baba": "7649c809632dff741682f75bc25b401ff4f1d9a36a1c3d5c4839e77b1304d161",
+    "docs/language/guide.md": "8e868cea8beb892131379f89d159f366390f1b0df9e5ed8e85dd1eb822345e77",
+    "tests/guest/named_functions_execution.test.ts": "86e20a20b9ffdd0ce4f9cb395342d759e77298029af3288be3b58b553be94c02"
+  },
+  "scope": [
+    "named module funcs, entry/private, currying, forward and recursive calls",
+    "tags preserve dispatch parameters and written results; latent effects may change",
+    "host parser/formatter, Tree-sitter, Goose parser and checker source mirror"
+  ],
+  "pending": [
+    "local hoisting and overload groups",
+    "parameterized namespaces, compile-time type values and staged scopes",
+    "immutable collections and automatic copy admission",
+    "whole Goose compiler and mirrored checker qualification",
+    "full native/release/integration qualification"
+  ],
+  "development": {
+    "report": {
+      "path": "build/bench/rfc46-named-final/run-dd60d91dda7c2c2/results.json",
+      "sha256": "8c88ff03887aca20dac7d57254afb523f2995e126d4a7d100d8dc7c3b84a794d"
+    },
+    "success": true,
+    "wall_seconds": 22.550954246999996,
+    "compiled_native_laws": 2971,
+    "selected_native_laws": 14,
+    "guest_host_checks": 31,
+    "allocation_failures": "sampled",
+    "compiler_sha256": "31a13ede89f2c5f6af9e6bf3d9befd675a3db99d552a65a4e2dbc922b899ed87",
+    "native_binary_sha256": "3c641ab9741dc208140a0870298a62b4d14e0a3c219e4a55ff28940905743aff",
+    "note": "Guide prose and one additional guest rejection law followed this family; the final native inventory compiles in the full-gate attempt."
+  },
+  "affected_exhaustive_allocation_failures": {
+    "log": {
+      "path": "build/bench/rfc46-named-final/affected-full-oom.log",
+      "sha256": "4768893067194c1957ca12df2ea0211ee20ce72e176c385793dd32cc47b2a636"
+    },
+    "passed": 14,
+    "failures": 0,
+    "leaks": 0,
+    "logged_errors": 0,
+    "seconds": 7.155205025,
+    "tests": [
+      {
+        "name": "eval.core_eval_tests.test.selected contract source interfaces do not evaluate method constant dependencies",
+        "duration_ns": 64351867,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_result_tests.test.explicit function returns cover every path without borrowing nested function or block exits through OOM",
+        "duration_ns": 1858586238,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_result_tests.test.named module functions preserve principal inference recursion and ordinary function values",
+        "duration_ns": 1288625,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_result_tests.test.named function tags preserve every dispatch parameter and written result while allowing new effects through OOM",
+        "duration_ns": 5218352824,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.lexer_tests.test.flat tokens preserve longest matches and source byte spans",
+        "duration_ns": 105251,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.dollar constructors and run staging preserve list arrays and spaced dollar application through OOM",
+        "duration_ns": 7274042,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.multi-parameter lambda sugar lowers to a curried chain with the result on the final stage",
+        "duration_ns": 84141,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.functions require explicit return and reject whitespace separated parameters",
+        "duration_ns": 307586,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.long curried parameter lists release fallback storage through allocation faults",
+        "duration_ns": 866381,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.return exits a function while break value finishes a do and bare break exits a loop",
+        "duration_ns": 112274,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.named function declarations share curried lambda IR and preserve local entry private and tag metadata",
+        "duration_ns": 184081,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.named function declarations release parameter and attribute scratch through allocation failures",
+        "duration_ns": 3350174,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.local named functions do not consume anonymous function expression statements",
+        "duration_ns": 84621,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "parse.parser_tests.test.named functions retain return parameter and identifier diagnostics and recover later declarations",
+        "duration_ns": 256920,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      }
+    ]
+  },
+  "final_executed_wasm": {
+    "compiler": "/home/jacobt/src/blot2/compiler/zig-out-native-fast/bin/blotc",
+    "compiler_sha256": "c98478eb158d03518fbd5a4455ce754c7fd1ee3c4418448682507f32cbcd2c2a",
+    "compiler_identity": "26853b7e1d5595aa7f19d1d1eddf23c737ccda049988e5ee4fb577443116a091",
+    "backend": "native, fast; not LLVM release",
+    "passed": 5,
+    "failed": 0,
+    "command": "deno test --allow-read --allow-write --allow-run tests/guest/named_functions_execution.test.ts -- compiler/zig-out-native-fast/bin/blotc"
+  },
+  "goose": {
+    "evidence": {
+      "path": "build/goose-port/engine-tests/evidence.json",
+      "sha256": "ea05b55c29a9d940f07474025d2ba3230fbbb2ccd9f32a2941e43f8f62642fe9"
+    },
+    "parser_engine_passed": true,
+    "parser_engine_seconds": 2.396193983993726,
+    "goose": {
+      "path": "/home/jacobt/src/goose-to-wasm/build/native/goose",
+      "sha256": "b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2"
+    },
+    "cc": {
+      "path": "/usr/bin/clang-23",
+      "sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d"
+    },
+    "whole_graph_parse": "36950 top-level declarations in 440 files",
+    "checker": "source mirror only; no semantic qualification",
+    "whole_compiler_executable": false
+  },
+  "full_gate": {
+    "report": {
+      "path": "build/bench/rfc46-final-full/timings.json",
+      "sha256": "d8998a9da9d6a5e729e16b80207d08ee2814a8f3e6e4f0a072ebf85199ec2b59"
+    },
+    "success": false,
+    "wall_seconds": 145.09962582900002,
+    "phase_cap_seconds": 120,
+    "phases": [
+      {
+        "name": "smoke-build",
+        "code": 0,
+        "wall_seconds": 0.541617852
+      },
+      {
+        "name": "smoke",
+        "code": 0,
+        "wall_seconds": 2.781816949
+      },
+      {
+        "name": "harness",
+        "code": 0,
+        "wall_seconds": 21.254454624999997
+      },
+      {
+        "name": "native-compile",
+        "code": 0,
+        "wall_seconds": 10.636594458
+      },
+      {
+        "name": "release-build",
+        "code": 124,
+        "wall_seconds": 120.256250581
+      },
+      {
+        "name": "native-run",
+        "code": 130,
+        "wall_seconds": 106.99131471199999
+      }
+    ],
+    "reason": "LLVM release exceeded 120s; native sibling cancelled. Pruned Options outputs also exposed stale manifests; those were evicted and a real list fixture rebuilt successfully."
+  },
+  "gdev": {
+    "report": {
+      "path": "/home/jacobt/src/blot2/build/rfc46-named-gdev/main-e643b580d06ca3dc/result.json",
+      "sha256": "d86f535214584402447b612ef612c815a50b74969bddb52be61b050e6825a76d"
+    },
+    "success": false,
+    "status": "timeout_incomplete",
+    "timeout_ms": 15000,
+    "total_ms": 15002.849859999998,
+    "compiler_sha256": "c98478eb158d03518fbd5a4455ce754c7fd1ee3c4418448682507f32cbcd2c2a",
+    "frame": "not run; no artifact emitted"
+  },
+  "environment": {
+    "regenerable_object_cache_directories_removed": 1580,
+    "older_than_days": 7,
+    "free_space_before_gib": 144,
+    "free_space_after_gib": 218,
+    "stale_empty_input_manifests_evicted": 83,
+    "regeneration": "list-runtime-fixture rebuilt with native backend in 1s; source, oracles and sibling assets preserved"
+  },
+  "qualifies_release": false,
+  "performance_claim": null
+}

@@ -143,8 +143,10 @@ export type LiteralKind =
   | "["
   | "]"
   | "let"
-  | "effect"
+  | "func"
   | "->"
+  | "return"
+  | "effect"
   | "data"
   | "|"
   | "#"
@@ -171,8 +173,6 @@ export type LiteralKind =
   | "concurrent"
   | "borrow"
   | "borrow_mut"
-  | "func"
-  | "return"
   | "and"
   | "or"
   | "run"
@@ -279,6 +279,8 @@ export type RuleName =
   | "declaration_attribute"
   | "attribute_name"
   | "value_declaration"
+  | "named_function_declaration"
+  | "named_function"
   | "effect_declaration"
   | "effect_type"
   | "effect_signature"
@@ -473,7 +475,7 @@ export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
 
 export interface DeclarationCursor extends RuleCursorBase<"declaration"> {
   field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor> | null;
-  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | ImplementationDeclarationCursor | NamedFixityCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor | OpaqueTypeCursor;
+  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | ImplementationDeclarationCursor | NamedFixityCursor | NamedFunctionDeclarationCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor | OpaqueTypeCursor;
   field(name: "visibility"): TokenCursor<"literal", "privatE"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -561,6 +563,23 @@ export interface ValueDeclarationCursor extends RuleCursorBase<"value_declaratio
   field(name: "value"): ExpressionCursor;
   field(name: "where"): WhereClauseCursor | null;
   field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface NamedFunctionDeclarationCursor extends RuleCursorBase<"named_function_declaration"> {
+  field(name: "modifier"): SourceIdentifierCursor | null;
+  field(name: "value"): NamedFunctionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface NamedFunctionCursor extends RuleCursorBase<"named_function"> {
+  field(name: "body"): DoBlockCursor | ExpressionCursor;
+  field(name: "name"): SourceIdentifierCursor;
+  field(name: "parameter"): ReadonlyArray<ParameterCursor>;
+  field(name: "result"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "parameter"): ReadonlyArray<ParameterCursor>;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
@@ -1136,7 +1155,7 @@ export interface SuiteCursor extends RuleCursorBase<"suite"> {
 }
 
 export interface StatementCursor extends RuleCursorBase<"statement"> {
-  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor;
+  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | NamedFunctionCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1386,6 +1405,8 @@ export type AnyRuleCursor =
   | DeclarationAttributeCursor
   | AttributeNameCursor
   | ValueDeclarationCursor
+  | NamedFunctionDeclarationCursor
+  | NamedFunctionCursor
   | EffectDeclarationCursor
   | EffectTypeCursor
   | EffectSignatureCursor

@@ -28,6 +28,7 @@ export default grammar({
         $.import_declaration,
         $.export_declaration,
         $.function_binding,
+        $.named_function_header,
         $.lambda_header,
         $.type_header,
         $.curried_type_header,
@@ -117,6 +118,22 @@ export default grammar({
           "func",
           field("parameter", $._parameter),
           repeat(seq("->", field("parameter", $._parameter))),
+        ),
+      ),
+
+    named_function_header: ($) =>
+      prec.dynamic(
+        3,
+        prec.right(
+          3,
+          seq(
+            optional(alias("private", $.private_modifier)),
+            optional(alias("entry", $.entry_modifier)),
+            "func",
+            field("name", $.identifier),
+            field("parameter", $._parameter),
+            repeat(seq("->", field("parameter", $._parameter))),
+          ),
         ),
       ),
 

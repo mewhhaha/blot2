@@ -77,6 +77,47 @@ fn depth_limit() {
  assert(tree.roots.len==0 && tree.diagnostics.len==1 && tree.diagnostics.items[0].code==blot_parse_ast::code_nesting_limit);
  tree.deinit();names.deinit();
 }
+// Local named declarations below qualify syntax only, not local hoisting/checking.
+fn named_functions() {
+ var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
+ var tree,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
+ parse_source("private func helper (first: U32) -> (second: U32) : U32 => return @u32.add first second\n@[decorate]\nentry func main () => do:\n  func local a -> b -> c -> d -> e -> f -> g -> h -> i => return i\n  return local 1 2 3 4 5 6 7 8 9\nconst function_value = func value => return value\n",names,tree);
+ assert(tree.diagnostics.len==0&&tree.roots.len==3);
+ let helper_id=tree.roots.items[0];let helper=tree.value_decl(helper_id);
+ assert(helper.function_declaration&&!helper.runtime&&!helper.exported&&blot_parse_ast::declaration_traits(tree,helper_id).private);
+ assert(names.get(helper.name)=="helper"&&helper.annotation==0);
+ let first=tree.node(helper.body);let second=tree.node(first.b);
+ assert(first.tag==blot_parse_ast::tag_lambda&&second.tag==blot_parse_ast::tag_lambda&&first.c==0&&second.c!=0);
+ let main_id=tree.roots.items[1];let main_decl=tree.value_decl(main_id);
+ assert(main_decl.function_declaration&&main_decl.exported&&main_decl.attributes.len==1&&tree.extra.items[tree.node(main_id).c+7]==3);
+ let main_lambda=tree.node(main_decl.body);let parameter=tree.parameter(main_lambda.a);assert(parameter.is_unit&&parameter.requires_return);
+ let statements=tree.children(main_lambda.b);assert(statements.len==2&&tree.node(statements[0]).tag==blot_parse_ast::tag_value_decl);
+ let local=tree.value_decl(statements[0]);assert(local.function_declaration&&names.get(local.name)=="local");
+ var body=local.body;for index in 0..9 {assert(tree.node(body).tag==blot_parse_ast::tag_lambda);body=tree.node(body).b;}
+ let ordinary=tree.value_decl(tree.roots.items[2]);assert(!ordinary.function_declaration&&tree.node(ordinary.body).tag==blot_parse_ast::tag_lambda);
+ assert(tree.nodes.len==tree.spans.len);
+ tree.deinit();names.deinit();
+}
+fn named_local_ambiguity() {
+ var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
+ var tree,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
+ parse_source("func outer () => do:\n  func value => return value\n  func local value => return value\n  return local 1\n",names,tree);
+ assert(tree.diagnostics.len==0&&tree.roots.len==1);
+ let outer=tree.node(tree.value_decl(tree.roots.items[0]).body);let statements=tree.children(outer.b);
+ assert(statements.len==3&&tree.node(statements[0]).tag==blot_parse_ast::tag_lambda&&tree.node(statements[1]).tag==blot_parse_ast::tag_value_decl);
+ assert(tree.value_decl(statements[1]).function_declaration);
+ tree.deinit();names.deinit();
+}
+fn named_recovery() {
+ for invalid in ["func missing value => value\n", "func missing => return 1\n", "func Name value => return value\n", "func scope.member value => return value\n"] {
+  var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
+  var tree,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
+  let source=str(invalid,"func later value => return value\n");parse_source(source,names,tree);
+  assert(tree.diagnostics.len!=0&&tree.roots.len==1);
+  let later=tree.value_decl(tree.roots.items[0]);assert(later.function_declaration&&names.get(later.name)=="later");
+  tree.deinit();names.deinit();
+ }
+}
 fn main() {
- for cycle in 0..3 {values();fixities();recovery();staging();depth_limit();}
+ for cycle in 0..3 {values();fixities();recovery();staging();depth_limit();named_functions();named_local_ambiguity();named_recovery();}
 }

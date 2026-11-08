@@ -48,6 +48,11 @@
 ["(" ")" "[" "]" "{" "}"] @punctuation.bracket
 
 (function_binding name: (identifier) @function)
+(named_function_header name: (identifier) @function)
+(named_function_header (private_modifier) @keyword.storage.modifier)
+(named_function_header (entry_modifier) @keyword.storage.modifier)
+(named_function_header parameter: (identifier) @variable.parameter)
+(named_function_header parameter: (parenthesized (identifier) @variable.parameter))
 (qualified_function_name name: (identifier) @function)
 (infix_function "`" @operator)
 (infix_function name: (identifier) @function)
