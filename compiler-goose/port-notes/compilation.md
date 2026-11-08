@@ -51,18 +51,17 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen235 inputs. The completed log
-captures9 diagnostics across6 files in88.25s, after234 captured21 across13.
-Owned Unit publication reattaches byte and AST headers through their existing
-owners; decoder storage now takes a temporary bytes.len snapshot after its
-original magic check/owner mark. Candidate publication retains exact owned buffers
-and snapshots while owning timing labels; default labels need no allocation.
-Focused runtime/negative controls pass, with reduced leaves documented. Whole
-C emission, linking, CLI and Wasm qualification remain pending. Counts come only
-from completed logs;45-second diagnostic windows describe failing prefixes.
-The opt-in1M cumulative clone-expansion checker passes201 frontend and8 runtime
-parity controls plus bounded expansion controls; its independent tail limit stays
-100k. The evidence pins all108 reconstructed checker source files.
+per stage. This checkpoint preserves exact frozen236 inputs. Its completed log
+captures 2 diagnostics in 2 files in 86.52s: projection receives a grow-shrink
+mapping carrier, and parameter annotation needs recursive declarations. Encoder
+scratch uses fixed typed holders; record sorting keeps scalar name ranges.
+Eight focused suites pass both checkers, with 54 rejecting mutation controls;
+controlled leaves remain explicit. Whole C emission, linking, CLI and Wasm
+qualification remain pending. Counts use completed logs and a 45-second
+collection window; durations describe failing prefixes. The opt-in private
+checker uses a 1M cumulative clone bound and separate100k tail traversal; its201
+frontend and8 runtime controls match the preceding checker. The evidence pins
+all108 reconstructed checker source files.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
 through one callback boundary. Actual core/snapshot admission methods use explicit

@@ -1259,6 +1259,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_runtime_operatio
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_runtime_operations::Entry) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_runtime_operations::Field)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_runtime_operations::Field) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_runtime_operations::FieldBuffer)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_runtime_operations::FieldBuffer) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_runtime_operations::KeyBuffer)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_runtime_operations::KeyBuffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_runtime_operations::Location)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_runtime_operations::Location) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_runtime_operations::Relocation)->bool {return equalFields(left,right);}

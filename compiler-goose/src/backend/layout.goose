@@ -465,9 +465,9 @@ recursive fn fromTypeRow(store: Store&, module: const blot_check_core::Module&, 
         var labels=blot_eval_type_evidence::WordBuffer{}; var arguments=blot_eval_type_evidence::WordBuffer{};
         recursive fn convertChildren()->Id,blot_error::Error {
 
-    for label in module.types.rowLabels(row) {
+    let label_count=module.types.rowLabels(row).len;for label_index in 0..label_count {let label=module.types.rowLabels(row)[label_index];
         arguments.clear();
-        for argument in module.types.operationArguments(label) { let selected, error = fromTypeDepth(store, module, argument, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
+        let argument_count=module.types.operationArguments(label).len;for argument_index in 0..argument_count {let argument=module.types.operationArguments(label)[argument_index]; let selected, error = fromTypeDepth(store, module, argument, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
         let operation = module.types.operation(label); let instance = blot_check_types::selectionAtom(module.types, mappedInstance(operation.instance, mappings));
         let mapped, error = store.effects.internOperationInstance(operation.identity, arguments.items, instance); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
@@ -604,9 +604,9 @@ recursive fn toEvidenceRow(store: Store&, target: blot_eval_type_evidence::Store
     recursive fn convertRow()->u32,blot_error::Error {
 
     let source = store.effects.view();
-    for label in source.rowLabels(row) {
+    let label_count=source.rowLabels(row).len;for label_index in 0..label_count {let label=source.rowLabels(row)[label_index];
         arguments.clear();
-        for argument in source.operationArguments(label) { let selected, error = toEvidenceDepth(store, target, argument, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
+        let argument_count=source.operationArguments(label).len;for argument_index in 0..argument_count {let argument=source.operationArguments(label)[argument_index]; let selected, error = toEvidenceDepth(store, target, argument, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
         let operation = source.operation(label); let mapped, error = target.effects.internOperationInstance(operation.identity, arguments.items, operation.instance); if error != blot_error::Error.none { return 0, error; } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
     let old_formal = store.effects.rows.items[row].formal; var formal: u32 = 0;
@@ -622,9 +622,9 @@ recursive fn fromEvidenceRow(store: Store&, view: blot_eval_type_evidence::View,
     var arguments=blot_eval_type_evidence::WordBuffer{};
     recursive fn convertRow()->u32,blot_error::Error {
 
-    for label in view.effects.rowLabels(row) {
+    let label_count=view.effects.rowLabels(row).len;for label_index in 0..label_count {let label=view.effects.rowLabels(row)[label_index];
         arguments.clear();
-        for argument in view.effects.operationArguments(label) { let selected, error = fromEvidenceDepth(store, view, argument, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
+        let argument_count=view.effects.operationArguments(label).len;for argument_index in 0..argument_count {let argument=view.effects.operationArguments(label)[argument_index]; let selected, error = fromEvidenceDepth(store, view, argument, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
         let operation = view.effects.operation(label); let mapped, error = store.effects.internOperationInstance(operation.identity, arguments.items, operation.instance); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
     let old_formal = view.effects.rows[row].formal; var formal: Id = 0;
@@ -750,7 +750,7 @@ recursive fn fromSolverDepth(store: Store&, source: blot_check_types::Store&, ty
         }
 
         if n.tag == blot_check_types::Tag.nominal { source_children.append(source.nominalArguments(n));if source_children.failure!=blot_error::Error.none {return 0,source_children.failure;} } else { source_children.append(source.list(blot_check_types::List { start: n.a, len: n.b , ..}));if source_children.failure!=blot_error::Error.none {return 0,source_children.failure;} }
-        for child in source_children.items { let value, error = fromSolverDepth(store, source, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(value);if values.failure!=blot_error::Error.none {return 0,values.failure;} }
+        for index in 0..source_children.len {let child=source_children.items[index]; let value, error = fromSolverDepth(store, source, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(value);if values.failure!=blot_error::Error.none {return 0,values.failure;} }
         if n.tag == blot_check_types::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values.items); } return intern(store, Tag.product, 0, 0, values.items);
 
         }
@@ -770,9 +770,9 @@ recursive fn fromSolverRow(store: Store&, source: blot_check_types::Store&, row:
     var source_arguments=blot_eval_type_evidence::WordBuffer{};
     recursive fn convertRow()->u32,blot_error::Error {
    source_labels.append(source.rowLabels(root));if source_labels.failure!=blot_error::Error.none {return 0,source_labels.failure;}
-    for label in source_labels.items {
+    for label_index in 0..source_labels.len {let label=source_labels.items[label_index];
         arguments.clear();  source_arguments.clear();source_arguments.append(source.operationArguments(label));if source_arguments.failure!=blot_error::Error.none {return 0,source_arguments.failure;} let identity = source.operation(label).identity;
-        for argument in source_arguments.items { let child, error = fromSolverDepth(store, source, argument, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } arguments.push(child);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
+        for argument_index in 0..source_arguments.len {let argument=source_arguments.items[argument_index]; let child, error = fromSolverDepth(store, source, argument, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } arguments.push(child);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
         let mapped, error = store.effects.internOperationInstance(identity, arguments.items, blot_check_types::selectionAtom(source, source.operation(label).instance)); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
     let result, error = store.effects.internRowWithFormal(labels.items, formal); if error != blot_error::Error.none { return 0, effectError(error); } return result, blot_error::Error.none;

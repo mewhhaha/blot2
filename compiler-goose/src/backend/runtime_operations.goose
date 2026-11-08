@@ -10,16 +10,19 @@ import check.effect_evidence;
 import reuse.artifact_emitter;
 import support.option;
 import support.error;
+import support.pooled_buffer;
 
 type Id = u32;
 let max_key_bytes: i64 = 1048576;
 struct Entry { key: blot_backend_runtime_ir::Range, foreign: bool = false, runtime: u32 = 0, next: Id = 0 }
 struct Location { word: bool = false, function: u32 = 0, index: u32 = 0 }
 struct Relocation { operation: Id, location: Location }
-struct Encoder { view: blot_eval_type_evidence::View, identity: blot_support::Option<blot_backend_runtime_identity::View>, bytes: u8[>..<]& }
+struct Encoder { view: blot_eval_type_evidence::View, identity: blot_support::Option<blot_backend_runtime_identity::View>, bytes: blot_backend_optimizer_buffers::Bytes& }
+// Construct the borrowed carrier outside the recursive encoding component.
+fn encoderFor(view:blot_eval_type_evidence::View,identity:blot_support::Option<blot_backend_runtime_identity::View>,bytes:blot_backend_optimizer_buffers::Bytes&)->Encoder {return Encoder{view,identity,bytes};}
 fn raw(encoder: Encoder&, bytes: const u8[:]) -> blot_error::Error {
     if encoder.bytes.len > max_key_bytes || bytes.len > max_key_bytes - encoder.bytes.len { return blot_error::Error.module_too_large; }
-    encoder.bytes.append(bytes); return blot_error::Error.none;
+    return encoder.bytes.append(bytes);
 }
 fn word(encoder: Encoder&, value: u32) -> blot_error::Error {
     let bytes: u8[4] = [(value >> 24) as! u8, (value >> 16) as! u8, (value >> 8) as! u8, value as! u8]; return raw(encoder, bytes);
@@ -38,35 +41,48 @@ recursive fn operation(encoder: Encoder&, label: blot_check_effect_evidence::Lab
     if depth >= 1024 || label == 0 || label >= encoder.view.effects.operations.len { return blot_error::Error.invalid_operation; }
     let operation = encoder.view.effects.operation(label);
     if operation.identity.decl == 0 || operation.arguments.start > encoder.view.effects.arguments.len || operation.arguments.len > encoder.view.effects.arguments.len - operation.arguments.start { return blot_error::Error.invalid_operation; }
-    let arguments = encoder.view.effects.operationArguments(label);
-    if operation.identity.unit == 0 && operation.identity.decl == 1 && arguments.len != 0 { return blot_error::Error.invalid_operation; }
+    let argument_count = encoder.view.effects.operationArguments(label).len;
+    if operation.identity.unit == 0 && operation.identity.decl == 1 && argument_count != 0 { return blot_error::Error.invalid_operation; }
     var error = owner(encoder, operation.identity.unit); if error != blot_error::Error.none { return error; }
     error = word(encoder, operation.identity.decl); if error != blot_error::Error.none { return error; }
-    error = count(encoder, arguments.len); if error != blot_error::Error.none { return error; }
-    for argument in arguments { error = ty(encoder, argument, depth + 1); if error != blot_error::Error.none { return error; } }
+    error = count(encoder, argument_count); if error != blot_error::Error.none { return error; }
+    for index in 0..argument_count {let argument=encoder.view.effects.operationArguments(label)[index]; error = ty(encoder, argument, depth + 1); if error != blot_error::Error.none { return error; } }
     return blot_error::Error.none;
 }
 fn lessBytes(left: const u8[:], right: const u8[:]) -> bool {
     var length = left.len; if right.len < length { length = right.len; }
     for index in 0..length { if left[index] != right[index] { return left[index] < right[index]; } } return left.len < right.len;
 }
+struct KeyBuffer {storage:blot_backend_runtime_ir::Range[:]=default<blot_backend_runtime_ir::Range[:]>(),items:blot_backend_runtime_ir::Range[:]=default<blot_backend_runtime_ir::Range[:]>(),len:i64=0}
+reusable[] var pool_KeyBuffer:blot_backend_runtime_ir::Range[>..]=[];
+fn push(self_:KeyBuffer&,value:blot_backend_runtime_ir::Range)->blot_error::Error {let error=blot_support_pooled_buffer::push(self_,value,pool_KeyBuffer);self_.len=self_.items.len;return error;}
+fn deinit(self_:KeyBuffer&) {blot_support_pooled_buffer::deinit(self_,pool_KeyBuffer);self_.len=0;}
+struct FieldBuffer {storage:Field[:]=default<Field[:]>(),items:Field[:]=default<Field[:]>(),len:i64=0}
+reusable[] var pool_FieldBuffer:Field[>..]=[];
+fn push(self_:FieldBuffer&,value:Field)->blot_error::Error {let error=blot_support_pooled_buffer::push(self_,value,pool_FieldBuffer);self_.len=self_.items.len;return error;}
+fn deinit(self_:FieldBuffer&) {blot_support_pooled_buffer::deinit(self_,pool_FieldBuffer);self_.len=0;}
 recursive fn row(encoder: Encoder&, id: u32, depth: i64) -> blot_error::Error {
     if depth >= 1024 || id >= encoder.view.effects.rows.len { return blot_error::Error.invalid_operation; }
     let span = encoder.view.effects.rows[id]; if span.start > encoder.view.effects.labels.len || span.len > encoder.view.effects.labels.len - span.start { return blot_error::Error.invalid_operation; }
-    var keys: blot_backend_runtime_ir::Range[>..<] = []; var bytes: u8[>..<] = [];
-    for label in encoder.view.effects.rowLabels(id) {
-        var child_bytes: u8[>..<] = []; let child = Encoder { view: encoder.view, identity: encoder.identity, bytes: child_bytes , ..};
+    var keys=KeyBuffer{};var bytes=blot_backend_optimizer_buffers::Bytes{};var child_bytes=blot_backend_optimizer_buffers::Bytes{};
+    recursive fn encodeRow()->blot_error::Error {
+
+    let label_count=encoder.view.effects.rowLabels(id).len;for index in 0..label_count {let label=encoder.view.effects.rowLabels(id)[index];
+        child_bytes.clear();let child=encoderFor(encoder.view,encoder.identity,child_bytes);
         let error = operation(child, label, depth + 1); if error != blot_error::Error.none { return error; }
-        keys.push(blot_backend_runtime_ir::Range { start: bytes.len, len: child_bytes.len , ..}); bytes.append(child_bytes);
+        let pushed=keys.push(blot_backend_runtime_ir::Range {start:bytes.len,len:child_bytes.len,..});if pushed!=blot_error::Error.none {return pushed;}let appended=bytes.append(child_bytes.items);if appended!=blot_error::Error.none {return appended;}
     }
     // Exact multiset order keeps duplicate operations.
     let key_count = keys.len;
-    for index in 1..key_count { let key = keys[index]; var next = index; while next > 0 { let previous = keys[next - 1]; if !lessBytes(bytes[key.start..key.start + key.len], bytes[previous.start..previous.start + previous.len]) { break; } keys[next] = previous; next--; } keys[next] = key; }
+    for index in 1..key_count { let key = keys.items[index]; var next = index; while next > 0 { let previous = keys.items[next - 1]; if !lessBytes(bytes.items[key.start..key.start + key.len], bytes.items[previous.start..previous.start + previous.len]) { break; } keys.items[next] = previous; next--; } keys.items[next] = key; }
     var error = count(encoder, keys.len); if error != blot_error::Error.none { return error; }
-    for key in keys { error = count(encoder, key.len); if error != blot_error::Error.none { return error; } error = raw(encoder, bytes[key.start..key.start + key.len]); if error != blot_error::Error.none { return error; } }
+    for index in 0..keys.len {let key=keys.items[index]; error = count(encoder, key.len); if error != blot_error::Error.none { return error; } error = raw(encoder, bytes.items[key.start..key.start + key.len]); if error != blot_error::Error.none { return error; } }
     return blot_error::Error.none;
+    }
+    let error=encodeRow();child_bytes.deinit();bytes.deinit();keys.deinit();return error;
 }
-struct Field { name: const u8[:], ty: u32 }
+struct Field {start:u32,len:u32,ty:u32}
+fn fieldName(encoder:const Encoder&,field:Field)->const u8[:] {return encoder.identity.value.bytes[field.start..field.start+field.len];}
 recursive fn ty(encoder: Encoder&, id: u32, depth: i64) -> blot_error::Error {
     if depth >= 1024 || id == 0 || id >= encoder.view.nodes.len { return blot_error::Error.invalid_operation; }
     let node = encoder.view.node(id); var error = raw(encoder, [blot_eval_type_evidence::tagCode(node.tag)]); if error != blot_error::Error.none { return error; }
@@ -87,30 +103,34 @@ recursive fn ty(encoder: Encoder&, id: u32, depth: i64) -> blot_error::Error {
         if node.c >= encoder.view.extra.len { return blot_error::Error.invalid_operation; } let length = encoder.view.extra[node.c];
         if length > encoder.view.extra.len - node.c - 1 { return blot_error::Error.invalid_operation; }
         error = count(encoder, length); if error != blot_error::Error.none { return error; }
-        for child in encoder.view.children(id) { error = ty(encoder, child, depth + 1); if error != blot_error::Error.none { return error; } } return blot_error::Error.none;
+        let child_count=encoder.view.children(id).len;for index in 0..child_count {let child=encoder.view.children(id)[index]; error = ty(encoder, child, depth + 1); if error != blot_error::Error.none { return error; } } return blot_error::Error.none;
     }
     if node.tag == blot_eval_type_evidence::Tag.product {
         if node.a > encoder.view.extra.len || node.b > encoder.view.extra.len - node.a { return blot_error::Error.invalid_operation; }
         error = count(encoder, node.b); if error != blot_error::Error.none { return error; }
-        for child in encoder.view.children(id) { error = ty(encoder, child, depth + 1); if error != blot_error::Error.none { return error; } } return blot_error::Error.none;
+        let child_count=encoder.view.children(id).len;for index in 0..child_count {let child=encoder.view.children(id)[index]; error = ty(encoder, child, depth + 1); if error != blot_error::Error.none { return error; } } return blot_error::Error.none;
     }
     if node.tag != blot_eval_type_evidence::Tag.record { return blot_error::Error.invalid_operation; }
     if node.a > encoder.view.extra.len || node.b > (encoder.view.extra.len - node.a) / 2 { return blot_error::Error.invalid_operation; }
-    let fields = encoder.view.children(id);
+
     if encoder.identity.present {
-        var ordered: Field[>..<] = [];
-        for index in 0..node.b { let name = blot_backend_runtime_identity::symbol(encoder.identity.value, fields[index * 2]); if !name.present { return blot_error::Error.invalid_operation; } ordered.push(Field { name: name.value, ty: fields[index * 2 + 1] , ..}); }
+        var ordered=FieldBuffer{};
+        recursive fn encodeFields()->blot_error::Error {
+
+        for index in 0..node.b { let name = blot_backend_runtime_identity::symbol(encoder.identity.value, encoder.view.children(id)[index * 2]); if !name.present { return blot_error::Error.invalid_operation; } let location=encoder.identity.value.symbols[encoder.view.children(id)[index*2]];let pushed=ordered.push(Field{location.start,location.len,encoder.view.children(id)[index*2+1]});if pushed!=blot_error::Error.none {return pushed;} }
         let length = ordered.len;
-        for index in 1..length { let field = ordered[index]; var next = index; while next > 0 && lessBytes(field.name, ordered[next - 1].name) { ordered[next] = ordered[next - 1]; next--; } ordered[next] = field; }
+        for index in 1..length { let field = ordered.items[index]; var next = index; while next > 0 && lessBytes(fieldName(encoder,field),fieldName(encoder,ordered.items[next-1])) { ordered.items[next] = ordered.items[next - 1]; next--; } ordered.items[next] = field; }
         error = count(encoder, ordered.len); if error != blot_error::Error.none { return error; }
-        for field, index in ordered {
-            if field.name.len == 0 || (index != 0 && blot_backend_runtime_identity::equalBytes(ordered[index - 1].name, field.name)) { return blot_error::Error.invalid_operation; }
-            error = count(encoder, field.name.len); if error != blot_error::Error.none { return error; } error = raw(encoder, field.name); if error != blot_error::Error.none { return error; } error = ty(encoder, field.ty, depth + 1); if error != blot_error::Error.none { return error; }
+        for index in 0..ordered.len {let field=ordered.items[index];
+            if field.len == 0 || (index != 0 && blot_backend_runtime_identity::equalBytes(fieldName(encoder,ordered.items[index-1]),fieldName(encoder,field))) { return blot_error::Error.invalid_operation; }
+            error = count(encoder, field.len); if error != blot_error::Error.none { return error; } error = raw(encoder, fieldName(encoder,field)); if error != blot_error::Error.none { return error; } error = ty(encoder, field.ty, depth + 1); if error != blot_error::Error.none { return error; }
         }
         return blot_error::Error.none;
+            }
+        let result=encodeFields();ordered.deinit();return result;
     }
     var prior: u32 = 0; error = count(encoder, node.b); if error != blot_error::Error.none { return error; }
-    for index in 0..node.b { let name = fields[index * 2]; if name <= prior { return blot_error::Error.invalid_operation; } prior = name; error = word(encoder, name); if error != blot_error::Error.none { return error; } error = ty(encoder, fields[index * 2 + 1], depth + 1); if error != blot_error::Error.none { return error; } }
+    for index in 0..node.b { let name = encoder.view.children(id)[index * 2]; if name <= prior { return blot_error::Error.invalid_operation; } prior = name; error = word(encoder, name); if error != blot_error::Error.none { return error; } error = ty(encoder, encoder.view.children(id)[index * 2 + 1], depth + 1); if error != blot_error::Error.none { return error; } }
     return blot_error::Error.none;
 }
 struct Store {
@@ -122,11 +142,14 @@ fn initProject(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers:
 fn key(store: Store&, entry: Entry) -> const u8[:] { store.key_bytes.items[entry.key.start..entry.key.start + entry.key.len] }
 fn intern(store: Store&, view: blot_eval_type_evidence::View, label: blot_check_effect_evidence::Label) -> Id, blot_error::Error {
     if store.finalized { return 0, blot_error::Error.invalid_operation; }
-    var bytes: u8[>..<] = []; let encoder = Encoder { view: view, identity: store.identity, bytes: bytes , ..};
+    var bytes=blot_backend_optimizer_buffers::Bytes{};let encoder=encoderFor(view,store.identity,bytes);
+    fn encodeIntern()->Id,blot_error::Error {
     var domain: u8 = 'S'; if store.identity.present { domain = 'P'; }
     let prefix:u8[2]=[1,domain];var error = raw(encoder, prefix); if error != blot_error::Error.none { return 0, error; }
     error = operation(encoder, label, 0); if error != blot_error::Error.none { return 0, error; }
-    let identity = view.effects.operation(label).identity; return internSymbol(store, bytes, identity.unit == 0 && identity.decl == 1);
+    let identity = view.effects.operation(label).identity; return internSymbol(store, bytes.items, identity.unit == 0 && identity.decl == 1);
+    }
+    let id,error=encodeIntern();bytes.deinit();return id,error;
 }
 fn internSymbol(store: Store&, bytes: const u8[:], foreign: bool) -> Id, blot_error::Error {
     var domain: u8 = 'S'; if store.identity.present { domain = 'P'; }
