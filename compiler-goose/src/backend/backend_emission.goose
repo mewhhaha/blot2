@@ -127,9 +127,10 @@ struct PlannedReturn { node: u32,template_result: bool }
 struct SmallResult { root: u32 = 0,slot: u32 = 0 }
 struct SmallOutput { live: bool = false,value: SmallCollection }
 var small_outputs: SmallOutput[>..] = [];
-var free_small_outputs: u32[>..<] = [];
-fn allocateSmallOutput(value: SmallCollection) -> u32,Error { var id: u32 = 0; if free_small_outputs.len != 0 { id = free_small_outputs[free_small_outputs.len - 1]; free_small_outputs.resize(free_small_outputs.len - 1); } else { if small_outputs.len >= 4294967295 { return 0,blot_error::Error.module_too_large; } small_outputs.push(SmallOutput {..}); id = small_outputs.len as u32; } small_outputs[id - 1] = SmallOutput { true,value , ..}; return id,blot_error::Error.none; }
-fn releaseSmallOutput(id: u32) { assert(id != 0 && id <= small_outputs.len && small_outputs[id - 1].live); small_outputs[id - 1].live = false; free_small_outputs.push(id); }
+var free_small_outputs: u32[>..] = [];
+var free_small_output_count:i64=0;
+fn allocateSmallOutput(value: SmallCollection) -> u32,Error { var id: u32 = 0; if free_small_output_count != 0 { id = free_small_outputs[free_small_output_count - 1]; free_small_output_count--; } else { if small_outputs.len >= 4294967295 { return 0,blot_error::Error.module_too_large; } small_outputs.push(SmallOutput {..}); id = small_outputs.len as u32; } small_outputs[id - 1] = SmallOutput { true,value , ..}; return id,blot_error::Error.none; }
+fn releaseSmallOutput(id: u32) { assert(id != 0 && id <= small_outputs.len && small_outputs[id - 1].live); small_outputs[id - 1].live = false; if free_small_output_count<free_small_outputs.len {free_small_outputs[free_small_output_count]=id;} else {free_small_outputs.push(id);} free_small_output_count++; }
 struct ExactBuild { plan: blot_backend_exact_builder::Plan,storage: u32,index: u32,row_words: u32 }
 struct SemanticContext { mappings: u32,rows: u32 }
 struct LoopInput { counter: u32,end: u32,array_local: u32,list_span: blot_support::Option<u32[3]>,small: blot_support::Option<SmallCollection>,borrowed_view: blot_support::Option<RowView>,row_view: blot_support::Option<RowView>,array_view: blot_support::Option<RowView>,list_directory: blot_support::Option<ListDirectory> }

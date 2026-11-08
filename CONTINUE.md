@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-The checkpoint through frozen370 replaces Session's Generator backpointer with the existing scalar
+The checkpoint through frozen372 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -139,7 +139,14 @@ parameter shadowing the lookup function. Frozen369 qualifies that exact call;
 Frozen370 lifts the plain requirement span into its optional Constraint field at
 the original evaluation point. Neighboring fields and existing name ownership
 remain unchanged. Its94.534s run reaches a redundant ImportPrincipal callback
-header copyback; removing it after auditing pointee-only mutation is next.
+header copyback. Frozen371 removes that unchanged header assignment after exact
+callback review; pointee mutations already reach the caller. Frozen372 gives
+the private SmallOutput free-ID stack a grow-only backing and scalar active
+count. Exact source review and two executed original/new controls preserve
+LIFO IDs and every slot payload field across more than 2,000 transitions.
+Its95.334s run reaches another global-buffer alias at the same collectCallAt
+argument slice. A local grow-only child-ID copy at that boundary is next;
+its extra copy/allocation cost remains unmeasured.
 No whole compiler success follows. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
