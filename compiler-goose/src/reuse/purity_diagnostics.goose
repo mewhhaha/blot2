@@ -19,7 +19,7 @@ fn clone(witness: Witness, owner: u8[>..<]&) -> Witness {
     }
     return result;
 }
-fn format(pool: blot_parse_symbols::Pool&, module_name: const u8[:], witness: Witness, out: u8[>..<]&) -> Error {
+fn format<O>(pool: blot_parse_symbols::Pool&, module_name: const u8[:], witness: Witness, out: O&) -> Error {
     if !witness.operation_name.present {
         if witness.origin_unavailable { return blot_error::Error.operation_purity_origin_required; }
         if witness.specialized { return blot_error::Error.specialized_purity_display_required; }

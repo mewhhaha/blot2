@@ -131,6 +131,14 @@ fn init()->Project,Error {
     let owner=blot_native::fresh_owner_id();let index=projects.alloc_index(ProjectState {owner:owner, ..});let state:ProjectState& =projects[index];
     return Project {owner_id:owner,lease:(index+1) as u32,symbols:pool,units:state.units,order:state.order,imports:state.imports,diagnostics:state.diagnostics, ..},blot_error::Error.none;
 }
+// The loader's scratch never owns a published header. Resolve the same pooled
+// cells and take compiled catalogs directly from the caller's load context.
+fn canonicalLoaded(self_:const Project&,modules:const blot_reuse_frozen_dependency::Module[:],reuse:const bool[:])->Project {
+ assert(self_.lease!=0 && self_.lease-1<projects.len);let state:ProjectState& =projects[self_.lease-1];assert(state.owner==self_.owner_id);
+ assert(self_.units .== state.units && self_.order .== state.order && self_.imports .== state.imports && self_.diagnostics .== state.diagnostics);
+ assert(blot_support::same_slice_identity(self_.compiled_modules,modules) && blot_support::same_slice_identity(self_.compiled_reuse,reuse));
+ return Project{owner_id:self_.owner_id,lease:self_.lease,input_mode:self_.input_mode,compiled_modules:modules,compiled_reuse:reuse,symbols:blot_parse_symbols::canonical(self_.symbols),units:state.units,order:state.order,imports:state.imports,diagnostics:state.diagnostics,entry:self_.entry,prelude_unit:self_.prelude_unit,source_bytes:self_.source_bytes,lowering:self_.lowering,checking:self_.checking};
+}
 fn deinit(self_:Project&) {
     if self_.lease==0 {return;}assert(projects[self_.lease-1].owner==self_.owner_id);
     for &unit in self_.units.items {unit.deinit();}self_.units.deinit();self_.order.deinit();self_.imports.deinit();
@@ -329,6 +337,10 @@ fn walk<P>(self_:Loader<P>&,root:UnitId)->Error {
 struct LoadContext {
     entrypath:const u8[:],result:blot_support::Option<Project>,dependency:const blot_reuse_frozen_dependency::FrozenDependency?=null,mutable:blot_reuse_frozen_dependency::FrozenDependency?=null,mutable_owner:blot_reuse_dependency_payload::Owner?=null,reuse:blot_support::Option<const bool[:]>,library:bool=false,provided:bool=false,
 }
+fn publishLoaded(context:LoadContext&,project:const Project&,modules:const blot_reuse_frozen_dependency::Module[:]) {
+ if context.reuse.present {context.result=blot_support::some<Project>(canonicalLoaded(project,modules,context.reuse.value));}
+ else {context.result=blot_support::some<Project>(canonicalLoaded(project,modules,default<const bool[:]>()));}
+}
 fn withLoader<P,F>(options:Options,inputs:P&,context:LoadContext&)->Error {
     let scope=blot_phase_profile::enter(blot_phase_profile::Phase.load);
     let initialized,error=init();if error!=blot_error::Error.none {scope.exit();return error;}
@@ -337,7 +349,9 @@ fn withLoader<P,F>(options:Options,inputs:P&,context:LoadContext&)->Error {
     let failure=F(context,loader);scope.exit();
     loader.deinitScratch();
     if failure!=blot_error::Error.none {loader.project.deinit();return failure;}
-    context.result=blot_support::some(loader.project);return blot_error::Error.none;
+    let dependency .=context.dependency;
+    if dependency {publishLoaded(context,loader.project,dependency.modules);}else {publishLoaded(context,loader.project,default<const blot_reuse_frozen_dependency::Module[:]>());}
+    return blot_error::Error.none;
 }
 fn load(entrypath:const u8[:],options:Options)->Project,Error {
     var inputs=FileInputs {..};var context=LoadContext {entrypath:entrypath, ..};let error=withLoader(options,inputs,context,loadSource);
@@ -429,7 +443,7 @@ fn loadCompiledMode<P>(context:LoadContext&,loader:Loader<P>&)->Error {
     let mutable=context.mutable;
     if mutable {
         let owner=context.mutable_owner;assert(owner!=null);
-        var units:u32[>..<]=[];for index in 0..dependency.modules.len {units.push((index+1) as u32);}
+        var units:u32[>..]=[];for index in 0..dependency.modules.len {units.push((index+1) as u32);}
         { let propagated_error = blot_reuse_dependency_relink::relink(owner,mutable,loader.project.symbols,units); if propagated_error != blot_error::Error.none { return propagated_error; } }
     } else {
         if dependency.symbols.len==0||dependency.symbols[0].text.len!=0 {return blot_error::Error.invalid_artifact;}

@@ -187,6 +187,7 @@ struct EffectMember {
     family: u32,
     member: blot_parse_symbols::Symbol
 }
+fn hash(key:EffectMember)->u64 {return ::hash_combine(::hash(key.family),::hash(key.member));}
 struct Rebinding {
     root: BindingId = 0,
     self_binding: BindingId = 0,
@@ -832,7 +833,7 @@ struct Engine {
     obligations: blot_check_types::Obligation[>..<]&,
     pending: PendingObligation[>..<]&,
     pending_queue: blot_check_solver_worklist::Queue = blot_check_solver_worklist::Queue {..},
-    scheme_dependencies: blot_check_scheme_dependencies::Cache = blot_check_scheme_dependencies::Cache {..},
+    scheme_dependencies: blot_check_scheme_dependencies::Cache&,
     counters: Counters = Counters {..},
     callee_memo: dictionary<const u8[:],CalleeOutcome>&,
     mark_depth: u32 = 0,

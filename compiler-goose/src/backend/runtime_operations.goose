@@ -117,7 +117,7 @@ struct Store {
     identity: blot_support::Option<blot_backend_runtime_identity::View>, entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&,
     relocations: Relocation[>..<]&, finalized: bool = false, artifacts: blot_reuse_artifact_emitter::Recorder&? = null,
 }
-fn init(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&, relocations: Relocation[>..<]&) -> Store { Store { entries: entries, key_bytes: key_bytes, keys: keys, relocations: relocations } }
+fn init(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&, relocations: Relocation[>..<]&) -> Store { Store { identity: blot_support::none<blot_backend_runtime_identity::View>(), entries: entries, key_bytes: key_bytes, keys: keys, relocations: relocations , ..} }
 fn initProject(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&, relocations: Relocation[>..<]&, names: blot_backend_runtime_identity::View) -> Store { var store = init(entries, key_bytes, keys, relocations); store.identity = blot_support::some(names); return store; }
 fn key(store: Store&, entry: Entry) -> const u8[:] { store.key_bytes.items[entry.key.start..entry.key.start + entry.key.len] }
 fn intern(store: Store&, view: blot_eval_type_evidence::View, label: blot_check_effect_evidence::Label) -> Id, blot_error::Error {

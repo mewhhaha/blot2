@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/jacobt/src/goose-to-wasm/build/source/stdlib"
   },
-  "digest": "a9fc61565a6e620b44a9b083e1a69f13af40ed9786d22892a41e5460dd0ef2e3",
+  "digest": "20718cbdc10789a2d6ba08198ecc30da0f8b1954f704ddebfaaadb248ab12769",
   "goose": "/home/jacobt/src/blot2/build/goose-port/expansion-checker/isolated-cache/374b7e97fb19b139d000b1a704915c6fc1e753289900d382a798e2c12033cb15/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -149,9 +149,9 @@
       "sha256": "3cb9e2a7f1b478f0cc3d926746dc7c1a99c82955d4df701648f859ddb03b8051"
     },
     {
-      "bytes": 3741,
+      "bytes": 3970,
       "path": "src/backend/array_cost_explanation.goose",
-      "sha256": "65375427edd6da3c824ee43230c8dbfad318cb5f8a303e2886a3497d2c334f6a"
+      "sha256": "5c6c9cebf92e1973dc7d4a606c79a18b64b54e00233511233aa2431a9996f045"
     },
     {
       "bytes": 6181,
@@ -229,9 +229,9 @@
       "sha256": "9343f1a9b8089062adb06cdb4c3a99107480440de013eb9a953d4e13852f6e49"
     },
     {
-      "bytes": 326332,
+      "bytes": 328198,
       "path": "src/backend/core_backend.goose",
-      "sha256": "54ae5f39fd2e7ad244fe72e5f21f8a70bd8c058fa0144c4593eceb5acc4f58de"
+      "sha256": "0792d65678ca6a3d7416681c15007599446a8644f8d6aa02fb94617169f81625"
     },
     {
       "bytes": 6406,
@@ -289,9 +289,9 @@
       "sha256": "8df56069425e9f265d521f277b8802c825a23d45e63f3b1c06ceec6073d44bd6"
     },
     {
-      "bytes": 75782,
+      "bytes": 79470,
       "path": "src/backend/layout.goose",
-      "sha256": "07008325a023701b4b909122770b1481c6821c0b8fbb2bb1c3466978d9543cde"
+      "sha256": "cbddf808392df3cdf4b04247bccf3c9b909a5d42e15c984bdd65f22fdde17310"
     },
     {
       "bytes": 4853,
@@ -439,9 +439,9 @@
       "sha256": "b107745a5352aa67936ff8183115f88fe41d0d628ae214e9e4ca64bdf4c4428c"
     },
     {
-      "bytes": 2211,
+      "bytes": 5710,
       "path": "src/backend/result_owner.goose",
-      "sha256": "05ae421a130daa05e1c4c9950a22e04a30f5bfddb9677b9d74a22d8fac6a7df1"
+      "sha256": "8f56d10bccaa5df67dd1912c7dfa4c0fc8040bbfef1a3964ad8914d237ae8f9e"
     },
     {
       "bytes": 10022,
@@ -494,9 +494,9 @@
       "sha256": "112ab7e17b509e0f27da8cb1bdb52618d4084f5bdedb0375963b0bca38c55e9e"
     },
     {
-      "bytes": 19017,
+      "bytes": 19090,
       "path": "src/backend/runtime_operations.goose",
-      "sha256": "ede61e9de2cc5985dd04989f6cc7feeb1afc613fba0d03b11f3c362b10a803da"
+      "sha256": "b384fd057b966fa71bb3f9dceb65f88a6dbd738b8451e6b2b7a54036fc9d2d05"
     },
     {
       "bytes": 12390,
@@ -524,9 +524,9 @@
       "sha256": "2b817fb1a07121d48383eb8acadb6b96c243fbf5dd626e56553ee4c84d76cea6"
     },
     {
-      "bytes": 692787,
+      "bytes": 692790,
       "path": "src/backend/scoped_backend.goose",
-      "sha256": "839ec4015c5c34ac5a34c1dbfa47c6c391a58d787ab3baf3f903c066f3af615e"
+      "sha256": "fd2c4ed0cc75d1c8d7bfb216d0c1c6570bdbb208ec2e257a68aa3d61a6909ae1"
     },
     {
       "bytes": 27546,
@@ -824,14 +824,14 @@
       "sha256": "3bab4067b738c063fda854b20992d980f225dfe2443ec2ec27aae40af02fece6"
     },
     {
-      "bytes": 1130965,
+      "bytes": 1131016,
       "path": "src/check/check.goose",
-      "sha256": "033fc3c06fe1b285a359d395ee6b23c1ce1ac9d2b883e81a46151fcd5854ae3a"
+      "sha256": "8bb39ea711c80f5bee326004619dcf47cea7756a5f9a1d870c96e2f7f3a1a110"
     },
     {
-      "bytes": 51503,
+      "bytes": 51544,
       "path": "src/check/check_factory.goose",
-      "sha256": "05d89571f02b9138a28a3741e31b9fd7c0ca43f7da7e01a7affa52150c65f17a"
+      "sha256": "f1bd9987b1bbb822ab1bb46cec2db43f454ed10986545f6fa1dc294d1f097ac9"
     },
     {
       "bytes": 61859,
@@ -999,9 +999,9 @@
       "sha256": "6670b61526f0213f32a1d6a644bf329c6c61ab21c68bf4c3f6c4b2f36c858890"
     },
     {
-      "bytes": 268153,
+      "bytes": 268151,
       "path": "src/check/package_core.goose",
-      "sha256": "f7467d839f584572dd2572ab6efec94e9be7335b0f145638fc7ae2514f812419"
+      "sha256": "442c06d2fa7ad2721f427f6c8dca96a911635e381e11474092a821c42420e552"
     },
     {
       "bytes": 1597,
@@ -1119,9 +1119,9 @@
       "sha256": "968a1c3d8236c7596cfd9d50d25938202953e0aedc7c340db626a9be0216ad01"
     },
     {
-      "bytes": 26632,
+      "bytes": 26803,
       "path": "src/check/staging_snapshot.goose",
-      "sha256": "bb79bbb5b9595fe35264c2b959a8ae1aefa3104ef1776c1e35e0b6d6b2a04808"
+      "sha256": "06adff6d17d781f1a2da340e656b51f05f5dc860be893a39b5a5f28820d39496"
     },
     {
       "bytes": 7984,
@@ -1319,9 +1319,9 @@
       "sha256": "bdcdac5992a8a344c27f5876ff921ebe5ef8f06b3b3506cbacfd6db26ff520ba"
     },
     {
-      "bytes": 96928,
+      "bytes": 96958,
       "path": "src/eval/implementation_evidence.goose",
-      "sha256": "8081d30c9f16a8a1b1c146142e8141c0443610da436050470e84651dd8037b0c"
+      "sha256": "444d892fbf2efd0f259c6e142390224cc1b7a2bb5e15d13a22da6b70287a128b"
     },
     {
       "bytes": 14568,
@@ -1424,14 +1424,14 @@
       "sha256": "dcc0509eb112e30de5c98c5b287476fd0d7abd424d50da661bb6ccb91c932388"
     },
     {
-      "bytes": 56080,
+      "bytes": 56096,
       "path": "src/eval/specialization.goose",
-      "sha256": "d4394135023555c76a8ba6889d2861e910e784f57daaa28874677e6f829a020d"
+      "sha256": "d06b6aedd1ebdab55705104940c3ca62b4e2a7aba668b9ef40ad928d2ce6c05a"
     },
     {
-      "bytes": 118429,
+      "bytes": 118853,
       "path": "src/eval/type_evidence.goose",
-      "sha256": "e7bf825f0e91e6260bf44e6450aef44a9146f9626c428623cb3ed622b5bd4459"
+      "sha256": "6904c8d9a090b6b31368cdb9a2d3a8d8e561316dc2411f0d35e257b95caf62e6"
     },
     {
       "bytes": 737,
@@ -1484,9 +1484,9 @@
       "sha256": "6568834f5a87ad65240137a396e0a1c455bd6d74f42b3efff8aabc740a1484f3"
     },
     {
-      "bytes": 9482,
+      "bytes": 9966,
       "path": "src/parse/symbols.goose",
-      "sha256": "8c4ebaaf7fda2313c3c7c25d2361431456ab7f2326501234157674c12edb501d"
+      "sha256": "253b4af869cbc687bb91a609842a009a5389c1d0eeb00f6338a862d9530af6cd"
     },
     {
       "bytes": 5290,
@@ -1559,9 +1559,9 @@
       "sha256": "a1de86d2f6667163bb49314c6bebb4e63d107dfbde044ac4d54c04a5cccc3481"
     },
     {
-      "bytes": 72864,
+      "bytes": 73112,
       "path": "src/reuse/body_check_digests.goose",
-      "sha256": "96f7daec3107e6ec389061964e44c2ae25df5696d3b65ed625c4d0326d3a4ca9"
+      "sha256": "7c2c834711442cad44af568abd1fdfffd58c2dd417a873e40488cd193caa3487"
     },
     {
       "bytes": 15310,
@@ -1604,9 +1604,9 @@
       "sha256": "57b634b49b3b27889b9ba6db2996415ec380cefd6b4f18765b38884533c837d3"
     },
     {
-      "bytes": 110454,
+      "bytes": 110601,
       "path": "src/reuse/code_artifacts.goose",
-      "sha256": "ba7801dc2958ad1fd3385468c022442f6314bcd133afdf89b16e51390ec5f298"
+      "sha256": "b82e70b27c797448be49f35417ecd988cf0790bf47b810bd7c7206998da47b73"
     },
     {
       "bytes": 3023,
@@ -1699,9 +1699,9 @@
       "sha256": "b35cdfef0d71a092b8fe9ecb9fe493268a7ebf2b2db6bcd36446bb694a6386d4"
     },
     {
-      "bytes": 30024,
+      "bytes": 30069,
       "path": "src/reuse/dependency_consumer.goose",
-      "sha256": "41a24b96760d9c61cd6979fa08efa0e7191bbd333785164a7232755784bbaefc"
+      "sha256": "d507f8876c752412eea1247a738f78167206472cf06901718badf45f447d20af"
     },
     {
       "bytes": 8063,
@@ -1734,9 +1734,9 @@
       "sha256": "f7c2dbca820c22bca112f16a5cdfcd52282ecd170f05f72564779354e4edb549"
     },
     {
-      "bytes": 25869,
+      "bytes": 25868,
       "path": "src/reuse/dependency_project_consumer.goose",
-      "sha256": "2ce7161334a2570bd0ad29ce4119fc9dd1862ccfa180fb4591f92f946dfcf540"
+      "sha256": "be17cc03032a06c084b2d0c8bb48b863625f79c9c1c2c0c7bce2542e41164044"
     },
     {
       "bytes": 4448,
@@ -1769,9 +1769,9 @@
       "sha256": "d34e01f7fbdfbe9f61d426e0475ff67a66e3d0ca4802ef883bfc8c5f785d2b0e"
     },
     {
-      "bytes": 17787,
+      "bytes": 17874,
       "path": "src/reuse/entry_frontend_cutoff.goose",
-      "sha256": "5f0de22db7d8cdd08d5fe77e38bc9122b29ade593531051b1a84adf83ee46823"
+      "sha256": "f23124f320f4eebb285f78a87aaf9063b4fd18ac34189a9c27e29da90a8ee93d"
     },
     {
       "bytes": 5568,
@@ -1784,9 +1784,9 @@
       "sha256": "0009bb1319f2988d8b428c781f2e92695a895f67c7c8210a04c53e9be4fc1e73"
     },
     {
-      "bytes": 48333,
+      "bytes": 48950,
       "path": "src/reuse/frontend_binding_relocation.goose",
-      "sha256": "c1730bc99a3c3507ab8e32191f2ab4bd69793da0b10ce785d08d20aa1102b620"
+      "sha256": "24c13c2a6698d490913b23476d998b9cb555e5da67a14f10f618556ebd3b730d"
     },
     {
       "bytes": 13878,
@@ -1854,9 +1854,9 @@
       "sha256": "9132ceda5ddbf0b5ec0de5c9f89d78590e20619b6f4796d888cd56e1da8fd476"
     },
     {
-      "bytes": 48102,
+      "bytes": 48992,
       "path": "src/reuse/partial_dependency.goose",
-      "sha256": "f45541a02433a8e4cca316a2411b49722a7b6ddd410c9ddb49158fa1874c4663"
+      "sha256": "93955121deb854a90a4d438a69b27c7f3735e850e6b72057043f83c3f05b075b"
     },
     {
       "bytes": 36748,
@@ -1909,9 +1909,9 @@
       "sha256": "4c39a583f356cf498f4f017239c8e785cb96dcb16d2526a33aa49dbfdbbf1d48"
     },
     {
-      "bytes": 46273,
+      "bytes": 47917,
       "path": "src/reuse/project.goose",
-      "sha256": "051703b76bef66ee2d8bc5974e455637852ccea27e39e630b8fc4629f573da35"
+      "sha256": "62b746d324d8052a4d25b1747abda1b4d9c6bb9b3092e2ece298839f8ad3ef04"
     },
     {
       "bytes": 10049,
@@ -1929,9 +1929,9 @@
       "sha256": "f5ae2437657ce76bfd4dacfd9c42cea1d4f63e361ca9d0bac911250f9c6c55ac"
     },
     {
-      "bytes": 19223,
+      "bytes": 19222,
       "path": "src/reuse/project_check_module.goose",
-      "sha256": "e39b5d580974bc87921546fc9b2b667adc6bfae284907b51cb58716842e677b2"
+      "sha256": "28f1feab408d6233a0ba7640bf6931c0f2d0bf01081b3d1ea097db038e6c9ddd"
     },
     {
       "bytes": 3026,
@@ -1959,9 +1959,9 @@
       "sha256": "3d3cd02302ac481205cfbeb1e1447a168814e40fe4ca7f0395da5ee098af1133"
     },
     {
-      "bytes": 1795,
+      "bytes": 1791,
       "path": "src/reuse/purity_diagnostics.goose",
-      "sha256": "36c953895815b8d5f1256d385a1aa872f88a39eaae8f533df9d6f74ae5e874a5"
+      "sha256": "dcfe59394e4328a4d55258721f42903ce850b7e2af3087bebefc00fa4076baad"
     },
     {
       "bytes": 33053,
@@ -1984,9 +1984,9 @@
       "sha256": "8f0048a78c59bb95074b7fead93e80002e8c58d2f4ff9d8c63bfef49076451f5"
     },
     {
-      "bytes": 25674,
+      "bytes": 25775,
       "path": "src/reuse/retained_revision.goose",
-      "sha256": "24c8438c31f2c53f002629c3be31770e0bb3fa631b7d88593df296f3dd5a4ad9"
+      "sha256": "3b580a696c2a39895c9501ad28a4690b652b7435fa6639853a8f28ab670d21af"
     },
     {
       "bytes": 26282,
@@ -1994,9 +1994,9 @@
       "sha256": "fc057461417c4febde24f9d8935215b710eced99703a3c0aa2f91a90019fba0f"
     },
     {
-      "bytes": 24200,
+      "bytes": 24344,
       "path": "src/reuse/retained_revision_prepare.goose",
-      "sha256": "88dfe333f7e1c40c684246f51270de3ffde3b426822fc875027e93427a2ac2b1"
+      "sha256": "09f94d6b40377827241574a844a5a569281385d637f0249c47c7acd18a40d076"
     },
     {
       "bytes": 39094,
@@ -2229,9 +2229,9 @@
       "sha256": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed"
     },
     {
-      "bytes": 978239,
+      "bytes": 978530,
       "path": "src/support/json_adapters.goose",
-      "sha256": "efda63de9ebd23b5b00b4c7e8eba57eabb4e9ced60d15fbebec960222a1210ef"
+      "sha256": "11b69f14d91c40435ed0a671bd1276d52322b8f97955cab57af24a88d07b4dab"
     },
     {
       "bytes": 3860,
@@ -2294,9 +2294,9 @@
       "sha256": "5a7c53a1916e5f434a46d8c56b977b9b6e76e7f31fb04c249fbe82c93725ff2b"
     },
     {
-      "bytes": 737714,
+      "bytes": 737954,
       "path": "src/support/structural_adapters.goose",
-      "sha256": "35c37e2e216086df2ef15c85f623c7695c56983cd90e37afb094b2ae08755826"
+      "sha256": "fd95124e1b9d7303e17cbf55caf0ae3d19dbb472a332d8f47ad13393645cfe53"
     },
     {
       "bytes": 264,

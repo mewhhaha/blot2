@@ -42,30 +42,30 @@ fn push(values:Words&,value:u32)->Error {return blot_support_pooled_buffer::push
 fn deinit(values:Words&) {blot_support_pooled_buffer::deinit(values,shape_words);}
 recursive fn row<Units>(self_: Shapes<Units>&, id: u32, depth: i64) -> u32, Error {
     let err=self_.step(depth);if err!=blot_error::Error.none {return 0,err;}
-    var labels=Words{..};let result,error=rowLabels(self_,id,depth,labels);labels.deinit();return result,error;
+    var labels=Words{..};let result,error=rowLabels(self_,id,depth,labels);blot_check_staging_snapshot::deinit(labels);return result,error;
 }
 recursive fn rowLabels<Units>(self_:Shapes<Units>&,id:u32,depth:i64,labels:Words&)->u32,Error {
     let view=self_.snapshot.evidence.view().effects;
-    for label in view.rowLabels(id) {let imported,error=rowOperation(self_,label,depth);if error!=blot_error::Error.none {return 0,error;}let error=labels.push(imported);if error!=blot_error::Error.none {return 0,failure(error);}}
+    for label in view.rowLabels(id) {let imported,error=rowOperation(self_,label,depth);if error!=blot_error::Error.none {return 0,error;}let error=blot_check_staging_snapshot::push(labels,imported);if error!=blot_error::Error.none {return 0,failure(error);}}
     let result,error=self_.store.effects.internRow(labels.items);if error!=blot_error::Error.none {return 0,failure(error);}return result,blot_error::Error.none;
 }
 recursive fn rowOperation<Units>(self_:Shapes<Units>&,label:u32,depth:i64)->u32,Error {
     let operation=self_.snapshot.evidence.view().effects.operation(label);if operation.instance.unit==0 && operation.instance.decl!=0 {return 0,blot_error::Error.invalid_artifact;}
-    var arguments=Words{..};let result,error=rowArguments(self_,label,depth,arguments);arguments.deinit();return result,error;
+    var arguments=Words{..};let result,error=rowArguments(self_,label,depth,arguments);blot_check_staging_snapshot::deinit(arguments);return result,error;
 }
 recursive fn rowArguments<Units>(self_:Shapes<Units>&,label:u32,depth:i64,arguments:Words&)->u32,Error {
     let view=self_.snapshot.evidence.view().effects;let operation=view.operation(label);
-    for argument in view.operationArguments(label) {let imported,error=self_.evidence(argument,depth+1);if error!=blot_error::Error.none {return 0,error;}let error=arguments.push(imported);if error!=blot_error::Error.none {return 0,failure(error);}}
+    for argument in view.operationArguments(label) {let imported,error=self_.evidence(argument,depth+1);if error!=blot_error::Error.none {return 0,error;}let error=blot_check_staging_snapshot::push(arguments,imported);if error!=blot_error::Error.none {return 0,failure(error);}}
     let imported,error=self_.store.effects.internOperationInstance(operation.identity,arguments.items,operation.instance);if error!=blot_error::Error.none {return 0,failure(error);}return imported,blot_error::Error.none;
 }
 recursive fn evidenceChildren<Units>(self_:Shapes<Units>&,id:u32,depth:i64)->u32,Error {
-    var children=Words{..};let result,error=evidenceChildrenValue(self_,id,depth,children);children.deinit();return result,error;
+    var children=Words{..};let result,error=evidenceChildrenValue(self_,id,depth,children);blot_check_staging_snapshot::deinit(children);return result,error;
 }
 recursive fn evidenceChildrenValue<Units>(self_:Shapes<Units>&,id:u32,depth:i64,children:Words&)->u32,Error {
     let view=self_.snapshot.evidence.view();let n=view.node(id);
     for child,index in view.children(id) {
         var value=child;if n.tag!=blot_eval_type_evidence::Tag.record || index%2!=0 {let imported,error=self_.evidence(child,depth+1);if error!=blot_error::Error.none {return 0,error;}value=imported;}
-        let error=children.push(value);if error!=blot_error::Error.none {return 0,failure(error);}
+        let error=blot_check_staging_snapshot::push(children,value);if error!=blot_error::Error.none {return 0,failure(error);}
     }
     var a:u32=0;var b:u32=0;if n.tag==blot_eval_type_evidence::Tag.nominal {a=n.a;b=n.b;}
     let value,error=self_.store.intern(n.tag,a,b,children.items);if error!=blot_error::Error.none {return 0,failure(error);}return value,blot_error::Error.none;

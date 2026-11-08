@@ -449,22 +449,22 @@ struct ModuleStamps {
     entries: ModuleStampEntry[>..] = [],
 }
 fn deinit(self_: ModuleStamps&) { self_.entries.clear(); }
-fn owns(self_: const ModuleStamps&, module: const blot_check_core::Module&) -> bool {
-    for &candidate in self_.current { if candidate .== module { return true; } }
-    { let optional_source_15 .= self_.previous; if optional_source_15 { let old .= optional_source_15;
-        if module.unit != 0 && module.unit <= old.modules.len && old.modules[module.unit - 1].module .== module { return true; }
-        for pin in old.modules { if pin.module .== module { return true; } }
-     } }
-    return false;
+fn ownedModule(self_:const ModuleStamps&,module:const blot_check_core::Module&)->const blot_check_core::Module? {
+ for &candidate in self_.current {if candidate .== module {return candidate;}}
+ let old .= self_.previous;if old {if module.unit!=0 && module.unit<=old.modules.len && old.modules[module.unit-1].module .== module {return old.modules[module.unit-1].module;}for pin in old.modules {if pin.module .== module {return pin.module;}}}
+ return null;
 }
+fn owns(self_:const ModuleStamps&,module:const blot_check_core::Module&)->bool {return ownedModule(self_,module)!=null;}
+
 fn find(self_: const ModuleStamps&, module: blot_check_core::Module) -> blot_support::Option<i64> {
     for entry, index in self_.entries {
         if entry.module.unit == module.unit && sameStorage(entry.module, module) { return blot_support::some(index); }
     }
     return blot_support::none<i64>();
 }
-fn record(self_: ModuleStamps&, module: blot_check_core::Module, token: Token,
+fn record(self_: ModuleStamps&, requested: const blot_check_core::Module&, token: Token,
     digest: blot_support::Option<u8[32]>) -> i64, Error {
+    let module .= ownedModule(self_,requested);assert(module);
     var known = digest;
     if self_.validate && !known.present { known = blot_support::some(stamp(module)); self_.hashed++; }
     let index = self_.entries.len; self_.entries.push(ModuleStampEntry{module,token,known,..});

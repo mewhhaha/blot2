@@ -197,7 +197,7 @@ fn compile(workspace:blot_backend_core_backend::CompileWorkspace&,source:const u
  var occupied:dictionary<u32,bool> =dictionary<u32,bool>{};
  for id in tree.roots.items {let node=tree.node(id);if node.tag==blot_parse_ast::tag_import_decl {let __cleanup_result_8_0: Result = Result{}; let __cleanup_result_8_1: Error = blot_error::Error.imported_consumer_unsupported; {tree.deinit();} return __cleanup_result_8_0, __cleanup_result_8_1;}
   if node.tag==blot_parse_ast::tag_value_decl || node.tag==blot_parse_ast::tag_data_decl || node.tag==blot_parse_ast::tag_effect_type_decl || node.tag==blot_parse_ast::tag_effect_decl {occupied.insert(node.a,true);}else if node.tag==blot_parse_ast::tag_implementation_decl {occupied.insert(tree.implementation(id).name,true);}
-  if node.tag==blot_parse_ast::tag_data_decl {for constructor in tree.children(node.b) {occupied.insert(tree.node(constructor).a,true);}}
+  if node.tag==blot_parse_ast::tag_data_decl {let count=tree.children(node.b).len;for index in count {let name=tree.node(tree.children(node.b)[index]).a;occupied.insert(name,true);}}
  }
  var imports:blot_check_check::ImportedBinding[>..<]=[];var catalogs:blot_check_check::ImportedCatalog[>..<]=[];var fixities:blot_check_check::ImportedFixity[>..<]=[];
  catalogs.push(blot_check_check::ImportedCatalog{frozen:dependency.interface,kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0});

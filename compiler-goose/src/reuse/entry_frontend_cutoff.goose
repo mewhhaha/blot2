@@ -131,7 +131,7 @@ fn comparePublished<C,M>(source:const Project&,checked:C&,unit:u32,old:const blo
  }
  if fixity_index!=old.fixities.len {return false,blot_error::Error.none;}
  for before,index in old.interface.nominals {if index==0||before.private {continue;}var at=index;if mapping.present {let translated=mapping.value.catalog(blot_reuse_frozen_dependency::ExportKind.nominal,index as u32);if !translated.present {return false,blot_error::Error.none;}at=translated.value;}if at>=published.nominals.len {return false,blot_error::Error.none;}let after=published.nominals[at];if before.is_opaque&&before.storage!=after.storage {storage_changed=true;}}
- if mapping.present&&mapping.value.changes() {checked.binding_maps[unit-1]=mapping;mapping.present=false;}return true,blot_error::Error.none;
+ if mapping.present&&mapping.value.changes() {checked.binding_maps[unit-1]=blot_support::some<Map>(blot_reuse_frontend_binding_relocation::canonicalOwned(mapping.value));mapping.present=false;}return true,blot_error::Error.none;
 }
 fn relocatedCatalog(unit:u32,mapping:blot_support::Option<Map>,prior:const blot_support::Option<Map>[:],exported:blot_reuse_frozen_dependency::Export)->blot_support::Option<u32> {
  if exported.target.unit==unit {if !mapping.present {return blot_support::some(exported.catalog);}return mapping.value.catalog(exported.kind,exported.catalog);}let mapped=Targets {units:prior, ..}.exported(exported);if !mapped.present {return blot_support::none<u32>();}return blot_support::some(mapped.value.catalog);

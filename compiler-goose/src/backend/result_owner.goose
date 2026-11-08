@@ -2,6 +2,7 @@
 namespace blot_backend_result_owner;
 import .allocation_emission;
 import .startup_emission_facts;
+import .backend_timing;
 import reuse.dispatch_explanation;
 import support.error;
 import support.native;
@@ -16,11 +17,29 @@ var inactive_bytes = ByteBuffer {..};
 var inactive_message = ByteBuffer {..};
 struct Owner { slot: u32 = 0,generation: u64 = 0 }
 struct Entry {
-    live: bool = false,generation: u64 = 0,bytes: ByteBuffer,message: ByteBuffer,diagnostic_text: ByteBuffer,
+    live: bool = false,generation: u64 = 0,bytes: ByteBuffer,message: ByteBuffer,diagnostic_text: ByteBuffer,timing_names: ByteBuffer,
     allocation: blot_backend_allocation_emission::Snapshot,startup: blot_backend_startup_emission_facts::Snapshot,explanation: blot_reuse_dispatch_explanation::Explanation,
 }
 reusable var entries: Entry[>..] = [];
 fn valid(owner: Owner) -> bool { return owner.slot != 0 && owner.slot - 1 < entries.len && entries[owner.slot - 1].live && entries[owner.slot - 1].generation == owner.generation; }
 fn init() -> Owner,Error { if entries.len >= 4294967295 { return Owner {..},blot_error::Error.out_of_memory; } let generation = blot_native::fresh_owner_id(); let index = entries.alloc_index(Entry { live: true,generation: generation,..}); return Owner { slot: (index + 1) as u32,generation: generation,..},blot_error::Error.none; }
 fn get(owner: Owner) -> Entry& { assert(valid(owner)); return entries[owner.slot - 1]; }
-fn deinit(owner: Owner&) { if owner.slot == 0 { return; } let entry .= get(owner); entry.bytes.deinit(); entry.message.deinit(); entry.diagnostic_text.deinit(); entry.allocation.deinit(); entry.startup.deinit(); entry.explanation.deinit(); entry.live = false; entries.free(owner.slot - 1); owner = Owner {..}; }
+fn deinit(owner: Owner&) { if owner.slot == 0 { return; } let entry .= get(owner); entry.bytes.deinit(); entry.message.deinit(); entry.diagnostic_text.deinit(); entry.timing_names.deinit(); entry.allocation.deinit(); entry.startup.deinit(); entry.explanation.deinit(); entry.live = false; entries.free(owner.slot - 1); owner = Owner {..}; }
+
+// Candidate publication consumes one detached result. Labels become owned before
+// its invocation-local metadata header is discarded.
+fn ownedTimingCost(owner:Owner,value:blot_backend_backend_timing::RegionCost,offset:i64&)->blot_backend_backend_timing::RegionCost {
+ let entry .= get(owner);let name=value.caller.function;var owned:const u8[:]=default<const u8[:]>();
+ if name=="overflow" {owned="overflow";}else if name.len!=0 {let start=offset;for byte,index in name {entry.timing_names.storage[start+index]=byte;}offset+=name.len;owned=entry.timing_names.storage[start..offset];}
+ return blot_backend_backend_timing::RegionCost{caller:blot_backend_backend_timing::RegionCaller{function:owned,line:value.caller.line},stage:value.stage,regions:value.regions,inclusive_us:value.inclusive_us,scopes:value.scopes,nodes:value.nodes,solver_bytes:value.solver_bytes,scratch_bytes:value.scratch_bytes,solver_allocations:value.solver_allocations,scratch_allocations:value.scratch_allocations};
+}
+fn ownedTiming(owner:Owner,value:blot_backend_backend_timing::Stats)->blot_backend_backend_timing::Stats,Error {
+ let entry .= get(owner);assert(entry.timing_names.len==0);var total:i64=0;let overflow_name=value.work.region_callers.overflow.caller.function;if overflow_name!="overflow" {total=overflow_name.len;}
+ for cost in value.work.region_callers.entries {if cost.caller.function=="overflow" {continue;}if cost.caller.function.len>0x7fffffffffffffff-total {return blot_backend_backend_timing::Stats{..},blot_error::Error.out_of_memory;}total+=cost.caller.function.len;}
+ let error=blot_support_pooled_buffer::ensure(entry.timing_names,total,byte_runs);if error!=blot_error::Error.none {return blot_backend_backend_timing::Stats{..},error;}
+ var census=blot_backend_backend_timing::RegionCensus{..};var offset:i64=0;
+ for cost,index in value.work.region_callers.entries {census.entries[index]=ownedTimingCost(owner,cost,offset);}census.overflow=ownedTimingCost(owner,value.work.region_callers.overflow,offset);
+ entry.timing_names.items=entry.timing_names.storage[..total];entry.timing_names.len=total;
+ let work=blot_backend_backend_timing::WorkStats{regions:value.work.regions,region_callers:census,refinements:value.work.refinements,thread_cpu_us:value.work.thread_cpu_us,lookup_us:value.work.lookup_us,query_prepare_us:value.work.query_prepare_us,query_scan_us:value.work.query_scan_us,query_source_us:value.work.query_source_us,query_import_us:value.work.query_import_us,query_match_us:value.work.query_match_us,query_validate_us:value.work.query_validate_us,query_publish_us:value.work.query_publish_us,replay_us:value.work.replay_us,specialization_us:value.work.specialization_us,constants_us:value.work.constants_us,principals_us:value.work.principals_us,interfaces_us:value.work.interfaces_us,startup_us:value.work.startup_us,layouts_us:value.work.layouts_us,evaluation_us:value.work.evaluation_us,inference_us:value.work.inference_us,semantic_coordination_us:value.work.semantic_coordination_us,semantic_dispatch_us:value.work.semantic_dispatch_us,semantic_publication_us:value.work.semantic_publication_us,semantic_job_sum_us:value.work.semantic_job_sum_us};
+ return blot_backend_backend_timing::Stats{prepare_us:value.prepare_us,generate_us:value.generate_us,initialize_us:value.initialize_us,assemble_us:value.assemble_us,capture_us:value.capture_us,profiled:value.profiled,work:work},blot_error::Error.none;
+}

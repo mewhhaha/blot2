@@ -42,6 +42,12 @@ var next_generation: u64=1;
 struct Pool { read_only: bool=false,missing_name: bool=false,owner_id: u64=0,bytes: Bytes& =inactive.bytes,entries: Entries& =inactive.entries,buckets: Buckets& =inactive.buckets,lease: u32=0,generation: u64=0 }
 fn initPooled() -> Pool,Error { if next_generation==0xffffffffffffffff||states.len>=0xffffffff { return Pool {},blot_error::Error.out_of_memory; } let generation=next_generation; next_generation++; let owner=blot_native::fresh_owner_id(); let at=states.alloc_index(State {generation:generation,owner_id:owner,live:true}); let state: State& =states[at]; return Pool {owner_id:owner,bytes:state.bytes,entries:state.entries,buckets:state.buckets,lease:(at+1) as u32,generation:generation},blot_error::Error.none; }
 fn valid(pool: const Pool&) -> bool { return pool.lease!=0&&pool.lease-1<states.len&&states[pool.lease-1].live&&states[pool.lease-1].generation==pool.generation&&states[pool.lease-1].owner_id==pool.owner_id; }
+// Resolve an existing live header without retaining or copying its storage.
+fn canonical(pool:const Pool&)->Pool {
+ assert(valid(pool));let state:State& =states[pool.lease-1];
+ assert(pool.bytes .== state.bytes && pool.entries .== state.entries && pool.buckets .== state.buckets);
+ return Pool{read_only:pool.read_only,missing_name:pool.missing_name,owner_id:pool.owner_id,bytes:state.bytes,entries:state.entries,buckets:state.buckets,lease:pool.lease,generation:pool.generation};
+}
 fn deinit(pool: Pool&) { if pool.lease==0 { return; } assert(!pool.read_only&&valid(pool)); pool.bytes.deinit(); pool.entries.deinit(); pool.buckets.deinit(); let at=pool.lease-1; states[at].live=false; states.free(at); pool=Pool {}; }
 fn get(pool: const Pool&, symbol: Symbol) -> const u8[:] {
  if symbol == absent { return pool.bytes.items[..0]; }

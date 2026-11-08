@@ -30,6 +30,10 @@ reusable[] var owned_qualifications:Qualification[>..]=[];
 fn words(length:i64,initial:u32)->u32[:] {let result=owned_words.alloc_slice(length);for &word in result {word=initial;}return result;}
 fn release(values:u32[:]) {if values.len!=0 {owned_words.free_slice(values);}}
 struct Map {bindings:u32[:]=default<u32[:]>(),nominals:u32[:]=default<u32[:]>(),constructors:u32[:]=default<u32[:]>(),contracts:u32[:]=default<u32[:]>(),implementations:u32[:]=default<u32[:]>(),qualifications:Qualification[:]=default<Qualification[:]>()}
+// Reattach only runs allocated by compare; no source/method borrow is published.
+fn canonicalOwned(self_:Map)->Map {
+ return Map{bindings:owned_words.realloc_slice(self_.bindings,self_.bindings.len),nominals:owned_words.realloc_slice(self_.nominals,self_.nominals.len),constructors:owned_words.realloc_slice(self_.constructors,self_.constructors.len),contracts:owned_words.realloc_slice(self_.contracts,self_.contracts.len),implementations:owned_words.realloc_slice(self_.implementations,self_.implementations.len),qualifications:owned_qualifications.realloc_slice(self_.qualifications,self_.qualifications.len)};
+}
 fn deinit(self_:Map&) {release(self_.bindings);release(self_.nominals);release(self_.constructors);release(self_.contracts);release(self_.implementations);if self_.qualifications.len!=0 {owned_qualifications.free_slice(self_.qualifications);}self_=Map {..};}
 fn binding(self_:Map,old:u32)->blot_support::Option<u32> {if old==0||old>=self_.bindings.len||self_.bindings[old]==0 {return blot_support::none<u32>();}return blot_support::some(self_.bindings[old]);}
 fn qualification(self_:Map,old:Span)->Span {

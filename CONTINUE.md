@@ -27,18 +27,18 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen233
-checkpoints recursive scratch, canonical type-store, diagnostic dispatch and
-retained-key ownership repairs. Native append-only module-stamp entries preserve
-exact saved headers; their focused runtime/reset controls pass, but one actual
-whole-context storage error remains. The latest whole run stops after 86.81s
-with 30 diagnostics across 20 files, including a standard-library instantiation,
-down from 48 across 32 files in232. C emission, linking and execution remain
-pending. The opt-in private checker raises cumulative const-for clone expansion
-from100k to1M; its separate tail traversal stays100k. Its201 frontend and8
-runtime controls match the preceding checker, and over-budget expansion rejects.
-Component receipts qualify exact hashes; bounded failing runs do not establish
-completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen234
+checkpoints canonical loader/cache publication, recursive scratch and candidate
+emission ownership. The candidate transfer reanchors existing output buffers and
+snapshots, owns timing labels, and adds no allocation for default timing metadata.
+Focused runtime and negative controls pass on both pinned checkers; reduced leaves
+are explicit in each receipt. The completed whole run stops after 87.14s with
+21 diagnostics across 13 files, down from30 across20 in233. C emission, linking
+and execution remain pending. The opt-in private checker raises cumulative
+const-for clone expansion from100k to1M while retaining the separate100k tail
+traversal. Its201 frontend and8 runtime controls match the preceding checker;
+over-budget expansion rejects. These failing runs do not establish completed
+compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

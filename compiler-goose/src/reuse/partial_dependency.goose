@@ -251,7 +251,7 @@ fn rejectChecked(source:Project&,entry_path:const u8[:],issue:blot_reuse_project
  if issue.numeric_literal.present {var actual=publication;actual.has_actual_token=true;actual.actual_token=issue.numeric_literal.value.actual_token;let details=[issue.numeric_literal.value];let diagnostic,error=blot_reuse_dependency_consumer::publishedDiagnostic(issue.unit,"check-project",unit.source,actual,details[..]);if error!=blot_error::Error.none {return Preparation.inactive,error;}return reject(source,entry_path,diagnostic);}
  if issue.purity.present {
   let witness=issue.purity.value;if !witness.operation_name.present && !witness.foreign {return Preparation.inactive,blot_error::Error.operation_purity_origin_required;}
-  var message:u8[>..<]=[];let error=blot_reuse_purity_diagnostics::format(source.symbols,"",witness,message);if error!=blot_error::Error.none {return Preparation.inactive,error;}var actual=publication;actual.message=message[..];let details=[witness];
+  var message:u8[>..]=[];let error=blot_reuse_purity_diagnostics::format(source.symbols,"",witness,message);if error!=blot_error::Error.none {return Preparation.inactive,error;}var actual=publication;actual.message=message[..];let details=[witness];
   let diagnostic,error=blot_reuse_dependency_consumer::publishedDiagnostic(issue.unit,"check-project",unit.source,actual,details[..]);if error!=blot_error::Error.none {return Preparation.inactive,error;}return reject(source,entry_path,diagnostic);
  }
  var message:u8[>..<]=[];message.append(issue.message());if issue.symbol!=0 {let code=issue.codeName();if code=="unknown_intrinsic" || code=="unknown_record_field" {message.append(" ");}else {message.append(": ");}message.append(source.symbols.get(issue.symbol));}
@@ -293,3 +293,12 @@ fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_d
 fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_dependency::ExplanationDetails)->bool {return true;}
 
 fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_partial_dependency::ContextDetails)->bool {return true;}
+
+// A candidate takes this ownership; its caller clears the old emission on success.
+fn candidateResult(value:const Result&)->Result,Error {
+ assert(!value.result.diagnostic.present && !value.diagnostic_filename.present && !value.related_filename.present && value.origins.entries.len==0);
+ let compiled,error=blot_backend_core_backend::candidateResult(value.result.compiled);if error!=blot_error::Error.none {return Result{..},error;}
+ var result=Result{result:ConsumerResult{compiled:compiled,stats:value.result.stats,..},source_bytes:value.source_bytes,fresh_modules:value.fresh_modules,cached_modules:value.cached_modules,portable:value.portable,..};
+ if value.array_costs.present {result.array_costs=blot_support::some<blot_backend_array_cost_explanation::Snapshot>(blot_backend_array_cost_explanation::canonicalOwned(value.array_costs.value));}
+ return result,blot_error::Error.none;
+}

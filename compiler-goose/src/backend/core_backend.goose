@@ -2468,3 +2468,15 @@ fn detachResult(result: Result&) -> blot_error::Error {
     result.bytes .= entry.bytes; result.owned_message .= entry.message; if result.diagnostic.present { result.diagnostic.value.detail = entry.diagnostic_text.items; } result.message_source = default<const u8[:]>(); result.detached = true;
     if result.publication_owner.slot != 0 { blot_backend_result_publication::releaseResult(result.publication_owner,result.publication_epoch,result.publication_pinned); } result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = default<const blot_check_core::Module[:]>(); return blot_error::Error.none;
 }
+
+// Only successful detached emissions enter retained candidates.
+fn candidateResult(value:const Result&)->Result,blot_error::Error {
+ assert(value.active && value.detached && value.output_owner.slot!=0 && value.capture==null && value.publication_owner.slot==0 && !value.diagnostic.present);
+ let entry .= blot_backend_result_owner::get(value.output_owner);assert(value.bytes .== entry.bytes);assert(value.owned_message .== entry.message);assert(value.message_source.len==0 && value.publication_units.len==0);
+ let timing,error=blot_backend_result_owner::ownedTiming(value.output_owner,value.timing);if error!=blot_error::Error.none {return Result{..},error;}
+ var result=Result{active:value.active,output_owner:value.output_owner,detached:true,timing:timing,counters:value.counters,optimization:value.optimization,runtime_optimization:value.runtime_optimization,module_stamps:value.module_stamps,refinements:value.refinements,completed_queries:value.completed_queries,query_tables:value.query_tables,artifacts:value.artifacts,whole_module_only:value.whole_module_only,reuse:value.reuse,principal:value.principal,source_validation:value.source_validation,bytes:entry.bytes,code_instances:value.code_instances,callable_wrappers:value.callable_wrappers,emitted_functions:value.emitted_functions,constant_steps:value.constant_steps,constant_receipts:value.constant_receipts,owned_message:entry.message,..};
+ let allocation .= value.allocation_emission;if allocation {assert(allocation .== entry.allocation);result.allocation_emission .= entry.allocation;}
+ let startup .= value.startup_observation;if startup {assert(startup .== entry.startup);result.startup_observation .= entry.startup;}
+ let explanation .= value.explanation;if explanation {assert(explanation .== entry.explanation);result.explanation .= entry.explanation;}
+ return result,blot_error::Error.none;
+}

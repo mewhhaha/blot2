@@ -185,7 +185,7 @@ fn saveActive(self_: Store,arguments: const u32[:]) -> List { let start=self_.ac
 fn saveArguments(self_: Store,arguments: const u32[:]) -> List { let start=self_.arguments.len; self_.arguments.append(arguments); return List {start as u32,arguments.len as u32}; }
 struct ProjectionContext<H> { host: H&,store: Store,context: u32 }
 fn projectionContext<H>(host:H&,store:Store,context:u32)->ProjectionContext<H> {return ProjectionContext<H>{host,store,context};}
-fn resolve<H>(self_: ProjectionContext<H>&,contract: Identity,member: u32,arguments: const u32[:]) -> u32,Error {
+recursive fn resolve<H>(self_: ProjectionContext<H>&,contract: Identity,member: u32,arguments: const u32[:]) -> u32,Error {
  let id,error=projection(self_.store,self_.host,self_.context,contract,member,arguments); if error==blot_error::Error.associated_limit { return 0,blot_error::Error.evidence_limit; } if error==blot_error::Error.out_of_memory||error==blot_error::Error.unresolved_type||error==blot_error::Error.none { return id,error; } return 0,blot_error::Error.type_mismatch;
 }
 fn resolver<H>(self_: ProjectionContext<H>&) -> blot_eval_type_evidence::ProjectionResolver<ProjectionContext<H>> { return blot_eval_type_evidence::ProjectionResolver<ProjectionContext<H>> {self_,self_.host.associated_remaining,true}; }
@@ -208,8 +208,8 @@ fn rejectedPrerequisite<H>(w: Work<H>&,error: Error,identity: Identity,traced: i
  if error==blot_error::Error.associated_limit||error==blot_error::Error.evidence_limit||(w.store.failure.present&&w.store.failure.value==Code.associated_limit) { w.store.failure=blot_support::some(Code.associated_limit); w.store.trace.candidate(identity,blot_reuse_dispatch_explanation::Outcome.limit); w.store.trace.setOutcome(traced,traced>=0,blot_reuse_dispatch_explanation::Outcome.limit); return fail(w,blot_error::Error.associated_limit); }
  w.store.failure=blot_support::some(Code.incompatible_implementation); w.store.trace.candidate(identity,blot_reuse_dispatch_explanation::Outcome.requires_evidence); w.store.trace.setOutcome(traced,traced>=0,blot_eval_implementation_predicates::failureOutcome(kind)); return fail(w,blot_error::Error.incompatible_implementation);
 }
-fn projection<H>(self_: Store,host: H&,context: u32,contract: Identity,member_name: u32,input: const u32[:]) -> u32,Error { var work=Work<H> {self_,host}; let result=projectionInner(work,context,contract,member_name,input); return result,work.error; }
-fn projectionInner<H>(w: Work<H>&,context: u32,contract: Identity,member_name: u32,input: const u32[:]) -> u32 {
+recursive fn projection<H>(self_: Store,host: H&,context: u32,contract: Identity,member_name: u32,input: const u32[:]) -> u32,Error { var work=Work<H> {self_,host}; let result=projectionInner(work,context,contract,member_name,input); return result,work.error; }
+recursive fn projectionInner<H>(w: Work<H>&,context: u32,contract: Identity,member_name: u32,input: const u32[:]) -> u32 {
  if w.error!=blot_error::Error.none { return 0; } let self_=w.store; let host .= w.host; let point=mark(self_); var success=false;
  if self_.active.len==0&&self_.active_projections.len==0&&self_.active_facts.len==0 { self_.failure=blot_support::none<Code>(); self_.trace=blot_eval_implementation_trace::Record {context:context,contract:contract, ..}; }
  var arguments=ArgumentsBuffer {};  arguments.append(input); if !step(w) { let __cleanup_result_155_0: u32 = 0; { if !success { rollback(self_,point); } } let __cleanup_result_3_0: u32 = __cleanup_result_155_0; arguments.deinit(); return __cleanup_result_3_0; } if !depthAvailable(self_) { self_.failure=blot_support::some(Code.associated_limit); let __cleanup_result_156_0: u32 = fail(w,blot_error::Error.associated_limit); { if !success { rollback(self_,point); } } let __cleanup_result_4_0: u32 = __cleanup_result_156_0; arguments.deinit(); return __cleanup_result_4_0; }

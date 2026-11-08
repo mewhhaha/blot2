@@ -18,6 +18,7 @@ import reuse.code_expectation;
 import support.error;
 import support.option;
 import support.wyhash;
+import support.pooled_buffer;
 
 type Id = u32;
 let word: Id = 3;
@@ -30,6 +31,10 @@ fn tagCode(tag: Tag) -> u8 { for value, index in tags { if value == tag { return
 fn tagFromCode(code: u8) -> Tag, blot_error::Error { if code >= tags.len { return Tag.invalid, blot_error::Error.type_mismatch; } return tags[code], blot_error::Error.none; }
 struct Node { tag: Tag = Tag.invalid, a: u32 = 0, b: u32 = 0, c: u32 = 0 }
 struct Mapping { variable: blot_check_types::Id, layout: Id, instance: blot_check_types::NominalIdentity }
+struct MappingBuffer { storage: Mapping[:]=default<Mapping[:]>(),items: Mapping[:]=default<Mapping[:]>(),failure: blot_error::Error=blot_error::Error.none }
+reusable[] var pool_MappingBuffer: Mapping[>..]=[];
+fn push(self_:MappingBuffer&,value:Mapping) { if self_.failure==blot_error::Error.none {self_.failure=blot_support_pooled_buffer::push(self_,value,pool_MappingBuffer);} }
+fn deinit(self_:MappingBuffer&) {blot_support_pooled_buffer::deinit(self_,pool_MappingBuffer);self_.failure=blot_error::Error.none;}
 struct RowMapping { variable: u32, row: u32 }
 struct UniversalDictionaries { owner: Id, start: u32, len: u32 }
 fn mappedInstance(original: blot_check_types::NominalIdentity, mappings: const Mapping[:]) -> blot_check_types::NominalIdentity {
@@ -263,14 +268,20 @@ recursive fn mergePartialDepth(store: Store&, left: Id, right: Id, depth: i64, b
     if a.tag == Tag.product || a.tag == Tag.record || a.tag == Tag.nominal {
         if a.tag == Tag.nominal && (a.a != b.a || a.b != b.b) { return 0, blot_error::Error.type_mismatch; }
         let count = children(store, left).len; if count != children(store, right).len { return 0, blot_error::Error.type_mismatch; }
-        var values: Id[>..<] = [];
+
+        var values=blot_eval_type_evidence::WordBuffer{};
+        recursive fn convertChildren()->Id,blot_error::Error {
+
         for index in 0..count {
             let first = children(store, left)[index]; let second = children(store, right)[index]; var value = first;
             if a.tag == Tag.record && index % 2 == 0 { if first != second { return 0, blot_error::Error.type_mismatch; } }
             else { let merged, error = mergePartialDepth(store, first, second, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } value = merged; }
-            values.push(value);
+            values.push(value);if values.failure!=blot_error::Error.none {return 0,values.failure;}
         }
-        if a.tag == Tag.nominal { return intern(store, Tag.nominal, a.a, a.b, values); } return intern(store, a.tag, 0, 0, values);
+        if a.tag == Tag.nominal { return intern(store, Tag.nominal, a.a, a.b, values.items); } return intern(store, a.tag, 0, 0, values.items);
+
+        }
+        let result,error=convertChildren();values.deinit();return result,error;
     }
     return 0, blot_error::Error.type_mismatch;
 }
@@ -389,34 +400,46 @@ recursive fn fromTypeNode(store: Store&, module: const blot_check_core::Module&,
     }
     if n.tag == blot_check_types::Tag.product || n.tag == blot_check_types::Tag.record || n.tag == blot_check_types::Tag.nominal {
         if n.tag == blot_check_types::Tag.nominal && n.a == blot_check_task_types::handle.unit && n.b == blot_check_task_types::handle.decl { return intern(store, Tag.product, 0, 0, [blot_check_types::u32_type, blot_check_types::u32_type]); }
-        var values: u32[>..<] = [];
+
+        var values=blot_eval_type_evidence::WordBuffer{};
+        recursive fn convertChildren()->Id,blot_error::Error {
+
         if n.tag == blot_check_types::Tag.record {
-            for index in 0..n.b { let field = module.types.recordField(n, index); values.push(field.name); let child, error = fromTypeDepth(store, module, field.ty, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } values.push(child); }
-            return internRecord(store, values);
+            for index in 0..n.b { let field = module.types.recordField(n, index); values.push(field.name);if values.failure!=blot_error::Error.none {return 0,values.failure;} let child, error = fromTypeDepth(store, module, field.ty, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } values.push(child);if values.failure!=blot_error::Error.none {return 0,values.failure;} }
+            return internRecord(store, values.items);
         }
         var children = module.types.list(blot_check_types::List { start: n.a, len: n.b , ..}); if n.tag == blot_check_types::Tag.nominal { children = module.types.nominalArguments(n); }
-        for child in children { let value, error = fromTypeDepth(store, module, child, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } values.push(value); }
-        if n.tag == blot_check_types::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values); } return intern(store, Tag.product, 0, 0, values);
+        for child in children { let value, error = fromTypeDepth(store, module, child, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } values.push(value);if values.failure!=blot_error::Error.none {return 0,values.failure;} }
+        if n.tag == blot_check_types::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values.items); } return intern(store, Tag.product, 0, 0, values.items);
+
+        }
+        let result,error=convertChildren();values.deinit();return result,error;
     }
     return 0, blot_error::Error.unresolved_type;
 }
-fn fromTypeQuantified(store: Store&, module: const blot_check_core::Module&, n: blot_check_types::Node, mappings: const Mapping[:], rows: const RowMapping[:], depth: i64, allow_erased: bool) -> Id, blot_error::Error {
-    var owned: Mapping[>..<] = [];
-    for binder, ordinal in module.types.list(blot_check_types::List { start: n.b, len: n.c }) {
+recursive fn fromTypeQuantified(store: Store&, module: const blot_check_core::Module&, n: blot_check_types::Node, mappings: const Mapping[:], rows: const RowMapping[:], depth: i64, allow_erased: bool) -> Id, blot_error::Error {
+
+        var owned=MappingBuffer{};
+        recursive fn convertChildren()->Id,blot_error::Error {
+
+    for ordinal in 0..n.c { let binder=module.types.list(blot_check_types::List { start: n.b, len: n.c })[ordinal];
         let leaf = module.types.node(binder); if leaf.tag != blot_check_types::Tag.bound || leaf.a != ordinal || leaf.b > 2 || leaf.c != 0 { return 0, blot_error::Error.unresolved_type; }
         let layout, error = internWithEffects(store, Tag.opened, ordinal as u32, 0, leaf.b, []); if error != blot_error::Error.none { return 0, error; }
-        owned.push(Mapping { variable: binder, layout: layout , ..});
+        owned.push(Mapping { variable: binder, layout: layout , ..});if owned.failure!=blot_error::Error.none {return 0,owned.failure;}
     }
-    for mapping in mappings {
+    for index in 0..mappings.len { let mapping=mappings[index];
         var outer = mapping; let representation = node(store, mapping.layout);
         if representation.tag == Tag.opened { if representation.b >= 127 { return 0, blot_error::Error.layout_limit; } let layout, error = internWithEffects(store, Tag.opened, representation.a, representation.b + 1, representation.c, []); if error != blot_error::Error.none { return 0, error; } outer.layout = layout; }
-        owned.push(outer);
+        owned.push(outer);if owned.failure!=blot_error::Error.none {return 0,owned.failure;}
     }
     var tag = Tag.existential; if n.tag == blot_check_types::Tag.forall { tag = Tag.universal; }
-    var binders: Id[128] = [0; 128]; for index in 0..n.c { binders[index] = owned[index].layout; }
-    let body, error = fromTypeDepth(store, module, n.a, owned, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; }
+    var binders: Id[128] = [0; 128]; for index in 0..n.c { binders[index] = owned.items[index].layout; }
+    let body, error = fromTypeDepth(store, module, n.a, owned.items, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; }
     return intern(store, tag, body, n.c, binders[..n.c]);
-}
+
+        }
+        let result,error=convertChildren();owned.deinit();return result,error;
+    }
 fn rowFromType(store: Store&, module: const blot_check_core::Module&, row: u32, mappings: const Mapping[:], rows: const RowMapping[:], partial: bool) -> u32, blot_error::Error { return fromTypeRow(store, module, row, mappings, rows, 0, partial); }
 recursive fn fromTypeRow(store: Store&, module: const blot_check_core::Module&, row: u32, mappings: const Mapping[:], rows: const RowMapping[:], depth: i64, allow_erased: bool) -> u32, blot_error::Error {
     if depth >= 1024 { return 0, blot_error::Error.layout_limit; }
@@ -437,16 +460,22 @@ recursive fn fromTypeRow(store: Store&, module: const blot_check_core::Module&, 
             let leaf = node(store, formal); if leaf.tag != Tag.opened || leaf.c != 1 { return 0, blot_error::Error.type_mismatch; }
         }
     }
-    var labels: u32[>..<] = []; var arguments: u32[>..<] = [];
+
+        var labels=blot_eval_type_evidence::WordBuffer{}; var arguments=blot_eval_type_evidence::WordBuffer{};
+        recursive fn convertChildren()->Id,blot_error::Error {
+
     for label in module.types.rowLabels(row) {
         arguments.clear();
-        for argument in module.types.operationArguments(label) { let selected, error = fromTypeDepth(store, module, argument, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } arguments.push(selected); }
+        for argument in module.types.operationArguments(label) { let selected, error = fromTypeDepth(store, module, argument, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
         let operation = module.types.operation(label); let instance = blot_check_types::selectionAtom(module.types, mappedInstance(operation.instance, mappings));
-        let mapped, error = store.effects.internOperationInstance(operation.identity, arguments, instance); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);
+        let mapped, error = store.effects.internOperationInstance(operation.identity, arguments.items, instance); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
-    labels.append(store.effects.view().rowLabels(suffix)); if suffix != 0 { formal = store.effects.rows.items[suffix].formal; }
-    let result, error = store.effects.internRowWithFormal(labels, formal); if error != blot_error::Error.none { return 0, effectError(error); } return result, blot_error::Error.none;
-}
+    labels.append(store.effects.view().rowLabels(suffix));if labels.failure!=blot_error::Error.none {return 0,labels.failure;} if suffix != 0 { formal = store.effects.rows.items[suffix].formal; }
+    let result, error = store.effects.internRowWithFormal(labels.items, formal); if error != blot_error::Error.none { return 0, effectError(error); } return result, blot_error::Error.none;
+
+        }
+        let result,error=convertChildren();arguments.deinit();labels.deinit();return result,error;
+    }
 fn fromEvidence(store: Store&, view: blot_eval_type_evidence::View, id: u32) -> Id, blot_error::Error { var budget: i64 = 1000000; return fromEvidenceDepth(store, view, id, 0, budget); }
 fn toEvidence(store: Store&, target: blot_eval_type_evidence::Store&, id: Id) -> u32, blot_error::Error { var budget: i64 = 1000000; return toEvidenceDepth(store, target, id, 0, budget, 0); }
 recursive fn toEvidenceDepth(store: Store&, target: blot_eval_type_evidence::Store&, id: Id, depth: i64, budget: i64&, bound_arity: u32) -> u32, blot_error::Error {
@@ -491,11 +520,17 @@ recursive fn toEvidenceDepth(store: Store&, target: blot_eval_type_evidence::Sto
         return target.internStateProvider(read, write, state);
     }
     if n.tag == Tag.product || n.tag == Tag.record || n.tag == Tag.nominal {
-        var values: u32[>..<] = []; let count = children(store, id).len;
-        for index in 0..count { let child = children(store, id)[index]; if n.tag == Tag.record && index % 2 == 0 { values.push(child); } else { let value, error = toEvidenceDepth(store, target, child, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } values.push(value); } }
-        if n.tag == Tag.nominal { return target.intern(blot_eval_type_evidence::Tag.nominal, n.a, n.b, values); }
-        if n.tag == Tag.record { return target.intern(blot_eval_type_evidence::Tag.record, 0, 0, values); }
-        return target.intern(blot_eval_type_evidence::Tag.product, 0, 0, values);
+
+        var values=blot_eval_type_evidence::WordBuffer{};
+        recursive fn convertChildren()->Id,blot_error::Error {
+ let count = children(store, id).len;
+        for index in 0..count { let child = children(store, id)[index]; if n.tag == Tag.record && index % 2 == 0 { values.push(child);if values.failure!=blot_error::Error.none {return 0,values.failure;} } else { let value, error = toEvidenceDepth(store, target, child, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } values.push(value);if values.failure!=blot_error::Error.none {return 0,values.failure;} } }
+        if n.tag == Tag.nominal { return target.intern(blot_eval_type_evidence::Tag.nominal, n.a, n.b, values.items); }
+        if n.tag == Tag.record { return target.intern(blot_eval_type_evidence::Tag.record, 0, 0, values.items); }
+        return target.intern(blot_eval_type_evidence::Tag.product, 0, 0, values.items);
+
+        }
+        let result,error=convertChildren();values.deinit();return result,error;
     }
     return 0, blot_error::Error.unresolved_type;
 }
@@ -541,10 +576,16 @@ recursive fn fromEvidenceDepth(store: Store&, view: blot_eval_type_evidence::Vie
     }
     if n.tag == blot_eval_type_evidence::Tag.product || n.tag == blot_eval_type_evidence::Tag.record || n.tag == blot_eval_type_evidence::Tag.nominal {
         if n.tag == blot_eval_type_evidence::Tag.nominal && n.a == blot_check_task_types::handle.unit && n.b == blot_check_task_types::handle.decl { return intern(store, Tag.product, 0, 0, [blot_check_types::u32_type, blot_check_types::u32_type]); }
-        var values: u32[>..<] = [];
-        for child, index in view.children(id) { if n.tag == blot_eval_type_evidence::Tag.record && index % 2 == 0 { values.push(child); } else { let selected, error = fromEvidenceDepth(store, view, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(selected); } }
-        if n.tag == blot_eval_type_evidence::Tag.record { return internRecord(store, values); }
-        if n.tag == blot_eval_type_evidence::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values); } return intern(store, Tag.product, 0, 0, values);
+
+        var values=blot_eval_type_evidence::WordBuffer{};
+        recursive fn convertChildren()->Id,blot_error::Error {
+
+        for child, index in view.children(id) { if n.tag == blot_eval_type_evidence::Tag.record && index % 2 == 0 { values.push(child);if values.failure!=blot_error::Error.none {return 0,values.failure;} } else { let selected, error = fromEvidenceDepth(store, view, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(selected);if values.failure!=blot_error::Error.none {return 0,values.failure;} } }
+        if n.tag == blot_eval_type_evidence::Tag.record { return internRecord(store, values.items); }
+        if n.tag == blot_eval_type_evidence::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values.items); } return intern(store, Tag.product, 0, 0, values.items);
+
+        }
+        let result,error=convertChildren();values.deinit();return result,error;
     }
     return 0, blot_error::Error.unresolved_type;
 }
@@ -634,11 +675,17 @@ recursive fn toExpectationDepth(store: Store&, target: blot_reuse_code_expectati
         return internExpectation(store, target, blot_eval_type_evidence::Tag.function, input, output, []);
     }
     if n.tag == Tag.product || n.tag == Tag.record || n.tag == Tag.nominal {
-        var values: u32[>..<] = []; let count = children(store, id).len;
-        for index in 0..count { let child = children(store, id)[index]; if n.tag == Tag.record && index % 2 == 0 { values.push(child); } else { let value, error = toExpectationDepth(store, target, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(value); } }
-        if n.tag == Tag.nominal { return internExpectation(store, target, blot_eval_type_evidence::Tag.nominal, n.a, n.b, values); }
-        if n.tag == Tag.record { return internExpectation(store, target, blot_eval_type_evidence::Tag.record, 0, 0, values); }
-        return internExpectation(store, target, blot_eval_type_evidence::Tag.product, 0, 0, values);
+
+        var values=blot_eval_type_evidence::WordBuffer{};
+        recursive fn convertChildren()->Id,blot_error::Error {
+ let count = children(store, id).len;
+        for index in 0..count { let child = children(store, id)[index]; if n.tag == Tag.record && index % 2 == 0 { values.push(child);if values.failure!=blot_error::Error.none {return 0,values.failure;} } else { let value, error = toExpectationDepth(store, target, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(value);if values.failure!=blot_error::Error.none {return 0,values.failure;} } }
+        if n.tag == Tag.nominal { return internExpectation(store, target, blot_eval_type_evidence::Tag.nominal, n.a, n.b, values.items); }
+        if n.tag == Tag.record { return internExpectation(store, target, blot_eval_type_evidence::Tag.record, 0, 0, values.items); }
+        return internExpectation(store, target, blot_eval_type_evidence::Tag.product, 0, 0, values.items);
+
+        }
+        let result,error=convertChildren();values.deinit();return result,error;
     }
     return 0, blot_error::Error.unresolved_type;
 }
@@ -656,13 +703,13 @@ recursive fn fromSolverDepth(store: Store&, source: blot_check_types::Store&, ty
     }
     if n.tag == blot_check_types::Tag.forall || n.tag == blot_check_types::Tag.existential {
         if n.c == 0 || n.c > 128 { return 0, blot_error::Error.layout_limit; }
-        var owned: u32[>..<] = []; owned.append(source.list(blot_check_types::List { start: n.b, len: n.c , ..})); var binders: Id[128] = [0; 128];
-        for formal, ordinal in owned {
+        var owned: u32[128] = [0; 128]; for index in 0..n.c { owned[index]=source.list(blot_check_types::List { start: n.b, len: n.c , ..})[index]; } var binders: Id[128] = [0; 128];
+        for ordinal in 0..n.c { let formal=owned[ordinal];
             let leaf = source.node(formal); if leaf.tag != blot_check_types::Tag.bound || leaf.a != ordinal || leaf.b > 2 || leaf.c != 0 { return 0, blot_error::Error.unresolved_type; }
             let value, error = internWithEffects(store, Tag.opened, ordinal as u32, 0, leaf.b, []); if error != blot_error::Error.none { return 0, error; } binders[ordinal] = value;
         }
         if store.solver_owners.len >= 128 { return 0, blot_error::Error.layout_limit; }
-        let mark = store.solver_binders.len; let range = blot_backend_runtime_ir::Range { start: mark, len: owned.len , ..}; store.solver_binders.append(owned); store.solver_owners.push(range);
+        let mark = store.solver_binders.len; let range = blot_backend_runtime_ir::Range { start: mark, len: n.c , ..}; store.solver_binders.append(owned[..n.c]); store.solver_owners.push(range);
         let body, error = fromSolverDepth(store, source, n.a, depth + 1, budget); store.solver_owners.pop(); store.solver_binders.resize(mark); if error != blot_error::Error.none { return 0, error; }
         var tag = Tag.existential; if n.tag == blot_check_types::Tag.forall { tag = Tag.universal; } return intern(store, tag, body, n.c, binders[..n.c]);
     }
@@ -693,14 +740,20 @@ recursive fn fromSolverDepth(store: Store&, source: blot_check_types::Store&, ty
     }
     if n.tag == blot_check_types::Tag.product || n.tag == blot_check_types::Tag.record || n.tag == blot_check_types::Tag.nominal {
         if n.tag == blot_check_types::Tag.nominal && n.a == blot_check_task_types::handle.unit && n.b == blot_check_task_types::handle.decl { return intern(store, Tag.product, 0, 0, [blot_check_types::u32_type, blot_check_types::u32_type]); }
-        var values: u32[>..<] = [];
+
+        var values=blot_eval_type_evidence::WordBuffer{}; var source_children=blot_eval_type_evidence::WordBuffer{};
+        recursive fn convertChildren()->Id,blot_error::Error {
+
         if n.tag == blot_check_types::Tag.record {
-            for index in 0..n.b { let field = source.recordField(n, index); values.push(field.name); let child, error = fromSolverDepth(store, source, field.ty, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(child); } return internRecord(store, values);
+            for index in 0..n.b { let field = source.recordField(n, index); values.push(field.name);if values.failure!=blot_error::Error.none {return 0,values.failure;} let child, error = fromSolverDepth(store, source, field.ty, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(child);if values.failure!=blot_error::Error.none {return 0,values.failure;} } return internRecord(store, values.items);
         }
-        var source_children: u32[>..<] = [];
-        if n.tag == blot_check_types::Tag.nominal { source_children.append(source.nominalArguments(n)); } else { source_children.append(source.list(blot_check_types::List { start: n.a, len: n.b , ..})); }
-        for child in source_children { let value, error = fromSolverDepth(store, source, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(value); }
-        if n.tag == blot_check_types::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values); } return intern(store, Tag.product, 0, 0, values);
+
+        if n.tag == blot_check_types::Tag.nominal { source_children.append(source.nominalArguments(n));if source_children.failure!=blot_error::Error.none {return 0,source_children.failure;} } else { source_children.append(source.list(blot_check_types::List { start: n.a, len: n.b , ..}));if source_children.failure!=blot_error::Error.none {return 0,source_children.failure;} }
+        for child in source_children.items { let value, error = fromSolverDepth(store, source, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(value);if values.failure!=blot_error::Error.none {return 0,values.failure;} }
+        if n.tag == blot_check_types::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values.items); } return intern(store, Tag.product, 0, 0, values.items);
+
+        }
+        let result,error=convertChildren();source_children.deinit();values.deinit();return result,error;
     }
     return 0, blot_error::Error.unresolved_type;
 }

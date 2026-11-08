@@ -857,6 +857,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_layout::ClosedUn
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_layout::ClosedUnit) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_layout::Mapping)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_layout::Mapping) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_layout::MappingBuffer)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_layout::MappingBuffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_layout::Node)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_layout::Node) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_layout::RowMapping)->bool {return equalFields(left,right);}

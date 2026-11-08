@@ -27,3 +27,7 @@ fn analyze(units: const blot_check_core::Module[:],filenames: const u8[:][:],ent
     }
     let error = gather(); if error != blot_error::Error.none { blot_support_pooled_buffer::deinit(sites,scratch_runs); return Snapshot {..},error; } let owned = site_runs.alloc_slice(sites.items.len); for site,index in sites.items { owned[index] = site; } blot_support_pooled_buffer::deinit(sites,scratch_runs); return Snapshot { sites: owned,omitted: omitted , ..},blot_error::Error.none;
 }
+
+fn canonicalOwned(snapshot:Snapshot)->Snapshot {
+ var sites=default<Site[:]>();if snapshot.sites.len!=0 {sites=site_runs.realloc_slice(snapshot.sites,snapshot.sites.len);}return Snapshot{sites:sites,omitted:snapshot.omitted};
+}
