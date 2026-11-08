@@ -40,13 +40,15 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen377 is the current source checkpoint. The owned-constraint constructor
-preserves all 31 fields and keeps region/principal name pools distinct. Its
-99.336s run clears the previous name-transfer error and reaches publication of
-PrincipalGraph. Next, preserve the graph's ten copied slice families, its
-transferred StoreSnapshot and exactly one fresh graph ID while removing the
-original description's borrowed provenance. No extra clone is authorized merely
-as a type-checking workaround.
+Frozen378 is the current source checkpoint. The graph constructor supplies all
+25 fields explicitly, preserving copy/byte-count order and its original fresh-ID
+mint. Transferred StoreSnapshot data is reconstructed through its existing
+live/generation lease and exact identity/length checks on all 22 owned ranges;
+State is copied unchanged. All 37 strict controls pass on both Goose checkers.
+Its98.842s run clears graph publication and reaches storing the returned graph
+in the caller's result. Next, verify the tuple binding preserves the graph
+reference, then use the existing exact-slot/live-lease graph getter at transfer.
+No whole compiler or runtime pass follows from this source checkpoint.
 
 Current representation repairs use the existing Session→Generator Frame token
 with live generation, current-frame and exact registered Session/Generator/

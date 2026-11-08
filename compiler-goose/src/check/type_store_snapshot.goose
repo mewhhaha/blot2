@@ -5,6 +5,7 @@ import check.types;
 import reuse.composite_resolution_cache;
 import reuse.epoch_resolution_cache;
 import support.error;
+import support.option;
 import work_counters;
 
 import std;
@@ -134,6 +135,280 @@ reusable[] var pool_effects_versions: blot_check_effects::Version[>..] = [];
 reusable[] var pool_effects_resolved: dictionary_slot<u32, u32>[>..] = [];
 reusable[] var pool_resolved_entries: blot_reuse_epoch_resolution_cache::Entry[>..] = [];
 reusable[] var pool_composites_entries: blot_reuse_composite_resolution_cache::Entry[>..] = [];
+// Reborrow the live lease's exact runs; this does not acquire another owner.
+fn canonicalSnapshot(source: Snapshot) -> Snapshot {
+    assert(source.lease_index != 0 && source.lease_index <= leases.len);
+    let lease = leases[source.lease_index - 1];
+    assert(lease.live && lease.generation == source.generation);
+    assert(source.state.store_owner_id != 0);
+    var result = Snapshot { state: source.state, lease_index: source.lease_index, generation: source.generation, .. };
+    {
+        let range = lease.store_nodes;
+        assert(range.start >= 0 && range.start <= pool_store_nodes.len);
+        assert(range.len >= 0 && range.len <= pool_store_nodes.len - range.start);
+        if range.len == 0 {
+            assert(source.store_nodes.len == 0);
+        } else {
+            let owned = pool_store_nodes[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_nodes, owned));
+            result.store_nodes = owned;
+        }
+    }
+    {
+        let range = lease.store_extra;
+        assert(range.start >= 0 && range.start <= pool_store_extra.len);
+        assert(range.len >= 0 && range.len <= pool_store_extra.len - range.start);
+        if range.len == 0 {
+            assert(source.store_extra.len == 0);
+        } else {
+            let owned = pool_store_extra[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_extra, owned));
+            result.store_extra = owned;
+        }
+    }
+    {
+        let range = lease.store_variables;
+        assert(range.start >= 0 && range.start <= pool_store_variables.len);
+        assert(range.len >= 0 && range.len <= pool_store_variables.len - range.start);
+        if range.len == 0 {
+            assert(source.store_variables.len == 0);
+        } else {
+            let owned = pool_store_variables[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_variables, owned));
+            result.store_variables = owned;
+        }
+    }
+    {
+        let range = lease.store_versions;
+        assert(range.start >= 0 && range.start <= pool_store_versions.len);
+        assert(range.len >= 0 && range.len <= pool_store_versions.len - range.start);
+        if range.len == 0 {
+            assert(source.store_versions.len == 0);
+        } else {
+            let owned = pool_store_versions[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_versions, owned));
+            result.store_versions = owned;
+        }
+    }
+    {
+        let range = lease.store_operations;
+        assert(range.start >= 0 && range.start <= pool_store_operations.len);
+        assert(range.len >= 0 && range.len <= pool_store_operations.len - range.start);
+        if range.len == 0 {
+            assert(source.store_operations.len == 0);
+        } else {
+            let owned = pool_store_operations[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_operations, owned));
+            result.store_operations = owned;
+        }
+    }
+    {
+        let range = lease.store_operation_links;
+        assert(range.start >= 0 && range.start <= pool_store_operation_links.len);
+        assert(range.len >= 0 && range.len <= pool_store_operation_links.len - range.start);
+        if range.len == 0 {
+            assert(source.store_operation_links.len == 0);
+        } else {
+            let owned = pool_store_operation_links[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_operation_links, owned));
+            result.store_operation_links = owned;
+        }
+    }
+    {
+        let range = lease.store_quantifier_goals;
+        assert(range.start >= 0 && range.start <= pool_store_quantifier_goals.len);
+        assert(range.len >= 0 && range.len <= pool_store_quantifier_goals.len - range.start);
+        if range.len == 0 {
+            assert(source.store_quantifier_goals.len == 0);
+        } else {
+            let owned = pool_store_quantifier_goals[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_quantifier_goals, owned));
+            result.store_quantifier_goals = owned;
+        }
+    }
+    {
+        let range = lease.store_quantifier_obligations;
+        assert(range.start >= 0 && range.start <= pool_store_quantifier_obligations.len);
+        assert(range.len >= 0 && range.len <= pool_store_quantifier_obligations.len - range.start);
+        if range.len == 0 {
+            assert(source.store_quantifier_obligations.len == 0);
+        } else {
+            let owned = pool_store_quantifier_obligations[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_quantifier_obligations, owned));
+            result.store_quantifier_obligations = owned;
+        }
+    }
+    {
+        let range = lease.store_occurs_seen;
+        assert(range.start >= 0 && range.start <= pool_store_occurs_seen.len);
+        assert(range.len >= 0 && range.len <= pool_store_occurs_seen.len - range.start);
+        if range.len == 0 {
+            assert(source.store_occurs_seen.len == 0);
+        } else {
+            let owned = pool_store_occurs_seen[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_occurs_seen, owned));
+            result.store_occurs_seen = owned;
+        }
+    }
+    {
+        let range = lease.store_closed_row_index;
+        assert(range.start >= 0 && range.start <= pool_store_closed_row_index.len);
+        assert(range.len >= 0 && range.len <= pool_store_closed_row_index.len - range.start);
+        if range.len == 0 {
+            assert(source.store_closed_row_index.len == 0);
+        } else {
+            let owned = pool_store_closed_row_index[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_closed_row_index, owned));
+            result.store_closed_row_index = owned;
+        }
+    }
+    {
+        let range = lease.store_closed_operation_index;
+        assert(range.start >= 0 && range.start <= pool_store_closed_operation_index.len);
+        assert(range.len >= 0 && range.len <= pool_store_closed_operation_index.len - range.start);
+        if range.len == 0 {
+            assert(source.store_closed_operation_index.len == 0);
+        } else {
+            let owned = pool_store_closed_operation_index[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_closed_operation_index, owned));
+            result.store_closed_operation_index = owned;
+        }
+    }
+    {
+        let range = lease.store_variable_views;
+        assert(range.start >= 0 && range.start <= pool_store_variable_views.len);
+        assert(range.len >= 0 && range.len <= pool_store_variable_views.len - range.start);
+        if range.len == 0 {
+            assert(source.store_variable_views.len == 0);
+        } else {
+            let owned = pool_store_variable_views[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_variable_views, owned));
+            result.store_variable_views = owned;
+        }
+    }
+    {
+        let range = lease.store_associated_equations;
+        assert(range.start >= 0 && range.start <= pool_store_associated_equations.len);
+        assert(range.len >= 0 && range.len <= pool_store_associated_equations.len - range.start);
+        if range.len == 0 {
+            assert(source.store_associated_equations.len == 0);
+        } else {
+            let owned = pool_store_associated_equations[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_associated_equations, owned));
+            result.store_associated_equations = owned;
+        }
+    }
+    {
+        let range = lease.store_projection_resolutions;
+        assert(range.start >= 0 && range.start <= pool_store_projection_resolutions.len);
+        assert(range.len >= 0 && range.len <= pool_store_projection_resolutions.len - range.start);
+        if range.len == 0 {
+            assert(source.store_projection_resolutions.len == 0);
+        } else {
+            let owned = pool_store_projection_resolutions[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_projection_resolutions, owned));
+            result.store_projection_resolutions = owned;
+        }
+    }
+    {
+        let range = lease.store_operation_chains;
+        assert(range.start >= 0 && range.start <= pool_store_operation_chains.len);
+        assert(range.len >= 0 && range.len <= pool_store_operation_chains.len - range.start);
+        if range.len == 0 {
+            assert(source.store_operation_chains.len == 0);
+        } else {
+            let owned = pool_store_operation_chains[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.store_operation_chains, owned));
+            result.store_operation_chains = owned;
+        }
+    }
+    {
+        let range = lease.effects_rows;
+        assert(range.start >= 0 && range.start <= pool_effects_rows.len);
+        assert(range.len >= 0 && range.len <= pool_effects_rows.len - range.start);
+        if range.len == 0 {
+            assert(source.effects_rows.len == 0);
+        } else {
+            let owned = pool_effects_rows[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.effects_rows, owned));
+            result.effects_rows = owned;
+        }
+    }
+    {
+        let range = lease.effects_labels;
+        assert(range.start >= 0 && range.start <= pool_effects_labels.len);
+        assert(range.len >= 0 && range.len <= pool_effects_labels.len - range.start);
+        if range.len == 0 {
+            assert(source.effects_labels.len == 0);
+        } else {
+            let owned = pool_effects_labels[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.effects_labels, owned));
+            result.effects_labels = owned;
+        }
+    }
+    {
+        let range = lease.effects_variables;
+        assert(range.start >= 0 && range.start <= pool_effects_variables.len);
+        assert(range.len >= 0 && range.len <= pool_effects_variables.len - range.start);
+        if range.len == 0 {
+            assert(source.effects_variables.len == 0);
+        } else {
+            let owned = pool_effects_variables[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.effects_variables, owned));
+            result.effects_variables = owned;
+        }
+    }
+    {
+        let range = lease.effects_versions;
+        assert(range.start >= 0 && range.start <= pool_effects_versions.len);
+        assert(range.len >= 0 && range.len <= pool_effects_versions.len - range.start);
+        if range.len == 0 {
+            assert(source.effects_versions.len == 0);
+        } else {
+            let owned = pool_effects_versions[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.effects_versions, owned));
+            result.effects_versions = owned;
+        }
+    }
+    {
+        let range = lease.effects_resolved;
+        assert(range.start >= 0 && range.start <= pool_effects_resolved.len);
+        assert(range.len >= 0 && range.len <= pool_effects_resolved.len - range.start);
+        if range.len == 0 {
+            assert(source.effects_resolved.len == 0);
+        } else {
+            let owned = pool_effects_resolved[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.effects_resolved, owned));
+            result.effects_resolved = owned;
+        }
+    }
+    {
+        let range = lease.resolved_entries;
+        assert(range.start >= 0 && range.start <= pool_resolved_entries.len);
+        assert(range.len >= 0 && range.len <= pool_resolved_entries.len - range.start);
+        if range.len == 0 {
+            assert(source.resolved_entries.len == 0);
+        } else {
+            let owned = pool_resolved_entries[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.resolved_entries, owned));
+            result.resolved_entries = owned;
+        }
+    }
+    {
+        let range = lease.composites_entries;
+        assert(range.start >= 0 && range.start <= pool_composites_entries.len);
+        assert(range.len >= 0 && range.len <= pool_composites_entries.len - range.start);
+        if range.len == 0 {
+            assert(source.composites_entries.len == 0);
+        } else {
+            let owned = pool_composites_entries[range.start..range.start + range.len];
+            assert(blot_support::same_slice_identity(source.composites_entries, owned));
+            result.composites_entries = owned;
+        }
+    }
+    return result;
+}
+
 fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
     if !blot_check_types::valid(store) || store.owner_id == 0 { return Snapshot {..}, blot_error::Error.invalid_artifact; }
     if store.owner_id == 0 || next_generation == 0xffffffffffffffff || leases.len == 0xffffffff { return default<Snapshot>(), blot_error::Error.type_limit; }

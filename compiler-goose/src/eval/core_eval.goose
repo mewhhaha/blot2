@@ -28,6 +28,7 @@ import check.staging_origins;
 import check.task_types;
 import check.typed_staging;
 import check.types;
+import check.type_store_snapshot;
 import eval.body_recipe;
 import eval.canonical_specialization;
 import eval.closed_local_value;
@@ -1632,17 +1633,21 @@ fn principalGraphBytes() -> i64 { return 407+blot_check_types::snapshotMetadataB
 fn constraintBytes() -> i64 { return 4+13+4+4+4+1+12+8+1+9+4+16+9+1+1+4+4+4+4+4+4+8+8+1+4+4+1+1+1+1+1; }
 fn copyPrincipalConstraints(values: const Constraint[:]) -> const Constraint[:] { let output=principal_constraint_pool.alloc_slice(values.len); for value,index in values { let name=principal_names_pool.alloc_slice(value.diagnostic_name.len); for byte,offset in value.diagnostic_name { name[offset]=byte; } output[index]=constraintWithName(value,name); } return output; }
 fn createPrincipalGraph(description: PrincipalGraph) -> PrincipalGraph&,Error {
- var graph=description; graph.owner_id=blot_native::fresh_owner_id(); graph.leases=1;
- let imports=principal_import_pool.alloc_slice(description.imports.len); for value,index in description.imports { imports[index]=value; } graph.imports=imports;
- let rows=principal_row_import_pool.alloc_slice(description.rows.len); for value,index in description.rows { rows[index]=value; } graph.rows=rows; graph.requirements=copyPrincipalConstraints(description.requirements); graph.constraints=copyPrincipalConstraints(description.constraints);
- let aliases=principal_alias_pool.alloc_slice(description.aliases.len); for value,index in description.aliases { aliases[index]=value; } graph.aliases=aliases;
- let functions=principal_words_pool.alloc_slice(description.functions.len); for value,index in description.functions { functions[index]=value; } graph.functions=functions;
- let arguments=principal_words_pool.alloc_slice(description.arguments.len); for value,index in description.arguments { arguments[index]=value; } graph.arguments=arguments;
- let references=principal_targets_pool.alloc_slice(description.references.len); for value,index in description.references { references[index]=value; } graph.references=references;
- let actions=principal_actions_pool.alloc_slice(description.actions.len); for value,index in description.actions { actions[index]=value; } graph.actions=actions;
- let dependencies=principal_sources_pool.alloc_slice(description.dependencies.len); for value,index in description.dependencies { dependencies[index]=value; } graph.dependencies=dependencies;
- let plain=principal_plain_pool.alloc_slice(description.plain_reads.len); for value,index in description.plain_reads { plain[index]=value; } graph.plain_reads=plain;
- graph.owned_bytes=blot_check_types::snapshotOwnedBytes(graph.types)+graph.imports.len*8+graph.rows.len*8+(graph.requirements.len+graph.constraints.len)*constraintBytes()+graph.aliases.len*9+(graph.functions.len+graph.arguments.len)*4+graph.references.len*12+graph.actions.len*5+graph.dependencies.len*8+graph.plain_reads.len*11; for constraint in graph.constraints { graph.owned_bytes=satAdd(graph.owned_bytes,constraint.diagnostic_name.len); } for constraint in graph.requirements { graph.owned_bytes=satAdd(graph.owned_bytes,constraint.diagnostic_name.len); }
+ let owner_id=blot_native::fresh_owner_id();
+ let imports=principal_import_pool.alloc_slice(description.imports.len); for value,index in description.imports { imports[index]=value; }
+ let rows=principal_row_import_pool.alloc_slice(description.rows.len); for value,index in description.rows { rows[index]=value; } let requirements=copyPrincipalConstraints(description.requirements); let constraints=copyPrincipalConstraints(description.constraints);
+ let aliases=principal_alias_pool.alloc_slice(description.aliases.len); for value,index in description.aliases { aliases[index]=value; }
+ let functions=principal_words_pool.alloc_slice(description.functions.len); for value,index in description.functions { functions[index]=value; }
+ let arguments=principal_words_pool.alloc_slice(description.arguments.len); for value,index in description.arguments { arguments[index]=value; }
+ let references=principal_targets_pool.alloc_slice(description.references.len); for value,index in description.references { references[index]=value; }
+ let actions=principal_actions_pool.alloc_slice(description.actions.len); for value,index in description.actions { actions[index]=value; }
+ let dependencies=principal_sources_pool.alloc_slice(description.dependencies.len); for value,index in description.dependencies { dependencies[index]=value; }
+ let plain=principal_plain_pool.alloc_slice(description.plain_reads.len); for value,index in description.plain_reads { plain[index]=value; }
+ var owned_bytes=blot_check_types::snapshotOwnedBytes(description.types)+imports.len*8+rows.len*8+(requirements.len+constraints.len)*constraintBytes()+aliases.len*9+(functions.len+arguments.len)*4+references.len*12+actions.len*5+dependencies.len*8+plain.len*11; for constraint in constraints { owned_bytes=satAdd(owned_bytes,constraint.diagnostic_name.len); } for constraint in requirements { owned_bytes=satAdd(owned_bytes,constraint.diagnostic_name.len); }
+ let graph=PrincipalGraph{owner_id:owner_id,key:description.key,leases:1,retention_eligible:description.retention_eligible,
+ types:blot_check_type_store_snapshot::canonicalSnapshot(description.types),node_count:description.node_count,base_edge_count:description.base_edge_count,owned_bytes:owned_bytes,pool_index:description.pool_index,root:description.root,
+ imports:imports,rows:rows,requirements:requirements,constraints:constraints,aliases:aliases,functions:functions,arguments:arguments,references:references,actions:actions,source_complete:description.source_complete,
+ dependencies:dependencies,plain_reads:plain,untracked_reads:description.untracked_reads,foreign_sources:description.foreign_sources,foreign_types_only:description.foreign_types_only};
  let index=principal_graph_pool.alloc_index(graph); principal_graph_pool[index].pool_index=index; return principal_graph_pool[index],blot_error::Error.none;
 }
 fn deinit(self_: PrincipalGraph&) { assert(self_.leases!=0); self_.leases--; if self_.leases!=0 { return; } let index=self_.pool_index; assert(index>=0); for constraint in self_.constraints { principal_names_pool.free_slice(constraint.diagnostic_name); } for constraint in self_.requirements { principal_names_pool.free_slice(constraint.diagnostic_name); } principal_constraint_pool.free_slice(self_.constraints); principal_constraint_pool.free_slice(self_.requirements); principal_import_pool.free_slice(self_.imports); principal_row_import_pool.free_slice(self_.rows); principal_alias_pool.free_slice(self_.aliases); principal_words_pool.free_slice(self_.functions); principal_words_pool.free_slice(self_.arguments); principal_targets_pool.free_slice(self_.references); principal_actions_pool.free_slice(self_.actions); principal_sources_pool.free_slice(self_.dependencies); principal_plain_pool.free_slice(self_.plain_reads); blot_check_types::deinit(self_.types); principal_graph_pool.free(index); }

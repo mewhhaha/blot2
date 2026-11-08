@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen377 is the current source checkpoint. Selected private checker
+Frozen378 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -67,12 +67,18 @@ behavior remain unmeasured. Fixed scratch default initialization also adds
 unmeasured work relative to native undefined spare capacity.
 
 Frozen377 shares the exact 31-field Constraint constructor between region-pool
-reconstitution and principal-name copying. Both retain their original distinct
-name pools and copy/free order. Independent source review passes. Its99.336s
-actual run clears that transfer and reaches PrincipalGraph publication. Next,
-preserve all copied fields, the transferred StoreSnapshot and exactly one fresh
-graph ID while making their ownership explicit. Do not clone owned payloads
-again solely to satisfy provenance checking. No whole compiler C, header or
+reconstitution and principal-name copying. Both retain their distinct original
+pools and copy/free order. Frozen378 reconstructs all 25 PrincipalGraph fields,
+keeping its original entry mint, allocation/copy order and byte accounting.
+StoreSnapshot is transferred through its existing live/generation lease and
+exact pointer/length validation of all 22 leased ranges, with State unchanged.
+The helper adds no allocation, clone, retain or ID mint. All 37 strict controls
+pass on official and selected Goose, including stale/reused leases, all redirected
+same-pool slices, foreign/stack slices and global publication/cleanup. Independent
+allocation/deinit mapping and complete graph-field inverses pass. Its98.842s
+actual run clears graph publication and reaches caller result retention. Next,
+verify the tuple binding keeps the returned graph reference, then reborrow through
+the existing exact-slot/live-lease getter. No whole compiler C, header or
 executable has been emitted; source acceptance is not runtime qualification.
 
 A single 15-second post-error collection experiment returns only one diagnostic
