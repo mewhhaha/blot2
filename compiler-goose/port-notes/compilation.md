@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen355 is the current source checkpoint. Selected private checker
+Frozen357 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -124,7 +124,15 @@ clears that boundary and reaches recursive result stores in constant-receipt
 demand queries. Frozen355 handles the ten-head cycle, two typed query stores and
 pure lookup/storage constructors. Independent review checks thirty concrete
 edges and preserves every Input field, default and cleanup point. Its87.474s
-run reaches pooled record insertion provenance; that boundary is next.
+run reaches pooled record insertion provenance. Frozen356 reconstitutes the
+already-live owned record through five named slice pools and exact optional
+output-header identity. Its source audit and fourteen reduced controls pass on
+both checkers, preserving all fields, nested query/judgment identities and deep
+cleanup. Pool range checks alone do not authorize arbitrary freed storage.
+Its87.460s run reaches scalarRoot's readonly-view parameter; Frozen357 takes
+that header by value, matching the native API and all five callers. Its89.755s
+run reaches an integer-enum switch missing a fallback. That translation family
+is next. No whole compiler C, header or executable has been emitted.
 The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo

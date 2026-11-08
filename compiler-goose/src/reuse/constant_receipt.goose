@@ -583,3 +583,18 @@ fn destroy(self_:Inputs&) {
  let index=self_.allocation_index;assert(index>=0 && index<output_inputs.len);let owned:Inputs& =output_inputs[index];assert(owned .== self_);
  self_.deinit();output_inputs.free(index);
 }
+
+// These payloads remain owned by the record through transfer and deinit.
+fn canonicalOwned(source:Inputs)->Inputs {
+ return Inputs{types:owned_types.realloc_slice(source.types,source.types.len),rows:owned_rows.realloc_slice(source.rows,source.rows.len),allocation_index:source.allocation_index};
+}
+fn canonicalOutputs(source:Inputs&?)->Inputs&? {
+ if !source {return null;}
+ let index=source.allocation_index;assert(index>=0&&index<output_inputs.len);
+ let owned:Inputs& =output_inputs[index];assert(source .== owned);return owned;
+}
+fn canonicalOwned(source:Record)->Record {
+ return Record{buffers:owned_buffers.realloc_slice(source.buffers,source.buffers.len),ordered_reads:source.ordered_reads,values_before:source.values_before,
+ target:source.target,value:source.value,options:source.options,events:owned_events.realloc_slice(source.events,source.events.len),sources:owned_sources.realloc_slice(source.sources,source.sources.len),
+ inputs:canonicalOwned(source.inputs),outputs:canonicalOutputs(source.outputs)};
+}

@@ -71,7 +71,7 @@ struct Stats {
 }
 fn room(current: i64, added: i64) -> bool { return current >= 0 && current <= 0xffffffff && added >= 0 && added <= 0xffffffff - current; }
 fn range(start: i64, len: i64, total: i64) -> bool { return start >= 0 && len >= 0 && start <= total && len <= total - start; }
-fn scalarRoot<S>(snapshot: const S&, id: u32) -> blot_support::Option<ValueInfo> {
+fn scalarRoot<S>(snapshot: S, id: u32) -> blot_support::Option<ValueInfo> {
     let no = blot_support::none<ValueInfo>(); if id == 0 || id >= snapshot.values.len || id >= snapshot.value_records.len || id >= snapshot.value_evidence.len { return no; }
     let info = snapshot.values[id]; if info.kind != blot_eval_eval_values::ValueKind.scalar || info.nominal != 0 || info.len != 0 || info.start > snapshot.children.len || snapshot.value_records[id] != 0 { return no; }
     var expected = blot_eval_type_evidence::Tag.absent;

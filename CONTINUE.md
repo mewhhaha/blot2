@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-The checkpoint through frozen355 replaces Session's Generator backpointer with the existing scalar
+The checkpoint through frozen357 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -101,7 +101,12 @@ checkers. Its87.297s run clears that boundary and reaches recursive result store
 in constant-receipt demand queries. Frozen355 handles that ten-head cycle and
 uses typed query setters and pure lookup/storage constructors. Independent
 review preserves all Input fields, defaults and cleanup order. Its87.474s run
-reaches pooled record insertion provenance; that ownership boundary is next.
+reaches pooled record insertion provenance. Frozen356 reconstructs the already
+owned record through its five named slice pools and exact optional output-header
+identity; fourteen reduced controls pass on both checkers. No allocation or
+payload copy is added. Frozen357 passes scalarRoot's readonly view by value,
+matching the native oracle and all five callers. Its89.755s run reaches an
+integer-enum switch missing a fallback; that translation family is next.
 No whole compiler success follows. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
