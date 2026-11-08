@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen388 is the current source checkpoint. PrincipalGraph publication keeps all
+Frozen390 is the current source checkpoint. PrincipalGraph publication keeps all
 25 fields and its original mint/copy/accounting order. The transferred snapshot
 uses its live/generation lease and exact checks on all 22 ranges; State is
 unchanged. All 37 strict controls pass on both checkers. Mutable reference-return
@@ -60,7 +60,12 @@ byte pool and normalizes ignored inactive keys to empty. Transfer controls pass
 on both checkers. Attempt387 was cancelled after57.352s with no diagnostic, not
 a pass; no actual inactive-key UAF was established. Its102.504s run reaches
 summary-job RegionSnapshot publication. Exact validation/reconstruction of its
-existing57-range lease is next; scalar-only handles are under source review.
+existing57-range lease is explicit in Frozen389, preserving all115Statefields
+and solver ownership;73strict controls pass on both checkers. Frozen390 borrows
+the resumed snapshot for synchronous restore, removing its whole-value copyback.
+Its107.726s run clears that boundary and reaches the remaining direct child-ID
+collectCall alias. Reusing the tested argument-copy boundary is next. Scalar-only
+snapshot handles remain under source review.
 No whole compiler or runtime pass follows from this source checkpoint.
 
 Current representation repairs use the existing Session→Generator Frame token

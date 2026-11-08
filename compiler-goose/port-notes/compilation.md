@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen388 is the current source checkpoint. Selected private checker
+Frozen390 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -107,8 +107,16 @@ Three actual-map transfer controls pass on both checkers, covering growth,
 suspension, restore and final cleanup. Attempt387 was cancelled after57.352s
 without a diagnostic; it is not a pass, and no actual inactive-key UAF was
 established. Its102.504s run reaches summary-job RegionSnapshot publication.
-The existing lease owns57ranges; explicit header reconstruction is next, while
-scalar-only snapshot representation is independently reviewed. No whole compiler C, header or executable has been emitted;
+Frozen389 validates all57exact leased ranges and rebuilds all115Statefields,
+using the existing static caller canonicalizer and owned solver-snapshot helper.
+All73strict controls pass on official/selected Goose, including every same-pool
+redirect, stale lease/generation, bad bounds, foreign/stack slice and cleanup.
+Full solver suspend/restore is not instantiated by that fixture. Frozen390 makes
+the resume carrier a nullable snapshot reference for the synchronous call and
+removes its whole-value copyback. Exact six-edit source review passes. Its107.726s
+run clears resume and reaches the remaining direct child-ID collectCall alias.
+The tested argument-copy boundary is next. A scalar-only snapshot representation
+is independently reviewed as a possible code/data-graph subtraction. No whole compiler C, header or executable has been emitted;
 source acceptance is not runtime qualification.
 
 A single 15-second post-error collection experiment returns only one diagnostic
