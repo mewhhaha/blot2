@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen404 is the current source checkpoint. Previous private checker
+Frozen405 is the current source checkpoint. Previous private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -396,3 +396,10 @@ Frozen404 narrows the borrowed nullable Engine before deinit, retaining the
 same pointer and cleanup order. Source review and a focused executed control
 pass on official/private checkers. Its100.802s run reaches project_packet27
 read-only decoder-output reference assignment; no C/header/executable.
+
+Frozen405 makes two packet decode temporaries mutable before readonly use;
+no checker const-rule change. Exact inverse and36extracted decoder laws pass
+on both checkers, including cursor/error/owner cleanup. Its100.473s run clears
+that assignment and reaches missing project::Range codec. Review also finds
+stale path/Cache-pointer BodyOffers wire assumptions; generic byte laws do
+not qualify that boundary. Batch current-domain codec/offer repairs next.

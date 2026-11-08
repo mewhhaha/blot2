@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen404 is the current source checkpoint. RegionSnapshot is now only a
+Frozen405 is the current source checkpoint. RegionSnapshot is now only a
 lease/generation handle; its existing lease owns State and solver metadata.
 Restore creates one invocation-local payload view after solver restore succeeds.
 The rewrite removes400lines/15948bytes and reduces the static Session type proxy
@@ -268,3 +268,10 @@ Frozen404 narrows the borrowed nullable Engine before deinit, retaining the
 same pointer and cleanup order. Source review and a focused executed control
 pass on official/private checkers. Its100.802s run reaches project_packet27
 read-only decoder-output reference assignment; no C/header/executable.
+
+Frozen405 makes two packet decode temporaries mutable before readonly use;
+no checker const-rule change. Exact inverse and36extracted decoder laws pass
+on both checkers, including cursor/error/owner cleanup. Its100.473s run clears
+that assignment and reaches missing project::Range codec. Review also finds
+stale path/Cache-pointer BodyOffers wire assumptions; generic byte laws do
+not qualify that boundary. Batch current-domain codec/offer repairs next.
