@@ -165,7 +165,7 @@ struct ScratchStats {
 struct QueryScratch {
     allocation_owner: u64 = 0, owner_id: u64 = blot_native::fresh_owner_id(), owner: u64 = 0,
     generator: u64 = 0, session: u64 = 0, pools: const Pools? = null, gate: const Gate? = null,
-    policy: blot_support::Option<RowPolicy>, stats: ScratchStats = ScratchStats {..},
+    policy: blot_support::Option<RowPolicy> =blot_support::none<RowPolicy>(), stats: ScratchStats = ScratchStats {..},
     anchors: WordBuffer = WordBuffer {..}, anchor_ids: WordBuffer = WordBuffer {..}, positions: SizeBuffer = SizeBuffer {..},
     candidate: WordBuffer = WordBuffer {..}, inverse: WordBuffer = WordBuffer {..}, inverse_ids: WordBuffer = WordBuffer {..},
     semantic: WordBuffer = WordBuffer {..}, types: MappingBuffer = MappingBuffer {..}, rows: RowBuffer = RowBuffer {..},

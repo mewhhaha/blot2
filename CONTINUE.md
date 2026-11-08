@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen352 replaces Session's Generator backpointer with the existing scalar
+The checkpoint through frozen354 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -92,7 +92,13 @@ of retaining it in Candidate; its83.663s run reaches a missing QueryStorage
 root_buffer default, defined as null in the native oracle. Frozen352 restores
 that declaration and routes six existing recorder assignments through the typed
 setter at their original points. Its87.459s check reaches a MemberTrace missing
-entries owner.
+entries initializer. Frozen353 initializes that fixed scratch capacity and
+restores the native-null QueryScratch policy default. Its86.662s run reaches
+trace-header provenance through the callback context. Frozen354 uses a checked
+existing-slot lookup while the outer call keeps the trace slot live, and handles
+the exact partial-array callback cycle. Sixteen reduced controls execute on both
+checkers. Its87.297s run clears that boundary and reaches recursive result stores
+in constant-receipt demand queries; those stores and their concrete cycle are next.
 No whole compiler success follows. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm

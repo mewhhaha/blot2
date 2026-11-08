@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen352 is the current source checkpoint. Selected private checker
+Frozen354 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -114,7 +114,15 @@ removes Plan from Candidate and forwards it explicitly to its two consumers.
 Its83.663s check reaches a missing QueryStorage.root_buffer default; the native
 oracle supplies null. Frozen352 restores the field default and preserves three
 recorder protocols through six existing-setter substitutions. Its87.459s actual
-check reaches a MemberTrace missing entries owner; its scoped owner API is next. The revised semantic-only entry probe with export-first checking still hit
+check reaches a MemberTrace missing entries owner; Frozen353 initializes that fixed scratch capacity at its actual allocation and
+restores the native-null policy default. Its86.662s run reaches trace-header
+provenance through the callback context. Frozen354 validates the existing trace
+slot's bounds and exact header identity; its outer invocation owns the slot until
+the synchronous callback returns. This grants no stale-after-reuse authority.
+Sixteen reduced controls execute on official and selected Goose. Its87.297s run
+clears that boundary and reaches recursive result stores in constant-receipt
+demand queries. The exact callback cycle and those stores are next.
+The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo
 was rejected because store replay mutates provenance. A semantic-only entry
@@ -239,9 +247,9 @@ its diagnostics qualify its recorded input tree only.
 The installed upstream Goose remains unchanged, SHA256
 `b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2`.
 Repair attempts explicitly select the optional private checker, SHA256
-`8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43`.
-Its baseline46 recipe is tracked; the accepted delta is pinned in the receipt
-above while combined-recipe verification finishes.
+`678b88bdf038dae9fdf1366cf59aca5dfeaf046fb29de0b2fadf85359b703c19`.
+The tracked recipe reconstructs all 108 selected source files byte-exactly; its
+accepted changes and independent controls are pinned in the receipt above.
 `tools/build_goose_checker.py` and `tools/goose-containment.patch` preserve its
 reproducible recipe without modifying the sibling installation. A zero-context
 patch applies without fuzz and reproduces all 108 candidate source hashes;
