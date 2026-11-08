@@ -75,10 +75,14 @@ That ChildVisitor candidate e083ca53 passes201frontend/8runtime/7focused/12C par
 still times out120.299s with zero diagnostics/C on the same442authored inputs.
 It also remains unselected. Next: measure completed checking/effect-replay work
 inside the fixed cap and target repeated algorithmic work, without blind reruns.
-The gprofng path failed its short prerequisite: forced-stop profiles retain no
-useful samples, natural control warns of unreliable intervals. No full compiler
-capture was launched. Next is a telemetry-only private checker with fixed scalar
-work counters read before termination; no optimization or cap increase yet.
+The gprofng prerequisite failed; no full profile was launched. Telemetry-only
+checker d8143f86 passes201frontend/8runtime/7focused/12C parity. Instrumented400
+retains five valid raw snapshots and reaps within119.657s. At114.914s it has
+13654specializations and17243normal body completions, but814.7million raw
+store examinations and12.78billion TypeEq entries. Held/slot fixedpoint work is
+small (1414/1908entries,max2sweeps). Checking progresses; prioritize repeated
+store-summary replay and type comparison work. Counters perturb timing; this
+is no speed result. No mutable-root cache, optimization or cap increase yet.
 No compiler C/header/executable or executed-Wasm/Gdev result exists for the port.
 
 Current representation repairs use the existing Session→Generator Frame token

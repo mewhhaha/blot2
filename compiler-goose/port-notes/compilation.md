@@ -360,3 +360,11 @@ Recoverable physical OOM and retention/allocation observation remain separate
 production requirements. Null/unavailable metrics do not close them. Full compiler,
 public API, executed Wasm, copied-worker, library and Gdev qualification remain
 pending. Subsecond compilation and 1–2MB Gdev Wasm remain unmet.
+
+Instrumented400 pins five raw work-counter snapshots within119.657s including
+cleanup, on unchanged397 authored inputs. The telemetry-only checker passes
+201frontend/8runtime/7focused/12C parity. By114.914s it completes17243body
+passes but examines814.7million raw stores and enters TypeEq12.78billion times;
+held/slot convergence work is small (max2sweeps). Target repeated store-summary
+replay and type comparison work next. Instrumented time is no speed result;
+no C/header/executable exists, and selected checker678b88 is unchanged.
