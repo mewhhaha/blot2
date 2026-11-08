@@ -166,13 +166,13 @@ fn operator(op: blot_check_core::Op) -> blot_support::Option<blot_check_types::O
         _ => { return blot_support::none<blot_check_types::Operator>(); },
     }
 }
-fn capture(module: Module&, declarations: Recipe[>..<]&, references: BindingRef[>..<]&, members: Member[>..<]&) -> Error {
+fn capture(module: const Module&, declarations: Recipe[>..<]&, references: BindingRef[>..<]&, members: Member[>..<]&) -> Error {
     assert(module.declaration_dependencies.len == 0); assert(declarations.len == 0 && references.len == 0 && members.len == 0);
     var work: Work[>..<] = []; var locations: u32[>..<] = []; var seen: dictionary<u32,bool> = dictionary<u32,bool>{};
     var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: seen , ..};
     for index in module.bodies.len { declarations.push(Recipe {..}); }
     for body, offset in module.bodies[1..] { let recipe, error = scan.scan(body); if error != blot_error::Error.none { declarations.clear(); references.clear(); members.clear(); return error; } declarations[offset + 1] = recipe; }
-    module.declaration_dependencies = declarations[..]; module.dependency_references = references[..]; module.dependency_members = members[..]; return blot_error::Error.none;
+    return blot_error::Error.none;
 }
 struct Selection { body: blot_check_core::Body, output: Member[>..<]& }
 fn selectionMembers(module: const Module&, body: blot_check_core::Body, output: Member[>..<]&) -> Error { return withCapture(module, Selection { body, output , ..}, true, 0, select); }

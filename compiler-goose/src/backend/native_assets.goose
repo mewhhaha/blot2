@@ -91,7 +91,7 @@ fn discover(candidate: Candidate&,root: const u8[:],overrides: const blot_reuse_
         let discovered = enumerate();blot_native::directory_close(directory);if discovered != blot_error::Error.none {return discovered;}
     }
     let canonical_assets,canonical_error = candidate.canonical(asset_path);if canonical_error != blot_error::Error.none {return canonical_error;}
-    for entry in overrides.files.slots {if entry.tag == 0 || !entry.val.present || !blot_backend_native_asset_readers::ends(entry.key,".wgsl") {continue;}let parent = blot_support_path::dirname(entry.key);if !parent.present || parent.value != canonical_assets {continue;}let path,error = candidate.join(asset_path,basename(entry.key));if error != blot_error::Error.none {return error;}let appended = appendDiscovered(candidate,definitions,path,Kind.wgsl);if appended != blot_error::Error.none {return appended;}}
+    for entry in overrides.files.slots {if entry.tag == 0 || !entry.val.present || !blot_backend_native_asset_readers::ends(entry.key,".wgsl") {continue;}let parent = blot_support_path::dirnameEnd(entry.key);if !parent.present || entry.key[..parent.value] != canonical_assets {continue;}let path,error = candidate.join(asset_path,basename(entry.key));if error != blot_error::Error.none {return error;}let appended = appendDiscovered(candidate,definitions,path,Kind.wgsl);if appended != blot_error::Error.none {return appended;}}
     return blot_error::Error.none;
 }
 // Zig 0.17's Linux open/read error names are part of the asset diagnostic.

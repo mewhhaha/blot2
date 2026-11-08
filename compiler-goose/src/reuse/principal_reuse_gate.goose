@@ -176,11 +176,12 @@ struct ProjectContext { gate: Gate&, module: const Module&, unit: i64, dirty: bo
 fn projectUnit(context: ProjectContext, workspace: blot_reuse_declaration_projection::Workspace&) -> Error {
     let gate .= context.gate; let module .= context.module; let unit = context.unit;
     let dirty = context.dirty; let origins = context.origins; let closures = context.closures; let reached .= context.reached;
+    workspace.prepareOrigins(origins[gate.offsets[unit]..gate.offsets[unit+1]]);
     let pools:const Pools& =requiredPools(gate.source_pools);let pin = pools.modules[unit]; var failure = blot_error::Error.none;
     for binding, index in module.bindings[1..] {
         let id = (index + 1) as u32; reached.clear(); var same = false;
         match binding.kind {
-            global => { let found, error = workspace.definitionEqualWithOrigins(pin.module, module, id, reached, gate.constant_types, origins[gate.offsets[unit]..gate.offsets[unit + 1]]); if error != blot_error::Error.none { failure = error; break; } same = found; },
+            global => { let found, error = workspace.definitionEqualWithOrigins(pin.module,module,id,reached,gate.constant_types); if error != blot_error::Error.none { failure = error; break; } same = found; },
             external => { same = id < pin.module.bindings.len && blot_structural::equal(pin.module.bindings[id], binding); },
             _ => {},
         }

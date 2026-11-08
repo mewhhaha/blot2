@@ -67,7 +67,7 @@ recursive fn suite(self_:Collector&,body:u32,depth:i64)->Error {
  return blot_error::Error.none;
 }
 reusable[] var returned:Symbol[>..]=[];
-fn release(values:const Symbol[:]) {if values.len==0 {return;}let first:const Symbol& =values[0];let at=returned.index_of(first);assert(at>=0);returned.free_slice(returned[at..at+values.len]);}
+fn release(values:const Symbol[:]) {if values.len==0 {return;}returned.free_slice(values);}
 fn collect(tree:const Tree&,pool:const Pool&,iterator_pattern:u32,body:u32)->const Symbol[:],Error {
  // Owners stay in this nonrecursive wrapper, and the result owns a separate run.
  var shadowed:dictionary<Symbol,u32> =dictionary<Symbol,u32> {};var seen:dictionary<Symbol,bool> =dictionary<Symbol,bool> {};var trail:Symbol[>..<]=[];var targets:Symbol[>..<]=[];

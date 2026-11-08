@@ -1674,8 +1674,8 @@ fn qualified(display: EntryDisplay&,owner: u32,name: const u8[:],saved_origin: c
         else if context.source_mode && owner == context.entry { origin = "main"; }
         else {
             let entry_path = context.identity.value.owner(context.entry); let owner_path = context.identity.value.owner(owner); if !entry_path.present || !owner_path.present { return false,blot_error::Error.none; }
-            let directory = blot_support_path::dirname(entry_path.value); if !directory.present { return false,blot_error::Error.none; }
-            let error = blot_support_path::relative(directory.value,owner_path.value,path); if error != blot_error::Error.none { return false,error; } origin = path;
+            let directory = blot_support_path::dirnameEnd(entry_path.value); if !directory.present { return false,blot_error::Error.none; }
+            let error = blot_support_path::relative(entry_path.value[..directory.value],owner_path.value,path); if error != blot_error::Error.none { return false,error; } origin = path;
         }
     }
     if origin.len == 0 { return false,blot_error::Error.none; } display.text.append(origin); display.text.append("::"); display.text.append(name); return true,blot_error::Error.none;

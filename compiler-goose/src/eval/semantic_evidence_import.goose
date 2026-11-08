@@ -11,7 +11,7 @@ import dictionary;
 type Error=blot_error::Error;
 type Tag=blot_eval_type_evidence::Tag;
 struct Importer { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View,destination: blot_eval_type_evidence::Store,max_depth: i64,allow_scoped: bool=true,remaining: i64?=null,nodes: dictionary<u32,u32>&,rows: dictionary<u32,u32>&,labels: dictionary<u32,u32>& }
-fn charge<I>(self_: I&) -> Error { if self_.remaining!=null { if self_.remaining==0 { return blot_error::Error.evidence_limit; } self_.remaining--; } return blot_error::Error.none; }
+fn charge<I>(self_: I&) -> Error { let remaining=self_.remaining; if remaining!=null { if remaining==0 { return blot_error::Error.evidence_limit; } remaining--; } return blot_error::Error.none; }
 recursive fn ty<I>(self_: I&,id: u32,depth: i64) -> u32,Error { var copied=WordBuffer {}; var goals=GoalBuffer {}; let value,error=tyInner(self_,id,depth,copied,goals); deinit(copied); deinit(goals); return value,error; }
 recursive fn tyInner<I>(self_: I&,id: u32,depth: i64,copied: WordBuffer&,goals: GoalBuffer&) -> u32,Error {
  let destination=target(self_);

@@ -499,7 +499,7 @@ fn loadCompiledMode<P>(context:LoadContext&,loader:Loader<P>&)->Error {
 }
 
 fn selectedImportParts(source_filename:const u8[:],raw:const u8[:],options:Options)->const u8[:],const u8[:],Error {
- if starts(raw,"./")||starts(raw,"../") {let directory=blot_support_path::dirname(source_filename);if !directory.present {return default<const u8[:]>(),default<const u8[:]>(),blot_error::Error.invalid_path;}return directory.value,raw,blot_error::Error.none;}
+ if starts(raw,"./")||starts(raw,"../") {let directory=blot_support_path::dirnameEnd(source_filename);if !directory.present {return default<const u8[:]>(),default<const u8[:]>(),blot_error::Error.invalid_path;}return source_filename[..directory.value],raw,blot_error::Error.none;}
  var matched:i64=0;var selected:i64=-1;if options.std_root.present&&starts(raw,"std/") {matched=4;}
  for alias,index in options.aliases {if alias.prefix.len>matched&&starts(raw,alias.prefix) {matched=alias.prefix.len;selected=index;}}
  if matched==0 {return default<const u8[:]>(),default<const u8[:]>(),blot_error::Error.invalid_path;}

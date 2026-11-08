@@ -64,7 +64,7 @@ fn publish(self_:RecipeTable&,visits:const u32[:],captures:bool)->u32,Error {
  let record=recipe_records.alloc_index(RecipeRecord {value:Recipe {owned,captures}});let index=self_.len as u32;
  self_.storage[self_.len]=record as u32;self_.len++;self_.items=self_.storage[..self_.len];return index,blot_error::Error.none;
 }
-fn clear(self_:RecipeTable&) {for id in self_.items {let words=recipe_records[id].value.visits;if words.len!=0 {let first:const u32& =words[0];let at=recipe_visits.index_of(first);assert(at>=0);recipe_visits.free_slice(recipe_visits[at..at+words.len]);}recipe_records.free(id);}self_.items=self_.storage[..0];self_.len=0;}
+fn clear(self_:RecipeTable&) {for id in self_.items {let words=recipe_records[id].value.visits;if words.len!=0 {recipe_visits.free_slice(words);}recipe_records.free(id);}self_.items=self_.storage[..0];self_.len=0;}
 fn release(self_:RecipeTable&) {self_.clear();blot_support_pooled_buffer::deinit(self_,recipe_indexes);}
 type Keys=blot_support_pooled_map::Map<Key,u32>;
 type Declines=blot_support_pooled_map::Map<Key,i64>;
@@ -91,7 +91,7 @@ fn initPooled()->Cache,Error {
 }
 fn init()->Cache,Error {return initPooled();}
 fn initPooledRef()->Cache?,Error {let cache,error=initPooled();if error!=blot_error::Error.none {return null,error;}return cache_slots[cache.lease-1].handle,blot_error::Error.none;}
-fn deinit(self_:Cache&) {if self_.lease==0 {return;}assert(valid(self_));self_.recipes.release();self_.keys.release();self_.declined_limits.release();let at=self_.lease-1;cache_slots[at].state.live=false;self_=Cache {};cache_slots.free(at);}
+fn deinit(self_:Cache&) {if self_.lease==0 {return;}assert(valid(self_));self_.recipes.release();release(self_.keys);release(self_.declined_limits);let at=self_.lease-1;cache_slots[at].state.live=false;self_=Cache {};cache_slots.free(at);}
 fn build(visits: u32[>..<]&,module: const Module&,key: Key,limit: i64) -> bool,Error {
  var items: u32[>..<]=[]; var work=Pending {items,limit}; var seen: dictionary<u32,bool> =dictionary<u32,bool> {}; let error=append(work,key.body); if error!=blot_error::Error.none { return false,error; } var captures=false;
  loop { let id,present=pop(work); if !present { break; } if id==0||::contains(seen,id) { continue; } if visits.len==limit { return false,blot_error::Error.plan_limit; } ::insert(seen,id,true); visits.push(id); let tag=module.node(id).tag;
@@ -100,12 +100,12 @@ fn build(visits: u32[>..<]&,module: const Module&,key: Key,limit: i64) -> bool,E
  } return captures,blot_error::Error.none;
 }
 fn get(self_: Cache&,units: const Module[:],key: Key,max_values: i64) -> const Recipe?,Error {
- assert(valid(self_));self_.requests++; let known=self_.keys.get(key); if known { let recipe=self_.recipes.at(known); if recipe.visits.len<=max_values { return self_.recipes.at(known),blot_error::Error.none; } self_.declined_walks++; return null,blot_error::Error.none; }
+ assert(valid(self_));self_.requests++; let known=get(self_.keys,key); if known { let recipe=self_.recipes.at(known); if recipe.visits.len<=max_values { return self_.recipes.at(known),blot_error::Error.none; } self_.declined_walks++; return null,blot_error::Error.none; }
  var limit=max_values; if limit>4096 { limit=4096; } if limit==0 { self_.declined_walks++; return null,blot_error::Error.none; }
- let decline=self_.declined_limits.get(key); if decline&&limit<=decline { self_.declined_walks++; self_.reused_declines++; return null,blot_error::Error.none; }
+ let decline=get(self_.declined_limits,key); if decline&&limit<=decline { self_.declined_walks++; self_.reused_declines++; return null,blot_error::Error.none; }
  var visits: u32[>..<]=[]; let captures,error=build(visits,units[key.owner],key,limit);
- if error==blot_error::Error.plan_limit { self_.declined_limits.insert(key,limit); self_.declined_walks++; return null,blot_error::Error.none; } if error!=blot_error::Error.none { return null,error; }
- let index,published=self_.recipes.publish(visits,captures);if published!=blot_error::Error.none {return null,published;}self_.keys.insert(key,index);self_.builds++;self_.planned_visits+=visits.len;return self_.recipes.at(index),blot_error::Error.none;
+ if error==blot_error::Error.plan_limit { insert(self_.declined_limits,key,limit); self_.declined_walks++; return null,blot_error::Error.none; } if error!=blot_error::Error.none { return null,error; }
+ let index,published=self_.recipes.publish(visits,captures);if published!=blot_error::Error.none {return null,published;}insert(self_.keys,key,index);self_.builds++;self_.planned_visits+=visits.len;return self_.recipes.at(index),blot_error::Error.none;
 }
 type Work=blot_support_pooled_buffer::Buffer<u32>;
 type Seen=blot_support_pooled_map::Map<u32,bool>;
@@ -119,4 +119,4 @@ fn next(self_:Walk&)->u32,bool,Error {
  let recipe=self_.recipe;if recipe {if self_.index==recipe.visits.len {return 0,false,blot_error::Error.none;}let id=recipe.visits[self_.index];self_.index++;self_.count++;return id,true,blot_error::Error.none;}
  while self_.work.items.len!=0 {let length=self_.work.items.len-1;let id=self_.work.items[length];blot_support_pooled_buffer::resize(self_.work,length);if id==0||blot_support_pooled_map::contains(self_.seen,id) {continue;}blot_support_pooled_map::insert(self_.seen,id,true,walk_slots);self_.count++;return id,true,blot_error::Error.none;}return 0,false,blot_error::Error.none;
 }
-fn reset(self_:Cache&) {assert(valid(self_));self_.recipes.clear();self_.keys.clear();self_.declined_limits.clear();self_.owner_id=blot_native::fresh_owner_id();self_.requests=0;self_.builds=0;self_.planned_visits=0;self_.replayed_visits=0;self_.declined_walks=0;self_.reused_declines=0;}
+fn reset(self_:Cache&) {assert(valid(self_));self_.recipes.clear();clear(self_.keys);clear(self_.declined_limits);self_.owner_id=blot_native::fresh_owner_id();self_.requests=0;self_.builds=0;self_.planned_visits=0;self_.replayed_visits=0;self_.declined_walks=0;self_.reused_declines=0;}

@@ -55,10 +55,12 @@ fn adopt(value:OwnedFrozen&)->Snapshot?,Error {
   self_.modules[index]=handle;allocated++;let owner,opened=blot_reuse_dependency_payload::init();if opened!=blot_error::Error.none {failure=opened;break;}module_owners[handle.slot-1].owner=owner;
  }
  if failure!=blot_error::Error.none {for handle in self_.modules[..allocated] {handle.release();}self_.discardBookkeeping();return null,failure;}
- for module,index in value.value.modules {
+ // Rebind the outer journal runs before partitioning their child ownership.
+ let modules=value.owner.mutable(value.value.modules);let symbols=value.owner.mutable(value.value.symbols);
+ for module,index in modules {
   let destination:Module& =module_owners[self_.modules[index].slot-1];value.owner.partitionInto(destination.owner,module);destination.value=module;
  }
- self_.value=value.value;self_.owner=value.owner;self_.initialized=self_.modules.len;value=default<OwnedFrozen>();return self_,blot_error::Error.none;
+ self_.value=Frozen{symbols,modules};self_.owner=value.owner;self_.initialized=self_.modules.len;value=default<OwnedFrozen>();return self_,blot_error::Error.none;
 }
 fn append(self_:Snapshot&,handle:ModuleHandle) {assert(self_.valid()&&!self_.validated&&self_.initialized<self_.modules.len&&handle.valid());self_.modules[self_.initialized]=handle;self_.value.modules[self_.initialized]=module_owners[handle.slot-1].value;self_.initialized++;}
 fn appendOwned(self_:Snapshot&,value:OwnedModule&)->Error {

@@ -33,12 +33,14 @@ fn recordField<S,N>(self_: const NominalTypes<S,N>&, value: blot_check_types::No
 fn typeBound<S,N>(self_: const NominalTypes<S,N>&, id: Id) -> bool { return id < self_.store.nodes.len; }
 fn rowBound<S,N>(self_: const NominalTypes<S,N>&, id: u32) -> bool { return id < self_.store.effects.rows.len; }
 fn payload(store, id: Id) -> bool { let empty: const blot_check_core::Nominal[:] = default<const blot_check_core::Nominal[:]>(); return payloadNominal(store, empty, id); }
+fn extraWords(store:const blot_check_types::Store&)->const u32[:] {return store.extra.items;}
+fn extraWords(store:const blot_check_core::Types&)->const u32[:] {return store.extra;}
 fn payloadNominal(store, nominals, id: Id) -> bool { var budget = Budget {..}; return payloadDepth(store, nominals, id, budget, 0); }
 recursive fn payloadDepth<S,N>(store:S, nominals:const N[:], id: Id, budget: Budget&, depth: i64) -> bool {
     if budget.charge(depth) != blot_error::Error.none || !typeBound(store, id) { return false; } let node = store.node(store.head(id, 0));
     if scalar(node.tag) { return node.a == 0 && node.b == 0 && node.c == 0; }
     if node.tag == blot_check_types::Tag.array || node.tag == blot_check_types::Tag.list { return node.b == 0 && node.c == 0 && payloadDepth(store, nominals, node.a, budget, depth + 1); }
-    let values = store.extra;
+    let values = extraWords(store);
     if node.tag == blot_check_types::Tag.nominal {
         if node.c >= values.len || values[node.c] > values.len - node.c - 1 { return false; }
         for nominal in nominals { if budget.charge(depth) != blot_error::Error.none { return false; } if nominal.identity.unit != node.a || nominal.identity.decl != node.b { continue; }

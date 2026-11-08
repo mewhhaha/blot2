@@ -227,6 +227,11 @@ fn ownChecked_resolved(owner:CheckedOwner,values:const BindingId[:])->BindingId[
 fn ownChecked_bindings(owner:CheckedOwner,values:const Binding[:])->Binding[:] {let state .= checkedOwnerState(owner);assert(state.bindings.len==0);let result=checked_bindings.alloc_slice(values.len);for value,index in values {result[index]=value;}state.bindings=result;return result;}
 fn ownChecked_merges(owner:CheckedOwner,values:const Merge[:])->Merge[:] {let state .= checkedOwnerState(owner);assert(state.merges.len==0);let result=checked_merges.alloc_slice(values.len);for value,index in values {result[index]=value;}state.merges=result;return result;}
 fn ownChecked_obligations(owner:CheckedOwner,values:const blot_check_types::Obligation[:])->blot_check_types::Obligation[:] {let state .= checkedOwnerState(owner);assert(state.obligations.len==0);let result=checked_obligations.alloc_slice(values.len);for value,index in values {result[index]=value;}state.obligations=result;return result;}
+fn cloneDiagnosticPurity(value:PurityWitness)->PurityWitness {
+ var name=blot_support::none<const u8[:]>();if value.operation_name.present {name=blot_support::some(ownDiagnosticText(value.operation_name.value));}
+ return PurityWitness{identity:value.identity,family:value.family,member:value.member,compound:value.compound,foreign:value.foreign,
+  specialized:value.specialized,origin_unavailable:value.origin_unavailable,operation_name:name};
+}
 // Publish scalar metadata first. cloneDiagnostics installs independently owned
 // text, hole and explanation payloads after this run has a cleanup owner.
 fn ownChecked_diagnostics(owner:CheckedOwner,values:const Diagnostic[:])->Diagnostic[:] {

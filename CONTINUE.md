@@ -27,19 +27,21 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen253
-checkpoints numeric child snapshots, typed provider/reuse resets, safe diagnostic
-publication through the existing owned clone path, and additional API repairs.
-The completed whole run stops after90.57s with5 diagnostics in5 files; C emission,
-linking and execution remain pending. Diagnostic publication adds a payload copy;
-its cost is not measured. Covariant and numeric component controls qualify their
-recorded earlier source hashes, not this whole compiler. Independent probes expose
-additional checker paths; unsupported dummy constructors and unproven borrow
-warnings remain excluded from production-fix claims. Numeric rollback retains
-high-water physical backing but exact live IDs/views; overlap remains O(n+m).
-The private checker uses bounded1M clone/separate100k tail limits with201 frontend/8
-runtime parity controls. Failing-prefix observations are not completed compiler
-timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen256
+checkpoints archive owner recovery, typed empty archive inputs, canonical context
+runs, a scalar dirnameEnd API, projection origin snapshots, symbol lookup tuple
+repairs and explicit stack scratch initialization. The completed whole run stops
+after94.80s with3 diagnostics: specialization initializer, Gate closure borrow
+and GlobalContext field order. C emission, linking and execution remain pending.
+Real diagnostic payload/owner controls, archive/recipe controls and path golden
+cases pass their recorded candidates. Diagnostic publication adds a payload copy;
+projection copies origins once per Workspace when any is true; stack scratch
+initialization adds unmeasured zeroing. Independent probes expose additional
+checker paths; dummy defaults and unproven borrow warnings are not production-bug
+proof. Numeric rollback retains high-water physical backing but exact live IDs
+and O(n+m) overlap. The private checker retains bounded1M clone/separate100k tail
+limits with201 frontend/8 runtime parity controls. Failing-prefix observations
+are not completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

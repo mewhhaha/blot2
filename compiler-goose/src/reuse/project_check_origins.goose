@@ -18,8 +18,8 @@ fn populateOrigins(source:const Project&,entries:blot_check_check::ModuleOrigin[
  for index in entries.len {let unit=(index+1) as u32;var name:const u8[:]=default<const u8[:]>();
  if unit==source.prelude_unit {name="std/prelude";}else if source.input_mode==blot_reuse_project::InputMode.source && unit==source.entry {name="main";}
  else {
- if source.entry==0 || source.entry>source.units.len {return blot_error::Error.type_limit;}let directory=blot_support_path::dirname(source.filename(source.entry));if !directory.present {return blot_error::Error.type_limit;}
- var relative:u8[>..<]=[];let error=blot_support_path::relative(directory.value,source.filename(unit),relative);if error!=blot_error::Error.none {return error;}entries[index]=blot_check_check::ModuleOrigin{unit,copyOwned(relative[..]),source.compiledModule(unit)==null, ..};continue;
+ if source.entry==0 || source.entry>source.units.len {return blot_error::Error.type_limit;}let directory=blot_support_path::dirnameEnd(source.filename(source.entry));if !directory.present {return blot_error::Error.type_limit;}
+ var relative:u8[>..<]=[];let error=blot_support_path::relative(source.filename(source.entry)[..directory.value],source.filename(unit),relative);if error!=blot_error::Error.none {return error;}entries[index]=blot_check_check::ModuleOrigin{unit,copyOwned(relative[..]),source.compiledModule(unit)==null, ..};continue;
  }
  entries[index]=blot_check_check::ModuleOrigin{unit,copyOwned(name),source.compiledModule(unit)==null, ..};
  }return blot_error::Error.none;

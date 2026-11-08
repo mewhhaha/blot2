@@ -20,8 +20,8 @@ fn origin(context: Context, owner: u32, diagnostic_origin: const u8[:], output: 
     if context.source_mode && owner == context.entry { output.append("main"); return true, blot_error::Error.none; }
     let current = context.identity.value; let entry_path = current.owner(context.entry); let owner_path = current.owner(owner);
     if !entry_path.present || !owner_path.present { return false, blot_error::Error.none; }
-    let directory = blot_support_path::dirname(entry_path.value); if !directory.present { return false, blot_error::Error.none; }
-    let start = output.len; let error = blot_support_path::relative(directory.value, owner_path.value, output);
+    let directory = blot_support_path::dirnameEnd(entry_path.value); if !directory.present { return false, blot_error::Error.none; }
+    let start = output.len; let error = blot_support_path::relative(entry_path.value[..directory.value], owner_path.value, output);
     if error != blot_error::Error.none { output.resize(start); return false, error; } return output.len != start, blot_error::Error.none;
 }
 fn number(self_: Display&, value: u32) {

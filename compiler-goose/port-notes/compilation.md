@@ -51,18 +51,20 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen253 inputs. Its completed run
-stops after90.57s with5 diagnostics in5 files: callback binding, admission min
-inference, optional importer IDs, declaration dependency storage and loop-frame
-lifetime. Numeric child snapshots, typed provider/reuse resets, and existing
-owned diagnostic clone publication advance past prior failures. Publication now
-copies nested diagnostic payloads before Engine cleanup; that cost is unmeasured.
-Focused earlier controls retain their recorded source hashes. Whole C emission,
-linking, CLI and Wasm qualification remain pending. Independent callback probes
-are diagnostic aids, not whole-engine qualification; dummy constructors and
+per stage. This checkpoint preserves exact frozen256 inputs. Its completed run
+stops after94.80s with3 diagnostics: a malformed specialization initializer,
+Gate closure borrowing and GlobalContext field evaluation order. Whole C emission,
+linking, CLI and Wasm qualification remain pending. The batch uses exact archive
+owner recovery, typed empty previous inputs, canonical context runs, a scalar
+path dirnameEnd API, one origin snapshot per Workspace, actual SymbolPool lookup
+tuples and initialized stack scratch. Real diagnostic publication/cleanup/hash,
+archive/recipe and path golden controls pass their pinned source candidates.
+Diagnostic publication adds a nested payload copy; the projection snapshot copies
+once when any origin is true; scratch initialization adds unmeasured zeroing.
+Independent callbacks are diagnostic aids. Unsupported dummy constructors and
 unreproduced borrow warnings do not establish production bugs. Numeric high-water
-backing and O(n+m) overlap cost remain disclosed. Full counts come from completed
-logs with a45-second collection window; timings are failing prefixes. The private
+backing and O(n+m) overlap remain disclosed. Full counts come from completed logs
+with a45-second collection window; timings are failing prefixes. The private
 checker retains bounded1M clone/separate100k tail limits and201 frontend/8 runtime
 parity controls.
 

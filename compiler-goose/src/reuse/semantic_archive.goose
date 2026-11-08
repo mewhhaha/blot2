@@ -100,39 +100,40 @@ fn decode<C>(factory:C&,compiler:Digest,bytes:const u8[:])->Archive<C>,Error {
 fn adopt<C>(factory:C&,snapshot:blot_reuse_dependency_format::Owned<Snapshot>&)->Archive<C>,Error {
  let capture,token,error=factory.createArchiveCapture();if error!=blot_error::Error.none {return Archive<C>.inactive {},error;}assert(capture!=null);var published=false;
  var pools=default<blot_reuse_code_artifacts::Pools>();var copying=blot_reuse_code_artifacts::CaptureState{shared:blot_eval_pool_leases::Builder{}};var pools_moved=false;
- pools.project_identity=true;let names=snapshot.value.identity;pools.identity=blot_support::some(blot_reuse_code_artifacts::IdentityMetadata{copying.capture_identity_bytes(names.bytes,[]),copying.capture_identity_symbols(names.symbols,[]),copying.capture_identity_owners(names.owners,[])});
+ pools.project_identity=true;let names=snapshot.value.identity;pools.identity=blot_support::some(blot_reuse_code_artifacts::IdentityMetadata{copying.capture_identity_bytes(names.bytes,default<const u8[:]>()),copying.capture_identity_symbols(names.symbols,default<const blot_backend_runtime_identity::Name[:]>()),copying.capture_identity_owners(names.owners,default<const blot_backend_runtime_identity::Name[:]>())});
  let pins=blot_reuse_code_artifacts::allocateOwned_pins(snapshot.value.units.len);pools.modules=pins;var offsets:i64[>..<]=[];var next:i64=0;
- for &unit,index in snapshot.value.units {pins[index]=blot_reuse_code_artifacts::init(unit.unit,unit.core,blot_reuse_code_artifacts::copyOwned(unit.canonical_path));pins[index].stamp=blot_support::some(unit.stamp);offsets.push(next);next+=unit.core.bindings.len;}
- pools.binding_offsets=copying.capture_binding_offsets(offsets[..],[]);pools.slots=copying.capture_slots(snapshot.value.slots,[]);pools.field_locations=copying.capture_field_locations(snapshot.value.field_locations,[]);pools.field_locations_stamp=blot_reuse_code_artifacts::stamp(snapshot.value.field_locations);
+ let units=snapshot.owner.mutable(snapshot.value.units);
+ for &unit,index in units {pins[index]=blot_reuse_code_artifacts::init(unit.unit,unit.core,blot_reuse_code_artifacts::copyOwned(unit.canonical_path));pins[index].stamp=blot_support::some(unit.stamp);offsets.push(next);next+=unit.core.bindings.len;}
+ pools.binding_offsets=copying.capture_binding_offsets(offsets[..],default<const i64[:]>());pools.slots=copying.capture_slots(snapshot.value.slots,default<const blot_reuse_code_artifacts::Slot[:]>());pools.field_locations=copying.capture_field_locations(snapshot.value.field_locations,default<const blot_reuse_code_artifacts::FieldLocation[:]>());pools.field_locations_stamp=blot_reuse_code_artifacts::stamp(snapshot.value.field_locations);
  let source=snapshot.value.evaluator;pools.evaluator.owner_id=source.owner_id;pools.evaluator.evidence.owner_id=source.evidence.owner_id;pools.evaluator.evidence.effects.owner_id=source.evidence.effects.owner_id;pools.evaluator.implementation_proofs.owner_id=source.implementation_proofs.owner_id;
- pools.evaluator.code_origins=copying.capture_code_origins(source.code_origins,[]);
- pools.evaluator.values=copying.capture_values(source.values,[]);
- pools.evaluator.children=copying.capture_children(source.children,[]);
- pools.evaluator.closures=copying.capture_closures(source.closures,[]);
- pools.evaluator.value_evidence=copying.capture_value_evidence(source.value_evidence,[]);
- pools.evaluator.type_mappings=copying.capture_type_mappings(source.type_mappings,[]);
- pools.evaluator.row_mappings=copying.capture_row_mappings(source.row_mappings,[]);
- pools.evaluator.value_records=copying.capture_value_records(source.value_records,[]);
- pools.evaluator.record_layouts=copying.capture_record_layouts(source.record_layouts,[]);
- pools.evaluator.field_names=copying.capture_field_names(source.field_names,[]);
- pools.evaluator.evidence.nodes=copying.capture_evidence_nodes(source.evidence.nodes,[]);
- pools.evaluator.evidence.extra=copying.capture_evidence_extra(source.evidence.extra,[]);
- pools.evaluator.evidence.quantifier_goals=copying.capture_evidence_quantifier_goals(source.evidence.quantifier_goals,[]);
- pools.evaluator.evidence.quantifier_obligations=copying.capture_evidence_quantifier_obligations(source.evidence.quantifier_obligations,[]);
- pools.evaluator.evidence.effects.operations=copying.capture_evidence_operations(source.evidence.effects.operations,[]);
- pools.evaluator.evidence.effects.arguments=copying.capture_evidence_arguments(source.evidence.effects.arguments,[]);
- pools.evaluator.evidence.effects.rows=copying.capture_evidence_rows(source.evidence.effects.rows,[]);
- pools.evaluator.evidence.effects.labels=copying.capture_evidence_labels(source.evidence.effects.labels,[]);
- pools.evaluator.implementation_proofs.proofs=copying.capture_implementation_proofs(source.implementation_proofs.proofs,[]);
- pools.evaluator.implementation_proofs.arguments=copying.capture_implementation_arguments(source.implementation_proofs.arguments,[]);
- pools.evaluator.implementation_proofs.members=copying.capture_implementation_members(source.implementation_proofs.members,[]);
- pools.evaluator.implementation_proofs.edges=copying.capture_implementation_edges(source.implementation_proofs.edges,[]);
+ pools.evaluator.code_origins=copying.capture_code_origins(source.code_origins,default<const blot_check_staging_origins::Record[:]>());
+ pools.evaluator.values=copying.capture_values(source.values,default<const blot_eval_eval_values::ValueInfo[:]>());
+ pools.evaluator.children=copying.capture_children(source.children,default<const u32[:]>());
+ pools.evaluator.closures=copying.capture_closures(source.closures,default<const blot_eval_eval_values::ClosureValue[:]>());
+ pools.evaluator.value_evidence=copying.capture_value_evidence(source.value_evidence,default<const u32[:]>());
+ pools.evaluator.type_mappings=copying.capture_type_mappings(source.type_mappings,default<const blot_eval_type_evidence::Mapping[:]>());
+ pools.evaluator.row_mappings=copying.capture_row_mappings(source.row_mappings,default<const blot_eval_type_evidence::RowMapping[:]>());
+ pools.evaluator.value_records=copying.capture_value_records(source.value_records,default<const u32[:]>());
+ pools.evaluator.record_layouts=copying.capture_record_layouts(source.record_layouts,default<const blot_check_core::List[:]>());
+ pools.evaluator.field_names=copying.capture_field_names(source.field_names,default<const u32[:]>());
+ pools.evaluator.evidence.nodes=copying.capture_evidence_nodes(source.evidence.nodes,default<const blot_eval_type_evidence::Node[:]>());
+ pools.evaluator.evidence.extra=copying.capture_evidence_extra(source.evidence.extra,default<const u32[:]>());
+ pools.evaluator.evidence.quantifier_goals=copying.capture_evidence_quantifier_goals(source.evidence.quantifier_goals,default<const blot_eval_type_evidence::QuantifierGoals[:]>());
+ pools.evaluator.evidence.quantifier_obligations=copying.capture_evidence_quantifier_obligations(source.evidence.quantifier_obligations,default<const blot_eval_type_evidence::Goal[:]>());
+ pools.evaluator.evidence.effects.operations=copying.capture_evidence_operations(source.evidence.effects.operations,default<const blot_check_effect_evidence::Operation[:]>());
+ pools.evaluator.evidence.effects.arguments=copying.capture_evidence_arguments(source.evidence.effects.arguments,default<const u32[:]>());
+ pools.evaluator.evidence.effects.rows=copying.capture_evidence_rows(source.evidence.effects.rows,default<const blot_check_effect_evidence::Row[:]>());
+ pools.evaluator.evidence.effects.labels=copying.capture_evidence_labels(source.evidence.effects.labels,default<const u32[:]>());
+ pools.evaluator.implementation_proofs.proofs=copying.capture_implementation_proofs(source.implementation_proofs.proofs,default<const blot_eval_implementation_evidence::Proof[:]>());
+ pools.evaluator.implementation_proofs.arguments=copying.capture_implementation_arguments(source.implementation_proofs.arguments,default<const u32[:]>());
+ pools.evaluator.implementation_proofs.members=copying.capture_implementation_members(source.implementation_proofs.members,default<const blot_eval_implementation_evidence::Member[:]>());
+ pools.evaluator.implementation_proofs.edges=copying.capture_implementation_edges(source.implementation_proofs.edges,default<const u32[:]>());
  if copying.failure!=blot_error::Error.none {let __cleanup_result_10_0: Archive<C> = Archive<C>.inactive {}; let __cleanup_result_10_1: Error = copying.failure; {if !pools_moved {pools.leases=copying.shared.leases;pools.deinit();}} {if !published {factory.destroyArchiveCapture(token);}} return __cleanup_result_10_0, __cleanup_result_10_1;}
  // All immutable pools are complete before any selected record is published.
  for record in snapshot.value.queries.records {
   let proof=record.dependencies;let owned=blot_reuse_specialization_receipt::Record{member:blot_support::none<blot_reuse_specialization_receipt::Member>(),input:record.key.input,expected:record.key.expected,selected:record.result.selected,options:record.key.options,depth:record.key.depth,values_before:proof.values_before,children_before:proof.children_before,values_added:proof.values_added,children_added:proof.children_added,steps:0,collected:proof.collected,source_scopes:proof.source_scopes,solver_nodes:proof.solver_nodes,complete:true,sources:blot_reuse_specialization_receipt::copyOwned(proof.sources),scalar_reads:blot_reuse_specialization_receipt::copyOwned(proof.scalar_reads),call_reads:blot_reuse_specialization_receipt::copyOwned(proof.call_reads),call_publications:blot_reuse_specialization_receipt::copyOwned(proof.call_publications),views:blot_reuse_specialization_receipt::copyOwned(proof.views),plain_facts:blot_reuse_specialization_receipt::copyOwned(proof.plain_facts)};
   let closure=snapshot.value.evaluator.closures[snapshot.value.evaluator.values[owned.input].bits];let position,remembered,error=blot_eval_selected_query::remember(capture.metadata.specialization_queries,closure,owned);if error!=blot_error::Error.none {let __cleanup_result_11_0: Archive<C> = Archive<C>.inactive {}; let __cleanup_result_11_1: Error = error; {if !pools_moved {pools.leases=copying.shared.leases;pools.deinit();}} {if !published {factory.destroyArchiveCapture(token);}} return __cleanup_result_11_0, __cleanup_result_11_1;}
  }
- pools.leases=copying.shared.leases;capture.metadata.pools=blot_support::some(pools);pools_moved=true;let result=Archive<C>.live{snapshot.value.units,capture,factory,token,snapshot.owner};snapshot.owner=blot_reuse_dependency_format::Owner{};published=true;let __cleanup_result_12_0: Archive<C> = result; let __cleanup_result_12_1: Error = blot_error::Error.none; {if !pools_moved {pools.leases=copying.shared.leases;pools.deinit();}} {if !published {factory.destroyArchiveCapture(token);}} return __cleanup_result_12_0, __cleanup_result_12_1;
+ pools.leases=copying.shared.leases;capture.metadata.pools=blot_support::some(pools);pools_moved=true;let result=Archive<C>.live{units,capture,factory,token,snapshot.owner};snapshot.owner=blot_reuse_dependency_format::Owner{};published=true;let __cleanup_result_12_0: Archive<C> = result; let __cleanup_result_12_1: Error = blot_error::Error.none; {if !pools_moved {pools.leases=copying.shared.leases;pools.deinit();}} {if !published {factory.destroyArchiveCapture(token);}} return __cleanup_result_12_0, __cleanup_result_12_1;
  {if !pools_moved {pools.leases=copying.shared.leases;pools.deinit();}} {if !published {factory.destroyArchiveCapture(token);}} }
 fn emptyEvaluator()->blot_eval_core_eval::Snapshot {return default<blot_eval_core_eval::Snapshot>();}

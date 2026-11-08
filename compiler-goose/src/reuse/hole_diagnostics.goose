@@ -28,15 +28,15 @@ reusable[] var memo_pool:dictionary_slot<u32,u32>[>..]=[];
 fn copyText(text:const u8[:])->const u8[:] {let result=text_pool.alloc_slice(text.len);for byte,index in text {result[index]=byte;}return result;}
 fn freeText(text:const u8[:]) {if text.len==0 {return;}text_pool.free_slice(text);}
 fn freeText(text:Text) {if text.present {freeText(text.value);}}
-fn cloneText(text:Text)->Text {if !text.present {return text;}return blot_support::some(copyText(text.value));}
+fn cloneText(text:Text)->Text {if !text.present {return blot_support::none<const u8[:]>();}return blot_support::some(copyText(text.value));}
 fn deinit(self_:Snapshot&) {
  for node in self_.nodes {freeText(node.name);}for edge in self_.edges {freeText(edge.name);}for binding in self_.scope {freeText(binding.name);}for requirement in self_.requirements {freeText(requirement.name);}
  if self_.nodes.len!=0 {node_pool.free_slice(self_.nodes);}if self_.edges.len!=0 {edge_pool.free_slice(self_.edges);}if self_.scope.len!=0 {binding_pool.free_slice(self_.scope);}if self_.requirements.len!=0 {requirement_pool.free_slice(self_.requirements);}self_=Snapshot{};
 }
 fn clone(self_:Snapshot)->Snapshot,Error {
- var result=Snapshot{expected:self_.expected,enclosing:self_.enclosing,truncated:self_.truncated};result.nodes=node_pool.alloc_slice(self_.nodes.len);for node,index in self_.nodes {result.nodes[index]=node;result.nodes[index].name=cloneText(node.name);}
- result.edges=edge_pool.alloc_slice(self_.edges.len);for edge,index in self_.edges {result.edges[index]=edge;result.edges[index].name=cloneText(edge.name);}result.scope=binding_pool.alloc_slice(self_.scope.len);for binding,index in self_.scope {result.scope[index]=binding;result.scope[index].name=copyText(binding.name);}
- result.requirements=requirement_pool.alloc_slice(self_.requirements.len);for requirement,index in self_.requirements {result.requirements[index]=requirement;result.requirements[index].name=cloneText(requirement.name);}return result,blot_error::Error.none;
+ var result=Snapshot{expected:self_.expected,enclosing:self_.enclosing,truncated:self_.truncated};result.nodes=node_pool.alloc_slice(self_.nodes.len);for node,index in self_.nodes {result.nodes[index]=Node{kind:node.kind,name:cloneText(node.name),identity:node.identity,variable:node.variable,children:node.children,effects:node.effects};}
+ result.edges=edge_pool.alloc_slice(self_.edges.len);for edge,index in self_.edges {result.edges[index]=Edge{name:cloneText(edge.name),ty:edge.ty};}result.scope=binding_pool.alloc_slice(self_.scope.len);for binding,index in self_.scope {result.scope[index]=Binding{name:copyText(binding.name),ty:binding.ty,requirements:binding.requirements};}
+ result.requirements=requirement_pool.alloc_slice(self_.requirements.len);for requirement,index in self_.requirements {result.requirements[index]=Requirement{kind:requirement.kind,name:cloneText(requirement.name),subject:requirement.subject,argument:requirement.argument,result:requirement.result,signature:requirement.signature,explicit:requirement.explicit};}return result,blot_error::Error.none;
 }
 fn jsonStringify(self_:Span,writer:blot_json::Writer&)->Error {return blot_json::jsonStringify(self_,writer);}
 fn jsonStringify(self_:Node,writer:blot_json::Writer&)->Error {writer.beginObject();writer.key("kind");writer.enumValue(self_.kind);writer.field("name",self_.name);writer.key("identity");if self_.identity.present {writer.beginObject();writer.field("unit",self_.identity.value.unit);writer.field("decl",self_.identity.value.decl);writer.endObject();}else {writer.nullValue();}writer.field("variable",self_.variable);writer.field("children",self_.children);writer.field("effects",self_.effects);writer.endObject();return writer.failure;}

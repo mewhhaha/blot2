@@ -13,10 +13,12 @@ type List = blot_check_core::List;
 enum Work { node { id: u32 }, binding { id: u32 }, pattern { id: u32 }, projection { id: u32 } }
 reusable[] var owned_words: u32[>..] = [];
 reusable[] var owned_work: Work[>..] = [];
+reusable[] var owned_origins:bool[>..]=[];
 fn release(run: const u32[:]) { if run.len != 0 { owned_words.free_slice(run); } }
 fn release(run: const Work[:]) { if run.len != 0 { owned_work.free_slice(run); } }
 struct Workspace {
     nodes: u32[:] = default<u32[:]>(), bindings: u32[:] = default<u32[:]>(), patterns: u32[:] = default<u32[:]>(), projections: u32[:] = default<u32[:]>(),
+    origins:bool[:]=default<bool[:]>(),
     generation: u32 = 0, scans: i64 = 0, visits: i64 = 0, work: Work[:] = default<Work[:]>(), count: i64 = 0,
 }
 fn init(old: const Module&) -> Workspace {
@@ -24,12 +26,17 @@ fn init(old: const Module&) -> Workspace {
     result.clear(); return result;
 }
 fn clear(self_: Workspace&) { for &v in self_.nodes { v = 0; } for &v in self_.bindings { v = 0; } for &v in self_.patterns { v = 0; } for &v in self_.projections { v = 0; } self_.generation = 0; }
-fn capacityBytes(self_: const Workspace&) -> i64 { return (self_.nodes.len + self_.bindings.len + self_.patterns.len + self_.projections.len) * 4 + self_.work.len * 5; }
-fn deinit(self_: Workspace&) { release(self_.nodes); release(self_.bindings); release(self_.patterns); release(self_.projections); release(self_.work); self_ = Workspace {..}; }
+fn capacityBytes(self_: const Workspace&) -> i64 { return (self_.nodes.len + self_.bindings.len + self_.patterns.len + self_.projections.len) * 4 + self_.work.len * 5 + self_.origins.len; }
+fn deinit(self_: Workspace&) { release(self_.nodes); release(self_.bindings); release(self_.patterns); release(self_.projections); release(self_.work); if self_.origins.len!=0 {owned_origins.free_slice(self_.origins);}self_ = Workspace {..}; }
 fn withWorkspace<C,F>(old: const Module&, context: C) { var workspace = init(old); let result = F(context, workspace); workspace.deinit(); return result; }
+// One immutable origin snapshot serves every definition in this module scan.
+fn prepareOrigins(self_:Workspace&,values:const bool[:]) {
+ assert(self_.origins.len==0);var any=false;for flag in values {if flag {any=true;break;}}if !any {return;}
+ let snapshot=owned_origins.alloc_slice(values.len);for flag,index in values {snapshot[index]=flag;}self_.origins=snapshot;
+}
 fn definitionEqual(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]? = null, constant_types: bool = false) -> bool, Error { return self_.run(old, current, binding, closures, constant_types, 0, null, []); }
-fn definitionEqualWithOrigins(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool, origins: const bool[:]) -> bool, Error {
-    let admitted=selectedOrigins(binding,origins); return self_.run(old, current, binding, closures, constant_types, 0, null, admitted);
+fn definitionEqualWithOrigins(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool) -> bool, Error {
+    let admitted=selectedOrigins(binding,self_.origins); return self_.run(old, current, binding, closures, constant_types, 0, null, admitted);
 }
 fn run(self_: Workspace&, old: const Module&, current: const Module&, binding: u32, closures: u32[>..<]?, constant_types: bool, expression: u32, reached: u32[>..<]?, origins: const bool[:]) -> bool, Error {
     if binding == 0 && expression == 0 { return false, blot_error::Error.none; }

@@ -365,7 +365,7 @@ recursive fn loopBody<E>(self_: Walker<E>&, source: AstId, node: blot_parse_ast:
     if flow == Outcome.live && single { record(self_, frame); } return flow, blot_error::Error.none;
 }
 fn validate<E>(engine: E) -> Error {
-    var states: State[>..<] = []; var walker = Walker<E> { engine: engine, states: states, task_views: engine.pool.lookup("@task.read").present || engine.pool.lookup("@task.write").present , ..};
+    var states: State[>..<] = []; let read_symbol,read_present=engine.pool.lookup("@task.read");var task_views=read_present;if !task_views {let write_symbol,write_present=engine.pool.lookup("@task.write");task_views=write_present;}var walker = Walker<E> { engine: engine, states: states, task_views: task_views , ..};
     for root in engine.tree.roots.items { if engine.tree.node(root).tag != blot_parse_ast::tag_value_decl { continue; } walker.states.clear(); walker.remaining = 65536; let binding = engine.resolved[root]; let body = engine.tree.value_decl(root).body;
         if binding != 0 && blot_check_cleanup_contracts::pureNominal(engine.types, engine.nominals, engine.bindings[binding].ty) && !blot_check_cleanup_contracts::source(engine, body) { let error = engine.usageDiagnostic(blot_check_check::Code.cleanup_not_safe, body); if error != blot_error::Error.none { return error; } }
         let flow, error = expression(walker, body, 0); if error == blot_error::Error.type_limit { let error = engine.usageDiagnostic(blot_check_check::Code.usage_analysis_limit, root); if error != blot_error::Error.none { return error; } continue; } if error != blot_error::Error.none { return error; }

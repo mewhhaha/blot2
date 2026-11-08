@@ -5,10 +5,10 @@ import .option;
 type Error = blot_error::Error;
 struct Component { start: i64, len: i64 }
 fn equal(left: const u8[:],right: const u8[:]) -> bool { if left.len != right.len { return false; } for byte,index in left { if byte != right[index] { return false; } } return true; }
-fn dirname(path: const u8[:]) -> blot_support::Option<const u8[:]> {
-    if path.len == 0 { return blot_support::none<const u8[:]>(); } var end = path.len; while end > 0 && path[end - 1] == '/' { end--; } if end == 0 { return blot_support::none<const u8[:]>(); }
-    var slash = end; while slash > 0 && path[slash - 1] != '/' { slash--; } if slash == 0 { return blot_support::none<const u8[:]>(); }
-    var directory_end = slash; while directory_end > 1 && path[directory_end - 1] == '/' { directory_end--; } return blot_support::some(path[..directory_end]);
+fn dirnameEnd(path: const u8[:]) -> blot_support::Option<i64> {
+    if path.len == 0 { return blot_support::none<i64>(); } var end = path.len; while end > 0 && path[end - 1] == '/' { end--; } if end == 0 { return blot_support::none<i64>(); }
+    var slash = end; while slash > 0 && path[slash - 1] != '/' { slash--; } if slash == 0 { return blot_support::none<i64>(); }
+    var directory_end = slash; while directory_end > 1 && path[directory_end - 1] == '/' { directory_end--; } return blot_support::some(directory_end);
 }
 fn components(path: const u8[:],out: Component[>..<]&) -> Error {
     var cursor: i64 = 0; while cursor < path.len {
