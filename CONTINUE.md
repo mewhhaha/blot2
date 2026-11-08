@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-The checkpoint through frozen365 replaces Session's Generator backpointer with the existing scalar
+The checkpoint through frozen367 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -127,7 +127,12 @@ optional-plan API and retains only IndexedRegion's frame ID, forwarding the
 existing caller Frame to its sole edit helper. Exact source review preserves
 accepted-path scalar/header aliases, identity guards and cleanup order. Its
 92.873s run clears those boundaries and reaches a recursive constant-recorder
-restore; remaining same-path recorder stores are next.
+restore. Frozen366 routes twelve remaining stores in four already-recursive
+functions through the existing typed setter, preserving branch/cleanup order.
+Frozen367 makes an append-only ModuleRef temporary grow-only and passes its
+explicit slice to synchronous validation. Six reduced controls pass on both
+checkers; its93.248s run clears that borrow boundary and reaches direct indexing
+of RecorderInterfacesBuffer. Its existing items view is the next API fix.
 No whole compiler success follows. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm

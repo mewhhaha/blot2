@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen365 is the current source checkpoint. Selected private checker
+Frozen367 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -155,8 +155,15 @@ unused stored IndexedRegion Frame payload. Its existing ID guards the sole edit
 call, which receives the current Frame directly. Exact source review preserves
 accepted-path staged/providers/header aliases and cleanup; nested call Frames
 have distinct IDs. Its92.873s run reaches a constant-recorder restore after a
-recursive call. That store family is next. No whole compiler C, header or
-executable has been emitted.
+recursive call. Frozen366 preserves twelve remaining recorder assignments
+through the existing typed setter. Exact inverse/source review retains saved
+references and cleanup ordering. Its93.719s run reaches a grow-shrink temporary
+slice captured in validation Context. Frozen367 uses the existing grow-only
+pattern: append before borrowing an explicit slice for synchronous validation.
+Six reduced controls pass on both checkers, including old-pattern rejection and
+local lifetime escape rejection. Its93.248s run clears that boundary and reaches
+direct RecorderInterfacesBuffer indexing; the existing items view is next.
+No whole compiler C, header or executable has been emitted.
 The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo
