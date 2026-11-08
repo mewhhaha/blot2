@@ -17,7 +17,7 @@ fn record(slots: u32[:],id: u32,owner: u32) { if id==0||id>=slots.len { return; 
 fn result(self_: Index,slots: const u32[:],id: u32) -> u32,bool { if !self_.complete||id==0||id>=slots.len||slots[id]==0||slots[id]==ambiguous { return 0,false; } return slots[id],true; }
 reusable[] var owner_words:u32[>..]=[];
 fn deinit(self_:Index&) {release(self_.nodes);release(self_.bindings);self_=Index {};}
-fn release(values:const u32[:]) {if values.len==0 {return;}let first:const u32& =values[0];let at=owner_words.index_of(first);assert(at>=0);owner_words.free_slice(owner_words[at..at+values.len]);}
+fn release(values:const u32[:]) {if values.len==0 {return;}owner_words.free_slice(values);}
 fn retain(nodes:const u32[:],bindings:const u32[:],complete:bool)->Index {let ns=owner_words.alloc_slice(nodes.len);let bs=owner_words.alloc_slice(bindings.len);for value,index in nodes {ns[index]=value;}for value,index in bindings {bs[index]=value;}return Index {ns,bs,complete};}
 fn build(module: const blot_check_core::Module&,limit: i64) -> Index,Error {
  if module.nodes.len>limit||module.bindings.len>limit { return Index {},blot_error::Error.none; }
@@ -58,10 +58,10 @@ fn initPooled()->Cache,Error {
 }
 fn init()->Cache,Error {return initPooled();}
 fn initPooledRef()->Cache?,Error {let cache,error=initPooled();if error!=blot_error::Error.none {return null,error;}return cache_slots[cache.lease-1].handle,blot_error::Error.none;}
-fn deinit(self_:Cache&) {if self_.lease==0 {return;}assert(valid(self_));self_.units.release();let at=self_.lease-1;cache_slots[at].state.live=false;self_=Cache {};cache_slots.free(at);}
+fn deinit(self_:Cache&) {if self_.lease==0 {return;}assert(valid(self_));blot_eval_source_owners::release(self_.units);let at=self_.lease-1;cache_slots[at].state.live=false;self_=Cache {};cache_slots.free(at);}
 fn index(self_: Cache&,units: const blot_check_core::Module[:],owner: i64,limit: i64) -> Index,bool,Error {
  assert(valid(self_)); if owner<0||owner>=units.len { return Index {},false,blot_error::Error.none; } let known=self_.units.get(owner); if known { return known,true,blot_error::Error.none; }
- let created,e=build(units[owner],limit); if e!=blot_error::Error.none { return Index {},false,e; } self_.units.insert(owner,created); return created,true,blot_error::Error.none;
+ let created,e=build(units[owner],limit); if e!=blot_error::Error.none { return Index {},false,e; } blot_eval_source_owners::insert(self_.units,owner,created); return created,true,blot_error::Error.none;
 }
 fn binding(self_: Cache&,units: const blot_check_core::Module[:],owner: i64,id: u32,limit: i64) -> u32,bool,Error { let view,present,error=index(self_,units,owner,limit); if error!=blot_error::Error.none||!present { return 0,false,error; } let value,found=result(view,view.bindings,id); return value,found,blot_error::Error.none; }
 fn node(self_: Cache&,units: const blot_check_core::Module[:],owner: i64,id: u32,limit: i64) -> u32,bool,Error { let view,present,error=index(self_,units,owner,limit); if error!=blot_error::Error.none||!present { return 0,false,error; } let value,found=result(view,view.nodes,id); return value,found,blot_error::Error.none; }

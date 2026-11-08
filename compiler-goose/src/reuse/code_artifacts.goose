@@ -208,6 +208,7 @@ struct Context {
     refinement_queries: blot_reuse_refinement_receipt::Table& =inactive_context_refinement_queries,
 }
 struct Scope { context: Context&?, id: u32, parent: u32, live: bool = true }
+fn requiredContext(context:Context?)->Context& {assert(context);return context;}
 fn depth(self_: const Context&) -> i64 {
     var id = self_.active_job; var count: i64 = 0;
     while id != 0 { id = self_.jobs.items[id - 1].parent; count++; }
@@ -272,82 +273,82 @@ fn functionCapacity(self_: Context&, function: u32) {
     while self_.function_jobs.len <= function { self_.function_jobs.push(0); }
 }
 fn hit(self_: Scope&, function: u32) -> Error {
-    assert(self_.context != null);
-    assert(self_.live && self_.context.active_job == self_.id);
-    self_.context.functionCapacity(function);
-    let target = self_.context.function_jobs.items[function];
-    self_.context.appendEvent(Event.hit { self_.id, target, function , ..});
-    self_.context.jobs.items[self_.id - 1].function = blot_support::some(function);
-    self_.context.jobs.items[self_.id - 1].target_job = target;
-    self_.context.jobs.items[self_.id - 1].state = State.hit; return blot_error::Error.none;
+    let context:Context& =requiredContext(self_.context);
+    assert(self_.live && context.active_job == self_.id);
+    context.functionCapacity(function);
+    let target = context.function_jobs.items[function];
+    context.appendEvent(Event.hit { self_.id, target, function , ..});
+    context.jobs.items[self_.id - 1].function = blot_support::some(function);
+    context.jobs.items[self_.id - 1].target_job = target;
+    context.jobs.items[self_.id - 1].state = State.hit; return blot_error::Error.none;
 }
 fn reserve(self_: Scope&, function: u32) -> Error {
-    assert(self_.context != null);
-    assert(self_.live && self_.context.active_job == self_.id);
-    self_.context.functionCapacity(function); assert(self_.context.function_jobs.items[function] == 0);
-    self_.context.appendEvent(Event.reserve { self_.id, function , ..});
-    self_.context.function_jobs.items[function] = self_.id;
-    self_.context.jobs.items[self_.id - 1].function = blot_support::some(function);
-    self_.context.jobs.items[self_.id - 1].state = State.reserved; return blot_error::Error.none;
+    let context:Context& =requiredContext(self_.context);
+    assert(self_.live && context.active_job == self_.id);
+    context.functionCapacity(function); assert(context.function_jobs.items[function] == 0);
+    context.appendEvent(Event.reserve { self_.id, function , ..});
+    context.function_jobs.items[function] = self_.id;
+    context.jobs.items[self_.id - 1].function = blot_support::some(function);
+    context.jobs.items[self_.id - 1].state = State.reserved; return blot_error::Error.none;
 }
 fn solved(self_: Scope&, mappings: const blot_backend_layout::Mapping[:],
     rows: const blot_backend_layout::RowMapping[:], templates: const blot_reuse_substitution_keys::Entry[:]) -> Error {
-    assert(self_.context != null);
-    assert(self_.live && self_.context.active_job == self_.id);
-    let m = Span { self_.context.mappings.len as u32, mappings.len as u32 , ..};
-    let r = Span { self_.context.rows.len as u32, rows.len as u32 , ..};
-    let t = Span { self_.context.templates.len as u32, templates.len as u32 , ..};
-    self_.context.mappings.append(mappings); self_.context.rows.append(rows); self_.context.templates.append(templates);
-    self_.context.appendEvent(Event.solved { self_.id , ..});
-    self_.context.jobs.items[self_.id - 1].mappings = m; self_.context.jobs.items[self_.id - 1].rows = r;
-    self_.context.jobs.items[self_.id - 1].templates = t; self_.context.jobs.items[self_.id - 1].solved = true;
+    let context:Context& =requiredContext(self_.context);
+    assert(self_.live && context.active_job == self_.id);
+    let m = Span { context.mappings.len as u32, mappings.len as u32 , ..};
+    let r = Span { context.rows.len as u32, rows.len as u32 , ..};
+    let t = Span { context.templates.len as u32, templates.len as u32 , ..};
+    context.mappings.append(mappings); context.rows.append(rows); context.templates.append(templates);
+    context.appendEvent(Event.solved { self_.id , ..});
+    context.jobs.items[self_.id - 1].mappings = m; context.jobs.items[self_.id - 1].rows = r;
+    context.jobs.items[self_.id - 1].templates = t; context.jobs.items[self_.id - 1].solved = true;
     return blot_error::Error.none;
 }
 fn complete(self_: Scope&, function: u32, result_template: blot_support::Option<u32>) -> Error {
-    assert(self_.context != null);
-    assert(self_.live && self_.context.active_job == self_.id);
-    self_.context.functionCapacity(function); let owner = self_.context.function_jobs.items[function];
+    let context:Context& =requiredContext(self_.context);
+    assert(self_.live && context.active_job == self_.id);
+    context.functionCapacity(function); let owner = context.function_jobs.items[function];
     assert(owner == 0 || owner == self_.id);
-    self_.context.appendEvent(Event.complete { self_.id, function, result_template , ..});
-    self_.context.function_jobs.items[function] = self_.id;
-    self_.context.jobs.items[self_.id - 1].function = blot_support::some(function);
-    self_.context.jobs.items[self_.id - 1].result_template = result_template;
-    self_.context.jobs.items[self_.id - 1].state = State.complete; return blot_error::Error.none;
+    context.appendEvent(Event.complete { self_.id, function, result_template , ..});
+    context.function_jobs.items[function] = self_.id;
+    context.jobs.items[self_.id - 1].function = blot_support::some(function);
+    context.jobs.items[self_.id - 1].result_template = result_template;
+    context.jobs.items[self_.id - 1].state = State.complete; return blot_error::Error.none;
 }
 fn completeValue(self_: Scope&, value: u32, shape: u32) -> Error {
-    assert(self_.context != null);
-    assert(self_.live && self_.context.active_job == self_.id);
+    let context:Context& =requiredContext(self_.context);
+    assert(self_.live && context.active_job == self_.id);
     let result = ValueResult { value, shape , ..};
-    self_.context.appendEvent(Event.complete_value { self_.id, result , ..});
-    self_.context.jobs.items[self_.id - 1].value = blot_support::some(result);
-    self_.context.jobs.items[self_.id - 1].state = State.complete; return blot_error::Error.none;
+    context.appendEvent(Event.complete_value { self_.id, result , ..});
+    context.jobs.items[self_.id - 1].value = blot_support::some(result);
+    context.jobs.items[self_.id - 1].state = State.complete; return blot_error::Error.none;
 }
 fn completeGlobal(self_: Scope&, global: u32) -> Error {
-    assert(self_.context != null);
-    assert(self_.live && self_.context.active_job == self_.id);
-    while self_.context.global_jobs.len <= global { self_.context.global_jobs.push(0); }
-    assert(self_.context.global_jobs.items[global] == 0);
-    self_.context.appendEvent(Event.complete_global { self_.id, global , ..});
-    self_.context.global_jobs.items[global] = self_.id;
-    self_.context.jobs.items[self_.id - 1].global = blot_support::some(global);
-    self_.context.jobs.items[self_.id - 1].state = State.complete; return blot_error::Error.none;
+    let context:Context& =requiredContext(self_.context);
+    assert(self_.live && context.active_job == self_.id);
+    while context.global_jobs.len <= global { context.global_jobs.push(0); }
+    assert(context.global_jobs.items[global] == 0);
+    context.appendEvent(Event.complete_global { self_.id, global , ..});
+    context.global_jobs.items[global] = self_.id;
+    context.jobs.items[self_.id - 1].global = blot_support::some(global);
+    context.jobs.items[self_.id - 1].state = State.complete; return blot_error::Error.none;
 }
 fn hitGlobal(self_: Scope&, global: u32) -> Error {
-    assert(self_.context != null);
-    assert(self_.live && self_.context.active_job == self_.id);
-    var target: u32 = 0; if global < self_.context.global_jobs.len { target = self_.context.global_jobs.items[global]; }
-    self_.context.appendEvent(Event.hit_global { self_.id, target, global , ..});
-    self_.context.jobs.items[self_.id - 1].global = blot_support::some(global);
-    self_.context.jobs.items[self_.id - 1].target_job = target;
-    self_.context.jobs.items[self_.id - 1].state = State.hit; return blot_error::Error.none;
+    let context:Context& =requiredContext(self_.context);
+    assert(self_.live && context.active_job == self_.id);
+    var target: u32 = 0; if global < context.global_jobs.len { target = context.global_jobs.items[global]; }
+    context.appendEvent(Event.hit_global { self_.id, target, global , ..});
+    context.jobs.items[self_.id - 1].global = blot_support::some(global);
+    context.jobs.items[self_.id - 1].target_job = target;
+    context.jobs.items[self_.id - 1].state = State.hit; return blot_error::Error.none;
 }
 fn deinit(self_: Scope&) {
-    assert(self_.context != null);
-    assert(self_.live && self_.context.active_job == self_.id);
-    let state = self_.context.jobs.items[self_.id - 1].state;
-    if state == State.pending || state == State.reserved { self_.context.jobs.items[self_.id - 1].state = State.failed; }
-    self_.context.appendEvent(Event.leave { self_.id, self_.parent , ..});
-    self_.context.active_job = self_.parent; self_.live = false;
+    let context:Context& =requiredContext(self_.context);
+    assert(self_.live && context.active_job == self_.id);
+    let state = context.jobs.items[self_.id - 1].state;
+    if state == State.pending || state == State.reserved { context.jobs.items[self_.id - 1].state = State.failed; }
+    context.appendEvent(Event.leave { self_.id, self_.parent , ..});
+    context.active_job = self_.parent; self_.live = false;
 }
 
 let stamp_buffer_bytes: i64 = 4096;

@@ -163,7 +163,7 @@ fn abi(store: const Store&, id: Id) -> blot_support::Option<blot_backend_runtime
     if node(store, n.a).tag == Tag.floating32 { return blot_support::some(blot_backend_runtime_ir::SC_array_f32); }
     return blot_support::none<blot_backend_runtime_ir::Scalar>();
 }
-fn intern(store: Store&, tag: Tag, a: u32, b: u32, values: const u32[:]) -> Id, blot_error::Error { return internWithEffects(store, tag, a, b, 0, values); }
+recursive fn intern(store: Store&, tag: Tag, a: u32, b: u32, values: const u32[:]) -> Id, blot_error::Error { return internWithEffects(store, tag, a, b, 0, values); }
 recursive fn internWithEffects(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:]) -> Id, blot_error::Error {
     if tag == Tag.opened && (a >= 128 || b >= 128 || row > 2 || values.len != 0) { return 0, blot_error::Error.type_mismatch; }
     if tag == Tag.existential || tag == Tag.universal {

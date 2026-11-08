@@ -27,7 +27,7 @@ fn earlier(self_:const Builder&,left:Name,right:Name)->bool {
  if !self_.constructor_prefix {if left.kind==blot_check_check::EditorName_kind.constructor && right.kind!=blot_check_check::EditorName_kind.constructor {return '#' as u8<b[0];}if left.kind!=blot_check_check::EditorName_kind.constructor && right.kind==blot_check_check::EditorName_kind.constructor {return a[0]<'#' as u8;}}
  let order=compare(a,b);if order!=0 {return order<0;}if left.kind!=right.kind {return blot_check_check::editorName_kindCode(left.kind)<blot_check_check::editorName_kindCode(right.kind);}if left.identity.unit!=right.identity.unit {return left.identity.unit<right.identity.unit;}return left.identity.decl<right.identity.decl;
 }
-fn finish(self_:Builder&)->Name[:],Error {sort(self_.names.items){left,right=>return self_.earlier(left,right);}let result=names_pool.alloc_slice(self_.names.items.len);for name,index in self_.names.items {result[index]=name;}return result,blot_error::Error.none;}
+fn finish(self_:Builder&)->Name[:],Error {fn less(left:Name,right:Name)->bool {return self_.earlier(left,right);}::sort<Name>(self_.names.items,less);let result=names_pool.alloc_slice(self_.names.items.len);for name,index in self_.names.items {result[index]=name;}return result,blot_error::Error.none;}
 fn add(self_:Builder&,item:Name)->Error {
  let text=self_.pool.get(item.name);if !starts(text,self_.prefix) {return blot_error::Error.none;}
  for old in self_.names.items {if old.kind==item.kind && old.name==item.name && old.identity==item.identity {return blot_error::Error.none;}}

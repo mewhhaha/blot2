@@ -19,6 +19,8 @@ import reuse.dependency_payload;
 import reuse.hole_diagnostics;
 import reuse.dispatch_explanation;
 import reuse.purity_diagnostics;
+import reuse.partial_dependency;
+import reuse.dependency_project_consumer;
 import backend.core_backend;
 import work_counters;
 import support.error;
@@ -132,8 +134,6 @@ fn detailWrite(writer:Writer&,value:u32)->Error {return blot_json::write(writer,
 fn detailWrite(writer:Writer&,value:u64)->Error {return blot_json::write(writer,value);}
 fn detailWrite(writer:Writer&,value:i64)->Error {return blot_json::write(writer,value);}
 fn detailWrite(writer:Writer&,value:const u8[:])->Error {return blot_json::write(writer,value);}
-fn detailWrite(writer:Writer&,value:u8[:])->Error {let view:const u8[:]=value;return detailWrite(writer,view);}
-fn detailWrite<T>(writer:Writer&,value:T[:])->Error {let view:const T[:]=value;return detailWrite(writer,view);}
 fn detailWrite<T>(writer:Writer&,value:blot_support::Option<T>)->Error {if !value.present {return writer.nullValue();}return detailWrite(writer,value.value);}
 fn detailWrite<T>(writer:Writer&,value:const T[:])->Error {let error=writer.beginArray();if error!=blot_error::Error.none {return error;}for item in value {let error=writer.separator(blot_json::FrameKind.array);if error!=blot_error::Error.none {return error;}let error=detailWrite(writer,item);if error!=blot_error::Error.none {return error;}}return writer.endArray();}
 fn detailField<T>(writer:Writer&,name:const u8[:],value:T)->Error {let error=writer.key(name);if error!=blot_error::Error.none {return error;}return detailWrite(writer,value);}
@@ -239,3 +239,15 @@ fn detailWrite(writer:Writer&,value:blot_parse_ast::Span)->Error {return detailR
 
 
 fn detailWrite(writer:Writer&,value:blot_check_check::DiagnosticContext)->Error {return detailRecord(writer,value);}
+
+fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::HoleDetails)->Error {return detailRecord(writer,value);}
+
+fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::ExplanationDetails)->Error {return detailRecord(writer,value);}
+
+fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::ContextDetails)->Error {return detailRecord(writer,value);}
+
+fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::HoleDetails)->Error {return detailRecord(writer,value);}
+
+fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::ExplanationDetails)->Error {return detailRecord(writer,value);}
+
+fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::ContextDetails)->Error {return detailRecord(writer,value);}

@@ -17,9 +17,10 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_SHA256 = "1c7388a6c15f4429fef83f9d8377524123c231a2df20ddad91542ea31ff4bd39"
-PATCH_SHA256 = "090a2f0059d496803f69da2be66b0ea9ce487ea869f6161d8efecc7b37d12416"
-PATCHED_SOURCE_SHA256 = "e0a8e821507e81d2e14f0d5d65d5c2e37fee57b0043c210af4b27ddee06148ca"
+PATCH_SHA256 = "8f0265cc997d08624b8dae654b76f07f29e6f315316b905894261f9ca1d44782"
+PATCHED_SOURCE_SHA256 = "1f47a9918d3f1d21e22545074cc7f3da95ead794b9ae5333c5a1424cba2ada73"
 PATCHED_HEADERS = {
+    "src/clone.h": "f9e88692342c320da4290773ca0fdb159171e6ddb9211967a55dd7fa819bc79c",
     "src/type_queries.h": "521a808993a7f286dfdd79aa9494979ab334731984305aefe82cf112c91a900c",
     "src/typecheck.h": "aa698a75bbceec0231e05d89a3b2b4e95125d1fbcf2a7666e324a05d61f9cc3c",
     "src/typecheck_types.h": "d5e00282733a81cada55cd255cf1b1f88c12ead6593559ecc1b2e5884e089fef",
@@ -129,6 +130,7 @@ def build(args):
     flags = [
         "-O3", "-DNDEBUG", "-std=gnu++20", "-Wall", "-Wextra",
         "-Wno-missing-field-initializers",
+        "-DGOOSE_EXPANSION_NODE_LIMIT=" + str(args.expansion_node_limit),
         '-DGOOSE_TCC_LIB_PATH="' + str(native / "tcclib") + '"',
         "-I" + str(goose_build / "source/third_party/subprocess"),
         "-I" + str(native / "generated"), "-isystem", str(native / "tcc/api"),
@@ -190,6 +192,10 @@ def main():
     parser.add_argument(
         "--cache-dir", type=Path, default=ROOT / "build/goose-port/private-checker",
         help="private build cache (default: ignored build/goose-port/private-checker)",
+    )
+    parser.add_argument(
+        "--expansion-node-limit", type=int, choices=(100000, 1000000), default=100000,
+        help="bounded cumulative const-for expansion nodes; default retains upstream100000",
     )
     args = parser.parse_args()
     try:

@@ -38,7 +38,7 @@ fn encodeRequest<R,C>(context:C&,request:R)->blot_process_pool::Request,Error {
  return blot_process_pool::Request {bytes:owned},blot_error::Error.none;
 }
 fn releaseRequests(requests:const blot_process_pool::Request[:]) {
- for request in requests { if request.bytes.len!=0 { let first:const u8& =request.bytes[0]; let index=request_bytes.index_of(first); assert(index>=0); request_bytes.free_slice(request_bytes[index..index+request.bytes.len]); } }
+ for request in requests { if request.bytes.len!=0 { request_bytes.free_slice(request.bytes); } }
 }
 fn run<T,R,C>(kind:blot_process_pool::Kind,requests:const R[:],requested:u8,cancellation:Cancellation&,context:C&,outcomes:Outcome<T>[>..<]&)->Batch<T>,Error {
  var output=NativeOutcomes<T> {outcomes}; return runInto<T,R,C,NativeOutcomes<T>>(kind,requests,requested,cancellation,context,output);

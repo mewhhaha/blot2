@@ -126,7 +126,7 @@ fn initPooled()->Cache,Error {
 }
 fn init()->Cache,Error {return initPooled();}
 fn initPooledRef()->Cache?,Error {let cache,error=initPooled();if error!=blot_error::Error.none {return null,error;}return cache_slots[cache.lease-1].handle,blot_error::Error.none;}
-fn deinit(self_:Cache&) {if self_.lease==0 {return;}assert(valid(self_));self_.inputs.release();self_.keys.release();let at=self_.lease-1;cache_slots[at].state.live=false;self_=Cache {};cache_slots.free(at);}
+fn deinit(self_:Cache&) {if self_.lease==0 {return;}assert(valid(self_));blot_eval_lexical_capture_inputs::release(self_.inputs);blot_eval_lexical_capture_inputs::release(self_.keys);let at=self_.lease-1;cache_slots[at].state.live=false;self_=Cache {};cache_slots.free(at);}
 
 fn intern<S>(self_:Cache&,session:S&,value:u32,selected:const Interfaces&)->u32,bool,Error {
  assert(valid(self_));self_.requests++;if self_.examined_words>=session.options.max_children {return 0,false,blot_error::Error.none;}

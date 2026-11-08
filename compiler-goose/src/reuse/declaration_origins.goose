@@ -12,7 +12,7 @@ fn name(module: const blot_check_core::Module&, body: blot_check_core::Body) -> 
     if span.len == 0 || span.start > module.names.len || span.len > module.names.len - span.start {
         return blot_support::none<const u8[:]>();
     }
-    return blot_support::some(module.names[span.start..span.start + span.len]);
+    return blot_support::some<const u8[:]>(module.names[span.start..span.start + span.len]);
 }
 fn collect(entries: dictionary<const u8[:], Pair>&, module: const blot_check_core::Module&, before: bool) -> Error {
     for body in module.bodies {

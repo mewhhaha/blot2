@@ -53,17 +53,20 @@ enum QueryKind { inferred, entry, specialized, source, array_member, judgment }
 enum JudgmentKind { match_, covariant, scheme, body }
 struct Inputs {
     types: const blot_eval_type_evidence::Mapping[:] = default<const blot_eval_type_evidence::Mapping[:]>(), rows: const blot_eval_type_evidence::RowMapping[:] = default<const blot_eval_type_evidence::RowMapping[:]>(),
+    allocation_index:i64=-1,
 }
 struct Judgment {
     kind: JudgmentKind, unit: u32, producer: u32 = 0, source: u32, root: u32 = 0,
     scheme: blot_check_types::Scheme = blot_check_types::Scheme {..}, closed_rows: blot_check_types::List = blot_check_types::List {..},
     allow_remaining: bool = false, matched: bool = true, inputs: Inputs = Inputs {..}, outputs: Inputs = Inputs {..},
     selected: const BindingRef[:] = default<const BindingRef[:]>(),
+    allocation_index:i64=-1,
 }
 struct Query {
     kind: QueryKind, input: u32 = 0, expected: u32 = 0, selected: u32 = 0,
     target: BindingRef = BindingRef { 0, 0 , ..}, result: blot_eval_core_eval::SourceInterface = blot_eval_core_eval::SourceInterface {..},
     judgment: Judgment&? = null, depth: i64 = 0, call_depth: i64 = 0,
+    allocation_index:i64=-1,
 }
 enum Event {
     work { value: Resources }, read { value: Read }, growth { value: Growth },
@@ -134,28 +137,31 @@ fn clone(self_: Judgment) -> Judgment&?, Error {
     let inputs, e1 = self_.inputs.clone(); if e1 != blot_error::Error.none { return null, e1; }
     let outputs, e2 = self_.outputs.clone();
     if e2 != blot_error::Error.none { var partial = inputs; partial.deinit(); return null, e2; }
-    var value = self_; value.inputs = inputs; value.outputs = outputs; value.selected = copyOwned(self_.selected);
-    let index = judgments.alloc_index(value); return judgments[index], blot_error::Error.none;
+    let selected=copyOwned(self_.selected);
+    let value=Judgment{self_.kind,self_.unit,self_.producer,self_.source,self_.root,self_.scheme,self_.closed_rows,self_.allow_remaining,self_.matched,inputs,outputs,selected};
+    let index = judgments.alloc_index(value); judgments[index].allocation_index=index;return judgments[index], blot_error::Error.none;
 }
 fn destroy(self_: Judgment&) {
-    self_.inputs.deinit(); self_.outputs.deinit(); releaseOwned(self_.selected);
-    let index = judgments.index_of(self_); assert(index >= 0); judgments.free(index);
+    let index=self_.allocation_index;assert(index>=0 && index<judgments.len);let owned:Judgment& =judgments[index];assert(owned .== self_);
+    self_.inputs.deinit(); self_.outputs.deinit(); releaseOwned(self_.selected);self_.allocation_index=-1;judgments.free(index);
 }
 fn ownedBytes(self_: Judgment) -> i64 {
     return blot_host_layout::constant_judgment + bytes_of(self_.inputs.types).len + bytes_of(self_.outputs.types).len +
         bytes_of(self_.inputs.rows).len + bytes_of(self_.outputs.rows).len + bytes_of(self_.selected).len;
 }
 fn clone(self_: Query) -> Query&?, Error {
-    var value = self_;
+    var owned_judgment:Judgment?=null;
     { let optional_source_53 .= self_.judgment; if optional_source_53 { let judgment .= optional_source_53;
         let cloned, error = judgment.clone(); if error != blot_error::Error.none { return null, error; }
-        assert(cloned != null); value.judgment = cloned;
+        assert(cloned != null); owned_judgment .= cloned;
      } }
-    let index = queries.alloc_index(value); return queries[index], blot_error::Error.none;
+    let value=Query{self_.kind,self_.input,self_.expected,self_.selected,self_.target,self_.result,owned_judgment,self_.depth,self_.call_depth};
+    let index = queries.alloc_index(value); queries[index].allocation_index=index;return queries[index], blot_error::Error.none;
 }
 fn destroy(self_: Query&) {
+    let index=self_.allocation_index;assert(index>=0 && index<queries.len);let owned:Query& =queries[index];assert(owned .== self_);
     { let optional_source_52 .= self_.judgment; if optional_source_52 { let judgment .= optional_source_52; judgment.destroy();  } }
-    let index = queries.index_of(self_); assert(index >= 0); queries.free(index);
+    self_.allocation_index=-1;queries.free(index);
 }
 fn ownedBytes(self_: Query) -> i64 {
     var bytes = blot_host_layout::constant_query; { let optional_source_51 .= self_.judgment; if optional_source_51 { let judgment .= optional_source_51; bytes += judgment.ownedBytes();  } } return bytes;
@@ -163,7 +169,10 @@ fn ownedBytes(self_: Query) -> i64 {
 fn clone(self_: Event) -> Event, Error {
     match self_ {
         query query => { let value, error = query.value.clone(); if error != blot_error::Error.none { return default<Event>(), error; } assert(value != null); return Event.query { value , ..}, blot_error::Error.none; },
-        _ => { return self_, blot_error::Error.none; },
+        work item=>{return Event.work{item.value},blot_error::Error.none;},
+        read item=>{return Event.read{item.value},blot_error::Error.none;},
+        growth item=>{return Event.growth{item.value},blot_error::Error.none;},
+        view item=>{return Event.view{item.value},blot_error::Error.none;},
     }
 }
 fn deinit(self_: Event&) { match self_ { query query => { query.value.destroy(); }, _ => {} } }
@@ -187,11 +196,11 @@ fn ownedBytes(self_: Record) -> i64 {
 fn deinit(self_: Record&) {
     releaseOwned(self_.buffers); for &event in self_.events { event.deinit(); } releaseOwned(self_.events); releaseOwned(self_.sources);
     self_.inputs.deinit();
-    { let optional_source_49 .= self_.outputs; if optional_source_49 { let outputs .= optional_source_49; outputs.deinit(); let index = output_inputs.index_of(outputs); assert(index >= 0); output_inputs.free(index);  } }
+    { let optional_source_49 .= self_.outputs; if optional_source_49 { let outputs .= optional_source_49; outputs.destroy();  } }
     self_ = default<Record>();
 }
 fn clone(self_: Record) -> Record, Error {
-    var result = self_; result.buffers = []; result.events = []; result.sources = []; result.inputs = Inputs {..}; result.outputs = null;
+    var result = self_; result.buffers = default<const BufferEffect[:]>(); result.events = default<Event[:]>(); result.sources = default<Source[:]>(); result.inputs = Inputs {..}; result.outputs .= null;
     result.buffers = copyOwned(self_.buffers);
     let events = owned_events.alloc_slice(self_.events.len);
     for index in self_.events.len { events[index] = default<Event>(); }
@@ -203,7 +212,7 @@ fn clone(self_: Record) -> Record, Error {
     let inputs, error = self_.inputs.clone(); if error != blot_error::Error.none { result.deinit(); return default<Record>(), error; } result.inputs = inputs;
     { let optional_source_48 .= self_.outputs; if optional_source_48 { let outputs .= optional_source_48;
         let inputs, error = outputs.clone(); if error != blot_error::Error.none { result.deinit(); return default<Record>(), error; }
-        let index = output_inputs.alloc_index(inputs); result.outputs = output_inputs[index];
+        let index = output_inputs.alloc_index(inputs);output_inputs[index].allocation_index=index;result.outputs .= output_inputs[index];
      } }
     return result, blot_error::Error.none;
 }
@@ -218,7 +227,7 @@ struct Stats {
 struct Lookup { value: ValueId, outputs: Inputs }
 struct Provider { context: blot_backend_core_backend::Generator& }
 fn lookup(self_: Provider, session: Session&, target: BindingRef, inputs: Inputs) -> blot_support::Option<Lookup>, Error {
-    return self_.context.lookupConstant(session, target, inputs);
+    return blot_backend_core_backend::constantLookup(self_.context,session,target,inputs);
 }
 fn sourceMappingKey(module: const blot_check_core::Module&, id: u32) -> bool {
     if id == 0 || id >= module.types.nodes.len { return false; }
@@ -266,7 +275,7 @@ fn queryBudgets(session: const Session&) -> i64[8] {
         session.specializations.lexical_inputs.interface_visits, session.specializations.lexical_inputs.inputs.len,
         session.specializations.canonical_specializations.table.records.len];
 }
-fn admittedGraph<S>(snapshot: const S&, value: u32) -> bool {
+fn admittedGraph<S>(snapshot: S, value: u32) -> bool {
     if value >= snapshot.values.len { return false; }
     match snapshot.values[value].kind {
         scalar, product, record,
@@ -277,6 +286,7 @@ fn admittedGraph<S>(snapshot: const S&, value: u32) -> bool {
 }
 
 struct ViewKey { value: u32, evidence: u32 }
+fn hash(key:ViewKey)->u64 {return ::hash_combine(::hash(key.value),::hash(key.evidence));}
 struct RecorderTables {
     events: RecorderEventsBuffer&, sources: RecorderSourcesBuffer&, view_inputs: RecorderViewInputsMap&,
     ready_reads: RecorderReadyReadsMap&, cached_views: RecorderCachedViewsMap&,
@@ -317,14 +327,10 @@ fn view(self_: Recorder&, input: u32) -> Error {
     self_.view_inputs.insert(input, false); return blot_error::Error.none;
 }
 fn prepareView(self_: Recorder&) -> Error {
-    if self_.eligible {
-        // Exercise the upcoming two append slots while no view publication
-        // has occurred. Both elements are inert work records and are removed.
-        self_.events.push(Event.work { Resources {} , ..}); self_.events.push(Event.work { Resources {} , ..});
-        self_.events.pop_n(2);
-    }
+    if self_.eligible {return self_.events.ensure(self_.events.len+2);}
     return blot_error::Error.none;
 }
+
 fn cacheView(self_: Recorder&, session: const Session&, effect: ViewEffect) -> Error {
     if !self_.eligible { return blot_error::Error.none; }
     let error = self_.flush(session); if error != blot_error::Error.none { return error; }
@@ -497,7 +503,7 @@ fn finish(self_: Recorder&, session: const Session&, target: BindingRef, value: 
     result.inputs = inputs;
     if self_.inputs.types != outputs.types || self_.inputs.rows != outputs.rows {
         let payload, error = outputs.clone(); if error != blot_error::Error.none { result.deinit(); return blot_support::none<Record>(), error; }
-        let index = output_inputs.alloc_index(payload); result.outputs = output_inputs[index];
+        let index = output_inputs.alloc_index(payload);output_inputs[index].allocation_index=index;result.outputs .= output_inputs[index];
     }
     return blot_support::some(result), blot_error::Error.none;
 }
@@ -570,3 +576,10 @@ fn initRecorderOwner(session: const Session&) -> RecorderOwner,Error { if next_r
 fn borrow(self_: RecorderOwner) -> Recorder? { if self_.lease==0||self_.lease-1>=recorder_owners.len { return null; } let owner: RecorderOwnerState& =recorder_owners[self_.lease-1]; if !owner.live||owner.generation!=self_.generation { return null; } return owner.value; }
 fn deinit(self_: RecorderOwner&) { if self_.lease==0 { return; } let at=self_.lease-1; assert(at<recorder_owners.len&&recorder_owners[at].live&&recorder_owners[at].generation==self_.generation); let owner: RecorderOwnerState& =recorder_owners[at]; owner.value.deinit(); let backing: RecorderBacking& =recorder_backings[owner.backing]; backing.events.deinit(); backing.sources.deinit(); release(backing.view_inputs); release(backing.ready_reads); release(backing.cached_views); backing.owned_children.deinit(); backing.buffers.deinit(); recorder_backings.free(owner.backing); owner.live=false; recorder_owners.free(at); self_=RecorderOwner {..}; }
 fn failure(self_: const Recorder&) -> Error { if self_.events.failure!=blot_error::Error.none { return self_.events.failure; } if self_.sources.failure!=blot_error::Error.none { return self_.sources.failure; } if self_.owned_children.failure!=blot_error::Error.none { return self_.owned_children.failure; } if self_.buffers.failure!=blot_error::Error.none { return self_.buffers.failure; } return blot_error::Error.none; }
+
+// Slot indices only recover the owning pool cell; logical receipt fields and
+// packed budget widths remain independent of this private bookkeeping.
+fn destroy(self_:Inputs&) {
+ let index=self_.allocation_index;assert(index>=0 && index<output_inputs.len);let owned:Inputs& =output_inputs[index];assert(owned .== self_);
+ self_.deinit();output_inputs.free(index);
+}

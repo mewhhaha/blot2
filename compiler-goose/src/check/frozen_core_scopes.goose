@@ -141,8 +141,8 @@ fn validateWithScratch(module: const Module&,context: Context,scratch: Scratch) 
 reusable[] var validation_colors: u8[>..]=[];
 reusable[] var validation_path: Frame[>..]=[];
 fn releaseScratch(scratch: Scratch) {
-    if scratch.colors.len != 0 {let first: const u8& =scratch.colors[0]; let at=validation_colors.index_of(first); assert(at >= 0); validation_colors.free_slice(validation_colors[at..at+scratch.colors.len]);}
-    if scratch.path.len != 0 {let first: const Frame& =scratch.path[0]; let at=validation_path.index_of(first); assert(at >= 0); validation_path.free_slice(validation_path[at..at+scratch.path.len]);}
+    if scratch.colors.len != 0 {validation_colors.free_slice(scratch.colors);}
+    if scratch.path.len != 0 {validation_path.free_slice(scratch.path);}
 }
 fn validate(module: const Module&,context: Context) -> Error {var remaining: i64=1000000; return validateWithBudget(module,context,remaining);}
 fn validateWithBudget(module: const Module&,context: Context,remaining: i64&) -> Error {return validateBatchWithBudget(module,context,remaining,null);}

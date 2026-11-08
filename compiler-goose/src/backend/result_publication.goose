@@ -44,11 +44,15 @@ fn stageInputs(owner: Owner,units: const blot_check_core::Module[:],catalog: Inp
     if units.len != 0 && catalog.lease == 0 { return blot_error::Error.invalid_artifact; }
     var count: i64 = 0; if catalog.lease != 0 { count++; } for input in unit_owners { if input.lease == 0 { if seed_owners.len == 0 { return blot_error::Error.invalid_artifact; } } else { count++; } } for input in seed_owners { if input.lease == 0 { return blot_error::Error.invalid_artifact; } count++; }
     var pins = Pins {..}; pins.journals = journal_runs.alloc_slice(count); for &input in pins.journals { input = InputOwner {..}; } var next: i64 = 0;
-    recursive fn retainInputs() -> Error {
+    fn retainInputs() -> Error {
         if catalog.lease != 0 { let held,error = catalog.retain(); if error != blot_error::Error.none { return error; } pins.journals[next] = held; next++; }
         for input in unit_owners { if input.lease == 0 { continue; } let held,error = input.retain(); if error != blot_error::Error.none { return error; } pins.journals[next] = held; next++; }
         for input in seed_owners { let held,error = input.retain(); if error != blot_error::Error.none { return error; } pins.journals[next] = held; next++; }
-        pins.units = module_runs.alloc_slice(units.len); for module,index in units { pins.units[index] = module; } return blot_error::Error.none;
+        pins.units = module_runs.alloc_slice(units.len);
+        // Catalogs own registered header ranges; retained journals keep
+        // every payload alive. Reborrow that run without moving or copying it.
+        let source = blot_reuse_dependency_payload::pool_header_module.realloc_slice(units,units.len);
+        for module,index in source { pins.units[index] = module; } return blot_error::Error.none;
     }
     let error = retainInputs(); if error != blot_error::Error.none { pins.deinit(); return error; } assert(next == count); state.pins = pins; state.inputs_staged = true; return blot_error::Error.none;
 }
@@ -58,10 +62,12 @@ fn inputUnits(owner: Owner,source: const blot_check_core::Module[:]) -> const bl
 fn prepare(owner: Owner,epoch: u64,units: const blot_check_core::Module[:],catalog: InputOwner,unit_owners: const InputOwner[:],seed_owners: const InputOwner[:],module_pins: const blot_reuse_code_artifacts::ModulePin[:]) -> Pins,Error {
     if !valid(owner) || !resultValid(owner,epoch,false) { return Pins {..},blot_error::Error.invalid_artifact; } let state = states[owner.slot - 1];
     if !state.inputs_staged || state.published || unit_owners.len != units.len || !sameUnits(state.pins.units,units) || !inputsMatch(state.pins,catalog,unit_owners,seed_owners) { return Pins {..},blot_error::Error.invalid_artifact; }
-    var pins = Pins {..}; pins.headers = module_runs.alloc_slice(module_pins.len); for pin,index in module_pins { pins.headers[index] = pin.module; } return pins,blot_error::Error.none;
+    var pins = Pins {..}; pins.headers = module_runs.alloc_slice(module_pins.len);
+    let source = blot_reuse_code_artifacts::owned_pins.realloc_slice(module_pins,module_pins.len);
+    for pin,index in source { pins.headers[index] = pin.module; } return pins,blot_error::Error.none;
 }
 fn commit(owner: Owner,epoch: u64,pins: Pins&) {
-    assert(valid(owner) && resultValid(owner,epoch,false)); let state: State& = states[owner.slot - 1]; assert(state.inputs_staged && !state.published && state.pins.headers.len == 0 && pins.journals.len == 0 && pins.units.len == 0); state.pins.headers = pins.headers; pins.headers = []; state.published = true; state.leased = true;
+    assert(valid(owner) && resultValid(owner,epoch,false)); let state: State& = states[owner.slot - 1]; assert(state.inputs_staged && !state.published && state.pins.headers.len == 0 && pins.journals.len == 0 && pins.units.len == 0); state.pins.headers = module_runs.realloc_slice(pins.headers,pins.headers.len); pins.headers = default<blot_check_core::Module[:]>(); state.published = true; state.leased = true;
 }
 fn units(owner: Owner,epoch: u64) -> const blot_check_core::Module[:] { assert(resultValid(owner,epoch,true)); return states[owner.slot - 1].pins.units; }
 fn releaseResult(owner: Owner,epoch: u64,pinned: bool) {

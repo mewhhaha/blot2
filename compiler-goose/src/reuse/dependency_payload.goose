@@ -427,7 +427,7 @@ fn adopt(self_:Owner&,source:Owner&)->Error {
  leases[at].live=false;source=Owner {..};leases.free(at);return blot_error::Error.none;
 }
 fn alloc<T>(self_:Owner&,length:i64)->T[:],Error {return allocate(self_,default<T>(),length);}
-fn copy<T>(self_:Owner&,values:const T[:])->T[:],Error {let result,error=blot_reuse_dependency_payload::alloc<T>(self_,values.len);if error!=blot_error::Error.none {return default<T[:]>(),error;}for value,index in values {result[index]=value;}return result,blot_error::Error.none;}
+fn copy<T>(self_:Owner&,values:const T[:])->T[:],Error {let result,error=blot_reuse_dependency_payload::alloc<T>(self_,values.len);if error!=blot_error::Error.none {return default<T[:]>(),error;}for value,index in values {result[index]=copyElement(self_,value);}return result,blot_error::Error.none;}
 
 fn allocate(self_:Owner&,sample:u32,length:i64)->u32[:],Error {
  assert(unique(self_));if length<0 {return default<u32[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<u32[:]>(),blot_error::Error.none;}
@@ -7914,3 +7914,10 @@ fn mutable(self_:const Owner&,values:const Owner[:])->Owner[:] {assert(unique(se
 reusable[] var pool_bool:bool[>..]=[];
 fn allocate(self_:Owner&,sample:bool,length:i64)->bool[:],Error {assert(unique(self_));if length<0 {return default<bool[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<bool[:]>(),blot_error::Error.none;}let run=pool_bool.alloc_slice(length);let error=remember(self_,Run.run_bool{run, ..});if error!=blot_error::Error.none {pool_bool.free_slice(run);return default<bool[:]>(),error;}return run,blot_error::Error.none;}
 fn mutable(self_:const Owner&,values:const bool[:])->bool[:] {assert(unique(self_));if values.len==0 {return default<bool[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_bool run=>{if blot_support::same_slice_identity(run.values,values) {return pool_bool.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
+
+// Proof headers already copied into this owner retain their exact registered runs.
+fn canonicalProofHeader(self_:const Owner&,value:blot_check_numeric_proof_headers::Owned)->blot_check_numeric_proof_headers::Owned {
+ return blot_check_numeric_proof_headers::Owned{arity:value.arity,value_slots:self_.mutable(value.value_slots),proof_slots:self_.mutable(value.proof_slots),values:self_.mutable(value.values),operands:self_.mutable(value.operands),requirements:self_.mutable(value.requirements),result:value.result};
+}
+fn copyElement<T>(self_:Owner&,value:T)->T {return value;}
+fn copyElement(self_:Owner&,value:blot_check_numeric_proof_headers::Named)->blot_check_numeric_proof_headers::Named {return blot_check_numeric_proof_headers::Named{value.binding,self_.canonicalProofHeader(value.header)};}

@@ -81,3 +81,6 @@ fn push(self_: WordBuffer&,value: u32) { if self_.failure!=blot_error::Error.non
 fn push(self_: GoalBuffer&,value: blot_eval_type_evidence::Goal) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,copied_goals); }
 fn deinit(self_: WordBuffer&) { blot_support_pooled_buffer::deinit(self_,copied_words); }
 fn deinit(self_: GoalBuffer&) { blot_support_pooled_buffer::deinit(self_,copied_goals); }
+
+fn get(self_:const dictionary<u32,u32>&,key:u32)->u32? {return ::get(self_,key);}
+fn insert(self_:dictionary<u32,u32>&,key:u32,value:u32) {::insert(self_,key,value);}

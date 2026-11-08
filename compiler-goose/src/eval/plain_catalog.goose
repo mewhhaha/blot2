@@ -17,7 +17,7 @@ fn nominal(self_: Walk&,unit: u32,decl: u32,depth: i64) -> bool {
  }
  return false;
 }
-fn data(self_: Walk&,owner: i64,id: u32,variables: blot_check_types::List,depth: i64) -> bool {
+recursive fn data(self_: Walk&,owner: i64,id: u32,variables: blot_check_types::List,depth: i64) -> bool {
  if !enter(self_,depth)||id==0 { return false; } let module=self_.units[owner]; let value=module.types.node(id); let tag=value.tag;
  if tag==blot_check_types::Tag.unit||tag==blot_check_types::Tag.boolean||tag==blot_check_types::Tag.unsigned32||tag==blot_check_types::Tag.floating32||tag==blot_check_types::Tag.never { return true; }
  if tag==blot_check_types::Tag.variable { for child in module.types.list(variables) { if child==id { return true; } } return false; }

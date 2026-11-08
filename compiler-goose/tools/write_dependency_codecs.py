@@ -163,7 +163,12 @@ def slice_child(hint):
   if m:return m[1]
  return None
 def install(name,kind,hint,children,**extra):
- if name in DESCS:return DESCS[name]
+ if name in DESCS:
+  existing=DESCS[name]
+  # Optional slice headers are invariant in Goose; use readonly ownership at
+  # every reference to this one native domain, including describe samples.
+  if hint and hint.startswith('blot_support::Option<const ') and existing['goose']==hint.replace('<const ','<',1):existing['goose']=hint
+  return existing
  if not hint:
   if kind=='primitive':
    if name=='void':hint='Void'
@@ -194,6 +199,7 @@ def build_named(name,kind,body,module,hint):
    target=field
    if field not in gf:
     target={'type':'ty'}.get(field,field)
+    if target not in gf and field+'_' in gf:target=field+'_'
    if target not in gf:raise ValueError(('missing Goose wire field',name,field,hint,list(gf)))
    gh=goose_type(gf[target],gns);child=native_resolve(raw,module,name,field,gh);d['fields'].append((field,child,target))
  elif kind=='enum':

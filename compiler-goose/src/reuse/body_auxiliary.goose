@@ -567,6 +567,7 @@ fn map_instance<M>(self_:Visitor<M>&,value:Identity)->Identity,Error {if value.u
 fn map_proposition<M>(self_:Visitor<M>&,value:blot_check_numeric_proof_terms::Proposition)->blot_check_numeric_proof_terms::Proposition,Error {return value,blot_error::Error.none;}
 fn map_nodes_pair<M>(self_:Visitor<M>&,value:u32[2])->u32[2],Error {var result=value;for item,index in value {let mapped,error=self_.mapper.map_node(item);if error!=blot_error::Error.none {return result,error;}result[index]=mapped;}return result,blot_error::Error.none;}
 recursive fn map_proof<M>(self_:Visitor<M>&,value:Proof)->Proof,Error {match value {given payload=>{let mapped,error=mapRecord(payload.value,self_);return blot_check_check::DictionaryProof.given{value:mapped, ..},error;},selected=>{return self_.mapper.map_proof(value);}}}
+fn map_node<M>(self_:Visitor<M>&,value:u32)->u32,Error {return self_.mapper.map_node(value);}
 fn map_binding<M>(self_:Visitor<M>&,value:u32)->u32,Error {return self_.mapper.map_binding(value);}
 fn map_ty<M>(self_:Visitor<M>&,value:u32)->u32,Error {return self_.mapper.map_ty(value);}
 fn map_row<M>(self_:Visitor<M>&,value:u32)->u32,Error {return self_.mapper.map_row(value);}

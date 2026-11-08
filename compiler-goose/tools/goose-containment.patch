@@ -221,3 +221,18 @@
 +        for (auto g : ast.globals)
 +            for (auto gd : g->defs) global(g, gd);
 +    }
+--- a/src/clone.h
++++ b/src/clone.h
+@@ -24,0 +25,7 @@
++#ifndef GOOSE_EXPANSION_NODE_LIMIT
++#define GOOSE_EXPANSION_NODE_LIMIT 100000
++#endif
++#if GOOSE_EXPANSION_NODE_LIMIT != 100000 && GOOSE_EXPANSION_NODE_LIMIT != 1000000
++#error "unsupported bounded Goose expansion node limit"
++#endif
++    static constexpr size_t MAX_CLONE_NODES = GOOSE_EXPANSION_NODE_LIMIT;
+@@ -42,2 +49,2 @@
+-        if (++*ctx->size > ExpansionClone::MAXNODES)
+-            ctx->error(line, cat("const for expansion exceeds ", ExpansionClone::MAXNODES, " generated nodes"));
++        if (++*ctx->size > ExpansionClone::MAX_CLONE_NODES)
++            ctx->error(line, cat("const for expansion exceeds ", ExpansionClone::MAX_CLONE_NODES, " generated nodes"));

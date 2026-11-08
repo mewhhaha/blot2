@@ -34,7 +34,7 @@ fn dotted(text:const u8[:])->i64 {for byte,index in text {if byte=='.' {return i
 fn value(self_:Builder&,unit:UnitId,root:Id,method:Id)->Error {
  let tree .= self_.source.unit(unit).tree;let declaration=tree.value_decl(root);let associated=dotted(self_.source.symbols.get(declaration.name))>=0;var owner=root;if method!=0 {owner=method;}
  self_.declarations.push(Declaration {unit,root,owner,method!=0||associated||declaration.exported, ..});
- if method==0 {{ let propagated_error = self_.put(Key {unit,declaration.name, ..},Name {value:self_.declarations.len as u32,public:self_.source.symbols.get(declaration.modifier)!="private"&&!tree.declaration_traits(root).private, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }}return blot_error::Error.none;
+ if method==0 {{ let propagated_error = self_.put(Key {unit,declaration.name, ..},Name {value:self_.declarations.len as u32,public:self_.source.symbols.get(declaration.modifier)!="private"&&!blot_parse_ast::declaration_traits(tree,root).private, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }}return blot_error::Error.none;
 }
 fn collect(self_:Builder&)->Error {
  for &unit,index in self_.source.units.items {
@@ -43,9 +43,9 @@ fn collect(self_:Builder&)->Error {
    let node=unit.tree.node(root);
    match node.tag {
     blot_parse_ast::tag_value_decl=>{{ let propagated_error = self_.value(id,root,0); if propagated_error != blot_error::Error.none { return propagated_error; } }},
-    blot_parse_ast::tag_implementation_decl=>{{ let propagated_error = self_.put(Key {id,node.a, ..},Name {public:!unit.tree.declaration_traits(root).private, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }for member in unit.tree.list(unit.tree.implementation(root).members) {if unit.tree.node(member).tag==blot_parse_ast::tag_value_decl {{ let propagated_error = self_.value(id,member,root); if propagated_error != blot_error::Error.none { return propagated_error; } }}}},
-    blot_parse_ast::tag_data_decl=>{let traits=unit.tree.declaration_traits(root);{ let propagated_error = self_.put(Key {id,node.a, ..},Name {public:!traits.private, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }for constructor in unit.tree.children(node.b) {{ let propagated_error = self_.put(Key {id,unit.tree.node(constructor).a, ..},Name {public:!traits.private&&!traits.is_opaque, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }}},
-    blot_parse_ast::tag_type_alias_decl,blot_parse_ast::tag_contract_decl,blot_parse_ast::tag_effect_decl,blot_parse_ast::tag_effect_type_decl=>{{ let propagated_error = self_.put(Key {id,node.a, ..},Name {public:!unit.tree.declaration_traits(root).private, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+    blot_parse_ast::tag_implementation_decl=>{{ let propagated_error = self_.put(Key {id,node.a, ..},Name {public:!blot_parse_ast::declaration_traits(unit.tree,root).private, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }for member in unit.tree.list(unit.tree.implementation(root).members) {if unit.tree.node(member).tag==blot_parse_ast::tag_value_decl {{ let propagated_error = self_.value(id,member,root); if propagated_error != blot_error::Error.none { return propagated_error; } }}}},
+    blot_parse_ast::tag_data_decl=>{let traits=blot_parse_ast::declaration_traits(unit.tree,root);{ let propagated_error = self_.put(Key {id,node.a, ..},Name {public:!traits.private, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }for constructor in unit.tree.children(node.b) {{ let propagated_error = self_.put(Key {id,unit.tree.node(constructor).a, ..},Name {public:!traits.private&&!traits.is_opaque, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }}},
+    blot_parse_ast::tag_type_alias_decl,blot_parse_ast::tag_contract_decl,blot_parse_ast::tag_effect_decl,blot_parse_ast::tag_effect_type_decl=>{{ let propagated_error = self_.put(Key {id,node.a, ..},Name {public:!blot_parse_ast::declaration_traits(unit.tree,root).private, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }},
     _=>{},
    }
   }
@@ -70,7 +70,7 @@ fn importNames(self_:Builder&)->Error {
    if imported.declaration.node==0 {{ let propagated_error = self_.whole(id); if propagated_error != blot_error::Error.none { return propagated_error; } }continue;}
    let forwarding=unit.tree.node(imported.declaration.node).tag==blot_parse_ast::tag_export_decl;
    if imported.namespace_!=0 {{ let propagated_error = self_.put(Key {id,imported.namespace_, ..},Name {namespace_:imported.target, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }if forwarding {{ let propagated_error = self_.whole(id); if propagated_error != blot_error::Error.none { return propagated_error; } }}continue;}
-   for binding in unit.tree.list(imported.bindings) {
+   let binding_count=unit.tree.list(imported.bindings).len;for binding_ordinal in 0..binding_count {let binding=unit.tree.list(imported.bindings)[binding_ordinal];
     let alias=unit.tree.import_binding(binding);let found=self_.exported(imported.target,alias.name,0);var target=Name {..};
     if found.present {target=found.value;}else {{ let propagated_error = self_.whole(imported.target); if propagated_error != blot_error::Error.none { return propagated_error; } }}target.public=forwarding;{ let propagated_error = self_.put(Key {id,alias.alias, ..},target); if propagated_error != blot_error::Error.none { return propagated_error; } }
     if forwarding {let old=self_.exports.get(Key {id,alias.alias, ..});if old {old.ambiguous=true;}else {self_.exports.insert(Key {id,alias.alias, ..},target);}}
@@ -165,7 +165,7 @@ fn prepareBuilder(builder:Builder&)->Error {
  var next:i64=0;
  while next<builder.work.len {
   let declaration=builder.declarations[builder.work[next]-1];next++;let tree .= builder.source.unit(declaration.unit).tree;
-  let span,present=tree.declaration_nodes(declaration.owner);
+  let span,present=blot_parse_ast::declaration_nodes(tree,declaration.owner);
   if present {for node in tree.nodes.items[span.start..span.start+span.len] {if node.tag==blot_parse_ast::tag_package_pack||node.tag==blot_parse_ast::tag_package_unpack {{ let propagated_error = builder.whole(declaration.unit); if propagated_error != blot_error::Error.none { return propagated_error; } }break;}}}else {{ let propagated_error = builder.whole(declaration.unit); if propagated_error != blot_error::Error.none { return propagated_error; } }}
   builder.current=declaration.unit;let self_name,self_exists=builder.source.symbols.lookup("self");var self_symbol:u32=0;if self_exists {self_symbol=self_name;}
   let found,error=blot_reuse_global_references::discover(tree,declaration.node,builder,self_symbol,builder.stats.transitions,4000000);

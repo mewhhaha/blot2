@@ -96,7 +96,7 @@ fn collect(owner: const blot_reuse_frozen_dependency::Module&) -> Slots, Error {
     var slots = Slots { owned_roles.alloc_slice(iface.graph.extra.len), owned_roles.alloc_slice(iface.patterns.extra.len), owned_roles.alloc_slice(ir.types.extra.len), owned_roles.alloc_slice(iface.capability_contracts.words.len), owned_roles.alloc_slice(ir.capability_contracts.words.len) , ..};
     for &slot in slots.interface_types { slot = 0; } for &slot in slots.patterns { slot = 0; } for &slot in slots.core_types { slot = 0; }
     let error = collectInto(owner, slots);
-    if error != blot_error::Error.none { slots.deinit(); return Slots { [], [], [], [], [] , ..}, error; }
+    if error != blot_error::Error.none { slots.deinit(); return default<Slots>(), error; }
     return slots, blot_error::Error.none;
 }
 fn collectInto(owner: const blot_reuse_frozen_dependency::Module&, slots: Slots&) -> Error {

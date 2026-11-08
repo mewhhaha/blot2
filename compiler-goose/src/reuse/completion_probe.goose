@@ -34,7 +34,7 @@ fn capture(source:const u8[:],position:u32)->blot_support::Option<Probe>,Error {
  let prefix=selectedCompletionPrefix(source,prefix_start,prefix_end,has_prefix);var kind=Kind.expression;if intrinsic {kind=Kind.intrinsic;}var original_start=replace.start;
  if !hole && previous.present {let token=previous.value;if token.end==replace.start {if token.tag==blot_parse_token::dot {kind=Kind.member;}else if token.tag==blot_parse_token::selector {kind=Kind.selector;}else if token.tag==blot_parse_token::hash {kind=Kind.constructor;original_start=replace.start;}}}
  if kind==Kind.member {var start=replace.start;while start!=0 {let byte=source[start-1];if !alphanumeric(byte) && byte!='_' && byte!='.' {break;}start--;}if start!=0 && source[start-1]=='$' {kind=Kind.constructor;}}
- var closing:u8[8];var depth:i64=0;var recover=true;
+ var closing:u8[8]=[0;8];var depth:i64=0;var recover=true;
  for token in tokens {
   if token.tag==blot_parse_token::l_paren || token.tag==blot_parse_token::l_bracket {if depth==closing.len {recover=false;break;}var close:u8=')';if token.tag==blot_parse_token::l_bracket {close=']';}closing[depth]=close;depth++;}
   else if token.tag==blot_parse_token::r_paren || token.tag==blot_parse_token::r_bracket {var close:u8=')';if token.tag==blot_parse_token::r_bracket {close=']';}if depth==0 || closing[depth-1]!=close {recover=false;break;}depth--;}

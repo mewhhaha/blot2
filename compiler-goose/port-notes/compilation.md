@@ -36,7 +36,8 @@ source/toolchain manifest. From attempt175, an immutable input copy is kept at
 `build-N-inputs/compiler-goose`; capture hashes are checked before and after
 copying. Capture175 costs 0.1865 seconds. Later live edits cannot mix with those
 inputs. Live artifacts are published only when their hashes still match.
-The coordinator collects five seconds of diagnostics after the first error,
+The coordinator uses an explicit diagnostic collection window after the first error
+(currently45 seconds),
 then terminates the build and its compiler process group. A timeout is not a pass.
 
 Checkpoint `0e84f55bea07a49cf3fb74957923779ff717ada7` preserves the first
@@ -51,8 +52,12 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen230 inputs with the accepted
-global-filter checker. Build222 stops after46.13s at hash/asset/decoder API errors;
+per stage. This checkpoint preserves exact frozen232 inputs. Build231 captured385
+errors across60 files;232 captured14 across12 files in86.32s under the same45s
+collection window. The opt-in1M cumulative clone-expansion checker passes201
+frontend and8 runtime parity controls plus bounded expansion controls; its
+independent tail-shape limit stays100k. Current source is still unverified as a
+whole compiler. The evidence pins all108 reconstructed checker source files. Build222 stops after46.13s at hash/asset/decoder API errors;
 223 advances to an unused Instance slice-field escape after46.64s.224 removes
 those two unobserved fields; substitution still fills the caller-owned buffers.
 Build224 stops after46.82s at a missing implementation-evidence scoped helper,

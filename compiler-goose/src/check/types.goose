@@ -434,7 +434,7 @@ fn record(self_: Store&, fields: const Field[:]) -> Id, Error {
 }
 fn scoped(self_: Store&, descriptor: Id, instance: NominalIdentity) -> Id, Error { let error = dataKind(self_, descriptor); if error != blot_error::Error.none { return 0, error; } return add(self_, Node { tag: Tag.scoped, a: descriptor, b: instance.unit, c: instance.decl , ..}); }
 fn capabilityParameter(self_: Store&, descriptor: Id) -> Id, Error { let variable, error = fresh(self_); if error != blot_error::Error.none { return 0, error; } return scoped(self_, descriptor, NominalIdentity { 0, variable , ..}); }
-fn resolveInstance(self_: Store&, instance: NominalIdentity, at: Cursor, depth: i64) -> NominalIdentity, Error {
+recursive fn resolveInstance(self_: Store&, instance: NominalIdentity, at: Cursor, depth: i64) -> NominalIdentity, Error {
     if instance.unit != 0 || instance.decl == 0 { return instance, blot_error::Error.none; }
     let bound, error = resolveDepth(self_, instance.decl, at, depth + 1); if error != blot_error::Error.none { return default<NominalIdentity>(), error; }
     let value = node(self_, bound);

@@ -27,16 +27,17 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen230
-checkpoints the return-value request decoder, high-water frame buffer, stable
-cache offers and caller-owned proof-term teardown. Actual reader/frame fixtures
-pass both checkers with cleanup, split I/O and negative controls. The last whole
-run stops after17.77s with19 captured diagnostics across14 files in its15s
-collection window. Later protocol-schema, archive, recursive API and revision-input
-publication repairs continue. These are bounded failing-prefix runs, not completed
-compiler timings. Component receipts qualify their exact hashes; source checkpoints
-remain unverified whole-compiler work. Whole-program emission, linking and execution
-remain pending. The prior nominal-identity/reachability
+including its source delta and byte-exact tracked recipe reconstruction. Frozen232
+checkpoints the broad owner/publication and recursive API repair batch. Focused
+buffer, query, retained-state, decoder and framing fixtures pass their pinned
+controls. The latest whole run stops after86.32s with14 captured diagnostics
+across12 files in a45s diagnostic window, down from385 across60 files in231.
+The opt-in private checker raises cumulative const-for clone expansion from100k
+to1M; its separate tail traversal stays100k.201 frontend and8 runtime controls
+match the preceding checker, and over-budget expansion still rejects. These are
+bounded failing-prefix runs, not completed compiler timings. Component receipts
+qualify exact hashes; whole-program emission, linking and execution remain pending.
+The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.

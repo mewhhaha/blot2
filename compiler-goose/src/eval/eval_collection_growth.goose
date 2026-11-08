@@ -9,7 +9,7 @@ import std;
 struct Span { start: u32, len: u32 }
 struct Frontier { offset: u32, capacity: u32 }
 struct BufferEffect { value: u32, frontier: Frontier }
-fn hash(value: Span) -> u64 { return hash((value.start as u64)<<32|value.len); }
+fn hash(value: Span) -> u64 { return ::hash((value.start as u64)<<32|value.len); }
 struct BufferMap { count: i64=0,slots: dictionary_slot<Span,Span>[:]=default<dictionary_slot<Span,Span>[:]>() }
 reusable[] var pool_BufferMap: dictionary_slot<Span,Span>[>..]=[];
 fn get(self_: const BufferMap&,key: Span) -> Span? { return blot_support_pooled_map::getSlots(self_.slots,key); }

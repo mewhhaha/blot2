@@ -461,15 +461,19 @@ fn projectEffects<S>(self_: Store,source: const S&,row: u32,mappings: const Mapp
 }
 fn projectOwned(self_: Store,source: const blot_check_types::Store&,ty: u32,memo: blot_reuse_projection_cache::Cache&) -> Id,Error {
  if !memo.activate(source.owner_id,self_.owner_id,source.closed_generation,source.effects.physical_epoch) { return project(self_,source,ty,[]); }
- var no=NoResolver {}; let remaining: i64& =no_projection_remaining; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=ProjectionWork<blot_check_types::Store,NoResolver> {self_,source,[],[],resolver}; var budget: i64=1000000; let id=projectDepth(work,ty,0,budget,true,memo,null); return id,work.failure;
+ var no=NoResolver {}; let remaining: i64& =no_projection_remaining; var resolver=ProjectionResolver<NoResolver> {no,remaining,false}; var work=ProjectionWork<blot_check_types::Store,NoResolver> {self_,source,default<const Mapping[:]>(),default<const RowMapping[:]>(),resolver}; var budget: i64=1000000; let id=projectDepth(work,ty,0,budget,true,memo,null); return id,work.failure;
 }
 fn projectAssociatedOwned(self_: Store,source: const blot_check_types::Store&,ty: u32,memo: blot_reuse_projection_cache::Cache&,remaining: i64&) -> Id,Error {
- var no=NoResolver {}; var resolver=ProjectionResolver<NoResolver> {no,remaining,true}; if !memo.activate(source.owner_id,self_.owner_id,source.closed_generation,source.effects.physical_epoch) { return projectSelected(self_,source,ty,[],[],resolver); }
- var work=ProjectionWork<blot_check_types::Store,NoResolver> {self_,source,[],[],resolver}; var budget: i64=1000000; let id=projectDepth(work,ty,0,budget,false,memo,null); return id,work.failure;
+ // The caller's counter may be an element of shrinking scratch storage. Keep
+ // only an invocation-local scalar in the resolver and publish its final debit.
+ var available:i64=remaining;var no=NoResolver {};var resolver=ProjectionResolver<NoResolver> {no,available,true};
+ if !memo.activate(source.owner_id,self_.owner_id,source.closed_generation,source.effects.physical_epoch) {let id,error=projectSelected(self_,source,ty,default<const Mapping[:]>(),default<const RowMapping[:]>(),resolver);remaining=available;return id,error;}
+ var work=ProjectionWork<blot_check_types::Store,NoResolver> {self_,source,default<const Mapping[:]>(),default<const RowMapping[:]>(),resolver};var budget:i64=1000000;let id=projectDepth(work,ty,0,budget,false,memo,null);remaining=available;return id,work.failure;
 }
+
 struct MatchWork<S,R,M,B> { destination: Store,source: S,mappings: M,rows: B,has_rows: bool,resolver: ProjectionResolver<R>,memo: MatchMemo,use_memo: bool,failure: Error=blot_error::Error.none }
 fn matchFail<S,R,M,B>(work: MatchWork<S,R,M,B>&,error: Error) -> bool { if work.failure==blot_error::Error.none { work.failure=error; } return false; }
-fn matchDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: Id,depth: i64,budget: i64&) -> bool {
+recursive fn matchDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: Id,depth: i64,budget: i64&) -> bool {
  if work.failure!=blot_error::Error.none { return false; } if depth>=1024||(work.use_memo&&depth>=256)||budget==0 { return matchFail(work,blot_error::Error.evidence_limit); } budget--;
  let self_=work.destination; let source=work.source; if actual==0||actual>=self_.nodes.len { return matchFail(work,blot_error::Error.unresolved_type); }
  let pair=(pattern as u64)<<32|actual; if work.use_memo&&work.memo.contains(pair) { return true; } let n=source.node(pattern); let tag=n.tag;
@@ -522,7 +526,7 @@ fn matchDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: Id,depth: 
   fields.deinit(); }
  if work.use_memo { blot_eval_type_evidence::insert(work.memo,pair,true); } return true;
 }
-fn matchRowDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: u32,depth: i64,budget: i64&) -> bool {
+recursive fn matchRowDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: u32,depth: i64,budget: i64&) -> bool {
  if work.failure!=blot_error::Error.none { return false; } let self_=work.destination; let source=work.source; let tail=source.row(pattern).tail; var closed=false;
  match tail {
   parameter=>{ return matchFail(work,blot_error::Error.unresolved_type); },
@@ -537,7 +541,7 @@ fn matchRowDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: u32,dep
  if expected.len>actuals.len||(closed&&expected.len!=actuals.len) { let __cleanup_result_29_0: bool = false; actuals.deinit(); return __cleanup_result_29_0; } var used=BoolBuffer {};  used.resize(actuals.len,false);
  let __cleanup_result_30_0: bool = matchOperations(work,expected,actuals.items,used.items,tail,actual_formal,0,depth,budget); used.deinit(); actuals.deinit(); return __cleanup_result_30_0;
  used.deinit(); actuals.deinit(); }
-fn matchOperations<S,R,M,B>(work: MatchWork<S,R,M,B>&,expected: const u32[:],actuals: const u32[:],used: bool[:],tail: blot_check_effects::Tail,actual_formal: Id,index: i64,depth: i64,budget: i64&) -> bool {
+recursive fn matchOperations<S,R,M,B>(work: MatchWork<S,R,M,B>&,expected: const u32[:],actuals: const u32[:],used: bool[:],tail: blot_check_effects::Tail,actual_formal: Id,index: i64,depth: i64,budget: i64&) -> bool {
  if work.failure!=blot_error::Error.none { return false; } if depth>=1024||(work.use_memo&&depth>=256)||budget==0 { return matchFail(work,blot_error::Error.evidence_limit); } budget--;
  let self_=work.destination; let source=work.source;
  if index==expected.len {
@@ -672,15 +676,19 @@ fn prepareCommit(source: const Store&,destination: Store&) -> Error { if !valid(
  return blot_check_effect_evidence::prepareCommit(source.effects,destination.effects); }
 // Publication moves typed capacity runs; old destination storage is reclaimed.
 fn commit(source: Store&,destination: Store&) { assert(valid(source)&&valid(destination)&&source.owner_id!=destination.owner_id);
- destination.nodes.deinit(); destination.nodes.items=source.nodes; source.nodes=NodeBuffer {};
- destination.extra.deinit(); destination.extra.items=source.extra; source.extra=WordBuffer {};
- destination.next.deinit(); destination.next=source.next; source.next=WordBuffer {};
- destination.buckets.deinit(); destination.buckets=source.buckets; source.buckets=Buckets {};
- destination.projection_owners.deinit(); destination.projection_owners=source.projection_owners; source.projection_owners=OwnersBuffer {};
- destination.projection_quantifiers.deinit(); destination.projection_quantifiers=source.projection_quantifiers; source.projection_quantifiers=WordBuffer {};
- destination.quantifier_goals.deinit(); destination.quantifier_goals.items=source.quantifier_goals; source.quantifier_goals=QuantifierBuffer {};
- destination.quantifier_obligations.deinit(); destination.quantifier_obligations.items=source.quantifier_obligations; source.quantifier_obligations=GoalBuffer {};
- blot_check_effect_evidence::commit(source.effects,destination.effects); let identity=destination.owner_id; destination.owner_id=source.owner_id; states[destination.lease-1].owner_id=destination.owner_id; source.owner_id=identity; states[source.lease-1].owner_id=source.owner_id;
+ let from:State& =states[source.lease-1];let into:State& =states[destination.lease-1];
+ // The validated owner leases anchor complete capacity headers globally.
+ assert(source.nodes .== from.nodes && source.extra .== from.extra && source.next .== from.next && source.buckets .== from.buckets && source.projection_owners .== from.projection_owners && source.projection_quantifiers .== from.projection_quantifiers && source.quantifier_goals .== from.quantifier_goals && source.quantifier_obligations .== from.quantifier_obligations && source.effects .== from.effects);
+ assert(destination.nodes .== into.nodes && destination.extra .== into.extra && destination.next .== into.next && destination.buckets .== into.buckets && destination.projection_owners .== into.projection_owners && destination.projection_quantifiers .== into.projection_quantifiers && destination.quantifier_goals .== into.quantifier_goals && destination.quantifier_obligations .== into.quantifier_obligations && destination.effects .== into.effects);
+ into.nodes.deinit(); into.nodes=from.nodes; from.nodes=NodeBuffer {};
+ into.extra.deinit(); into.extra=from.extra; from.extra=WordBuffer {};
+ into.next.deinit(); into.next=from.next; from.next=WordBuffer {};
+ into.buckets.deinit(); into.buckets=from.buckets; from.buckets=Buckets {};
+ into.projection_owners.deinit(); into.projection_owners=from.projection_owners; from.projection_owners=OwnersBuffer {};
+ into.projection_quantifiers.deinit(); into.projection_quantifiers=from.projection_quantifiers; from.projection_quantifiers=WordBuffer {};
+ into.quantifier_goals.deinit(); into.quantifier_goals=from.quantifier_goals; from.quantifier_goals=QuantifierBuffer {};
+ into.quantifier_obligations.deinit(); into.quantifier_obligations=from.quantifier_obligations; from.quantifier_obligations=GoalBuffer {};
+ blot_check_effect_evidence::commit(from.effects,into.effects); let identity=destination.owner_id; destination.owner_id=source.owner_id; states[destination.lease-1].owner_id=destination.owner_id; source.owner_id=identity; states[source.lease-1].owner_id=source.owner_id;
 }
 
 struct ByteBuffer { storage: u8[:]=default<u8[:]>(),items: u8[:]=default<u8[:]>(),len: i64=0,failure: Error=blot_error::Error.none }

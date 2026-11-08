@@ -2119,6 +2119,15 @@ fn compileLocals(workspace: CompileWorkspace&,units: const blot_check_core::Modu
     let first,error = compileAttempt(workspace,units,entry,options,false,speculative); if error != blot_error::Error.constant_receipt_retry { return first,error; } assert(options.constant_receipts);
     let retried,retry_error = compileAttempt(workspace,units,entry,options,true,speculative); assert(retry_error != blot_error::Error.constant_receipt_retry); if retry_error != blot_error::Error.none { return retried,retry_error; } var result = retried; result.constant_receipts.retries = 1; return result,blot_error::Error.none;
 }
+fn scopedStorage(options: CompileOptions) -> blot_backend_storage_plan::Config {
+    let fallback = options.policy.storage.config();
+    if options.storage.present { return options.storage.value; }
+    return fallback;
+}
+fn scopedCompileOptions(options: CompileOptions) -> blot_backend_scoped_backend::CompileOptions {
+    let storage = scopedStorage(options);
+    return blot_backend_scoped_backend::CompileOptions { completed_core_validation: options.completed_core_validation, source_completion: options.source_completion, identity: options.identity, storage: storage, tier: options.policy.codegen_tier, workers: options.policy.codegen_workers, share_machine_code: options.policy.share_machine_code, io: options.io, profile: options.profile_backend, .. };
+}
 fn compileWithOptions(workspace: CompileWorkspace&,source_units: const blot_check_core::Module[:],entry: u32,options: CompileOptions) -> Result,blot_error::Error {
     let units,input_error = blot_backend_result_publication::inputUnits(workspace.publication_owner,source_units); if input_error != blot_error::Error.none { return Result {..},input_error; }
     let publication_epoch,publication_error = blot_backend_result_publication::beginCompile(workspace.publication_owner); if publication_error != blot_error::Error.none { return Result {..},publication_error; } workspace.compiled_units = units;
@@ -2127,8 +2136,7 @@ fn compileWithOptions(workspace: CompileWorkspace&,source_units: const blot_chec
 
     let required,error = blot_backend_scoped_backend::required(units,entry); if error != blot_error::Error.none { return emptyResult(workspace),error; }
     if required {
-        var storage = options.policy.storage.config(); if options.storage.present { storage = options.storage.value; }
-        return blot_backend_scoped_backend::compileWithOptions(workspace,units,entry,blot_backend_scoped_backend::CompileOptions { completed_core_validation: options.completed_core_validation, source_completion: options.source_completion, identity: options.identity, storage: storage, tier: options.policy.codegen_tier, workers: options.policy.codegen_workers, share_machine_code: options.policy.share_machine_code, io: options.io, profile: options.profile_backend, .. });
+        return blot_backend_scoped_backend::compileWithOptions(workspace,units,entry,scopedCompileOptions(options));
     }
     let first,first_error = compileLocals(workspace,units,entry,options,true); if first_error != blot_error::Error.speculative_local_retry { return first,first_error; } return compileLocals(workspace,units,entry,options,false);
 

@@ -75,6 +75,10 @@ fn readSeeds(r: Reader&) -> ScalarSeed[:] { let length=count(r,13); if r.failure
 fn seed(session: blot_eval_core_eval::Session&,seeds: const ScalarSeed[:]) -> Error { for seed in seeds { let owner=session.unitIndex(seed.target.unit); if !owner.present||seed.target.binding==0||seed.target.binding>=session.units[owner.value].bindings.len { return blot_error::Error.invalid_artifact; } let module=session.units[owner.value]; let body=module.body(seed.target.binding); if body==null||body.runtime||module.bindings[seed.target.binding].kind!=blot_reuse_principal_interface::Kind.global||seed.value.scalar>3 { return blot_error::Error.invalid_artifact; } let value,error=session.makeScalar(owner.value,body.root,seed.value); if error!=blot_error::Error.none { return error; } session.slots[session.binding_offsets[owner.value]+seed.target.binding]=blot_eval_core_eval::Slot {state:blot_eval_core_eval::State.complete,value:value}; } return blot_error::Error.none; }
 import check.check;
 import .semantic_parallel;
+import eval.component_worker;
+import eval.lexical_capture_inputs;
+import reuse.specialization_receipt;
+import work_counters;
 fn put(w: Writer&,values: i64[15]) { for value in values { put(w,value); } }
 fn get(r: Reader&,values: i64[15]&) { for &value in values { get(r,value); } }
 fn writeCatalog(w: Writer&,modules: const blot_reuse_code_artifacts::ModulePin[:]) { count(w,modules.len); for pin in modules { var packet: u8[>..<]=[]; let error=blot_core_packet::encode(pin.module,packet); if error!=blot_error::Error.none { w.failure=error; return; } blob(w,packet); if w.failure!=blot_error::Error.none { return; } } }
@@ -86,7 +90,7 @@ reusable[] var proof_records: blot_reuse_independent_call_proof::Record[>..]=[];
 fn writeRecords(w: Writer&,records: const blot_reuse_independent_call_proof::Record[:]) { count(w,records.len); for record in records { writeRecord(w,record); } }
 fn readRecords(r: Reader&) -> blot_reuse_independent_call_proof::Record[:] { let length=count(r,16); if r.failure!=blot_error::Error.none { return default<blot_reuse_independent_call_proof::Record[:]>(); } let records=proof_records.alloc_slice(length); for &record in records { record=default<blot_reuse_independent_call_proof::Record>(); } for &record in records { record=readRecord(r); if r.failure!=blot_error::Error.none { releaseRecords(records); return default<blot_reuse_independent_call_proof::Record[:]>(); } } return records; }
 fn releaseRecords(records: blot_reuse_independent_call_proof::Record[:]) { for &record in records { record.deinit(); } proof_records.free_slice(records); }
-fn semanticPools(identity: const Identity&,module_pins: const blot_reuse_code_artifacts::ModulePin[:],evidence: const blot_evidence_packet::OwnedSnapshot&) -> blot_reuse_code_artifacts::Pools { let empty_effects=blot_check_effect_evidence::Snapshot {owner_id:0,..}; let evaluator=blot_eval_core_eval::Snapshot {owner_id:blot_native::fresh_owner_id(),evidence:evidence.snapshot,implementation_proofs:blot_eval_implementation_evidence::Snapshot {},..}; return blot_reuse_code_artifacts::Pools {project_identity:true,identity:blot_support::some(metadata(identity)),modules:module_pins,dependency_certificate:blot_support::none<blot_reuse_dependency_certificate::Certificate>(),layouts:blot_reuse_code_artifacts::Layouts {effects:empty_effects,..},evaluator:evaluator,rows:blot_reuse_code_artifacts::Substitutions {},templates:blot_reuse_code_artifacts::Substitutions {},static_values:blot_reuse_code_artifacts::Substitutions {},instance_arguments:blot_eval_instance_arguments::Owned {},bridge:blot_support::none<blot_reuse_code_artifacts::Bridge>(),field_locations_stamp:[0;32],operations_finalized:false,evaluator_steps:0,evaluator_demanded:0,evaluator_traced_bodies:0,evaluator_traced_nodes:0,..}; }
+fn semanticPools(identity: const Identity&,module_pins: const blot_reuse_code_artifacts::ModulePin[:],evidence: const blot_evidence_packet::OwnedSnapshot&) -> blot_reuse_code_artifacts::Pools { let empty_effects=blot_check_effect_evidence::Snapshot {owner_id:0,..}; let evaluator=blot_eval_core_eval::Snapshot {owner_id:blot_native::fresh_owner_id(),evidence:evidence.snapshot,implementation_proofs:blot_eval_implementation_evidence::Snapshot {},..}; return blot_reuse_code_artifacts::Pools {project_identity:true,identity:blot_support::some(metadata(identity)),modules:module_pins,dependency_certificate:blot_support::none<blot_reuse_dependency_certificate::Certificate>(),layouts:blot_reuse_code_artifacts::Layouts {effects:empty_effects,..},evaluator:evaluator,rows:blot_reuse_code_artifacts::Substitutions {},templates:blot_reuse_code_artifacts::Substitutions {},static_values:blot_reuse_code_artifacts::Substitutions {},instance_arguments:default<blot_eval_instance_arguments::Owned>(),bridge:blot_support::none<blot_reuse_code_artifacts::Bridge>(),field_locations_stamp:[0;32],operations_finalized:false,evaluator_steps:0,evaluator_demanded:0,evaluator_traced_bodies:0,evaluator_traced_nodes:0,..}; }
 
 fn get(r:Reader&,out:blot_backend_runtime_identity::Name&) {getRecord(r,out);}
 fn put(w:Writer&,value:blot_backend_runtime_identity::Name) {putRecord(w,value);}
@@ -111,3 +115,36 @@ fn put(w:Writer&,value:blot_eval_core_eval::CallSummaryKey) {putRecord(w,value);
 
 fn get(r:Reader&,out:blot_eval_core_eval::Target&) {getRecord(r,out);}
 fn put(w:Writer&,value:blot_eval_core_eval::Target) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_type_evidence::Mapping&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_type_evidence::Mapping) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_type_evidence::RowMapping&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_type_evidence::RowMapping) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_lexical_capture_inputs::Slot&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_lexical_capture_inputs::Slot) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_component_worker::Member&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_component_worker::Member) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_component_worker::Edge&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_component_worker::Edge) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_work_counters::Counters&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_work_counters::Counters) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_work_counters::Normalization&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_work_counters::Normalization) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_work_counters::SchemeMembership&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_work_counters::SchemeMembership) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_semantic_parallel::Request&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_semantic_parallel::Request) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_reuse_specialization_receipt::CallRead&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_reuse_specialization_receipt::CallRead) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_semantic_parallel::Counts&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_semantic_parallel::Counts) {putRecord(w,value);}

@@ -44,7 +44,7 @@ fn allocateSnapshot(count:i64)->Snapshot?,Error {
 }
 fn discardBookkeeping(self_:Snapshot&) {assert(self_.valid()&&self_.initialized==0&&self_.owner.lease==0);if self_.modules.len!=0 {handles.free_slice(self_.modules);}let at=self_.slot-1;self_.live=false;snapshots.free(at);}
 fn create(symbols:blot_reuse_frozen_dependency::Symbol[:],count:i64,owner:Owner&)->Snapshot?,Error {
- let self_,error=allocateSnapshot(count);if error!=blot_error::Error.none {return null,error;}assert(self_!=null);let views,failure=owner.alloc<FrozenModule>(count);if failure!=blot_error::Error.none {self_.discardBookkeeping();return null,failure;}
+ let self_,error=allocateSnapshot(count);if error!=blot_error::Error.none {return null,error;}assert(self_!=null);let views,failure=blot_reuse_dependency_payload::alloc<FrozenModule>(owner,count);if failure!=blot_error::Error.none {self_.discardBookkeeping();return null,failure;}
  self_.owner=copy(owner);owner=Owner {..};self_.value=Frozen {symbols,views, ..};return self_,blot_error::Error.none;
 }
 fn adopt(value:OwnedFrozen&)->Snapshot?,Error {

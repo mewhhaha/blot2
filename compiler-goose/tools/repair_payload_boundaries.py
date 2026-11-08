@@ -17,6 +17,27 @@ def repair_payload_identity(source):
                    'blot_support::same_slice_identity(run.values,values)', source)
 
 
+# A shallow Named copy may only publish proof-header leaves already registered
+# to this exact unique owner. Recover their globally rooted canonical runs;
+# copying them again would duplicate the preceding proof-header snapshot.
+PROOF_HEADER_RECEIPT = """// Proof headers already copied into this owner retain their exact registered runs.
+fn canonicalProofHeader(self_:const Owner&,value:blot_check_numeric_proof_headers::Owned)->blot_check_numeric_proof_headers::Owned {
+ return blot_check_numeric_proof_headers::Owned{arity:value.arity,value_slots:self_.mutable(value.value_slots),proof_slots:self_.mutable(value.proof_slots),values:self_.mutable(value.values),operands:self_.mutable(value.operands),requirements:self_.mutable(value.requirements),result:value.result};
+}
+fn copyElement<T>(self_:Owner&,value:T)->T {return value;}
+fn copyElement(self_:Owner&,value:blot_check_numeric_proof_headers::Named)->blot_check_numeric_proof_headers::Named {return blot_check_numeric_proof_headers::Named{value.binding,self_.canonicalProofHeader(value.header)};}
+
+"""
+
+def repair_payload_copy_receipt(source):
+    if PROOF_HEADER_RECEIPT in source:
+        return source,0
+    if 'fn canonicalProofHeader(' in source:
+        raise ValueError('proof header receipt diverged; review before regeneration')
+    source=source.replace('for value,index in values {result[index]=value;}return result,blot_error::Error.none;', 'for value,index in values {result[index]=copyElement(self_,value);}return result,blot_error::Error.none;',1)
+    return source+'\n'+PROOF_HEADER_RECEIPT,1
+
+
 def enum_shapes():
     shapes = {}
     for path in ROOT.rglob('*.goose'):
@@ -73,7 +94,20 @@ def repair_codec_const_options(source):
                                     'blot_support::some<const ' + child + '>(value)')
                 count += 1
         lines.append(line)
-    return ''.join(lines), count
+    source=''.join(lines)
+    # Schema samples use the callee's invariant Option type too. Existing
+    # evolved bodies stay intact; only the now-readonly sample headers change.
+    samples=dict(re.findall(r'fn (describe_\w+)\(hasher:[^,]+,value:([^\n]+?)\) \{',source))
+    def sample(match):
+        nonlocal count
+        wanted=samples.get(match[1])
+        old=match[2]
+        if wanted and wanted.startswith('blot_support::Option<const ') and old==wanted.replace('<const ','<',1):
+            count+=1
+            return match[1]+'(hasher,default<'+wanted+'>())'
+        return match[0]
+    source=re.sub(r'\b(describe_\w+)\(hasher,default<([^;{}]+)>\(\)\)',sample,source)
+    return source,count
 
 
 def main():
@@ -86,6 +120,9 @@ def main():
     ]:
         path = ROOT / 'reuse' / (name + '.goose')
         source, counts[name] = repair(path.read_text())
+        if name == 'dependency_payload':
+            source,extra = repair_payload_copy_receipt(source)
+            counts[name] += extra
         path.write_text(source)
     print(json.dumps(counts))
 

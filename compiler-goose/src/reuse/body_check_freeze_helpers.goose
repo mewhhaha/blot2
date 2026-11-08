@@ -3,7 +3,7 @@ namespace blot_reuse_body_check_cache;
 import .body_check_cache;
 import .dependency_snapshot;
 struct PrivateScope {old:u32,current:u32}
-struct AuxiliaryGraph {tree:Tree,checked:blot_check_check::Checked,bodies:Body[:],scopes:PrivateScope[>..<]&}
+struct AuxiliaryGraph {tree:Tree,checked:blot_check_check::Checked,bodies:Body[:],scopes:PrivateScope[>..]&}
 fn physical(self_:AuxiliaryGraph&,identity_:Identity,selection:bool)->Identity,Error {
  for body,index in self_.bodies {let owner .= body.auxiliary;if !owner {continue;}let proof=PrivateFacts{self_.tree,self_.checked,owner.origins, ..};let slot=proof.physical(identity_,selection);if slot.present {return Identity{(index+1) as u32,slot.value, ..},blot_error::Error.none;}}return Identity{0,0, ..},blot_error::Error.dependency_limit;
 }

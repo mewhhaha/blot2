@@ -43,5 +43,5 @@ fn prepare(self_: Cache&,stats: blot_work_counters::SchemeMembership&,owner: u64
  let key=Key {owner,span}; let known=self_.entries.get(key);
  if known { stats.hits++; return View {self_.words.items[known.start..known.start+known.len],true}; }
  if self_.entries.count>=64||values.len>16384-self_.items { stats.saturated++; return View {values,false}; }
- let sorted=membership_words.alloc_slice(values.len); for value,index in values { sorted[index]=value; } ::sort(sorted); let saved=List {self_.words.len as u32,sorted.len as u32}; self_.words.append(sorted); self_.entries.insert(key,saved); self_.items+=sorted.len; stats.publications++; stats.indexed_items+=sorted.len; membership_words.free_slice(sorted); return View {self_.words.items[saved.start..saved.start+saved.len],true};
+ let sorted=membership_words.alloc_slice(values.len); for value,index in values { sorted[index]=value; } ::sort(sorted); let saved=List {self_.words.len as u32,sorted.len as u32}; self_.words.append(sorted); self_.entries.insert(key,saved); self_.items+=sorted.len; stats.publications++; stats.indexed_items+=sorted.len as u64; membership_words.free_slice(sorted); return View {self_.words.items[saved.start..saved.start+saved.len],true};
 }

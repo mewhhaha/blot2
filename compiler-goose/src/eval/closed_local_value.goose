@@ -13,7 +13,7 @@ type Module=blot_check_core::Module;
 type Parameter=blot_check_core::Parameter;
 type BindingRef=blot_check_core::BindingRef;
 struct Proof { dependencies: BindingRef[16],len: i64=0 }
-struct Scan { units: const Module[:],proof: Proof=Proof {},remaining: i64=512 }
+struct Scan { units: const Module[:],proof: Proof=Proof {..},remaining: i64=512 }
 fn unit(self_: Scan&,id: u32) -> const Module? {
  for module,index in self_.units { var actual=module.unit; if actual==0 { actual=(index+1) as u32; } if actual==id { return module; } } return null;
 }

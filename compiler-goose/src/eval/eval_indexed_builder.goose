@@ -11,7 +11,7 @@ struct Plan { incoming: u32,outgoing: u32,aliases: u32[64],alias_count: i64=0,ed
 fn alias(self_: Plan&,binding: u32) -> bool { for item in self_.aliases[..self_.alias_count] { if item==binding { return true; } } return false; }
 fn addAlias(self_: Plan&,binding: u32) -> bool { if alias(self_,binding) { return true; } if self_.alias_count==64 { return false; } self_.aliases[self_.alias_count]=binding; self_.alias_count++; return true; }
 fn localAlias(self_: Plan&,m: const Module&,id: Id) -> bool { if m.node(id).tag!=blot_check_core::Tag.reference { return false; } let ref=m.reference(id); return (ref.unit==0||ref.unit==m.unit)&&alias(self_,ref.binding); }
-fn collect(self_: Plan&,m: const Module&,id: Id) -> bool {
+recursive fn collect(self_: Plan&,m: const Module&,id: Id) -> bool {
  if self_.budget==0 { return false; } self_.budget--; let n=m.node(id);
  if n.tag==blot_check_core::Tag.suite { for child in m.children(id) { if !collect(self_,m,child) { return false; } } }
  else if n.tag==blot_check_core::Tag.bind {}
@@ -24,7 +24,7 @@ fn collect(self_: Plan&,m: const Module&,id: Id) -> bool {
   if !collect(self_,m,loop_.body) { return false; }
  } else { return false; } return true;
 }
-fn independent(self_: Plan&,m: const Module&,id: Id) -> bool {
+recursive fn independent(self_: Plan&,m: const Module&,id: Id) -> bool {
  if id==0 { return true; } if self_.budget==0 { return false; } self_.budget--; let n=m.node(id);
  if n.tag==blot_check_core::Tag.constant { return true; }
  if n.tag==blot_check_core::Tag.reference { return !localAlias(self_,m,id); }

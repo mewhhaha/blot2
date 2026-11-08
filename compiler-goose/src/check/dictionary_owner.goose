@@ -11,7 +11,7 @@ enum Owner { quantified { value: blot_check_types::Id }, scheme { value: blot_ch
 fn forBinding(module: const blot_check_core::Module&, binding: blot_check_core::BindingId) -> blot_support::Option<Owner> {
     if binding == 0 || binding >= module.bindings.len { return blot_support::Option<Owner> { false, default<Owner>() , ..}; }
     let principal = module.bindings[binding]; if principal.ty == 0 { return blot_support::Option<Owner> { false, default<Owner>() , ..}; }
-    var owner = Owner.scheme { binding , ..}; if module.types.node(principal.ty).tag == blot_check_types::Tag.forall { owner = Owner.quantified { principal.ty , ..}; }
+    var owner: Owner = Owner.scheme { binding , ..}; if module.types.node(principal.ty).tag == blot_check_types::Tag.forall { owner = Owner.quantified { principal.ty , ..}; }
     for ordinal in count(owner, module) { if goal(owner, module, ordinal).kind == blot_check_types::ObligationKind.contract { return blot_support::Option<Owner> { true, owner , ..}; } }
     return blot_support::Option<Owner> { false, default<Owner>() , ..};
 }

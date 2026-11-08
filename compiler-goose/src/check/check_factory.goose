@@ -148,18 +148,18 @@ var imports_mapping:blot_check_check_scheme_import::WordMap;
 var imports_row_variables:blot_check_check_scheme_import::WordMap;
 var imports_rows:blot_check_check_scheme_import::WordMap;
 var imports_labels:blot_check_check_scheme_import::WordMap;
-var proof_header_value_slots:u32[>..];
-var proof_header_proof_slots:u32[>..];
-var proof_header_values:blot_check_numeric_proof_terms::Kind[>..];
-var proof_header_operands:blot_check_numeric_proof_terms::Term[>..];
-var proof_header_requirements:blot_check_numeric_proof_contracts::Requirement[>..];
+var proof_header_value_slots:u32[>..]=[];
+var proof_header_proof_slots:u32[>..]=[];
+var proof_header_values:blot_check_numeric_proof_terms::Kind[>..]=[];
+var proof_header_operands:blot_check_numeric_proof_terms::Term[>..]=[];
+var proof_header_requirements:blot_check_numeric_proof_contracts::Requirement[>..]=[];
 var proof_body_debits:blot_check_numeric_proof_bodies::Debit[>..<]=[];
 var proof_body_sources:dictionary<u32,u32> = dictionary<u32,u32>{};
 var proof_body_introductions:blot_check_numeric_proof_bodies::Introduction[>..<]=[];
 var proof_body_expressions:dictionary<u32,u32> = dictionary<u32,u32>{};
 var proof_body_parameters:blot_check_numeric_proof_bodies::Parameter[>..<]=[];
 var proof_body_uses:blot_check_numeric_proof_bodies::Use[>..<]=[];
-var proof_terms:blot_check_numeric_proof_terms::Term[>..];var proof_index:dictionary<blot_check_numeric_proof_terms::Term,u32> = dictionary<blot_check_numeric_proof_terms::Term,u32>{};
+var proof_terms:blot_check_numeric_proof_terms::Term[>..]=[];var proof_index:dictionary<blot_check_numeric_proof_terms::Term,u32> = dictionary<blot_check_numeric_proof_terms::Term,u32>{};
 let initialized_types,error=blot_check_types::initWithOptions(blot_check_types::Options{closed_graphs:true, ..});if error!=blot_error::Error.none {return default<Checked>(),error;}var types=initialized_types;
 let patterns,error=blot_check_parameter_patterns::initPooled();if error!=blot_error::Error.none {types.deinit();return default<Checked>(),error;}
 let capabilities,error=blot_check_capability_contracts::initPooled();if error!=blot_error::Error.none {types.deinit();var patterns=patterns;patterns.deinit();return default<Checked>(),error;}

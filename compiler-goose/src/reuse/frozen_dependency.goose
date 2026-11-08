@@ -15,3 +15,5 @@ struct Module {
 struct FrozenDependency { symbols: Symbol[:], modules: Module[:] }
 fn exportKindCode(kind: ExportKind) -> u32 { match kind { value => 0, nominal => 1, constructor => 2, effect_family => 3, contract => 4, implementation => 5 } }
 fn exportKindFromCode(code: u32) -> ExportKind, bool { match code { 0 => { return ExportKind.value, true; }, 1 => { return ExportKind.nominal, true; }, 2 => { return ExportKind.constructor, true; }, 3 => { return ExportKind.effect_family, true; }, 4 => { return ExportKind.contract, true; }, 5 => { return ExportKind.implementation, true; }, _ => { return ExportKind.value, false; } } }
+
+fn blot_structural::equal(left:blot_reuse_frozen_dependency::ExportKind,right:blot_reuse_frozen_dependency::ExportKind)->bool {return left==right;}

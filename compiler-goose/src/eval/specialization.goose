@@ -42,20 +42,20 @@ struct PhysicalProjection { layouts: blot_backend_layout::Store? = null,mappings
 fn physicalProjection(layouts: blot_backend_layout::Store&,mappings: Mapping[>..<]&) -> PhysicalProjection,Error { return PhysicalProjection { layouts,MappingSink.lexical { mappings , ..} , ..},blot_error::Error.none; }
 fn physicalProjection(layouts: blot_backend_layout::Store&,mappings: blot_backend_substitution_buffers::Mappings&) -> PhysicalProjection,Error { let sink,error = mappingSink(mappings); if error != blot_error::Error.none { return PhysicalProjection {..},error; } return PhysicalProjection { layouts,sink , ..},blot_error::Error.none; }
 fn mapping(self_: PhysicalProjection&, solver: blot_check_types::Store&, variable: blot_check_types::Id, root: blot_check_types::Id) -> Error {
-    assert(self_.layouts);
+    let layouts:blot_backend_layout::Store? .= self_.layouts;assert(layouts);
     for &entry in mappingItems(self_.mappings) { if entry.variable == variable && entry.layout != blot_backend_layout::erased { return blot_error::Error.none; } }
-    let concrete, error = self_.layouts.fromSolver(solver, root);
+    let concrete, error = layouts.fromSolver(solver, root);
     if error != blot_error::Error.none { if error == blot_error::Error.layout_limit { return blot_error::Error.type_limit; } return error; }
     if concrete == blot_backend_layout::erased { return blot_error::Error.none; }
     for &entry in mappingItems(self_.mappings) { if entry.variable == variable { entry.layout = concrete; return blot_error::Error.none; } }
     return appendSink(self_.mappings, Mapping { variable: variable, layout: concrete , ..});
 }
-struct OwnedProjection { unit: u32,mappings: const Mapping[:],physical: PhysicalProjection }
+struct OwnedProjection { unit: u32,mappings: MappingSink,physical: PhysicalProjection }
 fn mappingTarget(projection: blot_eval_core_eval::CodeProjection) -> PhysicalProjection { match projection { inactive=>{ abort("inactive code projection"); },physical p=>{ return p.value; },static_code p=>{ return p.value; },owned p=>{ return p.value.physical; }, } }
 fn mapping(self_: OwnedProjection&, solver: blot_check_types::Store&, variable: blot_check_types::Id, root: blot_check_types::Id) -> Error { self_.physical.mapping(solver, variable, root) }
 fn instance(self_: OwnedProjection&, unit: u32, variable: blot_check_types::Id) -> blot_support::Option<blot_check_types::NominalIdentity> {
     if unit != self_.unit { return blot_support::none<blot_check_types::NominalIdentity>(); }
-    for entry in self_.mappings { if entry.variable == variable && entry.instance.unit != 0 { return blot_support::some(entry.instance); } }
+    for entry in mappingItems(self_.mappings) { if entry.variable == variable && entry.instance.unit != 0 { return blot_support::some(entry.instance); } }
     return blot_support::none<blot_check_types::NominalIdentity>();
 }
 struct Service {
@@ -460,7 +460,7 @@ fn refineMappingsCapturesSink(self_: Service&, unit_id: u32, root: EvidenceRoot,
     recursive fn cleanup_continuation_5() -> Error {
  let partial,projection_error = physicalProjection(self_.layouts,shapes); if projection_error != blot_error::Error.none { return projection_error; }
     var physical = partial; if self_.code_projection.present { physical = mappingTarget(self_.code_projection.value); }
-    var owned_projection = OwnedProjection { unit: unit_id, mappings: mappingItems(mappings), physical: physical , ..}; let projection = blot_eval_core_eval::CodeProjection.owned { owned_projection , ..};
+    var owned_projection = OwnedProjection { unit: unit_id, mappings: mappings, physical: physical , ..}; let projection = blot_eval_core_eval::CodeProjection.owned { owned_projection , ..};
     var timing = blot_support::none<blot_backend_backend_timing::Scope>(); if self_.timing != null { timing = blot_support::some(self_.timing.enter(blot_backend_backend_timing::Phase.specialization)); }
     recursive fn cleanup_continuation_4() -> Error {
 

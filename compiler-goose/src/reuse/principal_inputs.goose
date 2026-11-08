@@ -296,7 +296,7 @@ fn plainRead(self_: Recorder&, key: u64, actual: blot_support::Option<bool>) -> 
     self_.plain_seen.insert(key, PlainSeen { initial: actual , ..}); self_.plain_reads.push(PlainRead { key, actual , ..}); return blot_error::Error.none;
 }
 fn plainRead(self_: Recorder&, key: u64, actual: const bool?) -> Error {
-    { let optional_source_38 .= actual; if optional_source_38 { let value: bool = optional_source_38.value; return self_.plainRead(key, blot_support::some(value));  } } return self_.plainRead(key, blot_support::none<bool>());
+    { let optional_source_38 .= actual; if optional_source_38 { let value: bool = optional_source_38; return self_.plainRead(key, blot_support::some(value));  } } return self_.plainRead(key, blot_support::none<bool>());
 }
 fn plainPublish(self_: Recorder&, key: u64, value: bool) -> Error {
     if !self_.eligible { return blot_error::Error.none; }

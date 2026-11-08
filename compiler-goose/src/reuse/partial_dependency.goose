@@ -120,7 +120,7 @@ fn emitWithOptions(self_:const Prepared&,workspace:Workspace&,options:CompileOpt
  published=true;let __cleanup_result_8_0: Result = output; let __cleanup_result_8_1: Error = blot_error::Error.none; {if !published {output.deinit();}} return __cleanup_result_8_0, __cleanup_result_8_1;
  {if !published {output.deinit();}} }
 enum Preparation {inactive,ready{value:Prepared},rejected{value:Result}}
-fn deinit(self_:Preparation&) {match self_ {inactive=>{},ready payload=>{payload.value.deinit();},rejected payload=>{payload.value.deinit();}}self_=Preparation.inactive;}
+fn deinit(self_:Preparation&) {match self_ {inactive=>{},ready payload=>{var value=payload.value;value.deinit();},rejected payload=>{var value=payload.value;value.deinit();}}self_=Preparation.inactive;}
 fn reject(source:const Project&,entry_path:const u8[:],diagnostic:ConsumerDiagnostic)->Preparation,Error {
  var path=entry_path;if diagnostic.unit!=0 {path=source.filename(diagnostic.unit);}let cached=min(source.units.len,source.compiledCount());
  return Preparation.rejected{Result{result:ConsumerResult{compiled:default<blot_backend_core_backend::Result>(),stats:Stats{},diagnostic:blot_support::some(diagnostic)},diagnostic_filename:blot_support::some(copyResultBytes(path)),source_bytes:source.source_bytes,fresh_modules:source.units.len-cached,cached_modules:cached}},blot_error::Error.none;

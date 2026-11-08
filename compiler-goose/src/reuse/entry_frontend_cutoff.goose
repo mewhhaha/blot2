@@ -45,7 +45,7 @@ fn confirm<C>(source:const Project&,checked:C&,previous:Previous,stats:Stats&)->
 }
 fn storageInputsMatch<C>(source:const Project&,checked:const C&,unit:u32,previous:const blot_check_core::Module?,stats:Stats&)->bool {
  var changed=false;for color in checked.interface_colors {if color==Color.green_storage {changed=true;break;}}if !changed {return true;}
- let tree .= source.unit(unit).tree;var defines_storage=false;for root in tree.roots.items {if tree.declaration_traits(root).is_opaque {defines_storage=true;break;}}if !defines_storage {return true;}
+ let tree .= source.unit(unit).tree;var defines_storage=false;for root in tree.roots.items {if blot_parse_ast::declaration_traits(tree,root).is_opaque {defines_storage=true;break;}}if !defines_storage {return true;}
  let module=previous;
  if module {var remaining:i64=1000000;if module.unit==unit {var stable=true;for nominal in module.nominals {if !nominal.is_opaque||nominal.identity.unit!=unit {continue;}if nominal.constructors.len!=1 {stable=false;break;}let constructor=module.constructors[module.extra[nominal.constructors.start]];if !storageTypeStable(source,checked,module,constructor.payload,0,remaining) {stable=false;break;}}if stable {return true;}}}
  stats.storage_rechecks++;return false;

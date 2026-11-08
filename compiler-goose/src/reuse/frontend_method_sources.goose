@@ -31,10 +31,15 @@ fn read<O>(self_:Context&,owner:const O&,role:Role,binding:u32,current:bool)->bl
   }
  }
  if !found {return blot_support::none<Header>();}let source=owner.bindings[binding];if !source.private||source.kind!=blot_reuse_principal_interface::Kind.global {return blot_support::none<Header>();}
- if current {
-  if !namedFunction(owner,binding)||source.name==0||role.implementation.decl&blot_check_types::opaque_name_bit==0 {return blot_support::none<Header>();}
-  let name=self_.names.get(source.name);let implementation=self_.names.get(role.implementation.decl&~blot_check_types::opaque_name_bit);let member=self_.names.get(role.member);
-  if name.len!=implementation.len+1+member.len||name[..implementation.len]!=implementation||name[implementation.len]!='.'||name[implementation.len+1..]!=member {return blot_support::none<Header>();}
- }
+ if current && !currentMethod(self_,owner,role,binding) {return blot_support::none<Header>();}
  return blot_support::some(Header {source.capability_flow,source.capability_parameters,owner.capability_contracts.header(binding,source.capability_parameters.arity() as u32), ..});
 }
+
+fn currentMethod(self_:Context&,owner:const blot_check_check::Checked&,role:Role,binding:u32)->bool {
+ let source=owner.bindings[binding];
+  if !namedFunction(owner,binding)||source.name==0||role.implementation.decl&blot_check_types::opaque_name_bit==0 {return false;}
+  let name=self_.names.get(source.name);let implementation=self_.names.get(role.implementation.decl&~blot_check_types::opaque_name_bit);let member=self_.names.get(role.member);
+  if name.len!=implementation.len+1+member.len||name[..implementation.len]!=implementation||name[implementation.len]!='.'||name[implementation.len+1..]!=member {return false;}
+ return true;
+}
+fn currentMethod(self_:Context&,owner:const blot_check_core::Module&,role:Role,binding:u32)->bool {return false;}

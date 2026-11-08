@@ -107,6 +107,12 @@ reusable[] var project_DiagnosticBuffer_runs:Diagnostic[>..]=[];
 var inactive_DiagnosticBuffer:DiagnosticBuffer=DiagnosticBuffer {..};
 fn ensure(self_:DiagnosticBuffer&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,project_DiagnosticBuffer_runs);return self_.failure;}
 fn push(self_:DiagnosticBuffer&,value:Diagnostic)->Error {let length=self_.items.len;let error=self_.ensure(length+1);if error!=blot_error::Error.none {return error;}self_.storage[length]=ownDiagnostic(value);self_.items=self_.storage[..length+1];self_.len=self_.items.len;return blot_error::Error.none;}
+// Admit storage before snapshotting a lexer scratch slice into an owned record.
+fn pushLexical(self_:DiagnosticBuffer&,unit:UnitId,span:Span,lex_code:blot_parse_lexer::Code,publication:blot_parse_syntax_diagnostics::Publication,lexical:const blot_parse_lexer::Diagnostic[:])->Error {
+ let length=self_.items.len;let error=self_.ensure(length+1);if error!=blot_error::Error.none {return error;}
+ self_.storage[length]=Diagnostic{unit:unit,span:span,code:Code.lexical_error,lex_code:blot_support::some(lex_code),publication:ownPublication(blot_support::some(publication)),lexical_details:copyLexical(lexical),..};
+ self_.items=self_.storage[..length+1];self_.len=self_.items.len;return blot_error::Error.none;
+}
 fn append(self_:DiagnosticBuffer&,values:const Diagnostic[:])->Error {let length=self_.items.len;if values.len>0x7fffffffffffffff-length {self_.failure=blot_error::Error.out_of_memory;return self_.failure;}let error=self_.ensure(length+values.len);if error!=blot_error::Error.none {return error;}for value,index in values {self_.storage[length+index]=ownDiagnostic(value);}self_.items=self_.storage[..length+values.len];self_.len=self_.items.len;return blot_error::Error.none;}
 fn resize(self_:DiagnosticBuffer&,length:i64) {assert(length>=0 && length<=self_.items.len);for &item in self_.items[length..] {item.deinit();}blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
 fn clear(self_:DiagnosticBuffer&) {for &item in self_.items {item.deinit();}blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
@@ -279,7 +285,7 @@ fn finishRead<P>(self_:Loader<P>&,id:UnitId,lexical:const blot_parse_lexer::Diag
     if id<=self_.visits.len {self_.visits[id-1]=Visit.pending;}else {self_.visits.push(Visit.pending);}
     if lexical.len!=0 {
         let first=lexical[0];
-        let appended=self_.project.diagnostics.push(Diagnostic {unit:id,span:Span {first.start,first.end, ..},code:Code.lexical_error,lex_code:blot_support::some(first.code),publication:blot_support::some(blot_parse_syntax_diagnostics::lexical(tokens,first)),lexical_details:lexical, ..});
+        let appended=self_.project.diagnostics.pushLexical(id,Span{first.start,first.end,..},first.code,blot_parse_syntax_diagnostics::lexical(tokens,first),lexical);
         if appended!=blot_error::Error.none {return 0,appended;}
     }
     let tree .= self_.project.units.items[id-1].tree;

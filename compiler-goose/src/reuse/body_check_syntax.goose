@@ -22,7 +22,7 @@ fn node(self_:Shape&,id:u32)->bool {
  self_.word(n.tag);self_.word(span.start-self_.start);self_.word(span.end-self_.start);
  match n.tag {
  blot_parse_ast::tag_task_region=>{return n.a==0 && n.b==0 && n.c==0;},
- blot_parse_ast::tag_value_decl=>{let d=self_.tree.value_decl(id);self_.name(d.name);self_.flag(d.runtime);self_.flag(d.exported);let traits=self_.tree.declaration_traits(id);self_.flag(traits.private);self_.flag(traits.is_opaque);return self_.edges([d.annotation,d.where_node,d.body]) && self_.list(d.attributes);},
+ blot_parse_ast::tag_value_decl=>{let d=self_.tree.value_decl(id);self_.name(d.name);self_.flag(d.runtime);self_.flag(d.exported);let traits=blot_parse_ast::declaration_traits(self_.tree,id);self_.flag(traits.private);self_.flag(traits.is_opaque);return self_.edges([d.annotation,d.where_node,d.body]) && self_.list(d.attributes);},
  blot_parse_ast::tag_lambda=>{return self_.edges([n.a,n.c,n.b]);},
  blot_parse_ast::tag_if_expr,blot_parse_ast::tag_if_stmt,blot_parse_ast::tag_range_stmt,blot_parse_ast::tag_request_arm=>{return self_.edges([n.a,n.b,n.c]);},
  blot_parse_ast::tag_parameter=>{let p=self_.tree.parameter(id);self_.name(p.name);self_.flag(p.is_unit);return self_.edges([p.annotation,p.where_node]);},
@@ -62,7 +62,7 @@ fn node(self_:Shape&,id:u32)->bool {
 }
 struct Syntax {ids:u32[:],digest:Digest}
 fn syntax(tree:const Tree&,pool:const Pool&,root:u32)->blot_support::Option<Syntax>,Error {
- let owner,present=tree.declaration_nodes(root);if !present || owner.len>4096 {return blot_support::none<Syntax>(),blot_error::Error.none;}
+ let owner,present=blot_parse_ast::declaration_nodes(tree,root);if !present || owner.len>4096 {return blot_support::none<Syntax>(),blot_error::Error.none;}
  let pending=shape_visits.alloc_slice(owner.len);let seen=owned_bool.alloc_slice(owner.len);for &value in seen {value=false;}
  let ids=owned_u32.alloc_slice(owner.len);var shape=Shape{pending:pending,tree:tree,pool:pool,owner:owner,start:tree.span(root).start, ..};
  let accepted=syntaxInto(shape,root,seen,ids);shape_visits.free_slice(pending);owned_bool.free_slice(seen);

@@ -49,7 +49,7 @@ type Fixity=blot_check_check::ImportedFixity;
 type Origin=blot_check_check::ModuleOrigin;
 struct ResolvedImport {node:u32,owner:u32}
 enum Lowered {inactive,ready{ir:OwnedCore,stats:Stats},rejected{value:Result}}
-fn deinit(self_:Lowered&) {match self_ {inactive=>{},ready payload=>{payload.ir.deinit();},rejected payload=>{payload.value.deinit();}}self_=Lowered.inactive;}
+fn deinit(self_:Lowered&) {match self_ {inactive=>{},ready payload=>{var ir=payload.ir;ir.deinit();},rejected payload=>{var result=payload.value;result.deinit();}}self_=Lowered.inactive;}
 fn rejected(unit:u32,stage:const u8[:],code:const u8[:],span:Span,message:const u8[:])->Lowered,Error {let issue,error=blot_reuse_dependency_consumer::init(unit,stage,code,span,message);if error!=blot_error::Error.none {return Lowered.inactive,error;}return Lowered.rejected{Result{diagnostic:blot_support::some(issue),..}},blot_error::Error.none;}
 fn publishedRejected<T>(unit:u32,stage:const u8[:],source:const u8[:],publication:blot_parse_syntax_diagnostics::Publication,details:T)->Lowered,Error {let issue,error=blot_reuse_dependency_consumer::publishedDiagnostic(unit,stage,source,publication,details);if error!=blot_error::Error.none {return Lowered.inactive,error;}return Lowered.rejected{Result{diagnostic:blot_support::some(issue),..}},blot_error::Error.none;}
 fn projectRejected(unit:u32,code:blot_reuse_project_check::Code,span:Span)->Lowered,Error {let issue=blot_reuse_project_check::Diagnostic{ unit:unit, span:span, code:code, .. };return rejected(unit,"project-check",issue.codeName(),span,issue.message());}

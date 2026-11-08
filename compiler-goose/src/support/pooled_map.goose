@@ -1,5 +1,6 @@
 // Fixed map descriptors keep recursive owners free of resizable locals.
 namespace blot_support_pooled_map;
+import .word_hash;
 import dictionary;
 struct Map<K,V> { count: i64 = 0, slots: dictionary_slot<K,V>[:] = default<dictionary_slot<K,V>[:]>() }
 fn probe<M,K>(map: const M&,key: K) -> i64 {

@@ -214,7 +214,7 @@ fn operationSymbol(self_: Recorder&, id: u32, key: const u8[:], foreign: bool) -
     let result = self_.append(Event.operation_symbol { id, bytes, foreign , ..}); if result != blot_error::Error.none { self_.bytes.resize(mark); } return result;
 }
 fn slice(self_: const Recorder&, span: Span) -> const u8[:] { self_.bytes.items[span.start..span.start + span.len] }
-fn seal(self_: Recorder&) { self_.owner = null; self_.clock = null; self_.sealed = true; }
+fn seal(self_: Recorder&) { self_.owner .= null; self_.clock .= null; self_.sealed = true; }
 
 fn roleForName(name: const u8[:]) -> FunctionRole {
     const for <N,V> in variants<FunctionRole> { if name == N { return V; } }
@@ -353,13 +353,13 @@ fn resolve(self_: const Replay&, operand: Operand) -> u32, Error {
         },
     }
 }
-fn mappedListField(self_: const Replay&, value: u32) -> u32, Error { self_.get(self_.functions, value) }
+fn mappedListField(self_: const Replay&, value: u32) -> u32, Error { return self_.get(self_.functions, value); }
 fn mappedListField(self_: const Replay&, value: blot_support::Option<u32>) -> blot_support::Option<u32>, Error { return blot_support::none<u32>(), blot_error::Error.none; }
 fn replayInstruction(self_: const Replay&, module: blot_backend_wasm::Module&, function: u32, op: Op, operand: Operand) -> Error {
     if operand.role == Role.callable_layout && (op != blot_backend_runtime_ir::OP_ownership || operand.value == 0 || operand.value >= 67108864) { return blot_error::Error.invalid_artifact; }
     let actual_function, e1 = self_.get(self_.functions, function); if e1 != blot_error::Error.none { return e1; }
     let actual_operand, e2 = self_.resolve(operand); if e2 != blot_error::Error.none { return e2; }
-    return module.emitReference(actual_function, blot_backend_runtime_ir::Instruction { op, actual_operand , ..}, operand.role);
+    return module.emitReference(actual_function, blot_backend_runtime_ir::instruction(op,actual_operand), operand.role);
 }
 fn materialize(self_: const Recorder&, destination: blot_backend_wasm::Module&) -> Error { self_.replayInto(destination) }
 fn replayInto(self_: const Recorder&, module: blot_backend_wasm::Module&) -> Error {
@@ -380,7 +380,7 @@ fn replayEvent(replay: Replay&, module: blot_backend_wasm::Module&, event: Event
         demand, operation_symbol, public_owners => {},
         cleanup_data item => { return module.setCleanupDataMetadata(replay.journal.slice(item.span)); },
         signature item => {
-            let actual, error = module.internType(replay.journal.parameters[item.parameters.start..item.parameters.start + item.parameters.len], item.result);
+            let actual, error = module.internType(replay.journal.parameters.items[item.parameters.start..item.parameters.start + item.parameters.len], item.result);
             if error != blot_error::Error.none { return error; } return replay.put(replay.signatures, item.id, actual);
         },
         function item => {
