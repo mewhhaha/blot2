@@ -7691,5 +7691,539 @@
     "reason": "cross-source resolver reentry resolves older frames against the wrong source; runtime counterexample returns bound level0 instead of original level1",
     "replacement": "owned binder snapshots and scalar range descriptors",
     "performance_claim": "no memory or speed gain; final frame16 bytes plus4 bytes/copied binder, one additional snapshot allocation"
+  },
+  "late_profile_220": {
+    "qualification": "three sparse late stack samples; interrupted after a source diagnostic, not a completed compile or phase timing",
+    "limits": [
+      "selected46 has no DWARF, typed counters unavailable",
+      "worker stacks truncated at256frames; absence of CheckRoots does not identify initializer phase",
+      "CLI check under GDB differs from unprofiled program-emission invocation; do not compare timings as a speed result"
+    ],
+    "stop_reason": "diagnostic grace5s",
+    "process_elapsed_seconds": 108.5408761370054,
+    "actual_samples": 3,
+    "compiler_completed": false,
+    "completed_vs_interrupted": "interrupted or debugger failure",
+    "compiler_exit_code": null,
+    "compiler_exit_signal": 15,
+    "phase_sample_counts": {
+      "shrink-target-expansion": 2,
+      "type-equality": 1
+    },
+    "inputs_unchanged": true,
+    "cleanup": {
+      "groups_signalled": [
+        1851307
+      ],
+      "remaining_session_groups": []
+    },
+    "runner_exit_code": 1,
+    "raw_profile_sha256": "eee0aa884b756cee10bab319ecd09b2d4f828d8589c296b7cf59da197eca0384",
+    "profiler_sha256": "04d381b35702fd74a3a9b77b9b138021be3fc139ab12688fe1de8759f2b236e5",
+    "manifest_sha256": "89a18140df6355630cbbc421339a6319c47b2e16f5d1f0fc5bcd26879522268c",
+    "source": "exact frozen220",
+    "binary_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+    "diagnostic": "implementation_admission.declarationCopy sync(work) requires nonnullable ProjectionWork reference",
+    "typed_counters_available": false,
+    "samples": [
+      {
+        "elapsed_seconds": 89.87821533100214,
+        "proc": {
+          "cpu_user_seconds": 89.0,
+          "cpu_system_seconds": 0.5,
+          "minor_faults": 215038,
+          "major_faults": 0,
+          "resident_pages": 373083,
+          "virtual_bytes": 1866141696,
+          "VmHWM": "1520060 kB",
+          "VmRSS": "1492784 kB",
+          "Threads": "2",
+          "io_rchar": 17939250,
+          "io_wchar": 437,
+          "io_syscr": 985,
+          "io_syscw": 5,
+          "io_read_bytes": 0,
+          "io_write_bytes": 8192,
+          "io_cancelled_write_bytes": 0
+        },
+        "phase_hint": "shrink-target-expansion",
+        "worker_stacks": [
+          {
+            "frames": [
+              {
+                "name": "goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*)",
+                "pc": "0x55555566211d"
+              },
+              {
+                "name": "goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool)::{lambda(goose::VarDef*, int)#1}::operator()(goose::VarDef*, int) const",
+                "pc": "0x5555556852d1"
+              },
+              {
+                "name": "goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool)",
+                "pc": "0x555555684dce"
+              },
+              {
+                "name": "goose::TypeCheck::ShrinkTargets(goose::Roots const&, goose::TypeExpr*, bool, bool)",
+                "pc": "0x555555681d25"
+              },
+              {
+                "name": "goose::TypeCheck::ApplyCalleeStores(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*, std::vector<int, std::allocator<int> >*)::{lambda(goose::StoreEvent const&, goose::Roots const&, bool)#1}::operator()(goose::StoreEvent const&, goose::Roots const&, bool) const",
+                "pc": "0x5555559f5470"
+              },
+              {
+                "name": "goose::TypeCheck::ApplyCalleeStores(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*, std::vector<int, std::allocator<int> >*)",
+                "pc": "0x5555559ee936"
+              },
+              {
+                "name": "goose::TypeCheck::ApplyCalleeShrinks(goose::Node*, goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >&, std::basic_string_view<char, std::char_traits<char> >, std::vector<goose::Node*, std::allocator<goose::Node*> > const&)",
+                "pc": "0x5555559e8f53"
+              },
+              {
+                "name": "goose::TypeCheck::ResolveCall(goose::Call*, std::vector<goose::SFunction*, std::allocator<goose::SFunction*> >&, goose::FnSpec*, std::basic_string_view<char, std::char_traits<char> >, goose::Val*, goose::Node*&, bool, bool*, goose::TypeExpr*)",
+                "pc": "0x5555559de0bc"
+              },
+              {
+                "name": "goose::TypeCheck::CheckUfcsCall(goose::Call*, goose::Dot*, goose::TypeExpr*)",
+                "pc": "0x5555559d522a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckCall(goose::Call*, goose::TypeExpr*)",
+                "pc": "0x5555559d480f"
+              },
+              {
+                "name": "goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*)",
+                "pc": "0x55555566ef70"
+              },
+              {
+                "name": "goose::TypeCheck::CheckValue(goose::Node*&, goose::TypeExpr*, bool, bool, bool)",
+                "pc": "0x55555566ce51"
+              },
+              {
+                "name": "goose::TypeCheck::CheckReturn(goose::Return*)",
+                "pc": "0x555555a4da31"
+              },
+              {
+                "name": "goose::Return::Check(goose::TypeCheck&, goose::TypeExpr*)",
+                "pc": "0x5555555c3f62"
+              },
+              {
+                "name": "goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*)",
+                "pc": "0x55555566ef70"
+              },
+              {
+                "name": "goose::TypeCheck::CheckValue(goose::Node*&, goose::TypeExpr*, bool, bool, bool)",
+                "pc": "0x55555566ce51"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmtExpr(goose::Node*)",
+                "pc": "0x5555556a7f64"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmt(goose::Node*)",
+                "pc": "0x5555556ca7be"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmts(goose::Block*)",
+                "pc": "0x5555556a7b0a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckSpecBodyOnce(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >*, goose::Line)",
+                "pc": "0x5555556a13d2"
+              },
+              {
+                "name": "goose::TypeCheck::GetOrCreateSpec(goose::TypeCheck::MatchInfo&, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*)",
+                "pc": "0x5555556baba8"
+              },
+              {
+                "name": "goose::TypeCheck::ResolveCall(goose::Call*, std::vector<goose::SFunction*, std::allocator<goose::SFunction*> >&, goose::FnSpec*, std::basic_string_view<char, std::char_traits<char> >, goose::Val*, goose::Node*&, bool, bool*, goose::TypeExpr*)",
+                "pc": "0x5555559de083"
+              },
+              {
+                "name": "goose::TypeCheck::CheckUfcsCall(goose::Call*, goose::Dot*, goose::TypeExpr*)",
+                "pc": "0x5555559d522a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckCall(goose::Call*, goose::TypeExpr*)",
+                "pc": "0x5555559d480f"
+              },
+              {
+                "name": "goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*)",
+                "pc": "0x55555566ef70"
+              },
+              {
+                "name": "goose::TypeCheck::CheckValue(goose::Node*&, goose::TypeExpr*, bool, bool, bool)",
+                "pc": "0x55555566ce51"
+              },
+              {
+                "name": "goose::TypeCheck::CheckVarDecl(goose::VarDecl*, bool)",
+                "pc": "0x55555566a386"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmt(goose::Node*)",
+                "pc": "0x5555556ca7b1"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmts(goose::Block*)",
+                "pc": "0x5555556a7b0a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckLoopBody(goose::Block*)",
+                "pc": "0x555555713d41"
+              },
+              {
+                "name": "goose::TypeCheck::CheckFor(goose::ForLoop*)::{lambda()#1}::operator()() const",
+                "pc": "0x555555a3e555"
+              },
+              {
+                "name": "goose::TypeCheck::CheckLoopPasses(goose::Node*, goose::TypeCheck::FlowState&, std::function<void ()> const&)",
+                "pc": "0x555555712108"
+              }
+            ],
+            "captured_frame_count": 256,
+            "truncated": true
+          }
+        ]
+      },
+      {
+        "elapsed_seconds": 94.8814522360044,
+        "proc": {
+          "cpu_user_seconds": 93.98,
+          "cpu_system_seconds": 0.5,
+          "minor_faults": 215692,
+          "major_faults": 0,
+          "resident_pages": 378823,
+          "virtual_bytes": 1866141696,
+          "VmHWM": "1520060 kB",
+          "VmRSS": "1515840 kB",
+          "Threads": "2",
+          "io_rchar": 17939250,
+          "io_wchar": 437,
+          "io_syscr": 985,
+          "io_syscw": 5,
+          "io_read_bytes": 0,
+          "io_write_bytes": 8192,
+          "io_cancelled_write_bytes": 0
+        },
+        "phase_hint": "type-equality",
+        "worker_stacks": [
+          {
+            "frames": [
+              {
+                "name": "goose::TypeCheck::TypeEq(goose::TypeExpr*, goose::TypeExpr*)",
+                "pc": "0x55555565465f"
+              },
+              {
+                "name": "goose::TypeCheck::ArrayElemsReached(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&)",
+                "pc": "0x5555556c27ce"
+              },
+              {
+                "name": "goose::TypeCheck::ArrayElemsReached(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&)",
+                "pc": "0x5555556c2b92"
+              },
+              {
+                "name": "goose::TypeCheck::ArrayElemsReached(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&)",
+                "pc": "0x5555556c2b92"
+              },
+              {
+                "name": "goose::TypeCheck::AppendArrayElemsReached(goose::TypeExpr*, std::vector<goose::TypeExpr*, std::allocator<goose::TypeExpr*> >&)",
+                "pc": "0x5555556be530"
+              },
+              {
+                "name": "goose::TypeCheck::GetOrCreateSpec(goose::TypeCheck::MatchInfo&, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*)",
+                "pc": "0x5555556b8c4a"
+              },
+              {
+                "name": "goose::TypeCheck::ResolveCall(goose::Call*, std::vector<goose::SFunction*, std::allocator<goose::SFunction*> >&, goose::FnSpec*, std::basic_string_view<char, std::char_traits<char> >, goose::Val*, goose::Node*&, bool, bool*, goose::TypeExpr*)",
+                "pc": "0x5555559de083"
+              },
+              {
+                "name": "goose::TypeCheck::CheckUfcsCall(goose::Call*, goose::Dot*, goose::TypeExpr*)",
+                "pc": "0x5555559d522a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckCall(goose::Call*, goose::TypeExpr*)",
+                "pc": "0x5555559d480f"
+              },
+              {
+                "name": "goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*)",
+                "pc": "0x55555566ef70"
+              },
+              {
+                "name": "goose::TypeCheck::CheckValue(goose::Node*&, goose::TypeExpr*, bool, bool, bool)",
+                "pc": "0x55555566ce51"
+              },
+              {
+                "name": "goose::TypeCheck::CheckReturn(goose::Return*)",
+                "pc": "0x555555a4da31"
+              },
+              {
+                "name": "goose::Return::Check(goose::TypeCheck&, goose::TypeExpr*)",
+                "pc": "0x5555555c3f62"
+              },
+              {
+                "name": "goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*)",
+                "pc": "0x55555566ef70"
+              },
+              {
+                "name": "goose::TypeCheck::CheckValue(goose::Node*&, goose::TypeExpr*, bool, bool, bool)",
+                "pc": "0x55555566ce51"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmtExpr(goose::Node*)",
+                "pc": "0x5555556a7f64"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmt(goose::Node*)",
+                "pc": "0x5555556ca7be"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmts(goose::Block*)",
+                "pc": "0x5555556a7b0a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckSpecBodyOnce(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >*, goose::Line)",
+                "pc": "0x5555556a13d2"
+              },
+              {
+                "name": "goose::TypeCheck::GetOrCreateSpec(goose::TypeCheck::MatchInfo&, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*)",
+                "pc": "0x5555556baba8"
+              },
+              {
+                "name": "goose::TypeCheck::ResolveCall(goose::Call*, std::vector<goose::SFunction*, std::allocator<goose::SFunction*> >&, goose::FnSpec*, std::basic_string_view<char, std::char_traits<char> >, goose::Val*, goose::Node*&, bool, bool*, goose::TypeExpr*)",
+                "pc": "0x5555559de083"
+              },
+              {
+                "name": "goose::TypeCheck::CheckNamedCall(goose::Call*, goose::Ident*, goose::TypeExpr*)",
+                "pc": "0x5555559d60c1"
+              },
+              {
+                "name": "goose::TypeCheck::CheckCall(goose::Call*, goose::TypeExpr*)",
+                "pc": "0x5555559d4824"
+              },
+              {
+                "name": "goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*)",
+                "pc": "0x55555566ef70"
+              },
+              {
+                "name": "goose::TypeCheck::CheckValue(goose::Node*&, goose::TypeExpr*, bool, bool, bool)",
+                "pc": "0x55555566ce51"
+              },
+              {
+                "name": "goose::TypeCheck::CheckVarDecl(goose::VarDecl*, bool)",
+                "pc": "0x55555566a386"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmt(goose::Node*)",
+                "pc": "0x5555556ca7b1"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmts(goose::Block*)",
+                "pc": "0x5555556a7b0a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckSpecBodyOnce(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >*, goose::Line)",
+                "pc": "0x5555556a13d2"
+              },
+              {
+                "name": "goose::TypeCheck::GetOrCreateSpec(goose::TypeCheck::MatchInfo&, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*)",
+                "pc": "0x5555556baba8"
+              },
+              {
+                "name": "goose::TypeCheck::ResolveCall(goose::Call*, std::vector<goose::SFunction*, std::allocator<goose::SFunction*> >&, goose::FnSpec*, std::basic_string_view<char, std::char_traits<char> >, goose::Val*, goose::Node*&, bool, bool*, goose::TypeExpr*)",
+                "pc": "0x5555559de083"
+              },
+              {
+                "name": "goose::TypeCheck::CheckUfcsCall(goose::Call*, goose::Dot*, goose::TypeExpr*)",
+                "pc": "0x5555559d522a"
+              }
+            ],
+            "captured_frame_count": 256,
+            "truncated": true
+          }
+        ]
+      },
+      {
+        "elapsed_seconds": 99.87197362100414,
+        "proc": {
+          "cpu_user_seconds": 98.93,
+          "cpu_system_seconds": 0.5,
+          "minor_faults": 217726,
+          "major_faults": 0,
+          "resident_pages": 386996,
+          "virtual_bytes": 1866141696,
+          "VmHWM": "1548504 kB",
+          "VmRSS": "1548504 kB",
+          "Threads": "2",
+          "io_rchar": 17939250,
+          "io_wchar": 437,
+          "io_syscr": 985,
+          "io_syscw": 5,
+          "io_read_bytes": 0,
+          "io_write_bytes": 8192,
+          "io_cancelled_write_bytes": 0
+        },
+        "phase_hint": "shrink-target-expansion",
+        "worker_stacks": [
+          {
+            "frames": [
+              {
+                "name": "goose::TypeCheck::CanContain(goose::TypeExpr*, goose::TypeExpr*)",
+                "pc": "0x555555662082"
+              },
+              {
+                "name": "goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool)::{lambda(goose::VarDef*, int)#1}::operator()(goose::VarDef*, int) const",
+                "pc": "0x5555556852d1"
+              },
+              {
+                "name": "goose::TypeCheck::RootCandidates(goose::TypeExpr*, int, bool, bool, bool)",
+                "pc": "0x555555684dce"
+              },
+              {
+                "name": "goose::TypeCheck::ShrinkTargets(goose::Roots const&, goose::TypeExpr*, bool, bool)",
+                "pc": "0x555555681d25"
+              },
+              {
+                "name": "goose::TypeCheck::ApplyCalleeStores(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*, std::vector<int, std::allocator<int> >*)::{lambda(goose::StoreEvent const&, goose::Roots const&, bool)#1}::operator()(goose::StoreEvent const&, goose::Roots const&, bool) const",
+                "pc": "0x5555559f5470"
+              },
+              {
+                "name": "goose::TypeCheck::ApplyCalleeStores(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*, std::vector<int, std::allocator<int> >*)",
+                "pc": "0x5555559ee936"
+              },
+              {
+                "name": "goose::TypeCheck::ApplyCalleeShrinks(goose::Node*, goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >&, std::basic_string_view<char, std::char_traits<char> >, std::vector<goose::Node*, std::allocator<goose::Node*> > const&)",
+                "pc": "0x5555559e8f53"
+              },
+              {
+                "name": "goose::TypeCheck::ResolveCall(goose::Call*, std::vector<goose::SFunction*, std::allocator<goose::SFunction*> >&, goose::FnSpec*, std::basic_string_view<char, std::char_traits<char> >, goose::Val*, goose::Node*&, bool, bool*, goose::TypeExpr*)",
+                "pc": "0x5555559de0bc"
+              },
+              {
+                "name": "goose::TypeCheck::CheckUfcsCall(goose::Call*, goose::Dot*, goose::TypeExpr*)",
+                "pc": "0x5555559d522a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckCall(goose::Call*, goose::TypeExpr*)",
+                "pc": "0x5555559d480f"
+              },
+              {
+                "name": "goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*)",
+                "pc": "0x55555566ef70"
+              },
+              {
+                "name": "goose::TypeCheck::CheckValue(goose::Node*&, goose::TypeExpr*, bool, bool, bool)",
+                "pc": "0x55555566ce51"
+              },
+              {
+                "name": "goose::TypeCheck::CheckVarDecl(goose::VarDecl*, bool)",
+                "pc": "0x55555566a386"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmt(goose::Node*)",
+                "pc": "0x5555556ca7b1"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmts(goose::Block*)",
+                "pc": "0x5555556a7b0a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckLoopBody(goose::Block*)",
+                "pc": "0x555555713d41"
+              },
+              {
+                "name": "goose::TypeCheck::CheckFor(goose::ForLoop*)::{lambda()#1}::operator()() const",
+                "pc": "0x555555a3e555"
+              },
+              {
+                "name": "goose::TypeCheck::CheckLoopPasses(goose::Node*, goose::TypeCheck::FlowState&, std::function<void ()> const&)",
+                "pc": "0x555555712108"
+              },
+              {
+                "name": "goose::TypeCheck::CheckFor(goose::ForLoop*)",
+                "pc": "0x555555a3c72f"
+              },
+              {
+                "name": "goose::ForLoop::Check(goose::TypeCheck&, goose::TypeExpr*)",
+                "pc": "0x5555555bd932"
+              },
+              {
+                "name": "goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*)",
+                "pc": "0x55555566ef70"
+              },
+              {
+                "name": "goose::TypeCheck::CheckValue(goose::Node*&, goose::TypeExpr*, bool, bool, bool)",
+                "pc": "0x55555566ce51"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmtExpr(goose::Node*)",
+                "pc": "0x5555556a7f64"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmt(goose::Node*)",
+                "pc": "0x5555556ca7be"
+              },
+              {
+                "name": "goose::TypeCheck::CheckStmts(goose::Block*)",
+                "pc": "0x5555556a7b0a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckSpecBodyOnce(goose::FnSpec*, std::vector<goose::Val, std::allocator<goose::Val> >*, goose::Line)",
+                "pc": "0x5555556a13d2"
+              },
+              {
+                "name": "goose::TypeCheck::GetOrCreateSpec(goose::TypeCheck::MatchInfo&, std::vector<goose::Val, std::allocator<goose::Val> >&, goose::Node*)",
+                "pc": "0x5555556baba8"
+              },
+              {
+                "name": "goose::TypeCheck::ResolveCall(goose::Call*, std::vector<goose::SFunction*, std::allocator<goose::SFunction*> >&, goose::FnSpec*, std::basic_string_view<char, std::char_traits<char> >, goose::Val*, goose::Node*&, bool, bool*, goose::TypeExpr*)",
+                "pc": "0x5555559de083"
+              },
+              {
+                "name": "goose::TypeCheck::CheckUfcsCall(goose::Call*, goose::Dot*, goose::TypeExpr*)",
+                "pc": "0x5555559d522a"
+              },
+              {
+                "name": "goose::TypeCheck::CheckCall(goose::Call*, goose::TypeExpr*)",
+                "pc": "0x5555559d480f"
+              },
+              {
+                "name": "goose::TypeCheck::CheckV(goose::Node*, goose::TypeExpr*)",
+                "pc": "0x55555566ef70"
+              },
+              {
+                "name": "goose::TypeCheck::CheckValue(goose::Node*&, goose::TypeExpr*, bool, bool, bool)",
+                "pc": "0x55555566ce51"
+              }
+            ],
+            "captured_frame_count": 256,
+            "truncated": true
+          }
+        ]
+      }
+    ],
+    "source_sha256": "391ed4fd81d4e912f4af34c8cedd2a3d235f5c7454fb51b99eb488ab731d9420",
+    "stdlib_sha256": "46df43caee7d394ff0cd10c118a5a500e8afe61a2cdb30682d8c183a6b1ad29a",
+    "gdb_sha256": "e2db863afa4d39c743d5057509aa18a9a6330d5b7ccd71a63ffe70c8b862810a",
+    "inferior_command": [
+      "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+      "check",
+      "/home/jacobt/src/blot2/build/goose-port/verification/build-220-inputs/compiler-goose/src/main.goose",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--diagnostics",
+      "text",
+      "-O0"
+    ],
+    "sample_targets_seconds": [
+      90,
+      95,
+      100,
+      105,
+      110,
+      115
+    ],
+    "first_error_seconds": 103.33872764000262,
+    "no_inferior_calls": true,
+    "total_process_window_seconds": 120
   }
 }

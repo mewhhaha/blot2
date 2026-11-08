@@ -4165,10 +4165,16 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_evidence_projection
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_evidence_projection::Comparison) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_given_equations::Equation)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_given_equations::Equation) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_given_equations::Equations)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_given_equations::Equations) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_given_equations::Fields)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_given_equations::Fields) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_given_equations::Memo)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_given_equations::Memo) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_given_equations::Rewrite)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_given_equations::Rewrite) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_given_equations::Words)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_eval_given_equations::Words) {hashFields(sink,value);}
 fn equal<StructuralLeft,O,P,Q>(left:StructuralLeft,right:blot_eval_implementation_admission::Declaration<O,P,Q>)->bool {return equalFields(left,right);}
 fn hash<StructuralSink,O,P,Q>(sink:StructuralSink&,value:blot_eval_implementation_admission::Declaration<O,P,Q>) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_implementation_admission::ProjectionWork)->bool {return equalFields(left,right);}

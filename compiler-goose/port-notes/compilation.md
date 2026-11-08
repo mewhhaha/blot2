@@ -51,11 +51,30 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This source checkpoint preserves exact frozen220 inputs. It reaches
-the120-second cap with no source diagnostic and no program C; this is incomplete
-verification, not a pass. The cap stays fixed. A late-phase profile of the exact
-frozen inputs and selected46 checker is the next measurement. Whole-program
-emission, linking, CLI execution and Wasm comparison remain pending.
+per stage. This checkpoint preserves exact frozen222 inputs, which select the
+accepted global-filter checker. It stops after46.13s with multiple source errors:
+missing ScopeKey/enum hash hooks, asset/checkpoint defaults and optional references,
+generic decoder owner allocation, JSON result types and image-pool kind. Targeted
+repairs continue in the working tree. Whole emission/link/CLI/Wasm qualification
+remains pending.
+
+Given-equation normalization uses lexical memo-hit scopes and fixed pooled scratch
+instead of native dynamic locals across its recursive cycle.123 executed controls
+per checker cover normalization, rank/ties, rows/effects, memo/depth/fuel/error
+order and six scratch failures; active runs return to zero. Body audit reconstructs
+the original algorithms modulo storage/cleanup. TypeStore semantics are controlled
+leaves. Declaration projection work now has a checked nonnullable borrow, retaining
+the original assertion and fuel behavior across calls;27 controls and old-bug/local
+escape negatives pass both checkers.
+
+The global-filter checker improves frozen220 first-error medians99.138 ->42.461s
+(57.17%) over two rotated matched pairs; sampled VmHWM is essentially unchanged.
+Both reviews,14 AST laws,256 ordered comparisons,201 frontend and eight runtime
+parity controls pass. These are not completed compiler timings. The
+[accepted receipt](../../benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json)
+pins the candidate and incremental source patch; folding the verified delta into
+the tracked builder recipe remains active. Installed Goose and Zig are unchanged.
+
 
 Generic implementation admission selects first matching contracts by scalar
 index into its actual immutable owner, supporting both core.Module and Interface
@@ -279,7 +298,9 @@ its diagnostics qualify its recorded input tree only.
 The installed upstream Goose remains unchanged, SHA256
 `b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2`.
 Repair attempts explicitly select the optional private checker, SHA256
-`46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e`.
+`8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43`.
+Its baseline46 recipe is tracked; the accepted delta is pinned in the receipt
+above while combined-recipe verification finishes.
 `tools/build_goose_checker.py` and `tools/goose-containment.patch` preserve its
 reproducible recipe without modifying the sibling installation. A zero-context
 patch applies without fuzz and reproduces all 108 candidate source hashes;

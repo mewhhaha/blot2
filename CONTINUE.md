@@ -21,20 +21,16 @@ tracked AST/fixity/recovery/depth laws pass. Four isolated engine suites pass.
 The current package repairs keep recursive state scalar, construct borrowed
 views through explicit boundaries, and share nested admission using local
 workspace copies. Whole-program C emission and linking are still pending.
-The selected private checker separates closed nominal identity from instance
-attachment and uses a query-specific readiness gate for reference reachability.
-It passes 41 additional AST laws, 178 graph controls, 201 frontend controls and
-eight runtime cases. Two frozen-prefix pairs measure 48.017 -> 29.326s to the
-identical diagnostic (38.925%); the earlier nominal-identity change separately
-measures 87.430 -> 54.749s. These are failing-prefix gains under separate paired
-conditions, not completed compiler timings. Current source repairs preserve
-exact owner roots, callback cleanup and native array construction. Projection
-frames own binder snapshots across cross-source reentry; focused real interner,
-projection and recursive-scratch fixtures pass. The latest frozen220 whole
-check reaches its120-second cap without a source diagnostic or program C; late
-checker profiling is the active frontier. Program emission, linking and execution
-remain pending. Removing the optional
-bounds cache may add allocation/runtime cost.
+The selected private checker filters impossible stable global candidates while
+retaining live reference/local provenance checks. Two frozen220 pairs measure
+99.138 ->42.461s to the identical source diagnostic (57.17% reduction), with
+sampled process memory essentially unchanged. These are failing-prefix gains,
+not completed compiler timings. The new candidate is pinned in the
+[global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
+including its source delta. Current full build222 stops after46.13s at remaining
+hash/asset/decoder API errors; targeted repairs are active. Whole-program emission,
+linking and execution remain pending. The prior nominal-identity/reachability
+measurements qualify their own separate frozen conditions.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
 Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.

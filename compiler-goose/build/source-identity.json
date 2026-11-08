@@ -13,7 +13,7 @@
     "cc_sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
     "entry": "src/main.goose",
     "goose_inline": "-O0",
-    "goose_sha256": "46b54e2a387c53bef9bee3f2e457808280269f463e6ab93d350665263ee1ea0e",
+    "goose_sha256": "8335db022b43cd0054747e29155edf54646bc170c8e30b5a17556a8e01b10f43",
     "host": "linux",
     "host_entry": "blot_goose_main",
     "inference_budget": 1000000,
@@ -22,8 +22,8 @@
     "schema": 1,
     "stdlib": "/home/jacobt/src/goose-to-wasm/build/source/stdlib"
   },
-  "digest": "24e9b106f3676b103b553d3dbbb4e7a4b0a6e5efa8c34b2251001c60702faf9d",
-  "goose": "/home/jacobt/src/blot2/build/goose-port/query-reaches-experiment/compiler-reaches/goose",
+  "digest": "9ea18096b65cb35e7b9a4cb902020b5e0ac7c10cf6eb96fa34eaa31957ce156a",
+  "goose": "/home/jacobt/src/blot2/build/goose-port/global-root-filter-experiment/compiler-filter/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
     "/home/jacobt/src/goose-to-wasm/build/source/stdlib"
@@ -1309,14 +1309,14 @@
       "sha256": "f99fd3ca4eff1883075ecca9b7029483efbd254640bcb31bc4cdb957bd78ef59"
     },
     {
-      "bytes": 8178,
+      "bytes": 12294,
       "path": "src/eval/given_equations.goose",
-      "sha256": "be9bb9fa2aec1e67c77289151d147990b10737357eb013427672c2224c5086ea"
+      "sha256": "733c0d308e3553fa1b993a5c8c4c4b9cb0ef9413745cf2d717ba3581eeebf449"
     },
     {
-      "bytes": 42826,
+      "bytes": 42924,
       "path": "src/eval/implementation_admission.goose",
-      "sha256": "cf7c407eb6704b920ae28c3c9ae3a00ba35c53e3d5416215398f6e2916521d25"
+      "sha256": "9ea76020a92d474e5d7d483548607cb6383d2eb0f929f7b13d0ef67786a6636b"
     },
     {
       "bytes": 96494,
@@ -2229,9 +2229,9 @@
       "sha256": "530b80be8d66afc72f016e8719ac5fa1e5b66404655023ee5b17777412be10ed"
     },
     {
-      "bytes": 976470,
+      "bytes": 977342,
       "path": "src/support/json_adapters.goose",
-      "sha256": "65a06ffe63a046a86058852ffcbf6bca20a5415bd9804d13ef14ea8a670a01f7"
+      "sha256": "bda0eb75bda95040d3a4a6f576551071fd6b636d443e8bffae59ebff354b2a69"
     },
     {
       "bytes": 3860,
@@ -2294,9 +2294,9 @@
       "sha256": "5a7c53a1916e5f434a46d8c56b977b9b6e76e7f31fb04c249fbe82c93725ff2b"
     },
     {
-      "bytes": 733383,
+      "bytes": 734101,
       "path": "src/support/structural_adapters.goose",
-      "sha256": "2cc7a8ef531b72c902e1e1fc119ac32b95efeb57812ec297ee88060622bd82e0"
+      "sha256": "ac6efa08541a0039d7204f8aee9f14e7a15a6cc186aae5107a95953c1800fb4d"
     },
     {
       "bytes": 4891,
