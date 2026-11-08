@@ -971,6 +971,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_assets::S
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_native_assets::Sources) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_assets::Stats)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_native_assets::Stats) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_assets::TextRun)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_native_assets::TextRun) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_assets::Texts)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_native_assets::Texts) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_numeric_rows::Cache)->bool {return equalFields(left,right);}

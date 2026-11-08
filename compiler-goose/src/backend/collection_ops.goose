@@ -1,6 +1,7 @@
 namespace blot_backend_collection_ops;
 import support.option;
 import support.error;
+import support.structural;
 
 enum Op { length, get, set, fill, generate, append, prepend, identity, convert, cursor, cursor_has, cursor_value, cursor_advance, concat, slice, simd_load, simd_store, flatten }
 let operations = [Op.length, Op.get, Op.set, Op.fill, Op.generate, Op.append, Op.prepend, Op.identity, Op.convert, Op.cursor, Op.cursor_has, Op.cursor_value, Op.cursor_advance, Op.concat, Op.slice, Op.simd_load, Op.simd_store, Op.flatten];
@@ -39,3 +40,5 @@ fn lookup(name: const u8[:]) -> blot_support::Option<Primitive> {
     }
     return blot_support::none<Primitive>();
 }
+
+fn blot_structural::hash<S>(sink:S&,value:blot_backend_collection_ops::Op) {blot_structural::hash(sink,blot_backend_collection_ops::opCode(value));}

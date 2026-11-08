@@ -51,13 +51,29 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen224 inputs with the accepted
+per stage. This checkpoint preserves exact frozen226 inputs with the accepted
 global-filter checker. Build222 stops after46.13s at hash/asset/decoder API errors;
 223 advances to an unused Instance slice-field escape after46.64s.224 removes
 those two unobserved fields; substitution still fills the caller-owned buffers.
 Build224 stops after46.82s at a missing implementation-evidence scoped helper,
 collection-operation hash hook and asset text ownership. Those follow-on repairs
 remain in progress; whole emission/link/CLI/Wasm qualification remains pending.
+
+The scoped implementation-evidence owner now initializes, invokes and cleans up
+through one callback boundary. Actual core/snapshot admission methods use explicit
+buffer items, stable Host locals and recursive annotations. Focused laws execute
+all twelve owner buffers and both maps, release/reuse/failure paths and admission
+budget/error conversion; resolver/projection/import leaves remain controlled.
+Collection operations retain their native four-byte enum ordinal hash. Asset text
+cleanup stores scalar ranges at allocation, and Candidate stores its exact slot
+index; cleanup validates its canonical reference before freeing. Type-safe null
+slices replace temporary defaults, retaining allocation and cleanup order.
+Specialization initialization preserves five borrowed tables, admits a shared or
+fresh stamped gate, leaves the target unchanged on failure and uses an empty
+scratch policy. Both native fixtures execute on official and selected checkers.
+225 was cancelled after22.5s when its concurrent focused fixture caught the
+scratch-policy initializer omission;226 includes that repair. Source-only checkpoint
+and focused controls do not establish whole-program qualification.
 
 ScopeKey and three principal-interface enum hash hooks now match native golden
 streams. Decoder allocations dispatch by the actual owner type at121 generated

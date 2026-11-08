@@ -27,13 +27,13 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen224
-checkpoints the hash, decoder-owner, checkpoint live-slot, JSON-publication and
-optional-reference repairs. Build223 stops after46.64s at unused Instance slice
-fields;224 removes those fields and retains the caller-owned substitution buffers.
-Build224 stops after46.82s at a missing scoped evidence helper, collection-op hash
-and asset text ownership; those repairs continue. Whole-program emission, linking
-and execution remain pending. The prior nominal-identity/reachability
+including its source delta and byte-exact tracked recipe reconstruction. Frozen226
+checkpoints scoped implementation evidence, explicit collection-op hash width,
+asset lifecycle receipts, stable checkpoint locals and specialization initialization.
+Actual focused native laws pass official and selected checkers, with controlled
+semantic leaves disclosed.225 was cancelled after22.5s when a focused fixture
+caught a scratch initializer omission;226 includes its fix. Whole-program emission,
+linking and execution remain pending. The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 
 Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
