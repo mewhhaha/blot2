@@ -520,7 +520,7 @@ fn unusedAggregate(generator: Generator&, unit_id: u32, binding: blot_check_core
 }
 fn specializer(source: Generator&) -> blot_eval_specialization::Service, blot_error::Error {
     let generator:Generator& =blot_compile_workspace::canonicalGenerator(source);
-    let bridge, error = generator.representations.representationBridge(generator.evaluator.evidenceStore());
+    let bridge, error .= generator.representations.representationBridge(generator.evaluator.evidenceStore());
     return blot_eval_specialization::Service { timing: generator.work_timing, units: generator.units, evaluator: generator.evaluator, layouts: generator.representations.store, bridge: bridge, refinement_stats: generator.refinement_stats, refinement_regions: generator.work.refinement_regions, cache: generator , ..}, error;
 }
 fn lookupRefinement(generator: Generator&, root: blot_reuse_refinement_receipt::Root, shape: blot_reuse_code_expectation::View, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:], rows: const blot_eval_type_evidence::RowMapping[:]) -> blot_support::Option<blot_eval_core_eval::SolvedEvidence>, blot_error::Error {
@@ -1753,7 +1753,7 @@ fn quantifiedVariable(generator: Generator&,unit_id: u32,variable: u32,row: bool
 }
 fn unitUses(generator: Generator&,unit_id: u32,need: blot_backend_unit_index::Need) -> const blot_backend_unit_index::Uses&,blot_error::Error {
     var index: blot_backend_unit_index::Uses&? = null; block { let known = generator.planning.uses.get(unit_id); if known { index .= known; } }
-    if index == null { let fresh,error = blot_backend_unit_index::createUses(unit(generator,unit_id),unit_id); if error != blot_error::Error.none { return fresh,error; } generator.planning.uses.insert(unit_id,fresh); index .= fresh; }
+    if index == null { let fresh,error .= blot_backend_unit_index::createUses(unit(generator,unit_id),unit_id); if error != blot_error::Error.none { return fresh,error; } generator.planning.uses.insert(unit_id,fresh); index .= fresh; }
     let error = index.ensure(unit(generator,unit_id),unit_id,need); return index,error;
 }
 fn ownsArrayUpdate(generator: Generator&,unit_id: u32,id: u32) -> bool,blot_error::Error {

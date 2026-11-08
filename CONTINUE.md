@@ -40,14 +40,17 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen378 is the current source checkpoint. The graph constructor supplies all
-25 fields explicitly, preserving copy/byte-count order and its original fresh-ID
-mint. Transferred StoreSnapshot data is reconstructed through its existing
-live/generation lease and exact identity/length checks on all 22 owned ranges;
-State is copied unchanged. All 37 strict controls pass on both Goose checkers.
-Its98.842s run clears graph publication and reaches storing the returned graph
-in the caller's result. Next, verify the tuple binding preserves the graph
-reference, then use the existing exact-slot/live-lease graph getter at transfer.
+Frozen380 is the current source checkpoint. PrincipalGraph publication now
+preserves all 25 fields and its original mint/copy/accounting order. Its owned
+StoreSnapshot uses the existing live/generation lease and exact checks on all
+22 ranges; State is unchanged. All 37 strict controls pass on both checkers.
+A runtime binding test found that plain reference-return tuples copy the pointee;
+borrowed tuple binding preserves the pool object. The graph return and three
+confirmed index/importer/bridge callers now borrow their tuples. NormalizePrincipal
+borrows its description directly; synchronous cleanup observes no result field,
+so the redundant whole-carrier copyback is removed. Its98.034s run clears that
+boundary and reaches owned PrincipalVisit buffer publication. That three-field
+record's graph pointer transfer through the existing slot getter is next.
 No whole compiler or runtime pass follows from this source checkpoint.
 
 Current representation repairs use the existing Session→Generator Frame token

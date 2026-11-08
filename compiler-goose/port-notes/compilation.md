@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen378 is the current source checkpoint. Selected private checker
+Frozen380 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -76,10 +76,18 @@ The helper adds no allocation, clone, retain or ID mint. All 37 strict controls
 pass on official and selected Goose, including stale/reused leases, all redirected
 same-pool slices, foreign/stack slices and global publication/cleanup. Independent
 allocation/deinit mapping and complete graph-field inverses pass. Its98.842s
-actual run clears graph publication and reaches caller result retention. Next,
-verify the tuple binding keeps the returned graph reference, then reborrow through
-the existing exact-slot/live-lease getter. No whole compiler C, header or
-executable has been emitted; source acceptance is not runtime qualification.
+actual run clears graph publication and reaches caller result retention.
+Frozen379 fixes the actual binding error: plain tuple binding snapshots a
+reference-returned graph; borrowed tuple binding keeps the pool header. Both
+checkers execute the distinction. Frozen380 applies the same exact correction
+to three audited mutable-reference results (cached unit Uses, importer and
+layout bridge), then makes NormalizePrincipal borrow its description instead
+of copying the whole carrier back. Only its final successful result mutates;
+cleanup has no observer and both callbacks are synchronous. Independent source
+reviews pass. Its98.034s run clears that boundary and reaches PrincipalVisit
+buffer publication. Its three-field owned pointer transfer is next. No whole
+compiler C, header or executable has been emitted; source acceptance is not
+runtime qualification.
 
 A single 15-second post-error collection experiment returns only one diagnostic
 after110.572s. It is rejected; subsequent attempts restore three seconds within
