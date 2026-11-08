@@ -35,6 +35,15 @@ var active_optimized_headers:blot_backend_optimized_bodies::Capture[>..]=[];
 fn activeOptimized()->blot_backend_optimized_bodies::Capture& {if active_optimized_headers.len==0 {active_optimized_headers.push(blot_backend_optimized_bodies::Capture{..});}return active_optimized_headers[0];}
 fn resetOptimized() {let current:blot_backend_optimized_bodies::Capture& =activeOptimized();current=blot_backend_optimized_bodies::Capture{..};}
 fn valid(self_:Frame)->bool {return self_.slot!=0&&self_.slot-1<frames.len&&frames[self_.slot-1].live&&frames[self_.slot-1].generation==self_.generation;}
+fn canonicalGenerator(source:Generator&)->Generator& {
+ assert(active.valid());let state:FrameState& =frames[active.slot-1];
+ assert(state.generator_slot!=0 && state.generator_slot-1<generators.len);
+ assert(state.workspace_slot!=0 && state.workspace_slot-1<workspaces.len);
+ let registered .= state.generator;let registered_workspace .= state.workspace;assert(registered && registered_workspace);
+ let owned:Generator& =generators[state.generator_slot-1];let workspace:Workspace& =workspaces[state.workspace_slot-1];
+ assert(source .== owned && registered .== owned && registered_workspace .== workspace && workspace.generator .== owned);
+ return owned;
+}
 fn borrow(self_:Frame)->Workspace? {if !self_.valid() {return null;}return frames[self_.slot-1].workspace;}
 fn retain(self_:Frame)->Frame,Error {if !self_.valid() {return Frame{..},blot_error::Error.invalid_artifact;}let state:FrameState& =frames[self_.slot-1];if state.references==0xffffffffffffffff {return Frame{..},blot_error::Error.dependency_limit;}state.references++;return self_,blot_error::Error.none;}
 fn create(allocation_owner:u64)->Frame,Error {

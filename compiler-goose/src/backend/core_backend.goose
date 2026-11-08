@@ -1,6 +1,7 @@
 // Named code instances and constants share the checked immutable Core graph.
 namespace blot_backend_core_backend;
 import parse.ast;
+import driver.compile_workspace;
 import .result_publication;
 import .result_owner;
 import reuse.dependency_payload;
@@ -581,7 +582,8 @@ fn constantLookup(generator: Generator&, session: blot_eval_core_eval::Session&,
     if !(session .== generator.evaluator) { return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none; }
     let constant .= generator.constant_state; if constant { return constant.lookup(generator, target, inputs); } return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none;
 }
-fn principalLookup(generator: Generator&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options) -> blot_support::Option<blot_eval_core_eval::SolvedEvidence>, blot_error::Error {
+fn principalLookup(source: Generator&, target: blot_check_core::BindingRef, options: blot_eval_core_eval::Options) -> blot_support::Option<blot_eval_core_eval::SolvedEvidence>, blot_error::Error {
+    let generator:Generator& =blot_compile_workspace::canonicalGenerator(source);
     let persisted .= generator.persisted_principals; if persisted { persisted.clearInputs(); }
     let principal .= generator.principal_state; if principal { let solved, error = principal.lookup(generator, target, options); if error != blot_error::Error.none || solved.present { return solved, error; } }
     else { generator.principal_stats.requests++; generator.principal_stats.missing++; }

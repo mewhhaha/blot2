@@ -155,7 +155,7 @@ fn primitiveEvidence<G>(self_: const State&, g: G&, owner: u32, types: const blo
     if error != blot_error::Error.none || current_u32 >= current_view.nodes.len || current_view.nodes[current_u32] != (blot_eval_type_evidence::Node { blot_eval_type_evidence::Tag.unsigned32 , ..}) { return PrimitiveResult.fallback, blot_error::Error.none; }
     let copied = blot_eval_core_eval::copySolvedTypes(types);
     for &mapping in copied { mapping.evidence = current_u32; }
-    return PrimitiveResult.solved { SolvedEvidence { copied, [] } , ..}, blot_error::Error.none;
+    return PrimitiveResult.solved { SolvedEvidence { types: copied, ..} , ..}, blot_error::Error.none;
 }
 fn inputImageEqual(self_: State&) -> bool {
     if self_.input_image_equal.present { return self_.input_image_equal.value; }
@@ -296,7 +296,7 @@ fn lookup<G>(self_: State&, g: G&, target: BindingRef, options: blot_eval_core_e
         let empty = proof.value.types.len == 0 && proof.value.rows.len == 0;
         if !exact { return self_.projectedLookup(g, target, proof, empty); }
         if !empty { self_.stats.nonempty_requests++; }
-        var solved = SolvedEvidence { [], [] , ..};
+        var solved = SolvedEvidence {};
         if !empty {
             let primitive, error = self_.primitiveEvidence(g, target.unit, proof.value.types, proof.value.rows);
             if error != blot_error::Error.none { return no, error; }
@@ -344,7 +344,7 @@ fn projectedLookup<G>(self_: State&, g: G&, target: BindingRef, proof: const blo
     }
     let current, error = self_.currentInputs(g, target, inputs); if error != blot_error::Error.none { return no, error; }
     if !current { self_.stats.projected_import_declines++; self_.stats.projected_empty_declines++; return no, blot_error::Error.none; }
-    var solved = SolvedEvidence { [], [] , ..};
+    var solved = SolvedEvidence {};
     if !empty {
         let ready, failure = self_.ensureGraphs(); if failure != blot_error::Error.none { return no, failure; }
         if !ready { self_.stats.projected_result_declines++; self_.stats.projected_empty_declines++; return no, blot_error::Error.none; }

@@ -27,22 +27,22 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen 292
-repairs constraint publication by reconstructing its 31 fields and validating
-its already-copied name run at unchanged length. The empty-header-only variant
-failed and was removed. Twelve focused controls preserve payloads and ownership;
-whole checking clears that boundary. Two importer effect-view selections now use
-a nonrecursive helper at the original points; focused controls reproduce the old
-recursive assignment failure and reject local escapes. Whole parsing passes 440
-files. The completed run stops after 97.556s with 1 captured readonly empty-literal
-mismatch in principal_evidence_reuse. C emission, linking and execution remain
-pending. The 3s first-error window is partial; stage/overall caps remain 120/300s.
-Callback constructor and graph ownership repairs remain. Focused controls retain
-their exact source/carrier limits; scalar reconstruction and net stack costs
-remain unbenchmarked. A refreshed 64-root Session check times out at 120s without
-diagnostics; that is incomplete coverage. Private checker bounds stay 1M clone /
-100k tail with 201 frontend / 8 runtime controls. Failing prefixes are not
-completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen 295
+replaces the type-argument stack's five stored reusable pools with two ordinary
+invocation-local owners. Owner-bound cached metadata ranges remove its snapshot
+buffer and environment map; the global owner-ID mint order remains. The exact
+candidate matches an adapted original-algorithm oracle for 1,503 operations twice
+on current 869 and official checkers; 11 semantic mutations and strict owner tests
+reject. Fixture non-common payload is 15,340 vs 55,321B, excluding publisher payload,
+runtime pages/freelists/headers; no whole-compiler memory or speed gain is claimed.
+An existing active-Frame getter recovers the exact Generator owner, clearing the
+old importer retention error; 16 focused authority controls pass. 56 mutable empty
+record fields use their declared typed defaults. Whole parsing passes 440 files.
+The completed run stops after 101.654s with 1 captured code_expectation children
+lifetime error. C emission, linking and execution remain pending. The 3s first-error
+window is partial; stage/overall caps remain 120/300s. Focused controls retain exact
+source/carrier limits. Private checker bounds stay 1M clone / 100k tail with 201 frontend /
+8 runtime controls. Failing prefixes are not completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

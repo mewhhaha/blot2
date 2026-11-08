@@ -209,7 +209,7 @@ fn recordOwned<G>(g: G&, table: Table&, root: Root, expected: u32, seeds: const 
         complete: observed.complete && observed.regions == 1 && result.selected.len == 0 &&
             g.evaluator.storage.values.len == before_values && g.evaluator.storage.children.len == before_children &&
             g.evaluator.steps == before_steps && tape.views.len == 0,
-        sources: [], scalar_reads: [], call_reads: [], call_publications: [], views: [], plain_facts: [],
+        sources: default<blot_check_core::BindingRef[:]>(), scalar_reads: default<blot_reuse_specialization_receipt::ScalarRead[:]>(), call_reads: default<blot_reuse_specialization_receipt::CallRead[:]>(), call_publications: default<blot_reuse_specialization_receipt::CallRead[:]>(), views: default<blot_reuse_specialization_receipt::ViewEffect[:]>(), plain_facts: default<blot_reuse_specialization_receipt::PlainFact[:]>(),
      ..});
     if error != blot_error::Error.none { return error; }
     var builder = table.begin(Key { root, expected, copySeeds(seeds), copyRows(rows), facts.options, facts.depth , ..});

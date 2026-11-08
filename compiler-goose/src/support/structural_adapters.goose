@@ -1403,8 +1403,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_scoped_backend::RootRead) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::Roots)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_scoped_backend::Roots) {hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::TypeArgument)->bool {return equalFields(left,right);}
-fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_scoped_backend::TypeArgument) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::TypeEvidence)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_scoped_backend::TypeEvidence) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::TypeRef)->bool {return equalFields(left,right);}
@@ -1697,18 +1695,24 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_transpor
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_transport::Position) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_transport::Query)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_transport::Query) {hashFields(sink,value);}
-fn equal<StructuralLeft,A>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Pools<A>)->bool {return equalFields(left,right);}
-fn hash<StructuralSink,A>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Pools<A>) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Entry)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Entry) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Heads)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Heads) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Journal)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Journal) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Key)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Key) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Owner)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Owner) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Positions)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Positions) {hashFields(sink,value);}
-fn equal<StructuralLeft,A>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Snapshot<A>)->bool {return equalFields(left,right);}
-fn hash<StructuralSink,A>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Snapshot<A>) {hashFields(sink,value);}
-fn equal<StructuralLeft,A>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Stack<A>)->bool {return equalFields(left,right);}
-fn hash<StructuralSink,A>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Stack<A>) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Stack)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Stack) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Stats)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Stats) {hashFields(sink,value);}
-fn equal<StructuralLeft,A>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Undo<A>)->bool {return equalFields(left,right);}
-fn hash<StructuralSink,A>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::Undo<A>) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::TypeArgument)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_arguments::TypeArgument) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_key::Builder)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_backend_storage_type_key::Builder) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_key::Node)->bool {return equalFields(left,right);}

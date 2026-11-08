@@ -51,9 +51,9 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 292 inputs. Whole parsing passes
-440 files. Its completed run stops after 97.556s with 1 captured readonly
-empty-literal mismatch in principal_evidence_reuse. C emission, linking, CLI and Wasm
+per stage. This checkpoint preserves exact frozen 295 inputs. Whole parsing passes
+440 files. Its completed run stops after 101.654s with 1 captured children
+return lifetime error in code_expectation. C emission, linking, CLI and Wasm
 remain pending. The 3s first-error window is partial, retaining 120/300s caps.
 The independently reviewed 35 recursion annotations use three concrete callback
 bindings; a broader merged-callback graph was rejected. Six scheme constructor
@@ -81,6 +81,21 @@ all surrounding checks/counters. Three focused controls include the original
 7.8 failure and strict local escape. A separate snapshot-name transfer fixture
 finds/verifies one later copy repair; that source change is after frozen 292.
 The 64-root Session refresh times out at 120s with no diagnostics, not a method pass.
+Frozen 295 also includes the specialized type-argument journal. Two ordinary local
+owners and an Owner-bound publisher replace five stored reusable-pool references,
+snapshot allocation and the environment cache map. Source and exact-candidate
+controls match 1,503 operations twice against the adapted original algorithm,
+including current 869. Eleven semantic mutations and strict publisher/lifetime
+controls reject. Global owner-ID miss mint ordering is retained. Measured trace
+non-common payload is 15,340 vs 55,321B; shared published data, runtime pages,
+freelists and owner headers are excluded. OldStack 185B is an adapted fixed-header
+oracle descriptor, not the original physical Stack. Full memory/speed/output
+qualification remains pending. Generated adapters are regenerated from inputs.
+Fifty-six concrete mutable-slice fields now use exact declared typedempty defaults.
+The existing activeFrame registry getter validates generation/live/slots/exact
+source and Workspace pointers, returning the same Generator pool slot. 16 focused
+controls use projected records; actual 295 clears the former importer retention
+boundary. No new registry, allocation, copy or retain is added by that getter.
 Earlier ClosureRegion local ownership, exact mask recovery, backend nullable
 access, lexical dictionary dispatch and DFS cursor repairs remain. Focused
 controls retain their exact source/carrier limits. Diagnostic root probes with

@@ -984,7 +984,10 @@
       "zig": "compiler/src/backend/storage_type_arguments.zig",
       "goose": "compiler-goose/src/backend/storage_type_arguments.goose",
       "role": "source_module",
-      "write_state": "written_unverified"
+      "write_state": "written_unverified",
+      "implementation_note": "Specialized the single TypeArgument instantiation to invocation-local journal/heads owners with Owner-bound published Range cache; removed stored reusable pool references, snapshot buffer and environment cache map.",
+      "qualification_note": "Exactcandidate differential1503operations x2, mutation/lifetime/ownership controls; fullcompiler/output/runtime qualification remains pending.",
+      "evidence": "benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json#type_argument_journal_295"
     },
     {
       "zig": "compiler/src/backend/storage_type_arguments_tests.zig",
