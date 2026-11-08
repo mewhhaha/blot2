@@ -168,7 +168,7 @@ fn instantiateCanonical<H>(self_: Store&, header: H, arguments: const Id[:]) -> 
 fn canonicalBody<H>(self_: Store&, header: H, arguments: const Id[:]) -> Id, Error {
     let source = header.view(); let error = source.validate(header.root, header.arity, true); if error != blot_error::Error.none { return 0, error; } if arguments.len != header.arity { return 0, blot_error::Error.invalid_capability_contract; }
     if self_.nodes.len == 0 { let id, error = append(self_, Term { Tag.empty , ..}); if error != blot_error::Error.none { return 0, error; } } for argument in arguments { if argument >= self_.nodes.len { return 0, blot_error::Error.invalid_capability_contract; } }
-    var map: Id[4096] = [0xffffffff; 4096]; map[0] = 0; var stack: Frame[130]; var depth: i64 = 1; stack[0] = Frame { header.root , ..};
+    var map: Id[4096] = [0xffffffff; 4096]; map[0] = 0; var stack: Frame[130] = default<Frame[130]>(); var depth: i64 = 1; stack[0] = Frame { header.root , ..};
     while depth != 0 { let top: Frame&  = stack[depth - 1]; if map[top.node] != 0xffffffff { depth -= 1; continue; } let term = source.nodes[top.node]; var pending: Id = 0xffffffff;
         match term.tag {
             callable => { while top.next < 2 { var child = term.c; if top.next == 0 { child = term.b; } top.next += 1; if map[child] == 0xffffffff { pending = child; break; } } },

@@ -53,3 +53,12 @@ fn recordBytes(self_: Adapter) -> i64 { blot_host_layout::principal_record }
 fn init(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_query_table::Limits {..}) -> Table {
     return blot_reuse_semantic_query_table::init<Key,Dependencies,Value,Adapter>(Adapter {..}, limits);
 }
+
+fn canonicalRecords(self_:Adapter,source:const Record[:])->Record[:] {return records.realloc_slice(source,source.len);}
+fn canonicalRecord(self_:Adapter,source:Record)->Record {
+ let value=blot_eval_core_eval::canonicalSolvedEvidence(source.value);
+ if source.dependencies.inputs.present {
+  return Record{source.key,Dependencies{blot_support::some<blot_reuse_principal_inputs::Key>(blot_reuse_principal_inputs::canonicalOwned(source.dependencies.inputs.value))},value};
+ }
+ return Record{source.key,Dependencies{blot_support::none<blot_reuse_principal_inputs::Key>()},value};
+}

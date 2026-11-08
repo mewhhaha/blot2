@@ -43,7 +43,7 @@ fn readValue(self_:InputReader&,value:RequestKind&,owner:JsonOwner&)->Error {ret
 fn readValue(self_:InputReader&,value:blot_compilation_tier::Tier&,owner:JsonOwner&)->Error {return self_.readEnum(value,owner);}
 fn readValue(self_:InputReader&,value:blot_backend_native_assets::Kind&,owner:JsonOwner&)->Error {return self_.readEnum(value,owner);}
 fn readValue<T>(self_:InputReader&,value:const T[:]& ,owner:JsonOwner&)->Error {
- if self_.depth>=64 {return self_.fail(blot_error::Error.invalid_request);}self_.depth++;let error=self_.character('[');if error!=blot_error::Error.none {self_.depth--;return error;}if self_.raw.peek()==']' {self_.raw.pos++;self_.depth--;value=[];return blot_error::Error.none;}
+ if self_.depth>=64 {return self_.fail(blot_error::Error.invalid_request);}self_.depth++;let error=self_.character('[');if error!=blot_error::Error.none {self_.depth--;return error;}if self_.raw.peek()==']' {self_.raw.pos++;self_.depth--;value=default<const T[:]>();return blot_error::Error.none;}
  // Discover the vector length without allocating a recursive growing owner.
  var scan=self_.raw;var count:i64=0;loop {scan.skip();if scan.error.len!=0 || count==4096 {self_.depth--;return self_.fail(blot_error::Error.source_limit);}count++;let next=scan.peek();if next==',' {scan.pos++;continue;}if next!=']' {self_.depth--;return self_.fail(blot_error::Error.invalid_request);}break;}
  let values,error=blot_reuse_zig_project_server::alloc<T>(owner,count);if error!=blot_error::Error.none {self_.depth--;return self_.fail(error);}for &element,index in values {element=default<T>();let error=self_.readValue(element,owner);if error!=blot_error::Error.none {self_.depth--;return error;}if index+1<count {let error=self_.character(',');if error!=blot_error::Error.none {self_.depth--;return error;}}}let error=self_.character(']');self_.depth--;if error!=blot_error::Error.none {return error;}value=values;return blot_error::Error.none;
@@ -55,10 +55,22 @@ fn required(sample:Request,name:const u8[:])->bool {return name=="kind" || name=
 fn required(sample:SourceRange,name:const u8[:])->bool {return name=="path" || name=="start" || name=="length";}
 fn required(sample:blot_reuse_project::Alias,name:const u8[:])->bool {return name=="prefix" || name=="root";}
 fn required(sample:blot_backend_native_assets::Definition,name:const u8[:])->bool {return name=="module" || name=="path" || name=="kind";}
-fn readValue<T>(self_:InputReader&,value:T&,owner:JsonOwner&)->Error {
+fn readRecord<T>(self_:InputReader&,value:T&,owner:JsonOwner&)->Error {
  if self_.depth>=64 {return self_.fail(blot_error::Error.invalid_request);}self_.depth++;let error=self_.character('{');if error!=blot_error::Error.none {self_.depth--;return error;}var seen:dictionary<const u8[:],bool> =dictionary<const u8[:],bool>{};
  if self_.raw.peek()!='}' {loop {let name,error=self_.readText(owner);if error!=blot_error::Error.none {self_.depth--;return error;}if seen.contains(name) {self_.depth--;return self_.fail(blot_error::Error.duplicate_field);}seen.insert(name,true);let error=self_.character(':');if error!=blot_error::Error.none {self_.depth--;return error;}var matched=false;
    const for <N,A> in fields<T> {if name==wireName(value,N) {matched=true;let error=self_.readValue(value.A,owner);if error!=blot_error::Error.none {self_.depth--;return error;}}}if !matched {self_.depth--;return self_.fail(blot_error::Error.unknown_field);}let next=self_.raw.peek();if next==',' {self_.raw.pos++;continue;}if next!='}' {self_.depth--;return self_.fail(blot_error::Error.invalid_request);}break;
  }}let error=self_.character('}');self_.depth--;if error!=blot_error::Error.none {return error;}const for <N,A> in fields<T> {if required(value,N) && !seen.contains(wireName(value,N)) {return self_.fail(blot_error::Error.missing_field);}}return blot_error::Error.none;
 }
 fn parseRequest(bytes:const u8[:])->ParsedRequest,Error {var result=ParsedRequest{..};var reader=InputReader{raw:json::reader(bytes),..};let error=reader.readValue(result.value,result.owner);if error!=blot_error::Error.none {result.deinit();return ParsedRequest{..},error;}if !reader.raw.finish() {result.deinit();return ParsedRequest{..},blot_error::Error.invalid_request;}return result,blot_error::Error.none;}
+
+fn readValue(self_:InputReader&,value:Request&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+
+fn readValue(self_:InputReader&,value:SourceRange&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+
+fn readValue(self_:InputReader&,value:blot_reuse_project::Alias&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+
+fn readValue(self_:InputReader&,value:blot_backend_native_assets::Definition&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+
+fn readValue(self_:InputReader&,value:blot_backend_native_assets::Options&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+
+fn readValue(self_:InputReader&,value:blot_backend_storage_plan::Budgets&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}

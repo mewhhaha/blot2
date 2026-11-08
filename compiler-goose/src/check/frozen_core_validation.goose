@@ -65,8 +65,8 @@ fn capture(context: Context, callers: const ModuleRef[:]) -> ContextImage, Error
     return ContextImage { owners: owners, nominal_facts: facts, reusable_: reusableContext(context, callers), symbol_count: context.symbol_count, source_length: context.source_length, forbidden_owner: context.forbidden_owner , ..}, blot_error::Error.none;
 }
 fn deinit(self_: ContextImage&) {
-    if self_.owners.len != 0 { let first: const ImageOwner&  = self_.owners[0]; let at = image_owners.index_of(first); assert(at >= 0); image_owners.free_slice(image_owners[at..at + self_.owners.len]); }
-    if self_.nominal_facts.len != 0 { let first: const NominalFact&  = self_.nominal_facts[0]; let at = image_facts.index_of(first); assert(at >= 0); image_facts.free_slice(image_facts[at..at + self_.nominal_facts.len]); }
+    if self_.owners.len != 0 { image_owners.free_slice(self_.owners); }
+    if self_.nominal_facts.len != 0 { image_facts.free_slice(self_.nominal_facts); }
     self_ = ContextImage {..};
 }
 fn matches(self_: const ContextImage&, context: Context, callers: const ModuleRef[:]) -> bool {

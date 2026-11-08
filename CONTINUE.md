@@ -27,13 +27,15 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen227
-checkpoints the next ownership/API batch,46 typed empty-slice returns and23 direct
-slice-pool frees. Build227 collects282 diagnostics across51 files after56.43s;
-repeated generated slice identity and enum-codec errors dominate. Serialization,
-archive/reuse and frontend/driver repair groups are active. Latest focused resolve
-and asset lifecycle controls qualify their own recorded source hashes, including
-later working-tree corrections; they are not frozen227 whole-runtime evidence.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen228
+checkpoints the broad repair batch and all eight query-table ownership adapters.
+Checked same-length pool receipts retain pointer identity, allocation order and
+payload bytes. Actual Portable/Optimizer table growth and all eight schema controls
+pass their pinned component laws. The full run stops after17.66s with nine captured
+diagnostics across eight files in its15s collection window; this is not a complete
+remaining-error inventory or comparable completed-compiler timing. Worker, archive,
+cleanup, hash and request-reader repairs continue. Component receipts qualify their
+own exact hashes; later cache-offer/publication repairs remain in the working tree.
 Whole-program emission, linking and execution remain pending. The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

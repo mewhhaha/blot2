@@ -51,7 +51,7 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen227 inputs with the accepted
+per stage. This checkpoint preserves exact frozen228 inputs with the accepted
 global-filter checker. Build222 stops after46.13s at hash/asset/decoder API errors;
 223 advances to an unused Instance slice-field escape after46.64s.224 removes
 those two unobserved fields; substitution still fills the caller-owned buffers.
@@ -85,6 +85,21 @@ archive/reuse and frontend/driver API repair groups. Whole program C is absent.
 Later actual resolve tests expose/fix copied Host state through reference binding;
 these and final asset laws qualify their exact recorded working-tree hashes.
 They do not retroactively qualify frozen227 or the full compiler.
+
+Frozen228 contains the broad serialization/API fixes and eight mandatory query
+adapter contracts. Canonical receipts validate each owned run against its named
+pool at unchanged length. They retain pointers, allocation/copy order, scalar
+metadata and cleanup. The actual Portable/Optimizer adapters execute40-record
+16->32->64 table growth, and all eight concrete schema mappings pass focused
+checks. Stack-backed and wrong-pool payloads abort at receipt validation before
+publication, as the Goose runtime pool contract requires; no escape rule changes.
+InputPin stores two scalar range words into its original pool instead of a slice
+header, with identical layout/allocation count and tested failure cleanup.
+Build228 stops after17.66s with nine captured diagnostics across eight files;
+its15s collection window is bounded and is not a complete remaining-error list.
+Later worker/archive/hash/cleanup fixes and request-reader API repairs are active.
+Latest diagnostic/cache-offer component laws qualify their recorded source hashes,
+including working-tree edits after228; whole compiler qualification remains pending.
 
 ScopeKey and three principal-interface enum hash hooks now match native golden
 streams. Decoder allocations dispatch by the actual owner type at121 generated

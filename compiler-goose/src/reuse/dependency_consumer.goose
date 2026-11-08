@@ -137,7 +137,7 @@ fn detailWrite<T>(writer:Writer&,value:T[:])->Error {let view:const T[:]=value;r
 fn detailWrite<T>(writer:Writer&,value:blot_support::Option<T>)->Error {if !value.present {return writer.nullValue();}return detailWrite(writer,value.value);}
 fn detailWrite<T>(writer:Writer&,value:const T[:])->Error {let error=writer.beginArray();if error!=blot_error::Error.none {return error;}for item in value {let error=writer.separator(blot_json::FrameKind.array);if error!=blot_error::Error.none {return error;}let error=detailWrite(writer,item);if error!=blot_error::Error.none {return error;}}return writer.endArray();}
 fn detailField<T>(writer:Writer&,name:const u8[:],value:T)->Error {let error=writer.key(name);if error!=blot_error::Error.none {return error;}return detailWrite(writer,value);}
-fn detailWrite<T>(writer:Writer&,value:T)->Error {let error=writer.beginObject();if error!=blot_error::Error.none {return error;}const for <N,A> in fields<T> {let error=detailField(writer,N,value.A);if error!=blot_error::Error.none {return error;}}return writer.endObject();}
+fn detailRecord<T>(writer:Writer&,value:T)->Error {let error=writer.beginObject();if error!=blot_error::Error.none {return error;}const for <N,A> in fields<T> {let error=detailField(writer,N,value.A);if error!=blot_error::Error.none {return error;}}return writer.endObject();}
 fn detailWrite(writer:Writer&,value:blot_parse_lexer::Diagnostic)->Error {
  writer.beginObject();detailField(writer,"code",blot_parse_lexer::code_name(value.code));detailField(writer,"start",value.start);detailField(writer,"end",value.end);writer.endObject();return writer.failure;
 }
@@ -158,7 +158,7 @@ fn forwardedDetails<T>(details:const T[:])->bool {return false;}
 fn forwardedDetails<T>(details:T[:])->bool {return false;}
 fn publishedDiagnostic<T>(unit:u32,stage:const u8[:],source:const u8[:],publication:blot_parse_syntax_diagnostics::Publication,details:T)->Diagnostic,Error {
  let created,error=init(unit,stage,publication.code,publication.span,publication.message);if error!=blot_error::Error.none {return Diagnostic{},error;}var result=created;var published=false;
- var bytes:u8[>..];var writer=Writer{out:bytes,options:blot_json::Options{}};let error=detailWrite(writer,details);if error!=blot_error::Error.none {let __cleanup_result_1_0: Diagnostic = Diagnostic{}; let __cleanup_result_1_1: Error = error; {if !published {result.deinit();}} return __cleanup_result_1_0, __cleanup_result_1_1;}if writer.failure!=blot_error::Error.none {let __cleanup_result_2_0: Diagnostic = Diagnostic{}; let __cleanup_result_2_1: Error = writer.failure; {if !published {result.deinit();}} return __cleanup_result_2_0, __cleanup_result_2_1;}
+ var bytes:u8[>..]=[];var writer=Writer{out:bytes,options:blot_json::Options{}};let error=detailWrite(writer,details);if error!=blot_error::Error.none {let __cleanup_result_1_0: Diagnostic = Diagnostic{}; let __cleanup_result_1_1: Error = error; {if !published {result.deinit();}} return __cleanup_result_1_0, __cleanup_result_1_1;}if writer.failure!=blot_error::Error.none {let __cleanup_result_2_0: Diagnostic = Diagnostic{}; let __cleanup_result_2_1: Error = writer.failure; {if !published {result.deinit();}} return __cleanup_result_2_0, __cleanup_result_2_1;}
  let span,has_span=blot_parse_syntax_diagnostics::utf16(publication,source);var snap=Publication{cause:publication.cause,details_json:ownBytes(bytes[..]),forwarded:forwardedDetails(details)};
  if has_span {snap.utf16=blot_support::some(span);}if publication.has_expected_token {snap.expected_token=blot_support::some(publication.expected_token);}if publication.has_actual_token {snap.actual_token=blot_support::some(publication.actual_token);}
  result.publication=blot_support::some(snap);published=true;let __cleanup_result_3_0: Diagnostic = result; let __cleanup_result_3_1: Error = blot_error::Error.none; {if !published {result.deinit();}} return __cleanup_result_3_0, __cleanup_result_3_1;
@@ -173,7 +173,7 @@ fn write(self_:const Diagnostic&,out:u8[>..]&,filename:const u8[:])->Error {
  }else {detailField(writer,"unit",self_.unit);detailField(writer,"code",self_.code[..]);detailField(writer,"start",self_.start);detailField(writer,"end",self_.end);detailField(writer,"message",self_.message[..]);}
  writer.endObject();if writer.failure!=blot_error::Error.none {return writer.failure;}out.push('\n');return blot_error::Error.none;
 }
-fn write<S>(self_:const Diagnostic&,stream:S&,filename:const u8[:])->Error {var bytes:u8[>..];let error=self_.write(bytes,filename);if error!=blot_error::Error.none {return error;}return stream.writeAll(bytes[..]);}
+fn write<S>(self_:const Diagnostic&,stream:S&,filename:const u8[:])->Error {var bytes:u8[>..]=[];let error=self_.write(bytes,filename);if error!=blot_error::Error.none {return error;}return stream.writeAll(bytes[..]);}
 struct Result {compiled:blot_backend_core_backend::Result=default<blot_backend_core_backend::Result>(),stats:Stats=Stats{},diagnostic:blot_support::Option<Diagnostic> =blot_support::none<Diagnostic>()}
 fn deinit(self_:Result&) {self_.compiled.deinit();if self_.diagnostic.present {self_.diagnostic.value.deinit();}self_=Result{};}
 fn rejected(stage:const u8[:],code:const u8[:],span:Span,message:const u8[:])->Result,Error {let diagnostic,error=init(1,stage,code,span,message);if error!=blot_error::Error.none {return Result{},error;}return Result{diagnostic:blot_support::some(diagnostic)},blot_error::Error.none;}
@@ -230,3 +230,12 @@ fn compile(workspace:blot_backend_core_backend::CompileWorkspace&,source:const u
  let emitted,error=blot_backend_core_backend::compileWithOptions(workspace,units,1,blot_backend_core_backend::CompileOptions{..});if error!=blot_error::Error.none {let __cleanup_result_21_0: Result = Result{}; let __cleanup_result_21_1: Error = error; {catalog.deinit();} {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_21_0, __cleanup_result_21_1;}var result=Result{compiled:emitted,stats:stats};
  let unit_owners=[ir.owner,dependency_core.owner];let error=blot_backend_core_backend::pinResult(result.compiled,catalog,unit_owners[..],[]);if error!=blot_error::Error.none {result.deinit();let __cleanup_result_22_0: Result = Result{}; let __cleanup_result_22_1: Error = error; {catalog.deinit();} {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_22_0, __cleanup_result_22_1;}let __cleanup_result_23_0: Result = result; let __cleanup_result_23_1: Error = blot_error::Error.none; {catalog.deinit();} {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_23_0, __cleanup_result_23_1;
  {catalog.deinit();} {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} }
+
+fn detailWrite(writer:Writer&,value:HoleDetails)->Error {return detailRecord(writer,value);}
+
+fn detailWrite(writer:Writer&,value:ExplanationDetails)->Error {return detailRecord(writer,value);}
+
+fn detailWrite(writer:Writer&,value:blot_parse_ast::Span)->Error {return detailRecord(writer,value);}
+
+
+fn detailWrite(writer:Writer&,value:blot_check_check::DiagnosticContext)->Error {return detailRecord(writer,value);}

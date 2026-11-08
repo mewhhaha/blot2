@@ -66,6 +66,14 @@ fn copySource(bytes: const u8[:]) -> const u8[:] { let result=owned_source.alloc
 fn releaseSource(bytes: const u8[:]) { if bytes.len==0 {return;} owned_source.free_slice(bytes); }
 fn copyLexical(values: const blot_parse_lexer::Diagnostic[:]) -> const blot_parse_lexer::Diagnostic[:] {let result=owned_lexical.alloc_slice(values.len);for value,index in values {result[index]=value;}return result;}
 fn releaseLexical(values: const blot_parse_lexer::Diagnostic[:]) {if values.len==0 {return;}owned_lexical.free_slice(values);}
+fn ownCause(value:blot_support::Option<const u8[:]>)->blot_support::Option<const u8[:]> {if !value.present {return blot_support::none<const u8[:]>();}return blot_support::some<const u8[:]>(copySource(value.value));}
+fn ownPublication(value:blot_support::Option<blot_parse_syntax_diagnostics::Publication>)->blot_support::Option<blot_parse_syntax_diagnostics::Publication> {
+    if !value.present {return blot_support::none<blot_parse_syntax_diagnostics::Publication>();}
+    let old=value.value;
+    return blot_support::some(blot_parse_syntax_diagnostics::Publication{cause:old.cause,code:copySource(old.code),span:old.span,message:copySource(old.message),has_expected_token:old.has_expected_token,expected_token:old.expected_token,has_actual_token:old.has_actual_token,actual_token:old.actual_token});
+}
+fn ownDiagnostic(value:Diagnostic)->Diagnostic {return Diagnostic{unit:value.unit,span:value.span,code:value.code,target:value.target,cause:ownCause(value.cause),lex_code:value.lex_code,parse_code:value.parse_code,publication:ownPublication(value.publication),parse_detail:value.parse_detail,lexical_details:copyLexical(value.lexical_details)};}
+fn deinit(self_:Diagnostic&) {if self_.cause.present {releaseSource(self_.cause.value);}if self_.publication.present {releaseSource(self_.publication.value.code);releaseSource(self_.publication.value.message);}releaseLexical(self_.lexical_details);self_=default<Diagnostic>();}
 fn deinit(self_: Unit&) {self_.tree.deinit();releaseSource(self_.source);self_.source=default<const u8[:]>();}
 struct UnitBuffer {storage:Unit[:]=default<Unit[:]>(),items:Unit[:]=default<Unit[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var project_UnitBuffer_runs:Unit[>..]=[];
@@ -98,11 +106,11 @@ struct DiagnosticBuffer {storage:Diagnostic[:]=default<Diagnostic[:]>(),items:Di
 reusable[] var project_DiagnosticBuffer_runs:Diagnostic[>..]=[];
 var inactive_DiagnosticBuffer:DiagnosticBuffer=DiagnosticBuffer {..};
 fn ensure(self_:DiagnosticBuffer&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,project_DiagnosticBuffer_runs);return self_.failure;}
-fn push(self_:DiagnosticBuffer&,value:Diagnostic)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::push(self_,value,project_DiagnosticBuffer_runs);self_.len=self_.items.len;return self_.failure;}
-fn append(self_:DiagnosticBuffer&,values:const Diagnostic[:])->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::append(self_,values,project_DiagnosticBuffer_runs);self_.len=self_.items.len;return self_.failure;}
-fn resize(self_:DiagnosticBuffer&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
-fn clear(self_:DiagnosticBuffer&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
-fn deinit(self_:DiagnosticBuffer&) {blot_support_pooled_buffer::deinit(self_,project_DiagnosticBuffer_runs);self_.len=0;self_.failure=blot_error::Error.none;}
+fn push(self_:DiagnosticBuffer&,value:Diagnostic)->Error {let length=self_.items.len;let error=self_.ensure(length+1);if error!=blot_error::Error.none {return error;}self_.storage[length]=ownDiagnostic(value);self_.items=self_.storage[..length+1];self_.len=self_.items.len;return blot_error::Error.none;}
+fn append(self_:DiagnosticBuffer&,values:const Diagnostic[:])->Error {let length=self_.items.len;if values.len>0x7fffffffffffffff-length {self_.failure=blot_error::Error.out_of_memory;return self_.failure;}let error=self_.ensure(length+values.len);if error!=blot_error::Error.none {return error;}for value,index in values {self_.storage[length+index]=ownDiagnostic(value);}self_.items=self_.storage[..length+values.len];self_.len=self_.items.len;return blot_error::Error.none;}
+fn resize(self_:DiagnosticBuffer&,length:i64) {assert(length>=0 && length<=self_.items.len);for &item in self_.items[length..] {item.deinit();}blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
+fn clear(self_:DiagnosticBuffer&) {for &item in self_.items {item.deinit();}blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
+fn deinit(self_:DiagnosticBuffer&) {self_.clear();blot_support_pooled_buffer::deinit(self_,project_DiagnosticBuffer_runs);}
 struct ProjectState {owner:u64=0,origin_lease:u32=0,units:UnitBuffer=UnitBuffer {..},order:WordBuffer=WordBuffer {..},imports:ImportBuffer=ImportBuffer {..},diagnostics:DiagnosticBuffer=DiagnosticBuffer {..}}
 reusable var projects:ProjectState[>..]=[];
 struct Lowering { io: bool=false, workers:u8=1 }
@@ -120,7 +128,7 @@ fn init()->Project,Error {
 fn deinit(self_:Project&) {
     if self_.lease==0 {return;}assert(projects[self_.lease-1].owner==self_.owner_id);
     for &unit in self_.units.items {unit.deinit();}self_.units.deinit();self_.order.deinit();self_.imports.deinit();
-    for item in self_.diagnostics.items {releaseLexical(item.lexical_details);}self_.diagnostics.deinit();self_.symbols.deinit();
+    self_.diagnostics.deinit();self_.symbols.deinit();
     let index=self_.lease-1;blot_reuse_project_check::releaseModuleOrigins(projects[index].origin_lease);projects[index].owner=0;projects.free(index);self_=Project {..};
 }
 fn compiledModule(self_:const Project&,id:i64)->const blot_reuse_frozen_dependency::Module? {if id==0||id>self_.compiled_modules.len {return null;}if self_.compiled_reuse.len!=0&&!self_.compiled_reuse[id-1] {return null;}return self_.compiled_modules[id-1];}
@@ -270,9 +278,9 @@ fn finishRead<P>(self_:Loader<P>&,id:UnitId,lexical:const blot_parse_lexer::Diag
     self_.project.source_bytes+=self_.project.unit(id).source.len;self_.files.insert(self_.project.unit(id).filename,id);
     if id<=self_.visits.len {self_.visits[id-1]=Visit.pending;}else {self_.visits.push(Visit.pending);}
     if lexical.len!=0 {
-        let first=lexical[0];let details=copyLexical(lexical);
-        let appended=self_.project.diagnostics.push(Diagnostic {unit:id,span:Span {first.start,first.end, ..},code:Code.lexical_error,lex_code:blot_support::some(first.code),publication:blot_support::some(blot_parse_syntax_diagnostics::lexical(tokens,first)),lexical_details:details, ..});
-        if appended!=blot_error::Error.none {releaseLexical(details);return 0,appended;}
+        let first=lexical[0];
+        let appended=self_.project.diagnostics.push(Diagnostic {unit:id,span:Span {first.start,first.end, ..},code:Code.lexical_error,lex_code:blot_support::some(first.code),publication:blot_support::some(blot_parse_syntax_diagnostics::lexical(tokens,first)),lexical_details:lexical, ..});
+        if appended!=blot_error::Error.none {return 0,appended;}
     }
     let tree .= self_.project.units.items[id-1].tree;
     if tree.diagnostics.len!=0 {
@@ -406,7 +414,7 @@ fn loadLibraryReadOnly<P>(entrypath:const u8[:],options:Options,library:const bl
 }
 
 fn loadCompiledMode<P>(context:LoadContext&,loader:Loader<P>&)->Error {
-    assert(context.dependency);let dependency .= context.dependency;let options=loader.options;
+    let dependency .= context.dependency;assert(dependency);let options=loader.options;
     if options.input_mode!=InputMode.project {return blot_error::Error.input_mode_unsupported;}
     if dependency.modules.len>=options.max_files||dependency.modules.len>=0xffffffff {return blot_error::Error.file_limit;}
     loader.project.compiled_modules=dependency.modules;

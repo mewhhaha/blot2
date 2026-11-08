@@ -403,7 +403,7 @@ fn stampReference<T>(value: T) -> u8[32] { stamp(Stamping { algorithm: StampAlgo
 // Goose composite equality compares slice members by buffer identity. Keeping
 // the fixed header itself gives an exact boundary comparison; no address hash
 // or lossy process-local pointer conversion is necessary.
-fn headerPrint(module: blot_check_core::Module) -> blot_check_core::StampView {
+fn headerPrint(module: const blot_check_core::Module&) -> blot_check_core::StampView {
     return blot_check_core::stampView(module);
 }
 fn sameStorage(left: blot_check_core::Module, right: blot_check_core::Module) -> bool {

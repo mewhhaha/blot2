@@ -98,7 +98,7 @@ fn coreGraph(module: const Module&) -> blot_check_frozen_types::Graph {
     return blot_check_frozen_types::Graph { nodes: module.types.nodes, extra: module.types.extra, rows: module.types.effects.rows, labels: module.types.effects.labels, operations: module.types.operations, row_variable_count: module.types.effects.variable_count, quantifier_goals: module.types.quantifier_goals, quantifier_obligations: module.types.quantifier_obligations, .. };
 }
 fn storageContracts(owner: const Interface&, implementation: const Module&) -> Error {
-    var entries: blot_backend_opaque_storage::AuthorityEntry[>..<] = [];
+    var entries: blot_backend_opaque_storage::AuthorityEntry[>..] = [];
     for nominal in implementation.nominals {
         if nominal.identity.unit != implementation.unit { continue; }
         entries.push(blot_backend_opaque_storage::AuthorityEntry { nominal.identity, blot_backend_opaque_storage::Authority { coreGraph(implementation), blot_check_types::List { nominal.parameters.start, nominal.parameters.len , ..}, nominal.storage, nominal.is_opaque , ..} , ..});
@@ -108,7 +108,7 @@ fn storageContracts(owner: const Interface&, implementation: const Module&) -> E
 fn storageClosure(owners: const blot_reuse_frozen_dependency::Module[:], units: const ModuleRef[:]) -> Error {
     { let propagated_error = require(owners.len == units.len); if propagated_error != blot_error::Error.none { return propagated_error; } }
     var offsets: i64[>..<] = [0]; var recipes: Storage[>..<] = []; var entry_indices: i64[>..<] = [];
-    var entries: blot_backend_opaque_storage::AuthorityEntry[>..<] = [];
+    var entries: blot_backend_opaque_storage::AuthorityEntry[>..] = [];
     for ref, index in units {
         let module .= ref.value;
         if module.nominals.len > 0x7fffffffffffffff - offsets[index] { return blot_error::Error.invalid_artifact; }

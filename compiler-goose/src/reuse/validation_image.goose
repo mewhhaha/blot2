@@ -23,7 +23,8 @@ fn update(self_: Writer&, bytes: const u8[:]) {
     if self_.failure != blot_error::Error.none || self_.declined { return; } if self_.bytes.len > self_.limit || bytes.len > self_.limit - self_.bytes.len { self_.declined = true; return; } self_.bytes.append(bytes);
 }
 fn writeInput<S,T>(sink: S&, input: T) { blot_structural::hash(sink, input); }
-fn writeInput<S>(sink: S&, input: blot_check_core::Module) { blot_structural::hash(sink, blot_check_core::stampView(input)); }
+fn writeInput(sink: Writer&, input: blot_check_core::Module) { blot_structural::hash(sink, blot_check_core::stampView(input)); }
+fn writeInput(sink: Reader&, input: blot_check_core::Module) { blot_structural::hash(sink, blot_check_core::stampView(input)); }
 fn capture<T>(input: T, remaining: i64&) -> blot_support::Option<Image>, Error {
     var bytes: u8[>..<] = []; var writer = Writer { remaining, bytes , ..}; writeInput(writer, input);
     if writer.failure != blot_error::Error.none { return blot_support::none<Image>(), writer.failure; } if writer.declined { return blot_support::none<Image>(), blot_error::Error.none; }

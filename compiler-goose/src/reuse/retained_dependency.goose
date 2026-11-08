@@ -20,21 +20,22 @@ fn valid(self_:ModuleHandle)->bool {return self_.slot!=0&&self_.slot-1<module_ow
 fn allocateModule()->ModuleHandle,Error {if module_owners.len>=0xffffffff {return ModuleHandle {..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=module_owners.alloc_index(Module {live:true,generation:generation, ..});return ModuleHandle {(at+1) as u32,generation, ..},blot_error::Error.none;}
 fn release(self_:ModuleHandle) {assert(self_.valid());let at=self_.slot-1;let module:Module& =module_owners[at];assert(module.references!=0);module.references--;if module.references!=0 {return;}module.owner.deinit();module.live=false;module_owners.free(at);}
 struct Snapshot {
- slot:u32=0,generation:u64=0,live:bool=false,value:Frozen=Frozen {symbols:[],modules:[], ..},modules:ModuleHandle[:]=default<ModuleHandle[:]>(),initialized:i64=0,validated:bool=false,
+ slot:u32=0,generation:u64=0,live:bool=false,value:Frozen=default<Frozen>(),modules:ModuleHandle[:]=default<ModuleHandle[:]>(),initialized:i64=0,validated:bool=false,
  core_validation:blot_reuse_completed_core_validation::Receipt?=null,source_completion:blot_reuse_source_completion::Prefix?=null,owner:Owner=Owner {..},
 }
 reusable var snapshots:Snapshot[>..]=[];
 reusable[] var handles:ModuleHandle[>..]=[];
-struct InputPin {owners:Owner[:]=default<Owner[:]>()}
+struct InputPin {start:i64=0,len:i64=0}
 reusable[] var input_owner_runs:Owner[>..]=[];
 fn pinInputs(self_:const Snapshot&)->InputPin,Error {
  if !self_.valid() || self_.initialized!=self_.modules.len {return InputPin{..},blot_error::Error.invalid_artifact;}
  let owners=input_owner_runs.alloc_slice(self_.modules.len+1);for &owner in owners {owner=Owner{..};}
  let root,error=self_.owner.retain();if error!=blot_error::Error.none {input_owner_runs.free_slice(owners);return InputPin{..},error;}owners[0]=root;
  for handle,index in self_.modules {assert(handle.valid());let owner,error=module_owners[handle.slot-1].owner.retain();if error!=blot_error::Error.none {for &prior in owners[..index+1] {prior.release();}input_owner_runs.free_slice(owners);return InputPin{..},error;}owners[index+1]=owner;}
- return InputPin{owners, ..},blot_error::Error.none;
+ let first:Owner& =owners[0];let start=input_owner_runs.index_of(first);return InputPin{start,owners.len},blot_error::Error.none;
 }
-fn deinit(self_:InputPin&) {for &owner in self_.owners {owner.release();}if self_.owners.len!=0 {input_owner_runs.free_slice(self_.owners);}self_=InputPin{..};}
+fn owners(self_:InputPin)->Owner[:] {if self_.len==0 {return default<Owner[:]>();}assert(self_.start>=0 && self_.start<=input_owner_runs.len && self_.len<=input_owner_runs.len-self_.start);return input_owner_runs[self_.start..self_.start+self_.len];}
+fn deinit(self_:InputPin&) {let owners=self_.owners();for &owner in owners {owner.release();}if owners.len!=0 {input_owner_runs.free_slice(owners);}self_=InputPin{..};}
 fn valid(self_:const Snapshot&)->bool {return self_.live&&self_.slot!=0&&self_.slot-1<snapshots.len&&snapshots[self_.slot-1].live&&snapshots[self_.slot-1].generation==self_.generation;}
 fn allocateSnapshot(count:i64)->Snapshot?,Error {
  if count<0||count>0xffffffff||snapshots.len>=0xffffffff {return null,blot_error::Error.out_of_memory;}
@@ -73,5 +74,5 @@ fn deinit(self_:Snapshot&) {
  if !self_.live {return;}assert(self_.valid());let completion=self_.source_completion;if completion {completion.deinit();}let validation=self_.core_validation;if validation {validation.deinit();}
  for handle in self_.modules[..self_.initialized] {handle.release();}if self_.modules.len!=0 {handles.free_slice(self_.modules);}self_.owner.deinit();let at=self_.slot-1;self_.live=false;snapshots.free(at);
 }
-struct Seed {value:Frozen=Frozen {symbols:[],modules:[], ..},snapshot:Snapshot?=null,owner:Owner=Owner {..}}
+struct Seed {value:Frozen=default<Frozen>(),snapshot:Snapshot?=null,owner:Owner=Owner {..}}
 fn deinit(self_:Seed&) {let snapshot=self_.snapshot;if snapshot {snapshot.deinit();}else {self_.owner.deinit();}self_=Seed {..};}

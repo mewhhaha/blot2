@@ -20,7 +20,7 @@ type Frozen=blot_reuse_frozen_dependency::FrozenDependency;
 type Identity=blot_backend_runtime_identity::View;
 struct Prefix {slot:u32=0,generation:u64=0}
 struct PrefixState {
- graph:Frozen=Frozen{symbols:[],modules:[], ..},validation:blot_reuse_completed_core_validation::Receipt=blot_reuse_completed_core_validation::Receipt{..},
+ graph:Frozen=default<Frozen>(),validation:blot_reuse_completed_core_validation::Receipt=blot_reuse_completed_core_validation::Receipt{..},
  generation:u64=0,live:bool=false,canonical:Prefix=Prefix{..},
 }
 reusable var prefixes:PrefixState[>..]=[];

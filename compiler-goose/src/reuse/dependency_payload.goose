@@ -4537,7 +4537,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const u32[:]) {
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_u32 run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_u32 run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_u32 run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4548,7 +4548,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Kind run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_terms__Kind run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_terms__Kind run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4559,7 +4559,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Term run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_terms__Term run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_terms__Term run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4570,7 +4570,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_contracts__Requirement run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_contracts__Requirement run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_contracts__Requirement run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4581,7 +4581,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_headers__Named run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_headers__Named run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_headers__Named run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4592,7 +4592,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_capability_con
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Term run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_capability_contracts__Term run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_capability_contracts__Term run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4603,7 +4603,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_capability_con
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_capability_contracts__Binding run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_capability_contracts__Binding run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4614,7 +4614,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::FieldNam
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__FieldName run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__FieldName run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__FieldName run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4625,7 +4625,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::RuntimeN
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__RuntimeName run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__RuntimeName run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__RuntimeName run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4636,7 +4636,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Declarat
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DeclarationDependencies run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DeclarationDependencies run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DeclarationDependencies run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4647,7 +4647,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::BindingR
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__BindingRef run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__BindingRef run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__BindingRef run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4658,7 +4658,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Dependen
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DependencyMember run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DependencyMember run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DependencyMember run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4669,7 +4669,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::ErasedDe
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ErasedDeclarationReference run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ErasedDeclarationReference run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ErasedDeclarationReference run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4680,7 +4680,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::RequestL
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__RequestLoopInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__RequestLoopInfo run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__RequestLoopInfo run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4691,7 +4691,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::RequestA
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__RequestArm run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__RequestArm run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__RequestArm run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4702,7 +4702,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::Node[:]
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__Node run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__Node run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__Node run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4713,7 +4713,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_effects::Row[:
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_effects__Row run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_effects__Row run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_effects__Row run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4724,7 +4724,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::Operati
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__Operation run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__Operation run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__Operation run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4735,7 +4735,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::Quantif
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__QuantifierGoals run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__QuantifierGoals run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__QuantifierGoals run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4746,7 +4746,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::Obligat
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__Obligation run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__Obligation run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__Obligation run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4757,7 +4757,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Node[:])
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Node run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Node run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Node run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4768,7 +4768,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_parse_ast::Span[:]) 
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_parse_ast__Span run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_parse_ast__Span run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_parse_ast__Span run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4779,7 +4779,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Binding[
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Binding run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Binding run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4790,7 +4790,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Body[:])
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Body run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Body run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Body run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4801,7 +4801,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Paramete
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Parameter run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Parameter run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Parameter run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4812,7 +4812,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::CallInfo
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__CallInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__CallInfo run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__CallInfo run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4823,7 +4823,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Merge[:]
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Merge run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Merge run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Merge run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4834,7 +4834,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::List[:])
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__List run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__List run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__List run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4845,7 +4845,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const u8[:]) {
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_u8 run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_u8 run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_u8 run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4856,7 +4856,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Obligati
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Obligation run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Obligation run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Obligation run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4867,7 +4867,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Nominal[
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Nominal run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Nominal run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Nominal run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4878,7 +4878,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Operatio
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__OperationName run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__OperationName run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__OperationName run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4889,7 +4889,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Construc
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Constructor run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Constructor run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Constructor run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4900,7 +4900,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Projecti
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Projection run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Projection run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Projection run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4911,7 +4911,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Projecti
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ProjectionVariant run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ProjectionVariant run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ProjectionVariant run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4922,7 +4922,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Pattern[
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Pattern run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Pattern run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Pattern run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4933,7 +4933,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::PatternR
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__PatternRow run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__PatternRow run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__PatternRow run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4944,7 +4944,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::MatchArm
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__MatchArm run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__MatchArm run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__MatchArm run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4955,7 +4955,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::MatchInf
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__MatchInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__MatchInfo run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__MatchInfo run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4966,7 +4966,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::UpdateIn
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__UpdateInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__UpdateInfo run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__UpdateInfo run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4977,7 +4977,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::UpdateSt
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__UpdateStep run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__UpdateStep run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__UpdateStep run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4988,7 +4988,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::ClosureI
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ClosureInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ClosureInfo run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ClosureInfo run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -4999,7 +4999,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Associat
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Associated run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Associated run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Associated run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5010,7 +5010,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Contract
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Contract run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Contract run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Contract run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5021,7 +5021,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__ContractMember run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__ContractMember run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__ContractMember run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5032,7 +5032,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Implementation run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Implementation run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Implementation run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5043,7 +5043,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__ImplementationMember run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__ImplementationMember run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__ImplementationMember run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5054,7 +5054,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__MemberTemplate run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__MemberTemplate run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__MemberTemplate run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5065,7 +5065,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__SelectedProof run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__SelectedProof run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__SelectedProof run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5076,7 +5076,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Selected
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__SelectedUse run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__SelectedUse run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__SelectedUse run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5087,7 +5087,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Dictiona
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionarySelection run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DictionarySelection run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DictionarySelection run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5098,7 +5098,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Dictiona
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionaryUse run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DictionaryUse run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DictionaryUse run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5109,7 +5109,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Primitiv
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Primitive run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Primitive run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Primitive run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5120,7 +5120,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::LoopInfo
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__LoopInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__LoopInfo run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__LoopInfo run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5131,7 +5131,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::LoopCarr
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__LoopCarry run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__LoopCarry run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__LoopCarry run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5142,7 +5142,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Resolver
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__ResolverInfo run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ResolverInfo run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__ResolverInfo run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5153,7 +5153,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Operatio
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__OperationValue run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__OperationValue run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__OperationValue run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5164,7 +5164,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::HandleEf
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__HandleEffects run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__HandleEffects run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__HandleEffects run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5175,7 +5175,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Diagnost
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__Diagnostic run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Diagnostic run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__Diagnostic run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5186,7 +5186,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_parameter_patt
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_parameter_patterns__Node run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_parameter_patterns__Node run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_parameter_patterns__Node run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5197,7 +5197,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Binding run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Binding run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5208,7 +5208,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Nominal run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Nominal run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Nominal run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5219,7 +5219,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Constructor run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Constructor run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Constructor run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5230,7 +5230,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__EffectFamily run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__EffectFamily run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__EffectFamily run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5241,7 +5241,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__EffectTemplate run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__EffectTemplate run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__EffectTemplate run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5252,7 +5252,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Associated run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Associated run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Associated run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5263,7 +5263,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_principal_inte
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_principal_interface__Contract run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Contract run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_principal_interface__Contract run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5274,7 +5274,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_depende
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__ImportResolution run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__ImportResolution run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__ImportResolution run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5285,7 +5285,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_depende
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Export run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Export run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Export run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5296,7 +5296,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_depende
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Fixity run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Fixity run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Fixity run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5307,7 +5307,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_depende
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Symbol run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Symbol run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Symbol run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }
@@ -5318,7 +5318,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_reuse_frozen_depende
  // An alias already transferred to this module keeps the same one owner.
  var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_reuse_frozen_dependency__Module run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
  var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Module run=>{found=run.values .== values;},_=>{}}
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_reuse_frozen_dependency__Module run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
  if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
  }abort("partitioned payload view must name this private owner's exact live run");
 }

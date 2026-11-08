@@ -22,6 +22,7 @@ type Module = blot_check_core::Module;
 type BindingRef = blot_check_core::BindingRef;
 type View = blot_backend_runtime_identity::View;
 type Pools = blot_reuse_code_artifacts::Pools;
+fn requiredPools(pools:const Pools?)->const Pools& {assert(pools);return pools;}
 struct Gate {
     constant_types: bool = false, has_generative_sources: bool = false,
     allocation_owner: u64 = 0, units: const Module[:] = default<const Module[:]>(), source_pools: const Pools? = null,
@@ -35,7 +36,7 @@ struct Gate {
     storage: u32 = 0, generation: u64 = 0,
 }
 struct Storage { references: u64 = 0, generation: u64 = 0 }
-reusable[] var storage: Storage[>..] = [];
+reusable var storage: Storage[>..] = [];
 reusable[] var bits: bool[>..] = [];
 reusable[] var sizes: i64[>..] = [];
 reusable[] var words: u32[>..] = [];
@@ -116,8 +117,8 @@ fn initialize(result: Gate&, old: const Pools&, names: blot_support::Option<View
         structural[unit] = exact || moduleEqual(pin.module, module); certified[unit] = exact; all_structural = all_structural && structural[unit];
     }
     if !all_structural { for &module, unit in units { if !structural[unit] && !catalogEqual(old.modules[unit].module, module, result.constant_types) { return blot_error::Error.none; } } }
-    var old_units: blot_check_frozen_core_validation::ModuleRef[>..<] = [];
-    var current_units: blot_check_frozen_core_validation::ModuleRef[>..<] = [];
+    var old_units: blot_check_frozen_core_validation::ModuleRef[>..] = [];
+    var current_units: blot_check_frozen_core_validation::ModuleRef[>..] = [];
     for &module, unit in units { old_units.push(blot_check_frozen_core_validation::ModuleRef { old.modules[unit].module , ..}); current_units.push(blot_check_frozen_core_validation::ModuleRef { module , ..}); }
     let old_context = blot_check_frozen_core_validation::Context { units: old_units[..], symbol_count: blot_support::some(previous.symbols.len) , ..};
     let current_context = blot_check_frozen_core_validation::Context { units: current_units[..], symbol_count: blot_support::some(current.symbols.len) , ..};
@@ -175,7 +176,7 @@ struct ProjectContext { gate: Gate&, module: const Module&, unit: i64, dirty: bo
 fn projectUnit(context: ProjectContext, workspace: blot_reuse_declaration_projection::Workspace&) -> Error {
     let gate .= context.gate; let module .= context.module; let unit = context.unit;
     let dirty = context.dirty; let origins = context.origins; let closures = context.closures; let reached .= context.reached;
-    let pin = gate.source_pools.modules[unit]; var failure = blot_error::Error.none;
+    let pools:const Pools& =requiredPools(gate.source_pools);let pin = pools.modules[unit]; var failure = blot_error::Error.none;
     for binding, index in module.bindings[1..] {
         let id = (index + 1) as u32; reached.clear(); var same = false;
         match binding.kind {
@@ -211,7 +212,7 @@ fn admitsLocalSource(self_: const Gate&, target: BindingRef) -> bool { return se
 fn admitsCheckedInterface(self_: const Gate&, target: BindingRef) -> bool { return self_.checkedInterfaceEqual(target, true); }
 fn checkedInterfaceEqual(self_: const Gate&, target: BindingRef, functions_only: bool) -> bool {
     if self_.constant_types || !self_.admitsCallIdentity(target) { return false; }
-    let old .= self_.source_pools.modules[target.unit - 1].module; let current: const Module& = self_.units[target.unit - 1];
+    let pools:const Pools& =requiredPools(self_.source_pools);let old .= pools.modules[target.unit - 1].module; let current: const Module& = self_.units[target.unit - 1];
     let before .= old.body(target.binding); let after .= current.body(target.binding); assert(before && after);
     let left = old.binding(target.binding); let right = current.binding(target.binding);
     if (functions_only && (!before.is_function || !after.is_function)) || !blot_structural::equal(left.scheme, right.scheme) || left.has_explicit != right.has_explicit || before.parameters.len != after.parameters.len ||
@@ -226,7 +227,7 @@ fn admitsCompletedInterface(self_: const Gate&, target: BindingRef) -> bool, Err
     let body .= current.body(target.binding); assert(body); var needs_proof = !body.is_function;
     for requirement in current.obligations[scheme.obligations.start..scheme.obligations.start + scheme.obligations.len] { needs_proof = needs_proof || !requirement.explicit; }
     if needs_proof {
-        var owners: blot_check_frozen_core_validation::ModuleRef[>..<] = []; for &module in self_.units { owners.push(blot_check_frozen_core_validation::ModuleRef { module , ..}); }
+        var owners: blot_check_frozen_core_validation::ModuleRef[>..] = []; for &module in self_.units { owners.push(blot_check_frozen_core_validation::ModuleRef { module , ..}); }
         var remaining: i64 = 65536;
         let error = blot_check_package_core::checkedInterfaceBody(current, target.binding, blot_check_frozen_core_validation::Context { units: owners[..] , ..}, remaining);
         if error == blot_error::Error.out_of_memory { return false, error; } if error != blot_error::Error.none { return false, blot_error::Error.none; }
@@ -242,7 +243,7 @@ enum IdentityFailure { none, disabled, bounds, kind, binding_type, source_positi
 fn admitsCallIdentity(self_: const Gate&, target: BindingRef) -> bool { return self_.callIdentityFailure(target) == IdentityFailure.none; }
 fn callIdentityFailure(self_: const Gate&, target: BindingRef) -> IdentityFailure {
     if !self_.enabled { return IdentityFailure.disabled; } if target.unit == 0 || target.unit > self_.units.len || target.binding == 0 { return IdentityFailure.bounds; }
-    let current: const Module& = self_.units[target.unit - 1]; let old .= self_.source_pools.modules[target.unit - 1].module;
+    let current: const Module& = self_.units[target.unit - 1]; let pools:const Pools& =requiredPools(self_.source_pools);let old .= pools.modules[target.unit - 1].module;
     if target.binding >= current.bindings.len || target.binding >= old.bindings.len { return IdentityFailure.bounds; }
     let left = old.binding(target.binding); let right = current.binding(target.binding);
     if left.kind != blot_reuse_principal_interface::Kind.global || right.kind != blot_reuse_principal_interface::Kind.global { return IdentityFailure.kind; }
@@ -263,10 +264,10 @@ fn admitsRefinement<R>(self_: const Gate&, record: const R&) -> bool {
 }
 fn freezeValidation(self_: const Gate&, pins: const blot_reuse_code_artifacts::ModulePin[:]) -> blot_support::Option<blot_reuse_dependency_certificate::Certificate>, Error {
     if !self_.dependencies_validated || pins.len != self_.units.len || !self_.validation_names.present { return blot_support::none<blot_reuse_dependency_certificate::Certificate>(), blot_error::Error.none; }
-    var units: blot_check_frozen_core_validation::ModuleRef[>..<] = [];
+    var units: blot_check_frozen_core_validation::ModuleRef[>..] = [];
     for pin, index in pins { let module: const Module& = self_.units[index]; if pin.module .!= module { return blot_support::none<blot_reuse_dependency_certificate::Certificate>(), blot_error::Error.none; } units.push(blot_check_frozen_core_validation::ModuleRef { module , ..}); }
     var previous: const blot_reuse_dependency_certificate::Certificate? = null;
-    if self_.source_pools && self_.source_pools.dependency_certificate.present { previous .= self_.source_pools.dependency_certificate.value; }
+    let pools .=self_.source_pools;if pools {if pools.dependency_certificate.present {previous .=pools.dependency_certificate.value;}}
     let certificate, error = blot_reuse_dependency_certificate::captureReusing(blot_check_frozen_core_validation::Context { units: units[..], symbol_count: blot_support::some(self_.validation_symbols) , ..}, pins, self_.validation_names.value, previous, self_.certified_images);
     return certificate, error;
 }
@@ -298,7 +299,7 @@ struct MemberSpan { start: i64, len: i64 }
 fn dirtySelections(gate: const Gate&, dirty: bool[:]) -> Error {
     var candidates: blot_check_core::Associated[>..<] = []; var members: blot_check_core::DependencyMember[>..<] = [];
     var scanned: dictionary<i64,MemberSpan> = dictionary<i64,MemberSpan>{};
-    while true {
+    loop {
         let known = candidates.len;
         for module, unit in gate.units { for candidate in module.associated {
             if !gate.targetDirty(unit, candidate.target) { continue; } var present = false;

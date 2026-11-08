@@ -18,6 +18,8 @@ fn view(self_:Context&)->Sources {return Sources {self_, ..};}
 fn before(self_:Sources,role:Role,binding:u32)->blot_support::Option<Header> {let context=self_.context;if !context {return blot_support::none<Header>();}return read(context,context.before,role,binding,false);}
 fn after(self_:Sources,role:Role,binding:u32)->blot_support::Option<Header> {let context=self_.context;if !context {return blot_support::none<Header>();}return read(context,context.after,role,binding,true);}
 fn work(self_:Context&)->bool {if self_.remaining==0 {return false;}self_.remaining--;return true;}
+fn namedFunction(owner: const blot_check_core::Module&, binding: u32) -> bool { if binding == 0 || binding >= owner.bindings.len { return false; } let body = owner.bindings[binding].body_id; if body == 0 || body >= owner.bodies.len { return false; } return owner.bodies[body].is_function; }
+fn namedFunction(owner: const blot_check_check::Checked&, binding: u32) -> bool { return binding < owner.bindings.len && owner.bindings[binding].named_function; }
 fn read<O>(self_:Context&,owner:const O&,role:Role,binding:u32,current:bool)->blot_support::Option<Header> {
  if !self_.work()||owner.unit!=role.implementation.unit||binding==0||binding>=owner.bindings.len {return blot_support::none<Header>();}var found=false;
  for implementation in owner.implementations {
@@ -30,7 +32,7 @@ fn read<O>(self_:Context&,owner:const O&,role:Role,binding:u32,current:bool)->bl
  }
  if !found {return blot_support::none<Header>();}let source=owner.bindings[binding];if !source.private||source.kind!=blot_reuse_principal_interface::Kind.global {return blot_support::none<Header>();}
  if current {
-  if !source.named_function||source.name==0||role.implementation.decl&blot_check_types::opaque_name_bit==0 {return blot_support::none<Header>();}
+  if !namedFunction(owner,binding)||source.name==0||role.implementation.decl&blot_check_types::opaque_name_bit==0 {return blot_support::none<Header>();}
   let name=self_.names.get(source.name);let implementation=self_.names.get(role.implementation.decl&~blot_check_types::opaque_name_bit);let member=self_.names.get(role.member);
   if name.len!=implementation.len+1+member.len||name[..implementation.len]!=implementation||name[implementation.len]!='.'||name[implementation.len+1..]!=member {return blot_support::none<Header>();}
  }

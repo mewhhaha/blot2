@@ -141,7 +141,7 @@ fn scalarEvidence<S>(session: const S&, target: blot_check_core::BindingRef) -> 
     return 0;
 }
 fn callKey(read: blot_reuse_specialization_receipt::CallRead, evidence: u32) -> blot_eval_core_eval::CallProofKey {
-    return blot_eval_core_eval::CallProofKey { target: blot_check_core::BindingRef { read.unit - 1, read.binding , ..}, evidence: evidence , ..};
+    return blot_eval_core_eval::CallProofKey { target: blot_eval_core_eval::Target { (read.unit - 1) as i64, read.binding , ..}, evidence: evidence , ..};
 }
 fn lookupLocal<G>(g: G&, root: Root, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:],
     rows: const blot_eval_type_evidence::RowMapping[:]) -> blot_support::Option<Value>, Error {
@@ -429,3 +429,11 @@ var next_observation_owner_slots_generation: u64=1;
 fn initObservationOwner() -> ObservationOwner,Error { if next_observation_owner_slots_generation==0xffffffffffffffff||observation_owner_slots.len>=0xffffffff { return ObservationOwner {..},blot_error::Error.out_of_memory; } let value=Observation {..}; let generation=next_observation_owner_slots_generation; next_observation_owner_slots_generation++; let at=observation_owner_slots.alloc_index(ObservationOwnerState {value,generation,true, ..}); return ObservationOwner {(at+1) as u32,generation, ..},blot_error::Error.none; }
 fn borrow(self_: ObservationOwner) -> Observation? { if self_.lease==0||self_.lease-1>=observation_owner_slots.len { return null; } let slot: ObservationOwnerState& =observation_owner_slots[self_.lease-1]; if !slot.live||slot.generation!=self_.generation { return null; } return slot.value; }
 fn deinit(self_: ObservationOwner&) { if self_.lease==0 { return; } let at=self_.lease-1; assert(at<observation_owner_slots.len&&observation_owner_slots[at].live&&observation_owner_slots[at].generation==self_.generation); let slot: ObservationOwnerState& =observation_owner_slots[at]; slot.value=Observation {..}; slot.live=false; observation_owner_slots.free(at); self_=ObservationOwner {..}; }
+
+fn canonicalRecords(self_:Adapter,source:const Record[:])->Record[:] {return owned_records.realloc_slice(source,source.len);}
+fn canonicalRecord(self_:Adapter,source:Record)->Record {
+ return Record{Key{source.key.root,source.key.expected,
+  key_seeds.realloc_slice(source.key.seeds,source.key.seeds.len),
+  key_rows.realloc_slice(source.key.rows,source.key.rows.len),
+  source.key.options,source.key.depth},blot_reuse_specialization_receipt::canonicalOwned(source.dependencies),blot_eval_core_eval::canonicalSolvedEvidence(source.value)};
+}

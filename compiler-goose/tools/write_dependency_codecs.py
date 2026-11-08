@@ -85,8 +85,11 @@ def goose_type(raw,namespace):
  if raw in ('u8','u16','u32','u64','i8','i16','i32','i64','bool','f32','f64'):return raw
  m=re.fullmatch(r'(.+)\[(:|\d+)\]',raw)
  if m:return goose_type(m[1],namespace)+'['+m[2]+']'
- if raw.startswith('blot_support::Option<'):return 'blot_support::Option<'+goose_type(raw[21:-1],namespace)+'>'
- if raw.startswith('Option<'):return 'blot_support::Option<'+goose_type(raw[7:-1],namespace)+'>'
+ if raw.startswith(('blot_support::Option<','Option<')):
+  child=raw[raw.index('<')+1:-1]
+  resolved=goose_type(child,namespace)
+  if child.startswith('const ') and child.endswith('[:]'):resolved='const '+resolved
+  return 'blot_support::Option<'+resolved+'>'
  key=raw if '::' in raw else namespace+'::'+raw
  if key not in G:raise ValueError(('undeclared Goose wire type',key))
  kind,body,owner=G[key]
@@ -155,6 +158,7 @@ def option_child(hint):
  return None
 def slice_child(hint):
  if hint:
+  if hint.startswith('const '):hint=hint[6:]
   m=re.fullmatch(r'(.+)\[(:|\d+)\]',hint)
   if m:return m[1]
  return None
@@ -374,7 +378,7 @@ for d in ORDER:
   else:lines.append('for index in 0..count as i64 '+step(d,f'read_{proc(child)}(reader,level+1)','result[index]'))
   lines.append('return result,Error.none;')
  elif kind=='optional':
-  child=d['children'][0];lines.append('let flag,error=reader.integer(1);if error!=Error.none {'+error_return(d)+'}if flag==0 {return blot_support::none<'+actual(child)+'>(),Error.none;}if flag!=1 {'+error_return(d,'Error.invalid_artifact')+'}let value,error=read_'+proc(child)+'(reader,level+1);if error!=Error.none {'+error_return(d)+'}return blot_support::some(value),Error.none;')
+  child=d['children'][0];option_type=t[len('blot_support::Option<'):-1];lines.append('let flag,error=reader.integer(1);if error!=Error.none {'+error_return(d)+'}if flag==0 {return blot_support::none<'+option_type+'>(),Error.none;}if flag!=1 {'+error_return(d,'Error.invalid_artifact')+'}let value,error=read_'+proc(child)+'(reader,level+1);if error!=Error.none {'+error_return(d)+'}return blot_support::some<'+option_type+'>(value),Error.none;')
  elif kind=='union':
   lines.append('let error=reader.depth(level+1);if error!=Error.none {'+error_return(d)+'}let tag,error=reader.varint();if error!=Error.none {'+error_return(d)+'}')
   for field,ordinal,target,child,fs in d['variants']:
@@ -419,7 +423,7 @@ fn alloc<T>(self:Owner&,length:i64)->T[:],Error {return allocate(self,default<T>
 ''')
 for t in elements:
  tag=ident(t);owner.append(f'''fn allocate(self:Owner&,witness:{t},length:i64)->{t}[:],Error {{assert(self.valid());if length<0 {{return [],Error.artifact_limit;}}if length==0 {{return [],Error.none;}}let values=pool_{tag}.alloc_slice(length);let error=self.remember(Run.run_{tag}{{values}});if error!=Error.none {{pool_{tag}.free_slice(values);return [],error;}}return values,Error.none;}}
-fn mutable(self:const Owner&,values:const {t}[:])->{t}[:] {{assert(self.valid());if values.len==0 {{return [];}}var link=owners[self.lease-1].head;while link!=0 {{let entry=links[link-1];match entry.run {{Run.run_{tag} run=>{{if run.values .== values {{return run.values;}}}},_=>{{}}}}link=entry.next;}}abort("archive slice is outside its owner");}}
+fn mutable(self:const Owner&,values:const {t}[:])->{t}[:] {{assert(self.valid());if values.len==0 {{return [];}}var link=owners[self.lease-1].head;while link!=0 {{let entry=links[link-1];match entry.run {{Run.run_{tag} run=>{{if blot_support::same_slice_identity(run.values,values) {{return pool_{tag}.realloc_slice(run.values,run.values.len);}}}},_=>{{}}}}link=entry.next;}}abort("archive slice is outside its owner");}}
 ''')
 Path('compiler-goose/src/reuse/dependency_format_owners.goose').write_text(''.join(owner))
 # Explicit partial-field cleanup remains available for record constructors.
@@ -454,6 +458,6 @@ for d in ORDER:
 with Path('compiler-goose/src/reuse/dependency_format_codecs.goose').open('a') as file:file.write(''.join(release_lines))
 release_owner=[]
 for t in elements:
- tag=ident(t);release_owner.append(f'''fn releaseSlice(self:Owner&,values:const {t}[:]) {{assert(self.valid());if values.len==0 {{return;}}var previous:u32=0;var link=owners[self.lease-1].head;while link!=0 {{let at=link-1;let entry=links[at];match entry.run {{Run.run_{tag} run=>{{if run.values .== values {{if previous==0 {{owners[self.lease-1].head=entry.next;}}else {{links[previous-1].next=entry.next;}}freeRun(entry.run);links[at]=Link{{}};links.free(at);return;}}}},_=>{{}}}}previous=link;link=entry.next;}}abort("partial field cleanup requires its exact archive owner");}}
+ tag=ident(t);release_owner.append(f'''fn releaseSlice(self:Owner&,values:const {t}[:]) {{assert(self.valid());if values.len==0 {{return;}}var previous:u32=0;var link=owners[self.lease-1].head;while link!=0 {{let at=link-1;let entry=links[at];match entry.run {{Run.run_{tag} run=>{{if blot_support::same_slice_identity(run.values,values) {{if previous==0 {{owners[self.lease-1].head=entry.next;}}else {{links[previous-1].next=entry.next;}}freeRun(entry.run);links[at]=Link{{}};links.free(at);return;}}}},_=>{{}}}}previous=link;link=entry.next;}}abort("partial field cleanup requires its exact archive owner");}}
 ''')
 with Path('compiler-goose/src/reuse/dependency_format_owners.goose').open('a') as file:file.write(''.join(release_owner))

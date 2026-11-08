@@ -95,10 +95,11 @@ fn publishDiagnostics(result:Result&,diagnostics:blot_support_pooled_buffer::Buf
  let owned=diagnostic_pool.alloc_slice(diagnostics.items.len);for issue,index in diagnostics.items {owned[index]=issue;}result.diagnostics=owned;diagnostics.clear();return blot_error::Error.none;
 }
 struct Lexical {loaded:Project&,unit:u32,probe:Probe,items:blot_support_pooled_buffer::Buffer<Item> =blot_support_pooled_buffer::Buffer<Item>{},visits:i64=0,truncated:bool&}
+fn shiftItems(items:Item[:],removed:i64) {for at in removed+1..items.len {items[at-1]=items[at];}}
 fn add(self_:Lexical&,symbol:u32,kind:ItemKind,node:u32,distance:u32)->Error {
  if symbol==0 {return blot_error::Error.none;}let name=self_.loaded.symbols.get(symbol);if name.len<self_.probe.prefix.len || name[..self_.probe.prefix.len]!=self_.probe.prefix {return blot_error::Error.none;}
  if name.len>256 || (kind==ItemKind.constructor && self_.probe.kind!=blot_reuse_completion_probe::Kind.constructor && name.len==256) {self_.truncated=true;return blot_error::Error.none;}
- for old,index in self_.items.items {if old.label==name {if old.distance<=distance {return blot_error::Error.none;}var removed=self_.items.items[index];for at in index+1..self_.items.items.len {self_.items.items[at-1]=self_.items.items[at];}self_.items.resize(self_.items.items.len-1);removed.deinit();break;}}
+ for old,index in self_.items.items {if old.label==name {if old.distance<=distance {return blot_error::Error.none;}var removed=self_.items.items[index];shiftItems(self_.items.items,index);self_.items.resize(self_.items.items.len-1);removed.deinit();break;}}
  if self_.items.items.len==4096 {self_.truncated=true;return blot_error::Error.none;}
  var item=Item{label:own(name),kind:kind,distance:distance,start:self_.loaded.unit(self_.unit).tree.span(node).start};var published=false;
  if kind==ItemKind.constructor && self_.probe.kind!=blot_reuse_completion_probe::Kind.constructor {let result=text_pool.alloc_slice(name.len+1);result[0]='$';for byte,index in name {result[index+1]=byte;}item.insertText=result;}else {item.insertText=own(name);}item.filename=own(self_.loaded.filename(self_.unit));let error=self_.items.push(item,item_pool);if error!=blot_error::Error.none {let __cleanup_result_9_0: Error = error; {if !published {item.deinit();}} return __cleanup_result_9_0;}published=true;let __cleanup_result_10_0: Error = blot_error::Error.none; {if !published {item.deinit();}} return __cleanup_result_10_0;

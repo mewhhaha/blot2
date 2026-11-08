@@ -37,7 +37,7 @@ fn put(w: Writer&,value: u32) { if reserve(w,4) { for shift in 0..4 { w.data.pus
 fn put(w: Writer&,value: u64) { if reserve(w,8) { for shift in 0..8 { w.data.push((value>>((shift*8) as u32)) as! u8); } } }
 fn put(w: Writer&,value: i64) { put(w,value as! u64); }
 fn put<T>(w: Writer&,value: blot_support::Option<T>) { put(w,value.present); if value.present { put(w,value.value); } }
-fn put<T>(w: Writer&,value: T) { const for <N,A> in fields<T> { put(w,value.A); } }
+fn putRecord<T>(w: Writer&,value: T) { const for <N,A> in fields<T> { put(w,value.A); } }
 fn available(r: Reader&,count: i64) -> bool { if r.failure!=blot_error::Error.none { return false; } if count<0||r.at<0||r.at>r.data.len||count>r.data.len-r.at { r.failure=blot_error::Error.invalid_artifact; return false; } return true; }
 fn get(r: Reader&,out: u8&) { if !available(r,1) { return; } out=r.data[r.at]; r.at++; }
 fn get(r: Reader&,out: bool&) { var byte: u8=0; get(r,byte); if byte>1 { r.failure=blot_error::Error.invalid_artifact; return; } out=byte==1; }
@@ -45,7 +45,7 @@ fn get(r: Reader&,out: u32&) { if !available(r,4) { return; } out=blot_bytes::ge
 fn get(r: Reader&,out: u64&) { if !available(r,8) { return; } out=blot_bytes::get_u64(r.data,r.at); r.at+=8; }
 fn get(r: Reader&,out: i64&) { var bits: u64=0; get(r,bits); out=bits as! i64; }
 fn get<T>(r: Reader&,out: blot_support::Option<T>&) { get(r,out.present); if out.present { get(r,out.value); } }
-fn get<T>(r: Reader&,out: T&) { const for <N,A> in fields<T> { get(r,out.A); } }
+fn getRecord<T>(r: Reader&,out: T&) { const for <N,A> in fields<T> { get(r,out.A); } }
 fn count(w: Writer&,length: i64) { if length<0||length>elements { w.failure=blot_error::Error.artifact_limit; return; } put(w,length as u32); }
 fn count(r: Reader&,width: i64) -> i64 { var value: u32=0; get(r,value); if r.failure!=blot_error::Error.none { return 0; } let length=value as i64; if length>elements||r.total>elements-length||width<=0||length>(r.data.len-r.at)/width { r.failure=blot_error::Error.artifact_limit; return 0; } r.total+=length; return length; }
 fn blob(w: Writer&,bytes: const u8[:]) { if !reserve(w,8+bytes.len) { return; } put(w,bytes.len as u64); w.data.append(bytes); }
@@ -86,4 +86,22 @@ reusable[] var proof_records: blot_reuse_independent_call_proof::Record[>..]=[];
 fn writeRecords(w: Writer&,records: const blot_reuse_independent_call_proof::Record[:]) { count(w,records.len); for record in records { writeRecord(w,record); } }
 fn readRecords(r: Reader&) -> blot_reuse_independent_call_proof::Record[:] { let length=count(r,16); if r.failure!=blot_error::Error.none { return default<blot_reuse_independent_call_proof::Record[:]>(); } let records=proof_records.alloc_slice(length); for &record in records { record=default<blot_reuse_independent_call_proof::Record>(); } for &record in records { record=readRecord(r); if r.failure!=blot_error::Error.none { releaseRecords(records); return default<blot_reuse_independent_call_proof::Record[:]>(); } } return records; }
 fn releaseRecords(records: blot_reuse_independent_call_proof::Record[:]) { for &record in records { record.deinit(); } proof_records.free_slice(records); }
-fn semanticPools(identity: const Identity&,module_pins: const blot_reuse_code_artifacts::ModulePin[:],evidence: const blot_evidence_packet::OwnedSnapshot&) -> blot_reuse_code_artifacts::Pools { let empty_effects=blot_check_effect_evidence::Snapshot {operations:[],arguments:[],rows:[],labels:[],owner_id:0}; let evaluator=blot_eval_core_eval::Snapshot {owner_id:blot_native::fresh_owner_id(),code_origins:[],values:[],children:[],closures:[],value_evidence:[],type_mappings:[],row_mappings:[],evidence:evidence.snapshot,value_records:[],record_layouts:[],field_names:[],implementation_proofs:blot_eval_implementation_evidence::Snapshot {}}; return blot_reuse_code_artifacts::Pools {project_identity:true,identity:blot_support::some(metadata(identity)),modules:module_pins,dependency_certificate:blot_support::none<blot_reuse_dependency_certificate::Certificate>(),layouts:blot_reuse_code_artifacts::Layouts {nodes:[],extra:[],effects:empty_effects},evaluator:evaluator,constant_records:[],rows:blot_reuse_code_artifacts::Substitutions {},templates:blot_reuse_code_artifacts::Substitutions {},static_values:blot_reuse_code_artifacts::Substitutions {},instance_arguments:blot_eval_instance_arguments::Owned {},captures:[],bridge:blot_support::none<blot_reuse_code_artifacts::Bridge>(),field_locations:[],field_locations_stamp:[0;32],operations:[],operation_relocations:[],operations_finalized:false,functions:[],serialized:[],runtime_globals:[],runtime_order:[],binding_offsets:[],node_offsets:[],slots:[],visited_nodes:[],provider_frames:[],provider_cells:[],request_cells:[],request_handlers:[],break_values:[],array_proofs:[],discard_proofs:[],evaluator_steps:0,evaluator_demanded:0,evaluator_traced_bodies:0,evaluator_traced_nodes:0}; }
+fn semanticPools(identity: const Identity&,module_pins: const blot_reuse_code_artifacts::ModulePin[:],evidence: const blot_evidence_packet::OwnedSnapshot&) -> blot_reuse_code_artifacts::Pools { let empty_effects=blot_check_effect_evidence::Snapshot {owner_id:0,..}; let evaluator=blot_eval_core_eval::Snapshot {owner_id:blot_native::fresh_owner_id(),evidence:evidence.snapshot,implementation_proofs:blot_eval_implementation_evidence::Snapshot {},..}; return blot_reuse_code_artifacts::Pools {project_identity:true,identity:blot_support::some(metadata(identity)),modules:module_pins,dependency_certificate:blot_support::none<blot_reuse_dependency_certificate::Certificate>(),layouts:blot_reuse_code_artifacts::Layouts {effects:empty_effects,..},evaluator:evaluator,rows:blot_reuse_code_artifacts::Substitutions {},templates:blot_reuse_code_artifacts::Substitutions {},static_values:blot_reuse_code_artifacts::Substitutions {},instance_arguments:blot_eval_instance_arguments::Owned {},bridge:blot_support::none<blot_reuse_code_artifacts::Bridge>(),field_locations_stamp:[0;32],operations_finalized:false,evaluator_steps:0,evaluator_demanded:0,evaluator_traced_bodies:0,evaluator_traced_nodes:0,..}; }
+
+fn get(r:Reader&,out:blot_backend_runtime_identity::Name&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_backend_runtime_identity::Name) {putRecord(w,value);}
+
+fn get(r:Reader&,out:ScalarSeed&) {getRecord(r,out);}
+fn put(w:Writer&,value:ScalarSeed) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_check_core::BindingRef&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_check_core::BindingRef) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_core_eval::Value&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_core_eval::Value) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_core_eval::Options&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_core_eval::Options) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_reuse_independent_call_proof::ScalarInput&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_reuse_independent_call_proof::ScalarInput) {putRecord(w,value);}

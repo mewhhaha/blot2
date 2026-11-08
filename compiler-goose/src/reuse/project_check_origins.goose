@@ -8,7 +8,7 @@ fn moduleOrigins(source:const Project&)->blot_check_check::ModuleOrigins {
  if source.lease==0 || source.lease-1>=blot_reuse_project::projects.len {return blot_check_check::ModuleOrigins{has_lookup:true,failure:blot_error::Error.type_limit, ..};}
  let project:blot_reuse_project::ProjectState& =blot_reuse_project::projects[source.lease-1];if project.owner!=source.owner_id {return blot_check_check::ModuleOrigins{has_lookup:true,failure:blot_error::Error.type_limit, ..};}
  if project.origin_lease==0 {
- let entries=origin_entries.alloc_slice(source.units.len);for &entry in entries {entry=blot_check_check::ModuleOrigin{0,[],false, ..};}
+ let entries=origin_entries.alloc_slice(source.units.len);for &entry in entries {entry=blot_check_check::ModuleOrigin{0,default<const u8[:]>(),false, ..};}
  let at=origin_states.alloc_index(OriginState{source_id:source.owner_id,entries:entries,live:true, ..});project.origin_lease=(at+1) as u32;
  origin_states[at].failure=populateOrigins(source,entries);
  }

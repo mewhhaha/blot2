@@ -82,7 +82,7 @@ fn semanticEqual(left:const blot_reuse_principal_interface::Nominal[:],right:con
 fn semanticEqual(left:Interface,right:Interface)->bool {const for <N,A> in fields<Interface> {if !semanticEqual(left.A,right.A) {return false;}}return true;}
 fn semanticEqual<T>(left:T,right:T)->bool {return blot_structural::equal(left,right);}
 fn principalEqual(left:Interface,right:Interface)->bool {
- if left.constructors.len!=right.constructors.len {return false;}var before=left;var after=right;before.constructors=[];after.constructors=[];if !semanticEqual(before,after) {return false;}
+ if left.constructors.len!=right.constructors.len {return false;}var before=left;var after=right;before.constructors=default<blot_reuse_principal_interface::Constructor[:]>();after.constructors=default<blot_reuse_principal_interface::Constructor[:]>();if !semanticEqual(before,after) {return false;}
  for old,index in left.constructors {
   let current=right.constructors[index];var candidate=current;
   if old.private&&current.private&&old.nominal<left.nominals.len&&current.nominal<right.nominals.len {let old_parent=left.nominals[old.nominal];let new_parent=right.nominals[current.nominal];if old_parent.is_opaque&&new_parent.is_opaque&&old_parent.storage.kind!=blot_backend_opaque_storage::Kind.unknown&&new_parent.storage.kind!=blot_backend_opaque_storage::Kind.unknown&&old_parent.identity==new_parent.identity&&old.identity.unit==old_parent.identity.unit&&current.identity.unit==new_parent.identity.unit {candidate.identity.decl=old.identity.decl;}}

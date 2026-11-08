@@ -13,7 +13,7 @@ struct Slots { interface_types: u8[:], patterns: u8[:], core_types: u8[:], inter
 reusable[] var owned_roles: u8[>..] = [];
 fn deinit(self_: Slots&) {
     release(self_.interface_types); release(self_.patterns); release(self_.core_types); release(self_.interface_capabilities); release(self_.core_capabilities);
-    self_ = Slots { [], [], [], [], [] , ..};
+    self_ = default<Slots>();
 }
 fn release(values: u8[:]) { if values.len != 0 { owned_roles.free_slice(values); } }
 fn mark(slots: u8[:], start: u32, len: u32, role: u8) -> Error {

@@ -23,6 +23,7 @@ type BindingRef = blot_check_core::BindingRef;
 type SolvedEvidence = blot_eval_core_eval::SolvedEvidence;
 type Inputs = blot_reuse_principal_inputs::Key;
 type Gate = blot_reuse_principal_reuse_gate::Gate;
+fn requiredOld(old:const blot_reuse_artifact_capture::Capture?)->const blot_reuse_artifact_capture::Capture& {assert(old);return old;}
 enum SourceReason { none, disabled, constant_types, incomplete, identity, changed_source, module_image, missing_root }
 struct SourceDecline {
     target: BindingRef = BindingRef { 0, 0 , ..}, source: BindingRef = BindingRef { 0, 0 , ..}, reason: SourceReason = SourceReason.none,
@@ -109,12 +110,12 @@ fn deinit(self_: State&) {
 }
 fn ensureGraphs(self_: State&) -> bool, Error {
     if self_.graphs.present { return self_.graphs.value.enabled, blot_error::Error.none; }
-    if !self_.gate.enabled { return false, blot_error::Error.none; } assert(self_.old);
-    let prepared, error = blot_reuse_artifact_import::initCheckedQuery(self_.allocation_owner, self_.old.metadata.pools.value, self_.gate.units, self_.gate);
+    if !self_.gate.enabled { return false, blot_error::Error.none; } let old:const blot_reuse_artifact_capture::Capture& =requiredOld(self_.old);
+    let prepared, error = blot_reuse_artifact_import::initCheckedQuery(self_.allocation_owner, old.metadata.pools.value, self_.gate.units, self_.gate);
     if error != blot_error::Error.none { return false, error; }
     var graphs = prepared;
     if !graphs.present {
-        let fresh, failure = blot_reuse_artifact_import::init(self_.allocation_owner, self_.old.metadata.pools.value, self_.gate.units, self_.names, self_.gate.units.len);
+        let fresh, failure = blot_reuse_artifact_import::init(self_.allocation_owner, old.metadata.pools.value, self_.gate.units, self_.names, self_.gate.units.len);
         if failure != blot_error::Error.none { return false, failure; } graphs = blot_support::some(fresh);
     }
     if !graphs.value.enabled { graphs.value.deinit(); return false, blot_error::Error.none; }
@@ -158,9 +159,9 @@ fn primitiveEvidence<G>(self_: const State&, g: G&, owner: u32, types: const blo
 }
 fn inputImageEqual(self_: State&) -> bool {
     if self_.input_image_equal.present { return self_.input_image_equal.value; }
-    self_.stats.input_image_checks++; assert(self_.old);
+    self_.stats.input_image_checks++;let old:const blot_reuse_artifact_capture::Capture& =requiredOld(self_.old);
     for &current, index in self_.gate.units {
-        if !blot_reuse_principal_input_image::moduleEqual(self_.old.metadata.pools.value.modules[index].module, current) { self_.input_image_equal = blot_support::some(false); return false; }
+        if !blot_reuse_principal_input_image::moduleEqual(old.metadata.pools.value.modules[index].module, current) { self_.input_image_equal = blot_support::some(false); return false; }
     }
     self_.input_image_equal = blot_support::some(true); return true;
 }

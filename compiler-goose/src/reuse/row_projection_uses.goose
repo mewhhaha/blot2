@@ -155,7 +155,7 @@ recursive fn visit(proof: Proof&, id: blot_check_core::Id, depth: i64) -> bool {
         reference => { return !isRow(proof, id); },
         project => {
             if proof.numeric != null {
-                if numericOffset(proof.source, id, proof.binding, proof.layouts, proof.numeric).present { return true; }
+                let numeric .= proof.numeric; if numericOffset(proof.source, id, proof.binding, proof.layouts, numeric).present { return true; }
                 return visit(proof, node.a, depth + 1);
             }
             if isRow(proof, node.a) { return fieldOffset(proof.source, node.b, proof.layouts, proof.row).present; }

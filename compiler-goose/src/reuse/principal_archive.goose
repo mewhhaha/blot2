@@ -34,9 +34,9 @@ struct Snapshot {modules:const Digest[:],namespace_:Digest,queries:Section,evide
 fn wireKey(compiler:Digest)->blot_reuse_dependency_format::Key {return blot_reuse_dependency_format::Key{compiler,blot_reuse_dependency_format::digest("blot-principal-archive-v9:transitive-checked-requirement-source-module-call-summary-proofs"),[0;32],[0;32]};}
 fn encode(compiler:Digest,context:const blot_reuse_code_artifacts::Context&)->u8[:],Error {return encodeWithDigests(compiler,context,blot_support::none<const Digest[:]>());}
 fn encodeWithDigests(compiler:Digest,context:const blot_reuse_code_artifacts::Context&,digests:blot_support::Option<const Digest[:]>)->u8[:],Error {
- if !context.pools.present {return default<u8[:]>(),blot_error::Error.invalid_artifact;}let pools=context.pools.value;if !pools.identity.present {return default<u8[:]>(),blot_error::Error.invalid_artifact;}let names=pools.identity.value.view();var modules:Digest[>..<]=[];
+ if !context.pools.present {return default<u8[:]>(),blot_error::Error.invalid_artifact;}let pools=context.pools.value;if !pools.identity.present {return default<u8[:]>(),blot_error::Error.invalid_artifact;}let names=pools.identity.value.view();var modules:Digest[>..]=[];
  if digests.present {if digests.value.len!=pools.modules.len {return default<u8[:]>(),blot_error::Error.invalid_artifact;}modules.append(digests.value);}else {for pin in pools.modules {var stamp=pin.stamp;if !stamp.present {stamp=blot_support::some(blot_reuse_code_artifacts::stamp(pin.module));}modules.push(stamp.value);}}
- var records:Record[>..<]=[];for proof in context.principal_queries.records {if proof.value.selected.len!=0 {continue;}if proof.dependencies.inputs.present {records.push(Record{RecordKey{proof.key.target,proof.key.options},proof.dependencies.inputs.value,RecordResult{proof.value.types,proof.value.rows}});}}
+ var records:Record[>..]=[];for proof in context.principal_queries.records {if proof.value.selected.len!=0 {continue;}if proof.dependencies.inputs.present {records.push(Record{RecordKey{proof.key.target,proof.key.options},proof.dependencies.inputs.value,RecordResult{proof.value.types,proof.value.rows}});}}
  return blot_reuse_dependency_format::encode(wireKey(compiler),Snapshot{modules[..],blot_reuse_code_artifacts::stamp(names),Section{blot_reuse_portable_query::header(claim),records[..]},pools.evaluator.evidence});
 }
 struct Archive {snapshot:Snapshot=default<Snapshot>(),owner:blot_reuse_dependency_format::Owner=blot_reuse_dependency_format::Owner{}}
@@ -90,7 +90,7 @@ struct Reader {
  archive:blot_support::Option<Archive> =blot_support::none<Archive>(),units:const Core[:]=default<const Core[:]>(),names:blot_support::Option<blot_backend_runtime_identity::View> =blot_support::none<blot_backend_runtime_identity::View>(),image_matches:blot_support::Option<bool> =blot_support::none<bool>(),last_inputs:blot_support::Option<Inputs> =blot_support::none<Inputs>(),
  query_table:PortableQueries=PortableQueries{adapter:PortableAdapter{}},query_indexed:bool=false,indexed_owner:blot_reuse_dependency_format::Owner=blot_reuse_dependency_format::Owner{},stats:Stats=Stats{},
 }
-fn initReader(archive:const Archive&,units:const Core[:],names:blot_support::Option<blot_backend_runtime_identity::View>)->Reader {return Reader{archive:blot_support::some(archive),units:units,names:names};}
+fn initReader(archive:const Archive&,units:const Core[:],names:blot_support::Option<blot_backend_runtime_identity::View>)->Reader {return Reader{archive:blot_support::some<Archive>(archive),units:units,names:names};}
 fn clearInputs(self_:Reader&) {if self_.last_inputs.present {self_.last_inputs.value.deinit();}self_.last_inputs=blot_support::none<Inputs>();}
 fn deinit(self_:Reader&) {self_.clearInputs();self_.query_table.deinit();self_=Reader{};}
 fn matchesImage(self_:Reader&)->bool {
@@ -108,7 +108,7 @@ fn ensureQueries(self_:Reader&)->Error {
  {if !published {table.deinit();}} }
 fn storage(self_:const Reader&)->blot_reuse_semantic_query_table::Storage {var result=self_.query_table.storage();result.inspected_positions=self_.stats.inspected_positions;return result;}
 fn lookup(self_:Reader&,session:blot_eval_core_eval::Session&,target:BindingRef,options:blot_eval_core_eval::Options)->blot_support::Option<blot_eval_core_eval::SolvedEvidence>,Error {
- self_.clearInputs();self_.stats.requests++;if !(session.units .== self_.units) || !self_.matchesImage() {return blot_support::none<blot_eval_core_eval::SolvedEvidence>(),blot_error::Error.none;}
+ self_.clearInputs();self_.stats.requests++;if !(blot_support::same_slice_identity(session.units,self_.units)) || !self_.matchesImage() {return blot_support::none<blot_eval_core_eval::SolvedEvidence>(),blot_error::Error.none;}
  let error=self_.ensureQueries();if error!=blot_error::Error.none {return blot_support::none<blot_eval_core_eval::SolvedEvidence>(),error;}assert(self_.archive.present);if self_.indexed_owner!=self_.archive.value.owner {return blot_support::none<blot_eval_core_eval::SolvedEvidence>(),blot_error::Error.none;}
  var candidates=self_.query_table.candidates(blot_reuse_principal_query::fingerprint(target),blot_reuse_semantic_query_table::Order.oldest_first);
  loop {
@@ -179,4 +179,9 @@ recursive fn row(self_:Import&,id:u32,depth:i64)->u32,Error {
 fn selectedImportChildren(self_:const Import&,node:blot_eval_type_evidence::Node)->const u32[:],Error {
  if node.tag==blot_eval_type_evidence::Tag.nominal {if !validTypeNominal(self_.units,blot_check_types::NominalIdentity{node.a,node.b}) || node.c>=self_.source.extra.len {return default<const u32[:]>(),blot_error::Error.invalid_evidence;}return span(self_.source.extra,node.c+1,self_.source.extra[node.c]);}
  if node.c!=0 {return default<const u32[:]>(),blot_error::Error.invalid_evidence;}var width:i64=1;if node.tag==blot_eval_type_evidence::Tag.record {width=2;}if node.b as u64>0x7fffffffffffffff/(width as u64) {return default<const u32[:]>(),blot_error::Error.invalid_evidence;}return span(self_.source.extra,node.a,node.b as i64*width);
+}
+
+fn canonicalRecords(self_:PortableAdapter,source:const PortableRecord[:])->PortableRecord[:] {return query_records.realloc_slice(source,source.len);}
+fn canonicalRecord(self_:PortableAdapter,source:PortableRecord)->PortableRecord {
+ return PortableRecord{source.key,blot_reuse_principal_inputs::canonicalOwned(source.dependencies),source.value};
 }

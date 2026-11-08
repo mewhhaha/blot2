@@ -90,6 +90,22 @@ fn copyOwned(source: const Summary[:]) -> Summary[:] {
 fn releaseOwned(source: const Summary[:]) {
     if source.len == 0 { return; } owned_summaries.free_slice(source);
 }
+// These receipts validate existing owned runs without moving or copying them.
+fn canonicalOwned(source: Key) -> Key {
+    return Key {
+        empty_call_inputs: source.empty_call_inputs, source_complete: source.source_complete,
+        sources: owned_binding.realloc_slice(source.sources, source.sources.len),
+        interfaces: owned_binding.realloc_slice(source.interfaces, source.interfaces.len),
+        source_units: owned_units.realloc_slice(source.source_units, source.source_units.len),
+        scalar_reads: owned_scalar.realloc_slice(source.scalar_reads, source.scalar_reads.len),
+        plain_reads: owned_plain_reads.realloc_slice(source.plain_reads, source.plain_reads.len),
+        plain_publications: owned_plain_publications.realloc_slice(source.plain_publications, source.plain_publications.len),
+        call_publications: owned_call_publications.realloc_slice(source.call_publications, source.call_publications.len),
+        call_reads: owned_call_reads.realloc_slice(source.call_reads, source.call_reads.len),
+        summary_reads: owned_summaries.realloc_slice(source.summary_reads, source.summary_reads.len),
+        summary_publications: owned_summaries.realloc_slice(source.summary_publications, source.summary_publications.len),
+    };
+}
 fn clone(self_: Key) -> Key, Error {
     var result = self_;
     result.sources = copyOwned(self_.sources);
@@ -117,7 +133,7 @@ fn deinit(self_: Key&) {
     releaseOwned(self_.summary_publications); self_.summary_publications = default<Summary[:]>();
 }
 fn proofKey(target: BindingRef, evidence: u32) -> blot_eval_core_eval::CallProofKey {
-    return blot_eval_core_eval::CallProofKey { target: BindingRef { target.unit - 1, target.binding , ..}, evidence: evidence , ..};
+    return blot_eval_core_eval::CallProofKey { target: blot_eval_core_eval::Target { (target.unit - 1) as i64, target.binding , ..}, evidence: evidence , ..};
 }
 fn matches<S>(self_: Key, session: const S&) -> bool {
     if !self_.matchesBase(session) { return false; }
@@ -280,7 +296,7 @@ fn plainRead(self_: Recorder&, key: u64, actual: blot_support::Option<bool>) -> 
     self_.plain_seen.insert(key, PlainSeen { initial: actual , ..}); self_.plain_reads.push(PlainRead { key, actual , ..}); return blot_error::Error.none;
 }
 fn plainRead(self_: Recorder&, key: u64, actual: const bool?) -> Error {
-    { let optional_source_38 .= actual; if optional_source_38 { let value .= optional_source_38; return self_.plainRead(key, blot_support::some(value));  } } return self_.plainRead(key, blot_support::none<bool>());
+    { let optional_source_38 .= actual; if optional_source_38 { let value: bool = optional_source_38.value; return self_.plainRead(key, blot_support::some(value));  } } return self_.plainRead(key, blot_support::none<bool>());
 }
 fn plainPublish(self_: Recorder&, key: u64, value: bool) -> Error {
     if !self_.eligible { return blot_error::Error.none; }

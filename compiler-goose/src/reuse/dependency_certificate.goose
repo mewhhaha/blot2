@@ -40,8 +40,7 @@ fn releasePath(bytes: const u8[:]) { if bytes.len != 0 { paths.free_slice(bytes)
 fn deinit(self_: ModuleImage&) { releasePath(self_.path); self_.graph.deinit(); self_.path = default<const u8[:]>(); }
 fn deinit(self_: Dependencies&) {
     self_.namespace_.deinit(); let count = self_.modules.len; if count == 0 { return; }
-    let first: const ModuleImage& = self_.modules[0]; let at = module_images.index_of(first); assert(at >= 0);
-    for &module in self_.modules { module.deinit(); } module_images.free_slice(module_images[at..at + count]); self_.modules = default<ModuleImage[:]>();
+    for &module in self_.modules { module.deinit(); } module_images.free_slice(self_.modules); self_.modules = default<ModuleImage[:]>();
 }
 fn deinit(self_: Certificate&) { self_.record.key.deinit(); self_.record.dependencies.deinit(); }
 fn capture(context: Context, pins: const Pin[:], names: View) -> blot_support::Option<Certificate>, Error { return captureWithBudget(context, pins, names, owned_bytes); }

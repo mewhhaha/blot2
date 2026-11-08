@@ -15,7 +15,7 @@ fn clone(witness: Witness, owner: u8[>..<]&) -> Witness {
     var result = witness;
     if witness.operation_name.present {
         let start = owner.len; owner.append(witness.operation_name.value);
-        result.operation_name = blot_support::some(owner[start..owner.len]);
+        let copied: const u8[:] = owner[start..owner.len]; result.operation_name = blot_support::some(copied);
     }
     return result;
 }

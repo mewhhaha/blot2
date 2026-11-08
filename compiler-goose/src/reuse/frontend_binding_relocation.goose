@@ -171,7 +171,7 @@ fn checkGraphs(left:const Interface&,right:const Interface&,targets:Targets,map:
  let progress=targets.progress;if progress {progress.graph=graph.diagnostic;progress.graph.remaining=graph.remaining;}graph.deinit();
  if error!=blot_error::Error.none {blot_support_pooled_buffer::deinit(checker.qualifications,qualification_runs);return error;}
  map.qualifications=owned_qualifications.alloc_slice(checker.qualifications.items.len);for value,index in checker.qualifications.items {map.qualifications[index]=value;}blot_support_pooled_buffer::deinit(checker.qualifications,qualification_runs);
- sort(map.qualifications) {left,right=>return qualificationLess(left,right);}
+ sort(map.qualifications) {left,right=>qualificationLess(left,right)}
  stage(targets,Stage.checked);return blot_error::Error.none;
 }
 fn check(self_:Checker&)->Error {

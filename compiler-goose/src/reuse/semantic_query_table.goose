@@ -177,7 +177,7 @@ fn prepare<K,D,V,A>(self_: Table<K,D,V,A>&, candidate: const Candidate<K,D,V,A>&
     if capacity != self_.backing.len {
         let out, error = self_.adapter.allocateRecords(capacity);
         if error != blot_error::Error.none { return blot_support::none<Prepared>(), error; }
-        for record, index in self_.records { out[index] = record; }
+        for record, index in self_.adapter.canonicalRecords(self_.backing)[..self_.records.len] { out[index] = record; }
         self_.adapter.releaseRecords(self_.backing); self_.backing = out;
         self_.records = out[..self_.index.count];
     }
@@ -194,7 +194,7 @@ fn validPrepared<K,D,V,A>(self_: const Table<K,D,V,A>&, prepared: Prepared, cand
 }
 fn publish<K,D,V,A>(self_: Table<K,D,V,A>&, prepared: Prepared, candidate: Candidate<K,D,V,A>&) -> Handle<A> {
     assert(self_.validPrepared(prepared, candidate)); assert(self_.records.len == self_.index.count);
-    self_.backing[self_.records.len] = candidate.record.value; candidate.record.present = false;
+    self_.backing[self_.records.len] = self_.adapter.canonicalRecord(candidate.record.value); candidate.record.present = false;
     self_.records = self_.backing[..self_.records.len + 1]; self_.index.publish(prepared.fingerprint);
     self_.owned_bytes += prepared.bytes;
     return Handle<A> { prepared.position as u32, self_.owner , ..};

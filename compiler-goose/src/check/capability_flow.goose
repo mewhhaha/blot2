@@ -359,7 +359,7 @@ recursive fn coreInvocation(module: const Module&, id: u32, bindings: const Core
 }
 fn unaryCore(module: const Module&, body: blot_check_core::Body, contract: Contract) -> bool { return unaryCoreWithOwners(module, body, contract, []); }
 fn equal(module: const Module&, left: u32, right: u32) -> bool { let result, error = blot_check_rank_equal::equal(module.types, left, right, true); return error == blot_error::Error.none && result; }
-fn unaryCoreWithOwners(module: const Module&, body: blot_check_core::Body, contract: Contract, owners: const ModuleRef[:]) -> bool {
+recursive fn unaryCoreWithOwners(module: const Module&, body: blot_check_core::Body, contract: Contract, owners: const ModuleRef[:]) -> bool {
     if contract == Contract.input_shape { if body.binding >= module.bindings.len { return false; } return blot_check_capability_contract_core::inputBodyWithOwners(module, body, module.bindings[body.binding].capability_parameters, owners); }
     if contract != Contract.identity && contract != Contract.member_unit { return false; }
     if !body.is_function || body.parameters.len != 1 || body.parameters.start >= module.parameters.len || body.root == 0 || body.root >= module.nodes.len || body.scheme.root >= module.types.nodes.len { return false; }

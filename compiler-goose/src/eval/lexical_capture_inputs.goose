@@ -141,3 +141,9 @@ fn intern<S>(self_:Cache&,session:S&,value:u32,selected:const Interfaces&)->u32,
 fn reset(self_:Cache&) {assert(valid(self_));self_.inputs.clear();self_.keys.clear();self_.owner_id=blot_native::fresh_owner_id();self_.requests=0;self_.reused=0;self_.retained_words=0;self_.examined_words=0;self_.interface_visits=0;}
 
 fn selectedCaptureBindings<M>(module:const M&,identity:u32,anonymous:bool)->const u32[:] {if anonymous {let captures=module.closures[identity].captures;return module.extra[captures.start..captures.start+captures.len];}return default<const u32[:]>();}
+
+fn canonicalOwned(source:Inputs)->Inputs {
+ return Inputs{source.unit,source.identity,source.anonymous,source.applied,source.source_type,source.existing,source.parameters,
+  mapping_pool.realloc_slice(source.mappings,source.mappings.len),row_pool.realloc_slice(source.rows,source.rows.len),
+  slot_pool.realloc_slice(source.slots,source.slots.len),word_pool.realloc_slice(source.words,source.words.len),value_pool.realloc_slice(source.values,source.values.len)};
+}

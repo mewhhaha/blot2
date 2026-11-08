@@ -475,7 +475,7 @@ fn matchDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: Id,depth: 
  let pair=(pattern as u64)<<32|actual; if work.use_memo&&work.memo.contains(pair) { return true; } let n=source.node(pattern); let tag=n.tag;
  if tag==blot_check_types::Tag.projection {
   if !work.resolver.enabled { return false; } let normalized,err=projectSelected(self_,source,pattern,mappingItems(work.mappings),mappingItems(work.rows),work.resolver);
-  if err==blot_error::Error.unresolved_type { return false; } if err!=blot_error::Error.none { return matchFail(work,err); } if normalized!=actual { return false; } if work.use_memo { work.memo.insert(pair,true); } return true;
+  if err==blot_error::Error.unresolved_type { return false; } if err!=blot_error::Error.none { return matchFail(work,err); } if normalized!=actual { return false; } if work.use_memo { blot_eval_type_evidence::insert(work.memo,pair,true); } return true;
  }
  let concrete=node(self_,actual);
  if tag==blot_check_types::Tag.existential||(tag==blot_check_types::Tag.forall&&concrete.tag==Tag.forall) {
@@ -520,7 +520,7 @@ fn matchDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: Id,depth: 
   var fields=WordBuffer {};  fields.append(children(self_,actual)); if fields.len!=(n.b as i64)*2 { let __cleanup_result_26_0: bool = false; fields.deinit(); return __cleanup_result_26_0; }
   for index in 0..n.b { let field=source.recordField(n,index); var found=false; var i=0; while i<fields.len { if fields.items[i]==field.name { if !matchDepth(work,field.ty,fields.items[i+1],depth+1,budget) { let __cleanup_result_27_0: bool = false; fields.deinit(); return __cleanup_result_27_0; } found=true; break; } i+=2; } if !found { let __cleanup_result_28_0: bool = false; fields.deinit(); return __cleanup_result_28_0; } }
   fields.deinit(); }
- if work.use_memo { work.memo.insert(pair,true); } return true;
+ if work.use_memo { blot_eval_type_evidence::insert(work.memo,pair,true); } return true;
 }
 fn matchRowDepth<S,R,M,B>(work: MatchWork<S,R,M,B>&,pattern: u32,actual: u32,depth: i64,budget: i64&) -> bool {
  if work.failure!=blot_error::Error.none { return false; } let self_=work.destination; let source=work.source; let tail=source.row(pattern).tail; var closed=false;

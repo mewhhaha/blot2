@@ -70,3 +70,14 @@ fn replay<S>(session: S&,entry: const Entry&,input: const Inputs&) -> u32,bool,E
  let selected=mapped(anchors,proof,before,proof.selected); session.storage.specialized_closures.insert(blot_eval_core_eval::ViewKey {value:input.values[0],evidence:proof.expected,entry_interface:entry.key.mode==Mode.entry},selected); if entry.key.mode==Mode.selected { session.storage.specialized_closures.insert(blot_eval_core_eval::ViewKey {value:selected,evidence:proof.expected},selected); }
  for old in entry.value.fixed { let current=mapped(anchors,proof,before,old); session.storage.specialized_closures.insert(blot_eval_core_eval::ViewKey {value:current,evidence:session.valueEvidence(current)},current); } if next.present { session.retained.specialization_receipts.push(next.value); next=blot_support::none<Proof>(); } for read in proof.call_reads { if read.present { session.proofs.proof_reused++; } } let __cleanup_result_497_0: u32 = selected; let __cleanup_result_497_1: bool = true; let __cleanup_result_497_2: Error = blot_error::Error.none; { if next.present { next.value.deinit(); } } return __cleanup_result_497_0, __cleanup_result_497_1, __cleanup_result_497_2;
  { if next.present { next.value.deinit(); } } }
+
+fn canonicalRecords(self_:Adapter,source:const Entry[:])->Entry[:] {return record_pool.realloc_slice(source,source.len);}
+fn canonicalRecord(self_:Adapter,source:Entry)->Entry {
+ return Entry{Key{source.key.mode,blot_eval_lexical_capture_inputs::canonicalOwned(source.key.input),source.key.fingerprint_,source.key.expected,source.key.options,source.key.depth},
+  blot_reuse_specialization_receipt::canonicalOwned(source.dependencies),Replay{source.value.selected,
+  values_pool.realloc_slice(source.value.values,source.value.values.len),
+  words_pool.realloc_slice(source.value.evidence,source.value.evidence.len),
+  words_pool.realloc_slice(source.value.records,source.value.records.len),
+  words_pool.realloc_slice(source.value.children,source.value.children.len),
+  words_pool.realloc_slice(source.value.fixed,source.value.fixed.len)}};
+}

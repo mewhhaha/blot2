@@ -126,6 +126,36 @@ fn deinit(self_: Record&) {
     releaseOwned(self_.call_publications); releaseOwned(self_.views); releaseOwned(self_.plain_facts);
     self_ = default<Record>();
 }
+fn canonicalOwned(source: Member) -> Member {
+    return Member {
+        ready: owned_ready.realloc_slice(source.ready, source.ready.len),
+        principals: owned_principals.realloc_slice(source.principals, source.principals.len),
+        principal_graphs: source.principal_graphs, target: source.target, function: source.function,
+        query_budgets: source.query_budgets, principal_nodes: source.principal_nodes, principal_edges: source.principal_edges,
+        summary_work: source.summary_work, transitions: source.transitions, exhausted: source.exhausted,
+    };
+}
+fn canonicalMember(source: blot_support::Option<Member>) -> blot_support::Option<Member> {
+    if source.present { return blot_support::some(canonicalOwned(source.value)); }
+    return blot_support::none<Member>();
+}
+// Rebuild borrowed headers from their owning pools; every run keeps its size.
+fn canonicalOwned(source: Record) -> Record {
+    return Record {
+        member: canonicalMember(source.member),
+        completed_closures: owned_closures.realloc_slice(source.completed_closures, source.completed_closures.len),
+        input: source.input, expected: source.expected, selected: source.selected, options: source.options,
+        depth: source.depth, values_before: source.values_before, children_before: source.children_before,
+        values_added: source.values_added, children_added: source.children_added, steps: source.steps,
+        collected: source.collected, source_scopes: source.source_scopes, solver_nodes: source.solver_nodes,
+        complete: source.complete, sources: owned_sources.realloc_slice(source.sources, source.sources.len),
+        scalar_reads: owned_scalars.realloc_slice(source.scalar_reads, source.scalar_reads.len),
+        call_reads: owned_calls.realloc_slice(source.call_reads, source.call_reads.len),
+        call_publications: owned_calls.realloc_slice(source.call_publications, source.call_publications.len),
+        views: owned_views.realloc_slice(source.views, source.views.len),
+        plain_facts: owned_plains.realloc_slice(source.plain_facts, source.plain_facts.len),
+    };
+}
 fn clone(self_: Record) -> Record, Error {
     var result = self_;
     if self_.member.present {
