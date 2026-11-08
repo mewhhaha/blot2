@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen382 is the current source checkpoint. Selected private checker
+Frozen384 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -90,12 +90,16 @@ pool-slot/live-lease graph getter after successful reserve. All five producers
 supply live table-owned graphs; sticky/failure/length order is unchanged.
 Frozen382 replaces RetainOpen's whole callback copyback with its only changed
 accepted Boolean at the same point, including matching-error results. Its100.869s
-run clears that boundary and reaches withSchemeCopy's generic whole context
-copyback. Concrete SchemeSeed/schemeSeed and SchemeRequirement/schemeRequirement
-reviews support borrowing their fresh caller-local contexts directly, preserving
-partial error outputs and the separate frame copyback. That change is next.
-No whole compiler C, header or executable has been emitted; source acceptance
-is not runtime qualification.
+run clears that boundary and reaches withSchemeCopy's generic whole-carrier
+stores. Frozen383 borrows C directly but still fails the actual recursive
+boundary. Frozen384 also borrows SchemeFrame and removes its whole copyback.
+Exact two-callback/three-call-site reviews preserve partial error outputs; F
+runs before any frame-state saves, and later map saves/deinit have no frame
+observer or callback. Physical OOM timing remains unqualified. Its108.620s actual
+run clears withSchemeCopy and reaches a borrowed constructor in schemeImport.
+The exact constructor family and removal of the unused Invocation.region
+reference are next. No whole compiler C, header or executable has been emitted;
+source acceptance is not runtime qualification.
 
 A single 15-second post-error collection experiment returns only one diagnostic
 after110.572s. It is rejected; subsequent attempts restore three seconds within
