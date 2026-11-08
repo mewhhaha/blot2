@@ -72,8 +72,9 @@ The global-filter checker improves frozen220 first-error medians99.138 ->42.461s
 Both reviews,14 AST laws,256 ordered comparisons,201 frontend and eight runtime
 parity controls pass. These are not completed compiler timings. The
 [accepted receipt](../../benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json)
-pins the candidate and incremental source patch; folding the verified delta into
-the tracked builder recipe remains active. Installed Goose and Zig are unchanged.
+pins the candidate and incremental source patch. The tracked builder recipe now
+reconstructs all108 candidate source files byte-for-byte with zero fuzz or offset;
+no rebuild was needed to verify adoption. Installed Goose and Zig are unchanged.
 
 
 Generic implementation admission selects first matching contracts by scalar

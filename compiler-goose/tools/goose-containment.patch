@@ -145,6 +145,15 @@
 @@ -104,0 +105,2 @@
 +    StableCanContainGraph stablecontainment;
 +    StableReachesGraph stablereaches;
+@@ -110,0 +113,6 @@
++    // Only stable type exclusions, never roots or live reference provenance.
++    // Globals and their definitions are fixed after parsing. Initializers must
++    // finish before an entry can omit a non-reference global permanently.
++    bool globalinitializersdone = false;
++    using GlobalRootFilter = vector<pair<VarDecl *, VarDef *>>;
++    flat_map<TypeExpr *, GlobalRootFilter> globalrootfilters;
+@@ -2974,0 +2983 @@
++        globalinitializersdone = true;
 --- a/src/typecheck_types.h
 +++ b/src/typecheck_types.h
 @@ -1110,2 +1110,12 @@
@@ -178,3 +187,37 @@
 +    auto result = walk();
 +    reachesthrough[key] = result;
 +    return result;
+@@ -1290,5 +1310,28 @@
+-    for (auto g : ast.globals)
+-        for (auto gd : g->defs) {
+-            consider(gd, 0);
+-            unchecked = unchecked || (!gd->type && !(g->type && IsRefOrSlice(g->type)));
+-        }
++    auto global = [&](VarDecl *g, VarDef *gd) {
++        consider(gd, 0);
++        unchecked = unchecked || (!gd->type && !(g->type && IsRefOrSlice(g->type)));
++    };
++    if (globalinitializersdone && !typesbuilding && stablecontainment.Identity(of)) {
++        auto filter = globalrootfilters.find(of);
++        if (!filter) {
++            GlobalRootFilter pending;
++            for (auto g : ast.globals)
++                for (auto gd : g->defs) {
++                    // An excluded global contributes nothing: globals are not
++                    // parameters, and this branch has no reference provenance.
++                    // Keep all unfinished/failed/view globals in the live scan.
++                    if (gd->type && !IsRefOrSlice(gd->type) &&
++                        !failedglobals.count(gd) && stablecontainment.Ready(gd->type) &&
++                        !CanContain(gd->type, of)) continue;
++                    pending.push_back({ g, gd });
++                }
++            // Publish only after the complete filter was built. Remaining
++            // entries keep AST order; each is reconsidered with its live state.
++            filter = &globalrootfilters[of];
++            *filter = std::move(pending);
++        }
++        for (auto [g, gd] : *filter) global(g, gd);
++    } else {
++        for (auto g : ast.globals)
++            for (auto gd : g->defs) global(g, gd);
++    }
