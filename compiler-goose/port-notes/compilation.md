@@ -51,10 +51,17 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 295 inputs. Whole parsing passes
-440 files. Its completed run stops after 101.654s with 1 captured children
-return lifetime error in code_expectation. C emission, linking, CLI and Wasm
-remain pending. The 3s first-error window is partial, retaining 120/300s caps.
+per stage. This checkpoint preserves exact frozen 298 inputs. Whole parsing passes
+440 files. Its completed run hits the 120s program-emission cap after 120.329s total,
+with no source diagnostic captured and no C/header/executable. This is incomplete
+checking, not a pass or proof that a previous method completed. The final child
+slice helper accepts only original extra plus scalar tag/a/b/c parameters. Its
+match body preserves all six original expressions and u32 arithmetic. Five
+compact controls preserve branches, addresses, bounds and escape checks; the old
+compact method also passes, leaving actual 295 as the original failure witness.
+Dispatch-only 297 failed and was removed; 296 was cancelled after a focused alias
+error. Caps remain 120/300s while a separate complete adapter namespace-dispatch
+prototype is reviewed. The 3s first-error window remains partial.
 The independently reviewed 35 recursion annotations use three concrete callback
 bindings; a broader merged-callback graph was rejected. Six scheme constructor
 factories pass ten controls on official/8335 and five on currently selected869.

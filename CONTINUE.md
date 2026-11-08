@@ -27,7 +27,7 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen 295
+including its source delta and byte-exact tracked recipe reconstruction. Frozen 298
 replaces the type-argument stack's five stored reusable pools with two ordinary
 invocation-local owners. Owner-bound cached metadata ranges remove its snapshot
 buffer and environment map; the global owner-ID mint order remains. The exact
@@ -38,9 +38,15 @@ runtime pages/freelists/headers; no whole-compiler memory or speed gain is claim
 An existing active-Frame getter recovers the exact Generator owner, clearing the
 old importer retention error; 16 focused authority controls pass. 56 mutable empty
 record fields use their declared typed defaults. Whole parsing passes 440 files.
-The completed run stops after 101.654s with 1 captured code_expectation children
-lifetime error. C emission, linking and execution remain pending. The 3s first-error
-window is partial; stage/overall caps remain 120/300s. Focused controls retain exact
+The completed run hits the 120s emission cap after 120.329s total with no captured
+source diagnostic and no compiler C/header/executable. This is incomplete
+checking, not a pass or proof the former boundary completed. childrenFields now
+accepts only the original extra slice and scalar Node fields, preserving its
+six slice expressions and u32 arithmetic. Five compact controls pass; the old
+compact method also passes, so actual 295 remains its original failure witness.
+The dispatch-only 297 experiment failed and was removed; 296 was cancelled after a
+focused alias error. Whole-build caps stay 120/300s while a separate adapter
+namespace-dispatch prototype is reviewed. Focused controls retain exact
 source/carrier limits. Private checker bounds stay 1M clone / 100k tail with 201 frontend /
 8 runtime controls. Failing prefixes are not completed compiler timings.
 The prior nominal-identity/reachability
