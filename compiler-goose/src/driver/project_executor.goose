@@ -88,7 +88,7 @@ fn getProject(reader:Reader&,source:Project&)->Error {
  return validateCompiled(source);
 }
 fn validateCompiled(source:const Project&)->Error {
- var refs:blot_check_frozen_core_validation::ModuleRef[>..<]=[];for &module in source.compiled_modules {refs.push(blot_check_frozen_core_validation::ModuleRef{module.core});}
+ var refs:blot_check_frozen_core_validation::ModuleRef[>..]=[];for &module in source.compiled_modules {refs.push(blot_check_frozen_core_validation::ModuleRef{module.core});}
  let context=blot_check_frozen_core_validation::Context{units:refs[..],symbol_count:blot_support::some(source.symbols.entries.len+1),source_length:blot_support::none<u32>(),forbidden_owner:blot_support::none<u32>()};var spawn=false;for module in source.compiled_modules {spawn=spawn||blot_check_frozen_core_validation::moduleHasSpawnContracts(module.core);}let batch=blot_check_frozen_core_validation::Batch{context,spawn};var remaining:i64=0x7fffffffffffffff;
  for module in source.compiled_modules {let error=batch.validateWithBudget(module.core,blot_support::none<u32>(),remaining);if error!=blot_error::Error.none {return error;}let error=blot_reuse_dependency_interface_validation::validate(module.interface,source.symbols.entries.len+1,source.units.len);if error!=blot_error::Error.none {return error;}let error=blot_reuse_dependency_interface_validation::validateGraph(module.interface);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
 }

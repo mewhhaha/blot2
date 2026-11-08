@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen367 is the current source checkpoint. Selected private checker
+Frozen368 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -162,7 +162,12 @@ slice captured in validation Context. Frozen367 uses the existing grow-only
 pattern: append before borrowing an explicit slice for synchronous validation.
 Six reduced controls pass on both checkers, including old-pattern rejection and
 local lifetime escape rejection. Its93.248s run clears that boundary and reaches
-direct RecorderInterfacesBuffer indexing; the existing items view is next.
+direct RecorderInterfacesBuffer indexing. Frozen368 uses its live items view and
+changes five audited append-only ModuleRef temporaries to grow-only, with three
+explicit slice arguments. They remain local and synchronous; no shrink, escape
+or post-borrow mutation is introduced. Exact source inverses pass. Its93.316s
+run reaches a target parameter shadowing the lookup function; qualifying that
+call and checking lexical siblings are next.
 No whole compiler C, header or executable has been emitted.
 The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its

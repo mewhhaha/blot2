@@ -361,8 +361,8 @@ fn validateValue(module: const Module&, units: const ModuleRef[:], remaining: i6
 }
 // Contiguous immutable module catalogs use the same admission algorithm.
 // These lexical references cannot escape into the returned ID-only plan.
-fn analyze(module: const Module&, units: const Module[:], limits: Options) -> Plan,Error { var owners: ModuleRef[>..<]=[]; for &unit in units { owners.push(ModuleRef {unit, ..}); } return analyze(module,owners,limits); }
-fn analyzePrepared(module: const Module&, units: const Module[:], body: const blot_check_core::Body&, selected: const Selected[:], limits: Options) -> Plan,Error { var owners: ModuleRef[>..<]=[]; for &unit in units { owners.push(ModuleRef {unit, ..}); } return analyzePrepared(module,owners,body,selected,limits); }
+fn analyze(module: const Module&, units: const Module[:], limits: Options) -> Plan,Error { var owners: ModuleRef[>..]=[]; for &unit in units { owners.push(ModuleRef {unit, ..}); } return analyze(module,owners[..],limits); }
+fn analyzePrepared(module: const Module&, units: const Module[:], body: const blot_check_core::Body&, selected: const Selected[:], limits: Options) -> Plan,Error { var owners: ModuleRef[>..]=[]; for &unit in units { owners.push(ModuleRef {unit, ..}); } return analyzePrepared(module,owners[..],body,selected,limits); }
 
 fn loopFrame(source:u32,previous:Loop?)->Loop {return Loop{source:source,previous:previous,..};}
 fn scopedChecker(parent:const Checker&,environment:Entries&,returns:Returns&,facts:Facts&,loop_:Loop?)->Checker {return Checker{selected:parent.selected,module:parent.module,units:parent.units,values:parent.values,environment:environment,returns:returns,plan:parent.plan,facts:facts,conditions:parent.conditions,degraded:parent.degraded,event:parent.event,loop_:loop_,..};}
