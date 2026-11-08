@@ -3,6 +3,7 @@ import backend.collection_ops;
 
 import check.core;
 import check.types;
+import support.option;
 
 type Id=u32;
 type Module=blot_check_core::Module;
@@ -49,8 +50,8 @@ recursive fn check(self_: Plan&,m: const Module&,id: Id) -> bool {
  if n.tag==blot_check_core::Tag.bind { if alias(self_,n.a) { return edit(self_,m,n.b); } return independent(self_,m,n.b); }
  if n.tag==blot_check_core::Tag.loop_ { let loop_=m.loopInfo(id); return independent(self_,m,loop_.first)&&independent(self_,m,loop_.end)&&check(self_,m,loop_.body); } return false;
 }
-fn analyze(m: const Module&,id: Id) -> Plan,bool {
+fn analyze(m: const Module&,id: Id) -> blot_support::Option<Plan> {
  var plan=default<Plan>(); var found=false;
- for carry in m.loopCarries(id) { let ty=m.types.node(m.binding(carry.incoming).ty); if ty.tag==blot_check_types::Tag.array||ty.tag==blot_check_types::Tag.list { plan=Plan {incoming:carry.incoming,outgoing:carry.outgoing}; found=true; break; } }
- if !found||!addAlias(plan,plan.incoming)||!collect(plan,m,id)||!check(plan,m,id)||plan.edit_count==0 { return plan,false; } return plan,true;
+ for carry in m.loopCarries(id) { let ty=m.types.node(m.binding(carry.incoming).ty); if ty.tag==blot_check_types::Tag.array||ty.tag==blot_check_types::Tag.list { plan=Plan {incoming:carry.incoming,outgoing:carry.outgoing,..}; found=true; break; } }
+ if !found||!addAlias(plan,plan.incoming)||!collect(plan,m,id)||!check(plan,m,id)||plan.edit_count==0 { return blot_support::none<Plan>(); } return blot_support::some(plan);
 }

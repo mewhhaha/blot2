@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen363 is the current source checkpoint. Selected private checker
+Frozen365 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -148,8 +148,15 @@ two consumers read Frame.owner_id. Frozen363 retains only that existing scalar;
 both guards and the full Frame passed to execution are unchanged. Exact source
 review confirms six substitutions with no allocation, copy or mint. Its92.917s
 run clears that boundary and reaches a missing fixed-capacity Plan.aliases
-initializer in indexed building. No whole compiler C, header or executable has
-been emitted.
+initializer in indexed building. Frozen364 initializes aliases and the edit
+capacity; active prefix/count semantics stay unchanged and zero-init cost is
+unmeasured. Frozen365 restores native optional-plan results and removes the
+unused stored IndexedRegion Frame payload. Its existing ID guards the sole edit
+call, which receives the current Frame directly. Exact source review preserves
+accepted-path staged/providers/header aliases and cleanup; nested call Frames
+have distinct IDs. Its92.873s run reaches a constant-recorder restore after a
+recursive call. That store family is next. No whole compiler C, header or
+executable has been emitted.
 The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo
