@@ -27,18 +27,20 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen236
-checkpoints fixed encoder scratch, scalar record-name ranges and checker carriers.
-Eight focused encoder/layout suites pass both checkers; 54 mutation controls
-reject. The completed whole run stops after 86.52s with 2 diagnostics in 2 files:
-a grow-shrink mapping carrier reaches projection, and parameter annotation lacks
-recursive declarations. C emission, linking and execution remain pending. Each
-component receipt qualifies its exact sources and disclosed reduced leaves.
-Archive decoding adds a temporary input snapshot; candidate publication reuses
-owned output buffers/snapshots, and default timing labels need no allocation.
-The opt-in private checker uses a 1M cumulative clone bound with a separate100k
-tail traversal; 201 frontend and 8 runtime controls match the preceding checker.
-These failing-prefix durations are not completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen239
+checkpoints312 missing recursive annotations in329 proven Engine cycle members,
+plus pooled legacy-method mappings and matching-cycle construction boundaries.
+Independent direct-call audits agree; aliases/other receivers were excluded.
+Actual matching/projection controls pass both checkers with exact fuel and cleanup;
+controlled selection leaves remain explicit. The completed whole run stops after
+86.66s with2 diagnostics in2 files: a closed-import recursive cycle and native
+scalar append. C emission, linking and execution remain pending. Component
+receipts qualify exact sources, not the complete compiler. Archive decoding adds
+a temporary input snapshot; candidate publication reuses owned output buffers and
+snapshots, and default timing labels need no allocation. The private checker uses
+a1M cumulative clone bound with a separate100k tail traversal;201 frontend and8
+runtime controls match the preceding checker. Failing-prefix durations are not
+completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

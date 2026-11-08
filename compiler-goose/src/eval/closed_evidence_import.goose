@@ -90,7 +90,7 @@ fn deinit(self_: Goals&) { blot_support_pooled_buffer::deinit(self_,goal_runs); 
 fn deinit(self_: Fields&) { blot_support_pooled_buffer::deinit(self_,field_runs); }
 struct PooledImporter { owner_id: u64=blot_native::fresh_owner_id(),source: blot_eval_type_evidence::View=blot_eval_type_evidence::View {nodes:[],extra:[],effects:blot_check_effect_evidence::View {}},destination: blot_check_types::Store=blot_check_types::Store {},types: WordMap=WordMap {},rows: WordMap=WordMap {},binders: Words=Words {},frames: Frame[128]=[Frame {0,0};128],scope_count: i64=0 }
 fn initPooled(source: blot_eval_type_evidence::View,destination: blot_check_types::Store&) -> PooledImporter { return PooledImporter {source:source,destination:destination}; }
-fn deinit(self_: PooledImporter&) { self_.types.deinit(); self_.rows.deinit(); self_.binders.deinit(); self_.destination=Store {}; self_.scope_count=0; self_.owner_id=0; }
+fn deinit(self_: PooledImporter&) { self_.types.deinit(); self_.rows.deinit(); self_.binders.deinit(); self_.destination=blot_check_types::Store {}; self_.scope_count=0; self_.owner_id=0; }
 fn deinit(self_: Importer&) { self_.types.clear(); self_.rows.clear(); self_.binders.clear(); self_.scope_count=0; self_.owner_id=0; }
 fn target(self_: Importer&) -> blot_check_types::Store { return self_.destination; }
 fn target(self_: PooledImporter&) -> blot_check_types::Store { if self_.destination.owner_id==0 { abort("inactive closed evidence importer"); } return self_.destination; }

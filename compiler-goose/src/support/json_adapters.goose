@@ -3450,6 +3450,7 @@ fn write<JsonWriter>(writer:JsonWriter&,value:blot_eval_implementation_evidence:
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_eval_implementation_evidence::ProofKind)->blot_error::Error {return enumValue(writer,value);}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_eval_pool_leases::Field)->blot_error::Error {return enumValue(writer,value);}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_eval_purity_type_key::Kind)->blot_error::Error {return enumValue(writer,value);}
+fn write<JsonWriter>(writer:JsonWriter&,value:blot_eval_selected_implementation_admission::LegacyMatch)->blot_error::Error {return unionValue(writer,value);}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_eval_specialization::FailureCode)->blot_error::Error {return enumValue(writer,value);}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_eval_specialization::MappingSink)->blot_error::Error {return unionValue(writer,value);}
 fn write<JsonWriter>(writer:JsonWriter&,value:blot_eval_specialization::RowSink)->blot_error::Error {return unionValue(writer,value);}
