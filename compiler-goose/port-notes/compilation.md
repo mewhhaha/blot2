@@ -1,5 +1,12 @@
 # Compilation repair frontier
 
+Current workflow: repair whole source families, then use
+`python3 compiler-goose/tools/check_engines.py` for partial production-path
+checks in parallel. The current 51-loop/API/ownership batch and remaining
+frontiers are recorded in `CONTINUE.md` and the compact batched-validation
+receipt. Full compilation and end-to-end parity remain pending. Astra is
+reserved for specific snags; Terra is not used.
+
 The user requested fixing and recompiling the Goose port. Verification is
 active. There is no working whole Goose compiler executable yet: whole parsing
 passes, but type/lifetime checking still stops before program C emission.
@@ -39,7 +46,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen412 is the current source checkpoint. The selected private checker is
+Checkpoint412 is superseded by the batched source work in CONTINUE.md. The selected private checker is
 `0c235f038e1b40a7ff59abd140b666abef2b6b33d98b18753b33172f6dcef653`.
 It retains 57bb's exported-root scheduling, raw-store identity skip and
 visited-type buckets, adding live historical event indexing. Candidate queries

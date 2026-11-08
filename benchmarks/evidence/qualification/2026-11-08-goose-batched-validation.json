@@ -1,0 +1,164 @@
+{
+  "status": "source-only checkpoint; no whole Goose compiler C/header/executable",
+  "workflow": "large API/ownership repair families; partial concrete production entry paths; no per-fix review or fixture generation",
+  "runs": [
+    {
+      "batch": "selected-batch-1",
+      "result": {
+        "partial": true,
+        "roots": [
+          "runtime",
+          "semantic",
+          "check",
+          "lower",
+          "independent"
+        ],
+        "exit": 1,
+        "seconds": 105.803,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2132,
+            "message": "error: cannot call caseRowPatterns: it may shrink self_ while patterns is still used, and patterns may refer into self_ (\u00a75.2)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/core_builder.goose",
+            "line": 623,
+            "message": "error: storing a reference that may point into saved_fields, which holds a grow-shrink array: such a reference lives in a variable, is passed down or returned, and is never stored (\u00a75.2)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/independent_worker.goose",
+            "line": 35,
+            "message": "error: storing a reference rooted at state, which does not outlive the destination (\u00a79.2)"
+          }
+        ],
+        "partial_marker": true
+      }
+    },
+    {
+      "batch": "selected-batch-2",
+      "result": {
+        "partial": true,
+        "engines": [
+          "runtime",
+          "semantic",
+          "check",
+          "lower",
+          "independent"
+        ],
+        "exit": 1,
+        "seconds": 108.158,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2562,
+            "message": "error: expected a value of type blot_support::Option<blot_check_types::NominalIdentity>, got blot_check_types::NominalIdentity"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/core_builder.goose",
+            "line": 244,
+            "message": "error: no matching overload for call to deinit"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-3",
+      "result": {
+        "partial": true,
+        "seconds": 81.95,
+        "results": [
+          {
+            "partial": true,
+            "engines": [
+              "runtime"
+            ],
+            "exit": 0,
+            "seconds": 2.003,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "semantic"
+            ],
+            "exit": 0,
+            "seconds": 81.9,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "check"
+            ],
+            "exit": 1,
+            "seconds": 40.149,
+            "stop": "completed",
+            "errors": [
+              {
+                "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+                "line": 2601,
+                "message": "error: expected a value of type blot_check_check::Entry, got blot_check_check::Entry[:]"
+              }
+            ],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "lower"
+            ],
+            "exit": 1,
+            "seconds": 2.704,
+            "stop": "completed",
+            "errors": [
+              {
+                "file": "/home/jacobt/src/blot2/compiler-goose/src/check/core_builder.goose",
+                "line": 460,
+                "message": "error: no matching overload for call to projectedTypeList"
+              }
+            ],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "independent"
+            ],
+            "exit": 1,
+            "seconds": 36.946,
+            "stop": "completed",
+            "errors": [
+              {
+                "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose",
+                "line": 3346,
+                "message": "error: storing a reference rooted at solved, which does not outlive the destination (\u00a79.2)"
+              }
+            ],
+            "full_qualification": false
+          }
+        ]
+      }
+    }
+  ],
+  "source_files": [
+    "compiler-goose/README.md",
+    "compiler-goose/build/source-identity.json",
+    "compiler-goose/src/check/check.goose",
+    "compiler-goose/src/check/core.goose",
+    "compiler-goose/src/check/core_builder.goose",
+    "compiler-goose/src/eval/core_eval.goose",
+    "compiler-goose/src/reuse/independent_worker.goose",
+    "compiler-goose/src/source_identity.goose",
+    "compiler-goose/tools/build_goose_checker.py"
+  ],
+  "next": "convert append-only lowering Tables as one grow-only family; rerun affected roots, then full build after partial frontiers clear",
+  "oracle": "native Zig compiler unchanged; ABI8/session2 preserved"
+}

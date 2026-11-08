@@ -138,6 +138,9 @@ def build(args):
         "-I" + str(native / "generated"), "-isystem", str(native / "tcc/api"),
     ]
     identity = fingerprints(goose_build, patch, cxx, flags)
+    diagnostic_patch = Path(__file__).with_name("goose-diagnostic-roots.patch")
+    if args.diagnostic_roots:
+        identity["diagnostic_roots_patch_sha256"] = digest(diagnostic_patch)
     key = json_digest(identity)
     cache.mkdir(parents=True, exist_ok=True)
     # Serialize publishers; a failed or interrupted build never replaces a binary.
@@ -162,6 +165,14 @@ def build(args):
             for name, expected in PATCHED_HEADERS.items():
                 if digest(work / "source" / name) != expected:
                     raise RuntimeError(f"patched header differs from candidate: {name}")
+            if args.diagnostic_roots:
+                stages.append(run_stage("diagnostic-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "-p1",
+                    "-d", str(work / "source"), "-i", str(diagnostic_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(
+                    work / "source", "45d68110e8c2c8466aa88ab81c39656ce9141786a868d43e2e257363d616b4eb"
+                )
             stages.append(run_stage("compile", [
                 str(cxx), *flags, "-c", str(work / "source/src/main.cpp"),
                 "-o", str(work / "main.cpp.o"),
@@ -171,7 +182,10 @@ def build(args):
                 *[str(native / name) for name in LINK_INPUTS],
                 "-ldl", "-lm", "-o", str(work / "goose"),
             ], work, 15))
-            if fingerprints(goose_build, patch, cxx, flags) != identity:
+            final_identity = fingerprints(goose_build, patch, cxx, flags)
+            if args.diagnostic_roots:
+                final_identity["diagnostic_roots_patch_sha256"] = digest(diagnostic_patch)
+            if final_identity != identity:
                 raise RuntimeError("build inputs changed during compilation; refusing publication")
             receipt = {
                 "identity": identity, "binary_sha256": digest(work / "goose"),
@@ -198,6 +212,10 @@ def main():
     parser.add_argument(
         "--expansion-node-limit", type=int, choices=(100000, 1000000), default=100000,
         help="bounded cumulative const-for expansion nodes; default retains upstream100000",
+    )
+    parser.add_argument(
+        "--diagnostic-roots", action="store_true",
+        help="build a partial selected-root diagnostic tool; normal compiler is unchanged",
     )
     args = parser.parse_args()
     try:

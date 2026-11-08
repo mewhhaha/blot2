@@ -5,7 +5,6 @@ import backend.opaque_storage;
 import check.capability_contracts;
 import check.capability_flow;
 import check.check_packet_owner;
-import check.core_builder;
 import check.effects;
 import check.numeric_proof_headers;
 import check.quantifier_goals;
@@ -1027,8 +1026,6 @@ fn deinit(self_: Module&) {
     self_.owner_id = 0; self_.types.owner_id = 0;
 }
 
-fn lower(tree, names, checked, tables) -> Module, blot_error::Error { return blot_check_core_builder::lower(tree, names, checked, tables); }
-fn lowerWithOrigins(tree, names, checked, diagnostic_origins, tables) -> Module, blot_error::Error { return blot_check_core_builder::lowerWithOrigins(tree, names, checked, diagnostic_origins, tables); }
 
 fn blot_structural::equal(left: blot_check_core::Tag, right: blot_check_core::Tag) -> bool { return left == right; }
 fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::Tag,sink: S&) { blot_structural::hash(sink, blot_check_core::tagCode(value) as! u8); }

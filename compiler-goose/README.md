@@ -58,6 +58,12 @@ the separate tail-shape traversal bound stays 100,000. Its measured
 improvement is for an older failing prefix, not completed compiler builds; see
 the compilation frontier for exact evidence and limits.
 
+Batch production diagnostics with `python3 compiler-goose/tools/check_engines.py`.
+It checks five real entry paths in parallel (`--jobs N` controls concurrency),
+collecting independent frontiers in one pass. `--engines check lower` selects a
+subset. The diagnostic tool is built automatically when absent; its explicit
+partial mode emits no compiler and never replaces the normal full build gate.
+
 Run the checked engine laws with
 `python3 compiler-goose/tools/test_engines.py`. They compile live coalescing, interning, scalar owner-frame and parser sources
 to C and execute them using cached runtime/platform objects.

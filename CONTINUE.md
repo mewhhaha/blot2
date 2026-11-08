@@ -2,109 +2,39 @@
 
 ## Current frontier
 
-The active experiment ports the compiler to idiomatic Goose in
-[`compiler-goose/`](compiler-goose/README.md). The user requests fixing and
-recompiling the written port.
-Whole-program parsing passes; type/lifetime repairs and full compilation are
-still pending. Source-only checkpoints are unverified;
-follow `compiler-goose/source-correspondence.json` and its port notes for exact
-writing status and runtime gaps. Keep `compiler/` and the default toolchain
-unchanged as the oracle. The remote tag `goose-port-oracle-156f84b` pins source
-`156f84b4810f630dff7e5efb7014b2194e3160f7`; its saved compiler is
-`build/goose-port/oracle/bin/blotc` with the release SHA256 below. Use bounded
-upstream Goose acceptance checks and differential comparisons. The
-[compilation frontier](compiler-goose/port-notes/compilation.md) records the
-current repair loop. The whole port establishes no compiler performance or parity
-result. Parser checkpoint `21df1327` is pushed: its import closure falls from
-436 to 14 files, and 63 controls match oracle counts and complete diagnostics;
-tracked AST/fixity/recovery/depth laws pass. Four isolated engine suites pass.
-The current package repairs keep recursive state scalar, construct borrowed
-views through explicit boundaries, and share nested admission using local
-workspace copies. Whole-program C emission and linking are still pending.
-The selected private checker filters impossible stable global candidates while
-retaining live reference/local provenance checks. Two frozen220 pairs measure
-99.138 ->42.461s to the identical source diagnostic (57.17% reduction), with
-sampled process memory essentially unchanged. These are failing-prefix gains,
-not completed compiler timings. The new candidate is pinned in the
-[global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Private
-checker678b88 retains the ce317 unused-overload-text optimization and checks
-exported roots first, retaining final export validation and every fixup. Its
-201frontend/8runtime/27focused controls pass; one error order changes while the
-complete multiset remains equal. The preceding
-global-bound correctness fix preserves all provenance alternatives and exactness;
-10 positive cases execute and 26 strict negatives reject. The formatting candidate
-matches 201 frontend cases, 8 executed runtimes, 20 focused cases and 15 emitted-C
-comparisons. Same-CPU synthetic overload checks improve 24–32% at 512–2048 heads;
-direct-call controls stay within 2%. This is not whole-port performance evidence.
-The tracked recipe reconstructs all 108 checker source files byte-exactly with no
-fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
+The Zig-to-Goose experiment in `compiler-goose/` is still source-only: no
+whole compiler C/header/executable or end-to-end parity result exists. Keep
+`compiler/`, the pinned Zig oracle and existing siblings unchanged.
 
-Frozen412 is the current source checkpoint.
-Selected private checker 0c235f03 adds live raw-event indexing to 57bb3e81.
-Its historical postings are filtered by current keys/normalization and sorted
-to preserve the original log order. It retains the earlier optimizations: a call-local raw-store identity skip
-and visited-type buckets keyed only by kind/nominal declaration. Relevant
-store mappings and possible-match type comparisons retain their original
-order. It passes 201 frontend / 8 runtime / 7 focused / 12 emitted-C controls and eight extra store controls;
-8,192 raw-loop comparisons (also ASan/UBSan) and 300 visited-type laws pass. The
-tracked recipe reconstructs all 108 source files byte-exactly. Installed tools,
-the Zig oracle and siblings remain unchanged.
+Work in large source batches. The current batch repairs 51 immutable AST loops,
+API/domain mismatches, signed metrics, five lowering Scratch containers and
+owned proof/evidence publication. Runtime and semantic production entry paths
+pass their partial checks. Checker/lower/independent paths are being repaired;
+latest lowering frontier is `quoteCaptures` retaining grow-shrink Tables views.
+All 59 Tables fields are append-only and should become grow-only together.
 
-Instrumented 400 finds 814.7 million raw-store examinations and 12.78 billion TypeEq
-entries by 114.914s while body checks continue progressing. Inner held/slot
-fixedpoint work is small. Telemetry time is no speed result. The selected
-optimizations restore diagnostic progress within the unchanged 120s cap; no
-completed compiler speed or parity result exists. Allocation-only prototypes
-398/399 remain unselected after capped whole attempts. Exact measurements,
-controls and rejected experiments remain in the linked global-filter receipt.
+Use `python3 compiler-goose/tools/check_engines.py` for five concrete production
+paths in parallel (`--engines check lower independent` narrows a batch).
+This is explicitly partial, emits no compiler and never replaces a full build.
+Use actual declarations and the Zig oracle, repair whole families, validate once
+per batch, then run the full build when these frontiers clear. Avoid per-edit
+synthetic fixtures/review/receipts. Use Astra only for a specific snag; never Terra.
 
-Recent source fixes reload immutable pattern children as scalar IDs and narrow
-the borrowed Engine before cleanup. 405 makes two fresh packet decode temporaries
-mutable before readonly use; 36 extracted decoder laws pass on both checkers.
-406 adds the generated Range codec and sends BodyOffers as symbol/presence/cache
-payload, reconstructing child ownership. Both checkers pass 20 offer laws and
-stale rejection; 750 ordinal comparisons agree. Normal generation reproduces
-all 440 source hashes. Its 102.180s run reaches initEngine retaining a
-source-rooted Project in the global engine pool. Trace actual Project ownership
-and borrowed compiled payload before repair; packet laws are not whole transport
-qualification. No compiler C/header/executable,
-executed-Wasm comparison or Gdev result exists for the port. Do not repeat capped
-inputs unchanged or increase the 120/300s stage/overall caps; first-error grace 3s.
+The normal private checker is `0c235f03...`: exported roots first, nominal
+identity/reference reachability, lazy overload diagnostics, visited-type buckets,
+raw identity skipping and historical live-event indexing. Its tracked recipe
+reconstructs 108 source files. Preserve current-key/order/classread checks;
+index membership is no lifetime authority. Dense all-relevant synthetic replay
+costs 2.15x; no completed compiler performance gain is claimed. The subsequent
+reference-prefix experiment remains unselected (one confounded failing-prefix
+pair: 108.859 to 104.512s). Installed Goose remains unchanged.
 
-Current representation repairs use the existing Session→Generator Frame token
-with live generation, current-frame and exact registered Session/Generator/
-Workspace identity checks. Retained import caches borrow source Views only per
-invocation. Readonly Plan headers travel explicitly; unused retained evaluator
-Frames are reduced to their existing identity scalar. Layout import ends before
-recursive proof evaluation. Named-pool receipts reconstruct already-live owned
-runs; range checks or owner IDs alone never establish liveness. Callback restores
-and cleanup retain their reviewed order. The collector's one new argument-ID
-copy and fixed scratch initialization costs remain unmeasured.
-
-Whole parsing passes 440 files, but no compiler C/header/executable, executed-Wasm
-comparison or Gdev result exists. These are failing-prefix measurements, not
-completed compilation timings or parity. Bounded attempts keep 120/300-second
-stage/overall caps and a three-second first-error window. One 15-second window
-returned only one error after110.572s and was rejected. Optional-global indexing
-showed no gain beyond controls; the array-cache gate regressed its stresses;
-both remain unselected. Exact repairs, rejected experiments and carrier limits
-remain in the linked qualification evidence and the
-[pinned repair history](https://github.com/mewhhaha/blot2/blob/a20bb37f4b1014bea338335e3802ebaaaad434af/CONTINUE.md).
-
-Shared-kernel runtime, Gdev Wasm size and short iterations remain priorities.
-Sub-five-second Main, subsecond compilation and 1–2MB Wasm remain unmet.
-Reachable throughput targets are 50k source lines in 0.5s, then one million
-lines/second.
-
-The
-[array engines checkpoint](benchmarks/goose/results/2026-11-04-array-engines.md)
-improves unchanged merge/custom hash/Sieve another **1.19/7.00/1.16x** across
-five release-Wasm pairs. Creation-proven descriptors retain private validation
-receipts; exact independent U32 lanes use scalar registers or SIMD; Sieve's
-strided count/index scan uses a branchless loop. Guards retain the original
-checked fallbacks and trap prefixes. All seven Goose pairs and both README
-charts are freshly measured.
+Current batch evidence is
+[batched validation](benchmarks/evidence/qualification/2026-11-08-goose-batched-validation.json).
+Prior repairs, qualified controls and rejected experiments remain in
+[the pinned handoff](https://github.com/mewhhaha/blot2/blob/22003c1b937c63e8dfdea723c6807e834060b1f7/CONTINUE.md)
+and its linked receipts. Whole stage/overall caps remain 120/300s. Full builds
+stop 3s after the first error; partial batches collect independent diagnostics.
 
 Main shrinks **10,038,987 → 9,203,613B** (8.3%). Three fresh paired compilations
 measure **5.768 → 5.523s**; paired deltas are **-1277ms, +38ms, +94ms**. There
