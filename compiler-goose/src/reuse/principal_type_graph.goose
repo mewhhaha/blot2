@@ -406,7 +406,7 @@ recursive fn copyChildren(self_:Copier&,node:blot_check_types::Node,depth:i64)->
     copied.deinit();
     return cleanup_result_1_0,cleanup_result_1_1;
 }
-fn withCopy<C,F>(source:Source,destination:Store&,max_depth:i64,max_nodes:i64,remaining:i64&,observed:i64&,context:C&)->Error {
+recursive fn withCopy<C,F>(source:Source,destination:Store&,max_depth:i64,max_nodes:i64,remaining:i64&,observed:i64&,context:C&)->Error {
  var copier,error=initPooled(source,destination,max_depth,max_nodes,false,remaining,observed);if error!=blot_error::Error.none {return error;}let result=F(context,copier);copier.deinit();return result;
 }
 fn withFrozenCopy<C,F>(source:Source,destination:Store&,max_depth:i64,max_nodes:i64,remaining:i64&,observed:i64&,context:C&)->Error {

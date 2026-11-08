@@ -27,14 +27,15 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen 287
+including its source delta and byte-exact tracked recipe reconstruction. Frozen 289
 repairs reference-bearing constructors in the callback cycle through pure helper
-functions. Independent source review recovers the exact original constructor
+functions. The next seven callback-cycle annotations and three constructors
+are repaired; read-only graph publication recovers the same registered, leased
+owner. Unsigned work-counter saturation matches Zig. Independent source review recovers the exact original constructor
 sites, field types and order. A side-effecting owner-ID default is explicit as
 the first argument, preserving its original position; executed controls reject
 the reordered alternative. Whole parsing passes 440 files. The completed run
-stops after 83.322s with 1 captured unsigned/signed saturating-add mismatch in
-importPrincipal. C emission, linking and execution remain pending. The 3s
+stops after 79.554s with 1 captured constraint publication lifetime error. C emission, linking and execution remain pending. The 3s
 first-error window is partial; stage/overall caps remain 120/300s. Earlier
 ClosureRegion ownership, exact mask recovery, backend nullable access, lexical
 dictionary dispatch and DFS cursor repairs remain. Focused controls retain their

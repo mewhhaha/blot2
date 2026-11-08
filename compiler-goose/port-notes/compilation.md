@@ -51,9 +51,9 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 287 inputs. Whole parsing passes
-440 files. Its completed run stops after 83.322s with 1 captured unsigned/signed
-saturating-add mismatch in importPrincipal. C emission, linking, CLI and Wasm
+per stage. This checkpoint preserves exact frozen 289 inputs. Whole parsing passes
+440 files. Its completed run stops after 79.554s with 1 captured constraint
+publication lifetime error. C emission, linking, CLI and Wasm
 remain pending. The 3s first-error window is partial, retaining 120/300s caps.
 The independently reviewed 35 recursion annotations use three concrete callback
 bindings; a broader merged-callback graph was rejected. Six scheme constructor
@@ -63,7 +63,15 @@ review reconstructs frozen 286 byte-for-byte after reversing only these changes,
 checks actual field types/order, and confirms one owner-ID mint as the first
 argument. Reduced executed default-order controls show original 12, naive 21 and
 corrected 12: leaving the side-effecting default inside a helper was rejected.
-Full recursive callback/Session/solver runtime parity remains pending.
+Seven further annotations follow the concrete importPrincipalRead/withCopy
+callback binding, and three pure factories preserve Store by value. Read-only
+graph worklist publication validates the same pool slot, pointer and live lease
+as the existing mutable getter. Seven focused controls cover its reduced
+carrier and unchanged pooled_buffer; the reduced all-global old variant also
+compiles, so actual288 remains the original failure witness. No stale-generation
+validation after slot reuse is claimed. The unsigned work-counter fix preserves
+Zig saturation with eight boundary controls. Full recursive callback/Session/solver
+runtime parity remains pending.
 Earlier ClosureRegion local ownership, exact mask recovery, backend nullable
 access, lexical dictionary dispatch and DFS cursor repairs remain. Focused
 controls retain their exact source/carrier limits. Diagnostic root probes with
