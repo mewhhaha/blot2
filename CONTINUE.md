@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-The checkpoint through frozen373 replaces Session's Generator backpointer with the existing scalar
+The checkpoint through frozen375 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -149,7 +149,12 @@ argument slice. Frozen373 copies those ordered child IDs into an invocation-owne
 named scratch run, preserving getter order and freeing it immediately after
 the call returns. Exact source review and two nested-copy controls pass. Its
 97.185s run clears the global alias boundary and reaches an empty UpdateStep
-placeholder initializer. Extra copy/allocation cost remains unmeasured.
+placeholder initializer. Frozen374–375 replace that unused initializer with a
+typed declaration and explicitly narrow the guarded normalization tape. Exact
+callback review preserves its live owner and cleanup. Its98.567s run reaches
+owned Constraint bulk-append provenance; the existing owned-transfer recipe is
+next. One bounded 15-second diagnostic collection window will test multi-root
+error batching, keeping the same 120/300-second stage/overall caps.
 No whole compiler success follows. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
