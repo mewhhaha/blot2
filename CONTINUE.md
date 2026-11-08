@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen402 is the current source checkpoint. RegionSnapshot is now only a
+Frozen404 is the current source checkpoint. RegionSnapshot is now only a
 lease/generation handle; its existing lease owns State and solver metadata.
 Restore creates one invocation-local payload view after solver restore succeeds.
 The rewrite removes400lines/15948bytes and reduces the static Session type proxy
@@ -255,3 +255,16 @@ preserving initial bounds/arity checks, child read and recursive call order.
 Exact source review passes. Its120.348s attempt caps with zero diagnostics and
 no C/header/executable; whole qualification remains pending. Do not repeat
 unchanged. Next is isolated ArrayElemsReached visited-type bucketing.
+
+Selected private checker57bb3e81 adds traversal-local visited-type buckets
+(kind/nominal declaration only) to4548. All201frontend/8runtime/7focused/12C
+and eight store controls pass;300extracted differential laws preserve order
+and effect/error traces. Same402 authored inputs reach a new Engine? deinit
+overload error in100.647s; no program C/header/executable. This restores
+diagnostic progress, not a completed compilation speed result. The tracked
+recipe reconstructs its108source files byte-exactly without another build.
+
+Frozen404 narrows the borrowed nullable Engine before deinit, retaining the
+same pointer and cleanup order. Source review and a focused executed control
+pass on official/private checkers. Its100.802s run reaches project_packet27
+read-only decoder-output reference assignment; no C/header/executable.

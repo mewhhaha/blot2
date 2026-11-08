@@ -375,3 +375,93 @@
      }
      // What a store into a slot put there, as seen from here. A slice loaded
      // through a reference to a slice whose elements hold no references is
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -1689,7 +1689,21 @@
+     bool HoldsByValue(TypeExpr *t, TypeExpr *of, vector<TypeExpr *> &open);
+     int ElemArrayPlaces(TypeExpr *t, TypeExpr *of);
+     bool OneArrayOf(VarDef *r, TypeExpr *elem);
+-    void ArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out, vector<TypeExpr *> &open);
++    // Traversal-local visited types, in the same order within each bucket.
++    // TypeEq rejects different kinds or nominal declarations before doing
++    // any recursive comparison or evaluating an array size. Everything else
++    // (qualifiers, arguments, array sizes and modes) still uses TypeEq.
++    struct ArrayReachVisited {
++        array<vector<TypeExpr *>, TY_VOID + 1> kinds;
++        unordered_map<const void *, vector<TypeExpr *>> nominals;
++
++        vector<TypeExpr *> &Bucket(TypeExpr *t) {
++            if (t->kind == TY_STRUCT) return nominals[t->struc->st];
++            if (t->kind == TY_ENUM) return nominals[t->enu->en];
++            return kinds[(size_t)t->kind];
++        }
++    };
++    void ArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out, ArrayReachVisited &open);
+     void AppendArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out);
+     bool RootedAtReceiver(const Val &rv, const Val &av, TypeExpr *elem);
+     void CheckRootedAtReceiver(Call *c, const char *op, const Val &rv, const Val &av, TypeExpr *elem,
+@@ -3223,7 +3237,8 @@
+                 ra.concrete = true;
+                 ra.writable = true;
+                 ra.pool = pool;
+-                vector<TypeExpr *> elems, open;
++                vector<TypeExpr *> elems;
++                ArrayReachVisited open;
+                 ArrayElemsReached(t, elems, open);
+                 for (auto e : elems)
+                     if (OneArrayOf(pool, e)) ra.onearray.push_back(e);
+@@ -3246,7 +3261,8 @@
+                     ra.reusable = RU_SLOTS | RU_SLICES;
+                 // Its class's storage is a value of the type it refers to.
+                 if (t->kind == TY_REF) {
+-                    vector<TypeExpr *> elems, open;
++                    vector<TypeExpr *> elems;
++                    ArrayReachVisited open;
+                     ArrayElemsReached(t, elems, open);
+                     for (auto e : elems)
+                         if (ElemArrayPlaces(LoadType(t->ref->sub), e) == 1) ra.onearray.push_back(e);
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1580,10 +1580,11 @@
+ // that type can reach an array of, where its class's storage may hold one
+ // (RootArg::onearray).
+ inline void TypeCheck::ArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out,
+-                                         vector<TypeExpr *> &open) {
+-    for (auto o : open)
++                                         ArrayReachVisited &open) {
++    auto &bucket = open.Bucket(t);
++    for (auto o : bucket)
+         if (TypeEq(o, t)) return;
+-    open.push_back(t);
++    bucket.push_back(t);
+     if (t->kind == TY_REF) {
+         ArrayElemsReached(LoadType(t->ref->sub), out, open);
+     } else if (t->kind == TY_SLICE) {
+@@ -1603,7 +1604,7 @@
+ // in first-appearance order; merging preserves the specialization key's order.
+ inline void TypeCheck::AppendArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out) {
+     if (typesbuilding || !stabletypes.Ready(t)) {
+-        vector<TypeExpr *> open;
++        ArrayReachVisited open;
+         ArrayElemsReached(t, out, open);
+         return;
+     }
+@@ -1616,14 +1617,16 @@
+     auto key = root->kind == TY_STRUCT ? (const void *)root->struc->inst : t;
+     auto it = arrayelements.find(key);
+     if (it == arrayelements.end()) {
+-        vector<TypeExpr *> elems, open;
++        vector<TypeExpr *> elems;
++        ArrayReachVisited open;
+         ArrayElemsReached(t, elems, open);
+         it = arrayelements.emplace(key, std::move(elems)).first;
+     }
+ #ifndef NDEBUG
+     // Assertion builds continuously compare cached answers with the original
+     // algorithm, including order and const/storage distinctions.
+-    vector<TypeExpr *> check, open;
++    vector<TypeExpr *> check;
++    ArrayReachVisited open;
+     ArrayElemsReached(t, check, open);
+     assert(TypeArgsEq(check, it->second));
+ #endif

@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen402 is the current source checkpoint. Previous private checker
+Frozen404 is the current source checkpoint. Previous private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -383,3 +383,16 @@ preserving initial bounds/arity checks, child read and recursive call order.
 Exact source review passes. Its120.348s attempt caps with zero diagnostics and
 no C/header/executable; whole qualification remains pending. Do not repeat
 unchanged. Next is isolated ArrayElemsReached visited-type bucketing.
+
+Selected private checker57bb3e81 adds traversal-local visited-type buckets
+(kind/nominal declaration only) to4548. All201frontend/8runtime/7focused/12C
+and eight store controls pass;300extracted differential laws preserve order
+and effect/error traces. Same402 authored inputs reach a new Engine? deinit
+overload error in100.647s; no program C/header/executable. This restores
+diagnostic progress, not a completed compilation speed result. The tracked
+recipe reconstructs its108source files byte-exactly without another build.
+
+Frozen404 narrows the borrowed nullable Engine before deinit, retaining the
+same pointer and cleanup order. Source review and a focused executed control
+pass on official/private checkers. Its100.802s run reaches project_packet27
+read-only decoder-output reference assignment; no C/header/executable.
