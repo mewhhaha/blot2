@@ -51,22 +51,24 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen 285 inputs. Whole parsing passes
-440 files. The completed run stops after 79.835s with 1 captured schemeImport
-recursive-constructor lifetime error; C emission, linking, CLI and Wasm remain
-pending. The 3s first-error window is a partial diagnostic list, retaining the
-120/300s stage/overall caps. 35 recursion annotations are justified by an
-independently reviewed graph with three concrete callback bindings; a broader
-merged-callback graph was rejected. Bodies are unchanged by those annotations.
-ClosureRegion is an invocation-local owner; 18 transitive carriers and old
-suspension cleanup establish its callback lifetime, and 6 reduced scoped controls
-reject escapes. Its 1270B payload is not measured net stack growth. Exact owned
-mask recovery preserves addresses, flags and cleanup without allocation/copy.
-Later nullable backend accesses, lexical dictionary dispatch and DFS value-cursor
-snapshots are repaired. DFS controls pass both recorded toolchains with 12 strict
-controls. Complementary Session probes remain diagnostic aids: their dummy
-constructors and timeout limits do not qualify full methods. Focused controls
-retain exact source/carrier limits and unbenchmarked zeroing/copy/high-water costs.
+per stage. This checkpoint preserves exact frozen 287 inputs. Whole parsing passes
+440 files. Its completed run stops after 83.322s with 1 captured unsigned/signed
+saturating-add mismatch in importPrincipal. C emission, linking, CLI and Wasm
+remain pending. The 3s first-error window is partial, retaining 120/300s caps.
+The independently reviewed 35 recursion annotations use three concrete callback
+bindings; a broader merged-callback graph was rejected. Six scheme constructor
+factories pass ten controls on official/8335 and five on currently selected869.
+A further 22 reference-bearing sites use 14 pure functions. Independent root
+review reconstructs frozen 286 byte-for-byte after reversing only these changes,
+checks actual field types/order, and confirms one owner-ID mint as the first
+argument. Reduced executed default-order controls show original 12, naive 21 and
+corrected 12: leaving the side-effecting default inside a helper was rejected.
+Full recursive callback/Session/solver runtime parity remains pending.
+Earlier ClosureRegion local ownership, exact mask recovery, backend nullable
+access, lexical dictionary dispatch and DFS cursor repairs remain. Focused
+controls retain their exact source/carrier limits. Diagnostic root probes with
+dummy constructors and timeout caps are not method qualification. Stack pool
+provider exploration is read-only; no production stack representation changes.
 Private checker bounds remain 1M/100k with 201 frontend/8 runtime controls.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
