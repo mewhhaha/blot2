@@ -74,12 +74,13 @@ fn ownPublication(value:blot_support::Option<blot_parse_syntax_diagnostics::Publ
 }
 fn ownDiagnostic(value:Diagnostic)->Diagnostic {return Diagnostic{unit:value.unit,span:value.span,code:value.code,target:value.target,cause:ownCause(value.cause),lex_code:value.lex_code,parse_code:value.parse_code,publication:ownPublication(value.publication),parse_detail:value.parse_detail,lexical_details:copyLexical(value.lexical_details)};}
 fn deinit(self_:Diagnostic&) {if self_.cause.present {releaseSource(self_.cause.value);}if self_.publication.present {releaseSource(self_.publication.value.code);releaseSource(self_.publication.value.message);}releaseLexical(self_.lexical_details);self_=default<Diagnostic>();}
+fn canonicalUnit(value:Unit)->Unit {return Unit{filename:value.filename,source:owned_source.realloc_slice(value.source,value.source.len),tree:blot_parse_ast::canonical(value.tree),imports:value.imports,implicit_prelude:value.implicit_prelude};}
 fn deinit(self_: Unit&) {self_.tree.deinit();releaseSource(self_.source);self_.source=default<const u8[:]>();}
 struct UnitBuffer {storage:Unit[:]=default<Unit[:]>(),items:Unit[:]=default<Unit[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var project_UnitBuffer_runs:Unit[>..]=[];
 var inactive_UnitBuffer:UnitBuffer=UnitBuffer {..};
 fn ensure(self_:UnitBuffer&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,project_UnitBuffer_runs);return self_.failure;}
-fn push(self_:UnitBuffer&,value:Unit)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::push(self_,value,project_UnitBuffer_runs);self_.len=self_.items.len;return self_.failure;}
+fn push(self_:UnitBuffer&,value:Unit)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::push(self_,canonicalUnit(value),project_UnitBuffer_runs);self_.len=self_.items.len;return self_.failure;}
 fn append(self_:UnitBuffer&,values:const Unit[:])->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::append(self_,values,project_UnitBuffer_runs);self_.len=self_.items.len;return self_.failure;}
 fn resize(self_:UnitBuffer&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
 fn clear(self_:UnitBuffer&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
@@ -283,7 +284,7 @@ fn read<P>(self_:Loader<P>&,path:const u8[:],origin:Origin)->blot_support::Optio
     }
     var id=(self_.project.units.len+1) as UnitId;if reserved.present {id=reserved.value;}
     var loaded=Unit {filename:filename,source:copySource(source),tree:tree,implicit_prelude:self_.prelude_ready, ..};
-    if reserved.present {self_.project.units.items[id-1]=loaded;}
+    if reserved.present {self_.project.units.items[id-1]=canonicalUnit(loaded);}
     else {let appended=self_.project.units.push(loaded);if appended!=blot_error::Error.none {loaded.deinit();return no,appended;}}
     let finished,failure=self_.finishRead(id,diagnostics,tokens);
     if failure!=blot_error::Error.none {return no,failure;}return blot_support::some(finished),blot_error::Error.none;
@@ -355,11 +356,11 @@ fn withLoader<P,F>(options:Options,inputs:P&,context:LoadContext&)->Error {
 }
 fn load(entrypath:const u8[:],options:Options)->Project,Error {
     var inputs=FileInputs {..};var context=LoadContext {entrypath:entrypath, ..};let error=withLoader(options,inputs,context,loadSource);
-    if error!=blot_error::Error.none {return Project {..},error;}return context.result.value,blot_error::Error.none;
+    if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
 }
 fn loadWithInputs<P>(entrypath:const u8[:],options:Options,inputs:P&)->Project,Error {
     var context=LoadContext {entrypath:entrypath,provided:true, ..};let error=withLoader(options,inputs,context,loadSource);
-    if error!=blot_error::Error.none {return Project {..},error;}return context.result.value,blot_error::Error.none;
+    if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
 }
 fn loadSource<P>(context:LoadContext&,loader:Loader<P>&)->Error {
     let valid,error=loader.validateAliases();if error!=blot_error::Error.none {return error;}if !valid {return blot_error::Error.none;}
@@ -412,25 +413,25 @@ fn freshOrder(source:const Project&)->u32[:],Error {
 }
 fn loadCompiled(entrypath:const u8[:],options:Options,dependency:blot_reuse_dependency_payload::Owned<blot_reuse_frozen_dependency::FrozenDependency>&)->Project,Error {
     var inputs=FileInputs {..};var context=LoadContext {entrypath:entrypath,dependency:dependency.value,mutable:dependency.value,mutable_owner:dependency.owner, ..};
-    let error=withLoader(options,inputs,context,loadCompiledMode);if error!=blot_error::Error.none {return Project {..},error;}return context.result.value,blot_error::Error.none;
+    let error=withLoader(options,inputs,context,loadCompiledMode);if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,dependency.value.modules,default<const bool[:]>()),blot_error::Error.none;
 }
 fn loadCompiledReadOnly<P>(entrypath:const u8[:],options:Options,dependency:const blot_reuse_frozen_dependency::FrozenDependency&,inputs:P&)->Project,Error {
     var context=LoadContext {entrypath:entrypath,dependency:dependency,provided:true, ..};let error=withLoader(options,inputs,context,loadCompiledMode);
-    if error!=blot_error::Error.none {return Project {..},error;}return context.result.value,blot_error::Error.none;
+    if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,dependency.modules,default<const bool[:]>()),blot_error::Error.none;
 }
 fn loadCompiledReadOnly(entrypath:const u8[:],options:Options,dependency:const blot_reuse_frozen_dependency::FrozenDependency&)->Project,Error {
     var inputs=FileInputs {..};var context=LoadContext {entrypath:entrypath,dependency:dependency, ..};let error=withLoader(options,inputs,context,loadCompiledMode);
-    if error!=blot_error::Error.none {return Project {..},error;}return context.result.value,blot_error::Error.none;
+    if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,dependency.modules,default<const bool[:]>()),blot_error::Error.none;
 }
 fn loadCompiledMixedReadOnly<P>(entrypath:const u8[:],options:Options,dependency:const blot_reuse_frozen_dependency::FrozenDependency&,inputs:P&,reuse:const bool[:])->Project,Error {
     let valid=validateReuseMask(dependency,reuse);if valid!=blot_error::Error.none {return Project {..},valid;}
     var context=LoadContext {entrypath:entrypath,dependency:dependency,reuse:blot_support::some(reuse),provided:true, ..};let error=withLoader(options,inputs,context,loadCompiledMode);
-    if error!=blot_error::Error.none {return Project {..},error;}return context.result.value,blot_error::Error.none;
+    if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,dependency.modules,reuse),blot_error::Error.none;
 }
 fn loadLibraryReadOnly<P>(entrypath:const u8[:],options:Options,library:const blot_reuse_frozen_dependency::FrozenDependency&,inputs:P&,reuse:const bool[:])->Project,Error {
     let valid=validateReuseMask(library,reuse);if valid!=blot_error::Error.none {return Project {..},valid;}
     var context=LoadContext {entrypath:entrypath,dependency:library,reuse:blot_support::some(reuse),library:true,provided:true, ..};let error=withLoader(options,inputs,context,loadCompiledMode);
-    if error!=blot_error::Error.none {return Project {..},error;}return context.result.value,blot_error::Error.none;
+    if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,library.modules,reuse),blot_error::Error.none;
 }
 
 fn loadCompiledMode<P>(context:LoadContext&,loader:Loader<P>&)->Error {

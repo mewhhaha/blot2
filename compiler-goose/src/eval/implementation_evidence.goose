@@ -208,7 +208,8 @@ fn rejectedPrerequisite<H>(w: Work<H>&,error: Error,identity: Identity,traced: i
  if error==blot_error::Error.associated_limit||error==blot_error::Error.evidence_limit||(w.store.failure.present&&w.store.failure.value==Code.associated_limit) { w.store.failure=blot_support::some(Code.associated_limit); w.store.trace.candidate(identity,blot_reuse_dispatch_explanation::Outcome.limit); w.store.trace.setOutcome(traced,traced>=0,blot_reuse_dispatch_explanation::Outcome.limit); return fail(w,blot_error::Error.associated_limit); }
  w.store.failure=blot_support::some(Code.incompatible_implementation); w.store.trace.candidate(identity,blot_reuse_dispatch_explanation::Outcome.requires_evidence); w.store.trace.setOutcome(traced,traced>=0,blot_eval_implementation_predicates::failureOutcome(kind)); return fail(w,blot_error::Error.incompatible_implementation);
 }
-recursive fn projection<H>(self_: Store,host: H&,context: u32,contract: Identity,member_name: u32,input: const u32[:]) -> u32,Error { var work=Work<H> {self_,host}; let result=projectionInner(work,context,contract,member_name,input); return result,work.error; }
+fn projectionWork<H>(store:Store,host:H&)->Work<H> {return Work<H>{store,host};}
+recursive fn projection<H>(self_: Store,host: H&,context: u32,contract: Identity,member_name: u32,input: const u32[:]) -> u32,Error { var work=projectionWork(self_,host); let result=projectionInner(work,context,contract,member_name,input); return result,work.error; }
 recursive fn projectionInner<H>(w: Work<H>&,context: u32,contract: Identity,member_name: u32,input: const u32[:]) -> u32 {
  if w.error!=blot_error::Error.none { return 0; } let self_=w.store; let host .= w.host; let point=mark(self_); var success=false;
  if self_.active.len==0&&self_.active_projections.len==0&&self_.active_facts.len==0 { self_.failure=blot_support::none<Code>(); self_.trace=blot_eval_implementation_trace::Record {context:context,contract:contract, ..}; }

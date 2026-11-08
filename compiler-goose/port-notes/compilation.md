@@ -51,14 +51,15 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen234 inputs. Its completed log
-captures21 diagnostics across13 files in87.14s, after233 captured30 across20.
-The candidate emission publication error is repaired with generation-checked
-output-owner references, exact owned array-cost receipts and one reserved label
-buffer; default timing labels need no allocation. Focused runtime transfer and
-negative lifetime controls pass; whole-program C emission, linking, CLI and Wasm
-qualification remain pending. Counts come only from completed logs. Both runs
-use a45-second diagnostic window; durations describe failing prefixes.
+per stage. This checkpoint preserves exact frozen235 inputs. The completed log
+captures9 diagnostics across6 files in88.25s, after234 captured21 across13.
+Owned Unit publication reattaches byte and AST headers through their existing
+owners; decoder storage now takes a temporary bytes.len snapshot after its
+original magic check/owner mark. Candidate publication retains exact owned buffers
+and snapshots while owning timing labels; default labels need no allocation.
+Focused runtime/negative controls pass, with reduced leaves documented. Whole
+C emission, linking, CLI and Wasm qualification remain pending. Counts come only
+from completed logs;45-second diagnostic windows describe failing prefixes.
 The opt-in1M cumulative clone-expansion checker passes201 frontend and8 runtime
 parity controls plus bounded expansion controls; its independent tail limit stays
 100k. The evidence pins all108 reconstructed checker source files.

@@ -27,9 +27,9 @@ fn word(encoder: Encoder&, value: u32) -> blot_error::Error {
 fn count(encoder: Encoder&, value: i64) -> blot_error::Error { if value > 4294967295 { return blot_error::Error.module_too_large; } return word(encoder, value as u32); }
 fn owner(encoder: Encoder&, unit: u32) -> blot_error::Error {
     if encoder.identity.present {
-        if unit == 0 || unit == 4294967295 { let error = raw(encoder, [0]); if error != blot_error::Error.none { return error; } return word(encoder, unit); }
+        if unit == 0 || unit == 4294967295 { let marker:u8[1]=[0];let error = raw(encoder, marker); if error != blot_error::Error.none { return error; } return word(encoder, unit); }
         let path = blot_backend_runtime_identity::owner(encoder.identity.value, unit); if !path.present { return blot_error::Error.invalid_operation; }
-        var error = raw(encoder, [1]); if error != blot_error::Error.none { return error; }
+        let marker:u8[1]=[1];var error = raw(encoder, marker); if error != blot_error::Error.none { return error; }
         error = count(encoder, path.value.len); if error != blot_error::Error.none { return error; } return raw(encoder, path.value);
     }
     return word(encoder, unit);
@@ -124,7 +124,7 @@ fn intern(store: Store&, view: blot_eval_type_evidence::View, label: blot_check_
     if store.finalized { return 0, blot_error::Error.invalid_operation; }
     var bytes: u8[>..<] = []; let encoder = Encoder { view: view, identity: store.identity, bytes: bytes , ..};
     var domain: u8 = 'S'; if store.identity.present { domain = 'P'; }
-    var error = raw(encoder, [1, domain]); if error != blot_error::Error.none { return 0, error; }
+    let prefix:u8[2]=[1,domain];var error = raw(encoder, prefix); if error != blot_error::Error.none { return 0, error; }
     error = operation(encoder, label, 0); if error != blot_error::Error.none { return 0, error; }
     let identity = view.effects.operation(label).identity; return internSymbol(store, bytes, identity.unit == 0 && identity.decl == 1);
 }

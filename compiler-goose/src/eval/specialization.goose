@@ -66,8 +66,8 @@ struct Service {
 fn unit(self_: Service&, id: u32) -> const blot_check_core::Module& { self_.units[id - 1] }
 fn decline(self_: Service&, id: u32, span: blot_check_core::Span, code: FailureCode) -> Error { self_.failure = blot_support::some(Failure { id, span, code , ..}); return blot_error::Error.declined; }
 fn evaluationFailure(self_: Service&) -> Error { decline(self_, 0, blot_check_core::Span { 0, 0 , ..}, FailureCode.evaluation) }
-fn toEvidence(self_: Service&, id: u32) -> u32, Error { self_.bridge.toEvidence(id) }
-fn fromEvidence(self_: Service&, id: u32) -> u32, Error { self_.bridge.fromEvidence(id) }
+fn toEvidence(self_: Service&, id: u32) -> u32, Error { return self_.bridge.toEvidence(id); }
+fn fromEvidence(self_: Service&, id: u32) -> u32, Error { return self_.bridge.fromEvidence(id); }
 fn rowToEvidence(self_: Service&, id: u32) -> u32, Error { return self_.bridge.rowToEvidence(id); }
 fn rowFromEvidence(self_: Service&, id: u32) -> u32, Error { return self_.bridge.rowFromEvidence(id); }
 fn representationError(self_: Service&, error: Error, unit_id: u32, span: blot_check_core::Span, code: FailureCode) -> Error {

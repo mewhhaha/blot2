@@ -199,7 +199,7 @@ fn compile(workspace:blot_backend_core_backend::CompileWorkspace&,source:const u
   if node.tag==blot_parse_ast::tag_value_decl || node.tag==blot_parse_ast::tag_data_decl || node.tag==blot_parse_ast::tag_effect_type_decl || node.tag==blot_parse_ast::tag_effect_decl {occupied.insert(node.a,true);}else if node.tag==blot_parse_ast::tag_implementation_decl {occupied.insert(tree.implementation(id).name,true);}
   if node.tag==blot_parse_ast::tag_data_decl {let count=tree.children(node.b).len;for index in count {let name=tree.node(tree.children(node.b)[index]).a;occupied.insert(name,true);}}
  }
- var imports:blot_check_check::ImportedBinding[>..<]=[];var catalogs:blot_check_check::ImportedCatalog[>..<]=[];var fixities:blot_check_check::ImportedFixity[>..<]=[];
+ var imports:blot_check_check::ImportedBinding[>..<]=[];var catalogs:blot_check_check::ImportedCatalog[>..<]=[];var fixities:blot_check_check::ImportedFixity[>..]=[];
  catalogs.push(blot_check_check::ImportedCatalog{frozen:dependency.interface,kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0});
  for exported in dependency.exports {
   if occupied.contains(exported.name) {continue;}
@@ -253,3 +253,6 @@ fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::Cont
 fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_dependency_consumer::HoleDetails)->bool {return true;}
 
 fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_dependency_consumer::ExplanationDetails)->bool {return true;}
+
+fn detailWrite(writer:Writer&,value:blot_reuse_purity_diagnostics::Witness)->Error {return detailRecord(writer,value);}
+fn detailWrite(writer:Writer&,value:blot_check_types::NominalIdentity)->Error {return detailRecord(writer,value);}

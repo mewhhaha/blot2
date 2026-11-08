@@ -91,7 +91,7 @@ recursive fn admitted<Units>(self_: Shapes<Units>&, id: u32, depth: i64) -> Erro
     let err = self_.step(depth); if err != blot_error::Error.none { return err; } let n = self_.store.node(id);
     match n.tag {
         unit, boolean, unsigned32, floating32, never => {},
-        existential => { let err = self_.store.view().body(n.a, self_.store.children(id), depth + 1, self_.remaining, null); if err != blot_error::Error.none { return failure(err); } },
+        existential => { let err = self_.store.view().body(n.a, self_.store.children(id), depth + 1, self_.remaining, default<bool[:]>()); if err != blot_error::Error.none { return failure(err); } },
         array, list => { let err = self_.admitted(n.a, depth + 1); if err != blot_error::Error.none { return err; } },
         function => { let err = self_.admitted(n.a, depth + 1); if err != blot_error::Error.none { return err; } let err = self_.admitted(n.b, depth + 1); if err != blot_error::Error.none { return err; } },
         product, record, nominal => { if n.tag == blot_eval_type_evidence::Tag.nominal && !blot_check_typed_staging::isIdentity(n.a, n.b) { let owner, err = self_.nominal(n.a, n.b, self_.store.children(id).len); if err != blot_error::Error.none { return err; } } for child, index in self_.store.children(id) { if n.tag == blot_eval_type_evidence::Tag.record && index % 2 == 0 { continue; } let err = self_.admitted(child, depth + 1); if err != blot_error::Error.none { return err; } } },

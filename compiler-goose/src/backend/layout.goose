@@ -15,6 +15,7 @@ import eval.type_evidence;
 import check.effect_evidence;
 import .opaque_storage;
 import reuse.code_expectation;
+import reuse.principal_interface;
 import support.error;
 import support.option;
 import support.wyhash;
@@ -353,21 +354,21 @@ recursive fn fromTypeNode(store: Store&, module: const blot_check_core::Module&,
         store.type_owners.push(ty); let result, error = fromTypeQuantified(store, module, n, mappings, rows, depth, allow_erased); store.type_owners.pop(); return result, error;
     }
     if n.tag == blot_check_types::Tag.projection {
-        let arguments = module.types.nominalArguments(n); var scope = store.type_owners.len;
+        let argument_count = module.types.nominalArguments(n).len; var scope = store.type_owners.len;
         while scope != 0 {
             scope--; let owner = store.type_owners[scope];
-            for goal, ordinal in module.types.quantifierGoals(owner) {
+            let goal_count=module.types.quantifierGoals(owner).len;for ordinal in 0..goal_count {let goal=module.types.quantifierGoals(owner)[ordinal];
                 if goal.kind != blot_check_types::ObligationKind.contract || goal.identity.unit != n.a || goal.identity.decl != n.b { continue; }
-                let tuple = module.types.node(goal.ty); if tuple.tag != blot_check_types::Tag.product || tuple.b != arguments.len { continue; }
+                let tuple = module.types.node(goal.ty); if tuple.tag != blot_check_types::Tag.product || tuple.b != argument_count { continue; }
                 var matches = true; let expected = module.types.list(blot_check_types::List { start: tuple.a, len: tuple.b , ..});
-                for value, index in expected { let same, error = blot_check_rank_equal::equal(module.types, value, arguments[index], true); if error != blot_error::Error.none { return 0, blot_error::Error.layout_limit; } if !same { matches = false; } }
+                for value, index in expected { let same, error = blot_check_rank_equal::equal(module.types, value, module.types.nominalArguments(n)[index], true); if error != blot_error::Error.none { return 0, blot_error::Error.layout_limit; } if !same { matches = false; } }
                 if !matches { continue; }
                 let member_name = module.types.projectionMember(n);
-                for contract in module.contracts {
+                for contract_index in 0..module.contracts.len {let contract=module.contracts[contract_index];
                     if contract.identity.unit != n.a || contract.identity.decl != n.b { continue; }
                     if contract.members.start > module.contract_members.len || contract.members.len > module.contract_members.len - contract.members.start { return 0, blot_error::Error.unresolved_type; }
-                    for member in module.contract_members[contract.members.start..contract.members.start + contract.members.len] {
-                        if member.name == member_name && member.kind != blot_check_types::MemberKind.value { return internAssociated(store, ordinal as u32, member_name, (store.type_owners.len - 1 - scope) as u32); }
+                    for member_index in 0..contract.members.len {let member=module.contract_members[contract.members.start+member_index];
+                        if member.name == member_name && member.kind != blot_reuse_principal_interface::ContractMemberKind.value { return internAssociated(store, ordinal as u32, member_name, (store.type_owners.len - 1 - scope) as u32); }
                     }
                 }
                 return 0, blot_error::Error.unresolved_type;
@@ -580,7 +581,7 @@ recursive fn fromEvidenceDepth(store: Store&, view: blot_eval_type_evidence::Vie
         var values=blot_eval_type_evidence::WordBuffer{};
         recursive fn convertChildren()->Id,blot_error::Error {
 
-        for child, index in view.children(id) { if n.tag == blot_eval_type_evidence::Tag.record && index % 2 == 0 { values.push(child);if values.failure!=blot_error::Error.none {return 0,values.failure;} } else { let selected, error = fromEvidenceDepth(store, view, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(selected);if values.failure!=blot_error::Error.none {return 0,values.failure;} } }
+        let count=view.children(id).len;for index in 0..count { let child=view.children(id)[index];if n.tag == blot_eval_type_evidence::Tag.record && index % 2 == 0 { values.push(child);if values.failure!=blot_error::Error.none {return 0,values.failure;} } else { let selected, error = fromEvidenceDepth(store, view, child, depth + 1, budget); if error != blot_error::Error.none { return 0, error; } values.push(selected);if values.failure!=blot_error::Error.none {return 0,values.failure;} } }
         if n.tag == blot_eval_type_evidence::Tag.record { return internRecord(store, values.items); }
         if n.tag == blot_eval_type_evidence::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values.items); } return intern(store, Tag.product, 0, 0, values.items);
 

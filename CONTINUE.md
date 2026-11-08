@@ -27,17 +27,18 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen234
-checkpoints canonical loader/cache publication, recursive scratch and candidate
-emission ownership. The candidate transfer reanchors existing output buffers and
-snapshots, owns timing labels, and adds no allocation for default timing metadata.
-Focused runtime and negative controls pass on both pinned checkers; reduced leaves
-are explicit in each receipt. The completed whole run stops after 87.14s with
-21 diagnostics across 13 files, down from30 across20 in233. C emission, linking
-and execution remain pending. The opt-in private checker raises cumulative
-const-for clone expansion from100k to1M while retaining the separate100k tail
-traversal. Its201 frontend and8 runtime controls match the preceding checker;
-over-budget expansion rejects. These failing runs do not establish completed
+including its source delta and byte-exact tracked recipe reconstruction. Frozen235
+checkpoints owned Unit/AST publication, scoped recursive constructors and scalar
+borrow boundaries. The completed whole run stops after 88.25s with 9 diagnostics
+across 6 files, down from21 across13 in234. C emission, linking and execution
+remain pending. Component runtime and negative controls qualify exact sources;
+reduced leaves are explicit in each receipt. Archive decoding now snapshots its
+borrowed input after the original magic check and owner mark, adding a temporary
+bytes.len copy/allocation. Candidate emission reuses owned buffers/snapshots and
+owns timing labels; default labels add no allocation. The opt-in private checker
+raises cumulative const-for clone expansion from100k to1M while retaining its
+separate100k tail traversal.201 frontend and8 runtime controls match the preceding
+checker; over-budget expansion rejects. Failing-prefix durations are not completed
 compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
