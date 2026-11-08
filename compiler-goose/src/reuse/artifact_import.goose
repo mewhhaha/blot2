@@ -374,27 +374,46 @@ recursive fn row<G>(self_: Importer&, g: G&, domain: Domain, id: u32, depth: i64
     let mapped, error = self_.rowInto(g, domain, id, depth, imported, arguments);
     imported.deinit(); arguments.deinit(); return mapped, error;
 }
+fn sourceEffectLabel(self_:const Importer&,domain:Domain,index:i64)->u32 {
+    let old:const Pools& =requiredPools(self_.old);if domain==Domain.semantic {return old.evaluator.evidence.effects.labels[index];}return old.layouts.effects.labels[index];
+}
+fn sourceEffectArgument(self_:const Importer&,domain:Domain,index:i64)->u32 {
+    let old:const Pools& =requiredPools(self_.old);if domain==Domain.semantic {return old.evaluator.evidence.effects.arguments[index];}return old.layouts.effects.arguments[index];
+}
 recursive fn rowInto<G>(self_: Importer&, g: G&, domain: Domain, id: u32, depth: i64, imported: blot_reuse_source_value_template::WordBuffer&, arguments: blot_reuse_source_value_template::WordBuffer&) -> u32, Error {
-    let old:const Pools& =requiredPools(self_.old);
-    var source = old.layouts.effects.view();
-    if domain == Domain.semantic { source = old.evaluator.evidence.effects.view(); }
-    if id >= source.rows.len { return 0, blot_error::Error.declined; }
-    let span = source.rows[id]; let labels, import_error_44 = bounded(source.labels, span.start, span.len); if import_error_44 != blot_error::Error.none { return 0, convert(import_error_44); }
-    if id == 0 && labels.len != 0 { return 0, blot_error::Error.declined; }
-    { let import_error_45 = imported.ensure(labels.len); if import_error_45 != blot_error::Error.none { return 0, convert(import_error_45); } }
-    for label in labels {
-        if label == 0 || label >= source.operations.len { return 0, blot_error::Error.declined; }
-        let operation = source.operations[label];
-        if operation.instance.unit != 0 || operation.instance.decl != 0 { return 0, blot_error::Error.declined; }
-        let old_args, import_error_46 = bounded(source.arguments, operation.arguments.start, operation.arguments.len); if import_error_46 != blot_error::Error.none { return 0, convert(import_error_46); }
-        self_.census.row_argument_words += old_args.len;
+    var label_start:i64=0;var label_count:i64=0;
+    {
+        let old:const Pools& =requiredPools(self_.old);var source=old.layouts.effects.view();
+        if domain==Domain.semantic {source=old.evaluator.evidence.effects.view();}
+        if id>=source.rows.len {return 0,blot_error::Error.declined;}
+        let span=source.rows[id];let labels,error=bounded(source.labels,span.start,span.len);
+        if error!=blot_error::Error.none {return 0,convert(error);}
+        label_start=span.start;label_count=labels.len;
+        if id==0 && label_count!=0 {return 0,blot_error::Error.declined;}
+    }
+    { let import_error_45 = imported.ensure(label_count); if import_error_45 != blot_error::Error.none { return 0, convert(import_error_45); } }
+    for label_index in 0..label_count {
+        let label=sourceEffectLabel(self_,domain,label_start+label_index);
+        var operation=default<blot_check_effect_evidence::Operation>();var old_arg_count:i64=0;
+        {
+            let old:const Pools& =requiredPools(self_.old);var source=old.layouts.effects.view();
+            if domain==Domain.semantic {source=old.evaluator.evidence.effects.view();}
+            if label==0 || label>=source.operations.len {return 0,blot_error::Error.declined;}
+            operation=source.operations[label];
+            if operation.instance.unit!=0 || operation.instance.decl!=0 {return 0,blot_error::Error.declined;}
+            let old_args,error=bounded(source.arguments,operation.arguments.start,operation.arguments.len);
+            if error!=blot_error::Error.none {return 0,convert(error);}
+            old_arg_count=old_args.len;
+        }
+        self_.census.row_argument_words += old_arg_count;
         var owner: u32 = 0;
         if operation.identity.unit == 0 {
-            if operation.identity.decl != 1 || old_args.len != 0 { return 0, blot_error::Error.declined; }
+            if operation.identity.decl != 1 || old_arg_count != 0 { return 0, blot_error::Error.declined; }
         } else if domain == Domain.semantic { { let imported_47, import_error_47 = self_.semanticNominal(operation.identity.unit, operation.identity.decl); if import_error_47 != blot_error::Error.none { return 0, convert(import_error_47); } owner = imported_47; } }
         else { { let imported_48, import_error_48 = self_.nominal(operation.identity.unit, operation.identity.decl); if import_error_48 != blot_error::Error.none { return 0, convert(import_error_48); } owner = imported_48; } }
-        arguments.clear(); { let import_error_49 = arguments.ensure(old_args.len); if import_error_49 != blot_error::Error.none { return 0, convert(import_error_49); } }
-        for argument in old_args {
+        arguments.clear(); { let import_error_49 = arguments.ensure(old_arg_count); if import_error_49 != blot_error::Error.none { return 0, convert(import_error_49); } }
+        for argument_index in 0..old_arg_count {
+            let argument=sourceEffectArgument(self_,domain,(operation.arguments.start as i64)+argument_index);
             var mapped: u32 = 0;
             if domain == Domain.layout { { let imported_50, import_error_50 = self_.shape(g, argument, depth + 1); if import_error_50 != blot_error::Error.none { return 0, convert(import_error_50); } mapped = imported_50; } }
             else { { let imported_51, import_error_51 = self_.semanticType(g, argument, depth + 1); if import_error_51 != blot_error::Error.none { return 0, convert(import_error_51); } mapped = imported_51; } }

@@ -2417,6 +2417,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ProjectionM
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_check::ProjectionMemo) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ProofContract)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_check::ProofContract) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ProofContracts)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_check::ProofContracts) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ProviderBlock)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_check_check::ProviderBlock) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::PurityArgument)->bool {return equalFields(left,right);}

@@ -31,8 +31,8 @@ fn push<T>(self_:NativeOutcomes<T>&,value:Outcome<T>) { self_.items.push(value);
 // Encoded Grow storage ends in this helper. Wave descriptors retain only exact
 // owned byte runs, never references to an encoder's local growing array.
 fn encodeRequest<R,C>(context:C&,request:R)->blot_process_pool::Request,Error {
- let payload,error=context.encode(request); if error!=blot_error::Error.none { return blot_process_pool::Request {bytes:[]},error; }
- if payload.len>blot_process_pool::packet_limit-30 { return blot_process_pool::Request {bytes:[]},blot_error::Error.artifact_limit; }
+ let payload,error=context.encode(request); if error!=blot_error::Error.none { return blot_process_pool::Request {bytes:default<const u8[:]>(), ..},error; }
+ if payload.len>blot_process_pool::packet_limit-30 { return blot_process_pool::Request {bytes:default<const u8[:]>(), ..},blot_error::Error.artifact_limit; }
  let telemetry=blot_phase_profile::captureWorker(); let owned=request_bytes.alloc_slice(payload.len+30);
  blot_bytes::put_u32(owned,0,0x534a5032); blot_bytes::put_u32(owned,4,2); owned[8]=0; if telemetry.enabled { owned[8]=1; } blot_bytes::put_u32(owned,9,telemetry.build); blot_bytes::put_u64(owned,13,telemetry.started_ns); blot_bytes::put_u64(owned,21,telemetry.id_base); owned[29]=0; if telemetry.space==blot_phase_profile::Space.core { owned[29]=1; } for byte,index in payload { owned[30+index]=byte; }
  return blot_process_pool::Request {bytes:owned},blot_error::Error.none;
@@ -50,7 +50,7 @@ fn runInto<T,R,C,O>(kind:blot_process_pool::Kind,requests:const R[:],requested:u
  if width>requests.len { width=requests.len; } if width>16 { width=16; } if width<1 { width=1; } batch.workers=width;
  var cursor:i64=0;
  while cursor<requests.len&&!cancelled(cancellation) {
-  var packets:blot_process_pool::Request[16]=[blot_process_pool::Request {bytes:[]};16];
+  var packets:blot_process_pool::Request[16]=[blot_process_pool::Request {bytes:default<const u8[:]>(), ..};16];
   var ordinals:i64[16]=[-1;16]; var count:i64=0;
   while count<width&&cursor<requests.len&&!cancelled(cancellation) {
    let index=cursor; cursor++; let packet,error=encodeRequest<R,C>(context,requests[index]);

@@ -51,23 +51,25 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen267 inputs. Whole parsing passes
-440 files. Its completed full run stops after62.33s with1 captured diagnostic:
-a nonlocal return inside an inline parallelReadyOwned sort callback. The15-second
-first-error window is a partial error list; these are failed prefixes, not compiler
-performance/completion results. Whole C emission, linking, CLI and Wasm remain
-pending. The batch makes12 audited catalog owners append-only, preserves real
-capability-root ordered deletion in an owned buffer, and constructs Catalog through
-typed owners.32 actual-schema controls,2 deletion/cleanup laws and10 constructor
-boundary controls pass their pinned candidates; callbacks and Engine identity
-remain intact. Snapshot constraint/string-key restoration recovers exact owned
-runs, and retained-owner/Session-registry receipts state their carrier reductions.
-Private profiling labels still use14 literals plus empty with lines unchanged.
-Independent probes retain unresolved proof-header and capability/catalog borrow
-paths. Pure constructor and owner-receipt experiments that still reject are not
-production fixes. Diagnostic payload copies, origin snapshots, scratch zeroing
-and numeric high-water backing remain disclosed. The private checker retains
-bounded1M clone/separate100k tail limits and201 frontend/8 runtime parity controls.
+per stage. This checkpoint preserves exact frozen271 inputs. Whole parsing passes
+440 files. Its completed full run stops after67.38s with1 captured diagnostic:
+implementation-evidence ProjectionResolver lifetime. The15-second first-error
+window gives a partial error list. Whole C emission, linking, CLI and Wasm remain
+pending. The proof-contract table now uses a nominal local owner record;10 focused
+controls preserve header addresses and reject escape/shrink cases. The actual
+full Engine callback advances past that publication conflict but still reports
+other failures at its120s cap. No extra header copies or pools were added. Typed
+Stack defaults, explicit worker pin receipts, callback/counter fixes and scalar
+import row loops are captured. Independent review preserves validation/census/
+intern order under immutable old Snapshots; no runtime equivalence is claimed
+for that traversal.64 independent Session roots captured12 diagnostics at120s,
+including one unsupported dummy constructor. Other dummy-input borrow warnings
+need valid-owner confirmation. Actual capability-children owner fixtures pass;
+that helper is unchanged. Earlier diagnostic copies, origin snapshots, zeroing
+and high-water backing costs retain their receipt scopes. Checkpoint blob/index
+batching produced the identical Git tree in0.24s versus one observed7.39s run;
+these are unpaired tool observations, not compiler timings. The private checker
+retains bounded1M clone/separate100k tail limits and201 frontend/8 runtime controls.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
 through one callback boundary. Actual core/snapshot admission methods use explicit
