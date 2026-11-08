@@ -6,15 +6,20 @@ The Zig-to-Goose experiment in `compiler-goose/` is still source-only: no
 whole compiler C/header/executable or end-to-end parity result exists. Keep
 `compiler/`, the pinned Zig oracle and existing siblings unchanged.
 
-Work in large source batches. Runtime, semantic, lowering and independent-proof
-production entry paths pass their partial checks. Lowering uses grow-only append
-tables and the correct type/proof domains. The latest checker batch replaces
-retained name/recipe slices with stable IDs, restores owned environments through
-existing pool helpers, moves callback construction outside recursive inference,
-and repairs projection/importer span traversal and proof callback/type domains.
-Row reconstruction now keeps a variable List identity and accepts both obligation
-domains. The remaining checker frontier is proof predicate aliasing at
-`proveLegacyWithStore`/`proveLegacyState`; whole compilation remains pending. The Zig compiler and siblings are unchanged.
+The owner is selecting the implementation strategy for language RFC
+[#46](https://github.com/mewhhaha/blot2/issues/46). Its latest sections change
+collections to immutable values with admitted automatic copies/last-use moves;
+that is a semantic change from the current named-owner alias writes. Do not
+silently apply that new behavior while treating the old Zig compiler as its oracle.
+
+The Goose source checkpoint repairs scalar proof outcomes, 44 retained AST
+bindings across 49 functions, and 15 type-span bindings/114 loops without new
+payload copies. Four production entry paths pass their combined partial check
+on 34f7a396. The remaining checker frontier is a `withImporter` callback lifetime
+at `LegacyProof.resolve`; no whole compiler is emitted. Before further callback
+rewrites, expose the original store location: `ApplyCalleeStores` already has
+`StoreEvent.at` and its raw event index. Keep the call location primary.
+The normal Zig compiler and siblings remain unchanged.
 
 Use `python3 compiler-goose/tools/check_engines.py` for five concrete production
 paths in parallel (`--engines check lower independent` narrows a batch).

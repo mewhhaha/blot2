@@ -2367,6 +2367,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LegacyProof
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::LegacyProof,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LegacyResolve)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::LegacyResolve,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LegacyResult)->bool {return equalFields(left,right);}
+fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::LegacyResult,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LoopCarry)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::LoopCarry,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::LoopExit)->bool {return equalFields(left,right);}

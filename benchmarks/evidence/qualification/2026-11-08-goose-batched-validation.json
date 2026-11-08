@@ -766,6 +766,161 @@
         ],
         "full_qualification": false
       }
+    },
+    {
+      "batch": "shared-evidence-batch-1",
+      "snapshot": "34f7a396b41eb5fd30fc98171e194bd7b9f986d6",
+      "result": {
+        "partial": true,
+        "seconds": 78.951,
+        "results": [
+          {
+            "partial": true,
+            "engines": [
+              "runtime"
+            ],
+            "exit": 0,
+            "seconds": 2.003,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "semantic"
+            ],
+            "exit": 0,
+            "seconds": 78.9,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "lower"
+            ],
+            "exit": 0,
+            "seconds": 4.606,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          },
+          {
+            "partial": true,
+            "engines": [
+              "independent"
+            ],
+            "exit": 0,
+            "seconds": 77.306,
+            "stop": "completed",
+            "errors": [],
+            "full_qualification": false
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-31",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 45.863,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1925,
+            "message": "error: cannot call scalarTypeArgumentFields: it may shrink self_ while children is still used, and children may refer into self_ (\u00a75.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-32",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 51.089,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 2626,
+            "message": "error: cannot call constrain, which may shrink self_ while iterations (bound at /home/jacobt/src/blot2/compiler-goose/src/check/check.goose:2626) is still used: it may refer into self_ (\u00a75.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-33",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 49.97,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 3038,
+            "message": "error: call mapRecord stores a reference rooted at mapper into what its parameter mapper leads to, which may be the caller's storage behind self_, which mapper does not outlive (\u00a79.2)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-34",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 45.163,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1900,
+            "message": "error: recursive call cycle through matchLegacySignature, which is not declared `recursive fn` (\u00a77.8)"
+          }
+        ],
+        "full_qualification": false
+      }
+    },
+    {
+      "batch": "selected-batch-35",
+      "result": {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 45.866,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+            "line": 1886,
+            "message": "error: call withImporter stores a reference rooted at context into what its parameter context leads to, which may be the caller's storage behind self_, which context does not outlive (\u00a79.2)"
+          }
+        ],
+        "full_qualification": false
+      }
     }
   ],
   "source_files": [
@@ -791,7 +946,7 @@
     "compiler-goose/src/support/structural_adapters.goose",
     "compiler-goose/tools/build_goose_checker.py"
   ],
-  "next": "Proof path aliasing at check.goose proveLegacyWithStore/proveLegacyState; repeated exact diagnostic held for bounded review, ordinary full build pending",
+  "next": "Goose experiment held while owner selects issue46 language migration strategy. Current port frontier: withImporter callback stores short-lived context through Engine; raw StoreEvent.at can expose original store location without changing checking.",
   "oracle": "native Zig compiler unchanged; ABI8/session2 preserved",
-  "source_batch": "Stable symbol/callback IDs; exact borrowed contexts; owned proof/editor/diagnostic publication; explicit proof callback recursion; whole projection/matching/importer span family; generic row reconstruction accepts original Types/Core obligation domains; direct proof-store init/deinit removes LegacyCall and two unused callback wrappers; generated adapters rebuilt from sources"
+  "source_batch": "Stable symbol/callback IDs; exact borrowed contexts; owned proof/editor/diagnostic publication; explicit proof callback recursion; whole projection/matching/importer span family; generic row reconstruction accepts original Types/Core obligation domains; direct proof-store init/deinit removes LegacyCall and two unused callback wrappers; generated adapters rebuilt from sources; LegacyResult carries proof signature explicitly across scalar-value predicate callbacks; removes unused carrier predicate/state references; retained AST family covers44 bindings/49 functions and24 boundaries; type-span family covers15 bindings/114 loops; recursive dictionary proof replay now uses explicit Engine"
 }
