@@ -528044,5 +528044,400 @@
     "selected": false,
     "whole_prefix_progress_demonstrated": false,
     "whole_compiler_qualified": false
+  },
+  "work_progress_measurement_plan_after399": {
+    "plan": {
+      "sha256": "b059a3eb5f24701b853f033ac5969a0697106c9765fd1ba0250c3057ca4064af",
+      "contents": {
+        "status": "READONLY design; no telemetry source/build executed",
+        "selected_checker_sha256": "678b88bdf038dae9fdf1366cf59aca5dfeaf046fb29de0b2fadf85359b703c19",
+        "source_hashes": {
+          "ast.h": "634070939bac352a7afa374d43cdcf0f55da403ea86f12fdc4a1b4886423fe4c",
+          "typecheck.h": "3d02a68d9cbda41640e9b108a18cb001970d31139f133d0dd10e145ec078ffa3",
+          "typecheck_calls.h": "3ca9bf3180d7793fa4e5cc7cc449f817bd1cb0ef6b44e6c07cf1ec33de15117c",
+          "typecheck_exprs.h": "cf8982dddb79db17718e9c9883fb8f5ebf6649c6b109cabb870a8a5e4ff16df9",
+          "typecheck_types.h": "608f0bd475467b0fecd9ae44c98df91ee2528b9ee3b97054397411459bc41d23",
+          "typecheck_builtins.h": "07a3876ff0c24dcf5429bb791b6fc23b420c1c7fe39a5533bb141b0eec3a6cd9"
+        },
+        "evidence": [
+          "Fresh396 samples include ApplyCalleeStores, ArrayElemsReached/TypeEq and EscapingContinue/free;4samples do not assign time fractions.",
+          "StaticEscapingContinue and ChildVisitor bounded gates/micro improved allocations, but same397 authored whole prefixes398/399 both hit120s withno diagnostic/C; no actionable whole-prefix gain demonstrated.",
+          "CheckSpecBody rechecks reached SCC members each round with prior records;8round cap applies there only.",
+          "ApplyCalleeStores has separate held and slotstores repeated full sweeps until no actual roots/slotchanges; these have no explicit sweep cap.",
+          "AddStoreEvent linearly scans existing class events for duplicate facts.",
+          "UsedAfter repeats the variable-independent exit cutoff scan for each qualifying variable in the same shrink scan."
+        ],
+        "first_measurement": {
+          "authorized": "One gprofng+GOOSE_ROUNDS run with exact678/frozen397, pilot sole actual-run coordinator",
+          "prerequisites": "Backend collector tiny cancellation/partial-profile test first, interval-quality warning verified and reported. Failure stops collector path.",
+          "cap_seconds": 120,
+          "output": "Bounded trace sidefile plus exact diagnostics retained; fingerprint source/binary/collector/clock mode; partial profile must survive prescribed termination.",
+          "interpretation": "Use hotspots/rawsample counts and SCC trace for diagnostic ranking, not speed percentages or an uncensored completion claim. No additional identical whole attempt without a specific unanswered measurement."
+        },
+        "telemetry_follow_on_if_needed": {
+          "form": "One isolated instrumentation-only build from678; no algorithm changes or installed/tracked edits.",
+          "abi": "Export a versioned extern-C symbol naming an aligned fixed uint64_t array. A fixed offset manifest labels every word. Raw GDB address/read_memory at normal sample stops needs no DWARF and no inferior functions.",
+          "updates": "Single compilerworker only. No maps,strings,allocation,per-node clock or atomic contention. Use explicit volatile load/store only if needed to guarantee observable telemetry; unsigned64 wraps are outside120s realistic count range. Maxima use local scalars.",
+          "sampling": "Existing append-safe GDB stop-snapshot mechanism, read fixed block at5/20/50/70/110seconds and termination if obtainable. Log pointer/ABI-size/magic checks; no arbitrary TypeCheck memory offsets.",
+          "overhead": "Counters on hot recursive entries perturb runtime; do not compare elapsed times against uninstrumented runs. Work ratios and progress deltas only.",
+          "counter_groups": [
+            {
+              "site": "ast.h:2533/2689/2690/2694",
+              "counters": [
+                "types_created",
+                "struct_instances_created",
+                "enum_instances_created",
+                "specs_created"
+              ],
+              "meaning": "Increment after original successful vector insertion; distinct allocated products, not completed checks."
+            },
+            {
+              "site": "typecheck_calls.h:GetOrCreateSpec1393/1618/1718/1722",
+              "counters": [
+                "spec_lookup_calls",
+                "spec_candidates_tested",
+                "spec_reuse_returns",
+                "spec_stale_body_rechecks"
+              ],
+              "meaning": "Count lookup work and distinguish cache reuse from a body recheck. Do not change any lookup criterion or order."
+            },
+            {
+              "site": "typecheck_calls.h:CheckSpecBodyOnce2886/2900/3307-3309",
+              "counters": [
+                "body_pass_started",
+                "body_pass_completed",
+                "extern_completed",
+                "current_body_depth",
+                "max_body_depth",
+                "last_body_started_id",
+                "last_body_completed_id"
+              ],
+              "meaning": "Normal completion only after original effects/flags are committed; extern success counted on its explicit return. Failed/unwound checks are not marked complete. Body passes are not unique finalized specializations."
+            },
+            {
+              "site": "typecheck_calls.h:CheckSpecBody2778-2805",
+              "counters": [
+                "scc_round_starts",
+                "scc_member_visits",
+                "scc_max_members",
+                "scc_max_round"
+              ],
+              "meaning": "Outer cycle rounds only; existing8round limit and SameRecord comparison remain unchanged. GOOSE_ROUNDS already prints head/member count and change reasons, but is silent during first-pass descent."
+            },
+            {
+              "site": "typecheck_builtins.h:ApplyCalleeStores1663/1676/1786/1939",
+              "counters": [
+                "apply_stores_calls",
+                "classat_calls",
+                "classat_parameter_tests",
+                "record_store_events_examined",
+                "class_events_examined"
+              ],
+              "meaning": "Count total replay and class-mapping work; no mutable-root cache."
+            },
+            {
+              "site": "typecheck_builtins.h:1952-1965",
+              "counters": [
+                "held_sweeps",
+                "held_entries_examined",
+                "held_entries_changed",
+                "held_max_sweeps_one_call"
+              ],
+              "meaning": "Count the class-read fixedpoint. An entry changes only when existing first/Roots.Same logic chooses applyevent; use a local scalar to record maxsweeps."
+            },
+            {
+              "site": "typecheck_builtins.h:1969-1973",
+              "counters": [
+                "slot_sweeps",
+                "slot_entries_examined",
+                "slot_entries_changed",
+                "slot_max_sweeps_one_call"
+              ],
+              "meaning": "Capture original StoreIntoSlot bool once then use it unchanged in original OR; no duplicate semantic call or changed order."
+            },
+            {
+              "site": "typecheck_builtins.h:AddStoreEvent1488-1523",
+              "counters": [
+                "store_events_added",
+                "class_event_dedup_comparisons",
+                "new_class_facts"
+              ],
+              "meaning": "Separate global event growth from linear class-fact duplicate checks and actual new facts."
+            },
+            {
+              "site": "typecheck_types.h:RootCandidates1281 and consider lambda",
+              "counters": [
+                "root_candidates_calls",
+                "local_candidates_considered",
+                "global_candidates_considered"
+              ],
+              "meaning": "Count actual live consider calls after existing global negative filter. Do not replace retained candidates or provenance."
+            },
+            {
+              "site": "typecheck_types.h:ShrinkScanVars1204; typecheck_exprs.h:UsedAfter3267",
+              "counters": [
+                "shrink_scan_groups",
+                "used_after_calls",
+                "used_after_exit_scan_requests"
+              ],
+              "meaning": "Exit-scan request increments only after original LaterOperands returns false, at originalcut/exitat block. Groups needing a cut can be added with a local instrumentation context, but no persistent/global result cache."
+            },
+            {
+              "site": "typecheck_exprs.h:MentionsName3165/EscapingContinue3192",
+              "counters": [
+                "mentions_name_node_visits",
+                "escaping_continue_node_visits"
+              ],
+              "meaning": "Count nonnull recursive entries. No AST helper semantics changed. Strongly label hot-counter instrumentation overhead."
+            },
+            {
+              "site": "typecheck_types.h:ArrayElemsReached1582 and TypeEq actual entry",
+              "counters": [
+                "array_reach_node_visits",
+                "type_eq_calls"
+              ],
+              "meaning": "Distinguish repeated type graph work from liveness AST work. Existing readiness/cache remains unchanged."
+            }
+          ]
+        },
+        "decision_rules": [
+          {
+            "observation": "New specs and body completions advance steadily; SCC rounds remain mostlyfirst pass.",
+            "next": "Investigate structural specialization breadth and lookup candidates; do not blame fixedpoint convergence from a silent GOOSE_ROUNDS log."
+          },
+          {
+            "observation": "SCC rounds/member rechecks dominate, withfew new specs.",
+            "next": "Use exact SameRecord reasons to identify which effect family changes; consider dirty-member scheduling only with dependency/replay order proof."
+          },
+          {
+            "observation": "Held/slot sweeps and unchanged-entry examinations greatly exceed changed entries.",
+            "next": "Prototype invocation-local dependency worklist for these2loops only, preserving least fixedpoint and diagnostic/event order. No mutableRoots memo or convergencecap increase."
+          },
+          {
+            "observation": "UsedAfter exit scans and EscapingContinue nodevisits dominate whilemanyvars shareone shrink scan.",
+            "next": "Prototype lazy per-scan ExitCut hoist below; no persistent AST cache."
+          },
+          {
+            "observation": "Root/event/type comparisons dominate instead.",
+            "next": "Optimize measured mapping/dedup loop only after exact input mutability proof; no universal TypeEq or RootCandidates cache."
+          }
+        ],
+        "hoist_candidate": {
+          "scope": "One fresh stack ExitCut context in each of GrowOnlyShrinkAt1376,CheckShrinkHolders2412,NoteLiveViews2802 ShrinkScanVars groups.",
+          "contents": "ready,cut,exitat only; no VarDef answer/root provenance/localfn result cache.",
+          "evaluation": "Original LaterOperands/name test remains first for eachvariable. Lazily compute exactold3279-3300 exit block on firstpost-LaterOperands request; reuse onlyforrestofsame synchronous group.",
+          "proof": "Cutoff reads only currentblock/statement/scopes/frame and AST continues, notv. LexicalVars enumerates frames/vars synchronously. The3callbackfamilies querytypes/roots, reporterrors, orappendroot/effectfacts; they do not call CheckStmt or rewrite activeblock/frames. CheckStmts doesreplaceConstFor andprune tails, so context mustnever survivecheck statements, recursivechecks,rounds orother scan groups.",
+          "unchanged": "Every variable-specific MentionsName,NamesFrame,loopbindingtest,depthtest,root/effectjudgment,errorpoint remains original.",
+          "control_requirements": [
+            "Multiple surviving vars whereonlylateronehasliveuse",
+            "return/break/outercontinue/innercontinue/functionvalue boundaries",
+            "Earlier LaterOperands success mustnotforceexit scan",
+            "Newscan afterASTexpansion/pruning getsfreshcontext",
+            "Exceptions/errorprefix retainoriginalvariableorder"
+          ],
+          "measurement_gate": "Count actual post-LaterOperands cutrequests andgroupsneedingcut; avoidablecutscans=former-latter. Prove workreductionbeforeclaimingprefixgain."
+        },
+        "no_build_or_optimization_authorized_by_this_receipt": true
+      }
+    },
+    "profiler_prerequisite": {
+      "sha256": "9580f6b4a37b330cc18fea6575682a8364f101557c376330b26e04e13a8e9fe8",
+      "contents": {
+        "audit": "399 profiler/work-counter prerequisite; read-only, no builds or full compiler attempts",
+        "host": {
+          "perf_binary": "absent",
+          "perf_stat_test": {
+            "command": "perf stat -- true",
+            "exit": 127,
+            "result": "shell reports command not found"
+          },
+          "perf_event_paranoid": "2",
+          "CAP_PERFMON": false,
+          "CAP_SYS_PTRACE": false,
+          "ptrace_scope": "1"
+        },
+        "tools": {
+          "gprof": {
+            "path": "/usr/bin/gprof",
+            "sha256": "55de8e2f4bd7ee6e39a9346add7d63b9011afac9cf8a8b4bd34c9f5420a9156c",
+            "usable_on_current_binary": false,
+            "evidence": "gprof baseline Goose reports gmon.out missing; selected compile flags omit -pg"
+          },
+          "gprofng": {
+            "path": "/usr/bin/gprofng",
+            "version": "GNU gprofng 2.47",
+            "sha256": "0b3577f0b1876dad800607240102e9b59b51a796827147529a6b34dc430a4c3a",
+            "usable_unprivileged": true,
+            "probe": "gprofng collect app -p off -h cycles,lo -t 1s on 0.8s Python CPU loop exited 0; report captured nonzero CPU-cycle samples without CAP_PERFMON",
+            "caveat": "header warns sampling timer interval changed (0 -> 100000) and data may be unreliable; validate on Goose target before treating hotspot shares as high confidence"
+          },
+          "gdb": "/usr/bin/gdb installed; ptrace_scope=1 and CAP_SYS_PTRACE absent, so own-child debugging is possible but no statistical sampling workflow was established",
+          "llvm_profdata": "/usr/bin/llvm-profdata installed; collection requires instrumented binary",
+          "llvm_cov": "/usr/bin/llvm-cov installed; current binary has no coverage instrumentation",
+          "unavailable": [
+            "perf",
+            "valgrind",
+            "strace",
+            "bpftrace",
+            "trace-cmd",
+            "samply"
+          ]
+        },
+        "current_goose": {
+          "binary": "build/goose-port/export-root-schedule-build/goose",
+          "binary_sha256": "678b88bdf038dae9fdf1366cf59aca5dfeaf046fb29de0b2fadf85359b703c19",
+          "compile_flags": [
+            "-O3",
+            "-DNDEBUG",
+            "-std=gnu++20",
+            "-Wall",
+            "-Wextra",
+            "-Wno-missing-field-initializers",
+            "-DGOOSE_EXPANSION_NODE_LIMIT=1000000",
+            "-DGOOSE_TCC_LIB_PATH=\"/home/jacobt/src/goose-to-wasm/build/native/tcclib\"",
+            "-I/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess",
+            "-I/home/jacobt/src/goose-to-wasm/build/native/generated",
+            "-isystem",
+            "/home/jacobt/src/goose-to-wasm/build/native/tcc/api"
+          ],
+          "main_cpp": "/home/jacobt/src/goose-to-wasm/build/source/src/main.cpp",
+          "main_cpp_sha256": "4e23802cd3d11f0367287fec1571ea11e564d294c62b6ecaf4aed984176469f6",
+          "typecheck_header": "/home/jacobt/src/goose-to-wasm/build/source/src/typecheck.h",
+          "typecheck_header_sha256": "49120613af6bd6743b650dfa7005514958da7f479a2c3c048750669811ca38dc"
+        },
+        "existing_cli_counters": {
+          "phase_clock_source": "main.cpp:1336-1393; steady-clock timestamps for parse, resolve, and typecheck; then optimizer and BCE timestamps around 1394-1420.",
+          "failure_gate": "TypeCheckProgram returns through the ast.errors gate at main.cpp:1390-1393 before optimizer/BCE and all stats serialization.",
+          "success_summary": "main.cpp:1380-1381 prints parsed top-level declaration/file counts; 1401-1411 prints specialization/type instance counts, optimizer action counts (inlined/base/folded/propagated/tail-loop/reassociated), and BCE index/slice counts.",
+          "structured_timing": "--wasm-stats path (help at main.cpp:706) serializes parse_ns, resolve_ns, typecheck_ns, optimize_ns, bce_ns, frontend_ns, backend_ns and direct backend functions/code/region/activation/module sizes at 1450-1485; only after successful direct compile at 1440+.",
+          "399_applicability": "A typecheck failure returns before structured stats; no per-function typecheck time/work counter exists in this CLI path. --diagnostics json captures diagnostics/progress, not phase profiles."
+        },
+        "probe_report": "build/goose-port/verification/gprofng-prereq-probe.txt",
+        "hashes": {
+          "gprofng_probe_output": "2c3801d44d7ea783fdfff20715483c93e10973a3fd1ef73591d6e37d7b69e196"
+        },
+        "recommendation": "gprofng is the only installed unprivileged sampler found that successfully recorded CPU-cycle samples without changing the Goose binary, but its clock-timer warning remains; run one bounded actual-Goose capture and inspect sample volume/warnings before making a hotspot claim."
+      }
+    },
+    "termination_selftest": {
+      "sha256": "593b529da811a51b80afeebfaf34e7fd2a5583bdc33ef225036c74869fb31929",
+      "contents": {
+        "binary": "/home/jacobt/src/blot2/build/goose-port/export-root-schedule-build/goose",
+        "binary_sha256": "678b88bdf038dae9fdf1366cf59aca5dfeaf046fb29de0b2fadf85359b703c19",
+        "gprofng": "/usr/bin/gprofng",
+        "gprofng_version": "GNU gprofng binutils version 2.47",
+        "pass": true,
+        "results": [
+          {
+            "command": [
+              "/usr/bin/gprofng",
+              "collect",
+              "app",
+              "-p",
+              "off",
+              "-h",
+              "cycles,lo",
+              "-t",
+              "1s",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/verification/gprofng-rounds-selftest-term/experiment.er",
+              "/usr/bin/python3",
+              "-c",
+              "import time; end=time.monotonic()+8; x=0\nwhile time.monotonic()<end: x+=1"
+            ],
+            "display_exit": 0,
+            "elapsed_seconds": 0.9512349860015092,
+            "experiment_exists": true,
+            "experiment_files": [
+              "experiment.er/data.frameinfo",
+              "experiment.er/dyntext",
+              "experiment.er/hwcounters",
+              "experiment.er/log.xml",
+              "experiment.er/map.xml",
+              "experiment.er/overview"
+            ],
+            "interval_warning": false,
+            "max_elapsed_seconds": 2.0,
+            "pid": 2404276,
+            "report_bytes": 1083,
+            "report_has_data": true,
+            "returncode": -15,
+            "signal": "SIGTERM",
+            "stderr_bytes": 0
+          },
+          {
+            "command": [
+              "/usr/bin/gprofng",
+              "collect",
+              "app",
+              "-p",
+              "off",
+              "-h",
+              "cycles,lo",
+              "-t",
+              "1s",
+              "-o",
+              "/home/jacobt/src/blot2/build/goose-port/verification/gprofng-rounds-selftest-kill/experiment.er",
+              "/usr/bin/python3",
+              "-c",
+              "import time; end=time.monotonic()+8; x=0\nwhile time.monotonic()<end: x+=1"
+            ],
+            "display_exit": 0,
+            "elapsed_seconds": 0.9512079150008503,
+            "experiment_exists": true,
+            "experiment_files": [
+              "experiment.er/data.frameinfo",
+              "experiment.er/dyntext",
+              "experiment.er/hwcounters",
+              "experiment.er/log.xml",
+              "experiment.er/map.xml",
+              "experiment.er/overview"
+            ],
+            "interval_warning": false,
+            "max_elapsed_seconds": 2.0,
+            "pid": 2404278,
+            "report_bytes": 1083,
+            "report_has_data": true,
+            "returncode": -9,
+            "signal": "SIGKILL",
+            "stderr_bytes": 0
+          }
+        ]
+      }
+    },
+    "natural_control": {
+      "sha256": "90e3237bcb0103a2e460ec11bdd8f317306409ad6fb806d03172833f4113b240",
+      "contents": {
+        "command": [
+          "/usr/bin/gprofng",
+          "collect",
+          "app",
+          "-p",
+          "off",
+          "-h",
+          "cycles,lo",
+          "-t",
+          "2s",
+          "-o",
+          "/home/jacobt/src/blot2/build/goose-port/verification/gprofng-rounds-natural-control/experiment.er",
+          "/usr/bin/python3",
+          "-c",
+          "import time; end=time.monotonic()+1.2; x=0\nwhile time.monotonic()<end: x+=1"
+        ],
+        "elapsed_seconds": 1.2689397229987662,
+        "returncode": 0,
+        "display_returncode": 0,
+        "header_bytes": 1424,
+        "functions_bytes": 2383,
+        "no_warnings": false,
+        "interval_warning": true,
+        "functions_has_cycles": true,
+        "header_sha256": "b77a32af6059c342e80b230ece7c62ef211493a71a156129202e3651a08ac61d",
+        "functions_sha256": "ef44270b16de0dfd9ac74a555197c725776110d4c20300fe20db310c7182e501"
+      }
+    },
+    "gprofng_full_workload_launched": false,
+    "gprofng_path_rejected": true,
+    "next": "Telemetry-only bounded build/run, fixed raw-readable scalar counters; no optimization or cap growth."
   }
 }

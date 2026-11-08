@@ -75,6 +75,10 @@ That ChildVisitor candidate e083ca53 passes201frontend/8runtime/7focused/12C par
 still times out120.299s with zero diagnostics/C on the same442authored inputs.
 It also remains unselected. Next: measure completed checking/effect-replay work
 inside the fixed cap and target repeated algorithmic work, without blind reruns.
+The gprofng path failed its short prerequisite: forced-stop profiles retain no
+useful samples, natural control warns of unreliable intervals. No full compiler
+capture was launched. Next is a telemetry-only private checker with fixed scalar
+work counters read before termination; no optimization or cap increase yet.
 No compiler C/header/executable or executed-Wasm/Gdev result exists for the port.
 
 Current representation repairs use the existing Session→Generator Frame token

@@ -157,7 +157,13 @@ attempt still times out120.299s with zero diagnostics/C on matching442authored
 inputs. It remains unselected. Both valid allocation levers have no demonstrated
 whole-prefix progress under this censored cap. The next investigation measures
 completed specs/effect events/traversal work and repeated SCC/global-root replay;
-no identical rerun, larger cap or unchecked memoization is authorized.
+avoid unchanged blind reruns, larger caps and unchecked memoization. gprofng
+forced-stop controls produce no useful retained samples; its natural control
+warns of unreliable timing. That path is rejected before a full workload capture.
+Use a telemetry-only private build with a fixed scalar block readable before
+termination to distinguish completed body passes, SCC rounds, deferred/slot
+fixed-point sweeps and UsedAfter/AST work. No hot allocations/maps/strings or
+ownership changes belong in that measurement patch.
 No whole compiler C, header or executable has been emitted; source acceptance
 is not runtime qualification.
 
