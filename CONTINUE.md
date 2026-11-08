@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen408 is the current source checkpoint. Selected private checker 57bb3e81
+Frozen409 is the current source checkpoint. Selected private checker 57bb3e81
 adds two bounded optimizations to 678b88: a call-local raw-store identity skip
 and visited-type buckets keyed only by kind/nominal declaration. Relevant
 store mappings and possible-match type comparisons retain their original
@@ -238,3 +238,10 @@ pattern; exact source review passes. Its 120.308s capped run captures one new
 recursive-cycle lifetime error at inputCallbackRecipe (check.goose2003), with
 no C/header/executable. Subtract the borrowed Recipe carrier if source proof
 permits; no unchanged retry or cap growth.
+
+409 extracts the callback recipe/derive/instantiate prefix to an acyclic helper
+returning a scalar; branch casts, errors and recursive tail stay ordered. Both
+checkers pass 42 controls and two local-borrow escape negatives. The whole run
+caps at 120.281s with zero diagnostics and no C output; no qualification or
+completed speed claim. Next: fresh instrumentation-only work measurement from
+57bb on unchanged 409, with 58-word ABI2 counters and the same 120s cap.

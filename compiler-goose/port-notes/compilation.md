@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen408 is the current source checkpoint. The selected private checker is
+Frozen409 is the current source checkpoint. The selected private checker is
 `57bb3e817a5edab895f90cb518812299f1076a49127c3509b37f57a45515e847`.
 It retains 678b88's exported-root scheduling and adds a call-local raw-store
 identity skip plus traversal-local visited-type buckets. All 201 frontend,
@@ -268,3 +268,10 @@ pattern; exact source review passes. Its 120.308s capped run captures one new
 recursive-cycle lifetime error at inputCallbackRecipe (check.goose2003), with
 no C/header/executable. Subtract the borrowed Recipe carrier if source proof
 permits; no unchanged retry or cap growth.
+
+409 extracts the callback recipe/derive/instantiate prefix to an acyclic helper
+returning a scalar; branch casts, errors and recursive tail stay ordered. Both
+checkers pass 42 controls and two local-borrow escape negatives. The whole run
+caps at 120.281s with zero diagnostics and no C output; no qualification or
+completed speed claim. Next: fresh instrumentation-only work measurement from
+57bb on unchanged 409, with 58-word ABI2 counters and the same 120s cap.
