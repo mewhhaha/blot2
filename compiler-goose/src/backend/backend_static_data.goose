@@ -382,7 +382,7 @@ recursive fn serializeAggregate(self_: State&,g: Generator&,id: ValueId,ty: u32,
         if info.kind == blot_eval_eval_values::ValueKind.nominal {
             var payload_type: u32 = 0; var payload_bits: u32 = 0; var payload_value: u32 = 0;
             if info.len != 0 { let payload,error = g.nominalPayload(info.nominal,info.bits,ty); if error != blot_error::Error.none { return 0,error; } payload_type = payload; payload_value = g.evaluator.valueChildren(id)[0]; let bits,serialized = serialize(self_,g,payload_value,payload_type,depth + 1); if serialized != blot_error::Error.none { return 0,serialized; } payload_bits = bits; }
-            let added = words.append([info.bits,payload_bits]); if added != blot_error::Error.none { return 0,added; } let values_added = word_values.append([0,payload_value]); if values_added != blot_error::Error.none { return 0,values_added; }
+            let added = words.append([info.bits,payload_bits]); if added != blot_error::Error.none { return 0,added; } let values_added = word_values.append([0 as u32,payload_value]); if values_added != blot_error::Error.none { return 0,values_added; }
         } else {
             if info.kind == blot_eval_eval_values::ValueKind.array { let added = words.push(info.len); if added != blot_error::Error.none { return 0,added; } let value_added = word_values.push(0); if value_added != blot_error::Error.none { return 0,value_added; } }
             let node = g.representations.store.node(ty);

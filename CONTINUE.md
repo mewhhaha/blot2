@@ -27,20 +27,21 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen273
-checkpoints typed Session/admission-host budget access: the actual shared scalar
-is recovered through the existing registered Session identity, with no snapshot
-or writeback delay.12 focused reentrant/identity controls pass; the actual full
-run advances past the resolver borrow and stops after66.38s with1 captured
-u32/optional API mismatch in core_eval. Whole parsing passes440 files.15s after
-first error is a partial collection window; C emission, linking and execution
-remain pending. Nullable backend/Stack access, worker pin receipts, typed lexical
-word literals and retired-membership storage recovery are included. Local region
-ownership remains a separately reviewed experiment, not this checkpoint. Source
-reviews preserve importer row/child traversal ordering under immutable old
-Snapshots. Prior proof-owner/catalog/snapshot controls retain their exact scopes.
-The private checker remains bounded1M clone/separate100k tail with201 frontend/8
-runtime parity controls. Failed prefixes are not completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen281
+checkpoints callback-local ClosureRegion ownership, preserving existing snapshot
+and cleanup behavior while removing its pool.18-carrier escape review and6 scoped
+controls support that change; payload is1270B, not measured net stack growth.
+Exact mask recovery fixes header publication/return without copies or new pools.
+The batch also includes scalar importer children, nullable Plan dereferences,
+explicit indexed-loop allocation/outgoing state, typed word arrays and bounded
+scratch initialization. Whole parsing passes440 files. The completed full run
+stops after94.63s with1 captured backend principal-graph nullable-access error;
+C emission, linking and execution remain pending.15s after first error is a
+partial diagnostic window.64 complementary Session roots collect6 diagnostics
+at120s, including2 unsupported dummy constructors. Focused controls retain their
+exact source/carrier limits; stack zeroing remains unbenchmarked. Private checker
+bounds stay1M clone/separate100k tail with201 frontend/8 runtime controls.
+Failing prefixes are not completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

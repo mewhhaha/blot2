@@ -25,6 +25,8 @@ type Error = blot_error::Error;
 type Module = blot_check_core::Module;
 type Pools = blot_reuse_code_artifacts::Pools;
 type Gate = blot_reuse_principal_reuse_gate::Gate;
+fn requiredPools(value:const Pools?)->const Pools& {assert(value);return value;}
+fn requiredGate(value:const Gate?)->const Gate& {assert(value);return value;}
 type ValueInfo = blot_eval_eval_values::ValueInfo;
 type ValueKind = blot_eval_eval_values::ValueKind;
 type ClosureOrigin = blot_eval_eval_values::ClosureOrigin;
@@ -178,7 +180,7 @@ struct Plan {
 reusable[] var plan_order: u32[>..] = [];
 fn deinit(self_: Plan&) { if self_.order.len != 0 { plan_order.free_slice(self_.order); } self_ = Plan {..}; }
 fn bind<G>(self_: QueryScratch&, plan: const Plan&, g: G&) -> Error {
-    if !plan.gate || !plan.pools || self_.allocation_owner == 0 || self_.allocation_owner != g.evaluator.allocation_owner || !blot_reuse_catalog_storage::same(g.evaluator.units, plan.gate.units) { return blot_error::Error.declined; }
+    if !plan.gate || !plan.pools || self_.allocation_owner == 0 || self_.allocation_owner != g.evaluator.allocation_owner || !blot_reuse_catalog_storage::same(g.evaluator.units, requiredGate(plan.gate).units) { return blot_error::Error.declined; }
     if self_.owner != 0 { if self_.owner != self_.owner_id || self_.generator != g.owner_id || self_.session != g.evaluator.owner_id || self_.pools .!= plan.pools || self_.gate .!= plan.gate || !self_.policy.present || self_.policy.value != plan.row_policy { return blot_error::Error.declined; } }
     else { if self_.owner_id == 0 || g.owner_id == 0 || g.evaluator.owner_id == 0 { return blot_error::Error.declined; } self_.owner = self_.owner_id; self_.generator = g.owner_id; self_.session = g.evaluator.owner_id; self_.pools .= plan.pools; self_.gate .= plan.gate; self_.policy = blot_support::some(plan.row_policy); }
     return blot_error::Error.none;
@@ -187,7 +189,7 @@ fn grow<B,T>(self_: QueryScratch&, buffer: B&, length: i64, initial: T) -> Error
 fn begin<G>(self_: QueryScratch&, plan: const Plan&, g: G&) -> u32[:], Error {
     let bound = self_.bind(plan, g); if bound != blot_error::Error.none { return default<u32[:]>(), bound; }
     for id in self_.anchor_ids.items { self_.anchors.items[id] = 0; } self_.stats.anchor_resets += self_.anchor_ids.items.len; self_.anchor_ids.clear();
-    let error = self_.grow(self_.anchors, plan.pools.evaluator.values.len, 0 as u32); if error != blot_error::Error.none { return default<u32[:]>(), error; } return self_.anchors.items, blot_error::Error.none;
+    let error = self_.grow(self_.anchors, requiredPools(plan.pools).evaluator.values.len, 0 as u32); if error != blot_error::Error.none { return default<u32[:]>(), error; } return self_.anchors.items, blot_error::Error.none;
 }
 fn finishMatch(self_: QueryScratch&, order: const u32[:]) { for id in order { self_.positions.items[id] = 0x7fffffffffffffff; self_.candidate.items[id] = 0; } for id in self_.inverse_ids.items { self_.inverse.items[id] = 0; } self_.stats.inverse_positions += self_.inverse_ids.items.len; self_.inverse_ids.clear(); }
 fn finishChildren(self_: QueryScratch&, order: const u32[:]) { for id in self_.child_ids.items { self_.children.items[id] = 0xffffffff; } self_.stats.child_positions += self_.child_ids.items.len; self_.child_ids.clear(); for id in order { self_.append_children.items[id] = false; } }
@@ -401,7 +403,7 @@ fn inspectOwnedRoots(pools: const Pools&, gate: const Gate&, roots: const u32[:]
     checker.deinit(); return Inspection { reason, stats, plan , ..}, failure;
 }
 fn paired<G>(self_: const Plan&, g: G&, graphs: const blot_reuse_artifact_import::Importer&) -> bool {
-    if !self_.gate || !self_.pools || self_.gate.source_pools .!= self_.pools || graphs.old .!= self_.pools || !graphs.enabled || !blot_support::same_slice_identity(g.evaluator.units, self_.gate.units) || graphs.unit_map.len != self_.gate.units.len || !blot_support::same_slice_identity(graphs.units, self_.gate.units) { return false; }
+    if !self_.gate || !self_.pools || requiredGate(self_.gate).source_pools .!= self_.pools || graphs.old .!= self_.pools || !graphs.enabled || !blot_support::same_slice_identity(g.evaluator.units, requiredGate(self_.gate).units) || graphs.unit_map.len != requiredGate(self_.gate).units.len || !blot_support::same_slice_identity(graphs.units, requiredGate(self_.gate).units) { return false; }
     for unit, index in graphs.unit_map { if unit != index + 1 { return false; } } for symbol, index in graphs.symbol_map { if symbol != index { return false; } } return true;
 }
 recursive fn matchesAnchor<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import::Importer&, positions: const i64[:], semantic: const u32[:], mapped: const u32[:], candidate: u32[:], inverse: u32[:], old_id: u32, current: u32, depth: i64, inverse_ids: WordBuffer?) -> bool, Error {
@@ -409,7 +411,7 @@ recursive fn matchesAnchor<G>(self_: const Plan&, g: G&, graphs: blot_reuse_arti
     if depth >= 128 || old_id >= positions.len || positions[old_id] == 0x7fffffffffffffff || current == 0 || current >= g.evaluator.storage.values.len { return false, blot_error::Error.none; }
     if mapped[old_id] != 0 && mapped[old_id] != current { return false, blot_error::Error.none; } if candidate[old_id] != 0 { return candidate[old_id] == current, blot_error::Error.none; }
     if inverse[current] != 0 && inverse[current] != old_id { return false, blot_error::Error.none; }
-    assert(self_.pools); let old .= self_.pools.evaluator; let left = old.values[old_id]; let right = g.evaluator.valueInfo(current);
+    assert(self_.pools); let old .= requiredPools(self_.pools).evaluator; let left = old.values[old_id]; let right = g.evaluator.valueInfo(current);
     if left.kind != right.kind || left.scalar != right.scalar || left.len != right.len || semantic[positions[old_id]] != g.evaluator.valueEvidence(current) { return false, blot_error::Error.none; }
     if left.kind == blot_eval_eval_values::ValueKind.package {
         let dictionary, first = graphs.importClosedEvidence(g, left.nominal as u32); if first != blot_error::Error.none || !dictionary.present { return false, first; }
@@ -446,7 +448,7 @@ fn matchRootsIntoWithScratch<G>(self_: const Plan&, g: G&, graphs: blot_reuse_ar
 fn matchEngine<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_roots: const u32[:], current_roots: const u32[:], mapped: u32[:], scratch: QueryScratch&, borrowed_anchors: bool) -> bool, Error {
     if old_roots.len == 0 || old_roots.len != current_roots.len { return false, blot_error::Error.none; }
     let bound = scratch.bind(self_, g); if bound != blot_error::Error.none { return false, bound; }
-    if !self_.paired(g, graphs) || mapped.len != self_.pools.evaluator.values.len || (borrowed_anchors && !blot_support::same_slice_identity(mapped, scratch.anchors.items)) { return false, blot_error::Error.declined; }
+    if !self_.paired(g, graphs) || mapped.len != requiredPools(self_.pools).evaluator.values.len || (borrowed_anchors && !blot_support::same_slice_identity(mapped, scratch.anchors.items)) { return false, blot_error::Error.declined; }
     let p = scratch.grow(scratch.positions, mapped.len, 0x7fffffffffffffff as i64); if p != blot_error::Error.none { return false, p; }
     let c = scratch.grow(scratch.candidate, mapped.len, 0 as u32); if c != blot_error::Error.none { return false, c; }
     let i = scratch.grow(scratch.inverse, g.evaluator.storage.values.len, 0 as u32); if i != blot_error::Error.none { return false, i; }
@@ -464,7 +466,7 @@ fn matchEngine<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import:
 fn matchPrepared<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import::Importer&, old_roots: const u32[:], current_roots: const u32[:], mapped: u32[:], scratch: QueryScratch&) -> bool, Error {
     assert(self_.pools);
     for id, index in self_.order {
-        var actual: u32 = 0; if self_.pools.evaluator.value_evidence[id] != 0 { let imported, error = graphs.importClosedEvidence(g, self_.pools.evaluator.value_evidence[id]); if error != blot_error::Error.none || !imported.present { return false, error; } actual = imported.value; } scratch.semantic.items[index] = actual;
+        var actual: u32 = 0; if requiredPools(self_.pools).evaluator.value_evidence[id] != 0 { let imported, error = graphs.importClosedEvidence(g, requiredPools(self_.pools).evaluator.value_evidence[id]); if error != blot_error::Error.none || !imported.present { return false, error; } actual = imported.value; } scratch.semantic.items[index] = actual;
     }
     for old in scratch.anchor_ids.items { let current = mapped[old]; if current >= scratch.inverse.items.len { return false, blot_error::Error.none; } if scratch.inverse.items[current] == 0 { let error = scratch.inverse_ids.push(current); if error != blot_error::Error.none { return false, error; } } scratch.inverse.items[current] = old; }
     for old_root, index in old_roots {
@@ -499,11 +501,11 @@ fn materializeReceiptWithScratch<G>(self_: const Plan&,g: G&,graphs: blot_reuse_
     return self_.materializeImpl(g,blot_support::none<u32>(),blot_support::some(seeds),blot_support::some(storage),graphs,scratch);
 }
 fn materializeImpl<G>(self_: const Plan&,g: G&,entry: blot_support::Option<u32>,seeds: blot_support::Option<const u32[:]>,storage: blot_support::Option<QueryStorage>,paired: blot_reuse_artifact_import::Importer?,scratch: QueryScratch?) -> u32[:],Error {
-    if !self_.gate || !self_.pools || self_.gate.source_pools .!= self_.pools || !self_.gate.enabled || !blot_support::same_slice_identity(g.evaluator.units,self_.gate.units) {return default<u32[:]>(),blot_error::Error.declined;}
+    if !self_.gate || !self_.pools || requiredGate(self_.gate).source_pools .!= self_.pools || !requiredGate(self_.gate).enabled || !blot_support::same_slice_identity(g.evaluator.units,requiredGate(self_.gate).units) {return default<u32[:]>(),blot_error::Error.declined;}
     var owned=blot_support::none<blot_reuse_artifact_import::Importer>(); var graphs: blot_reuse_artifact_import::Importer?=paired;
-    if !graphs {let created,error=blot_reuse_artifact_import::init(g.evaluator.allocation_owner,self_.pools,self_.gate.units,self_.pools.identity.value.view(),self_.gate.units.len); if error!=blot_error::Error.none {return default<u32[:]>(),error;} owned=blot_support::some(created); graphs .= owned.value;}
+    if !graphs {let created,error=blot_reuse_artifact_import::init(g.evaluator.allocation_owner,requiredPools(self_.pools),requiredGate(self_.gate).units,requiredPools(self_.pools).identity.value.view(),requiredGate(self_.gate).units.len); if error!=blot_error::Error.none {return default<u32[:]>(),error;} owned=blot_support::some(created); graphs .= owned.value;}
     assert(graphs); var temporary=QueryScratch{allocation_owner:g.evaluator.allocation_owner, ..}; var buffers: QueryScratch?=scratch;
-    if !buffers {let run=scratch_wordbuffer.alloc_slice(self_.pools.evaluator.values.len); for &word in run {word=0;} temporary.anchors=WordBuffer{run,run, ..}; buffers .= temporary;}
+    if !buffers {let run=scratch_wordbuffer.alloc_slice(requiredPools(self_.pools).evaluator.values.len); for &word in run {word=0;} temporary.anchors=WordBuffer{run,run, ..}; buffers .= temporary;}
     assert(buffers); let mapped,error=self_.materializeOwned(g,graphs,entry,seeds,storage,buffers,scratch!=null);
     if owned.present {owned.value.deinit();}
     if error==blot_error::Error.none && !scratch {temporary.anchors.storage=[]; temporary.anchors.items=[];}
@@ -511,15 +513,15 @@ fn materializeImpl<G>(self_: const Plan&,g: G&,entry: blot_support::Option<u32>,
 }
 fn materializeOwned<G>(self_: const Plan&,g: G&,graphs: blot_reuse_artifact_import::Importer&,entry: blot_support::Option<u32>,seeds: blot_support::Option<const u32[:]>,storage: blot_support::Option<QueryStorage>,buffers: QueryScratch&,retained_scratch: bool) -> u32[:],Error {
     assert(self_.gate && self_.pools);
-    if !graphs.enabled || graphs.old .!= self_.pools || !blot_support::same_slice_identity(graphs.units,self_.gate.units) || graphs.unit_map.len!=self_.gate.units.len || graphs.allocation_owner!=g.evaluator.allocation_owner || (graphs.generator_owner!=0 && graphs.generator_owner!=g.owner_id) {return default<u32[:]>(),blot_error::Error.declined;}
-    for mapped_unit,unit in graphs.unit_map {if mapped_unit!=unit+1 {return default<u32[:]>(),blot_error::Error.declined;} graphs.stable[unit]=self_.gate.structural_units[unit];}
+    if !graphs.enabled || graphs.old .!= self_.pools || !blot_support::same_slice_identity(graphs.units,requiredGate(self_.gate).units) || graphs.unit_map.len!=requiredGate(self_.gate).units.len || graphs.allocation_owner!=g.evaluator.allocation_owner || (graphs.generator_owner!=0 && graphs.generator_owner!=g.owner_id) {return default<u32[:]>(),blot_error::Error.declined;}
+    for mapped_unit,unit in graphs.unit_map {if mapped_unit!=unit+1 {return default<u32[:]>(),blot_error::Error.declined;} graphs.stable[unit]=requiredGate(self_.gate).structural_units[unit];}
     for mapped_symbol,symbol in graphs.symbol_map {if mapped_symbol!=symbol {return default<u32[:]>(),blot_error::Error.declined;}}
     let mapped=buffers.anchors.items; if seeds.present {if seeds.value.len!=mapped.len {return default<u32[:]>(),blot_error::Error.declined;} if !retained_scratch {for value,index in seeds.value {mapped[index]=value;}}}
     var state=Material<G>{self_,g,graphs,buffers,entry,storage, ..}; let error=state.prepareMaterial(retained_scratch);
     if error==blot_error::Error.none {state.publishMaterial(retained_scratch);} if retained_scratch && state.children_prepared {buffers.finishChildren(self_.order);} state.deinit(); if error!=blot_error::Error.none {return default<u32[:]>(),error;} return mapped,blot_error::Error.none;
 }
 fn prepareMaterial<G>(self_: Material<G>&,retained_scratch: bool) -> Error {
-    let plan .= self_.plan; assert(plan.pools); let old .= plan.pools.evaluator; let mapped=self_.scratch.anchors.items;
+    let plan .= self_.plan; assert(plan.pools); let old .= requiredPools(plan.pools).evaluator; let mapped=self_.scratch.anchors.items;
     if self_.storage.present && self_.storage.value.root_buffer.present {
         let buffer=self_.storage.value.root_buffer.value; let root=old.values[plan.root];
         if mapped[plan.root]!=0 || (root.kind!=blot_eval_eval_values::ValueKind.array && root.kind!=blot_eval_eval_values::ValueKind.list) || root.len==0 || buffer.capacity<root.len || buffer.offset>buffer.capacity-root.len {return blot_error::Error.declined;}
@@ -551,7 +553,7 @@ fn prepareMaterial<G>(self_: Material<G>&,retained_scratch: bool) -> Error {
 }
 fn reserve<T>(values: T[>..<]&,added: i64,initial: T) {let length=values.len; values.resize(length+added,initial); values.resize(length);}
 fn prepareSpans<G>(self_: Material<G>&,query: QueryStorage,effects: const blot_eval_eval_collection_growth::BufferEffect[:],retained_scratch: bool) -> Error {
-    assert(self_.plan.pools); let plan .= self_.plan; let old .= plan.pools.evaluator; let session .= self_.generator.evaluator; let mapped=self_.scratch.anchors.items; let positions=self_.scratch.children.items; let append_children=self_.scratch.append_children.items;
+    assert(self_.plan.pools); let plan .= self_.plan; let old .= requiredPools(plan.pools).evaluator; let session .= self_.generator.evaluator; let mapped=self_.scratch.anchors.items; let positions=self_.scratch.children.items; let append_children=self_.scratch.append_children.items;
     if self_.count>query.values_added || (query.exact && self_.count!=query.values_added) {return blot_error::Error.declined;}
     for id in plan.order {
         let info=old.values[id]; if mapped[id]==0 {if id<query.values_before {return blot_error::Error.declined;} continue;}
@@ -584,7 +586,7 @@ fn prepareSpans<G>(self_: Material<G>&,query: QueryStorage,effects: const blot_e
     if self_.added_children>query.children_added || (query.exact && self_.added_children!=query.children_added) {return blot_error::Error.declined;} return blot_error::Error.none;
 }
 fn publishMaterial<G>(self_: Material<G>&,retained_scratch: bool) {
-    assert(self_.plan.pools); let plan .= self_.plan; let old .= plan.pools.evaluator; let session .= self_.generator.evaluator; let mapped=self_.scratch.anchors.items;
+    assert(self_.plan.pools); let plan .= self_.plan; let old .= requiredPools(plan.pools).evaluator; let session .= self_.generator.evaluator; let mapped=self_.scratch.anchors.items;
     var child_count=plan.stats.children; if self_.storage.present {child_count=self_.added_children;} if self_.storage.present && self_.storage.value.precharged {session.constant_value_debt-=self_.count; session.constant_child_debt-=child_count;}
     for buffer in self_.transported {assert(buffer.start==session.storage.children.len); session.storage.children.resize(session.storage.children.len+buffer.old.len,0);}
     var type_index: i64=0; var row_index: i64=0;
@@ -607,7 +609,7 @@ fn publishMaterial<G>(self_: Material<G>&,retained_scratch: bool) {
 }
 fn anchorGlobals<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import::Importer&, semantic: const u32[:], mapped: u32[:], entry: u32) -> Error {
     assert(self_.pools); var positions = SizeBuffer {..}; var candidate = WordBuffer {..}; var inverse = WordBuffer {..};
-    var error = positions.resize(self_.pools.evaluator.values.len, 0x7fffffffffffffff as i64);
+    var error = positions.resize(requiredPools(self_.pools).evaluator.values.len, 0x7fffffffffffffff as i64);
     if error == blot_error::Error.none { error = candidate.resize(positions.items.len, 0 as u32); }
     if error == blot_error::Error.none { error = inverse.resize(g.evaluator.storage.values.len, 0 as u32); }
     if error == blot_error::Error.none { for id, index in self_.order { positions.items[id] = index; } error = self_.anchorGlobalsPrepared(g, graphs, semantic, mapped, entry, positions.items, candidate.items, inverse.items); }
@@ -615,11 +617,11 @@ fn anchorGlobals<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_impor
 }
 fn anchorGlobalsPrepared<G>(self_: const Plan&, g: G&, graphs: blot_reuse_artifact_import::Importer&, semantic: const u32[:], mapped: u32[:], entry: u32, positions: const i64[:], candidate: u32[:], inverse: u32[:]) -> Error {
     assert(self_.pools && self_.gate);
-    for pin in self_.pools.modules {
+    for pin in requiredPools(self_.pools).modules {
         if pin.unit == entry { continue; }
         for body in pin.module.bodies[1..] {
-            if body.runtime || !self_.gate.admits(blot_check_core::BindingRef { pin.unit, body.binding , ..}) { continue; }
-            let old_slot = self_.pools.slots[self_.pools.binding_offsets[pin.unit - 1] + body.binding];
+            if body.runtime || !requiredGate(self_.gate).admits(blot_check_core::BindingRef { pin.unit, body.binding , ..}) { continue; }
+            let old_slot = requiredPools(self_.pools).slots[requiredPools(self_.pools).binding_offsets[pin.unit - 1] + body.binding];
             if old_slot.state != 2 || old_slot.value == 0 || old_slot.value >= positions.len || positions[old_slot.value] == 0x7fffffffffffffff { continue; }
             let slot = g.evaluator.slots[g.evaluator.binding_offsets[pin.unit - 1] + body.binding]; if slot.state != blot_eval_core_eval::State.complete { return blot_error::Error.declined; }
             for &value in candidate { value = 0; } for &value in inverse { value = 0; }

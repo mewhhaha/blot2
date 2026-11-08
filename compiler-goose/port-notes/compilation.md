@@ -51,20 +51,23 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen273 inputs. Whole parsing passes
-440 files. Its completed full run advances past the real Session resolver-budget
-borrow, then stops after66.38s with1 captured u32/optional API mismatch in core_eval.
-The15s first-error window gives a partial error list. Whole C emission, linking,
-CLI and Wasm remain pending. Typed host budget access returns the same registered
-Session/admission counter, preserving reentrant charges;12 controls validate
-identity, generation and shared updates. Nullable backend/Stack access, worker pin
-receipts, typed lexical word arrays and same-pool retired-membership storage are
-captured. Local ClosureRegion ownership is separately reviewed/probed and not in
-this snapshot. Import row/child source reviews preserve bounds/error/census/intern
-order under immutable old Snapshots; no runtime equivalence claim was added.
-Earlier proof/catalog/snapshot/capability controls retain their receipt scopes.
+per stage. This checkpoint preserves exact frozen281 inputs. Whole parsing passes
+440 files. Its completed run stops after94.63s with1 captured backend principal
+lookup nullable-access error. The15s first-error window is a partial diagnostic
+list; C emission, linking, CLI and Wasm remain pending. ClosureRegion is now an
+invocation-local owner;18 transitive carriers and old suspension cleanup establish
+its callback lifetime, and6 reduced scoped controls reject escapes. Its measured
+1270B record payload is not net stack growth. Owned HeaderParts and Option transfer
+recover the exact existing mask pool run, preserving addresses, flags and cleanup
+without allocation/copy. Indexed-loop pure allocation/outgoing scalar, scalar
+importer children, nullable Plan access, literal word types and stack initialization
+are captured. Earlier indexed controls have a projected Session and older3-helper
+fixture; actual minimal allocation passes its former source boundary but not the
+whole callback.16 backend literal arrays preserve numericbits/order. Complementary
+Session probes collect6 diagnostics at120s, including2 unsupported dummy defaults.
+These remain diagnostic aids, not runtime qualification. Focused control source
+limits and unbenchmarked zeroing/copy/high-water costs remain in pinned receipts.
 Private checker clone/tail bounds remain1M/100k with201 frontend/8 runtime controls.
-All failed-prefix and short-window results remain distinct from completed builds.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
 through one callback boundary. Actual core/snapshot admission methods use explicit

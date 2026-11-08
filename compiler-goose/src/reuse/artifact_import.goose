@@ -288,11 +288,14 @@ recursive fn shapeInto<G>(self_: Importer&, g: G&, id: u32, depth: i64, values: 
         },
         product, record, nominal => {
             if n.tag != blot_backend_layout::Tag.nominal && c != 0 { return 0, blot_error::Error.declined; }
-            let children, import_error_1 = shapeChildren(__old.layouts, id); if import_error_1 != blot_error::Error.none { return 0, convert(import_error_1); }
-            { let import_error_2 = values.ensure(children.len); if import_error_2 != blot_error::Error.none { return 0, convert(import_error_2); } }
+            var child_count:i64=0;var child_start:i64=n.a;
+            {let children, import_error_1 = shapeChildren(__old.layouts, id); if import_error_1 != blot_error::Error.none { return 0, convert(import_error_1); }child_count=children.len;}
+            { let import_error_2 = values.ensure(child_count); if import_error_2 != blot_error::Error.none { return 0, convert(import_error_2); } }
+            if n.tag==blot_backend_layout::Tag.nominal {child_start=n.c+1;}
             if n.tag == blot_backend_layout::Tag.nominal { { let imported_3, import_error_3 = self_.nominal(a, b); if import_error_3 != blot_error::Error.none { return 0, convert(import_error_3); } a = imported_3; } { let imported_4, import_error_4 = self_.nominalDeclaration(b); if import_error_4 != blot_error::Error.none { return 0, convert(import_error_4); } b = imported_4; } }
             else { a = 0; b = 0; }
-            for child, index in children {
+            for index in 0..child_count {
+                let child=sourceTypeWord(self_,Domain.layout,child_start+index);
                 var mapped: u32 = 0;
                 if n.tag == blot_backend_layout::Tag.record && index % 2 == 0 { { let imported_5, import_error_5 = self_.symbol(child); if import_error_5 != blot_error::Error.none { return 0, convert(import_error_5); } mapped = imported_5; } }
                 else { { let imported_6, import_error_6 = self_.shape(g, child, depth + 1); if import_error_6 != blot_error::Error.none { return 0, convert(import_error_6); } mapped = imported_6; } }
@@ -337,11 +340,14 @@ recursive fn semanticTypeInto<G>(self_: Importer&, g: G&, id: u32, depth: i64, v
         unit, boolean, unsigned32, floating32, never => { if a != 0 || b != 0 || c != 0 { return 0, blot_error::Error.declined; } },
         product, record, nominal => {
             if n.tag != blot_eval_type_evidence::Tag.nominal && c != 0 { return 0, blot_error::Error.declined; }
-            let children, import_error_23 = evidenceChildren(__old.evaluator.evidence.view(), id); if import_error_23 != blot_error::Error.none { return 0, convert(import_error_23); }
-            { let import_error_24 = values.ensure(children.len); if import_error_24 != blot_error::Error.none { return 0, convert(import_error_24); } }
+            var child_count:i64=0;var child_start:i64=n.a;
+            {let children, import_error_23 = evidenceChildren(__old.evaluator.evidence.view(), id); if import_error_23 != blot_error::Error.none { return 0, convert(import_error_23); }child_count=children.len;}
+            { let import_error_24 = values.ensure(child_count); if import_error_24 != blot_error::Error.none { return 0, convert(import_error_24); } }
+            if n.tag==blot_eval_type_evidence::Tag.nominal {child_start=n.c+1;}
             if n.tag == blot_eval_type_evidence::Tag.nominal { { let imported_25, import_error_25 = self_.semanticNominal(a, b); if import_error_25 != blot_error::Error.none { return 0, convert(import_error_25); } a = imported_25; } { let imported_26, import_error_26 = self_.nominalDeclaration(b); if import_error_26 != blot_error::Error.none { return 0, convert(import_error_26); } b = imported_26; } }
             else { a = 0; b = 0; }
-            for child, index in children {
+            for index in 0..child_count {
+                let child=sourceTypeWord(self_,Domain.semantic,child_start+index);
                 var mapped: u32 = 0;
                 if n.tag == blot_eval_type_evidence::Tag.record && index % 2 == 0 { { let imported_27, import_error_27 = self_.symbol(child); if import_error_27 != blot_error::Error.none { return 0, convert(import_error_27); } mapped = imported_27; } }
                 else { { let imported_28, import_error_28 = self_.semanticType(g, child, depth + 1); if import_error_28 != blot_error::Error.none { return 0, convert(import_error_28); } mapped = imported_28; } }
@@ -373,6 +379,9 @@ recursive fn row<G>(self_: Importer&, g: G&, domain: Domain, id: u32, depth: i64
     var arguments = blot_reuse_source_value_template::WordBuffer {..};
     let mapped, error = self_.rowInto(g, domain, id, depth, imported, arguments);
     imported.deinit(); arguments.deinit(); return mapped, error;
+}
+fn sourceTypeWord(self_:const Importer&,domain:Domain,index:i64)->u32 {
+ let old:const Pools& =requiredPools(self_.old);if domain==Domain.semantic {return old.evaluator.evidence.extra[index];}return old.layouts.extra[index];
 }
 fn sourceEffectLabel(self_:const Importer&,domain:Domain,index:i64)->u32 {
     let old:const Pools& =requiredPools(self_.old);if domain==Domain.semantic {return old.evaluator.evidence.effects.labels[index];}return old.layouts.effects.labels[index];
