@@ -27,22 +27,19 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen249
-checkpoints reusable numeric-term rollback using a live dictionary-count prefix:
-failed tail slots stay physically allocated and the next intern reuses exact IDs.
-Every view/copy/publication uses the live prefix; overlap still covers physical
-backing. Golden rollback, strict pool controls and publication checks pass their
-pinned fixtures. High-water aborted backing remains until owner destruction.
-The completed whole run stops after88.74s with2 diagnostics: nullable numeric Plan
-publication and global-loop storage provenance. C emission, linking and execution
-remain pending.64 strided diagnostic-only Engine roots captured20 diagnostics at
-a120s cap; dummy defaults caused known harness-only failures and borrow warnings
-that require valid-owner reproduction. Intrinsic checker API fixes are batched;
-all qualification limits remain explicit. Numeric overlap scans cost O(n+m),
-decoder snapshots add temporary input copies, and default timing labels add no
-allocation. The private checker retains bounded1M clone/separate100k tail limits
-with201 frontend/8 runtime parity controls. These are failing-prefix observations,
-not completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen251
+checkpoints covariant fixed scratch, typed numeric values and loop-frame pool
+reborrows, alongside intrinsic checker repairs from independent probes. Focused
+covariant controls reproduce original failures and pass both checkers; no allocator
+OOM injection was claimed. The completed whole run stops after90.71s with2
+diagnostics: numeric summary borrow and Span/Option mismatch. C emission, linking
+and execution remain pending. Refreshed64-root probes captured17 diagnostics at
+a120s cap; unsupported dummy constructors and unproven borrow-context warnings
+remain excluded from production-fix claims. Numeric rollback retains high-water
+physical backing but exact live IDs/views; overlap remains O(n+m). Component
+fixtures and their reductions are pinned. The private checker uses bounded1M
+clone/separate100k tail limits with201 frontend/8 runtime parity controls.
+Failing-prefix observations are not completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

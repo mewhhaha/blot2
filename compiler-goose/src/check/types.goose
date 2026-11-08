@@ -1744,28 +1744,39 @@ recursive fn closeCovariantNode(self_: Store&, root: Id, generalized: const u32[
             if effect_row == value.c { return root, blot_error::Error.none; } return provider(self_, value.a, effect_row);
         },
         function => {
-            let parameter_free, pe = freeRowVariables(self_, value.a); if pe != blot_error::Error.none { return 0, pe; }
-            let result_free, re = freeRowVariables(self_, value.b); if re != blot_error::Error.none { return 0, re; }
-            var effect_row = value.c; let tail = self_.effects.node(effect_row).tail;
-            match tail { variable v => { if has(generalized, v.value) && !has(protected, v.value) && !has(parameter_free, v.value) && !has(result_free, v.value) {
-                if record_decisions && !has(decisions, v.value) { decisions.push(v.value); }
-                let next, error = self_.effects.row(rowLabels(self_, effect_row), blot_check_effects::Tail.closed); if error != blot_error::Error.none { return 0, effectError(error); } effect_row = next;
-            } }, _ => {}, }
-            var nested: u32[>..] = []; nested.append(protected); let union = unionInto(self_, nested, parameter_free); if union != blot_error::Error.none { return 0, union; }
-            match self_.effects.node(effect_row).tail { variable v => { let error = unionInto(self_, nested, [v.value]); if error != blot_error::Error.none { return 0, error; } }, _ => {}, }
-            let result, error = closeCovariantDepth(self_, value.b, generalized, nested, decisions, record_decisions, memo, depth + 1); if error != blot_error::Error.none { return 0, error; }
-            if result == value.b && effect_row == value.c { return root, blot_error::Error.none; } return functionWithEffects(self_, value.a, result, effect_row);
+            var effect_row:u32=0;var nested:Id[:]=default<Id[:]>();
+            block {
+                let parameter_free,pe=freeRowVariables(self_,value.a);if pe!=blot_error::Error.none {return 0,pe;}
+                let result_free,re=freeRowVariables(self_,value.b);if re!=blot_error::Error.none {return 0,re;}
+                effect_row=value.c;let tail=self_.effects.node(effect_row).tail;
+                match tail {variable v=>{if has(generalized,v.value) && !has(protected,v.value) && !has(parameter_free,v.value) && !has(result_free,v.value) {
+                    if record_decisions && !has(decisions,v.value) {decisions.push(v.value);}
+                    let next,error=self_.effects.row(rowLabels(self_,effect_row),blot_check_effects::Tail.closed);if error!=blot_error::Error.none {return 0,effectError(error);}effect_row=next;
+                }},_=>{},}
+                var gathered:u32[>..]=[];gathered.append(protected);let union=unionInto(self_,gathered,parameter_free);if union!=blot_error::Error.none {return 0,union;}
+                match self_.effects.node(effect_row).tail {variable v=>{let error=unionInto(self_,gathered,[v.value]);if error!=blot_error::Error.none {return 0,error;}},_=>{},}
+                nested=substitution_ids.alloc_slice(gathered.len);for id,index in gathered {nested[index]=id;}
+            }
+            let result,error=closeCovariantDepth(self_,value.b,generalized,nested,decisions,record_decisions,memo,depth+1);
+            if nested.len!=0 {substitution_ids.free_slice(nested);}if error!=blot_error::Error.none {return 0,error;}
+            if result==value.b && effect_row==value.c {return root,blot_error::Error.none;}return functionWithEffects(self_,value.a,result,effect_row);
         },
         product, record => {
-            var protected_siblings: u32[>..] = []; protected_siblings.append(protected);
-            for i in value.b { var child = self_.extra.items[value.a + i]; if value.tag == Tag.record { child = recordField(self_, value, i).ty; } let error = covariantInputs(self_, child, protected_siblings, depth + 1); if error != blot_error::Error.none { return 0, error; } }
-            var children: Id[>..] = []; var fields: Field[>..] = []; var changed = false;
+            let protected_siblings,prepared=covariantSiblingRows(self_,value,protected,depth);if prepared!=blot_error::Error.none {return 0,prepared;}
+            var children:Id[:]=default<Id[:]>();var fields:Field[:]=default<Field[:]>();
+            if value.tag==Tag.record {fields=substitution_fields.alloc_slice(value.b);}else {children=substitution_ids.alloc_slice(value.b);}
+            recursive fn rewriteChildren()->Id,Error {
+
+var changed=false;
             for i in value.b {
                 var field = Field { 0, self_.extra.items[value.a + i] , ..}; if value.tag == Tag.record { field = recordField(self_, value, i); }
                 let child, error = closeCovariantDepth(self_, field.ty, generalized, protected_siblings, decisions, record_decisions, memo, depth + 1); if error != blot_error::Error.none { return 0, error; }
-                changed = changed || child != field.ty; if value.tag == Tag.record { fields.push(Field { field.name, child , ..}); } else { children.push(child); }
+                changed = changed || child != field.ty; if value.tag == Tag.record { fields[i]=Field{field.name,child}; } else { children[i]=child; }
             }
             if !changed { return root, blot_error::Error.none; } if value.tag == Tag.record { return record(self_, fields); } return product(self_, children);
+
+            }
+            let result,error=rewriteChildren();if fields.len!=0 {substitution_fields.free_slice(fields);}if children.len!=0 {substitution_ids.free_slice(children);}if protected_siblings.len!=0 {substitution_ids.free_slice(protected_siblings);}return result,error;
         },
         usage => {
             let child, error = closeCovariantDepth(self_, value.a, generalized, protected, decisions, record_decisions, memo, depth + 1); if error != blot_error::Error.none { return 0, error; }
@@ -1778,6 +1789,12 @@ recursive fn closeCovariantNode(self_: Store&, root: Id, generalized: const u32[
         _ => { return root, blot_error::Error.none; },
     }
 }
+// The recursive closing frame retains a fixed snapshot of protected row IDs.
+fn covariantSiblingRows(self_:Store&,value:Node,protected:const u32[:],depth:i64)->Id[:],Error {
+    var gathered:u32[>..]=[];gathered.append(protected);
+    for i in value.b {var child=self_.extra.items[value.a+i];if value.tag==Tag.record {child=recordField(self_,value,i).ty;}let error=covariantInputs(self_,child,gathered,depth+1);if error!=blot_error::Error.none {return default<Id[:]>(),error;}}
+    let snapshot=substitution_ids.alloc_slice(gathered.len);for id,index in gathered {snapshot[index]=id;}return snapshot,blot_error::Error.none;
+}
 fn covariantInputs(self_: Store&, root: Id, out: u32[>..]&, depth: i64) -> Error { var seen = dictionary<CovariantInput, bool> {}; return covariantInputsSeen(self_, root, out, depth, seen); }
 recursive fn covariantInputsSeen(self_: Store&, root: Id, out: u32[>..]&, depth: i64, seen: dictionary<CovariantInput, bool>&) -> Error {
     if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return error; } }
@@ -1785,7 +1802,7 @@ recursive fn covariantInputsSeen(self_: Store&, root: Id, out: u32[>..]&, depth:
     if self_.has_projections || self_.use_closed_graphs { let key = CovariantInput { root, depth , ..}; if ::contains(seen,key) { return blot_error::Error.none; } ::insert(seen,key, true); }
     let value = node(self_, root);
     match value.tag {
-        function => { let free, error = freeRowVariables(self_, value.a); if error != blot_error::Error.none { return error; } let added = unionInto(self_, out, free); if added != blot_error::Error.none { return added; } return covariantInputsSeen(self_, value.b, out, depth + 1, seen); },
+        function => {block {let free,error=freeRowVariables(self_,value.a);if error!=blot_error::Error.none {return error;}let added=unionInto(self_,out,free);if added!=blot_error::Error.none {return added;}}return covariantInputsSeen(self_,value.b,out,depth+1,seen);},
         nominal, state_provider => { let free, error = freeRowVariables(self_, root); if error != blot_error::Error.none { return error; } return unionInto(self_, out, free); },
         provider => { let free, error = freeRowVariables(self_, value.a); if error != blot_error::Error.none { return error; } return unionInto(self_, out, free); },
         product, record => { for i in value.b { var child = self_.extra.items[value.a + i]; if value.tag == Tag.record { child = recordField(self_, value, i).ty; } let error = covariantInputsSeen(self_, child, out, depth + 1, seen); if error != blot_error::Error.none { return error; } } },
@@ -1825,12 +1842,19 @@ recursive fn openCovariantNode(self_: Store&, root: Id, memo: dictionary<Covaria
             if result == value.b && effect_row == value.c { return root, blot_error::Error.none; } return functionWithEffects(self_, value.a, result, effect_row);
         },
         product, record => {
-            var children: Id[>..] = []; var fields: Field[>..] = []; var changed = false;
+            var children:Id[:]=default<Id[:]>();var fields:Field[:]=default<Field[:]>();
+            if value.tag==Tag.record {fields=substitution_fields.alloc_slice(value.b);}else {children=substitution_ids.alloc_slice(value.b);}
+            recursive fn rewriteChildren()->Id,Error {
+
+            var changed=false;
             for i in value.b { var field = Field { 0, self_.extra.items[value.a + i] , ..}; if value.tag == Tag.record { field = recordField(self_, value, i); }
                 let child, error = openCovariantDepth(self_, field.ty, memo, depth + 1); if error != blot_error::Error.none { return 0, error; }
-                changed = changed || child != field.ty; if value.tag == Tag.record { fields.push(Field { field.name, child , ..}); } else { children.push(child); }
+                changed = changed || child != field.ty; if value.tag == Tag.record { fields[i]=Field{field.name,child}; } else { children[i]=child; }
             }
             if !changed { return root, blot_error::Error.none; } if value.tag == Tag.record { return record(self_, fields); } return product(self_, children);
+
+            }
+            let result,error=rewriteChildren();if fields.len!=0 {substitution_fields.free_slice(fields);}if children.len!=0 {substitution_ids.free_slice(children);}return result,error;
         },
         usage => {
             if value.b == blot_parse_ast::usagekind_cleanup || value.b == blot_parse_ast::usagekind_concurrent { return root, blot_error::Error.none; }

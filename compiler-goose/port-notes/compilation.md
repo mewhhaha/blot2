@@ -51,19 +51,18 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen249 inputs. Its completed run
-stops after88.74s with2 diagnostics: nullable Plan publication and global-loop
-storage provenance. Numeric rollback retains physical high-water backing and
-uses dictionary count as the exact live prefix, overwriting aborted tail slots
-on subsequent intern while preserving IDs. Views/copies/publication exclude the
-tail; the overlap guard includes it. Golden/strict/publication fixtures pass,
-with reductions recorded.64 diagnostic-only Engine roots captured20 diagnostics
-at a120s cap; dummy defaults and borrow-context differences prevent treating
-that run as production qualification. Intrinsic API fixes are batched from it.
-Whole C emission, linking, CLI and Wasm qualification remain pending. O(n+m)
-overlap scans and temporary decoder copies are explicit costs. Full counts use
-completed logs with a45-second diagnostic window. The private checker retains
-bounded1M clone and separate100k tail limits, with201 frontend/8 runtime controls.
+per stage. This checkpoint preserves exact frozen251 inputs. Its completed run
+stops after90.71s with2 diagnostics: numeric summary borrow and Span/Option
+mismatch. Covariant fixed scratch, typed numeric values and exact loop-frame
+pool reborrows advance past prior failures. Focused controls preserve error/fuel
+and identity behavior; native OOM injection is not claimed. Refreshed64-root
+probes captured17 diagnostics at a120s cap. Unsupported dummy defaults and
+unreproduced borrow warnings do not establish production bugs. Whole C emission,
+linking, CLI and Wasm qualification remain pending. Numeric high-water backing
+and O(n+m) overlap cost remain disclosed. Full counts come from completed logs
+with a45-second collection window; timings are failing prefixes. The private
+checker retains bounded1M clone/separate100k tail limits and201 frontend/8
+runtime parity controls.
 
 The scoped implementation-evidence owner now initializes, invokes and cleans up
 through one callback boundary. Actual core/snapshot admission methods use explicit
