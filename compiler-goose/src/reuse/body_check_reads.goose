@@ -1,7 +1,7 @@
 // Exact per-body reachable payload and identity reads within an immutable chunk.
 namespace blot_reuse_body_check_cache;
 import .body_check_cache;
-struct AuxiliaryReads {source:Source,pending:u32[>..<]&,reads:u32[>..<]&,nominals:const IdentityRead[:],bytes:i64=0}
+struct AuxiliaryReads {source:Source,pending:u32[>..<]&,reads:u32[>..<]&,nominals:const IdentityRead[>..<]&,bytes:i64=0}
 fn addRead(self_:AuxiliaryReads&,index:u32)->Error {if index>=self_.nominals.len {return blot_error::Error.dependency_limit;}if !position(self_.reads[..],index).present {self_.reads.push(index);self_.bytes+=identity_read_footprint+self_.nominals[index].name.len;}return blot_error::Error.none;}
 fn label(self_:AuxiliaryReads&,id:u32)->Error {
  if id==0 || id==blot_check_types::foreign_operation {return blot_error::Error.none;}if id>=self_.source.operationCount() {return blot_error::Error.dependency_limit;}let operation=self_.source.operation(id);if operation.identity.unit==0 || operation.identity.unit>self_.nominals.len {return blot_error::Error.dependency_limit;}let index=operation.identity.unit-1;if self_.nominals[index].kind!=NominalKind.operation {return blot_error::Error.dependency_limit;}
@@ -11,7 +11,7 @@ fn map_ty(self_:AuxiliaryReads&,value:u32)->u32,Error {self_.pending.push(value)
 fn map_label(self_:AuxiliaryReads&,value:u32)->u32,Error {let error=self_.label(value);return value,error;}
 fn map_row(self_:AuxiliaryReads&,value:u32)->u32,Error {let row=self_.source.row(value);self_.bytes+=effect_row_footprint+row.labels.len*4;for operation in self_.source.rowLabels(row.labels) {let error=self_.label(operation);if error!=blot_error::Error.none {return 0,error;}}return value,blot_error::Error.none;}
 struct BodyReads {nominals:u32[:]=default<u32[:]>(),bytes:i64=0}
-fn bodyReads(graph:const blot_check_frozen_types::Graph&,body:const Body&,names:const (u8[:])[:],nominals:const IdentityRead[:])->BodyReads,Error {
+fn bodyReads(graph:const blot_check_frozen_types::Graph&,body:const Body&,names:const (u8[:])[:],nominals:const IdentityRead[>..<]&)->BodyReads,Error {
  var pending:u32[>..<]=[];var reads:u32[>..<]=[];var mapper=AuxiliaryReads{blot_check_frozen_types::Source.frozen{graph},pending,reads,nominals, ..};let error=bodyReadsInto(body,names,mapper);if error!=blot_error::Error.none {return BodyReads{..},error;}return BodyReads{copyOwned(reads[..]),mapper.bytes, ..},blot_error::Error.none;
 }
 fn bodyReadsInto(body:const Body&,names:const (u8[:])[:],mapper:AuxiliaryReads&)->Error {

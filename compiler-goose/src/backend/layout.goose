@@ -409,8 +409,16 @@ recursive fn fromTypeNode(store: Store&, module: const blot_check_core::Module&,
             for index in 0..n.b { let field = module.types.recordField(n, index); values.push(field.name);if values.failure!=blot_error::Error.none {return 0,values.failure;} let child, error = fromTypeDepth(store, module, field.ty, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } values.push(child);if values.failure!=blot_error::Error.none {return 0,values.failure;} }
             return internRecord(store, values.items);
         }
-        var children = module.types.list(blot_check_types::List { start: n.a, len: n.b , ..}); if n.tag == blot_check_types::Tag.nominal { children = module.types.nominalArguments(n); }
-        for child in children { let value, error = fromTypeDepth(store, module, child, mappings, rows, depth + 1, allow_erased); if error != blot_error::Error.none { return 0, error; } values.push(value);if values.failure!=blot_error::Error.none {return 0,values.failure;} }
+        var child_count:i64=0;
+        if n.tag == blot_check_types::Tag.nominal { child_count=module.types.nominalArguments(n).len; }
+        else { child_count=module.types.list(blot_check_types::List{start:n.a,len:n.b,..}).len; }
+        for index in 0..child_count {
+            var child:u32=0;
+            if n.tag == blot_check_types::Tag.nominal { child=module.types.nominalArguments(n)[index]; }
+            else { child=module.types.list(blot_check_types::List{start:n.a,len:n.b,..})[index]; }
+            let value,error=fromTypeDepth(store,module,child,mappings,rows,depth+1,allow_erased);if error!=blot_error::Error.none {return 0,error;}
+            values.push(value);if values.failure!=blot_error::Error.none {return 0,values.failure;}
+        }
         if n.tag == blot_check_types::Tag.nominal { return intern(store, Tag.nominal, n.a, n.b, values.items); } return intern(store, Tag.product, 0, 0, values.items);
 
         }

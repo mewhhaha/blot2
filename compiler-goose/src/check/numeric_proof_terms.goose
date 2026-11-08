@@ -129,10 +129,17 @@ fn importMany(self_: Store&, source: View, proofs: const Proposition[:], boundar
     if error != blot_error::Error.none { return [], error; }
     return result, blot_error::Error.none;
 }
+// Either first element lies in the other range exactly when aligned term slices overlap.
+fn overlaps(left:const Term[:],right:const Term[:])->bool {
+    if left.len==0 || right.len==0 {return false;}
+    for &value in left {if value .==right[0] {return true;}}
+    for &value in right {if value .==left[0] {return true;}}
+    return false;
+}
 fn importInto(self_: Store&, source: View, proofs: const Proposition[:], results: Proposition[:], boundary: Boundary, substitution: Substitution) -> blot_error::Error {
     if source.terms.len != 0 && self_.terms.len != 0 {
         if (source.owner_id != 0 && source.owner_id == self_.owner_id) ||
-           self_.terms.index_of(source.terms[0]) >= 0 || source.terms.index_of(self_.terms[0]) >= 0 {
+           overlaps(self_.terms, source.terms) {
             return blot_error::Error.invalid_proof_operand;
         }
     }

@@ -2,21 +2,28 @@
 namespace blot_reuse_body_check_cache;
 import .body_check_cache;
 import check.source_sort;
-struct BindingOrderEntry {binding:Binding,origin:u32,slot:u32}
+struct BindingOrderEntry {origin:u32,slot:u32}
 struct BindingOrder {entries:BindingOrderEntry[:]}
 reusable[] var binding_order_runs:BindingOrderEntry[>..]=[];
 fn lessThan(self_:BindingOrder,left:i64,right:i64)->bool {return self_.entries[left].origin<self_.entries[right].origin;}
 fn swap(self_:BindingOrder,left:i64,right:i64) {let before=self_.entries[left];self_.entries[left]=self_.entries[right];self_.entries[right]=before;}
 fn orderBindings(bindings:Binding[:],origins:u32[:],facts:Fact[:],merges:Merge[:],carries:LoopCarry[:],exits:u32[:],rebindings:Rebinding[:])->Error {
  var ordered=true;var previous:u32=0;for origin,index in origins {let binding=bindings[index];if binding.kind!=blot_reuse_principal_interface::Kind.local && binding.kind!=blot_reuse_principal_interface::Kind.parameter {continue;}if previous>origin {ordered=false;}previous=origin;}if ordered {return blot_error::Error.none;}
- let entries=binding_order_runs.alloc_slice(bindings.len);for binding,index in bindings {entries[index]=BindingOrderEntry{binding,origins[index],index as u32, ..};}blot_check_source_sort::pdqContext(0,entries.len,BindingOrder{entries, ..});
+ let entries=binding_order_runs.alloc_slice(bindings.len);for binding,index in bindings {entries[index]=BindingOrderEntry{origins[index],index as u32, ..};}blot_check_source_sort::pdqContext(0,entries.len,BindingOrder{entries, ..});
  for entry,index in entries {origins[entry.slot]=(index+1) as u32;}
  for &fact in facts {if fact.binding!=0 {fact.binding=origins[fact.binding-1];}}
  for &merge in merges {merge.result=origins[merge.result-1];merge.yes=origins[merge.yes-1];merge.no=origins[merge.no-1];}
  for &carry in carries {carry.incoming=origins[carry.incoming-1];carry.iteration=origins[carry.iteration-1];carry.backedge=origins[carry.backedge-1];carry.outgoing=origins[carry.outgoing-1];}
  for &binding in exits {binding=origins[binding-1];}
  for &binding in rebindings {binding.root=origins[binding.root-1];binding.self_binding=origins[binding.self_binding-1];}
- for entry,index in entries {bindings[index]=entry.binding;origins[index]=entry.origin;}binding_order_runs.free_slice(entries);return blot_error::Error.none;
+ // Pull each sorted permutation cycle through one local header. The global
+ // sort scratch contains only scalar indices; every binding stays caller-owned.
+ for start in 0..entries.len {
+  if entries[start].slot==start {continue;}
+  let before=bindings[start];var at=start;
+  loop {let next=entries[at].slot;entries[at].slot=at as u32;if next==start {bindings[at]=before;break;}bindings[at]=bindings[next];at=next;}
+ }
+ for entry,index in entries {origins[index]=entry.origin;}binding_order_runs.free_slice(entries);return blot_error::Error.none;
 }
 fn instantiatedReference(tree:const Tree&,checked:const blot_check_check::Checked&,predicate:blot_check_types::Obligation)->u32 {let tag=tree.node(predicate.source).tag;if tag!=blot_parse_ast::tag_name && tag!=blot_parse_ast::tag_binary {return 0;}let target=checked.resolved[predicate.source];if target==0 || checked.bindings[target].scheme.obligations.len==0 {return 0;}if tag==blot_parse_ast::tag_name && directPathField(checked,predicate) {return 0;}return target;}
 fn directPathField(checked:const blot_check_check::Checked&,predicate:blot_check_types::Obligation)->bool {

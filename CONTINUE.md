@@ -27,21 +27,21 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen243
-checkpoints174 further reviewed recursive annotations across16 files, plus typed
-row-construction boundaries and concrete catalog-key hashes. The wider audit
-rejects qualified/aliased/generic receiver false edges; exact reviewed graphs and
-source hashes are pinned. Option.some now snapshots ordinary values before
-construction;16 value cases and strict same-scope grow-shrink escape controls
-pass both checkers. Explicit reference-valued options are unused and intentionally
-snapshot values under this helper. The completed whole run stops after86.96s
-with2 diagnostics in2 files: a recursive row Context and uninitialized editor
-stack arrays. C emission, linking and execution remain pending. Component
-receipts qualify exact sources and disclosed reduced leaves. Decoder input
-snapshots add a temporary copy; default timing labels need no allocation.
-The private checker uses a1M cumulative clone bound and a separate100k tail
-traversal, with201 frontend/8 runtime parity controls. These are failing-prefix
-durations, not completed compiler timings.
+including its source delta and byte-exact tracked recipe reconstruction. Frozen247
+checkpoints numeric validation scopes and module lookup, scalar binding sorting,
+native read carriers, fixed editor stack arrays, and concrete borrow/API fixes.
+The completed whole run stops after88.40s with2 diagnostics: reusable numeric
+term rollback and a missing obligation scratch pool. C emission, linking and
+execution remain pending. Twelve independent diagnostic probe roots captured9
+errors in a120s capped run, exposing additional future checking paths; dummy
+arguments make those diagnostics investigation evidence, not whole qualification.
+Focused runtime/negative controls qualify exact sources and disclosed reductions.
+Numeric import now checks overlap by exact identity scans: O(n+m) comparisons
+instead of native O(1), no copy/allocation/fuel debit. Decoder snapshots add a
+temporary input copy; default timing labels need no allocation. The private
+checker retains its bounded1M clone experiment and separate100k tail traversal,
+with201 frontend/8 runtime parity controls. These are failing-prefix durations,
+not completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.
 

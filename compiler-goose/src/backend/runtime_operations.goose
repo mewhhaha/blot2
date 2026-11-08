@@ -159,16 +159,18 @@ fn internSymbol(store: Store&, bytes: const u8[:], foreign: bool) -> Id, blot_er
         let entry = store.entries[candidate - 1];
         if blot_backend_runtime_identity::equalBytes(key(store, entry), bytes) {
             if entry.foreign != foreign { return 0, blot_error::Error.invalid_operation; }
-            if store.artifacts { let error = blot_reuse_artifact_emitter::recordDemand(store.artifacts, blot_reuse_artifact_emitter::ResourceKind.operation, candidate, true); if error != blot_error::Error.none { return 0, error; } }
+            let artifacts .= store.artifacts;if artifacts {let active:blot_reuse_artifact_emitter::Recorder& = artifacts;let error = blot_reuse_artifact_emitter::recordDemand(active, blot_reuse_artifact_emitter::ResourceKind.operation, candidate, true); if error != blot_error::Error.none { return 0, error; } }
             return candidate, blot_error::Error.none;
         }
         candidate = entry.next;
     }
     if store.entries.len >= 4294967293 { return 0, blot_error::Error.module_too_large; }
     let id = (store.entries.len + 1) as Id;
-    if store.artifacts {
-        var error = blot_reuse_artifact_emitter::operationSymbol(store.artifacts, id, bytes, foreign); if error != blot_error::Error.none { return 0, error; }
-        error = blot_reuse_artifact_emitter::recordDemand(store.artifacts, blot_reuse_artifact_emitter::ResourceKind.operation, id, false); if error != blot_error::Error.none { return 0, error; }
+    let artifacts .= store.artifacts;
+    if artifacts {
+        let active:blot_reuse_artifact_emitter::Recorder& = artifacts;
+        var error = blot_reuse_artifact_emitter::operationSymbol(active, id, bytes, foreign); if error != blot_error::Error.none { return 0, error; }
+        error = blot_reuse_artifact_emitter::recordDemand(active, blot_reuse_artifact_emitter::ResourceKind.operation, id, false); if error != blot_error::Error.none { return 0, error; }
     }
     let range = blot_backend_runtime_ir::Range { start: store.key_bytes.len, len: bytes.len , ..}; let appended=store.key_bytes.append(bytes);if appended!=blot_error::Error.none {return 0,appended;}
     var previous: Id = 0; block { let found = store.keys.get(fingerprint); if found { previous = found; } }

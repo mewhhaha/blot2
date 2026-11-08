@@ -28,7 +28,7 @@ fn node(self_: Source, id: blot_check_types::Id) -> blot_check_types::Node {
     match self_ { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.node(id); }, frozen s => { return s.value.nodes[id]; }, }
 }
 fn list(self_: Source, span: blot_check_types::List) -> const blot_check_types::Id[:] {
-    match self_ { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.list(span); }, frozen s => { return s.value.extra[span.start..span.start + span.len]; }, }
+    match self_ { inactive => { abort("inactive frozen source descriptor"); }, store s => { return s.value.extra.items[span.start..span.start + span.len]; }, frozen s => { return s.value.extra[span.start..span.start + span.len]; }, }
 }
 fn nominalArguments(self_: Source, value: blot_check_types::Node) -> const blot_check_types::Id[:] {
     match self_ { inactive => { abort("inactive frozen source descriptor"); },
