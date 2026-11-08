@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen397 is the current source checkpoint. Selected private checker
+Frozen402 is the current source checkpoint. Previous private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -368,3 +368,18 @@ passes but examines814.7million raw stores and enters TypeEq12.78billion times;
 held/slot convergence work is small (max2sweeps). Target repeated store-summary
 replay and type comparison work next. Instrumented time is no speed result;
 no C/header/executable exists, and selected checker678b88 is unchanged.
+
+Private checker4548ebed now adds a raw-store identity fast path to678b88.
+The call-local class-membership set expires before slot rebinding; relevant
+events retain ordered live lookups and unrelated events retain classread
+normalization. Its201frontend/8runtime/7focused/12C checks, eight extra store
+controls and8192extracted-loop comparisons (also ASan/UBSan) pass. Same397
+authored inputs reach a new matchPattern slice-lifetime diagnostic in108.520s,
+where397/398/399 capped without diagnostics. This is restored diagnostic
+progress, not completed compilation or a measured speed percentage.
+
+Frozen402 changes matchPattern product children to scalar count/ID reloads,
+preserving initial bounds/arity checks, child read and recursive call order.
+Exact source review passes. Its120.348s attempt caps with zero diagnostics and
+no C/header/executable; whole qualification remains pending. Do not repeat
+unchanged. Next is isolated ArrayElemsReached visited-type bucketing.

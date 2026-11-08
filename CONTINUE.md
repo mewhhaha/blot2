@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen397 is the current source checkpoint. RegionSnapshot is now only a
+Frozen402 is the current source checkpoint. RegionSnapshot is now only a
 lease/generation handle; its existing lease owns State and solver metadata.
 Restore creates one invocation-local payload view after solver restore succeeds.
 The rewrite removes400lines/15948bytes and reduces the static Session type proxy
@@ -240,3 +240,18 @@ separate. Recheck real integration after semantic changes with the tracked
 unrelated work and existing siblings; no new worktrees. Commit/push coherent
 checked batches to main and verify the remote. Environment publication and
 upstream comments require explicit requests.
+
+Private checker4548ebed now adds a raw-store identity fast path to678b88.
+The call-local class-membership set expires before slot rebinding; relevant
+events retain ordered live lookups and unrelated events retain classread
+normalization. Its201frontend/8runtime/7focused/12C checks, eight extra store
+controls and8192extracted-loop comparisons (also ASan/UBSan) pass. Same397
+authored inputs reach a new matchPattern slice-lifetime diagnostic in108.520s,
+where397/398/399 capped without diagnostics. This is restored diagnostic
+progress, not completed compilation or a measured speed percentage.
+
+Frozen402 changes matchPattern product children to scalar count/ID reloads,
+preserving initial bounds/arity checks, child read and recursive call order.
+Exact source review passes. Its120.348s attempt caps with zero diagnostics and
+no C/header/executable; whole qualification remains pending. Do not repeat
+unchanged. Next is isolated ArrayElemsReached visited-type bucketing.

@@ -331,3 +331,47 @@
 +        for (size_t i = 0; i < ast.functions.size(); i++) {
 +            auto sf = ast.functions[i];
 +            if (!sf->isexport) CheckRoot([&] { CheckUnreached(sf); });
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1783,13 +1783,27 @@
+         });
+     }
+     auto end = min(rec->eventend, storeevents.size());
++    if (rec->eventstart < end) {
++        // Membership alone is stable during this raw-event remapping phase.
++        // Keep the original ordered classat lookup and live argument reads for
++        // relevant events; no roots or mutable event classifications are cached.
++        unordered_set<VarDef *> rawclasses;
++        rawclasses.reserve(std::min(spec->params.size(), argvals.size()) * 2);
++        for (size_t p = 0; p < spec->params.size() && p < argvals.size(); p++) {
++            if (auto root = spec->params[p]->ref.Root()) rawclasses.insert(root);
++            if (auto view = ViewClassOf(spec, p)) rawclasses.insert(view);
++        }
+     for (auto i = rec->eventstart; i < end; i++) {
+-        auto e = storeevents[i];
+-        // A call back into a body still being checked leaves the events of
+-        // that body's own variables as they are: a cycle's rounds keep the
+-        // variables, so they are those of the activation being checked, which
+-        // this call's arguments do not describe.
+-        if (spec->inprogress && e.container && e.container->ownerspec == spec) continue;
++        const auto &raw = storeevents[i];
++        // A back edge leaves its own activation's variables unchanged.
++        if (spec->inprogress && raw.container && raw.container->ownerspec == spec) continue;
++        if (!rawclasses.contains(raw.root) && !rawclasses.contains(raw.src)) {
++            // mapped/source are identity here; only classread normalization
++            // can change the single event. In particular no event is appended.
++            storeevents[i].classread = raw.classread && IsClassRoot(raw.src);
++            continue;
++        }
++        auto e = raw;
+         auto r = mapped(e.root, e.exact);
+         auto src = source(e.src);
+         e.classread = e.classread && IsClassRoot(src);
+@@ -1809,6 +1823,7 @@
+             if (k == 0) storeevents[i] = e;
+             else storeevents.push_back(e);
+         }
++    }
+     }
+     // What a store into a slot put there, as seen from here. A slice loaded
+     // through a reference to a slice whose elements hold no references is

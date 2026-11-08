@@ -17,11 +17,11 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_SHA256 = "1c7388a6c15f4429fef83f9d8377524123c231a2df20ddad91542ea31ff4bd39"
-PATCH_SHA256 = "2155c1bc31c8a40b6fb14d5abef0f6a643d65fc93e4f368617b97663d94737eb"
-PATCHED_SOURCE_SHA256 = "a7208ad7bfaf495d2fee16ddd65eb5282b05e8db60529b99ba83719c47e52d6b"
+PATCH_SHA256 = "74e0c6c36c2cd6330094a29c3ceebb7ab77928cf6fe8f14a8df63b345cc474ac"
+PATCHED_SOURCE_SHA256 = "4aa9d45d1786590c5a6d9f54c39a05ab1db3cddf0df0c16d1024c8507e7dc533"
 PATCHED_HEADERS = {
     "src/typecheck_calls.h": "3ca9bf3180d7793fa4e5cc7cc449f817bd1cb0ef6b44e6c07cf1ec33de15117c",
-    "src/typecheck_builtins.h": "07a3876ff0c24dcf5429bb791b6fc23b420c1c7fe39a5533bb141b0eec3a6cd9",
+    "src/typecheck_builtins.h": "c5f4835ee8205b464ad976f9b7e4d2951cb70f165ed78900e719ef9afb73798c",
     "src/clone.h": "f9e88692342c320da4290773ca0fdb159171e6ddb9211967a55dd7fa819bc79c",
     "src/type_queries.h": "521a808993a7f286dfdd79aa9494979ab334731984305aefe82cf112c91a900c",
     "src/typecheck.h": "3d02a68d9cbda41640e9b108a18cb001970d31139f133d0dd10e145ec078ffa3",
